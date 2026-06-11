@@ -66,12 +66,6 @@ export interface Experiment {
 
 export const EXPERIMENTS: Experiment[] = [
     {
-        id: "hero-headline",
-        variants: ["control", "benefit", "action"],
-        weights: [34, 33, 33],
-        expires: "2026-08-01",
-    },
-    {
         id: "navigation-structure",
         variants: ["control", "flat-nav"],
         weights: [50, 50],

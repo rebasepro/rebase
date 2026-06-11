@@ -11,6 +11,7 @@ import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo';
 import RoadmapSection from '../../components/RoadmapSection.astro';
 import ABVariant from '../../components/ABVariant.astro';
+import AlternativesComparison from '../AlternativesComparison.astro';
 
 import ClientLogos from '../../components/ClientLogos.astro';
 
@@ -44,21 +45,9 @@ const translatePath = useTranslatedPath(lang);
                 <!-- Headline -->
                 <div class="relative">
                     <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 112, 244, 0.10) 0%, rgba(0, 80, 200, 0.05) 45%, transparent 75%); filter: blur(20px);"></div>
-                    <ABVariant experiment="hero-headline" variant="control">
-                        <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
-                            {t('hero.title.part1')}<br/><span class="text-primary subtle-shimmer">{t('hero.title.part2')}</span>
-                        </h1>
-                    </ABVariant>
-                    <ABVariant experiment="hero-headline" variant="benefit">
-                        <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
-                            One TypeScript Schema.<br/><span class="text-primary subtle-shimmer">Your Entire Backend.</span>
-                        </h1>
-                    </ABVariant>
-                    <ABVariant experiment="hero-headline" variant="action">
-                        <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
-                            Stop Building Plumbing.<br/><span class="text-primary subtle-shimmer">Start Shipping Product.</span>
-                        </h1>
-                    </ABVariant>
+                    <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                        {t('hero.title.part1')}<br/><span class="text-primary subtle-shimmer">{t('hero.title.part2')}</span>
+                    </h1>
                 </div>
                 <p class="mb-4 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up" set:html={t('hero.subtitle')} />
                 <p class="mb-8 text-sm font-medium text-surface-500 tracking-wide animate-on-scroll fade-in-up">{t('hero.category')}</p>
@@ -286,34 +275,11 @@ const translatePath = useTranslatedPath(lang);
                 <p class="mt-2 text-center text-xs sm:text-sm text-surface-500">
                     A quick tour of the generated Rebase admin panel.
                 </p>
-                <div class="mt-6 flex items-center justify-center gap-2 text-xs text-surface-500 font-medium">
-                    <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                    <span>Alternative to</span>
-                    <div class="flex items-center gap-3.5">
-                        <span class="flex items-center gap-1 text-surface-400 hover:text-rose-400 transition-colors">
-                            <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                <path d="M11.992 1.966c-.434 0-.87.086-1.28.257L1.779 5.917c-.503.208-.49.908.012 1.116l8.982 3.558a3.266 3.266 0 0 0 2.454 0l8.982-3.558c.503-.196.503-.908.012-1.116l-8.957-3.694a3.255 3.255 0 0 0-1.272-.257zM23.4 8.056a.589.589 0 0 0-.222.045l-10.012 3.877a.612.612 0 0 0-.38.564v8.896a.6.6 0 0 0 .821.552L23.62 18.1a.583.583 0 0 0 .38-.551V8.653a.6.6 0 0 0-.6-.596zM.676 8.095a.644.644 0 0 0-.48.19C.086 8.396 0 8.53 0 8.69v8.355c0 .442.515.737.908.54l6.27-3.006.307-.147 2.969-1.436c.466-.22.43-.908-.061-1.092L.883 8.138a.57.57 0 0 0-.207-.044z"/>
-                            </svg>
-                            Airtable
-                        </span>
-                        <a href={translatePath("/rebase-vs-retool")} class="flex items-center gap-1 text-surface-400 hover:text-violet-500 transition-colors">
-                            <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                <path d="M0 2.2A2.2 2.2 0 0 1 2.2 0h8.6A2.2 2.2 0 0 1 13 2.2v1.7A1.1 1.1 0 0 1 11.9 5H1.1A1.1 1.1 0 0 1 0 3.9V2.2zm0 6.9A1.1 1.1 0 0 1 1.1 8h20.7a2.2 2.2 0 0 1 2.2 2.2v5.7a1.1 1.1 0 0 1-1.1 1.1H2.2A2.2 2.2 0 0 1 0 14.8V9.1zm11 12a1.1 1.1 0 0 1 1.1-1.1h10.8a1.1 1.1 0 0 1 1.1 1.1v.7a2.2 2.2 0 0 1-2.2 2.2h-8.6a2.2 2.2 0 0 1-2.2-2.2v-.7z"/>
-                            </svg>
-                            Retool
-                        </a>
-                        <a href={translatePath("/rebase-vs-directus")} class="flex items-center gap-1 text-surface-400 hover:text-blue-400 transition-colors">
-                            <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                <path d="M19.187 13.909a1.74 1.74 0 0 1-.286-.092.657.657 0 0 1-.203-.139c.056-.488 0-.912.047-1.392.184-1.862 1.355-1.272 2.406-1.577.655-.184 1.31-.562 1.475-1.336a13.528 13.528 0 0 0-2.397-2.204c-2.85-2.028-6.574-2.84-9.958-2.277a5.113 5.113 0 0 0 2.238 2.074s-.917 0-1.703-.587c-.23.092-.692.274-.913.384a5.094 5.094 0 0 0 6.63.37c-.01.017-.185.285-.397 1.4-.47 2.38-1.826 2.195-3.504 1.596-3.485-1.264-5.403-.093-7.145-2.49-.507.286-.82.82-.82 1.402 0 .599.331 1.106.81 1.383.262-.348.38-.446.836-.446-.706.4-.79.75-1.094 1.718-.368 1.171-.212 2.37-1.936 2.683-.913.046-.894.664-1.226 1.586-.415 1.199-.968 1.678-2.047 2.812.443.535.904.6 1.374.406.968-.406 1.715-1.66 2.415-2.471.784-.904 2.665-.517 4.085-1.402.977-.599 1.457-1.41.811-2.784a2.72 2.72 0 0 1 .701 1.66c1.641-.213 3.836 1.788 5.836 2.12a3.574 3.574 0 0 1-.488-.82c-.23-.554-.304-1.06-.258-1.503.184 1.097 1.29 2.507 3.07 2.637.452.036.95-.019 1.466-.176.618-.184 1.19-.424 1.872-.295.507.093.977.35 1.272.784.443.645 1.41.784 1.844-.009-.977-2.554-3.67-2.72-4.813-3.015z"/>
-                            </svg>
-                            Directus
-                        </a>
-                    </div>
-                </div>
             </div>
         </section>
+
+        <!-- Alternatives Comparison Block -->
+        <AlternativesComparison />
 
         <!-- How it works -->
         <section id="s-how-it-works" class="relative py-28 sm:py-36 overflow-hidden bg-black">
@@ -485,33 +451,6 @@ const translatePath = useTranslatedPath(lang);
                     </div>
                 </div>
 
-                <div class="mt-16 flex items-center justify-center gap-2 text-xs text-surface-500 font-medium animate-on-scroll fade-in-up delay-100">
-                    <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                    <span>Alternative to</span>
-                    <div class="flex items-center gap-3.5">
-                        <a href={translatePath("/rebase-vs-supabase")} class="flex items-center gap-1 text-surface-400 hover:text-emerald-400 transition-colors">
-                            <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z"/>
-                            </svg>
-                            Supabase
-                        </a>
-                        <a href={translatePath("/rebase-vs-firebase")} class="flex items-center gap-1 text-surface-400 hover:text-amber-500 transition-colors">
-                            <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                <path d="M19.455 8.369c-.538-.748-1.778-2.285-3.681-4.569-.826-.991-1.535-1.832-1.884-2.245a146 146 0 0 0-.488-.576l-.207-.245-.113-.133-.022-.032-.01-.005L12.57 0l-.609.488c-1.555 1.246-2.828 2.851-3.681 4.64-.523 1.064-.864 2.105-1.043 3.176-.047.241-.088.489-.121.738-.209-.017-.421-.028-.632-.033-.018-.001-.035-.002-.059-.003a7.46 7.46 0 0 0-2.28.274l-.317.089-.163.286c-.765 1.342-1.198 2.869-1.252 4.416-.07 2.01.477 3.954 1.583 5.625 1.082 1.633 2.61 2.882 4.42 3.611l.236.095.071.025.003-.001a9.59 9.59 0 0 0 2.941.568q.171.006.342.006c1.273 0 2.513-.249 3.69-.742l.008.004.313-.145a9.63 9.63 0 0 0 3.927-3.335c1.01-1.49 1.577-3.234 1.641-5.042.075-2.161-.643-4.304-2.133-6.371m-7.083 6.695c.328 1.244.264 2.44-.191 3.558-1.135-1.12-1.967-2.352-2.475-3.665-.543-1.404-.87-2.74-.974-3.975.48.157.922.366 1.315.622 1.132.737 1.914 1.902 2.325 3.461zm.207 6.022c.482.368.99.712 1.513 1.028-.771.21-1.565.302-2.369.273a8 8 0 0 1-.373-.022c.458-.394.869-.823 1.228-1.279zm1.347-6.431c-.516-1.957-1.527-3.437-3.002-4.398-.647-.421-1.385-.741-2.194-.95.011-.134.026-.268.043-.4.014-.113.03-.216.046-.313.133-.689.332-1.37.589-2.025.099-.25.206-.499.321-.74l.004-.008c.177-.358.376-.719.61-1.105l.092-.152-.003-.001c.544-.851 1.197-1.627 1.942-2.311l.288.341c.672.796 1.304 1.548 1.878 2.237 1.291 1.549 2.966 3.583 3.612 4.48 1.277 1.771 1.893 3.579 1.83 5.375-.049 1.395-.461 2.755-1.195 3.933-.694 1.116-1.661 2.05-2.8 2.708-.636-.318-1.559-.839-2.539-1.599.79-1.575.952-3.28.479-5.072zm-2.575 5.397c-.725.939-1.587 1.55-2.09 1.856-.081-.029-.163-.06-.243-.093l-.065-.026c-1.49-.616-2.747-1.656-3.635-3.01-.907-1.384-1.356-2.993-1.298-4.653.041-1.19.338-2.327.882-3.379.316-.07.638-.114.96-.131l.084-.002c.162-.003.324-.003.478 0 .227.011.454.035.677.07.073 1.513.445 3.145 1.105 4.852.637 1.644 1.694 3.162 3.144 4.515z"/>
-                            </svg>
-                            Firebase
-                        </a>
-                        <a href={translatePath("/rebase-vs-hasura")} class="flex items-center gap-1 text-surface-400 hover:text-indigo-400 transition-colors">
-                            <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                <path d="M23.558 8.172c.707-2.152.282-6.447-1.09-8.032a.419.419 0 0 0-.664.051l-1.69 2.59a1.322 1.322 0 0 1-1.737.276C16.544 1.885 14.354 1.204 12 1.204s-4.544.68-6.378 1.853a1.326 1.326 0 0 1-1.736-.276L2.196.191A.42.42 0 0 0 1.532.14C.16 1.728-.265 6.023.442 8.172c.236.716.3 1.472.16 2.207-.137.73-.276 1.61-.276 2.223C.326 18.898 5.553 24 11.997 24c6.447 0 11.671-5.105 11.671-11.398 0-.613-.138-1.494-.276-2.223a4.468 4.468 0 0 1 .166-2.207zm-11.56 13.284c-4.984 0-9.036-3.96-9.036-8.827 0-.16.005-.316.014-.473.18-3.316 2.243-6.15 5.16-7.5 1.17-.546 2.481-.848 3.864-.848s2.69.302 3.864.85c2.917 1.351 4.98 4.187 5.16 7.501.008.157.014.316.014.473-.003 4.864-4.057 8.824-9.04 8.824zm3.915-5.43-2.31-3.91-1.98-3.26a.26.26 0 0 0-.223-.125H9.508a.26.26 0 0 0-.227.13.246.246 0 0 0 .003.254l1.895 3.109-2.542 3.787a.25.25 0 0 0-.011.259.26.26 0 0 0 .23.132h1.905a.259.259 0 0 0 .218-.116l1.375-2.096 1.233 2.088a.263.263 0 0 0 .224.127h1.878c.094 0 .18-.049.224-.127a.241.241 0 0 0 0-.251z"/>
-                            </svg>
-                            Hasura
-                        </a>
-                    </div>
-                </div>
-
             </div>
         </section>
 
@@ -555,18 +494,7 @@ const translatePath = useTranslatedPath(lang);
                                 </div>
                                 <p class="text-surface-400 text-sm leading-relaxed">{t('features.sdk.desc')}</p>
                             </div>
-                            <div class="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-surface-500 font-medium">
-                                <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span>Alternative to</span>
-                                <a href={translatePath("/rebase-vs-firebase")} class="text-surface-400 hover:text-amber-500 transition-colors flex items-center gap-1">
-                                    <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                        <path d="M19.455 8.369c-.538-.748-1.778-2.285-3.681-4.569-.826-.991-1.535-1.832-1.884-2.245a146 146 0 0 0-.488-.576l-.207-.245-.113-.133-.022-.032-.01-.005L12.57 0l-.609.488c-1.555 1.246-2.828 2.851-3.681 4.64-.523 1.064-.864 2.105-1.043 3.176-.047.241-.088.489-.121.738-.209-.017-.421-.028-.632-.033-.018-.001-.035-.002-.059-.003a7.46 7.46 0 0 0-2.28.274l-.317.089-.163.286c-.765 1.342-1.198 2.869-1.252 4.416-.07 2.01.477 3.954 1.583 5.625 1.082 1.633 2.61 2.882 4.42 3.611l.236.095.071.025.003-.001a9.59 9.59 0 0 0 2.941.568q.171.006.342.006c1.273 0 2.513-.249 3.69-.742l.008.004.313-.145a9.63 9.63 0 0 0 3.927-3.335c1.01-1.49 1.577-3.234 1.641-5.042.075-2.161-.643-4.304-2.133-6.371m-7.083 6.695c.328 1.244.264 2.44-.191 3.558-1.135-1.12-1.967-2.352-2.475-3.665-.543-1.404-.87-2.74-.974-3.975.48.157.922.366 1.315.622 1.132.737 1.914 1.902 2.325 3.461zm.207 6.022c.482.368.99.712 1.513 1.028-.771.21-1.565.302-2.369.273a8 8 0 0 1-.373-.022c.458-.394.869-.823 1.228-1.279zm1.347-6.431c-.516-1.957-1.527-3.437-3.002-4.398-.647-.421-1.385-.741-2.194-.95.011-.134.026-.268.043-.4.014-.113.03-.216.046-.313.133-.689.332-1.37.589-2.025.099-.25.206-.499.321-.74l.004-.008c.177-.358.376-.719.61-1.105l.092-.152-.003-.001c.544-.851 1.197-1.627 1.942-2.311l.288.341c.672.796 1.304 1.548 1.878 2.237 1.291 1.549 2.966 3.583 3.612 4.48 1.277 1.771 1.893 3.579 1.83 5.375-.049 1.395-.461 2.755-1.195 3.933-.694 1.116-1.661 2.05-2.8 2.708-.636-.318-1.559-.839-2.539-1.599.79-1.575.952-3.28.479-5.072zm-2.575 5.397c-.725.939-1.587 1.55-2.09 1.856-.081-.029-.163-.06-.243-.093l-.065-.026c-1.49-.616-2.747-1.656-3.635-3.01-.907-1.384-1.356-2.993-1.298-4.653.041-1.19.338-2.327.882-3.379.316-.07.638-.114.96-.131l.084-.002c.162-.003.324-.003.478 0 .227.011.454.035.677.07.073 1.513.445 3.145 1.105 4.852.637 1.644 1.694 3.162 3.144 4.515z"/>
-                                    </svg>
-                                    Firebase SDK
-                                </a>
-                            </div>
+
                         </div>
                     </div>
 
@@ -721,26 +649,7 @@ const translatePath = useTranslatedPath(lang);
                                 </div>
                                 <p class="text-surface-400 text-sm leading-relaxed">{t('features.api.desc')}</p>
                             </div>
-                            <div class="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-surface-500 font-medium">
-                                <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span>Alternative to</span>
-                                <div class="flex items-center gap-3">
-                                    <a href={translatePath("/rebase-vs-supabase")} class="text-surface-400 hover:text-emerald-400 transition-colors flex items-center gap-1">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z"/>
-                                        </svg>
-                                        Supabase
-                                    </a>
-                                    <a href={translatePath("/rebase-vs-hasura")} class="text-surface-400 hover:text-indigo-400 transition-colors flex items-center gap-1">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M23.558 8.172c.707-2.152.282-6.447-1.09-8.032a.419.419 0 0 0-.664.051l-1.69 2.59a1.322 1.322 0 0 1-1.737.276C16.544 1.885 14.354 1.204 12 1.204s-4.544.68-6.378 1.853a1.326 1.326 0 0 1-1.736-.276L2.196.191A.42.42 0 0 0 1.532.14C.16 1.728-.265 6.023.442 8.172c.236.716.3 1.472.16 2.207-.137.73-.276 1.61-.276 2.223C.326 18.898 5.553 24 11.997 24c6.447 0 11.671-5.105 11.671-11.398 0-.613-.138-1.494-.276-2.223a4.468 4.468 0 0 1 .166-2.207zm-11.56 13.284c-4.984 0-9.036-3.96-9.036-8.827 0-.16.005-.316.014-.473.18-3.316 2.243-6.15 5.16-7.5 1.17-.546 2.481-.848 3.864-.848s2.69.302 3.864.85c2.917 1.351 4.98 4.187 5.16 7.501.008.157.014.316.014.473-.003 4.864-4.057 8.824-9.04 8.824zm3.915-5.43-2.31-3.91-1.98-3.26a.26.26 0 0 0-.223-.125H9.508a.26.26 0 0 0-.227.13.246.246 0 0 0 .003.254l1.895 3.109-2.542 3.787a.25.25 0 0 0-.011.259.26.26 0 0 0 .23.132h1.905a.259.259 0 0 0 .218-.116l1.375-2.096 1.233 2.088a.263.263 0 0 0 .224.127h1.878c.094 0 .18-.049.224-.127a.241.241 0 0 0 0-.251z"/>
-                                        </svg>
-                                        Hasura
-                                    </a>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
 
@@ -769,26 +678,7 @@ const translatePath = useTranslatedPath(lang);
                                 </span>
                             </div>
                             <p class="text-surface-400 text-sm leading-relaxed">{t('features.customization.desc')}</p>
-                            <div class="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-surface-500 font-medium">
-                                <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span>Alternative to</span>
-                                <div class="flex items-center gap-3">
-                                    <a href={translatePath("/rebase-vs-retool")} class="flex items-center gap-1 text-surface-400 hover:text-violet-500 transition-colors">
-                                        <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M0 2.2A2.2 2.2 0 0 1 2.2 0h8.6A2.2 2.2 0 0 1 13 2.2v1.7A1.1 1.1 0 0 1 11.9 5H1.1A1.1 1.1 0 0 1 0 3.9V2.2zm0 6.9A1.1 1.1 0 0 1 1.1 8h20.7a2.2 2.2 0 0 1 2.2 2.2v5.7a1.1 1.1 0 0 1-1.1 1.1H2.2A2.2 2.2 0 0 1 0 14.8V9.1zm11 12a1.1 1.1 0 0 1 1.1-1.1h10.8a1.1 1.1 0 0 1 1.1 1.1v.7a2.2 2.2 0 0 1-2.2 2.2h-8.6a2.2 2.2 0 0 1-2.2-2.2v-.7z"/>
-                                        </svg>
-                                        Retool Custom Views
-                                    </a>
-                                    <a href={translatePath("/rebase-vs-directus")} class="flex items-center gap-1 text-surface-400 hover:text-blue-400 transition-colors">
-                                        <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M19.187 13.909a1.74 1.74 0 0 1-.286-.092.657.657 0 0 1-.203-.139c.056-.488 0-.912.047-1.392.184-1.862 1.355-1.272 2.406-1.577.655-.184 1.31-.562 1.475-1.336a13.528 13.528 0 0 0-2.397-2.204c-2.85-2.028-6.574-2.84-9.958-2.277a5.113 5.113 0 0 0 2.238 2.074s-.917 0-1.703-.587c-.23.092-.692.274-.913.384a5.094 5.094 0 0 0 6.63.37c-.01.017-.185.285-.397 1.4-.47 2.38-1.826 2.195-3.504 1.596-3.485-1.264-5.403-.093-7.145-2.49-.507.286-.82.82-.82 1.402 0 .599.331 1.106.81 1.383.262-.348.38-.446.836-.446-.706.4-.79.75-1.094 1.718-.368 1.171-.212 2.37-1.936 2.683-.913.046-.894.664-1.226 1.586-.415 1.199-.968 1.678-2.047 2.812.443.535.904.6 1.374.406.968-.406 1.715-1.66 2.415-2.471.784-.904 2.665-.517 4.085-1.402.977-.599 1.457-1.41.811-2.784a2.72 2.72 0 0 1 .701 1.66c1.641-.213 3.836 1.788 5.836 2.12a3.574 3.574 0 0 1-.488-.82c-.23-.554-.304-1.06-.258-1.503.184 1.097 1.29 2.507 3.07 2.637.452.036.95-.019 1.466-.176.618-.184 1.19-.424 1.872-.295.507.093.977.35 1.272.784.443.645 1.41.784 1.844-.009-.977-2.554-3.67-2.72-4.813-3.015z"/>
-                                        </svg>
-                                        Directus Panels
-                                    </a>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
 
@@ -836,33 +726,7 @@ const translatePath = useTranslatedPath(lang);
                                 </span>
                             </div>
                             <p class="text-surface-400 text-sm leading-relaxed">{t('features.realtime.desc')}</p>
-                            <div class="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-surface-500 font-medium">
-                                <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span>Alternative to</span>
-                                <div class="flex items-center gap-3">
-                                    <span class="flex items-center gap-1 text-surface-400 hover:text-orange-500 transition-colors">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 64 64">
-                                            <path d="M 27.1,18.6 C 14.6,18.6 4.4,28.8 4.4,41.3 4.4,53.8 14.6,64 27.1,64 39.6,64 49.8,53.8 49.8,41.3 49.8,28.8 39.7,18.6 27.1,18.6 Z m 0,32.8 C 21.5,51.4 17,46.9 17,41.3 c 0,-5.6 4.5,-10.1 10.1,-10.1 5.6,0 10.1,4.5 10.1,10.1 0,5.6 -4.5,10.1 -10.1,10.1 z" fill="currentColor"/>
-                                            <path d="M 18.3,16.9 C 18,17 17.7,17 17.4,17.1 c -1,0 -1.9,-0.6 -2.3,-1.5 l -4,-8.7 V 7 C 10.9,6.7 10.8,6.3 10.8,5.9 10.8,4.9 11.4,4.1 12.2,3.6 16.8,1.2 21.9,0 27.1,0 45,0 59.6,14.5 59.6,32.5 59.6,42 55.5,50.6 48.9,56.6 v 0 c -0.1,0.1 -0.1,0.1 -0.2,0.1 -0.2,0 -0.3,-0.1 -0.3,-0.3 0,-0.1 0,-0.2 0.1,-0.2 3,-4.3 4.6,-9.5 4.6,-14.8 0,-14.3 -11.6,-26 -26,-26 -3,-0.1 -6,0.5 -8.8,1.5" fill="currentColor"/>
-                                        </svg>
-                                        Ably
-                                    </span>
-                                    <span class="flex items-center gap-1 text-surface-400 hover:text-surface-300 transition-colors">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M12 23.966v-6.0166a.0348.0348 0 01.0182-.031l7.7319-4.4645a.0348.0348 0 00.0181-.031v-1.711a.0356.0356 0 00-.0537-.031l-7.6608 4.423a.0356.0356 0 01-.0537-.031v-1.7117a.0356.0356 0 01.0181-.031l7.732-4.4645a.037.037 0 00.0181-.031v-1.711a.0363.0363 0 00-.0537-.031l-7.6608 4.4229a.0356.0356 0 01-.0537-.031v-1.711a.0348.0348 0 01.0181-.031l7.732-4.4622a.0356.0356 0 00.0181-.031V4.515a.0757.0757 0 00-.0356-.062L12.0356.0096a.0704.0704 0 00-.0712 0L10.5002.855a.0356.0356 0 000 .062L18.161 5.34a.0363.0363 0 010 .062l-1.4642.8452a.0757.0757 0 01-.0719 0L8.9286 1.8038a.0757.0757 0 00-.0757 0l-1.4597.8445a.0356.0356 0 000 .062l7.6593 4.4236a.0356.0356 0 010 .0621l-1.4634.8452a.0757.0757 0 01-.0757 0l-7.6926-4.444a.0757.0757 0 00-.0756 0l-1.5134.8762v15.0492a.0348.0348 0 00.0181.031l1.4816.8558a.0356.0356 0 00.0538-.031V5.433a.0356.0356 0 01.0537-.031l1.4824.8558a.0356.0356 0 01.0174.031v15.028a.0356.0356 0 00.0181.031l1.4816.8559a.0363.0363 0 00.0545-.0318V7.227a.0356.0356 0 01.0537-.031l1.4817.855a.0356.0356 0 01.0181.0311v15.0288a.037.037 0 00.0174.031l1.4862.855A.0356.0356 0 0012 23.966z"/>
-                                        </svg>
-                                        Pusher
-                                    </span>
-                                    <span class="flex items-center gap-1 text-surface-400 hover:text-surface-300 transition-colors">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M11.9362.0137a12.1694 12.1694 0 0 0-2.9748.378C4.2816 1.5547.5678 5.7944.0918 10.6012c-.59 4.5488 1.7079 9.2856 5.6437 11.6345 3.8608 2.4179 9.0926 2.3199 12.8734-.223 3.3969-2.206 5.5118-6.2277 5.3858-10.2845-.058-4.0159-2.31-7.9167-5.7588-9.9796C16.354.5876 14.1431.0047 11.9362.0137zm-.063 1.696c4.9448-.007 9.7886 3.8137 10.2815 8.9245.945 5.6597-3.7528 11.4125-9.4875 11.5795-5.4538.544-10.7245-4.0798-10.8795-9.5566-.407-4.4338 2.5159-8.8346 6.6977-10.2995a9.1126 9.1126 0 0 1 3.3878-.647zm5.0908 3.2248c-2.6869 2.0849-5.2598 4.3078-7.8886 6.4567 1.2029.017 2.4118.016 3.6208.01 1.41-2.165 2.8589-4.3008 4.2678-6.4667zm-5.6647 7.6536c-1.41 2.166-2.86 4.3088-4.2699 6.4737 2.693-2.0799 5.2548-4.3198 7.9017-6.4557a255.4132 255.4132 0 0 0-3.6318-.018z"/>
-                                        </svg>
-                                        Socket.io
-                                    </span>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -889,26 +753,6 @@ const translatePath = useTranslatedPath(lang);
                     <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
                         {t('ai.subtitle')}
                     </p>
-                    <div class="mt-6 flex items-center justify-center gap-2 text-xs text-surface-500 font-medium">
-                        <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        <span>Alternative to</span>
-                        <div class="flex items-center gap-3">
-                            <a href={translatePath("/rebase-vs-firebase")} class="flex items-center gap-1 text-surface-400 hover:text-amber-500 transition-colors">
-                                <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                    <path d="M19.455 8.369c-.538-.748-1.778-2.285-3.681-4.569-.826-.991-1.535-1.832-1.884-2.245a146 146 0 0 0-.488-.576l-.207-.245-.113-.133-.022-.032-.01-.005L12.57 0l-.609.488c-1.555 1.246-2.828 2.851-3.681 4.64-.523 1.064-.864 2.105-1.043 3.176-.047.241-.088.489-.121.738-.209-.017-.421-.028-.632-.033-.018-.001-.035-.002-.059-.003a7.46 7.46 0 0 0-2.28.274l-.317.089-.163.286c-.765 1.342-1.198 2.869-1.252 4.416-.07 2.01.477 3.954 1.583 5.625 1.082 1.633 2.61 2.882 4.42 3.611l.236.095.071.025.003-.001a9.59 9.59 0 0 0 2.941.568q.171.006.342.006c1.273 0 2.513-.249 3.69-.742l.008.004.313-.145a9.63 9.63 0 0 0 3.927-3.335c1.01-1.49 1.577-3.234 1.641-5.042.075-2.161-.643-4.304-2.133-6.371m-7.083 6.695c.328 1.244.264 2.44-.191 3.558-1.135-1.12-1.967-2.352-2.475-3.665-.543-1.404-.87-2.74-.974-3.975.48.157.922.366 1.315.622 1.132.737 1.914 1.902 2.325 3.461zm.207 6.022c.482.368.99.712 1.513 1.028-.771.21-1.565.302-2.369.273a8 8 0 0 1-.373-.022c.458-.394.869-.823 1.228-1.279zm1.347-6.431c-.516-1.957-1.527-3.437-3.002-4.398-.647-.421-1.385-.741-2.194-.95.011-.134.026-.268.043-.4.014-.113.03-.216.046-.313.133-.689.332-1.37.589-2.025.099-.25.206-.499.321-.74l.004-.008c.177-.358.376-.719.61-1.105l.092-.152-.003-.001c.544-.851 1.197-1.627 1.942-2.311l.288.341c.672.796 1.304 1.548 1.878 2.237 1.291 1.549 2.966 3.583 3.612 4.48 1.277 1.771 1.893 3.579 1.83 5.375-.049 1.395-.461 2.755-1.195 3.933-.694 1.116-1.661 2.05-2.8 2.708-.636-.318-1.559-.839-2.539-1.599.79-1.575.952-3.28.479-5.072zm-2.575 5.397c-.725.939-1.587 1.55-2.09 1.856-.081-.029-.163-.06-.243-.093l-.065-.026c-1.49-.616-2.747-1.656-3.635-3.01-.907-1.384-1.356-2.993-1.298-4.653.041-1.19.338-2.327.882-3.379.316-.07.638-.114.96-.131l.084-.002c.162-.003.324-.003.478 0 .227.011.454.035.677.07.073 1.513.445 3.145 1.105 4.852.637 1.644 1.694 3.162 3.144 4.515z"/>
-                                </svg>
-                                Firebase Genkit
-                            </a>
-                            <span class="flex items-center gap-1 text-surface-400 hover:text-teal-500 transition-colors">
-                                <svg class="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24">
-                                    <path d="M13.796 0a6.93 6.93 0 0 0-4.91 2.019L5.451 5.455l3.273 3.27 3.432-3.432a2.284 2.284 0 0 1 3.277 0 2.28 2.28 0 0 1 0 3.275L12 12.001l3.273 3.273 3.433-3.435c2.692-2.692 2.692-7.127 0-9.82A6.92 6.92 0 0 0 13.796 0m-5.07 8.728-3.433 3.434c-2.692 2.693-2.692 7.126 0 9.819A6.92 6.92 0 0 0 10.203 24a6.93 6.93 0 0 0 4.911-2.02l3.432-3.432-3.271-3.272-3.433 3.433a2.284 2.284 0 0 1-3.277 0 2.28 2.28 0 0 1 0-3.276L12 12z"/>
-                                </svg>
-                                LangChain Pipelines
-                            </span>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Agent Infrastructure Feature Grid -->
@@ -1446,32 +1290,7 @@ const translatePath = useTranslatedPath(lang);
                             <p class="text-lg text-surface-400 leading-relaxed">
                                 {t('security.desc')}
                             </p>
-                            <div class="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-surface-500 font-medium">
-                                <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span>Alternative to</span>
-                                <div class="flex items-center gap-3">
-                                    <span class="flex items-center gap-1 text-surface-400 hover:text-orange-500 transition-colors">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.312.03 9.206 3.815 12.015L12.007 24l6.157-4.552c3.755-2.81 5.182-7.688 3.815-12.015l-6.16 4.58 2.343 7.45-6.157-4.597-6.158 4.58 2.358-7.433-6.188-4.55 7.63-.045L12.008 0l2.356 7.404 7.615.044z"/>
-                                        </svg>
-                                        Auth0
-                                    </span>
-                                    <span class="flex items-center gap-1 text-surface-400 hover:text-violet-500 transition-colors">
-                                        <svg class="h-3.5 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="m21.47 20.829-2.881-2.881a.572.572 0 0 0-.7-.084 6.854 6.854 0 0 1-7.081 0 .576.576 0 0 0-.7.084l-2.881 2.881a.576.576 0 0 0-.103.69.57.57 0 0 0 .166.186 12 12 0 0 0 14.113 0 .58.58 0 0 0 .239-.423.576.576 0 0 0-.172-.453Zm.002-17.668-2.88 2.88a.569.569 0 0 1-.701.084A6.857 6.857 0 0 0 8.724 8.08a6.862 6.862 0 0 0-1.222 3.692 6.86 6.86 0 0 0 .978 3.764.573.573 0 0 1-.083.699l-2.881 2.88a.567.567 0 0 1-.864-.063A11.993 11.993 0 0 1 6.771 2.7a11.99 11.99 0 0 1 14.637-.405.566.566 0 0 1 .232.418.57.57 0 0 1-.168.448Zm-7.118 12.261a3.427 3.427 0 1 0 0-6.854 3.427 3.427 0 0 0 0 6.854Z"/>
-                                        </svg>
-                                        Clerk
-                                    </span>
-                                    <a href={translatePath("/rebase-vs-supabase")} class="flex items-center gap-1 text-surface-400 hover:text-emerald-400 transition-colors">
-                                        <svg class="h-3 w-auto fill-current" viewBox="0 0 24 24">
-                                            <path d="M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z"/>
-                                        </svg>
-                                        Supabase RLS
-                                    </a>
-                                </div>
-                            </div>
+
                         </div>
                         <div class="relative z-10 mt-8">
                             <a href={translatePath("/studio")}
@@ -1530,26 +1349,7 @@ const translatePath = useTranslatedPath(lang);
                             <p class="text-lg text-surface-400 leading-relaxed">
                                 {t('opensource.desc')}
                             </p>
-                            <div class="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-surface-500 font-medium">
-                                <svg class="h-3.5 w-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                </svg>
-                                <span>Alternative to</span>
-                                <div class="flex items-center gap-3">
-                                    <span class="flex items-center gap-1 text-surface-400">
-                                        <svg class="h-3.5 w-3.5 fill-none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                        </svg>
-                                        Vendor lock-in
-                                    </span>
-                                    <span class="flex items-center gap-1 text-surface-400">
-                                        <svg class="h-3.5 w-3.5 fill-none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                        Per-seat developer fees
-                                    </span>
-                                </div>
-                            </div>
+
                         </div>
                         <div class="relative z-10 mt-8 flex items-center gap-6">
                             <a href={translatePath("/developers")}

@@ -4,7 +4,8 @@ import React, { useCallback } from "react";
 import {
     useAuthController,
     useCustomizationController,
-    useData
+    useData,
+    useTranslation
 } from "@rebasepro/core";
 import { useCMSContext } from "../../hooks";
 import { CollectionActionsProps, Entity, EntityCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
@@ -42,6 +43,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
 }) {
+
+    const { t } = useTranslation();
 
     const exportConfig = typeof collection.exportable === "object" ? collection.exportable : undefined;
 
@@ -184,17 +187,16 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             onOpenChange={setOpen}
             maxWidth={"xl"}>
 
-            <DialogTitle variant={"h6"}>Export data</DialogTitle>
+            <DialogTitle variant={"h6"}>{t("export_data")}</DialogTitle>
 
             <DialogContent className={"flex flex-col gap-4 my-4"}>
 
-                <div>DownloadIcon the the content of this table as a CSV</div>
+                <div>{t("download_table_csv")}</div>
 
                 {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT &&
                     <Alert color={"warning"}>
                         <div>
-                            This collections has a large number
-                            of documents ({collectionEntitiesCount}).
+                            {t("large_number_of_documents", { count: collectionEntitiesCount.toString() })}
                         </div>
                     </Alert>}
 
@@ -203,11 +205,11 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                         <RadioGroup value={exportType} onValueChange={(v) => setExportType(v as "csv" | "json")}>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="csv" id="radio-csv"/>
-                                <Label htmlFor="radio-csv">CSV</Label>
+                                <Label htmlFor="radio-csv">{t("csv")}</Label>
                             </div>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="json" id="radio-json"/>
-                                <Label htmlFor="radio-json">JSON</Label>
+                                <Label htmlFor="radio-json">{t("json")}</Label>
                             </div>
                         </RadioGroup>
                     </div>
@@ -216,11 +218,11 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                         <RadioGroup value={dateExportType} onValueChange={(v) => setDateExportType(v as "timestamp" | "string")}>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="timestamp" id="radio-timestamp"/>
-                                <Label htmlFor="radio-timestamp">Dates as timestamps ({dateRef.current.getTime()})</Label>
+                                <Label htmlFor="radio-timestamp">{t("dates_as_timestamps")} ({dateRef.current.getTime()})</Label>
                             </div>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="string" id="radio-string"/>
-                                <Label htmlFor="radio-string">Dates as strings ({dateRef.current.toISOString()})</Label>
+                                <Label htmlFor="radio-string">{t("dates_as_strings")} ({dateRef.current.toISOString()})</Label>
                             </div>
                         </RadioGroup>
                     </div>
@@ -231,13 +233,13 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                     disabled={exportType !== "csv"}
                     value={flattenArrays}
                     onValueChange={setFlattenArrays}
-                    label={"Flatten arrays"}/>
+                    label={t("flatten_arrays")}/>
 
                 <BooleanSwitchWithLabel
                     size={"small"}
                     value={includeUndefinedValues}
                     onValueChange={setIncludeUndefinedValues}
-                    label={"Include undefined values"}/>
+                    label={t("include_undefined_values")}/>
 
                 {!canExport && notAllowedView}
 
@@ -249,12 +251,12 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 <Button onClick={handleClose}
                     variant={"text"}>
-                    Cancel
+                    {t("cancel")}
                 </Button>
 
                 <Button onClick={onOkClicked}
                     disabled={dataLoading || !canExport}>
-                    DownloadIcon
+                    {t("download")}
                 </Button>
 
             </DialogActions>

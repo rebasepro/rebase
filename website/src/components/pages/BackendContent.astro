@@ -2,10 +2,8 @@
 const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
-
-
-
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import HeroConnectionWidget from '../demos/HeroConnectionWidget';
 
 
 
@@ -66,6 +64,9 @@ const drizzleCode = `<span class="text-surface-500">// Your collection definitio
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
           Define your collections in TypeScript. Get a production-ready API server with REST, GraphQL, WebSocket realtime, JWT auth, and auto-generated OpenAPI docs.
         </p>
+        <div class="mt-4 max-w-xl mx-auto">
+          <HeroConnectionWidget client:load />
+        </div>
       </div>
     </section>
 

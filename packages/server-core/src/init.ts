@@ -122,6 +122,7 @@ export interface RebaseAuthConfig {
      * ```
      */
     hooks?: AuthHooks;
+
     [key: string]: unknown;
 }
 
@@ -271,11 +272,13 @@ export interface RebaseBackendInstance {
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
     cronScheduler?: import("./cron").CronScheduler;
+
     /**
      * Deep health check that verifies database connectivity.
      * Returns latency and component status.
      */
     healthCheck(): Promise<HealthCheckResult>;
+
     /**
      * Graceful shutdown helper for the BaaS instance.
      * Stops the cron scheduler and closes the HTTP server, allowing
@@ -341,8 +344,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let activeCollections = config.collections || [];
     if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
-        logger.info("Auto-discovered collections", { count: activeCollections.length,
-dir: config.collectionsDir });
+        logger.info("Auto-discovered collections", {
+            count: activeCollections.length,
+            dir: config.collectionsDir
+        });
     }
 
     // Apply default security rules to collections that don't define their own
@@ -354,8 +359,6 @@ dir: config.collectionsDir });
         }
         logger.info("Default security rules applied to collections without explicit rules");
     }
-
-
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
     const delegates: Record<string, DataDriver> = {};
@@ -398,8 +401,10 @@ dir: config.collectionsDir });
             defaultDriverId = b.id || bootstrapper.type;
         }
 
-        const driverResult = await bootstrapper.initializeDriver({ collections: activeCollections,
-collectionRegistry });
+        const driverResult = await bootstrapper.initializeDriver({
+            collections: activeCollections,
+            collectionRegistry
+        });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
 
         if ((b.id || bootstrapper.type) === defaultDriverId || !defaultDriverResult) {
@@ -419,7 +424,9 @@ collectionRegistry });
     if (!defaultDriver || !defaultDriverResult) {
         throw new Error("Default driver not initialized by bootstrappers");
     }
-    const defaultBootstrapper = bootstrappers.find(b => (b as BackendBootstrapper & { id?: string }).id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
+    const defaultBootstrapper = bootstrappers.find(b => (b as BackendBootstrapper & {
+        id?: string
+    }).id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
 
     // 2. Initialize Auth & History via the default driver's bootstrapper
@@ -584,7 +591,10 @@ collectionRegistry });
 
             if (safeAuthConfig.linkedin?.clientId && safeAuthConfig.linkedin?.clientSecret) {
                 const { createLinkedinProvider } = await import("./auth");
-                oauthProviders.push(createLinkedinProvider(safeAuthConfig.linkedin as { clientId: string; clientSecret: string }));
+                oauthProviders.push(createLinkedinProvider(safeAuthConfig.linkedin as {
+                    clientId: string;
+                    clientSecret: string
+                }));
             }
 
             if (safeAuthConfig.github?.clientId && safeAuthConfig.github?.clientSecret) {
@@ -854,6 +864,18 @@ collectionRegistry });
     if (emailService) {
         Object.assign(serverClient, { email: emailService });
         logger.info("Email service attached to singleton", { configured: emailService.isConfigured() });
+
+        if (emailService.isConfigured() && typeof emailService.verifyConnection === "function") {
+            emailService.verifyConnection().then((success) => {
+                if (!success) {
+                    logger.warn("Warning: SMTP connection verification failed. Email delivery may fail.");
+                } else {
+                    logger.info("SMTP connection verified successfully.");
+                }
+            }).catch((err) => {
+                logger.warn("Warning: SMTP connection verification failed. Email delivery may fail.", { error: err });
+            });
+        }
     }
 
     // Attach raw SQL capability when the driver supports it (Postgres, MySQL).
@@ -917,8 +939,10 @@ collectionRegistry });
             const fnRoutes = createFunctionRoutes(loadedFunctions);
             functionsRouter.route("/", fnRoutes);
             config.app.route(`${basePath}/functions`, functionsRouter);
-            logger.info("Mounted custom functions", { count: loadedFunctions.length,
-path: `${basePath}/functions` });
+            logger.info("Mounted custom functions", {
+                count: loadedFunctions.length,
+                path: `${basePath}/functions`
+            });
         }
     }
 
@@ -967,13 +991,19 @@ path: `${basePath}/functions` });
             // Start the scheduler
             cronScheduler.start();
 
-            logger.info("Mounted cron jobs", { count: loadedCronJobs.length,
-path: `${basePath}/cron` });
+            logger.info("Mounted cron jobs", {
+                count: loadedCronJobs.length,
+                path: `${basePath}/cron`
+            });
         }
     }
 
-    if ((defaultBootstrapper as BackendBootstrapper & { initializeWebsockets?: (...args: unknown[]) => unknown }).initializeWebsockets) {
-        await (defaultBootstrapper as BackendBootstrapper & { initializeWebsockets: (...args: unknown[]) => unknown }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth, authAdapter);
+    if ((defaultBootstrapper as BackendBootstrapper & {
+        initializeWebsockets?: (...args: unknown[]) => unknown
+    }).initializeWebsockets) {
+        await (defaultBootstrapper as BackendBootstrapper & {
+            initializeWebsockets: (...args: unknown[]) => unknown
+        }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth, authAdapter);
     }
 
     logger.info("Rebase Backend Initialized");
@@ -988,12 +1018,16 @@ path: `${basePath}/cron` });
                 await admin.executeSql("SELECT 1");
             } else {
                 // Fallback: try a lightweight fetch to confirm driver is responsive
-                await defaultDriver.fetchCollection({ path: "__health_check_nonexistent__",
-limit: 1 });
+                await defaultDriver.fetchCollection({
+                    path: "__health_check_nonexistent__",
+                    limit: 1
+                });
             }
             const latencyMs = Math.round(performance.now() - start);
-            return { healthy: true,
-latencyMs };
+            return {
+                healthy: true,
+                latencyMs
+            };
         } catch (error: unknown) {
             const latencyMs = Math.round(performance.now() - start);
             logger.error("Health check failed", {
@@ -1027,7 +1061,10 @@ latencyMs };
                 //    timer callbacks don't fire against a closed pool.
                 for (const [key, rt] of Object.entries(realtimeServices)) {
                     try {
-                        const rtWithLifecycle = rt as RealtimeProvider & { destroy?: () => Promise<void>; stopListening?: () => Promise<void> };
+                        const rtWithLifecycle = rt as RealtimeProvider & {
+                            destroy?: () => Promise<void>;
+                            stopListening?: () => Promise<void>
+                        };
                         if (typeof rtWithLifecycle.destroy === "function") {
                             await rtWithLifecycle.destroy();
                             logger.info(`Realtime service "${key}" destroyed`);

@@ -16,6 +16,7 @@ export const env = loadEnv({
         SMTP_USER: z.string().optional(),
         SMTP_PASS: z.string().optional(),
         SMTP_FROM: z.string().optional(),
+        SMTP_NAME: z.string().optional(),
         APP_NAME: z.string().default("Rebase"),
     })
 });

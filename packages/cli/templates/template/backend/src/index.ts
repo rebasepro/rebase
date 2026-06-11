@@ -90,7 +90,23 @@ relations },
                 ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
             seedDefaultRoles: true,
-            allowRegistration: env.ALLOW_REGISTRATION
+            allowRegistration: env.ALLOW_REGISTRATION,
+            email: env.SMTP_HOST
+                ? {
+                    from: env.SMTP_FROM || `${env.APP_NAME} <noreply@rebase.pro>`,
+                    smtp: {
+                        host: env.SMTP_HOST,
+                        port: env.SMTP_PORT,
+                        secure: env.SMTP_SECURE,
+                        auth: env.SMTP_USER
+                            ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
+                            : undefined,
+                        name: env.SMTP_NAME,
+                    },
+                    appName: env.APP_NAME,
+                    resetPasswordUrl: env.FRONTEND_URL,
+                }
+                : undefined,
         },
         storage: env.STORAGE_TYPE === "s3"
             ? {

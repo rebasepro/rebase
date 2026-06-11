@@ -1,10 +1,10 @@
 export const fr = {
   "hero.badge": "Open-source · Auto-hébergé · Natif Postgres",
-  "hero.title.part1": "Panel Admin, APIs & SDK",
-  "hero.title.part2": "Générés depuis votre Schéma.",
+  "hero.title.part1": "Le Panneau d'Administration & Capa de API",
+  "hero.title.part2": "pour votre Postgres Existant.",
   "hero.subtitle":
-    'Définissez votre modèle de données une fois en TypeScript. Rebase génère un <b class="text-white font-medium">panneau d\'administration prêt pour la production</b>, des <b class="text-white font-medium">APIs REST et GraphQL</b>, un <b class="text-white font-medium">SDK typé</b> et la <b class="text-white font-medium">synchronisation en temps réel</b> — le tout depuis votre Postgres existant.',
-  "hero.category": "La plateforme open-source pour Postgres — CMS, BaaS et outils internes en un.",
+    "Déployez Rebase sur n'importe quelle base de données PostgreSQL—ou définissez votre modèle en TypeScript. Obtenez instantanément une belle interface d'administration sous forme de tableur, des API REST/GraphQL instantanées et un SDK sécurisé. 100% open-source, auto-hébergé et natif d'agents.",
+  "hero.category": "La plateforme d'applications Postgres open-source : CMS, BaaS et outils internes en un.",
   "hero.cta.demo": "Essayer la Démo",
   "hero.cta.github": "Voir sur GitHub",
   "demo.badge": "Trois commandes. Zéro boilerplate.",
@@ -452,5 +452,20 @@ export const fr = {
   "ai.badge": "Infrastructure pour Agents",
   "ai.title": "Le backend dont <span class=\"text-primary subtle-shimmer\">les agents IA ont besoin.</span>",
   "ai.subtitle": "Recherche vectorielle, clés API à portée limitée, fonctions personnalisées, synchronisation en temps réel et cron jobs — tout ce dont vos agents IA ont besoin pour lire, écrire et agir sur vos données Postgres de manière autonome.",
+
+  // Alternatives Section
+  "alternatives.badge": "Alternatives",
+  "alternatives.title": "Remplace votre stack technique",
+  "alternatives.subtitle": "Au lieu d'assembler une demi-douzaine de services et de payer des licences de développeur par utilisateur, Rebase fournit une stack open-source unifiée qui s'exécute sur votre base de datos.",
+  "alternatives.card.supabase.title": "Alternative à Supabase & Firebase",
+  "alternatives.card.supabase.desc": "Contrairement aux plateformes BaaS à écosystème fermé, Rebase est totalement agnostique de la base de données et se connecte directement à votre base existante. Vous possédez votre infrastructure, vos données et vos définitions de schéma en TypeScript propre.",
+  "alternatives.card.retool.title": "Alternative à Retool & outils internes",
+  "alternatives.card.retool.desc": "Pas de tarification par développeur ni de verrouillage technologique. Rebase est une application React open-source. Étendez-la naturellement avec des composants React standard, gérez les versions avec Git, et hébergez-la vous-même gratuitement.",
+  "alternatives.card.directus.title": "Alternative à Directus & Strapi",
+  "alternatives.card.directus.desc": "Pas de modifications opaques de la base de données ni de stockages de configuration propriétaires. Rebase fonctionne avec le schéma sous forme de code : définissez vos modèles en TypeScript et obtenez de vrais fichiers de migration.",
+  "demo.page.title": "Démo interactive en direct",
+  "demo.page.subtitle": "Découvrez Rebase en direct dans votre navigateur : jouez avec un panneau d'administration interactif et voyez les requêtes SDK TypeScript générées automatiquement et les réponses HTTP REST se mettre à jour en temps réel.",
+  "demo.meta.title": "Démo interactive en direct | Rebase",
+  "demo.meta.description": "Découvrez Rebase en direct dans votre navigateur : jouez avec un panneau d'administration interactif et voyez les requêtes SDK TypeScript générées automatiquement et les réponses HTTP REST se mettre à jour en temps réel.",
 };
 

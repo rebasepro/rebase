@@ -95,6 +95,7 @@ async function startServer() {
                         auth: env.SMTP_USER
                             ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
                             : undefined,
+                        name: env.SMTP_NAME,
                     },
                     appName: env.APP_NAME,
                     resetPasswordUrl: env.FRONTEND_URL,

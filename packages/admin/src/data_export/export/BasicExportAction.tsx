@@ -1,6 +1,7 @@
 
 import React, { useCallback } from "react";
 
+import { useTranslation } from "@rebasepro/core";
 import { Entity, Properties } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
@@ -31,6 +32,7 @@ export function BasicExportAction({
     propertiesOrder
 }: BasicExportActionProps) {
 
+    const { t } = useTranslation();
     const dateRef = React.useRef<Date>(new Date());
     const [flattenArrays, setFlattenArrays] = React.useState<boolean>(true);
     const [exportType, setExportType] = React.useState<"csv" | "json">("csv");
@@ -78,22 +80,22 @@ export function BasicExportAction({
             onOpenChange={setOpen}
             maxWidth={"xl"}>
 
-            <DialogTitle variant={"h6"}>Export data</DialogTitle>
+            <DialogTitle variant={"h6"}>{t("export_data")}</DialogTitle>
 
             <DialogContent className={"flex flex-col gap-4 my-4"}>
 
-                <div>DownloadIcon the the content of this table as a CSV</div>
+                <div>{t("download_table_csv")}</div>
 
                 <div className={"flex flex-row gap-4"}>
                     <div className={"p-4 flex flex-col"}>
                         <RadioGroup value={exportType} onValueChange={(v) => setExportType(v as "csv" | "json")}>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="csv" id="radio-csv"/>
-                                <Label htmlFor="radio-csv">CSV</Label>
+                                <Label htmlFor="radio-csv">{t("csv")}</Label>
                             </div>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="json" id="radio-json"/>
-                                <Label htmlFor="radio-json">JSON</Label>
+                                <Label htmlFor="radio-json">{t("json")}</Label>
                             </div>
                         </RadioGroup>
                     </div>
@@ -102,11 +104,11 @@ export function BasicExportAction({
                         <RadioGroup value={dateExportType} onValueChange={(v) => setDateExportType(v as "timestamp" | "string")}>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="timestamp" id="radio-timestamp"/>
-                                <Label htmlFor="radio-timestamp">Dates as timestamps ({dateRef.current.getTime()})</Label>
+                                <Label htmlFor="radio-timestamp">{t("dates_as_timestamps")} ({dateRef.current.getTime()})</Label>
                             </div>
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem value="string" id="radio-string"/>
-                                <Label htmlFor="radio-string">Dates as strings ({dateRef.current.toISOString()})</Label>
+                                <Label htmlFor="radio-string">{t("dates_as_strings")} ({dateRef.current.toISOString()})</Label>
                             </div>
                         </RadioGroup>
                     </div>
@@ -117,7 +119,7 @@ export function BasicExportAction({
                     disabled={exportType !== "csv"}
                     value={flattenArrays}
                     onValueChange={setFlattenArrays}
-                    label={"Flatten arrays"}/>
+                    label={t("flatten_arrays")}/>
 
             </DialogContent>
 
@@ -125,11 +127,11 @@ export function BasicExportAction({
 
                 <Button onClick={handleClose}
                     variant={"text"}>
-                    Cancel
+                    {t("cancel")}
                 </Button>
 
                 <Button onClick={onOkClicked}>
-                    DownloadIcon
+                    {t("download")}
                 </Button>
 
             </DialogActions>

@@ -57,6 +57,7 @@ const usersCollection: EntityCollection = {
         roles: {
             name: "Roles",
             type: "array",
+            columnType: "text[]",
             of: {
                 name: "Role",
                 type: "string",

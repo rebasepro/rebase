@@ -2,6 +2,18 @@ import { createTransport, Transporter } from "nodemailer";
 import { EmailService, EmailSendOptions, EmailConfig } from "./types";
 
 /**
+ * Safely parse a hostname from a URL string
+ */
+function getHostname(urlStr: string): string | undefined {
+    try {
+        const url = new URL(urlStr.includes("://") ? urlStr : `https://${urlStr}`);
+        return url.hostname;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * SMTP Email Service implementation using Nodemailer
  */
 export class SMTPEmailService implements EmailService {
@@ -12,7 +24,26 @@ export class SMTPEmailService implements EmailService {
         this.config = config;
 
         if (config.smtp) {
+            let smtpName = config.smtp.name;
+            if (!smtpName) {
+                const urlsToTry = [
+                    process.env.FRONTEND_URL,
+                    config.resetPasswordUrl,
+                    config.verifyEmailUrl
+                ];
+                for (const urlStr of urlsToTry) {
+                    if (urlStr) {
+                        const hostname = getHostname(urlStr);
+                        if (hostname) {
+                            smtpName = hostname;
+                            break;
+                        }
+                    }
+                }
+            }
+
             this.transporter = createTransport({
+                name: smtpName,
                 host: config.smtp.host,
                 port: config.smtp.port,
                 secure: config.smtp.secure ?? (config.smtp.port === 465),

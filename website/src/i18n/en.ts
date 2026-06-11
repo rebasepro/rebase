@@ -1,9 +1,9 @@
 export const en = {
   "hero.badge": "Open-source · Self-hosted · Postgres-native",
-  "hero.title.part1": "Admin Panel, APIs & SDK",
-  "hero.title.part2": "Generated from Your Schema.",
+  "hero.title.part1": "The Admin Panel & API Layer",
+  "hero.title.part2": "for Your Existing Postgres.",
   "hero.subtitle":
-    'Define your data model once in TypeScript. Rebase generates a <b class="text-white font-medium">production-ready admin panel</b>, <b class="text-white font-medium">REST & GraphQL APIs</b>, a <b class="text-white font-medium">typed SDK</b>, and <b class="text-white font-medium">real-time sync</b> — all from your existing Postgres.',
+    "Drop Rebase onto any PostgreSQL database—or define your model in TypeScript. Instantly get a beautiful spreadsheet-like Admin UI, instant REST/GraphQL APIs, and a type-safe SDK. 100% Open-source, self-hosted, and agent-native.",
   "hero.category": "The open-source Postgres app platform — CMS, BaaS, and internal tools in one.",
   "hero.cta.demo": "Try the Demo",
   "hero.cta.github": "View on GitHub",
@@ -594,5 +594,9 @@ export const en = {
   "alternatives.card.retool.desc": "No per-seat developer pricing or vendor lock-in. Rebase is an open-source React application. Extend it naturally with standard React components, version-control it with Git, and self-host for free.",
   "alternatives.card.directus.title": "Alternative to Directus & Strapi",
   "alternatives.card.directus.desc": "No opaque database alterations or proprietary configuration stores. Rebase works with schema-as-code: define your models in TypeScript and get real migration files.",
+  "demo.page.title": "Interactive Live Demo",
+  "demo.page.subtitle": "Experience Rebase live in your browser: play with an interactive admin panel and see auto-generated TypeScript SDK queries and REST HTTP responses update in real time.",
+  "demo.meta.title": "Interactive Live Demo | Rebase",
+  "demo.meta.description": "Experience Rebase live in your browser: play with an interactive admin panel and see auto-generated TypeScript SDK queries and REST HTTP responses update in real time.",
 };
 

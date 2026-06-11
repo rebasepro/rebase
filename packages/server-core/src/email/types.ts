@@ -22,6 +22,7 @@ export interface SMTPConfig {
         user: string;
         pass: string;
     };
+    name?: string;
 }
 
 /**

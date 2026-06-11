@@ -33,4 +33,6 @@ export interface EmailService {
     send(options: EmailSendOptions): Promise<void>;
     /** Returns `true` when the service has valid credentials / is ready to send. */
     isConfigured(): boolean;
+    /** Verify connection/credentials with the email provider. */
+    verifyConnection?(): Promise<boolean>;
 }
