@@ -15,6 +15,13 @@
       "when": 1778971863268,
       "tag": "0001_windy_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781181427840,
+      "tag": "0002_square_whiplash",
+      "breakpoints": true
     }
   ]
 }

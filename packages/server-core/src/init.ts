@@ -318,10 +318,11 @@ dir: config.collectionsDir });
     }
 
     if (config.auth) {
-        // Prepend defaultUsersCollection if not overridden by the developer's collections
-        activeCollections = Array.from(
-            new Map([defaultUsersCollection, ...activeCollections].map(c => [c.slug, c])).values()
-        );
+        // Append defaultUsersCollection if not overridden by the developer's collections
+        const activeSlugs = new Set(activeCollections.map(c => c.slug));
+        if (!activeSlugs.has(defaultUsersCollection.slug)) {
+            activeCollections = [...activeCollections, defaultUsersCollection];
+        }
     }
 
     const realtimeServices: Record<string, RealtimeProvider> = {};

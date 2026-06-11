@@ -1,4 +1,4 @@
-import type { ComponentRef, EntityCollection, EntityCustomViewParams, EntityDetailViewConfig } from "@rebasepro/types";
+import type { ComponentRef, EntityCollection, EntityCustomViewParams, FormViewConfig } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -47,9 +47,7 @@ import { EntityJsonPreview } from "../components/EntityJsonPreview";
 
 const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 
-export const MAIN_TAB_VALUE = "__main_##Q$SC^#S6";
-export const JSON_TAB_VALUE = "__json";
-export const HISTORY_TAB_VALUE = "__rebase_history";
+import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/entity_view_constants";
 
 export type BarActionsParams = {
     values: object,
@@ -237,8 +235,9 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
     }), [entityId, parentCollectionSlugs, parentEntityIds, path, collection, context, readOnlyFormContext, layout]);
     const pluginActionsTop = useSlot("form.actions.top", formActionTopProps);
 
-    // Detail view config from collection
-    const detailViewConfig = (collection as EntityCollection<M> & { detailView?: EntityDetailViewConfig<M> }).detailView;
+    // Resolve formView.Builder if provided
+    const formViewConfig = (collection as EntityCollection<M> & { formView?: FormViewConfig<M> }).formView;
+    const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
 
     // Title resolution
     const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
@@ -358,42 +357,28 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
     }, [onTabChange, path, entityId, collection]);
 
     const propertyDetailView = () => {
-        // Allow full override via detailView.Builder
-        if (detailViewConfig?.Builder) {
-            const CustomBuilder = resolveComponentRef(detailViewConfig.Builder);
-            if (CustomBuilder && usedEntity) {
-                return <CustomBuilder
-                    collection={collection}
-                    entity={usedEntity}
-                    path={path}
-                    onEditClick={onEditClick ?? (() => {})}
-                />;
-            }
+        // formView.Builder replaces the default property display
+        if (FormViewBuilder && usedEntity) {
+            return <ErrorBoundary>
+                <Suspense fallback={<CircularProgressCenter />}>
+                    <FormViewBuilder
+                        collection={collection}
+                        parentCollectionSlugs={parentCollectionSlugs}
+                        parentEntityIds={parentEntityIds}
+                        entity={usedEntity}
+                        modifiedValues={usedEntity?.values}
+                        formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
+                    />
+                </Suspense>
+            </ErrorBoundary>;
         }
-
-        const HeaderComponent = detailViewConfig?.Header ? resolveComponentRef(detailViewConfig.Header) : null;
-        const FooterComponent = detailViewConfig?.Footer ? resolveComponentRef(detailViewConfig.Footer) : null;
 
         return (
             <>
-                {HeaderComponent && usedEntity && <HeaderComponent
-                    collection={collection}
-                    entity={usedEntity}
-                    path={path}
-                    onEditClick={onEditClick ?? (() => {})}
-                />}
-
                 {usedEntity && <EntityView
                     entity={usedEntity}
                     collection={collection}
                     path={path}
-                />}
-
-                {FooterComponent && usedEntity && <FooterComponent
-                    collection={collection}
-                    entity={usedEntity}
-                    path={path}
-                    onEditClick={onEditClick ?? (() => {})}
                 />}
             </>
         );

@@ -8,7 +8,7 @@ import type { EntityOverrides } from "./entity_overrides";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
-import type { EntityCustomView, EntityDetailViewConfig } from "./entity_views";
+import type { EntityCustomView, FormViewConfig } from "./entity_views";
 import type { EntityAction } from "./entity_actions";
 import type { ComponentRef } from "./component_ref";
 
@@ -144,10 +144,14 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     defaultEntityAction?: "view" | "edit";
 
     /**
-     * Customization options for the read-only detail view.
-     * Only used when `defaultEntityAction` is `"view"`.
+     * Replace the default entity form with a custom component.
+     * The Builder receives the same props as entity view tabs
+     * (entity, formContext, collection, etc.) and has full control over the UI.
+     *
+     * Works in both edit mode and read-only mode (when `defaultEntityAction`
+     * is `"view"`). In read-only mode, `formContext.readOnly` will be `true`.
      */
-    detailView?: EntityDetailViewConfig;
+    formView?: FormViewConfig;
 
     /**
      * Prevent default actions from being displayed or executed on this collection.

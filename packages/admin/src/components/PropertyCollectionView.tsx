@@ -258,6 +258,7 @@ export const PropertyCollectionView = ({
                 <div className={baseKey ? `pl-4 mt-1 border-l ${defaultBorderMixin}` : ""}>
                     {Object.entries(data).map(([key, value]) => {
                         if (value === null || value === undefined) return null;
+                        if (baseKey === "" && !properties[key]) return null;
                         const currentKey = baseKey ? `${baseKey}.${key}` : key;
                         return (
                             <PropertyCollectionView

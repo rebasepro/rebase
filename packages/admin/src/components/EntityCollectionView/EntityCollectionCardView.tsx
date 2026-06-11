@@ -60,6 +60,19 @@ function getGridColumnsClass(size: CollectionSize): string {
     }
 }
 
+function getScrollParent(element: HTMLElement | null): HTMLElement | null {
+    if (!element) return null;
+    let parent = element.parentElement;
+    while (parent) {
+        const overflowY = window.getComputedStyle(parent).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll") {
+            return parent;
+        }
+        parent = parent.parentElement;
+    }
+    return document.documentElement;
+}
+
 /**
  * Card grid view for displaying entities with infinite scroll.
  * Alternative to the EntityCollectionTable for visual browsing.
@@ -78,7 +91,6 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
 }: EntityCollectionCardViewProps<M>) {
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const loadMoreRef = useRef<HTMLDivElement>(null);
     const hasRestoredScroll = useRef(false);
 
     const {
@@ -95,8 +107,8 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     // Track if we're currently loading to prevent multiple simultaneous load requests
     const isLoadingMore = useRef(false);
 
-    // Keep mutable refs for values used in the IntersectionObserver callback
-    // to avoid re-creating the observer every time pagination state changes.
+    // Keep mutable refs for values used in the scroll listener callback
+    // to avoid re-attaching the listener every time pagination state changes.
     const paginationStateRef = useRef({ paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize });
     useEffect(() => {
         paginationStateRef.current = { paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize };
@@ -107,43 +119,60 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
         if (!dataLoading) isLoadingMore.current = false;
     }, [dataLoading]);
 
-    // Infinite scroll with Intersection Observer — stable deps only
+    // Infinite scroll and resize observer
     useEffect(() => {
-        if (!loadMoreRef.current) return;
+        const el = containerRef.current;
+        if (!el) return;
+        const scrollEl = getScrollParent(el);
+        if (!scrollEl) return;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const { paginationEnabled: pe, noMoreToLoad: nm, dataLoading: dl, itemCount: ic, pageSize: ps } = paginationStateRef.current;
-                if (entries[0].isIntersecting && pe && !dl && !nm && !isLoadingMore.current) {
-                    isLoadingMore.current = true;
-                    setItemCount?.((ic ?? ps) + ps);
-                }
-            },
-            {
-                root: containerRef.current,
-                rootMargin: "400px",
-                threshold: 0
+        let rafId: number | null = null;
+
+        const update = () => {
+            rafId = null;
+
+            // Infinite scroll: trigger load-more when near the bottom
+            const { paginationEnabled: pe, noMoreToLoad: nm, itemCount: ic, pageSize: ps } = paginationStateRef.current;
+            if (
+                pe &&
+                !nm &&
+                !isLoadingMore.current &&
+                scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 400
+            ) {
+                isLoadingMore.current = true;
+                setItemCount?.((ic ?? ps) + ps);
             }
-        );
+        };
 
-        observer.observe(loadMoreRef.current);
+        const onScrollEvent = () => {
+            if (rafId === null) rafId = requestAnimationFrame(update);
+        };
 
-        return () => observer.disconnect();
-    }, [setItemCount, data.length]);
+        scrollEl.addEventListener("scroll", onScrollEvent, { passive: true });
+        const ro = new ResizeObserver(() => update());
+        ro.observe(scrollEl);
+        update(); // initial measurement
+
+        return () => {
+            scrollEl.removeEventListener("scroll", onScrollEvent);
+            ro.disconnect();
+            if (rafId !== null) cancelAnimationFrame(rafId);
+        };
+    }, [setItemCount]);
 
     // Scroll restoration — deferred to after layout paint
     useEffect(() => {
         if (!containerRef.current || !initialScroll || hasRestoredScroll.current || data.length === 0) return;
 
+        const scrollEl = getScrollParent(containerRef.current);
+        if (!scrollEl) return;
+
         let attempts = 0;
         const maxAttempts = 5;
 
         const tryRestore = () => {
-            const el = containerRef.current;
-            if (!el) return;
-
-            if (el.scrollHeight >= initialScroll || attempts >= maxAttempts) {
-                el.scrollTop = initialScroll;
+            if (scrollEl.scrollHeight >= initialScroll || attempts >= maxAttempts) {
+                scrollEl.scrollTop = initialScroll;
                 hasRestoredScroll.current = true;
             } else {
                 attempts++;
@@ -157,11 +186,13 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     // Scroll tracking: call onScroll when user scrolls
     const lastScrollOffset = useRef(0);
     useEffect(() => {
-        const container = containerRef.current;
-        if (!container || !onScroll) return;
+        const el = containerRef.current;
+        if (!el || !onScroll) return;
+        const scrollEl = getScrollParent(el);
+        if (!scrollEl) return;
 
         const handleScroll = () => {
-            const currentOffset = container.scrollTop;
+            const currentOffset = scrollEl.scrollTop;
             const direction = currentOffset > lastScrollOffset.current ? "forward" : "backward";
             lastScrollOffset.current = currentOffset;
             onScroll({
@@ -171,8 +202,8 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
             });
         };
 
-        container.addEventListener("scroll", handleScroll, { passive: true });
-        return () => container.removeEventListener("scroll", handleScroll);
+        scrollEl.addEventListener("scroll", handleScroll, { passive: true });
+        return () => scrollEl.removeEventListener("scroll", handleScroll);
     }, [onScroll]);
 
     const handleEntityClick = useCallback((entity: Entity<M>) => {
@@ -201,7 +232,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     return (
         <div
             ref={containerRef}
-            className="flex-1 overflow-auto p-4"
+            className="w-full p-4"
         >
             {/* Error state */}
             {dataLoadingError ? (
@@ -215,7 +246,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
                     <CircularProgress size="small"/>
                 </div>
             ) : isEmpty ? (
-                <div className="flex items-center justify-center py-12 px-8">
+                <div className="w-full flex items-center justify-center py-12 px-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
                             No entries found
@@ -247,7 +278,6 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
 
                         {/* Load more trigger / Loading indicator */}
                         <div
-                            ref={loadMoreRef}
                             className="flex items-center justify-center py-8"
                         >
                             {dataLoading && (

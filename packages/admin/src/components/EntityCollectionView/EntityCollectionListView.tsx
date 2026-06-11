@@ -604,7 +604,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     <CircularProgress size="small"/>
                 </div>
             ) : isEmpty ? (
-                <div className="flex items-center justify-center py-12 px-8">
+                <div className="w-full flex items-center justify-center py-12 px-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
                             No entries found

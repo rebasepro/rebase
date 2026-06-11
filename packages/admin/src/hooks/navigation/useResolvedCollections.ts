@@ -95,15 +95,14 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
 
                 if (cancelled) return;
 
-                // Prepend system defaults; developer collections override via generic dedup.
-                // Map keyed by slug — last-write-wins, so developer collections overwrite defaults.
+                // Append system defaults; developer collections override via generic dedup.
                 const defaults: EntityCollection[] = [];
                 if (userManagementRef.current) {
                     defaults.push(defaultUsersCollection);
                 }
-                const deduped = Array.from(
-                    new Map([...defaults, ...resolved].map(c => [c.slug, c])).values()
-                );
+                const resolvedSlugs = new Set(resolved.map(c => c.slug));
+                const defaultsToAppend = defaults.filter(c => !resolvedSlugs.has(c.slug));
+                const deduped = [...resolved, ...defaultsToAppend];
 
                 // Register with the CollectionRegistry; returns true if changed
                 const changed = collectionRegistryController.collectionRegistryRef.current.registerMultiple(deduped);

@@ -90,11 +90,11 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             collections = [];
         }
 
-        // Always inject defaults first; developer collections override via generic dedup
-        // Map keyed by slug — last-write-wins, so developer collections overwrite defaults
-        collections = Array.from(
-            new Map([defaultUsersCollection, ...collections].map(c => [c.slug, c])).values()
-        );
+        // Always inject defaults last; developer collections override via generic dedup
+        const collectionsSlugs = new Set(collections.map(c => c.slug));
+        if (!collectionsSlugs.has(defaultUsersCollection.slug)) {
+            collections = [...collections, defaultUsersCollection];
+        }
 
         // Sort collections by slug alphabetically to ensure deterministic schema generation
         collections.sort((a, b) => a.slug.localeCompare(b.slug));

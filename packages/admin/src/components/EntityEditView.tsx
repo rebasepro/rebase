@@ -1,4 +1,4 @@
-import type { ComponentRef, EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
+import type { ComponentRef, EntityCollection, EntityCustomViewParams, FormViewConfig } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -50,9 +50,8 @@ import { usePermissions } from "@rebasepro/core";
 import { useUrlController } from "../index";
 import { useNavigate } from "react-router-dom";
 
-export const MAIN_TAB_VALUE = "__main_##Q$SC^#S6";
-export const JSON_TAB_VALUE = "__json";
-export const HISTORY_TAB_VALUE = "__rebase_history";
+import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/entity_view_constants";
+export { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE };
 
 export type BarActionsParams = {
     values: object,
@@ -286,6 +285,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         return {
             entityId,
             disabled: false,
+            readOnly: true,
             openEntityMode: layout,
             status: status,
             values: usedEntity?.values ?? ({} as M),
@@ -431,6 +431,11 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
         }
     }, [status, onTabChange, path, entityId, collection]);
 
+    // Resolve formView.Builder if provided
+    const formViewConfig = (collection as EntityCollection<M> & { formView?: FormViewConfig<M> }).formView;
+    const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
+    const formViewIncludeActions = formViewConfig?.includeActions !== false;
+
     const entityReadOnlyView = !canEdit && entity ? <div
         className={cls("flex-1 flex flex-row w-full overflow-y-auto justify-center", (canEdit || !mainViewVisible || selectedSecondaryForm) ? "hidden" : "")}>
         <div
@@ -438,52 +443,86 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
             <Typography className={"mt-16 mb-8 mx-8"} variant={"h4"}>
                 {collection.singularName ?? collection.name}
             </Typography>
-            <EntityView
-                className={"px-8 h-full overflow-auto"}
-                entity={entity}
-                path={path}
-                collection={collection} />
+            {FormViewBuilder && readOnlyFormContext ? (
+                <ErrorBoundary>
+                    <Suspense fallback={<CircularProgressCenter />}>
+                        <FormViewBuilder
+                            collection={collection}
+                            parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
+                            entity={usedEntity}
+                            modifiedValues={usedEntity?.values}
+                            formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
+                        />
+                    </Suspense>
+                </ErrorBoundary>
+            ) : (
+                <EntityView
+                    className={"px-8 h-full overflow-auto"}
+                    entity={entity}
+                    path={path}
+                    collection={collection} />
+            )}
             <div className="h-16" />
         </div>
     </div> : null;
 
-    const entityView = <EntityForm<M>
-        collection={collection}
-        path={path}
-        entityId={entityId ?? usedEntity?.id}
-        onValuesModified={onValuesModified}
-        entity={entity}
-        initialDirtyValues={initialDirtyValues}
-        openEntityMode={layout}
-        forceActionsAtTheBottom={actionsAtTheBottom}
-        initialStatus={status}
-        className={cls((!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : "", formProps?.className)}
-        EntityFormActionsComponent={EntityEditViewFormActions}
-        disabled={!canEdit}
-        navigateBack={navigateBack}
-        {...formProps}
-        onEntityChange={(entity) => {
-            setUsedEntity(entity);
-            formProps?.onEntityChange?.(entity);
-        }}
-        onStatusChange={(status) => {
-            setStatus(status);
-            formProps?.onStatusChange?.(status);
-        }}
-        onFormContextReady={(formContext) => {
-            setFormContext(formContext);
-            formProps?.onFormContextReady?.(formContext);
-        }}
-        onSaved={(params) => {
-            const res = {
-                ...params,
-                selectedTab: MAIN_TAB_VALUE === selectedTab ? undefined : selectedTab
-            };
-            onSaved?.(res);
-            formProps?.onSaved?.(res);
-        }}
-        Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
-    />;
+    const entityView = FormViewBuilder ? (
+        // formView.Builder replaces the default form
+        <div className={cls(
+            "relative flex-1 w-full h-full overflow-auto",
+            (!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : ""
+        )}>
+            <ErrorBoundary>
+                <Suspense fallback={<CircularProgressCenter />}>
+                    {(formContext ?? readOnlyFormContext) && <FormViewBuilder
+                        collection={collection}
+                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
+                        entity={usedEntity}
+                        modifiedValues={(formContext ?? readOnlyFormContext)?.formex?.values ?? usedEntity?.values}
+                        formContext={(formContext ?? readOnlyFormContext) as FormContext<Record<string, unknown>>}
+                    />}
+                </Suspense>
+            </ErrorBoundary>
+        </div>
+    ) : (
+        <EntityForm<M>
+            collection={collection}
+            path={path}
+            entityId={entityId ?? usedEntity?.id}
+            onValuesModified={onValuesModified}
+            entity={entity}
+            initialDirtyValues={initialDirtyValues}
+            openEntityMode={layout}
+            forceActionsAtTheBottom={actionsAtTheBottom}
+            initialStatus={status}
+            className={cls((!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : "", formProps?.className)}
+            EntityFormActionsComponent={EntityEditViewFormActions}
+            disabled={!canEdit}
+            navigateBack={navigateBack}
+            {...formProps}
+            onEntityChange={(entity) => {
+                setUsedEntity(entity);
+                formProps?.onEntityChange?.(entity);
+            }}
+            onStatusChange={(status) => {
+                setStatus(status);
+                formProps?.onStatusChange?.(status);
+            }}
+            onFormContextReady={(formContext) => {
+                setFormContext(formContext);
+                formProps?.onFormContextReady?.(formContext);
+            }}
+            onSaved={(params) => {
+                const res = {
+                    ...params,
+                    selectedTab: MAIN_TAB_VALUE === selectedTab ? undefined : selectedTab
+                };
+                onSaved?.(res);
+                formProps?.onSaved?.(res);
+            }}
+            Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
+        />
+    );
 
     const subcollectionTabs = subcollections && subcollections.map((subcollection) => {
         const icon = getIcon(subcollection.icon, undefined, undefined, "small");

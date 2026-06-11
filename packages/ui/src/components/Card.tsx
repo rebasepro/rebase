@@ -8,7 +8,7 @@ type CardProps = {
     style?: React.CSSProperties;
     onClick?: (e?: React.MouseEvent) => void;
     className?: string;
-};
+} & React.HTMLAttributes<HTMLDivElement>;
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(({
     children,

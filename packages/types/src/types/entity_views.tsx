@@ -73,6 +73,28 @@ export type EntityCustomView<M extends Record<string, unknown> = Record<string, 
     position?: "start" | "end";
 };
 
+/**
+ * Configuration to replace the default entity form with a custom component.
+ * The Builder receives the same props as entity view tabs (entity, formContext, etc.)
+ * and has full control over the UI.
+ *
+ * The form tab still appears in the tab bar but renders your Builder
+ * instead of the auto-generated field form.
+ *
+ * @group Models
+ */
+export type FormViewConfig<M extends Record<string, unknown> = Record<string, unknown>> = {
+    /**
+     * Custom component that replaces the default form.
+     */
+    Builder: ComponentRef<EntityCustomViewParams<M>>;
+    /**
+     * If true, the save/delete action bar is rendered alongside the custom view.
+     * Defaults to true.
+     */
+    includeActions?: boolean;
+};
+
 export interface EntityCustomViewParams<M extends Record<string, unknown> = Record<string, unknown>> {
     collection: EntityCollection<M>;
     entity?: Entity<M>;
@@ -80,36 +102,4 @@ export interface EntityCustomViewParams<M extends Record<string, unknown> = Reco
     formContext: FormContext<M>;
     parentCollectionSlugs?: string[];
     parentEntityIds?: string[];
-}
-
-/**
- * Configuration for customizing the read-only detail view of an entity.
- * Only used when `defaultEntityAction` is set to `"view"` on the collection.
- * @group Models
- */
-export type EntityDetailViewConfig<M extends Record<string, unknown> = Record<string, unknown>> = {
-    /**
-     * Custom component rendered above the property display in the detail view.
-     */
-    Header?: ComponentRef<EntityDetailViewParams<M>>;
-    /**
-     * Custom component rendered below the property display in the detail view.
-     */
-    Footer?: ComponentRef<EntityDetailViewParams<M>>;
-    /**
-     * Completely replace the default detail view with a custom component.
-     * When set, Header and Footer are ignored.
-     */
-    Builder?: ComponentRef<EntityDetailViewParams<M>>;
-};
-
-/**
- * Props passed to detail view customization components (Header, Footer, Builder).
- * @group Models
- */
-export interface EntityDetailViewParams<M extends Record<string, unknown> = Record<string, unknown>> {
-    collection: EntityCollection<M>;
-    entity: Entity<M>;
-    path: string;
-    onEditClick: () => void;
 }
