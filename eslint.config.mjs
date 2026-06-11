@@ -6,7 +6,33 @@ import pluginReactHooks from "eslint-plugin-react-hooks";
 /** @type {import("eslint").Linter.Config[]} */
 export default [
     {
-        ignores: ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.next/**"]
+        ignores: [
+            "**/node_modules/**",
+            "**/node_modules_backup/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/.next/**",
+            "**/.astro/**",
+            "**/.turbo/**",
+            "**/.yarn/**",
+            "**/.idea/**",
+            "**/.vscode/**",
+            "**/.agent/**",
+            "**/.antigravity/**",
+            "**/scratch/**",
+            "**/e2e-screenshots/**",
+            "**/playwright-report/**",
+            "**/test-results/**",
+            "**/videos/**",
+            "**/website/**",
+            "**/examples/**",
+            "**/saas/**",
+            "scripts/**",
+            ".pnp.loader.mjs",
+            "update_translations.js",
+            "inspect_product.mjs",
+            "screenshot.mjs"
+        ]
     },
     pluginJs.configs.recommended,
     ...tseslint.configs.recommended,

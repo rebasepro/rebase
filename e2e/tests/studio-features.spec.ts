@@ -1,6 +1,19 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test.describe('Rebase Studio Features E2E', () => {
+  test.afterAll(async () => {
+    const filePath = path.resolve(__dirname, '../../app/config/collections/e_2_e_test_collection.ts');
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        console.error('Failed to clean up E2E collection file:', err);
+      }
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     // Perform standard demo login
     await page.goto('/');

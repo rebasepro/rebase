@@ -547,15 +547,13 @@ colors: true }));
                     }
                         break;
 
-                    // Route subscription messages to RealtimeService
+                    // Route subscription messages, broadcast channels, and presence to RealtimeService
                     case "subscribe_collection":
                     case "subscribe_entity":
                     case "unsubscribe":
-                    // Broadcast channels
                     case "join_channel":
                     case "leave_channel":
                     case "broadcast":
-                    // Presence
                     case "presence_track":
                     case "presence_untrack":
                     case "presence_state": {

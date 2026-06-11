@@ -1,14 +1,14 @@
-import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, FilterOperator, LogicalCondition, WhereValue } from "@rebasepro/types";
+import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, FilterOperator, LogicalCondition, WhereValue, FilterCondition } from "@rebasepro/types";
 
-export function or(...conditions: any[]): LogicalCondition {
+export function or(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
     return { type: "or", conditions };
 }
 
-export function and(...conditions: any[]): LogicalCondition {
+export function and(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
     return { type: "and", conditions };
 }
 
-export function cond(column: string, operator: FilterOperator, value: unknown): any {
+export function cond(column: string, operator: FilterOperator, value: unknown): FilterCondition {
     return { column, operator, value };
 }
 
@@ -24,7 +24,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      */
     where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
-    where(columnOrCondition: any, operator?: FilterOperator, value?: any): this {
+    where(columnOrCondition: string | LogicalCondition, operator?: FilterOperator, value?: unknown): this {
         // Handle LogicalCondition signature
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
             this.params.logical = columnOrCondition as LogicalCondition;

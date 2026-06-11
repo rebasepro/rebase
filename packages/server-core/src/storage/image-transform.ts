@@ -6,9 +6,10 @@
  * in-memory cache to avoid redundant processing.
  */
 
-// Lazy-load sharp to avoid crashing when it isn't installed (e.g. in tests)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sharpFactory: ((input: Buffer | Uint8Array) => any) | undefined;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getSharp(): Promise<(input: Buffer | Uint8Array) => any> {
     if (!sharpFactory) {
         try {

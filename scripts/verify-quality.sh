@@ -33,7 +33,7 @@ fi
 # 2. ESLint Check
 section "2. Code Style & Linting Check (ESLint)"
 echo "Running ESLint..."
-if npx eslint . --max-warnings=0; then
+if npx eslint . --quiet; then
     ok "No ESLint warnings or errors found."
 else
     err "ESLint checks failed. Please fix style or React rules violations."

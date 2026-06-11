@@ -1,4 +1,4 @@
-import type { VectorSearchParams, LogicalCondition } from "@rebasepro/types";
+import type { VectorSearchParams, LogicalCondition, FilterCondition } from "@rebasepro/types";
 import { QueryOptions } from "../types";
 
 /**
@@ -27,7 +27,7 @@ function getLastValue(val: unknown): unknown {
     return val;
 }
 
-export function parseLogicalString(str: string): any {
+export function parseLogicalString(str: string): FilterCondition | LogicalCondition {
     str = str.trim();
     if (str.startsWith("or(") && str.endsWith(")")) {
         const inner = str.slice(3, -1);
@@ -56,8 +56,8 @@ export function parseLogicalString(str: string): any {
         valStr = rest;
     }
     
-    const rebaseOp = mapOperator(op) || "==";
-    let parsedVal: any = valStr;
+    const rebaseOp = (mapOperator(op) || "==") as FilterCondition["operator"];
+    let parsedVal: unknown = valStr;
     if (valStr === "true") parsedVal = true;
     else if (valStr === "false") parsedVal = false;
     else if (valStr === "null") parsedVal = null;
@@ -77,8 +77,8 @@ export function parseLogicalString(str: string): any {
     return { column: field, operator: rebaseOp, value: parsedVal };
 }
 
-function parseLogicalList(str: string): any[] {
-    const list: any[] = [];
+function parseLogicalList(str: string): (FilterCondition | LogicalCondition)[] {
+    const list: (FilterCondition | LogicalCondition)[] = [];
     let depth = 0;
     let current = "";
     
@@ -152,7 +152,7 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
         if (reservedQueryKeys.includes(key)) continue;
 
         const rawValues = Array.isArray(rawValue) ? rawValue : [rawValue];
-        const conditions: [string, any][] = [];
+        const conditions: [string, unknown][] = [];
 
         for (const value of rawValues) {
             if (typeof value === "string") {

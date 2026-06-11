@@ -421,7 +421,9 @@ async function startPgContainer(): Promise<PgContainer> {
         } catch (e) {
             attempts++;
             const start = Date.now();
-            while (Date.now() - start < 500) {}
+            while (Date.now() - start < 500) {
+                // busy wait
+            }
         }
     }
 
@@ -610,6 +612,7 @@ async function run() {
                 process.stdout.write(output);
                 accumulatedOutput += output;
 
+                // eslint-disable-next-line no-control-regex
                 const cleanOutput = accumulatedOutput.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
 
                 if (cleanOutput.includes("[admin]") && (cleanOutput.includes("Local:") || cleanOutput.includes("Frontend URL:"))) {

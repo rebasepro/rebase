@@ -74,9 +74,9 @@ function convertWhereToFilter(where?: Record<string, WhereFieldValue>): FilterVa
 
         // Handle tuple or array of tuples
         if (Array.isArray(rawValue)) {
-            const conditions: [WhereFilterOpShort, any][] = Array.isArray(rawValue[0])
-                ? (rawValue as [WhereFilterOpShort, any][])
-                : [rawValue as [WhereFilterOpShort, any]];
+            const conditions: [WhereFilterOpShort, unknown][] = Array.isArray(rawValue[0])
+                ? (rawValue as [WhereFilterOpShort, unknown][])
+                : [rawValue as [WhereFilterOpShort, unknown]];
 
             const mappedConditions: [WhereFilterOp, unknown][] = conditions.map(([rawOp, val]) => {
                 const mappedOp = operatorMap[rawOp] ?? "==";

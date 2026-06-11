@@ -253,7 +253,7 @@ export function buildRebaseSearchController(
             }
 
             try {
-                const collection = await (typesenseClient as Record<string, Function>).collections(collectionName).retrieve();
+                const collection = await (typesenseClient as Record<string, (...args: any[]) => any>).collections(collectionName).retrieve();
 
                 // Extract string fields from the schema
                 const stringFields = (collection.fields as Array<{ type: string; name: string }>)
@@ -335,7 +335,7 @@ export function buildRebaseSearchController(
                     searchParams.filter_by = parentFilter;
                 }
 
-                const result = await (typesenseClient as Record<string, Function>)
+                const result = await (typesenseClient as Record<string, (...args: any[]) => any>)
                     .collections(collectionName)
                     .documents()
                     .search(searchParams);

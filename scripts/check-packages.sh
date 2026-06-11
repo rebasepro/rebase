@@ -49,9 +49,10 @@ for pkg_dir in "$PACKAGES_DIR"/*/; do
     [ -f "$pkg_json" ] || continue
 
     # Collect unique @rebasepro/* imports from source (not from test files)
-    imports=$(grep -rhoE 'from "@rebasepro/[a-zA-Z0-9_-]+"' "$src_dir" 2>/dev/null \
-        | grep -v '.test.' | grep -v '.spec.' \
-        | sed 's/from "//;s/"//' | sort -u || true)
+    imports=$(grep -rh --exclude="*.test.*" --exclude="*.spec.*" 'from "@rebasepro/[a-zA-Z0-9_-]+"' "$src_dir" 2>/dev/null \
+        | grep -vE '^\s*(\*|//|/\*)' \
+        | grep -oE '@rebasepro/[a-zA-Z0-9_-]+' \
+        | sort -u || true)
 
     for imp in $imports; do
         # Skip self-references
