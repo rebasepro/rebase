@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/types",
   "type": "module",
-  "version": "0.2.5",
+  "version": "0.4.0",
   "description": "Rebase type definitions — shared interfaces and controller types",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
