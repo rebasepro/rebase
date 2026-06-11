@@ -13,6 +13,7 @@ import {
     cleanupDevPortFile,
     logger
 } from "@rebasepro/server-core";
+import type { SecurityRule } from "@rebasepro/types";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
@@ -25,7 +26,16 @@ const app: Hono<HonoEnv> = new Hono<HonoEnv>();
 
 const isProduction = env.NODE_ENV === "production";
 const allowedOrigins = isProduction
-    ? (env.CORS_ORIGINS || env.FRONTEND_URL || "https://yourdomain.com").split(",").map(s => s.trim())
+    ? (() => {
+        const origins = env.CORS_ORIGINS || env.FRONTEND_URL;
+        if (!origins) {
+            throw new Error(
+                "CORS_ORIGINS or FRONTEND_URL must be set in production. " +
+                "Example: CORS_ORIGINS=https://yourdomain.com"
+            );
+        }
+        return origins.split(",").map(s => s.trim());
+    })()
     : [];
 
 app.use("/*", cors({
@@ -48,6 +58,13 @@ async function startServer() {
     const jwtSecret = env.JWT_SECRET;
     const PORT = env.PORT;
     const server = createServer(getRequestListener(app.fetch));
+
+    // Default security rules for collections that don't define their own.
+    // Authenticated users can read all rows; only admins can write.
+    const defaultSecurityRules: SecurityRule[] = [
+        { operation: "select", access: "public" },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ];
 
     const backend = await initializeRebaseBackend({
         collectionsDir: path.resolve(__dirname, "../../config/collections"),
@@ -87,7 +104,8 @@ relations },
                 type: "local",
                 basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
             },
-        history: true
+        history: true,
+        defaultSecurityRules
     });
 
     // ─── Health check ─────────────────────────────────────────────

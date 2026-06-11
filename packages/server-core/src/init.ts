@@ -1,4 +1,4 @@
-import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin, BackendHooks, AuthAdapter, DatabaseAdapter } from "@rebasepro/types";
+import { DataDriver, EntityCollection, BackendBootstrapper, BootstrappedAuth, RealtimeProvider, HealthCheckResult, InitializedDriver, isSQLAdmin, BackendHooks, AuthAdapter, DatabaseAdapter, SecurityRule, isPostgresCollection } from "@rebasepro/types";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DriverRegistry, DEFAULT_DRIVER_ID, DefaultDriverRegistry } from "./services/driver-registry";
@@ -136,6 +136,20 @@ export interface RebaseBackendConfig {
      */
     storage?: BackendStorageConfig | StorageController | Record<string, BackendStorageConfig | StorageController>;
     history?: unknown;
+    /**
+     * Default security rules applied to any collection that does not define
+     * its own `securityRules`. Opt-in — if not set, collections without
+     * explicit rules remain unrestricted (beyond `requireAuth`).
+     *
+     * @example
+     * ```ts
+     * defaultSecurityRules: [
+     *     { operation: "select", access: "public" },
+     *     { operations: ["insert", "update", "delete"], roles: ["admin"] }
+     * ]
+     * ```
+     */
+    defaultSecurityRules?: SecurityRule[];
     enableSwagger?: boolean;
     functionsDir?: string;
     cronsDir?: string;
@@ -291,6 +305,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
         logger.info("Auto-discovered collections", { count: activeCollections.length,
 dir: config.collectionsDir });
+    }
+
+    // Apply default security rules to collections that don't define their own
+    if (config.defaultSecurityRules?.length) {
+        for (const collection of activeCollections) {
+            if (isPostgresCollection(collection) && (!collection.securityRules || collection.securityRules.length === 0)) {
+                collection.securityRules = config.defaultSecurityRules;
+            }
+        }
+        logger.info("Default security rules applied to collections without explicit rules");
     }
 
     if (config.auth) {

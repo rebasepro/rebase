@@ -510,3 +510,55 @@ describe("docker-compose.yml", () => {
         expect(compose).toContain("uploads");
     });
 });
+
+// =============================================================================
+// Scaffold security & quality (audit fixes)
+// =============================================================================
+
+describe("scaffold security defaults", () => {
+    describe("users collection", () => {
+        it("has securityRules defined", () => {
+            const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+            const content = fs.readFileSync(usersPath, "utf-8");
+            expect(content).toContain("securityRules");
+        });
+
+        it("restricts all operations to admin role", () => {
+            const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+            const content = fs.readFileSync(usersPath, "utf-8");
+            expect(content).toContain('"admin"');
+            // Should not have access: "public" on users (sensitive fields)
+            expect(content).not.toContain('access: "public"');
+        });
+
+        it("has autoValue on createdAt", () => {
+            const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+            const content = fs.readFileSync(usersPath, "utf-8");
+            expect(content).toContain('autoValue: "on_create"');
+        });
+    });
+
+    describe("backend template", () => {
+        it("configures defaultSecurityRules", () => {
+            const indexPath = path.join(TEMPLATE_DIR, "backend", "src", "index.ts");
+            const content = fs.readFileSync(indexPath, "utf-8");
+            expect(content).toContain("defaultSecurityRules");
+        });
+
+        it("does not silently fallback to a placeholder CORS domain", () => {
+            const indexPath = path.join(TEMPLATE_DIR, "backend", "src", "index.ts");
+            const content = fs.readFileSync(indexPath, "utf-8");
+            // Should throw instead of silently using a non-existent domain
+            expect(content).not.toMatch(/\|\|\s*["']https:\/\/yourdomain\.com["']/);
+            expect(content).toContain("throw new Error");
+        });
+    });
+
+    describe(".gitignore", () => {
+        it("ignores both .rebase-dev-url and .rebase-dev-port", () => {
+            const gitignore = fs.readFileSync(path.join(TEMPLATE_DIR, ".gitignore"), "utf-8");
+            expect(gitignore).toContain(".rebase-dev-url");
+            expect(gitignore).toContain(".rebase-dev-port");
+        });
+    });
+});

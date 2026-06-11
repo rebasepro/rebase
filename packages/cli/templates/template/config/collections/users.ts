@@ -11,6 +11,10 @@ const usersCollection: EntityCollection = {
     group: "Settings",
     openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
+    securityRules: [
+        { operation: "select", roles: ["admin"] },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ],
     entityActions: [
         resetPasswordAction,
         {
@@ -113,6 +117,7 @@ const usersCollection: EntityCollection = {
             name: "Created At",
             type: "date",
             columnName: "created_at",
+            autoValue: "on_create",
             ui: {
                 readOnly: true
             }

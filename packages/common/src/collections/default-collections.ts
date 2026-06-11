@@ -17,6 +17,10 @@ export const defaultUsersCollection: PostgresCollection = {
     group: "Settings",
     openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
+    securityRules: [
+        { operation: "select", roles: ["admin"] },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ],
     sort: ["createdAt", "desc"],
     properties: {
         id: {
@@ -91,6 +95,7 @@ export const defaultUsersCollection: PostgresCollection = {
             name: "Created At",
             type: "date",
             columnName: "created_at",
+            autoValue: "on_create",
             ui: { readOnly: true }
         },
         updatedAt: {

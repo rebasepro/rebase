@@ -32,6 +32,8 @@ export function ReadOnlyFieldBinding({
     // if (!context.entityId)
     //     throw new Error("ReadOnlyFieldBinding: Entity id is null");
 
+    const skipCardWrapper = property.type === "relation" || property.type === "reference";
+
     return (
 
         <>
@@ -45,7 +47,7 @@ export function ReadOnlyFieldBinding({
             }
 
             <div
-                className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-scroll no-scrollbar")}>
+                className={cls(!skipCardWrapper && paperMixin, "w-full min-h-14 overflow-x-scroll no-scrollbar", !skipCardWrapper && "p-4 md:p-6")}>
 
                 <ErrorBoundary>
                     <PropertyPreview propertyKey={propertyKey}
