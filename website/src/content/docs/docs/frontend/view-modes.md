@@ -20,9 +20,9 @@ const productsCollection: EntityCollection = {
     slug: "products",
     defaultViewMode: "table",            // Default view
     enabledViews: ["list", "table", "kanban"],    // Available views
+    orderProperty: "sort_order",         // Property for drag-and-drop ordering
     kanban: {
-        columnProperty: "status",        // Enum property for columns
-        orderProperty: "sort_order"      // Property for drag-and-drop ordering
+        columnProperty: "status"         // Enum property for columns
     },
     // ...
 };
@@ -70,9 +70,9 @@ Configure a Kanban board by specifying which enum property to use as columns:
 const tasksCollection: EntityCollection = {
     slug: "tasks",
     defaultViewMode: "kanban",
+    orderProperty: "sort_order",
     kanban: {
-        columnProperty: "status",
-        orderProperty: "sort_order"
+        columnProperty: "status"
     },
     properties: {
         title: { type: "string", name: "Title" },

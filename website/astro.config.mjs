@@ -49,246 +49,106 @@ export default defineConfig({
                     label: "Getting Started",
                     collapsed: false,
                     items: [
-                        {
-                            label: "Introduction",
-                            slug: "docs"
-                        },
-                        {
-                            label: "Quickstart",
-                            slug: "docs/getting-started/quickstart"
-                        },
-                        {
-                            label: "Project Structure",
-                            slug: "docs/getting-started/project-structure"
-                        },
-                        {
-                            label: "Configuration",
-                            slug: "docs/getting-started/configuration"
-                        }
-                    ]
-                },
-                {
-                    label: "Deployment",
-                    collapsed: false,
-                    items: [
-                        { label: "Overview",
-slug: "docs/getting-started/deployment" },
-                        { label: "AWS",
-slug: "docs/deployment/aws" },
-                        { label: "Google Cloud",
-slug: "docs/deployment/gcp" },
-                        { label: "Azure",
-slug: "docs/deployment/azure" },
-                        { label: "Hetzner Cloud (EU)",
-slug: "docs/deployment/hetzner" },
-                        { label: "Scaleway (EU)",
-slug: "docs/deployment/scaleway" },
-                        { label: "Railway",
-slug: "docs/deployment/railway" },
-                        { label: "Fly.io",
-slug: "docs/deployment/flyio" }
-                    ]
-                },
-                {
-                    label: "Architecture",
-                    collapsed: false,
-                    items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/architecture"
-                        },
-                        {
-                            label: "Schema as Code",
-                            slug: "docs/architecture/schema-as-code"
-                        }
+                        { label: "Introduction", slug: "docs" },
+                        { label: "Quickstart", slug: "docs/getting-started/quickstart" },
+                        { label: "Project Structure", slug: "docs/getting-started/project-structure" },
+                        { label: "Environment & Configuration", slug: "docs/getting-started/configuration" }
                     ]
                 },
                 {
                     label: "Collections",
                     collapsed: false,
                     items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/collections"
-                        },
-                        {
-                            label: "Properties",
-                            slug: "docs/collections/properties"
-                        },
-                        {
-                            label: "Relations",
-                            slug: "docs/collections/relations"
-                        },
-                        {
-                            label: "Security Rules (RLS)",
-                            slug: "docs/collections/security-rules"
-                        },
-                        {
-                            label: "Entity Callbacks",
-                            slug: "docs/collections/callbacks"
-                        }
+                        { label: "Defining Collections", slug: "docs/collections" },
+                        { label: "Properties", slug: "docs/collections/properties" },
+                        { label: "Relations", slug: "docs/collections/relations" },
+                        { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
                     ]
                 },
                 {
                     label: "Backend",
                     collapsed: false,
                     items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/backend"
-                        },
-                        {
-                            label: "Entity History",
-                            slug: "docs/backend/history"
-                        },
-                        {
-                            label: "Cron Jobs",
-                            slug: "docs/backend/cron-jobs"
-                        },
-                        {
-                            label: "Custom Functions",
-                            slug: "docs/backend/custom-functions"
-                        },
-                        {
-                            label: "Custom Server",
-                            slug: "docs/backend/custom-server"
-                        },
-                        {
-                            label: "Global Hooks",
-                            slug: "docs/backend/hooks"
-                        }
+                        { label: "Backend Setup", slug: "docs/backend" },
+                        { label: "REST & GraphQL API", slug: "docs/backend/api" },
+                        { label: "Authentication", slug: "docs/backend/authentication" },
+                        { label: "Storage Configuration", slug: "docs/backend/storage" },
+                        { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
+                        { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
+                        { label: "Custom Functions", slug: "docs/backend/custom-functions" },
+                        { label: "Global Hooks", slug: "docs/backend/hooks" },
+                        { label: "Entity History", slug: "docs/backend/history" },
+                        { label: "Database Branching", slug: "docs/backend/branching" },
+                        { label: "Custom Server Integration", slug: "docs/backend/custom-server" }
                     ]
                 },
                 {
-                    label: "Authentication",
+                    label: "Frontend",
                     collapsed: false,
                     items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/auth"
-                        }
-                    ]
-                },
-                {
-                    label: "Storage",
-                    collapsed: true,
-                    items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/storage"
-                        }
+                        { label: "Frontend Setup", slug: "docs/frontend" },
+                        { label: "Authentication & Login", slug: "docs/frontend/authentication" },
+                        { label: "Storage & File Uploads", slug: "docs/frontend/storage" },
+                        { label: "View Modes", slug: "docs/frontend/view-modes" },
+                        { label: "Custom Fields", slug: "docs/frontend/custom-fields" },
+                        { label: "Entity Views", slug: "docs/frontend/entity-views" },
+                        { label: "Entity Actions", slug: "docs/frontend/entity-actions" },
+                        { label: "Additional Columns", slug: "docs/frontend/additional-columns" },
+                        { label: "Data Import & Export", slug: "docs/frontend/data-import-export" },
+                        { label: "Plugins", slug: "docs/plugins" },
+                        { label: "Hooks Reference", slug: "docs/hooks" }
                     ]
                 },
                 {
                     label: "Client SDK",
-                    collapsed: true,
+                    collapsed: false,
                     items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/sdk"
-                        }
+                        { label: "Getting Started", slug: "docs/sdk" },
+                        { label: "Querying Data", slug: "docs/sdk/querying" },
+                        { label: "Authentication", slug: "docs/sdk/authentication" },
+                        { label: "Realtime Subscriptions", slug: "docs/sdk/realtime" },
+                        { label: "Storage & Files", slug: "docs/sdk/storage" }
                     ]
                 },
                 {
-                    label: "Frontend (React)",
+                    label: "CLI & Tooling",
                     collapsed: true,
                     items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/frontend"
-                        },
-                        {
-                            label: "View Modes",
-                            slug: "docs/frontend/view-modes"
-                        },
-                        {
-                            label: "Custom Fields",
-                            slug: "docs/frontend/custom-fields"
-                        },
-                        {
-                            label: "Entity Views",
-                            slug: "docs/frontend/entity-views"
-                        },
-                        {
-                            label: "Entity Actions",
-                            slug: "docs/frontend/entity-actions"
-                        },
-                        {
-                            label: "Additional Columns",
-                            slug: "docs/frontend/additional-columns"
-                        }
+                        { label: "CLI Commands", slug: "docs/cli" },
+                        { label: "Schema Generation", slug: "docs/cli/schema" },
+                        { label: "Studio", slug: "docs/studio" }
                     ]
                 },
                 {
-                    label: "Hooks Reference",
+                    label: "Architecture",
                     collapsed: true,
                     items: [
-                        {
-                            label: "All Hooks",
-                            slug: "docs/hooks"
-                        }
+                        { label: "How Rebase Works", slug: "docs/architecture" },
+                        { label: "Schema as Code", slug: "docs/architecture/schema-as-code" }
                     ]
                 },
                 {
-                    label: "Plugins",
+                    label: "Deployment",
                     collapsed: true,
                     items: [
-                        {
-                            label: "Plugin System",
-                            slug: "docs/plugins"
-                        }
-                    ]
-                },
-                {
-                    label: "Studio Tools",
-                    collapsed: true,
-                    items: [
-                        {
-                            label: "Overview",
-                            slug: "docs/studio"
-                        }
-                    ]
-                },
-                {
-                    label: "CLI",
-                    collapsed: true,
-                    items: [
-                        {
-                            label: "Commands",
-                            slug: "docs/cli"
-                        }
-                    ]
-                },
-                {
-                    label: "Features",
-                    collapsed: true,
-                    items: [
-                        {
-                            label: "Data Import",
-                            slug: "docs/features/data-import"
-                        },
-                        {
-                            label: "Data Export",
-                            slug: "docs/features/data-export"
-                        }
+                        { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
+                        { label: "AWS", slug: "docs/deployment/aws" },
+                        { label: "Google Cloud", slug: "docs/deployment/gcp" },
+                        { label: "Azure", slug: "docs/deployment/azure" },
+                        { label: "Hetzner Cloud", slug: "docs/deployment/hetzner" },
+                        { label: "Scaleway", slug: "docs/deployment/scaleway" },
+                        { label: "Railway", slug: "docs/deployment/railway" },
+                        { label: "Fly.io", slug: "docs/deployment/flyio" }
                     ]
                 },
                 {
                     label: "Recipes",
                     collapsed: true,
                     items: [
-                        {
-                            label: "Blog CMS",
-                            slug: "docs/recipes/blog-cms"
-                        },
-                        {
-                            label: "Custom Dashboard",
-                            slug: "docs/recipes/custom-dashboard"
-                        },
-                        {
-                            label: "Webhook Integration",
-                            slug: "docs/recipes/webhooks"
-                        }
+                        { label: "Blog CMS", slug: "docs/recipes/blog-cms" },
+                        { label: "Custom Dashboard", slug: "docs/recipes/custom-dashboard" },
+                        { label: "Webhook Integration", slug: "docs/recipes/webhooks" }
                     ]
                 }
             ],

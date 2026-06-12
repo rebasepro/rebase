@@ -152,7 +152,7 @@ export const articlesCollection: EntityCollection = {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
-            readOnly: true
+            ui: { readOnly: true }
         }
     },
     relations: [

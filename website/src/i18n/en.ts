@@ -1,7 +1,7 @@
 export const en = {
   "hero.badge": "Open-source · Self-hosted · Postgres-native",
-  "hero.title.part1": "The Admin Panel & API Layer",
-  "hero.title.part2": "for Your Existing Postgres.",
+  "hero.title.part1": "One TypeScript Schema.",
+  "hero.title.part2": "Admin, APIs, SDK — Instantly.",
   "hero.subtitle":
     "Drop Rebase onto any PostgreSQL database—or define your model in TypeScript. Instantly get a beautiful spreadsheet-like Admin UI, instant REST/GraphQL APIs, and a type-safe SDK. 100% Open-source, self-hosted, and agent-native.",
   "hero.category": "The open-source Postgres app platform — CMS, BaaS, and internal tools in one.",

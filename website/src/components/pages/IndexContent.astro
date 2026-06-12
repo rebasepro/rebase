@@ -11,7 +11,7 @@ import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo';
 import RoadmapSection from '../../components/RoadmapSection.astro';
 import ABVariant from '../../components/ABVariant.astro';
-import AlternativesComparison from '../AlternativesComparison.astro';
+
 
 import ClientLogos from '../../components/ClientLogos.astro';
 
@@ -37,7 +37,7 @@ const translatePath = useTranslatedPath(lang);
                 <!-- Badge -->
                 <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll fade-in">
                     <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400">
-                        <span class="inline-block text-base">🐘</span>
+                        <img src="/img/postgresql-logo.svg" alt="PostgreSQL" class="h-4 w-auto" />
                         {t('hero.badge')}
                     </span>
                 </div>
@@ -45,7 +45,7 @@ const translatePath = useTranslatedPath(lang);
                 <!-- Headline -->
                 <div class="relative">
                     <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 112, 244, 0.10) 0%, rgba(0, 80, 200, 0.05) 45%, transparent 75%); filter: blur(20px);"></div>
-                    <h1 class="relative mb-6 text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                    <h1 class="relative mb-6 text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
                         {t('hero.title.part1')}<br/><span class="text-primary subtle-shimmer">{t('hero.title.part2')}</span>
                     </h1>
                 </div>
@@ -261,14 +261,7 @@ const translatePath = useTranslatedPath(lang);
 
         <section id="s-demo-carousel" class="bg-black relative py-24 sm:py-32">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <div class="text-center mb-10 max-w-2xl mx-auto animate-on-scroll fade-in-up">
-                    <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-3">
-                        Automated React Admin UI
-                    </h2>
-                    <p class="text-surface-400 text-sm leading-relaxed max-w-xl mx-auto">
-                        Your TypeScript schema generates a spreadsheet-like data manager, Kanban board, and list view instantly.
-                    </p>
-                </div>
+
                 <div style="min-height: 700px;">
                     <AdminDemoCarousel client:load />
                 </div>
@@ -278,8 +271,8 @@ const translatePath = useTranslatedPath(lang);
             </div>
         </section>
 
-        <!-- Alternatives Comparison Block -->
-        <AlternativesComparison />
+
+
 
         <!-- How it works -->
         <section id="s-how-it-works" class="relative py-28 sm:py-36 overflow-hidden bg-black">

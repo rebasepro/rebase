@@ -58,7 +58,7 @@ export const productsCollection: EntityCollection = {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
-            readOnly: true
+            ui: { readOnly: true }
         }
     }
 };
@@ -91,7 +91,7 @@ export const productsCollection: EntityCollection = {
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | How entities open for editing |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
@@ -156,10 +156,10 @@ You can set default or forced filters:
 ```typescript
 {
     // Default filter — users can change it
-    filter: { active: ["==", true] },
+    defaultFilter: { active: ["==", true] },
 
-    // Forced filter — cannot be changed
-    forceFilter: { tenant_id: ["==", currentTenantId] },
+    // Fixed filter — cannot be changed
+    fixedFilter: { tenant_id: ["==", currentTenantId] },
 
     // Default sort
     sort: ["created_at", "desc"]

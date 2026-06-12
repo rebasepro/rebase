@@ -106,17 +106,17 @@ relations: [
 Two collections connected through an intermediate junction table.
 
 ```typescript
-// On the Users collection:
+// On the Articles collection:
 relations: [
     {
-        relationName: "roles",
-        target: () => rolesCollection,
+        relationName: "tags",
+        target: () => tagsCollection,
         cardinality: "many",
         direction: "owning",
         through: {
-            table: "user_roles",         // Junction table name
-            sourceColumn: "user_id",     // FK to this collection
-            targetColumn: "role_id"      // FK to target collection
+            table: "article_tags",           // Junction table name
+            sourceColumn: "article_id",      // FK to this collection
+            targetColumn: "tag_id"           // FK to target collection
         }
     }
 ]
@@ -124,10 +124,10 @@ relations: [
 
 This creates:
 ```sql
-CREATE TABLE user_roles (
-    user_id INTEGER REFERENCES users(id),
-    role_id INTEGER REFERENCES roles(id),
-    PRIMARY KEY (user_id, role_id)
+CREATE TABLE article_tags (
+    article_id INTEGER REFERENCES articles(id),
+    tag_id INTEGER REFERENCES tags(id),
+    PRIMARY KEY (article_id, tag_id)
 );
 ```
 
