@@ -1,4 +1,3 @@
-import type { Properties } from "@rebasepro/types";
 import type { FieldProps, PropertyFieldBindingProps } from "../../types/fields";
 import type { MapProperty } from "@rebasepro/types";
 import React from "react";
@@ -10,8 +9,7 @@ import { getIconForProperty } from "../../util/property_utils";
 import { isHidden, isReadOnly } from "@rebasepro/common";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
-import { cls, ExpandablePanel, InputLabel, Select, SelectItem } from "@rebasepro/ui";
-import { pick } from "@rebasepro/utils";
+import { cls, ExpandablePanel } from "@rebasepro/ui";
 
 /**
  * Field that renders the children property fields
@@ -35,7 +33,6 @@ export function MapFieldBinding({
     onPropertyChange
 }: FieldProps<MapProperty>) {
 
-    const pickOnlySomeKeys = property.pickOnlySomeKeys || false;
     const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
     const minimalistView = minimalistViewProp || property.ui?.minimalistView;
     const { t } = useTranslation();
@@ -44,19 +41,7 @@ export function MapFieldBinding({
         throw Error(`You need to specify a 'properties' prop (or specify a custom field) in your map property ${propertyKey}`);
     }
 
-    let mapProperties: Properties;
-    if (pickOnlySomeKeys) {
-        if (value) {
-            mapProperties = pick(property.properties,
-                ...Object.keys(value)
-                    .filter(key => key in property.properties!)
-            ) as Properties;
-        } else {
-            mapProperties = {};
-        }
-    } else {
-        mapProperties = property.properties;
-    }
+    const mapProperties = property.properties;
 
     const mapFormView = <>
         <div
@@ -96,7 +81,7 @@ export function MapFieldBinding({
             }
         </div>
 
-        {/*{pickOnlySomeKeys && buildPickKeysSelect(disabled, property.properties, setValue, value)}*/}
+
 
     </>
         ;
@@ -133,30 +118,3 @@ export function MapFieldBinding({
     );
 }
 
-const buildPickKeysSelect = (disabled: boolean, properties: Properties, setValue: (value: Record<string, unknown> | null) => void, value: Record<string, unknown> | undefined) => {
-
-    const keys = Object.keys(properties)
-        .filter((key) => !value || !(key in value));
-
-    const handleAddProperty = (updatedValue: string | string[]) => {
-        setValue({
-            ...value,
-            [updatedValue as string]: null
-        });
-    };
-
-    if (!keys.length) return <></>;
-
-    return <div className={"m-4"}>
-        <InputLabel>Add property</InputLabel>
-        <Select
-            value={""}
-            fullWidth={true}
-            disabled={disabled}
-            onValueChange={handleAddProperty}
-            renderValue={(key) => (properties as Properties)[key].name || key}>
-            {keys.map((key) => <SelectItem key={key}
-                value={key}>{(properties as Properties)[key].name || key}</SelectItem>)}
-        </Select>
-    </div>;
-};

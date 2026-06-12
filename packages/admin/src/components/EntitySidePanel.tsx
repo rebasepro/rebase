@@ -103,6 +103,9 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
     // caller passed to sideEntityController.open().
     const hasCorrectedDefaultView = useRef(false);
     useEffect(() => {
+        hasCorrectedDefaultView.current = false;
+    }, [entityId]);
+    useEffect(() => {
         if (hasCorrectedDefaultView.current) return;
         if (selectedTab) return; // Already has a tab — no correction needed
         if (!entityId || !collection?.defaultSelectedView) return;

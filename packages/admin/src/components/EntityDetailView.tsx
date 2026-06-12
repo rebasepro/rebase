@@ -152,27 +152,23 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
         { status: "existing", entityId }
     ), [collection, entityId]);
 
-    // Track whether we've applied the defaultSelectedView already.
-    // See EntityEditView for a full explanation of this pattern.
-    const hasAppliedDefault = useRef(false);
+    // Track whether the user has explicitly clicked a tab in this component
+    // instance. See EntityEditViewInner for full explanation.
+    const userHasChangedTab = useRef(false);
 
     const [selectedTab, setSelectedTab] = useState<string>(() => {
         const val = selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE;
-        hasAppliedDefault.current = true;
         return val === "edit" ? MAIN_TAB_VALUE : val;
     });
     useEffect(() => {
-        const val = hasAppliedDefault.current
+        const val = userHasChangedTab.current
             ? (selectedTabProp ?? MAIN_TAB_VALUE)
             : (selectedTabProp ?? defaultSelectedView ?? MAIN_TAB_VALUE);
         const target = val === "edit" ? MAIN_TAB_VALUE : val;
-        if (!hasAppliedDefault.current) {
-            hasAppliedDefault.current = true;
-        }
         if (target !== selectedTab) {
             setSelectedTab(target);
         }
-    }, [selectedTabProp]);
+    }, [selectedTabProp, defaultSelectedView]);
 
     const subcollections = getSubcollections(collection).filter(c => !c.hideFromNavigation);
     const subcollectionsCount = subcollections?.length ?? 0;
@@ -347,6 +343,7 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
     }).filter(Boolean);
 
     const onSideTabClick = useCallback((value: string) => {
+        userHasChangedTab.current = true;
         setSelectedTab(value);
         onTabChange?.({
             path,

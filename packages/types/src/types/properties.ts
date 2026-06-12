@@ -746,15 +746,6 @@ export interface MapProperty extends BaseProperty {
      */
     previewProperties?: string[];
     /**
-     * Allow the user to add only some keys in this map.
-     * By default, all properties of the map have the corresponding field in
-     * the form view. Setting this flag to true allows to pick only some.
-     * Useful for map that can have a lot of sub-properties that may not be
-     * needed
-     */
-    pickOnlySomeKeys?: boolean;
-
-    /**
      * Render this map as a key-value table that allows to use
      * arbitrary keys. You don't need to define the properties in this case.
      */

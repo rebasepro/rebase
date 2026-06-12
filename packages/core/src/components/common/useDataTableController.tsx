@@ -128,7 +128,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         const { filterValues: urlFilterValues, sortBy: urlSortBy } = parseFilterAndSort(location.search);
         if (!fixedFilter) {
-            setFilterValues(urlFilterValues as FilterValues<Extract<keyof M, string> | (string & {})> | undefined);
+            setFilterValues((urlFilterValues ?? defaultFilter) as FilterValues<Extract<keyof M, string> | (string & {})> | undefined);
         }
         if (urlSortBy && fixedFilter && !checkFilterCombination(fixedFilter, urlSortBy)) {
             console.warn("URL sort is not compatible with the force filter.");
@@ -186,7 +186,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
     const [noMoreToLoad, setNoMoreToLoad] = useState<boolean>(false);
 
-    const clearFilter = useCallback(() => setFilterValues(fixedFilter ?? undefined), [fixedFilter]);
+    const clearFilter = useCallback(() => setFilterValues(fixedFilter ?? defaultFilter ?? undefined), [fixedFilter, defaultFilter]);
 
     const updateFilterValues = useCallback((updatedFilter: FilterValues<Extract<keyof M, string> | (string & {})> | undefined) => {
         if (fixedFilter) {
