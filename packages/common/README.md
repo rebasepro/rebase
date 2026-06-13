@@ -1,242 +1,95 @@
-<p align="center">
-  <a href="https://rebase.pro">
-    <img src="https://rebase.pro/img/logo_small.png" width="240px" alt="Rebase logo" />
-  </a>
-</p>
+# @rebasepro/common
 
-<h1 align="center">Rebase</h1>
-<h3 align="center">The Open-Source Headless CMS & Admin Panel for Postgres</h3>
-<p align="center">
-  <strong>Ship production-ready backends and radically extensible back-office apps in minutes.</strong><br/>
-  Own your data, own your code. The absolute easiest way to build on PostgreSQL.
-</p>
+Shared utilities, collection registry, data driver adapter, and fluent query builder used across Rebase packages.
 
-<p align="center">
-  <a href="https://demo.rebase.pro">Live Demo</a> •
-  <a href="https://rebase.pro/docs">Documentation</a> •
-  <a href="https://rebase.pro/features">Features</a> •
-  <a href="https://github.com/rebasepro/rebase">GitHub</a> •
-  <a href="https://discord.gg/fxy7xsQm3m">Discord</a>
-</p>
-
-<p align="center">
-  <a href="https://www.npmjs.com/package/@rebasepro/core"><img src="https://img.shields.io/npm/v/@rebasepro/core.svg?style=flat-square&color=orange" alt="NPM Version" /></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-purple.svg?style=flat-square" alt="License: MIT" /></a>
-  <a href="https://www.npmjs.com/package/@rebasepro/core"><img src="https://img.shields.io/npm/dw/@rebasepro/core?style=flat-square&color=blue" alt="NPM Downloads" /></a>
-  <a href="https://discord.gg/fxy7xsQm3m"><img src="https://img.shields.io/discord/1013768502458470442?style=flat-square&logo=discord&logoColor=white&label=Discord" alt="Discord" /></a>
-</p>
-
-<br/>
-
-<p align="center">
-  <img src="https://rebase.pro/img/demo_products.png" width="800px" alt="Rebase Dashboard" />
-</p>
-
----
-
-## What is Rebase?
-
-Rebase is a **developer-first**, open-source headless CMS and admin panel framework built with **React** and **TypeScript**. It gives you a complete backend-as-a-service layer on top of PostgreSQL — including authentication, S3-compatible storage, a full admin UI, and auto-generated APIs — while letting you extend every layer with custom React components, serverless functions, and scripts.
-
-### ✨ Key Highlights
-
-- 🔓 **No Vendor Lock-in** — Self-host anywhere. Full control over your infrastructure, code, and database.
-- ⚡ **Instant Setup** — `npx @rebasepro/cli init` scaffolds a production-ready project in seconds.
-- 🗄️ **PostgreSQL First** — First-class Postgres support with Drizzle ORM, schema introspection, and automatic migrations.
-- 🧩 **Radical Extensibility** — Not constrained to pre-built widgets. If you can build it in React, you can build it in Rebase.
-- 🎨 **Premium UI** — Fast, accessible design system built on Tailwind CSS v4 and Radix UI.
-- 🤖 **AI-Ready** — MCP server for AI-assisted database management, plus data enhancement and insights plugins.
-
----
-
-## ⚡ Quick Start
-
-Scaffold a complete, self-hosted Rebase application connected to your database:
+## Installation
 
 ```bash
-npx @rebasepro/cli init my-rebase-app
+pnpm add @rebasepro/common
 ```
 
-Configure your database in `.env`, then start everything:
+## What This Package Does
 
-```bash
-cd my-rebase-app
-npm run dev
-```
+`@rebasepro/common` is the lowest-level shared logic layer in the Rebase frontend stack. It provides:
 
-Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`.
+- **Collection utilities** — collection registry, default collection definitions, path resolution, navigation helpers
+- **Data driver adapter** — `buildRebaseData()` bridges any `DataDriver` implementation into a `RebaseData` proxy with typed collection accessors
+- **Query builder** — fluent `QueryBuilder` class plus `or()`, `and()`, `cond()` helpers for composing complex queries
+- **Entity/property utilities** — entity resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
 
----
+This package has no React dependency — it's pure TypeScript and can be used in both client and server contexts.
 
-## Features
+## Key Exports
 
-### 🏓 Full Admin Panel & CMS
+### Data
 
-An incredibly fast, windowed spreadsheet view to manage your database with inline editing, real-time updates, filtering, sorting, and text search. Switch between multiple view modes:
-
-- **Spreadsheet table** — Inline editing, column reordering, drag-and-drop
-- **Card grid** — Visual overview with image previews
-- **List view** — Compact, scannable layout
-- **Custom views** — Build any React component as a collection view
-
-### 🔒 Typed Schema & Database Migrations
-
-Define your data models using pure TypeScript collections. Rebase automatically generates your Drizzle ORM schema, handles PostgreSQL migrations, and keeps your live database perfectly in sync using built-in tooling like `rebase doctor`.
-
-### 🔐 Authentication & Access Control
-
-Built-in authentication with multiple providers:
-
-- **Email/Password** — With password reset flow
-- **Google OAuth** — One-click sign-in
-- **Anonymous** — For guest access
-
-Granular **role-based access control (RBAC)** with customizable permissions per collection, field, and action.
-
-### 📦 S3-Compatible Storage
-
-Native S3-compatible file storage with:
-
-- Drag-and-drop uploads with progress tracking
-- Automatic image resizing and optimization
-- File metadata management
-- Storage browser in Studio
-
-### 🛠️ Studio — Developer Toolbox
-
-A full developer environment built into the admin panel:
-
-| Tool | Description |
+| Export | Description |
 |---|---|
-| **SQL Editor** | Write and execute SQL queries directly against your database with schema-aware autocomplete |
-| **RLS Policy Editor** | Visual editor for PostgreSQL Row-Level Security policies |
-| **Schema Visualizer** | Interactive ER diagram of your database with relationship mapping |
-| **JS/TS Editor** | In-browser code editor for scripts and functions |
-| **API Explorer** | Browse and test your auto-generated REST API endpoints |
-| **Cron Jobs** | Schedule and monitor recurring tasks |
-| **Storage Browser** | Browse and manage files in your S3-compatible storage |
+| `buildRebaseData(driver)` | Wraps a `DataDriver` in a `Proxy`-based `RebaseData` object. Property access like `data.products` returns a `CollectionAccessor` for that collection slug (camelCase → snake_case). |
+| `QueryBuilder<M>` | Fluent query builder with `.where()`, `.orderBy()`, `.limit()`, `.offset()`, `.search()`, `.include()`, `.find()`, and `.listen()` |
+| `or(...conditions)` | Create an OR logical condition |
+| `and(...conditions)` | Create an AND logical condition |
+| `cond(column, op, value)` | Create a single filter condition |
 
-### ⚡ Extensible API & Edge Functions
+### Collections
 
-Drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` directories. Rebase auto-loads them with database access and JWT authentication middleware injected automatically.
+| Export | Description |
+|---|---|
+| `CollectionRegistry` | Registry for managing collection definitions |
+| Default collections | Pre-built collection configurations |
 
-### 🧬 SDK Generator
+### Utilities
 
-Auto-generate fully typed **TypeScript SDKs** from your collection definitions. Use them in any frontend, script, or service to interact with your Rebase backend with complete type safety.
+| Module | Contents |
+|---|---|
+| `collections` | Collection config helpers |
+| `common` | General-purpose utilities |
+| `entities` | Entity value resolution |
+| `enums` | Enum type helpers |
+| `paths` | Path parsing and manipulation |
+| `resolutions` | Property and collection resolution |
+| `permissions` | Permission evaluation |
+| `references` | Reference property helpers |
+| `relations` | Relation property helpers |
+| `navigation_from_path` | Build navigation tree from a path |
+| `parent_references_from_path` | Extract parent references |
+| `builders` | Collection/property builder utilities |
+| `storage` | Storage path utilities |
+| `callbacks` | Callback composition utilities |
+| `conditions` | Conditional logic helpers |
+| `navigation_utils` | Navigation tree utilities |
 
-```bash
-npx @rebasepro/cli generate-sdk
+## Quick Start
+
+```ts
+import { buildRebaseData, QueryBuilder, or, cond } from "@rebasepro/common";
+
+// Wrap a DataDriver into a proxy-based data accessor
+const data = buildRebaseData(myDriver);
+
+// Access collections by name (camelCase auto-converts to snake_case)
+const { data: products } = await data.products.find({ limit: 10 });
+const entity = await data.products.findById("abc-123");
+
+// Fluent query builder
+const { data: results } = await data.products
+    .where("status", "==", "published")
+    .orderBy("created_at", "desc")
+    .limit(20)
+    .find();
+
+// Complex logical queries
+const { data: filtered } = await data.products
+    .where(or(
+        cond("category", "==", "electronics"),
+        cond("price", ">=", 100)
+    ))
+    .find();
 ```
 
-### 🤖 MCP Server
+## Related Packages
 
-A built-in **Model Context Protocol** server that enables AI assistants to:
-
-- Query and manage your database schema
-- Create, read, update, and delete documents
-- Manage users and roles
-- Introspect your data model
-
-### 🔍 Schema Inference & Introspection
-
-Point Rebase at an existing PostgreSQL database and automatically generate collection definitions from your tables — including types, relations, validation constraints, and more.
-
-### 📥📤 Import & Export
-
-Import data from **CSV, JSON, and Excel** with an intuitive field mapper. Export your data in multiple formats with configurable column selection.
-
-### 🧩 Plugins
-
-Extend the admin experience with first-party plugins:
-
-- **Data Enhancement** — AI-powered field suggestions and auto-fill
-- **Insights** — Analytics dashboards and usage metrics
-
-### 📜 Standalone Scripting
-
-Write standalone data manipulation scripts that connect directly to your running backend using the `@rebasepro/client` SDK. The CLI persists the dev server URL to `.rebase-dev-url` for zero-config local development.
-
-### 🧩 Custom Views & React Extensibility
-
-Build entirely custom views — dashboards, previews, charts — and drop them into the main navigation or as entity-level tabs. Use built-in hooks to interact with Rebase's internal state.
-
----
-
-## 🛠️ Core Technologies
-
-Built entirely on modern, battle-tested web standards:
-
-| Technology | What we use it for |
-|---|---|
-| 💙 **TypeScript 5.x** | End-to-end type safety |
-| ⚛️ **React 19** | Component-driven UI |
-| 🌊 **Tailwind CSS v4** | Utility-first styling |
-| 🔌 **WebSockets** | Real-time synchronization |
-| 🗄️ **Drizzle ORM** | Type-safe SQL migrations and queries |
-| 🧱 **Radix UI** | Accessible UI primitives |
-| 📝 **TipTap v3** | Rich text editing |
-| 🌐 **Hono** | Ultrafast HTTP server framework |
-
----
-
-## 📦 Packages
-
-Rebase is structured as a modular monorepo — install only the layers you need:
-
-| Package | Description |
-|---|---|
-| `@rebasepro/types` | Core TypeScript type definitions |
-| `@rebasepro/utils` | Shared utility functions |
-| `@rebasepro/common` | Common modules shared across packages |
-| `@rebasepro/formex` | Lightweight form management library |
-| `@rebasepro/ui` | Standalone React component library (Tailwind + Radix) |
-| `@rebasepro/core` | Core CMS logic and controllers |
-| `@rebasepro/client` | Client-side data access layer |
-| `@rebasepro/client-postgresql` | PostgreSQL client adapter |
-| `@rebasepro/client-firebase` | Firebase/Firestore client adapter |
-| `@rebasepro/server-core` | Server framework and middleware (Hono) |
-| `@rebasepro/server-postgresql` | PostgreSQL server adapter with Drizzle |
-| `@rebasepro/server-mongodb` | MongoDB server adapter |
-| `@rebasepro/auth` | Authentication controllers and login views |
-| `@rebasepro/admin` | Full admin panel interface |
-| `@rebasepro/studio` | SQL editor, RLS editor, schema visualizer, API explorer |
-| `@rebasepro/cli` | CLI for project scaffolding and management |
-| `@rebasepro/sdk-generator` | TypeScript SDK code generation |
-| `@rebasepro/mcp-server` | MCP server for AI integrations |
-| `@rebasepro/schema-inference` | Database schema introspection and inference |
-| `@rebasepro/plugin-data-enhancement` | AI-powered data enhancement plugin |
-| `@rebasepro/plugin-insights` | Analytics and insights plugin |
-
----
-
-## 🎨 Standalone UI Library
-
-Rebase exposes its design system as a completely independent library. Fully typed, accessible, and customizable via Tailwind CSS v4:
-
-```bash
-npm install @rebasepro/ui
-```
-
----
-
-## Demo
-
-Explore a live interactive sandbox with all features — data resets periodically:
-
-**👉 [demo.rebase.pro](https://demo.rebase.pro)**
-
----
-
-## Support & Community
-
-- 📖 [Documentation](https://rebase.pro/docs)
-- 💬 [Discord Community](https://discord.gg/fxy7xsQm3m)
-- 🐛 [GitHub Issues](https://github.com/rebasepro/rebase/issues)
-- 📝 [Changelog](./CHANGELOG.md)
-
----
-
-## License
-
-Rebase is open-source and licensed under the **MIT License**.
-See the full [License](https://github.com/rebasepro/rebase/blob/main/LICENSE) for details.
+- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Entity`, `FindResponse`, etc.
+- [`@rebasepro/utils`](../utils) — Low-level utilities (`toSnakeCase`, etc.)
+- [`@rebasepro/core`](../core) — Runtime layer that consumes `@rebasepro/common`
+- [`@rebasepro/client`](../client) — HTTP client that re-exports and extends the `QueryBuilder`

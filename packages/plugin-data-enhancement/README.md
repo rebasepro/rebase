@@ -1,89 +1,81 @@
-## Rebase Data enhancement plugin
+# @rebasepro/plugin-data-enhancement
 
-This plugin allows you to enhance data in your [Rebase](https://rebase.pro)
-project, using ChatGPT.
+AI-powered data autofill and text autocomplete plugin for Rebase.
 
-The ChatGPT plugin allows you to use the OpenAI API to generate content using
-the latest GPT models. This plugin is able to understand the structure of your
-data and generate content that fits your schema.
+## Installation
 
-<p align="center">
-    <img src="https://rebase.pro/img/data_enhancement.png" width="800px" alt="Data enhancement UI" />
-</p>
-
-In order to be able to use this plugin you need to have a valid subscription.
-
-You can get a subscription in
-the [Rebase dashboard](https://app.rebase.pro/subscriptions).
-
-You need to specify the Firebase project id you would like to use the plugin
-with,
-in the website. And that's it!
-
-No need to add any subscription key or anything like that.
-
-```tsx
-import React from "react";
-import { Rebase } from "@rebasepro/core";
-import "@fontsource/rubik";
-import "@fontsource/jetbrains-mono";
-
-import { useDataEnhancementPlugin } from "@rebasepro/data_enhancement";
-
-// TODO: Replace with your Firebase config
-const firebaseConfig = {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
-};
-
-export default function App() {
-
-    const dataEnhancementPlugin = useDataEnhancementPlugin({
-        // Optional callback for defining which collections should be enhanced
-        getConfigForPath: ({ path }) => {
-            if (path === "books")
-                return true;
-            return false;
-        }
-    });
-
-    const plugins = [dataEnhancementPlugin];
-    
-    const navigationController = useBuildNavigationStateController({
-        // ... rest of your config
-        plugins
-    }); 
-    
-    return <Rebase
-        name={"My Online Shop"}
-        plugins={[dataEnhancementPlugin]}
-        authentication={myAuthenticator}
-        navigationController={navigationController}
-        firebaseConfig={firebaseConfig}
-    />;
-}
+```bash
+pnpm add @rebasepro/plugin-data-enhancement
 ```
 
-## How does it work?
+**Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`, `react-router >= 6.28.0`, `react-router-dom >= 6.28.0`
 
-This plugin uses the OpenAI API to generate content using the latest GPT models.
-This plugin is able to understand the structure of your data and generate
-content that fits your schema.
+## What This Package Does
 
-Some tips in order to get the best results:
+This plugin adds AI-powered capabilities to the Rebase admin panel:
 
-- Make sure you select the **right data** type for your fields.
-- The **field names** are used to generate the content and are usually enough to
-  generate good results. If you want to get even better results, you can
-  **add a description** to your fields. This will help the plugin understand the
-  context of your data and generate better results.
-- The **collection name** is important as well.
-- You can establish **relations between fields** and the plugin will pick it up.
-  e.g. if you have a field called `author` and another field called `book`, the
-  plugin will understand that the author is related to the book and will
-  generate content accordingly. You can use this for making **summaries, reviews,
-  translations, SEO content**, etc.
+- **Form autofill** — An "Enhance" action button injected into entity forms that uses AI to suggest and fill field values based on collection schema and existing data.
+- **Editor autocomplete** — A streaming text autocomplete controller for rich text editors, powered by an AI backend.
+
+It registers as a standard `RebasePlugin`, injecting UI slots and providers automatically.
+
+## Key Exports
+
+| Export | Type | Description |
+|---|---|---|
+| `useDataEnhancementPlugin` | Hook | Creates the plugin. Returns a `RebasePlugin` to pass to your app's `plugins` array |
+| `DataEnhancementPluginProps` | Type | Configuration options for the plugin |
+| `useEditorAIController` | Hook | Returns an `EditorAIController` with a streaming `autocomplete` method for rich text editors |
+
+### `DataEnhancementPluginProps`
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `apiKey` | `string` | Built-in default key | API key for the data enhancement service |
+| `getConfigForPath` | `(props: { path, collection, user }) => boolean` | — | Return `false` to disable enhancement for specific paths |
+| `host` | `string` | — | Custom API host (development only) |
+
+## Quick Start
+
+```tsx
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
+
+// In your app setup:
+const dataEnhancementPlugin = useDataEnhancementPlugin({
+    getConfigForPath: ({ path, collection }) => {
+        // Disable for certain collections
+        return collection.name !== "system_logs";
+    }
+});
+
+// Pass to your Rebase app:
+<RebaseFirebaseApp
+    plugins={[dataEnhancementPlugin]}
+    // ...other props
+/>
+```
+
+### Editor AI Autocomplete
+
+```tsx
+import { useEditorAIController } from "@rebasepro/plugin-data-enhancement";
+
+const aiController = useEditorAIController({
+    getAuthToken: () => firebaseUser.getIdToken()
+});
+
+// Use in a rich text editor:
+await aiController.autocomplete(
+    "The quick brown",   // text before cursor
+    " over the fence",   // text after cursor
+    (delta) => {         // streaming callback
+        appendText(delta);
+    }
+);
+```
+
+## Related Packages
+
+- `@rebasepro/admin` — The admin panel this plugin extends
+- `@rebasepro/core` — Core framework providing the plugin system
+- `@rebasepro/types` — Shared types (`RebasePlugin`, `EntityCollection`, etc.)

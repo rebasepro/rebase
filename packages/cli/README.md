@@ -1,16 +1,16 @@
-## Rebase CLI
+# @rebasepro/cli
 
-Developer tools for scaffolding, running, and managing Rebase projects.
+Developer CLI for scaffolding, running, and managing Rebase projects.
 
-### Installation
-
-The CLI is bundled with every Rebase project. You can also install it globally:
+## Installation
 
 ```bash
 pnpm add -g @rebasepro/cli
 ```
 
-### Commands
+The CLI is also bundled with every Rebase project as a local dependency.
+
+## Commands
 
 | Command | Description |
 |---------|-------------|
@@ -19,16 +19,18 @@ pnpm add -g @rebasepro/cli
 | `rebase build` | Build all workspace packages |
 | `rebase start` | Start the backend server (production) |
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
-| `rebase schema introspect` | Introspect an existing database to generate collections |
-| `rebase db push` | Apply schema directly to database (development) |
+| `rebase schema introspect` | Introspect an existing database → Rebase collections |
+| `rebase db push` | Apply schema directly to database (dev) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
 | `rebase db studio` | Open Drizzle Studio |
-| `rebase generate-sdk` | Generate a typed JS SDK from collections |
+| `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
 | `rebase auth reset-password` | Reset a user's password |
-| `rebase doctor` | Detect schema drift between collections, schema, and DB |
+| `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
 
-### Quick Start
+Run `rebase --help` or `rebase <command> --help` for detailed usage.
+
+## Quick Start
 
 ```bash
 rebase init my-app
@@ -38,21 +40,11 @@ pnpm run db:push
 pnpm run dev
 ```
 
-### Help
+## Related Packages
 
-Run `rebase --help` or `rebase <command> --help` for detailed usage information.
-
-### Development
-
-For local development of the CLI itself, link the package:
-
-```bash
-pnpm link --global
-```
-
-You can change the environment when deploying to Rebase Cloud by defining the `--env` variable.
-Possible values are `prod` (default) and `dev`.
-
-```bash
-rebase deploy --env dev
-```
+| Package | Role |
+|---------|------|
+| `@rebasepro/server-core` | Backend framework used by `dev` and `start` |
+| `@rebasepro/server-postgresql` | PostgreSQL driver used by schema/db commands |
+| `@rebasepro/sdk-generator` | Powers `generate-sdk` |
+| `@rebasepro/types` | Shared type definitions |

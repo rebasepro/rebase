@@ -1,165 +1,105 @@
-# Formex - React Form Library
+# @rebasepro/formex
 
-Formex is a lightweight, flexible library designed to simplify form handling within React applications. By leveraging React's powerful context and hooks features, Formex allows for efficient form state management with minimal boilerplate code.
-
-## Features
-
-- Lightweight and easy to integrate
-- Supports custom field components
-- Built-in validation handling
-- Provides both field-level and form-level state management
+Lightweight React form state management with undo/redo support.
 
 ## Installation
 
-To install Formex, you can use either npm or yarn:
-
-```sh
-npm install @rebasepro/formex
-
-# or if you're using yarn
-
-yarn add @rebasepro/formex
+```bash
+pnpm add @rebasepro/formex
 ```
+
+**Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`
+
+## What This Package Does
+
+Formex is a minimal, Formik-inspired form library used throughout the Rebase admin panel. It manages form values, validation, touched/dirty state, submission, and provides built-in undo/redo history tracking. It uses `fast-equals` for deep equality checks and avoids unnecessary re-renders.
+
+## Key Exports
+
+| Export | Type | Description |
+|---|---|---|
+| `useCreateFormex<T>` | Hook | Creates a `FormexController` — the primary way to initialize a form |
+| `Formex` | Component | Context provider — wraps children to share form state via `useFormex` |
+| `useFormex<T>` | Hook | Consumes the nearest `Formex` context, returns `FormexController<T>` |
+| `Field` | Component | Connects an input to the form by `name`. Supports render-prop children, `as` prop, checkbox/radio/select types |
+| `FormexController<T>` | Type | The full form controller object (values, errors, touched, dirty, submit, undo/redo, etc.) |
+| `FormexResetProps<T>` | Type | Options for `resetForm()` (values, errors, touched, submitCount) |
+| `getIn` | Utility | Deep-get a value from an object by dot/bracket path |
+| `setIn` | Utility | Immutably deep-set a value in an object by path |
+
+### `useCreateFormex` Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `initialValues` | `T` | *required* | Starting form values |
+| `initialErrors` | `Record<string, string>` | `{}` | Pre-set field errors |
+| `initialDirty` | `boolean` | `false` | Initial dirty flag |
+| `initialTouched` | `Record<string, boolean>` | `{}` | Pre-set touched fields |
+| `validation` | `(values: T) => Record<string, string> \| Promise<...> \| void` | — | Sync or async validation function |
+| `validateOnChange` | `boolean` | `false` | Run validation on every field change |
+| `validateOnInitialRender` | `boolean` | `false` | Run validation on mount |
+| `onSubmit` | `(values: T, controller) => void \| Promise<void>` | — | Submit handler |
+| `onReset` | `(controller) => void \| Promise<void>` | — | Reset callback |
+| `onValuesChangeDeferred` | `(values: T, controller) => void` | — | Debounced (300ms) callback on value changes |
+| `debugId` | `string` | — | Optional identifier for debugging |
+
+### `FormexController<T>` Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `values` | `T` | Current form values |
+| `initialValues` | `T` | The initial values the form was created with |
+| `errors` | `Record<string, string>` | Current validation errors |
+| `touched` | `Record<string, boolean>` | Which fields have been touched |
+| `dirty` | `boolean` | Whether values differ from initial |
+| `isSubmitting` | `boolean` | Whether the form is currently submitting |
+| `isValidating` | `boolean` | Whether validation is running |
+| `submitCount` | `number` | How many times submit has been called |
+| `version` | `number` | Incremented on submit and reset |
+| `canUndo` / `canRedo` | `boolean` | Whether undo/redo is available |
+| `setValues`, `setFieldValue`, `setFieldError`, `setFieldTouched`, `setDirty`, `setSubmitting`, `setTouched`, `setSubmitCount` | Functions | State setters |
+| `handleChange`, `handleBlur`, `handleSubmit` | Event handlers | Bind to form/input events |
+| `validate`, `resetForm`, `undo`, `redo` | Functions | Form actions |
 
 ## Quick Start
 
-To get started with Formex, you first need to create your form context and form controller using the `useCreateFormex` hook. Then, you can structure your form using the `<Field />` components provided by Formex.
+```tsx
+import { useCreateFormex, Formex, useFormex, Field } from "@rebasepro/formex";
 
-### Step 1: Create your form controller
-
-```jsx
-import React from 'react';
-import { useCreateFormex } from 'formex-library';
-
-const MyForm = () => {
-    const formController = useCreateFormex({
-        initialValues: {
-            name: '',
-            email: '',
+function MyForm() {
+    const controller = useCreateFormex({
+        initialValues: { name: "", email: "" },
+        validation: (values) => {
+            const errors: Record<string, string> = {};
+            if (!values.name) errors.name = "Required";
+            return errors;
         },
-        // Optionally add a validation function
-        // validation: values => {
-        //   const errors = {};
-        //   if (!values.name) errors.name = 'Name is required';
-        //   return errors;
-        // },
-        onSubmit: (values) => {
-            console.log('Form Submitted:', values);
-        },
+        onSubmit: async (values) => {
+            await saveToAPI(values);
+        }
     });
 
     return (
-        <form onSubmit={formController.handleSubmit}>
-            {/* Field components go here */}
-        </form>
+        <Formex value={controller}>
+            <form onSubmit={controller.handleSubmit}>
+                <Field name="name" />
+                <Field name="email" type="email" />
+                <button type="submit" disabled={controller.isSubmitting}>
+                    Save
+                </button>
+            </form>
+        </Formex>
     );
-};
+}
+
+// In a child component:
+function SubmitButton() {
+    const { isSubmitting, dirty } = useFormex();
+    return <button type="submit" disabled={isSubmitting || !dirty}>Save</button>;
+}
 ```
 
-### Step 2: Use the `<Field />` component
+## Related Packages
 
-```jsx
-import { Field } from 'formex-library';
-
-// Inside your form component
-<Field name="name">
-  {({ field }) => (
-    <input
-      {...field}
-      placeholder="Your name"
-    />
-  )}
-</Field>
-
-<Field name="email">
-  {({ field }) => (
-    <input
-      {...field}
-      type="email"
-      placeholder="Your email"
-    />
-  )}
-</Field>
-
-<button type="submit">Submit</button>
-```
-
-### Handling Submissions
-
-Wrap your form inputs and submit button within a form element and pass the `submitForm` method from your form controller to the form's `onSubmit` event:
-
-```jsx
-<form onSubmit={formController.handleSubmit}>
-    {/* Fields and submit button */}
-</form>
-```
-
-## API Reference
-
-### `useCreateFormex`
-
-Hook to create a form controller.
-
-**Parameters**
-
-- `initialValues`: An object with your form's initial values.
-- `initialErrors` (optional): An object for any initial validation errors.
-- `validation` (optional): A function for validating form data.
-- `validateOnChange` (optional): If `true`, validates fields whenever they change.
-- `onSubmit`: A function that fires when the form is submitted.
-
-
-### `<Field />`
-
-A component used to render individual form fields.
-
-**Props**
-
-- `name`: The name of the form field.
-- `as` (optional): The component or HTML tag that should be rendered. Defaults to `"input"`.
-- `children`: A function that returns the field input component. Receives field props as its parameter.
-
-**Example**
-
-```jsx
-<Field name="username">
-  {({ field }) => <input {...field} />}
-</Field>
-```
-
-## Customization
-
-Formex is designed to be flexible. You can create custom field components, use any validation library, or integrate with UI component libraries.
-
-### Using with UI Libraries
-
-```jsx
-import { Field } from 'formex-library';
-import { TextField } from 'some-ui-library';
-
-<Field name="username">
-  {({ field }) => (
-    <TextField {...field} label="Username" />
-  )}
-</Field>
-```
-
-### Custom Validation
-
-Leverage the `validation` function in `useCreateFormex` to integrate any validation logic or library.
-
-```jsx
-const validate = values => {
-  const errors = {};
-  if (!values.email.includes('@')) {
-    errors.email = 'Invalid email';
-  }
-  return errors;
-};
-```
-
-## Conclusion
-
-Formex provides a simple yet powerful way to manage forms in React applications. It reduces the amount of boilerplate code needed and offers flexibility to work with custom components and validation strategies. Whether you are building simple or complex forms, Formex can help streamline your form management process.
-
-For further examples and advanced usage, refer to the Formex documentation or source code.
+- `@rebasepro/admin` — Uses Formex for all entity editing forms
+- `@rebasepro/core` — Core Rebase framework

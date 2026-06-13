@@ -11,62 +11,191 @@ Every collection defined in Rebase automatically gets full REST CRUD and GraphQL
 
 ## REST API
 
-### Endpoint Convention
+### Base Paths
 
-All REST data endpoints follow the pattern:
-
-```
-BASE_URL/api/data/{slug}
-```
-
-Where `slug` is the collection's slug (e.g., `products`, `users`, `blog-posts`).
-
-Other API categories use their own base paths:
+All data routes are mounted under `/api/data/`. Other route categories:
 
 | Base Path | Purpose |
 |-----------|---------|
 | `/api/data/{slug}` | Collection CRUD (auto-generated) |
-| `/api/auth/*` | Authentication (login, register, refresh) |
+| `/api/data/{slug}/count` | Count matching entities |
+| `/api/data/{parent}/{parentId}/{child}` | Subcollection routes |
+| `/api/auth/*` | Authentication (login, register, refresh, OAuth) |
 | `/api/admin/*` | User & role management |
+| `/api/admin/api-keys` | Service API key management |
 | `/api/storage/*` | File uploads and downloads |
-| `/api/functions/{name}` | Custom backend functions (auto-mounted from `functions/` dir) |
+| `/api/functions/{name}` | Custom backend functions |
 | `/api/schema-editor/*` | Visual schema editor (dev only) |
+| `/api/docs` | OpenAPI 3.0.3 JSON spec |
+| `/api/swagger` | Swagger UI (dev only) |
+| `/api/graphql` | GraphQL endpoint (when enabled) |
+| `/api/graphiql` | GraphiQL IDE (dev only, when GraphQL enabled) |
+| `/api/health` | Health check (when using `RebaseApiServer`) |
+| `/api/collections` | Collections metadata (when using `RebaseApiServer`) |
 
 ### CRUD Operations
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/data/{slug}` | List documents (with filtering, sorting, pagination) |
-| `GET` | `/api/data/{slug}/:id` | Get a single document by ID |
-| `POST` | `/api/data/{slug}` | Create a new document |
-| `PUT` | `/api/data/{slug}/:id` | Update a document (full replace) |
-| `PATCH` | `/api/data/{slug}/:id` | Partial update a document |
-| `DELETE` | `/api/data/{slug}/:id` | Delete a document |
+> **IMPORTANT FOR AGENTS:** There is NO `PATCH` method. Updates use `PUT` only. `POST` returns `201`, `DELETE` returns `204` (empty body).
 
-### Query Parameters (GET List)
+| Method | Endpoint | Description | Status |
+|--------|----------|-------------|--------|
+| `GET` | `/api/data/{slug}` | List entities (with filtering, sorting, pagination) | `200` |
+| `GET` | `/api/data/{slug}/count` | Count matching entities (with optional filters) | `200` |
+| `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
+| `POST` | `/api/data/{slug}` | Create a new entity | `201` |
+| `PUT` | `/api/data/{slug}/:id` | Update an entity | `200` |
+| `DELETE` | `/api/data/{slug}/:id` | Delete an entity | `204` |
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `limit` | Max results per page (default: 25) | `?limit=50` |
-| `offset` | Skip N results | `?offset=25` |
-| `orderBy` | Sort field | `?orderBy=created_at` |
-| `order` | Sort direction (`asc`/`desc`) | `?order=desc` |
-| `filter[field][op]` | Field filter | `?filter[price][gte]=100` |
+### Subcollection Routes
+
+For collections with relations, Rebase generates nested routes automatically. The URL pattern is `/{parent}/{parentId}/{child}`, and it supports arbitrarily deep nesting (parent/id/child/id/grandchild):
+
+| Method | Endpoint | Description | Status |
+|--------|----------|-------------|--------|
+| `GET` | `/api/data/{parent}/{parentId}/{child}` | List child entities | `200` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}/count` | Count child entities | `200` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}/:id` | Get a single child entity | `200` |
+| `POST` | `/api/data/{parent}/{parentId}/{child}` | Create a child entity | `201` |
+| `PUT` | `/api/data/{parent}/{parentId}/{child}/:id` | Update a child entity | `200` |
+| `DELETE` | `/api/data/{parent}/{parentId}/{child}/:id` | Delete a child entity | `204` |
+
+**Example:** List all posts by author `111094`:
+```bash
+GET /api/data/authors/111094/posts
+```
+
+## Query Parameters
+
+### Pagination
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | `20` | Max results per page (max: `100`) |
+| `offset` | integer | `0` | Number of records to skip |
+| `page` | integer | — | Page number (alternative to offset). Calculates offset as `(page - 1) * limit` |
+
+> **IMPORTANT FOR AGENTS:** The default limit is **20**, NOT 25. The max limit is **100**.
+
+### Sorting
+
+Use the `orderBy` parameter. Two formats are supported:
+
+**Simple format:**
+```
+?orderBy=field:direction
+```
+
+**JSON array format (for multi-column sort):**
+```
+?orderBy=[{"field":"created_at","direction":"desc"},{"field":"name","direction":"asc"}]
+```
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `orderBy` | string | Sort field and direction | `?orderBy=created_at:desc` |
+
+### Filtering (PostgREST-Style)
+
+> **IMPORTANT FOR AGENTS:** Filters use PostgREST-style syntax: `?field=op.value`. This is NOT bracket syntax. For example: `?status=eq.active`, NOT `?filter[status][eq]=active`.
+
+Every field in the collection can be used as a query parameter with an operator prefix:
+
+```
+?{field}={operator}.{value}
+```
+
+**Implicit equality:** A plain value without an operator prefix implies equality:
+```
+?status=active          →  status == "active"
+?price=29.99            →  price == 29.99
+```
 
 ### Filter Operators
 
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `eq` | Equal | `?filter[status][eq]=active` |
-| `neq` | Not equal | `?filter[status][neq]=archived` |
-| `gt` | Greater than | `?filter[price][gt]=50` |
-| `gte` | Greater than or equal | `?filter[price][gte]=50` |
-| `lt` | Less than | `?filter[price][lt]=100` |
-| `lte` | Less than or equal | `?filter[price][lte]=100` |
-| `like` | Pattern match (SQL LIKE) | `?filter[name][like]=%widget%` |
-| `in` | In list | `?filter[status][in]=active,published` |
+| Operator | Mapped To | Description | Example |
+|----------|-----------|-------------|---------|
+| `eq` | `==` | Equal | `?status=eq.active` |
+| `neq` | `!=` | Not equal | `?status=neq.archived` |
+| `gt` | `>` | Greater than | `?price=gt.50` |
+| `gte` | `>=` | Greater than or equal | `?price=gte.50` |
+| `lt` | `<` | Less than | `?price=lt.100` |
+| `lte` | `<=` | Less than or equal | `?price=lte.100` |
+| `in` | `in` | Value in list | `?status=in.(active,published)` |
+| `nin` | `not-in` | Value not in list | `?status=nin.(archived,deleted)` |
+| `cs` | `array-contains` | Array contains value | `?tags=cs.javascript` |
+| `csa` | `array-contains-any` | Array contains any of values | `?tags=csa.(javascript,typescript)` |
 
-### Response Format
+> **WARNING FOR AGENTS:** There is NO `like` operator. Use `searchString` for text search instead.
+
+**Array values** for `in`, `nin`, and `csa` use parenthesized comma-separated lists: `(val1,val2,val3)`.
+
+**Automatic type coercion:** The values `true`, `false`, `null`, and numeric strings are automatically parsed to their corresponding types.
+
+### Logical Operators (or / and)
+
+For complex conditions, use the `or` and `and` query parameters with nested condition strings:
+
+```
+?or=(status.eq.active,status.eq.pending)
+?and=(price.gte.10,price.lte.100)
+```
+
+Nested logical conditions are also supported:
+
+```
+?or=(status.eq.active,and(price.gte.10,price.lte.50))
+```
+
+### Full-Text Search
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `searchString` | string | Full-text search query across searchable fields |
+
+```
+?searchString=widget
+```
+
+### Relation Includes (Eager Loading)
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `include` | string | Comma-separated list of relations to eager-load | `?include=author,tags` |
+
+Use `*` to include all relations:
+```
+?include=*
+```
+
+### Field Selection
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `fields` | string | Comma-separated list of fields to return | `?fields=id,name,price` |
+
+### Vector Similarity Search
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `vector_search` | string | Name of the vector property to search | `?vector_search=embedding` |
+| `vector` | string | JSON array of numbers (query vector) | `?vector=[0.1,0.2,0.3]` |
+| `vector_distance` | string | Distance function: `cosine`, `l2`, or `inner_product` (default: `cosine`) | `?vector_distance=cosine` |
+| `vector_threshold` | number | Optional similarity threshold | `?vector_threshold=0.8` |
+
+**Example — vector similarity search:**
+```
+?vector_search=embedding&vector=[0.1,0.2,0.3,0.4]&vector_distance=cosine&vector_threshold=0.5
+```
+
+### Reserved Query Keys
+
+These parameter names are reserved and will NOT be interpreted as filter fields:
+
+`limit`, `offset`, `page`, `orderBy`, `include`, `fields`, `searchString`, `vector_search`, `vector`, `vector_distance`, `vector_threshold`, `or`, `and`
+
+## Response Format
+
+### List Response (GET collection)
 
 ```json
 {
@@ -74,21 +203,244 @@ Other API categories use their own base paths:
     { "id": "uuid-1", "name": "Product A", "price": 29.99 },
     { "id": "uuid-2", "name": "Product B", "price": 49.99 }
   ],
-  "pagination": {
+  "meta": {
     "total": 150,
-    "limit": 25,
+    "limit": 20,
     "offset": 0,
     "hasMore": true
   }
 }
 ```
 
-### Authentication
+> **IMPORTANT FOR AGENTS:** The pagination envelope key is `meta`, NOT `pagination`.
 
-All API requests require a valid JWT token in the `Authorization` header:
+### Single Entity Response (GET by ID)
+
+Returns the flat entity object directly (no `data` wrapper):
+
+```json
+{
+  "id": "uuid-1",
+  "name": "Product A",
+  "price": 29.99,
+  "created_at": "2025-01-15T10:30:00.000Z"
+}
+```
+
+### Create Response (POST — 201)
+
+Returns the created entity as a flat object:
+
+```json
+{
+  "id": "generated-uuid",
+  "name": "New Product",
+  "price": 19.99
+}
+```
+
+### Update Response (PUT — 200)
+
+Returns the updated entity as a flat object.
+
+### Delete Response (DELETE — 204)
+
+Returns an empty body with status `204 No Content`.
+
+### Count Response
+
+```json
+{
+  "count": 42
+}
+```
+
+## Error Handling
+
+All errors follow the canonical shape:
+
+```json
+{
+  "error": {
+    "message": "Human-readable error description",
+    "code": "ERROR_CODE",
+    "details": {}
+  }
+}
+```
+
+The `details` field is optional and only present when additional context is available.
+
+### Error Codes and HTTP Status Codes
+
+| HTTP Status | Code | Description |
+|-------------|------|-------------|
+| `400` | `BAD_REQUEST` | Invalid input or malformed request |
+| `400` | `INVALID_INPUT` | Validation failure |
+| `401` | `UNAUTHORIZED` | Missing or invalid authentication token |
+| `401` | `INVALID_CREDENTIALS` | Wrong email/password |
+| `401` | `INVALID_TOKEN` | Expired or malformed JWT |
+| `403` | `FORBIDDEN` | Insufficient permissions (e.g., API key lacks permission) |
+| `403` | `API_KEY_FORBIDDEN` | API key does not have permission for this operation |
+| `404` | `NOT_FOUND` | Entity not found |
+| `409` | `CONFLICT` | Duplicate resource (e.g., email exists) |
+| `409` | `EMAIL_EXISTS` | Registration with existing email |
+| `413` | `PAYLOAD_TOO_LARGE` | Request body exceeds max size (default 10MB) |
+| `500` | `INTERNAL_ERROR` | Unexpected server error |
+| `503` | `SERVICE_UNAVAILABLE` | Service not available |
+
+### ApiError Factory Methods
+
+The backend uses `ApiError` static methods to throw typed errors:
+
+```typescript
+ApiError.badRequest("Invalid email format", "INVALID_INPUT");
+ApiError.unauthorized("Token expired");
+ApiError.forbidden("Admin access required");
+ApiError.notFound("Entity not found");
+ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+ApiError.internal("Database connection failed");
+ApiError.serviceUnavailable("Service is down");
+```
+
+## Authentication
+
+### Bearer Token (JWT)
 
 ```
 Authorization: Bearer <jwt-token>
+```
+
+### Query Parameter Token
+
+As an alternative to the Authorization header, pass the token as a query parameter:
+
+```
+?token=<jwt-token>
+```
+
+### Service Key
+
+A static secret key for server-to-server or script authentication. When a request sends a Bearer token matching the service key, it is granted admin-level access (`userId: "service"`, `roles: ["admin"]`) without JWT verification.
+
+```
+Authorization: Bearer <service-key>
+```
+
+### API Keys (rk_ prefix)
+
+Service API keys start with the `rk_` prefix and are validated against the database. API keys have per-collection permissions controlling which CRUD operations are allowed:
+
+```
+Authorization: Bearer rk_live_abc123...
+```
+
+If an API key lacks the required permission for an operation, a `403 API_KEY_FORBIDDEN` error is returned.
+
+### Authentication Enforcement
+
+- **Default:** Auth is required (`requireAuth: true`). Requests without a valid token receive `401`.
+- **Public access:** Set `requireAuth: false` to allow anonymous access. Access control is then fully delegated to Postgres Row-Level Security (RLS) policies.
+- **Fail-closed:** The raw unscoped driver is never placed in the request context. Every request is either RLS-scoped or rejected.
+
+## DataHooks Lifecycle
+
+DataHooks run at the REST API boundary (after DB operations, before response) and apply to **all** collections. They are configured via `hooks.data` in the backend config.
+
+| Hook | Trigger | Can Modify? | Can Abort? |
+|------|---------|-------------|------------|
+| `afterRead(slug, entity, ctx)` | GET (list & single) | Return modified entity, or `null` to filter it out | No |
+| `beforeSave(slug, values, entityId, ctx)` | POST and PUT, before DB write | Return modified values | Throw to abort |
+| `afterSave(slug, entity, ctx)` | POST and PUT, after DB write | No (fire-and-forget) | No |
+| `beforeDelete(slug, entityId, ctx)` | DELETE, before DB delete | No | Throw to abort |
+| `afterDelete(slug, entityId, ctx)` | DELETE, after DB delete | No (fire-and-forget) | No |
+
+The `BackendHookContext` provides:
+
+```typescript
+interface BackendHookContext {
+  requestUser?: { userId: string; roles: string[] };
+  method: "GET" | "POST" | "PUT" | "DELETE";
+}
+```
+
+> **IMPORTANT FOR AGENTS:** `afterSave` and `afterDelete` are fire-and-forget — they run asynchronously and do not block the response. Errors in these hooks are logged but not returned to the client.
+
+**Example — masking PII for non-admin users:**
+
+```typescript
+const hooks: BackendHooks = {
+  data: {
+    afterRead(slug, entity, ctx) {
+      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
+        return { ...entity, email: "***" };
+      }
+      return entity;
+    },
+    beforeSave(slug, values, entityId, ctx) {
+      // Add audit trail
+      return { ...values, updatedBy: ctx.requestUser?.userId };
+    }
+  }
+};
+```
+
+## REST API Examples
+
+### List with filtering, sorting, and pagination
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/products?status=eq.active&price=gte.50&orderBy=created_at:desc&limit=10&offset=0&include=category"
+```
+
+### Create an entity
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "New Widget", "price": 19.99, "status": "draft"}' \
+  "https://example.com/api/data/products"
+```
+
+### Update an entity
+
+```bash
+curl -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Widget", "price": 24.99, "status": "active"}' \
+  "https://example.com/api/data/products/uuid-123"
+```
+
+### Delete an entity
+
+```bash
+curl -X DELETE \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/products/uuid-123"
+```
+
+### Count with filters
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/products/count?status=eq.active"
+```
+
+### Logical OR filtering
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/products?or=(status.eq.active,status.eq.pending)"
+```
+
+### Subcollection listing
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/authors/111094/posts?orderBy=created_at:desc&limit=5"
 ```
 
 ## GraphQL API
@@ -96,51 +448,95 @@ Authorization: Bearer <jwt-token>
 ### Endpoint
 
 ```
-BASE_URL/api/data/graphql
+POST /api/graphql
 ```
 
-GraphQL is optional and must be explicitly enabled in the backend entry point (e.g., `backend/src/index.ts` in the template).
+GraphQL is **enabled by default** (`enableGraphQL: true` in `ApiConfig`). In non-production environments, a GraphiQL IDE is also available at `/api/graphiql`.
 
 ### Auto-Generated Schema
 
-For each collection, Rebase generates:
-- **Query**: `{collectionName}` (list), `{collectionName}ById` (single)
-- **Mutation**: `create{CollectionName}`, `update{CollectionName}`, `delete{CollectionName}`
+For each collection, Rebase generates the following GraphQL types and operations:
 
-### Example Query
+**Types:**
+- `{TypeName}` — Entity output type (e.g., `Product`, `BlogPost`)
+- `{TypeName}Input` — Input type for create/update mutations
+
+The type name is derived from `collection.singularName` (spaces removed) or by removing the last character of `collection.name`.
+
+**Queries:**
+
+| Query | Arguments | Returns | Description |
+|-------|-----------|---------|-------------|
+| `{typeName}` (lowercase) | `id: String!` | `{TypeName}` | Get single entity |
+| `{collection.slug}` | `limit: Int = 20`, `offset: Int = 0`, `where: String`, `orderBy: String` | `[{TypeName}]` | List entities |
+
+**Mutations:**
+
+| Mutation | Arguments | Returns | Description |
+|----------|-----------|---------|-------------|
+| `create{TypeName}` | `input: {TypeName}Input!` | `{TypeName}` | Create entity |
+| `update{TypeName}` | `id: String!`, `input: {TypeName}Input!` | `{TypeName}` | Update entity |
+| `delete{TypeName}` | `id: String!` | `Boolean` | Delete entity (returns `true`/`false`) |
+
+### GraphQL Type Mapping
+
+| Rebase Property Type | GraphQL Type |
+|---------------------|--------------|
+| `string` | `String` |
+| `binary` | `String` |
+| `number` | `Float` |
+| `boolean` | `Boolean` |
+| `date` | `String` |
+| `array` | `[String]` |
+| `vector` | `[Float]` |
+| All others | `String` |
+
+Fields with `validation.required` are wrapped in `GraphQLNonNull`.
+
+### GraphQL Query Examples
+
+**List products with filters:**
 
 ```graphql
 query {
   products(
     limit: 10,
     offset: 0,
-    orderBy: "created_at",
-    order: DESC,
-    filter: { price: { gte: 50 } }
+    where: "{\"status\":[\"==\",\"active\"]}",
+    orderBy: "created_at"
   ) {
-    data {
-      id
-      name
-      price
-      category
-      created_at
-    }
-    pagination {
-      total
-      hasMore
-    }
+    id
+    name
+    price
+    status
+    created_at
   }
 }
 ```
 
-### Example Mutation
+> **IMPORTANT FOR AGENTS:** The `where` argument is a JSON **string**, not an object. It must be a valid JSON object where keys are field names and values are `[operator, value]` tuples. The `orderBy` argument is a plain field name string.
+
+**Get single product:**
+
+```graphql
+query {
+  product(id: "uuid-123") {
+    id
+    name
+    price
+    category
+  }
+}
+```
+
+**Create product:**
 
 ```graphql
 mutation {
   createProduct(input: {
     name: "New Widget",
     price: 19.99,
-    category: "electronics"
+    status: "draft"
   }) {
     id
     name
@@ -149,7 +545,118 @@ mutation {
 }
 ```
 
+**Update product:**
+
+```graphql
+mutation {
+  updateProduct(id: "uuid-123", input: {
+    name: "Updated Widget",
+    price: 24.99
+  }) {
+    id
+    name
+    price
+  }
+}
+```
+
+**Delete product:**
+
+```graphql
+mutation {
+  deleteProduct(id: "uuid-123")
+}
+```
+
+## OpenAPI / Swagger
+
+### OpenAPI 3.0.3 Spec
+
+Available at `GET /api/docs`. Returns a JSON OpenAPI specification that mirrors the REST API exactly.
+
+The spec includes:
+- All collection CRUD routes with parameters and schemas
+- PostgREST-style filter parameters per field
+- Subcollection routes for relations
+- Component schemas for each collection (output and input)
+- `PaginationMeta` and `ErrorResponse` component schemas
+- Security schemes (`bearerAuth` and `queryToken`) when auth is enabled
+- Proper `201` for POST and `204` for DELETE
+
+### Swagger UI
+
+Available at `GET /api/swagger` in non-production environments. Renders an interactive Swagger UI that loads the spec from `/api/docs`.
+
+## Metadata Endpoints
+
+### Health Check (RebaseApiServer only)
+
+```
+GET /api/health
+```
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "collections": ["products", "users", "orders"],
+  "driver": "postgres"
+}
+```
+
+### Collections Metadata (RebaseApiServer only)
+
+```
+GET /api/collections
+```
+
+```json
+{
+  "data": [
+    {
+      "slug": "products",
+      "name": "Products",
+      "singularName": "Product",
+      "description": "Product catalog",
+      "properties": ["name", "price", "status", "created_at"],
+      "relations": [
+        {
+          "relationName": "category",
+          "target": "categories",
+          "cardinality": "many_to_one",
+          "direction": "outbound"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Server Configuration (ApiConfig)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `basePath` | `string` | `"/api"` | Base path for all API routes |
+| `enableGraphQL` | `boolean` | `true` | Enable GraphQL endpoint |
+| `enableREST` | `boolean` | `true` | Enable REST CRUD endpoints |
+| `requireAuth` | `boolean` | `true` | Require authentication for API endpoints |
+| `pagination.defaultLimit` | `number` | `20` | Default page size |
+| `pagination.maxLimit` | `number` | `100` | Maximum allowed page size |
+| `cors.origin` | `string \| string[] \| boolean` | — | CORS origin configuration |
+| `cors.credentials` | `boolean` | `false` | Allow credentials in CORS |
+| `collections` | `EntityCollection[]` | `[]` | Collections to generate APIs for |
+| `collectionsDir` | `string` | — | Directory to auto-discover collections |
+
 ## References
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
+- **REST API Generator:** `packages/server-core/src/api/rest/api-generator.ts`
+- **Query Parser:** `packages/server-core/src/api/rest/query-parser.ts`
+- **GraphQL Generator:** `packages/server-core/src/api/graphql/graphql-schema-generator.ts`
+- **OpenAPI Generator:** `packages/server-core/src/api/openapi-generator.ts`
+- **Error Handling:** `packages/server-core/src/api/errors.ts`
+- **Server Setup:** `packages/server-core/src/api/server.ts`
+- **API Types:** `packages/server-core/src/api/types.ts`
+- **Auth Middleware:** `packages/server-core/src/auth/middleware.ts`
+- **DataHooks Types:** `packages/types/src/types/backend_hooks.ts`

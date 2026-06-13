@@ -1,159 +1,92 @@
-# Rebase Collection Editor Plugin
+# @rebasepro/studio
 
-This plugin enables creating and managing Firestore collections directly from your Rebase interface. It adds a visual
-collection editor that allows you to create, edit, and delete collections without writing code.
+Developer tools layer for Rebase — provides 9 lazy-loaded tools (SQL Console, JS Console, RLS Editor, Storage, Cron Jobs, Schema Visualizer, Branches, API Explorer, Logs Explorer) plus a customizable home page.
 
 ## Installation
 
 ```bash
-npm install @rebasepro/collection_editor
-# or
-yarn add @rebasepro/collection_editor
+pnpm add @rebasepro/studio
 ```
 
-For Firebase integration, also install:
+### Peer Dependencies
 
-```bash
-npm install @rebasepro/collection_editor_firebase
-# or
-yarn add @rebasepro/collection_editor_firebase
+- `react` >= 19.0.0
+- `react-dom` >= 19.0.0
+- `react-router` ^7.0.0
+- `react-router-dom` ^7.0.0
+- `@rebasepro/admin` (optional)
+
+## What This Package Does
+
+`@rebasepro/studio` registers a set of developer tools into the Rebase CMS. The `<RebaseStudio>` component renders nothing visible — it declaratively registers tool views into the Rebase registry. Each tool (Monaco-based editors, xyflow graph, etc.) is lazy-loaded so it stays out of the initial bundle.
+
+## Available Tools
+
+| Slug | Name | Group | Description |
+|---|---|---|---|
+| `sql` | SQL Console | Database | Execute raw SQL queries |
+| `js` | JS Console | Compute | Run JavaScript in a live sandbox |
+| `rls` | RLS Policies | Database | Configure Row Level Security |
+| `storage` | Storage | Storage | Browse and manage files |
+| `cron` | Cron Jobs | Compute | Monitor scheduled tasks |
+| `schema-visualizer` | Schema Visualizer | Database | Interactive database ERD |
+| `branches` | Branches | Database | Create and manage database branches |
+| `api` | API Explorer | API | Interactive API docs and testing |
+| `logs` | Logs Explorer | Database | Real-time system and query logs |
+
+All 9 tools are enabled by default. The `schema` tool (collection editor) is auto-injected by the CMS when `collectionEditor` is enabled — it is **not** registered here.
+
+## Key Exports
+
+| Export | Type | Description |
+|---|---|---|
+| `RebaseStudio` | Component | Main entry point — registers tools into the Rebase registry |
+| `StudioHomePage` | Component | Default home page with tool cards and SDK quick-start snippet |
+| `StudioBridgeProvider` | Component | Re-exported from `@rebasepro/core` |
+| `StudioBridgeContext` | Context | Re-exported from `@rebasepro/core` |
+| `useStudioCollectionRegistry` | Hook | Access the collection registry |
+| `useStudioSideEntityController` | Hook | Control the side entity panel |
+| `useStudioUrlController` | Hook | URL state management |
+| `useStudioNavigationState` | Hook | Navigation state |
+| `useStudioBreadcrumbs` | Hook | Breadcrumb management |
+| `StudioBridge` | Type | Bridge interface type |
+| `BreadcrumbEntry` | Type | Single breadcrumb item |
+| `BreadcrumbsController` | Type | Breadcrumb controller interface |
+
+Individual tools (e.g. `SQLEditor`, `SchemaVisualizer`) are **not** re-exported from the barrel to preserve code splitting. Use deep imports if needed:
+
+```typescript
+import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
 ```
 
-## Features
-
-- Create and edit collections through a visual interface
-- Define properties, validations, and display options
-- Organize collections with groups and subcollections
-- Merge UI-defined collections with code-defined collections
-- Persist collection configurations in Firestore
-- Control permissions for collection editing operations
-
-## Basic Usage
+## Quick Start
 
 ```tsx
-import React from "react";
-import { RebaseCMS } from "@rebasepro/admin";
-import { useFirestoreCollectionsConfigController } from "@rebasepro/collection_editor_firebase";
+import { RebaseStudio } from "@rebasepro/studio";
 
-export default function App() {
-    // Controller to save collection configs in Firestore
-    const collectionConfigController = useFirestoreCollectionsConfigController({
-        firebaseApp
-    });
-    
-    return <RebaseCMS
-        name={"My CMS"}
-        authentication={myAuthenticator}
-        firebaseConfig={firebaseConfig}
-        collectionEditor={{
-            collectionConfigController
-        }}
-    />;
-}
+// Inside your Rebase app — enable all 9 tools (default)
+<RebaseStudio />
+
+// Or pick specific tools
+<RebaseStudio tools={["sql", "rls", "storage", "api"]} />
+
+// Custom home page
+<RebaseStudio homePage={<MyCustomHomePage />} />
 ```
 
-## Advanced Configuration
+### StudioHomePage Props
 
-You can customize collection editor behavior with these options using the `collectionEditor` prop on `RebaseCMS`:
+| Prop | Type | Description |
+|---|---|---|
+| `additionalActions` | `ReactNode` | Extra actions in the top-right area |
+| `additionalChildrenStart` | `ReactNode` | Content before the tool grid |
+| `additionalChildrenEnd` | `ReactNode` | Content after the tool grid |
+| `sections` | `HomePageSection[]` | Extra sections appended to the page |
+| `hiddenGroups` | `string[]` | Groups to hide from the home page |
 
-```tsx
-<RebaseCMS
-    collectionEditor={{
-        collectionConfigController, // Required: controller that handles persistence
-        
-        // Define permissions for collection operations
-        configPermissions: ({ user }) => ({
-            createCollections: user.roles?.includes("admin") ?? false,
-            editCollections: user.roles?.includes("admin") ?? false,
-            deleteCollections: user.roles?.includes("admin") ?? false
-        }),
-        
-        // Prevent these group names from being used
-        reservedGroups: ["admin", "system"],
-        
-        // Optional custom view to add to the editor
-        extraView: {
-            View: MyCustomView,
-            icon: <CustomIcon />
-        },
-        
-        // Function to infer collection structure from existing data
-        collectionInference: async ({ path }) => {
-            // Return inferred schema based on data at path
-        },
-        
-        // Function to get sample data for a collection
-        getData: async (path, parentPaths) => {
-            // Return sample data for the specified path
-        },
-        
-        // Track collection editor events
-        onAnalyticsEvent: (event, params) => {
-            console.log("Collection editor event:", event, params);
-        },
-        
-        // Include introduction widget when no collections exist
-        includeIntroView: true
-    }}
-/>
-```
+## Related Packages
 
-## Integration with Code-Defined Collections
-
-You can combine collections defined in code with those created in the UI:
-
-```tsx
-import { mergeCollections } from "@rebasepro/admin/collection_editor";
-
-
-const collectionsBuilder = useCallback(() => {
-    // Collections defined in code
-    const codeCollections = [productsCollection, ordersCollection];
-    
-    // Merge with collections from the editor UI
-    return mergeCollections(codeCollections, collectionConfigController.collections ?? []);
-}, [collectionConfigController.collections]);
-
-const navigationController = useBuildNavigationStateController({
-    collections: collectionsBuilder,
-    // Other options
-});
-```
-
-## Firestore Configuration Controller
-
-To persist collections in Firestore:
-
-```tsx
-const collectionConfigController = useFirestoreCollectionsConfigController({
-    firebaseApp,
-    
-    // Optional: specify where to save configs (default: "__REBASE/config/collections")
-    configPath: "custom/config/path",
-    
-    // Optional: define permissions for collections
-    permissions: ({ user }) => ({
-        // Your permissions logic
-    }),
-    
-    // Optional: custom property configurations
-    propertyConfigs: [
-        // Custom property types
-    ]
-});
-```
-
-## Additional Notes
-
-- Collections created through the editor are stored in Firestore and loaded dynamically
-- The plugin automatically adds UI elements for creating and managing collections
-- For a complete solution, consider using alongside other plugins like data import/export
-
-## Related Plugins
-
-Rebase offers several complementary plugins:
-
-- Data Import: Import data from CSV or JSON into Firestore collections
-- Data Export: Export collection data to CSV or JSON formats
-- Data Enhancement: Generate content using AI for your collections
-- Entity History: Track changes to your collection entities
+- `@rebasepro/core` — Bridge, registry, and navigation primitives
+- `@rebasepro/ui` — Component library used by Studio tools
+- `@rebasepro/admin` — The CMS layer (optional peer dep)
+- `@rebasepro/types` — Shared type definitions

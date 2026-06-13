@@ -1,81 +1,149 @@
 ---
 name: rebase-studio
-description: Guide for using and customizing the Rebase Studio admin panel. Use this skill when the user needs help with the visual collection editor, custom views, dev/editor mode toggle, or Studio configuration.
+description: Guide for using and customizing the Rebase Studio developer tools layer. Use this skill when the user needs help with Studio dev tools (SQL/JS/RLS/Storage/Cron/Schema Visualizer/Branches/API Explorer/Logs), admin modes (content/studio/settings), Studio home page customization, bridge hooks, or Studio configuration. Studio is NOT the CMS — the CMS lives in @rebasepro/admin.
 ---
 
 # Rebase Studio
 
-Rebase Studio is the visual admin panel that provides a complete CMS experience — table views, form editing, visual schema editor, user management, and more.
+Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 9 built-in tools — SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, API Explorer, and Logs Explorer — accessible via the "Studio" mode toggle in the sidebar.
 
 ## Overview
 
-The Studio is built on `@rebasepro/core` and provides:
-- **Table collection views** with inline editing
-- **Visual schema editor** for non-developers
-- **Form views** with 20+ field types
-- **Card grid** and **Kanban board** view modes
-- **List** and **Split** view modes
-- **User management** with role-based access
-- **Data import/export** (CSV, JSON, Excel)
-- **Entity history** and audit trail
-- **Custom views** as React components
-- **Rich text editor** (TipTap-based, Notion-style)
-- **Storage browser** for uploaded files and media
-- **Collection Editor** with AST-backed schema editing
+- **9 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
+- **StudioHomePage** — customizable landing page with tool cards grouped by section
+- **Studio Bridge** — hooks that connect Studio tools to CMS data (collections, navigation, side panels)
 
-## Dev Mode & Editor Mode
+## Admin Modes (Tri-State)
 
-The Studio has two modes controlled by `AdminModeController`:
+> **IMPORTANT FOR AGENTS:** The Studio uses a **tri-state** mode system: `"content"` | `"studio"` | `"settings"`. It is NOT `"developer"` / `"editor"`. These are the only valid values.
 
-### Developer Mode (`mode === "developer"`)
-- Full access to collection editor, schema management
-- "Edit Schema" inline actions on views
-- Debug tools and developer-specific UI
-- Can simulate different roles via **Effective Role Controller**
+The admin mode is controlled by `AdminModeController` and persisted in `localStorage` under the key `rebase-admin-mode`. Default mode is `"content"`.
 
-### Editor Mode (`mode === "editor"`)
-- Clean end-user experience
-- No developer-specific UI elements
-- Shows exactly what end-users see
+### Mode Values
 
-**Important:** This toggle must always be preserved. Developers use it to preview the exact end-user experience.
+| Mode | Description | Navigation Shows |
+|------|-------------|------------------|
+| `"content"` | Clean CMS experience for editing data. Default mode. | Collections + admin entries (Users/Roles) |
+| `"studio"` | Developer tools and schema management. | Dev tool views + admin entries (Users/Roles) |
+| `"settings"` | Application settings and configuration. | Settings-related views |
+
+### Mode Controller API
+
+```typescript
+import { useAdminModeController } from "@rebasepro/core";
+
+interface AdminModeController {
+    mode: "content" | "studio" | "settings";
+    setMode: (mode: "content" | "studio" | "settings") => void;
+}
+
+// Usage in a component
+function MyComponent() {
+    const adminModeController = useAdminModeController();
+
+    // Check current mode
+    if (adminModeController.mode === "studio") {
+        // Show developer UI
+    }
+
+    // Switch modes
+    adminModeController.setMode("content");
+}
+```
+
+### Drawer Mode Switch
+
+When `<RebaseStudio>` is registered, the drawer automatically renders a segmented **Content / Studio** toggle. Clicking "Content" sets mode to `"content"` and navigates to the base path. Clicking "Studio" sets mode to `"studio"` and navigates to `/s`.
 
 ## Effective Role Simulation
 
-In Dev Mode, developers can select an "effective role" to preview the application as a specific role would see it:
+> **IMPORTANT FOR AGENTS:** The hook is called `useEffectiveRoleController()`, NOT `useEffectiveRole()`.
+
+In Studio mode, developers can select an "effective role" to preview the application as a specific role would see it. The role is persisted in `localStorage` under `rebase-effective-role`.
 
 ```typescript
-// The EffectiveRoleController context provides:
-const { effectiveRole, setEffectiveRole } = useEffectiveRole();
+import { useEffectiveRoleController } from "@rebasepro/core";
+
+interface EffectiveRoleController {
+    effectiveRole: string | null;
+    setEffectiveRole: (role: string | null) => void;
+}
+
+// Usage
+function RoleSimulator() {
+    const { effectiveRole, setEffectiveRole } = useEffectiveRoleController();
+
+    // Set a role to simulate
+    setEffectiveRole("editor");
+
+    // Clear simulation (back to actual role)
+    setEffectiveRole(null);
+}
 ```
 
-When toggled to Editor Mode with an effective role set, the developer sees exactly what that role can access.
+## Studio Dev Tools
 
-## Visual Collection Editor
+The Studio ships 9 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
 
-The Studio's collection editor allows non-developers to:
-- Add, remove, and reorder fields
-- Configure field types and validation
-- Set up enum values and relations
-- Preview the form layout
+### Tool Reference
 
-Under the hood, it uses **AST manipulation** (via `ts-morph`) to modify the TypeScript collection files — preserving all custom callbacks and code.
+| Tool Key | Component | Name | Group | Icon | Description |
+|----------|-----------|------|-------|------|-------------|
+| `"sql"` | `SQLEditor` | SQL Console | Database | `terminal` | Execute raw SQL queries against the database |
+| `"js"` | `JSEditor` | JS Console | Compute | `code` | Run JavaScript with the Rebase SDK in a live sandbox |
+| `"rls"` | `RLSEditor` | RLS Policies | Database | `ShieldCheck` | Configure Row Level Security for fine-grained data access |
+| `"storage"` | `StorageView` | Storage | Storage | `HardDrive` | Browse, upload, and manage files in the storage bucket |
+| `"cron"` | `CronJobsView` | Cron Jobs | Compute | `Clock` | Monitor and manage scheduled background tasks |
+| `"schema-visualizer"` | `SchemaVisualizer` | Schema Visualizer | Database | `Network` | Interactive ERD showing tables, columns, and relationships |
+| `"branches"` | `BranchesView` | Branches | Database | `GitBranch` | Create and manage isolated database copies for development |
+| `"api"` | `ApiExplorer` | API Explorer | API | `BookOpen` | Interactive API documentation with live request testing |
+| `"logs"` | `LogsExplorer` | Logs Explorer | Database | `Activity` | Real-time system, query, and authentication logs |
 
-### Collection Editor Auth
+> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseCMS>`. Do not try to register it manually.
 
-The collection editor requires an auth token to communicate with the backend's AST editing endpoints:
+### Enabling/Disabling Tools
+
+By default, **all 9 tools** are enabled. Use the `tools` prop on `<RebaseStudio>` to selectively enable a subset:
+
+```tsx
+// Enable all tools (default behavior — both are equivalent)
+<RebaseStudio />
+<RebaseStudio tools={undefined} />
+
+// Enable only specific tools
+<RebaseStudio tools={["sql", "rls", "storage"]} />
+
+// Enable everything except branches
+<RebaseStudio tools={["sql", "js", "rls", "storage", "cron", "schema-visualizer", "api", "logs"]} />
+```
+
+The `tools` prop accepts an array of tool key strings:
 
 ```typescript
-const collectionEditor = React.useMemo(() => ({
-    getAuthToken: authController.getAuthToken
-}), [authController.getAuthToken]);
+type ToolKey = "sql" | "js" | "rls" | "schema" | "storage" | "cron"
+    | "schema-visualizer" | "branches" | "api" | "logs";
 
-<RebaseCMS collections={collections} collectionEditor={collectionEditor}/>
+// Default when tools is undefined:
+const DEFAULT_TOOLS: ToolKey[] = [
+    "sql", "js", "rls", "storage", "cron",
+    "schema-visualizer", "branches", "api", "logs"
+];
 ```
+
+### Direct Tool Imports (Advanced)
+
+For advanced use cases where you need direct access to a tool component (e.g., embedding it outside the Studio), use deep imports:
+
+```typescript
+// Deep import — avoids pulling all tools into the bundle
+import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
+```
+
+> **WARNING FOR AGENTS:** Do NOT import individual tools from `@rebasepro/studio` top-level. The index only exports `RebaseStudio` and `StudioHomePage`. Individual tools are intentionally excluded to preserve code splitting.
 
 ## Frontend Composition
 
-The Studio is mounted using the declarative composition API:
+The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the `RebaseRegistry`. `<RebaseShell>` then reads the registry and builds the actual UI.
 
 ```tsx
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
@@ -94,16 +162,12 @@ export function App() {
     const userManagement = useBackendUserManagement({ client: rebaseClient, currentUser: authController.user });
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
-    const collectionEditor = React.useMemo(() => ({
-        getAuthToken: authController.getAuthToken
-    }), [authController.getAuthToken]);
-
     return (
         <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={[dataEnhancementPlugin]}>
             <RebaseAuth/>
-            <RebaseCMS collections={collections} collectionEditor={collectionEditor}/>
+            <RebaseCMS collections={collections} collectionEditor={true}/>
             <RebaseStudio tools={undefined} homePage={undefined} />
-            <RebaseShell title="Rebase"/>
+            <RebaseShell title="My App"/>
         </Rebase>
     );
 }
@@ -111,57 +175,490 @@ export function App() {
 
 ### TypeScript Strict Props Warning
 
-Under strict TypeScript checks, importing and calling `<RebaseStudio/>` without props might throw a compilation error:
+Under strict TypeScript checks, `<RebaseStudio/>` without props throws:
 `Type '{}' is missing the following properties from type '{ tools: any; homePage: any; }': tools, homePage`
 
-To satisfy the type checker, pass `tools={undefined} homePage={undefined}` explicitly to the component:
-`<RebaseStudio tools={undefined} homePage={undefined} />`
+Pass `tools={undefined} homePage={undefined}` explicitly:
+```tsx
+<RebaseStudio tools={undefined} homePage={undefined} />
+```
 
 ### Key Components
 
-| Component | Package | Purpose |
-|-----------|---------|---------|
-| `<Rebase>` | `@rebasepro/core` | Root provider (client, auth, user management, plugins) |
-| `<RebaseAuth/>` | `@rebasepro/auth` | Authentication UI (login/register) |
-| `<RebaseCMS>` | `@rebasepro/admin` | CMS frontend (collections, views, editor) |
-| `<RebaseStudio/>` | `@rebasepro/studio` | Admin panel (visual schema, settings) |
-| `<RebaseShell>` | `@rebasepro/admin` | App shell (drawer, navigation) |
+| Component | Package | Purpose | Renders UI? |
+|-----------|---------|---------|-------------|
+| `<Rebase>` | `@rebasepro/core` | Root provider (client, auth, user management, plugins) | Yes (providers) |
+| `<RebaseAuth>` | `@rebasepro/core` | Authentication config (custom login view) | No — registers into registry |
+| `<RebaseCMS>` | `@rebasepro/admin` | CMS config (collections, views, editor) | No — registers into registry |
+| `<RebaseStudio>` | `@rebasepro/studio` | Studio config (tools, home page) | No — registers into registry |
+| `<RebaseShell>` | `@rebasepro/admin` | App shell (drawer, navigation, routes, layout) | Yes — the actual UI |
+
+## RebaseCMS Configuration
+
+`<RebaseCMS>` accepts the full `RebaseCMSConfig`:
+
+```typescript
+interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection> {
+    collections?: EC[] | EntityCollectionsBuilder<EC>;
+    homePage?: ReactNode;
+    entityViews?: EntityCustomView[];
+    entityActions?: EntityAction[];
+    plugins?: RebasePlugin[];
+    navigationGroupMappings?: NavigationGroupMapping[];
+    collectionEditor?: boolean | CollectionEditorOptions;
+}
+```
+
+### Collection Editor Options
+
+```typescript
+interface CollectionEditorOptions {
+    /** Auth token for schema-editor API calls. Falls back to authController.getAuthToken. */
+    getAuthToken?: () => Promise<string | null>;
+    /** Mark the editor as read-only (disable mutations). */
+    readOnly?: boolean;
+    /** Suggested base paths shown when creating new collections. */
+    pathSuggestions?: string[];
+}
+```
+
+### Navigation Group Mappings
+
+Control how collections and views are grouped in the sidebar and home page:
+
+```typescript
+interface NavigationGroupMapping {
+    name: string;           // Group header display name
+    entries: string[];      // Collection slugs or view paths
+    collapsedByDefault?: boolean | {
+        drawer?: boolean;   // Collapse in sidebar
+        home?: boolean;     // Collapse on home page
+    };
+}
+
+// Usage
+<RebaseCMS
+    collections={collections}
+    navigationGroupMappings={[
+        { name: "Content", entries: ["posts", "pages", "media"] },
+        { name: "Commerce", entries: ["products", "orders"], collapsedByDefault: { drawer: true } },
+    ]}
+/>
+```
+
+## RebaseStudio Configuration
+
+`<RebaseStudio>` accepts the full `RebaseStudioConfig`:
+
+```typescript
+interface RebaseStudioConfig {
+    tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron"
+        | "schema-visualizer" | "branches" | "api" | "logs")[];
+    homePage?: ReactNode;
+    devViews?: AppView[];  // Computed internally — not passed by consumers
+}
+```
+
+## StudioHomePage Customization
+
+The `StudioHomePage` component is the default landing page for Studio mode. It renders tool cards organized by section. It can be customized through props:
+
+```typescript
+interface StudioHomePageProps {
+    additionalActions?: React.ReactNode;       // Toolbar actions at the top
+    additionalChildrenStart?: React.ReactNode;  // Content before tool sections
+    additionalChildrenEnd?: React.ReactNode;    // Content after tool sections
+    sections?: HomePageSection[];               // Extra sections after tools
+    hiddenGroups?: string[];                    // Groups to hide (unused by default sections)
+}
+
+interface HomePageSection {
+    key: string;             // Unique key
+    title: string;           // Section header text
+    children: React.ReactNode; // Arbitrary content
+}
+```
+
+### Built-in Home Page Sections
+
+The default `StudioHomePage` renders tools grouped into these sections:
+
+| Section | Dot Color | Tools |
+|---------|-----------|-------|
+| Database | Emerald | Collections, Schema Visualizer, SQL Console, Branches, RLS Policies, Logs Explorer |
+| Compute | Blue | JS Console, Cron Jobs |
+| API | Violet | API Explorer |
+| Storage | Amber | Storage |
+| Access Control | Rose | Users, Roles |
+
+### Custom Home Page Examples
+
+**Add extra sections:**
+```tsx
+<RebaseStudio
+    homePage={
+        <StudioHomePage
+            sections={[
+                {
+                    key: "analytics",
+                    title: "Analytics",
+                    children: <AnalyticsDashboard />,
+                },
+            ]}
+        />
+    }
+/>
+```
+
+**Add action buttons:**
+```tsx
+<RebaseStudio
+    homePage={
+        <StudioHomePage
+            additionalActions={
+                <Button onClick={exportAll}>Export All Data</Button>
+            }
+        />
+    }
+/>
+```
+
+**Completely replace the home page:**
+```tsx
+<RebaseStudio
+    homePage={<MyCustomStudioHome />}
+/>
+```
+
+## Custom Login View
+
+Use `<RebaseAuth>` with the `loginView` prop to replace the default login UI:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController}>
+    <RebaseAuth loginView={<MyCustomLoginPage />} />
+    <RebaseCMS collections={collections} />
+    <RebaseStudio />
+    <RebaseShell title="My App" />
+</Rebase>
+```
+
+The `loginView` is registered into the `RebaseRegistry` via `registerAuth()` and consumed by `<RebaseAuthGate>`.
 
 ## Custom Views
 
-Add custom React views to the Studio navigation:
+Add custom React views to the Studio navigation using the `AppView` interface:
 
 ```typescript
-import { EntityCollection } from "@rebasepro/core";
+interface AppView {
+    slug: string;                    // URL path segment
+    name: string;                    // Display name
+    description?: string;            // Optional description (Markdown)
+    icon?: string | React.ReactNode; // Lucide icon name or custom element
+    hideFromNavigation?: boolean;    // Hide from sidebar (still accessible by URL)
+    group?: string;                  // Navigation group name
+    view: React.ReactNode;           // React component to render
+    nestedRoutes?: boolean;          // Enable nested routing (slug/*)
+}
+```
 
-const myCustomView = {
-    path: "dashboard",
-    name: "Dashboard",
-    view: <DashboardView />,
+Custom views are typically added through `entityViews` on `<RebaseCMS>` or through plugins.
+
+## CollectionPanel Component
+
+`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, entity detail views):
+
+```typescript
+import { CollectionPanel } from "@rebasepro/admin";
+
+type CollectionPanelProps = {
+    path: string;                           // Collection slug (required)
+    title?: string | false;                 // Title above the collection (false = hide)
+    viewMode?: ViewMode;                    // Force view mode (table, card, etc.)
+    sort?: [string, "asc" | "desc"];        // Override sort
+    limit?: number;                         // Max entities to display
+    updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    className?: string;                     // Container CSS class
+    collectionOverrides?: Partial<EntityCollection>; // Additional overrides
 };
 ```
 
-### Useful Hooks
+### Usage Examples
 
-| Hook | Description |
-|------|-------------|
-| `useSideEntityController()` | Open/close entity side panels |
-| `useSnackbarController()` | Show toast notifications |
-| `useAuthController()` | Access current user and auth state |
-| `useNavigationController()` | Navigate between views |
-| `useDataSource()` | Access the data source for CRUD ops |
-| `useRebaseLocaleContext()` | Access `t()` for translations |
+```tsx
+import { CollectionPanel } from "@rebasepro/admin";
 
-## Key Packages
+function MyDashboard() {
+    return (
+        <div>
+            {/* Simple usage */}
+            <CollectionPanel path="tasks" title="Pending Tasks" />
 
-| Package | Description |
-|---------|-------------|
-| `@rebasepro/core` | Core framework, hooks, types |
-| `@rebasepro/studio` | Studio admin panel components |
-| `@rebasepro/admin` | CMS frontend application (previously `cms`) |
-| `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
-| `@rebasepro/plugin-data-enhancement` | AI-powered autofill |
-| `@rebasepro/schema-inference` | Auto-infer schema from data |
+            {/* With overrides */}
+            <CollectionPanel
+                path="clients"
+                viewMode="table"
+                limit={10}
+                sort={["createdAt", "desc"]}
+                collectionOverrides={{
+                    defaultFilter: { status: ["!=", "completed"] }
+                }}
+            />
+
+            {/* Hide title, custom open mode */}
+            <CollectionPanel
+                path="orders"
+                title={false}
+                openEntityMode="dialog"
+            />
+        </div>
+    );
+}
+```
+
+> **IMPORTANT FOR AGENTS:** `CollectionPanel` defaults `updateUrl` to `false` so embedded panels don't hijack the browser URL. If you need URL sync, explicitly set `updateUrl={true}`.
+
+## Studio Bridge Hooks
+
+The Studio Bridge provides CMS capabilities to Studio components. When CMS is present, real implementations are injected. When CMS is absent, noop defaults ensure Studio works standalone.
+
+### Bridge Interface
+
+```typescript
+interface StudioBridge {
+    collectionRegistry: CollectionRegistryController;
+    sideEntityController: SideEntityController;
+    urlController: UrlController;
+    navigationState: NavigationStateController;
+    breadcrumbs: BreadcrumbsController;
+}
+```
+
+### Bridge Hook Reference
+
+| Hook | Return Type | Description |
+|------|-------------|-------------|
+| `useStudioCollectionRegistry()` | `CollectionRegistryController` | Access registered collections from Studio |
+| `useStudioSideEntityController()` | `SideEntityController` | Open/close entity side panels from Studio |
+| `useStudioUrlController()` | `UrlController` | Build URLs and navigate from Studio |
+| `useStudioNavigationState()` | `NavigationStateController` | Access navigation state from Studio |
+| `useStudioBreadcrumbs()` | `BreadcrumbsController` | Set breadcrumbs from Studio tools |
+
+All bridge hooks are exported from `@rebasepro/studio` (re-exported from `@rebasepro/core`):
+
+```typescript
+import {
+    useStudioCollectionRegistry,
+    useStudioSideEntityController,
+    useStudioUrlController,
+    useStudioNavigationState,
+    useStudioBreadcrumbs
+} from "@rebasepro/studio";
+```
+
+### BreadcrumbsController
+
+```typescript
+interface BreadcrumbEntry {
+    title: string;
+    url: string;
+    count?: number | null;
+    id?: string;
+}
+
+interface BreadcrumbsController {
+    breadcrumbs: BreadcrumbEntry[];
+    set: (props: { breadcrumbs: BreadcrumbEntry[] }) => void;
+    updateCount: (id: string, count: number | null | undefined) => void;
+}
+```
+
+### StudioBridgeProvider (Advanced)
+
+For custom wiring, use `StudioBridgeProvider` to inject CMS capabilities:
+
+```tsx
+import { StudioBridgeProvider } from "@rebasepro/studio";
+
+<StudioBridgeProvider value={{
+    collectionRegistry: useCollectionRegistryController(),
+    sideEntityController: useSideEntityController(),
+    urlController: useUrlController(),
+    navigationState: useNavigationStateController(),
+    breadcrumbs: useBreadcrumbsController(),
+}}>
+    <RebaseStudio />
+</StudioBridgeProvider>
+```
+
+## Core Hooks Reference
+
+These hooks are exported from `@rebasepro/core` and available inside any `<Rebase>` provider tree:
+
+### Primary Hooks
+
+| Hook | Return Type | Description |
+|------|-------------|-------------|
+| `useRebaseContext()` | `RebaseContext` | Full Rebase context with all controllers |
+| `useAuthController()` | `AuthController` | Access current user and auth state |
+| `useAdminModeController()` | `AdminModeController` | Read/set admin mode (`content` / `studio` / `settings`) |
+| `useEffectiveRoleController()` | `EffectiveRoleController` | Simulate a role for previewing |
+| `useModeController()` | `ModeController` | Read/set color theme (`light` / `dark`) |
+| `useSnackbarController()` | `SnackbarController` | Show toast notifications |
+| `useStorageSource()` | `StorageSource` | Access file storage |
+| `useData()` | `DataSource` | Access the data source for CRUD ops |
+| `useDialogsController()` | `DialogsController` | Programmatic dialog management |
+| `useCustomizationController()` | `CustomizationController` | Access plugins, slots, property configs |
+| `usePermissions()` | `{ canCreate, canEdit, canDelete, canRead }` | Role-aware permission checks |
+
+### UI & Layout Hooks
+
+| Hook | Return Type | Description |
+|------|-------------|-------------|
+| `useLargeLayout()` | `boolean` | `true` when viewport ≥ 1025px (lg breakpoint) |
+| `useClipboard(options?)` | `useClipboardReturnType` | Copy/cut to clipboard with `ref` or text |
+| `useSlot(name, props)` | `ReactNode \| null` | Render plugin slot contributions |
+| `useTranslation()` | `{ t }` | Access `t()` for i18n translations |
+| `useCollapsedGroups(groups, namespace, defaults)` | `{ isGroupCollapsed, toggleGroupCollapsed }` | Manage collapsible navigation groups |
+
+### Navigation & Data Hooks (from `@rebasepro/admin`)
+
+| Hook | Package | Description |
+|------|---------|-------------|
+| `useSideEntityController()` | `@rebasepro/admin` | Open/close entity side panels |
+| `useNavigationStateController()` | `@rebasepro/admin` | Navigate between views |
+| `useUrlController()` | `@rebasepro/admin` | Build URLs and navigate |
+| `useBreadcrumbsController()` | `@rebasepro/admin` | Set breadcrumbs |
+| `useRebaseRegistry()` | `@rebasepro/core` | Access the full registry (CMS + Studio + Auth configs) |
+| `useRebaseClient()` | `@rebasepro/core` | Access the `RebaseClient` instance |
+
+### ModeController (Color Theme)
+
+```typescript
+interface ModeController {
+    mode: "light" | "dark";
+    setMode: (mode: "light" | "dark" | "system") => void;
+}
+
+// Usage
+const { mode, setMode } = useModeController();
+setMode("dark");     // Force dark mode
+setMode("system");   // Follow OS preference
+```
+
+### useClipboard
+
+```typescript
+interface UseClipboardProps {
+    onSuccess?: (text: string) => void;
+    onError?: (error: string) => void;
+    disableClipboardAPI?: boolean;
+    copiedDuration?: number;  // ms before isCoppied resets to false
+}
+
+const { copy, cut, isCoppied, clipboard, clearClipboard, ref, isSupported } = useClipboard({
+    copiedDuration: 2000
+});
+
+// Copy text directly
+copy("Hello world");
+
+// Copy from a ref
+<input ref={ref} />
+<button onClick={() => copy()}>Copy</button>
+```
+
+### usePermissions
+
+```typescript
+const { canCreate, canEdit, canDelete, canRead } = usePermissions();
+
+// Check if current user can create in a collection
+if (canCreate(myCollection, "products")) { ... }
+
+// Check if current user can edit a specific entity
+if (canEdit(myCollection, "products", entity)) { ... }
+```
+
+### useRebaseContext
+
+Returns the full context object combining all controllers:
+
+```typescript
+const context = useRebaseContext();
+
+// Access any controller
+context.authController        // Auth state
+context.data                  // Data source
+context.storageSource         // File storage
+context.snackbarController    // Toast notifications
+context.effectiveRoleController // Role simulation
+context.databaseAdmin         // Database admin capabilities
+context.client                // RebaseClient instance
+```
+
+## RebaseShell Configuration
+
+`<RebaseShell>` composes all CMS layers with sensible defaults:
+
+```typescript
+interface RebaseShellProps {
+    title?: string;              // App title (default: "Rebase")
+    appBar?: React.ReactNode;    // Custom app bar
+    drawer?: React.ReactNode;    // Custom drawer
+    autoOpenDrawer?: boolean;    // Auto-open drawer on mount (default: false)
+    children?: React.ReactNode;  // Additional route content
+}
+```
+
+Internally it composes:
+```
+<RebaseAuthGate>
+  <RebaseNavigation>
+    <RebaseRouteDefs layout={<RebaseLayout>}>
+      {children}
+    </RebaseRouteDefs>
+  </RebaseNavigation>
+</RebaseAuthGate>
+```
+
+## Visual Collection Editor
+
+The Studio's collection editor allows non-developers to:
+- Add, remove, and reorder fields
+- Configure field types and validation
+- Set up enum values and relations
+- Preview the form layout
+
+Under the hood, it uses **AST manipulation** (via `ts-morph`) to modify the TypeScript collection files — preserving all custom callbacks and code.
+
+### Enabling the Collection Editor
+
+```tsx
+// Simple — uses authController.getAuthToken automatically
+<RebaseCMS collections={collections} collectionEditor={true} />
+
+// With options
+<RebaseCMS
+    collections={collections}
+    collectionEditor={{
+        getAuthToken: authController.getAuthToken,
+        readOnly: false,
+        pathSuggestions: ["config/collections/"]
+    }}
+/>
+```
+
+## Virtual Collection Import
+
+Collections are auto-loaded via a Vite plugin:
+
+```typescript
+import { collections } from "virtual:rebase-collections";
+```
+
+This reads all collection files from the configured collections directory (e.g., `config/collections/`) and makes them available without manual barrel exports.
 
 ## Running the Studio
 
@@ -170,19 +667,22 @@ const myCustomView = {
 pnpm run dev
 ```
 
-This starts both frontend and backend via the monorepo dev script. The Studio is accessible at `http://localhost:5173` (Vite default).
+This starts both frontend and backend. The Studio is accessible at `http://localhost:5173` (Vite default).
 
-## Virtual Collection Import
+## Key Packages
 
-Collections are auto-loaded via a Vite plugin using the `virtual:rebase-collections` import:
-
-```typescript
-import { collections } from "virtual:rebase-collections";
-```
-
-This reads all collection files from the configured collections directory (e.g., `config/collections/` in the starter template) and makes them available to the frontend without manual barrel exports.
+| Package | Description |
+|---------|-------------|
+| `@rebasepro/core` | Core framework, hooks, types, `<Rebase>` provider |
+| `@rebasepro/studio` | Studio admin panel (`<RebaseStudio>`, `StudioHomePage`, bridge hooks) |
+| `@rebasepro/admin` | CMS frontend (`<RebaseCMS>`, `<RebaseShell>`, `CollectionPanel`, collection editor) |
+| `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
+| `@rebasepro/types` | Shared TypeScript types |
+| `@rebasepro/plugin-data-enhancement` | AI-powered autofill |
+| `@rebasepro/schema-inference` | Auto-infer schema from data |
 
 ## References
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
+- **Icons:** [rebase.pro/docs/icons](https://rebase.pro/docs/icons) (Lucide-based)

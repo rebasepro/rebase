@@ -7,10 +7,39 @@ description: Bare minimum INITIAL setup for getting started with Rebase (Node.js
 
 This skill documents the bare minimum setup required for a full Rebase development experience. Before starting to use any Rebase features, you MUST verify that each of the following steps has been completed.
 
+> **IMPORTANT FOR AGENTS:** This skill is for INITIAL setup only. For day-to-day development, CLI commands, schema workflow, and troubleshooting, use the `rebase-basics` skill instead.
+
+## Monorepo Structure
+
+Rebase is a **pnpm monorepo**. Understanding the layout is essential before setup:
+
+```
+rebase/
+├── app/                        # The main application
+│   ├── .env.example            # Full env var reference — copy to .env
+│   ├── .env                    # Your local env config (git-ignored)
+│   ├── backend/                # Hono API server (runs on port 3001)
+│   ├── frontend/               # Vite + React UI (runs on port 5173)
+│   ├── config/
+│   │   └── collections/        # Collection definitions (schema-as-code)
+│   └── generated/              # Auto-generated SDK, Drizzle schema, etc.
+├── packages/                   # Shared libraries (workspace packages)
+│   ├── cli/                    # @rebasepro/cli — provides the `rebase` binary
+│   ├── server-core/            # Core server framework, env loading
+│   ├── server-postgresql/      # PostgreSQL adapter (Drizzle ORM)
+│   ├── studio/                 # Studio admin panel
+│   ├── ui/                     # @rebasepro/ui component library
+│   ├── client/                 # Client SDK
+│   └── ...                     # Other packages (auth, types, utils, etc.)
+├── pnpm-workspace.yaml         # Workspace configuration
+└── package.json                # Root package.json
+```
+
 ## 1. Verify Node.js
 
 - **Action**: Run `node --version`.
-- **Handling**: Ensure Node.js is installed and the version is `>= 20`. If Node.js is missing or `< v20`:
+- **Required**: Node.js **22 LTS** (the version used in the production Dockerfile). Node >= 20 works but 22 is recommended.
+- **Handling**: If Node.js is missing or < v22:
 
   **Recommended: Use a Node Version Manager**
 
@@ -24,8 +53,8 @@ This skill documents the bare minimum setup required for a full Rebase developme
      ```
   4. Install Node.js:
      ```bash
-     nvm install 20
-     nvm use 20
+     nvm install 22
+     nvm use 22
      ```
 
   **For Windows:**
@@ -49,6 +78,8 @@ Rebase's backend requires a PostgreSQL database (v14+).
 
 ### Option A: Docker (Recommended)
 
+> **IMPORTANT FOR AGENTS:** Docker requires **Docker Desktop** (macOS/Windows) or an alternative like **colima** (macOS). If `docker info` fails, guide the user to install [Docker Desktop](https://www.docker.com/products/docker-desktop/) or run `brew install colima && colima start`.
+
 ```bash
 # Check if Docker is running
 docker info
@@ -59,13 +90,14 @@ docker run --name rebase-postgres \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=rebase \
   -p 5432:5432 \
-  -d postgres:18
+  -d postgres:17
 ```
 
 ### Option B: Local Installation
 
-- **macOS**: `brew install postgresql@18 && brew services start postgresql@18`
-- **Linux**: `sudo apt-get install postgresql-18`
+- **macOS**: `brew install postgresql@17 && brew services start postgresql@17`
+  - If 17 is unavailable: `brew install postgresql@16 && brew services start postgresql@16`
+- **Linux**: `sudo apt-get install postgresql` (installs the distro default, typically 14–16)
 - **Windows**: Download from [postgresql.org](https://www.postgresql.org/download/)
 
 ### Verify Connection
@@ -76,38 +108,82 @@ psql -h localhost -U postgres -d rebase -c "SELECT 1;"
 
 ## 4. Configure Environment Variables
 
-Create an `.env` file in the project root directory:
+Rebase ships an `.env.example` in the `app/` directory with every variable documented. The recommended approach:
+
+```bash
+cp app/.env.example app/.env
+```
+
+Then edit `app/.env` with your local values. The **minimum** required variables for local dev:
+
+| Variable | Example Value | Notes |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/rebase` | **Required.** Must be a valid URL. |
+| `JWT_SECRET` | *(any string ≥ 32 characters)* | If left blank, an ephemeral secret is auto-generated in dev mode — **sessions are invalidated on every server restart**. Set an explicit value for persistent sessions. |
+| `VITE_API_URL` | `http://localhost:3001` | Must match the backend URL. The backend defaults to port `3001`. |
+| `PORT` | `3001` | Backend listen port (default: `3001`). |
+| `FRONTEND_URL` | `http://localhost:5173` | Used in password-reset / verification emails. |
+
+> **WARNING FOR AGENTS:** `JWT_SECRET` must be ≥ 32 characters (enforced by Zod validation in `packages/server-core/src/env.ts`). In dev mode, if `JWT_SECRET` is empty the server auto-generates a random one — but this means **all user sessions are lost on every restart**. Always recommend setting an explicit value:
+> ```env
+> JWT_SECRET=change-me-to-a-random-string-at-least-32-chars-long!!
+> ```
+
+A minimal `.env` looks like:
 
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rebase
+JWT_SECRET=change-me-to-a-random-string-at-least-32-chars-long!!
+VITE_API_URL=http://localhost:3001
 ```
 
 ## 5. Install Dependencies
 
-From the repo root:
+From the monorepo root:
 
 ```bash
 pnpm install
 ```
 
-## 6. Initialize the Database
+This installs all workspace packages (`packages/*`, `app/frontend`, `app/backend`).
+
+## 6. The `rebase` CLI
+
+The `rebase` command comes from the `@rebasepro/cli` package (`packages/cli`). After `pnpm install`, it is available via the workspace `node_modules/.bin/rebase` binary.
+
+Run CLI commands from the **`app/`** directory (or monorepo root if configured):
 
 ```bash
-cd <project-root>
+# From the app/ directory:
+rebase schema generate   # Generate Drizzle schema from collection definitions
+rebase db push           # Push schema directly to the database (dev workflow)
+rebase dev               # Start the dev server (frontend + backend)
+rebase --help            # Show all available commands
+```
+
+## 7. Initialize the Database
+
+```bash
 rebase schema generate
 rebase db push
 ```
 
-## 7. Start the Development Server
+## 8. Start the Development Server
 
 ```bash
-cd <project-root>
 pnpm run dev
 ```
 
-This starts both the frontend (Vite) and backend (Hono) servers.
+This starts both:
+- **Frontend** (Vite) at `http://localhost:5173`
+- **Backend** (Hono) at `http://localhost:3001`
+
+The frontend proxies API requests to the backend via `VITE_API_URL`.
 
 ## References
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
+- **Env reference:** `app/.env.example` (69 vars with inline documentation)
+- **Env validation:** `packages/server-core/src/env.ts` (Zod schema + auto-generated secrets logic)
+- **CLI source:** `packages/cli/src/cli.ts` (all commands and help text)

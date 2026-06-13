@@ -22,15 +22,34 @@ Properties define the fields of your collection. Rebase supports these built-in 
 
 | Type | Description | PostgreSQL Column |
 |------|-------------|-------------------|
-| `string` | Text fields, URLs, emails, file uploads | `VARCHAR` / `TEXT` |
+| `string` | Text fields, URLs, emails, markdown, file uploads | `VARCHAR` / `TEXT` |
 | `number` | Integers and decimals | `INTEGER` / `DOUBLE PRECISION` |
 | `boolean` | True/false toggles | `BOOLEAN` |
 | `date` | Date and datetime values | `TIMESTAMP` |
 | `map` | Nested objects (JSON) | `JSONB` |
-| `array` | Lists of values | `JSONB` |
-| `relation` | Foreign key to another collection | FK column or junction table |
-| `reference` | Legacy FK reference by collection slug | `UUID` with FK |
+| `array` | Lists of values | `JSONB` or native arrays |
+| `relation` | Foreign key to another collection (SQL JOINs) | FK column or junction table |
+| `reference` | Legacy FK reference by collection slug (Firestore-style) | `UUID` with FK |
 | `geopoint` | Latitude/longitude pairs | `JSONB` |
+| `vector` | Embedding vectors for similarity search | `VECTOR` |
+
+### Reference vs Relation
+
+> **IMPORTANT FOR AGENTS:** Understand the difference between `reference` and `relation` — they are NOT interchangeable.
+
+| Feature | `relation` (Recommended) | `reference` (Legacy) |
+|---------|-------------------------|---------------------|
+| Backend | SQL JOINs, FK constraints | Stores a collection path + entity ID |
+| Cascade rules | `onDelete`, `onUpdate` | None |
+| Junction tables | Yes (many-to-many) | No |
+| Multi-hop joins | Yes (`joinPath`) | No |
+| Inverse lookups | Yes (`direction: "inverse"`) | No |
+| Where to use | **PostgresCollection** | FirebaseCollection or legacy |
+| Stored value | FK column(s) managed by framework | `{ id, path }` object or string |
+
+**Use `relation` for all new Postgres collections.** The `reference` type exists for backward compatibility with Firestore-style collections.
+
+A `string` property can also act as a lightweight reference via its `reference` sub-property (stores just the ID string and renders a reference picker), but this does not create SQL JOINs.
 
 ### Schema-as-Code
 
@@ -48,10 +67,14 @@ const productsCollection: PostgresCollection = {
     table: "products",
     icon: "ShoppingBag",
     group: "E-Commerce",
+    description: "Product catalog with pricing and inventory",
     history: true,
     defaultViewMode: "table",
     enabledViews: ["table", "cards"],
     openEntityMode: "split",
+    inlineEditing: true,
+    exportable: true,
+    selectionEnabled: true,
     properties: {
         id: {
             name: "ID",
@@ -83,8 +106,7 @@ const productsCollection: PostgresCollection = {
             type: "date",
             mode: "date_time",
             autoValue: "on_create",
-            readOnly: true,
-            hideFromCollection: true
+            ui: { readOnly: true, hideFromCollection: true }
         },
         category: {
             name: "Category",
@@ -107,37 +129,460 @@ export default productsCollection;
 
 ### Collection Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | `string` | Display name (plural) |
-| `singularName` | `string` | Singular display name |
-| `slug` | `string` | URL slug for API and routing |
-| `table` | `string` | PostgreSQL table name |
-| `icon` | `string` | Lucide icon name |
-| `group` | `string` | Sidebar group heading |
-| `history` | `boolean` | Enable entity audit trail |
-| `defaultViewMode` | `"table" \| "cards" \| "kanban" \| "list"` | Default view on open |
-| `enabledViews` | `string[]` | Enabled view modes |
-| `openEntityMode` | `"split" \| "side_panel" \| "full_screen"` | How entities open |
-| `kanban` | `{ columnProperty: string }` | Kanban column config |
-| `propertiesOrder` | `string[]` | Field display order in forms |
-| `entityViews` | `string[] \| EntityView[]` | Custom tabs on entity detail |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | `string` | — | Display name (plural). E.g. `"Products"` |
+| `singularName` | `string` | — | Singular display name. E.g. `"Product"` |
+| `slug` | `string` | — | URL slug for API and routing |
+| `table` | `string` | — | PostgreSQL table name |
+| `schema` | `string` | `"public"` | PostgreSQL schema name |
+| `description` | `string` | — | Description shown in the UI (supports Markdown) |
+| `icon` | `string \| ReactNode` | — | Lucide icon name or React element |
+| `group` | `string` | `"Views"` | Sidebar group heading |
+| `driver` | `"postgres" \| undefined` | `undefined` | Backend driver (Postgres is default) |
+| `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
+| `defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
+| `enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
+| `openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
+| `defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
+| `kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
+| `propertiesOrder` | `string[]` | — | Field display order in forms and table |
+| `entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
+| `titleProperty` | `string` | first text prop | Property used as entity title in previews |
+| `previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
+| `listProperties` | `string[]` | — | Columns to display in list view |
+| `selectionEnabled` | `boolean` | — | Enable row selection checkboxes |
+| `selectionController` | `SelectionController` | — | External selection state controller |
+| `inlineEditing` | `boolean` | — | Allow inline editing in collection table view |
+| `exportable` | `boolean \| ExportConfig` | — | Enable data export. `true` for default, or `ExportConfig` for custom fields |
+| `pagination` | `boolean \| number` | `true` (50) | Enable pagination. Set a number to customize page size |
+| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — | Default rendered row size |
+| `fixedFilter` | `FilterValues` | — | Permanent filter that cannot be changed by users |
+| `defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
+| `filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
+| `sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["created_at", "desc"]` |
+| `orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general) |
+| `formAutoSave` | `boolean` | `false` | Auto-save form on field change |
+| `formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
+| `hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
+| `hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form |
+| `hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
+| `defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
+| `sideDialogWidth` | `number \| string` | — | Width of side dialog in pixels |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Re-apply defaults on every update |
+| `includeJsonView` | `boolean` | `false` | Show a JSON tab in entity detail |
+| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Local changes backup strategy |
+| `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | — | Disable built-in actions |
+| `additionalFields` | `AdditionalFieldDelegate[]` | — | Virtual computed columns for views |
+| `entityActions` | `EntityAction[]` | — | Custom action buttons (see Entity Actions section) |
+| `Actions` | `ComponentRef[]` | — | Custom toolbar action components |
+| `callbacks` | `EntityCallbacks<M, USER>` | — | Lifecycle hooks (see Entity Callbacks section) |
+| `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
+| `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
+| `childCollections` | `() => EntityCollection[]` | — | Nested child collections (populated automatically) |
+| `overrides` | `EntityOverrides` | — | Override data source or storage source |
+| `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 
-## Property Validation
+## Common Property Options (BaseProperty)
 
-Every property supports a `validation` object:
+All property types share these base options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | `string` | — | Display label for the field |
+| `description` | `string` | — | Help text displayed under the field |
+| `columnName` | `string` | auto from key | Explicit DB column name (bypasses snake_case conversion) |
+| `validation` | `PropertyValidationSchema` | — | Validation rules (see below) |
+| `defaultValue` | `unknown` | — | Default value for new entities |
+| `propertyConfig` | `string` | — | Reuse a globally defined property config by key |
+| `dynamicProps` | `(props) => Partial<Property>` | — | Dynamic property overrides based on entity values |
+| `conditions` | `PropertyConditions` | — | JSON Logic-based declarative conditions |
+| `callbacks` | `PropertyCallbacks` | — | Per-field `afterRead` and `beforeSave` hooks |
+
+### UI Options (BaseUIConfig)
+
+All property types support a `ui` object for display configuration:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ui.columnWidth` | `number` | — | Column width in pixels (table view) |
+| `ui.hideFromCollection` | `boolean` | — | Hide from collection table view |
+| `ui.readOnly` | `boolean` | — | Render as read-only preview |
+| `ui.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
+| `ui.widthPercentage` | `number` | — | Width as percentage of form |
+| `ui.customProps` | `unknown` | — | Custom props passed to the field component |
+| `ui.Field` | `ComponentRef` | — | Custom field component |
+| `ui.Preview` | `ComponentRef` | — | Custom preview/cell component |
+
+## String Properties
+
+```typescript
+title: {
+    name: "Title",
+    type: "string",
+    validation: { required: true, min: 3, max: 200 },
+    multiline: false
+}
+```
+
+### String-Specific Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"varchar"` | Database column type |
+| `isId` | `boolean \| "manual" \| "uuid" \| "cuid" \| string` | — | Mark as primary key with generation strategy |
+| `enum` | `EnumValues` | — | Dropdown/picklist values |
+| `multiline` | `boolean` | `false` | Multi-line text area |
+| `markdown` | `boolean` | `false` | Markdown editor with preview |
+| `url` | `boolean \| PreviewType` | — | Render as link. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
+| `email` | `boolean` | — | Email field rendering |
+| `storage` | `StorageConfig` | — | File upload configuration (see Storage section) |
+| `userSelect` | `boolean` | — | Render as user picker (value = user ID) |
+| `previewAsTag` | `boolean` | — | Render value as a colored tag/chip |
+| `reference` | `ReferenceProperty` | — | Lightweight reference to another collection by ID |
+
+### String isId Strategies
+
+| Value | Behavior |
+|-------|----------|
+| `true` / `"manual"` | User-defined ID, must be entered manually |
+| `"uuid"` | Auto-generated UUID via `gen_random_uuid()` |
+| `"cuid"` | Auto-generated CUID |
+| Any other string | Raw SQL default expression, e.g. `"nanoid()"` |
+
+### String Validation
 
 ```typescript
 validation: {
-    required: true,           // Field is mandatory
-    min: 0,                   // Minimum value (numbers) or length (strings)
-    max: 1000,                // Maximum value or length
-    matches: /^[a-z]+$/,      // Regex pattern (strings)
-    unique: true,             // Must be unique across all documents
-    uniqueInArray: true,      // Must be unique within array
-    requiredMessage: "...",   // Custom error message
+    required: true,
+    min: 3,            // Minimum string length
+    max: 200,          // Maximum string length
+    matches: /^[a-z]+$/,  // Regex pattern (string or RegExp)
+    matchesMessage: "Only lowercase letters allowed",
+    unique: true,
+    uniqueInArray: true,
+    requiredMessage: "Title is required",
+    trim: true,        // Trim whitespace before validation
+    lowercase: true,   // Transform to lowercase before validation
+    uppercase: false,   // Transform to uppercase before validation
 }
 ```
+
+### Storage Configuration (File Uploads)
+
+When a string property has `storage`, it becomes a file upload field. The stored value is the file path (or URL) in your storage provider.
+
+```typescript
+avatar: {
+    name: "Avatar",
+    type: "string",
+    storage: {
+        storagePath: "avatars/{entityId}",
+        acceptedFiles: ["image/*"],
+        maxSize: 5 * 1024 * 1024, // 5MB
+        fileName: "{rand}_{file.name}.{file.ext}",
+        metadata: { cacheControl: "max-age=31536000" },
+        imageResize: {
+            maxWidth: 400,
+            maxHeight: 400,
+            mode: "cover",
+            format: "webp",
+            quality: 80
+        },
+        previewUrl: (path) => `https://cdn.example.com/${path}`,
+        processFile: async (file) => { /* transform before upload */ return file; },
+        postProcess: async (pathOrUrl) => { /* transform saved value */ return pathOrUrl; }
+    }
+}
+```
+
+| StorageConfig Option | Type | Default | Description |
+|---------------------|------|---------|-------------|
+| `storagePath` | `string \| (ctx) => string` | **required** | Upload destination path. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` |
+| `acceptedFiles` | `FileType[]` | all | Allowed MIME types. E.g. `["image/*"]`, `["application/pdf"]` |
+| `maxSize` | `number` | — | Max file size in bytes |
+| `fileName` | `string \| (ctx) => string` | — | Custom filename. Same placeholders as `storagePath` |
+| `metadata` | `Record<string, unknown>` | — | Upload metadata (e.g. Firebase `UploadMetadata`) |
+| `imageResize` | `ImageResize` | — | Resize images before upload |
+| `previewUrl` | `(fileName) => string` | — | Custom preview URL builder |
+| `processFile` | `(file: File) => Promise<File>` | — | Transform file before upload |
+| `postProcess` | `(pathOrUrl) => Promise<string>` | — | Transform saved path/URL after upload |
+| `includeBucketUrl` | `boolean` | `false` | Include bucket URL in saved path |
+| `storeUrl` | `boolean` | `false` | Save download URL instead of storage path |
+
+### ImageResize Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxWidth` | `number` | — | Max width in pixels |
+| `maxHeight` | `number` | — | Max height in pixels |
+| `mode` | `"contain" \| "cover"` | `"contain"` | Resize fitting mode |
+| `format` | `"original" \| "jpeg" \| "png" \| "webp"` | `"original"` | Output format |
+| `quality` | `number` (0-100) | `80` | Quality for JPEG/WebP |
+
+## Number Properties
+
+```typescript
+price: {
+    name: "Price",
+    type: "number",
+    validation: { required: true, min: 0, positive: true }
+}
+```
+
+### Number-Specific Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `columnType` | `"integer" \| "real" \| "double precision" \| "numeric" \| "bigint" \| "serial" \| "bigserial"` | auto | Database column type |
+| `isId` | `boolean \| "manual" \| "increment" \| string` | — | Mark as primary key |
+| `enum` | `EnumValues` | — | Dropdown values |
+
+### Number isId Strategies
+
+| Value | Behavior |
+|-------|----------|
+| `true` / `"manual"` | User-defined numeric ID |
+| `"increment"` | Auto-incrementing integer (`GENERATED BY DEFAULT AS IDENTITY`) |
+| Any other string | Raw SQL default expression |
+
+### Number Validation
+
+```typescript
+validation: {
+    required: true,
+    min: 0,
+    max: 1000,
+    lessThan: 1001,
+    moreThan: -1,
+    positive: true,
+    negative: false,
+    integer: true,
+    unique: true
+}
+```
+
+## Boolean Properties
+
+```typescript
+published: {
+    name: "Published",
+    type: "boolean",
+    defaultValue: false,
+    validation: { required: true }
+}
+```
+
+No additional options beyond `BaseProperty`.
+
+## Date Properties
+
+```typescript
+created_at: {
+    name: "Created At",
+    type: "date",
+    mode: "date_time",
+    autoValue: "on_create",
+    clearable: false,
+    ui: { readOnly: true }
+}
+
+updated_at: {
+    name: "Updated At",
+    type: "date",
+    mode: "date_time",
+    autoValue: "on_update",
+    ui: { readOnly: true }
+}
+```
+
+### Date-Specific Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `columnType` | `"timestamp" \| "date" \| "time"` | `"timestamp"` | Database column type (with timezone) |
+| `mode` | `"date" \| "date_time"` | `"date_time"` | Date-only or date + time picker |
+| `autoValue` | `"on_create" \| "on_update"` | — | Auto-set timestamp on create or every update |
+| `timezone` | `string` | — | Timezone string for display |
+| `clearable` | `boolean` | `false` | Show clear button to set value to `null` |
+
+### Date Validation
+
+```typescript
+validation: {
+    required: true,
+    min: new Date("2020-01-01"),
+    max: new Date("2030-12-31")
+}
+```
+
+## Map Properties (Nested Objects)
+
+Maps store nested objects as `JSONB` in PostgreSQL. They can define their own inner properties schema.
+
+```typescript
+address: {
+    name: "Address",
+    type: "map",
+    properties: {
+        street: { name: "Street", type: "string" },
+        city: { name: "City", type: "string", validation: { required: true } },
+        zip: { name: "ZIP Code", type: "string" },
+        country: { name: "Country", type: "string", enum: [
+            { id: "US", label: "United States" },
+            { id: "UK", label: "United Kingdom" }
+        ]}
+    },
+    propertiesOrder: ["street", "city", "zip", "country"],
+    ui: { expanded: true, spreadChildren: true }
+}
+```
+
+### Map-Specific Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `columnType` | `"json" \| "jsonb"` | `"jsonb"` | Database column type |
+| `properties` | `Properties` | — | Nested property schema (same types as collection properties) |
+| `propertiesOrder` | `string[]` | — | Display order of nested fields |
+| `previewProperties` | `string[]` | — | Properties shown in preview/collapsed state |
+| `keyValue` | `boolean` | — | Render as key-value table with arbitrary keys (no `properties` needed) |
+
+### Map UI Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ui.expanded` | `boolean` | — | Expand map fields by default in forms |
+| `ui.minimalistView` | `boolean` | — | Compact rendering |
+| `ui.spreadChildren` | `boolean` | — | Spread child fields as if they were top-level form fields |
+
+> **IMPORTANT FOR AGENTS:** If `validation.required` is not set on the map property itself, an empty object `{}` is considered valid even if inner properties have `required: true`. Always set `validation: { required: true }` on the map if the entire object is mandatory.
+
+## Array Properties
+
+Arrays can contain any element type (except nested arrays). They map to native Postgres arrays for primitives or `JSONB` for complex types.
+
+```typescript
+tags: {
+    name: "Tags",
+    type: "array",
+    of: { type: "string" },
+    validation: { min: 1, max: 10 }
+}
+
+gallery: {
+    name: "Gallery",
+    type: "array",
+    of: {
+        type: "string",
+        storage: {
+            storagePath: "products/{entityId}/gallery",
+            acceptedFiles: ["image/*"]
+        }
+    }
+}
+
+metadata: {
+    name: "Metadata",
+    type: "array",
+    of: {
+        type: "map",
+        properties: {
+            key: { name: "Key", type: "string", validation: { required: true } },
+            value: { name: "Value", type: "string" }
+        }
+    },
+    ui: { expanded: true }
+}
+```
+
+### Array-Specific Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | auto | Database column type. Primitives default to native arrays |
+| `of` | `Property \| Property[]` | — | Element type definition. Use a single `Property` for homogeneous arrays |
+| `oneOf` | `{ properties, propertiesOrder?, typeField?, valueField? }` | — | Discriminated union for heterogeneous arrays (e.g. blog blocks) |
+| `sortable` | `boolean` | `true` | Allow drag-and-drop reordering |
+| `canAddElements` | `boolean` | `true` | Allow adding new elements |
+
+### Array UI Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ui.expanded` | `boolean` | — | Expand array items by default |
+| `ui.minimalistView` | `boolean` | — | Compact rendering |
+| `ui.Field` | `ComponentRef` | — | Custom field component for the entire array |
+
+### Array Validation
+
+```typescript
+validation: {
+    required: true,
+    min: 1,    // Minimum number of elements
+    max: 20    // Maximum number of elements
+}
+```
+
+### oneOf (Discriminated Union Arrays)
+
+Use `oneOf` for content blocks with different types (e.g. blog content):
+
+```typescript
+content: {
+    name: "Content Blocks",
+    type: "array",
+    oneOf: {
+        typeField: "type",   // default: "type"
+        valueField: "value", // default: "value"
+        properties: {
+            text: {
+                name: "Text Block",
+                type: "string",
+                markdown: true
+            },
+            image: {
+                name: "Image",
+                type: "string",
+                storage: { storagePath: "blog/{entityId}/content" }
+            },
+            quote: {
+                name: "Quote",
+                type: "map",
+                properties: {
+                    text: { name: "Quote Text", type: "string" },
+                    author: { name: "Author", type: "string" }
+                }
+            }
+        }
+    }
+}
+// Stored as: [{ type: "text", value: "# Hello" }, { type: "image", value: "path/to/img.jpg" }]
+```
+
+## Property Validation
+
+Every property supports a `validation` object with these common options:
+
+| Option | Type | Applies To | Description |
+|--------|------|-----------|-------------|
+| `required` | `boolean` | All | Field is mandatory |
+| `requiredMessage` | `string` | All | Custom error message when required validation fails |
+| `unique` | `boolean` | All | Value must be unique across all entities |
+| `uniqueInArray` | `boolean` | All | Value must be unique within parent array |
+| `min` | `number \| Date` | String (length), Number, Date, Array (count) | Minimum value/length/count/date |
+| `max` | `number \| Date` | String (length), Number, Date, Array (count) | Maximum value/length/count/date |
+| `matches` | `string \| RegExp` | String | Regex pattern |
+| `matchesMessage` | `string` | String | Error message for regex mismatch |
+| `trim` | `boolean` | String | Trim whitespace before validation |
+| `lowercase` | `boolean` | String | Transform to lowercase |
+| `uppercase` | `boolean` | String | Transform to uppercase |
+| `length` | `number` | String | Exact string length |
+| `lessThan` | `number` | Number | Value must be less than |
+| `moreThan` | `number` | Number | Value must be greater than |
+| `positive` | `boolean` | Number | Value must be positive |
+| `negative` | `boolean` | Number | Value must be negative |
+| `integer` | `boolean` | Number | Value must be an integer |
 
 ## Enum Values
 
@@ -151,12 +596,28 @@ status: {
     enum: [
         { id: "draft", label: "Draft", color: "gray" },
         { id: "published", label: "Published", color: "green" },
-        { id: "archived", label: "Archived", color: "red" }
+        { id: "archived", label: "Archived", color: "red", disabled: true }
     ]
 }
 ```
 
-Each enum entry supports `id` (stored value), `label` (display text), `color` (optional chip color), and `disabled` (optional).
+Each `EnumValueConfig` entry supports:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string \| number` | Stored value |
+| `label` | `string` | Display text |
+| `color` | `ColorKey \| ColorScheme` | Optional chip color |
+| `disabled` | `boolean` | Option is visible but not selectable |
+
+`EnumValues` can also be a `Record<string, string | EnumValueConfig>` for simpler definitions:
+
+```typescript
+enum: {
+    draft: "Draft",
+    published: { label: "Published", color: "green" }
+}
+```
 
 ### PostgreSQL Enum Database Constraints
 
@@ -179,6 +640,7 @@ import authorsCollection from "./authors";
 
 const postsCollection: PostgresCollection = {
     name: "Posts",
+    slug: "posts",
     table: "posts",
     properties: {
         author: {
@@ -223,20 +685,34 @@ comments: {
 
 ### Relation Property Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `target` | `() => EntityCollection` | Target collection (use a function for lazy resolution) |
-| `cardinality` | `"one" \| "many"` | Whether this references one or many records |
-| `direction` | `"owning" \| "inverse"` | Which side owns the FK or junction table |
-| `localKey` | `string` | Column on this table storing the FK (auto-inferred) |
-| `foreignKeyOnTarget` | `string` | Column on target table storing the FK (for inverse) |
-| `through` | `{ table, sourceColumn, targetColumn }` | Custom junction table config |
-| `onDelete` | `OnAction` | Cascade rule on delete |
-| `onUpdate` | `OnAction` | Cascade rule on update |
-| `widget` | `"select" \| "dialog"` | UI widget for selecting relations |
-| `previewProperties` | `string[]` | Properties shown in relation preview (max 3) |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `target` | `string \| (() => EntityCollection \| string)` | — | Target collection (use a function for lazy resolution to avoid circular imports) |
+| `cardinality` | `"one" \| "many"` | `"one"` | Whether this references one or many records |
+| `direction` | `"owning" \| "inverse"` | `"owning"` | Which side owns the FK or junction table |
+| `localKey` | `string` | auto-inferred | Column on THIS table storing the FK (e.g. `"author_id"`) |
+| `foreignKeyOnTarget` | `string` | auto-inferred | Column on TARGET table storing the FK (for inverse) |
+| `through` | `{ table, sourceColumn, targetColumn }` | auto-inferred | Junction table config for many-to-many |
+| `joinPath` | `JoinStep[]` | — | Explicit multi-hop join path (overrides all other join config) |
+| `relationName` | `string` | property key | Override the relation name (defaults to the property key) |
+| `inverseRelationName` | `string` | — | Name of the corresponding relation on the target collection |
+| `onDelete` | `OnAction` | — | Cascade rule on delete |
+| `onUpdate` | `OnAction` | — | Cascade rule on update |
+| `overrides` | `Partial<EntityCollection>` | — | Override target collection config when rendered as subcollection tab |
+| `fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
+| `includeId` | `boolean` | `true` | Show entity ID in the reference preview |
+| `includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
+| `isId` | `boolean` | — | Mark as primary key |
+| `validation` | `{ required?: boolean }` | — | Relation-level validation |
 
-### Cascade Rules
+### Relation UI Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ui.widget` | `"select" \| "dialog"` | `"select"` | UI widget for selecting relations |
+| `ui.previewProperties` | `string[]` | — | Properties shown in relation preview (max 3) |
+
+### Cascade Rules (OnAction)
 
 | Action | Behavior |
 |--------|----------|
@@ -246,17 +722,126 @@ comments: {
 | `"no action"` | Defer to constraint check |
 | `"set default"` | Set FK to default value |
 
+### Multi-Hop Joins (joinPath)
+
+Use `joinPath` for advanced relationships that traverse multiple tables. When set, it overrides `localKey`, `foreignKeyOnTarget`, and `through`.
+
+Each `JoinStep` defines one JOIN operation:
+
+```typescript
+interface JoinStep {
+    table: string;          // Table to join TO
+    on: {
+        from: string | string[];  // Column(s) on the PREVIOUS table
+        to: string | string[];    // Column(s) on THIS table
+    };
+}
+```
+
+**Example: Users → Permissions through Roles (4-table join)**
+
+```typescript
+permissions: {
+    name: "Permissions",
+    type: "relation",
+    target: () => permissionsCollection,
+    cardinality: "many",
+    joinPath: [
+        {
+            table: "user_roles",
+            on: { from: "id", to: "user_id" }         // users.id = user_roles.user_id
+        },
+        {
+            table: "roles",
+            on: { from: "role_id", to: "id" }          // user_roles.role_id = roles.id
+        },
+        {
+            table: "role_permissions",
+            on: { from: "id", to: "role_id" }          // roles.id = role_permissions.role_id
+        },
+        {
+            table: "permissions",
+            on: { from: "permission_id", to: "id" }    // role_permissions.permission_id = permissions.id
+        }
+    ]
+}
+```
+
+**Example: Composite key join**
+
+```typescript
+customer: {
+    name: "Customer",
+    type: "relation",
+    target: () => customersCollection,
+    cardinality: "one",
+    joinPath: [
+        {
+            table: "customers",
+            on: {
+                from: ["company_code", "region_id"],  // orders table columns
+                to: ["code", "region_id"]             // customers table columns
+            }
+        }
+    ]
+}
+```
+
 > **See full documentation:** [Relations](https://rebase.pro/docs/collections/relations)
 
 ## Entity Callbacks (Lifecycle Hooks)
 
 > **IMPORTANT FOR AGENTS**: Collections support **lifecycle callbacks** that let you run custom logic when entities are created, updated, read, or deleted. Use these to **sync data between collections**, transform data, validate business rules, or trigger side effects. **Do NOT use raw SQL triggers, cron jobs, or external scripts** when a callback can solve the problem.
 
-Add a `callbacks` property to any collection definition:
+### Generic Type Parameters
+
+`EntityCallbacks<M, USER>` accepts two generic type parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `M` | `Record<string, unknown>` | Entity values type — maps to your collection's property schema |
+| `USER` | `User` | User type — extends the base `User` type with custom fields |
+
+```typescript
+import { PostgresCollection, EntityCallbacks } from "@rebasepro/types";
+
+interface Product {
+    name: string;
+    price: number;
+    slug: string;
+    status: string;
+}
+
+const callbacks: EntityCallbacks<Product> = {
+    beforeSave: async ({ values, status }) => {
+        // `values` is typed as Partial<Product>
+        if (values.name) {
+            values.slug = values.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        }
+        return values;
+    }
+};
+```
+
+### RebaseCallContext\<USER\>
+
+All callbacks receive a `context` property of type `RebaseCallContext<USER>`. This is the subset of the full `RebaseContext` that is available in both frontend and backend (server-side) execution:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `context.client` | `RebaseClient` | Invoke backend functions, access APIs |
+| `context.data` | `RebaseData` | Unified data access — `context.data.products.create(...)` |
+| `context.storageSource` | `StorageSource` | File storage operations |
+| `context.user` | `USER \| undefined` | Authenticated user (set by backend in server-side callbacks) |
+
+> **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sideEntityController`, etc.). Entity callbacks always receive `RebaseCallContext`.
+
+### Callback Example
 
 ```typescript
 const jobSubmissionsCollection: PostgresCollection = {
     name: "Job Submissions",
+    slug: "job_submissions",
     table: "job_submissions",
     callbacks: {
         // Runs BEFORE saving — transform or validate data
@@ -272,21 +857,13 @@ const jobSubmissionsCollection: PostgresCollection = {
 
         // Runs AFTER saving — trigger side effects, sync other collections
         afterSave: async ({ values, entityId, previousValues, context }) => {
-            // Example: When status changes to "approved", copy to the jobs table
             if (values.status === "approved" && previousValues?.status !== "approved") {
-                const dataSource = context.dataSource;
-                await dataSource.saveEntity({
-                    path: "jobs",
-                    entityId: undefined, // auto-generate new ID
-                    values: {
-                        title: values.title,
-                        description: values.description,
-                        company_id: values.company_id,
-                        status: "published",
-                        source_submission_id: entityId,
-                    },
-                    collection: jobsCollection, // reference to target collection
-                    status: "new"
+                await context.data.jobs.create({
+                    title: values.title,
+                    description: values.description,
+                    company_id: values.company_id,
+                    status: "published",
+                    source_submission_id: entityId,
                 });
             }
         },
@@ -322,12 +899,66 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Callback | When It Runs | Return Value | Can Block? |
 |----------|-------------|--------------|------------|
-| `beforeSave` | Before write to DB (after validation) | Modified `values` | Yes (throw to block) |
+| `beforeSave` | Before write to DB (after validation) | Modified `values` (`Partial<EntityValues<M>>`) | Yes (throw to block) |
 | `afterSave` | After successful write | `void` | No |
 | `afterSaveError` | After a failed write | `void` | No |
-| `afterRead` | After reading from DB | Modified `entity` | No |
-| `beforeDelete` | Before deletion | `void` | Yes (throw to block) |
+| `afterRead` | After reading from DB | Modified `entity` (`Entity<M>`) | No |
+| `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw to block) |
 | `afterDelete` | After successful deletion | `void` | No |
+
+### Callback Props Reference
+
+**`beforeSave` / `afterSave` / `afterSaveError` Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `values` | `Partial<EntityValues<M>>` | Entity values being saved |
+| `entityId` | `string \| number` (optional in `beforeSave`) | Entity ID (`undefined` for new entities in `beforeSave`) |
+| `previousValues` | `Partial<EntityValues<M>> \| undefined` | Previous values (for updates) |
+| `status` | `EntityStatus` | `"new"`, `"existing"`, or `"copy"` |
+| `collection` | `EntityCollection<M>` | The collection definition |
+| `path` | `string` | Collection path |
+| `context` | `RebaseCallContext<USER>` | Context with `client`, `data`, `storageSource`, `user` |
+
+**`afterRead` Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `entity` | `Entity<M>` | The fetched entity |
+| `collection` | `EntityCollection<M>` | The collection definition |
+| `path` | `string` | Collection path |
+| `context` | `RebaseCallContext<USER>` | Context |
+
+**`beforeDelete` / `afterDelete` Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `entity` | `Entity<M>` | The entity being deleted |
+| `entityId` | `string \| number` | Entity ID |
+| `collection` | `EntityCollection<M>` | The collection definition |
+| `path` | `string` | Collection path |
+| `context` | `RebaseCallContext<USER>` | Context |
+
+### Property-Level Callbacks
+
+Individual properties also support `callbacks` with `afterRead` and `beforeSave`:
+
+```typescript
+title: {
+    name: "Title",
+    type: "string",
+    callbacks: {
+        beforeSave: async ({ value, values }) => {
+            // Transform just this property's value before saving
+            return value?.trim().replace(/\s+/g, " ");
+        },
+        afterRead: async ({ value }) => {
+            // Transform just this property's value after reading
+            return value?.toUpperCase();
+        }
+    }
+}
+```
 
 ### Common Use Cases
 
@@ -337,21 +968,6 @@ const jobSubmissionsCollection: PostgresCollection = {
 - **Notifications** — Use `afterSave` to send emails, Slack messages, or webhook calls
 - **Cascade operations** — Use `afterDelete` to clean up related records in other collections
 - **Data enrichment** — Use `afterRead` to add computed/virtual fields for display
-
-### Callback Props Reference
-
-All callbacks receive these properties:
-
-| Prop | Available In | Description |
-|------|-------------|-------------|
-| `values` | `beforeSave`, `afterSave`, `afterSaveError` | Entity values being saved |
-| `entityId` | All callbacks | Entity ID (`undefined` for new entities in `beforeSave`) |
-| `previousValues` | `beforeSave`, `afterSave` | Previous values (for updates) |
-| `status` | `beforeSave`, `afterSave` | `"new"`, `"existing"`, or `"copy"` |
-| `entity` | `afterRead`, `beforeDelete`, `afterDelete` | Full entity object |
-| `context` | All callbacks | Rebase context with `dataSource`, `authController`, etc. |
-| `collection` | All callbacks | The collection definition |
-| `path` | All callbacks | Collection path |
 
 > **See full documentation:** [Entity Callbacks](https://rebase.pro/docs/collections/callbacks)
 
@@ -364,6 +980,7 @@ Add an `entityActions` array to any collection definition:
 ```typescript
 const jobSubmissionsCollection: PostgresCollection = {
     name: "Job Submissions",
+    slug: "job_submissions",
     table: "job_submissions",
     entityActions: [
         {
@@ -373,12 +990,8 @@ const jobSubmissionsCollection: PostgresCollection = {
             isEnabled: ({ entity }) => entity?.values.status === "pending",
             onClick: async ({ entity, context, onCollectionChange }) => {
                 if (!entity) return;
-                await context.dataSource.saveEntity({
-                    path: "job_submissions",
-                    entityId: entity.id,
-                    values: { ...entity.values, status: "approved" },
-                    collection: jobSubmissionsCollection,
-                    status: "existing"
+                await context.data.job_submissions.update(entity.id, {
+                    status: "approved"
                 });
                 context.snackbarController?.open({
                     type: "success",
@@ -402,27 +1015,36 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 ### EntityAction Interface
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `name` | `string` | Button label |
-| `icon` | `ReactElement` | Optional icon |
-| `onClick` | `(props) => void` | Action handler — receives `entity`, `context`, `formContext`, `selectionController` |
-| `isEnabled` | `(props) => boolean` | Optional — disable the action conditionally |
-| `collapsed` | `boolean` | If `true`, show in overflow menu (default: `true`) |
-| `includeInForm` | `boolean` | Show in entity form view (default: `true`) |
-| `key` | `string` | Override default actions (`"edit"`, `"delete"`, `"copy"`) |
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `name` | `string` | — | Button label |
+| `key` | `string` | — | Override default actions: `"edit"`, `"delete"`, `"copy"` |
+| `icon` | `ReactElement` | — | Optional icon |
+| `onClick` | `(props: EntityActionClickProps) => void \| Promise<void>` | — | Action handler |
+| `isEnabled` | `(props: EntityActionClickProps) => boolean` | — | Conditionally disable the action |
+| `collapsed` | `boolean` | `true` | If `true`, show in overflow menu |
+| `includeInForm` | `boolean` | `true` | Show in entity form view |
+| `showActionsInListView` | `boolean` | `false` | Show inline on each row in list view |
 
-### onClick Props
+### EntityActionClickProps
 
-The `onClick` handler receives:
-- `entity` — The current entity
-- `context` — Full Rebase context (`dataSource`, `authController`, `snackbarController`, etc.)
-- `formContext` — Form state and methods (when called from a form)
-- `sideEntityController` — Side panel control (when in side panel)
-- `selectionController` — Multi-select state (when in collection view)
-- `view` — `"collection"` or `"form"`
-- `onCollectionChange` — Call to refresh the collection view
-- `navigateBack` — Navigate back (e.g., after deleting)
+The `onClick` and `isEnabled` handlers receive:
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `entity` | `Entity<M> \| undefined` | The current entity |
+| `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
+| `path` | `string \| undefined` | Collection path |
+| `collection` | `EntityCollection<M> \| undefined` | Collection definition |
+| `formContext` | `FormContext \| undefined` | Form state (when called from a form) |
+| `sideEntityController` | `SideEntityController \| undefined` | Side panel control |
+| `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
+| `view` | `"collection" \| "form"` | Where the action was triggered |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
+| `highlightEntity` | `(entity) => void` | Highlight an entity row |
+| `unhighlightEntity` | `(entity) => void` | Remove highlight |
+| `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
+| `onCollectionChange` | `() => void` | Refresh the collection view |
 
 ## Entity Custom Views (Tabs)
 
@@ -448,6 +1070,7 @@ const entityViews = [
 // Per-collection reference in collection definition
 const postsCollection: PostgresCollection = {
     name: "Posts",
+    slug: "posts",
     table: "posts",
     entityViews: ["blog_preview"],  // References the global view by key
     properties: { /* ... */ }
@@ -473,6 +1096,32 @@ if (!entity) {
 ```
 This narrows the type of `entity` for the remainder of the component, allowing safe property access (e.g. `entity.id`, `entity.values.field`).
 
+## Vector Properties
+
+For similarity search and AI embeddings:
+
+```typescript
+embedding: {
+    name: "Embedding",
+    type: "vector",
+    dimensions: 1536  // Required — must match your model's output dimensions
+}
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `dimensions` | `number` | **Required.** Number of dimensions in the vector |
+
+## Geopoint Properties
+
+```typescript
+location: {
+    name: "Location",
+    type: "geopoint"
+}
+// Stored as JSONB: { latitude: number, longitude: number }
+```
+
 ## Security Rules (RLS)
 
 Collections support **Row Level Security** via the `securityRules` array. This generates PostgreSQL RLS policies:
@@ -480,6 +1129,7 @@ Collections support **Row Level Security** via the `securityRules` array. This g
 ```typescript
 const postsCollection: PostgresCollection = {
     name: "Posts",
+    slug: "posts",
     table: "posts",
     securityRules: [
         // Anyone can read published posts
@@ -493,18 +1143,59 @@ const postsCollection: PostgresCollection = {
 };
 ```
 
-### Shortcut Options
+### Security Rule Types
 
-| Option | Example | SQL Generated |
-|--------|---------|---------------|
-| `access: "public"` | Anyone can access | `USING (true)` |
-| `access: "authenticated"` | Any logged-in user | `USING (auth.uid() IS NOT NULL)` |
-| `ownerField: "user_id"` | Only the owner | `USING (user_id = auth.uid())` |
-| `roles: ["admin"]` | Specific roles only | `USING ('admin' = ANY(auth.roles()))` |
-| `using: "..."` | Raw SQL expression | Custom USING clause |
-| `withCheck: "..."` | Raw SQL for writes | Custom WITH CHECK clause |
+Rules are a discriminated union — you must use exactly one of: `ownerField`, `access: "public"`, raw `using`/`withCheck`, or roles-only. They cannot be mixed (enforced at the type level).
+
+| Variant | Key Field | Generates |
+|---------|-----------|-----------|
+| `OwnerSecurityRule` | `ownerField: "user_id"` | `USING (user_id = auth.uid())` |
+| `PublicSecurityRule` | `access: "public"` | `USING (true)` |
+| `RawSQLSecurityRule` | `using: "..."` | Custom USING/WITH CHECK clause |
+| `RolesOnlySecurityRule` | (none of the above) | Roles-only, no row filter |
+
+### Common Options (SecurityRuleBase)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | `string` | auto-generated | Human-readable policy name (must be unique per table) |
+| `operation` | `SecurityOperation` | `"all"` | Single operation: `"select"`, `"insert"`, `"update"`, `"delete"`, `"all"` |
+| `operations` | `SecurityOperation[]` | — | Multiple operations (generates one policy per operation) |
+| `mode` | `"permissive" \| "restrictive"` | `"permissive"` | Permissive rules are OR'd; restrictive are AND'd |
+| `roles` | `string[]` | — | Application-level roles (Rebase roles, NOT Postgres roles). Can be combined with any variant |
+| `pgRoles` | `string[]` | `["public"]` | Advanced: native PostgreSQL database roles for the `TO` clause |
+
+### SQL Context Functions
+
+In raw SQL expressions (`using`, `withCheck`), these functions are available:
+- `auth.uid()` — the current user's ID
+- `auth.roles()` — comma-separated app role IDs
+- `auth.jwt()` — full JWT claims as JSONB
+- `{column_name}` — resolves to `table.column_name`
 
 > **See full documentation:** [Security Rules](https://rebase.pro/docs/collections/security-rules)
+
+## Dynamic Properties (Conditions)
+
+For declarative, JSON-serializable dynamic behavior, use `conditions` instead of `dynamicProps`:
+
+```typescript
+discount_percentage: {
+    name: "Discount %",
+    type: "number",
+    conditions: {
+        // Only show when sale_enabled is true
+        hidden: { "!": { "var": "values.sale_enabled" } },
+        // Required when visible
+        required: { "var": "values.sale_enabled" },
+        // Min 0, max 100
+        min: 0,
+        max: 100
+    }
+}
+```
+
+Available condition fields: `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`, `required`, `requiredMessage`, `min`, `max`, `defaultValue`, `enumConditions`, `allowedEnumValues`, `excludedEnumValues`, `referencePath`, `referenceFilter`, `canAddElements`, `sortable`, `acceptedFiles`, `maxFileSize`.
 
 ## Schema Migration Workflow
 

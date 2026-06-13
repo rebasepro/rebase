@@ -1,106 +1,74 @@
-# @rebasepro/postgresql
+# @rebasepro/client-postgresql
 
-PostgreSQL data source client for Rebase with real-time WebSocket connectivity.
-
-This package provides a complete client-side implementation for connecting Rebase applications to PostgreSQL backends, featuring real-time synchronization via WebSockets.
+PostgreSQL data source client for Rebase — connects the Rebase admin panel to a PostgreSQL backend via WebSocket.
 
 ## Installation
 
 ```bash
-npm install @rebasepro/postgresql @rebasepro/core
+pnpm add @rebasepro/client-postgresql
 ```
 
-## Usage
+**Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`
 
-### Basic Setup with React Hook
+## What This Package Does
 
-```typescript
-import { usePostgresDataSource } from "@rebasepro/postgresql";
-import { Rebase } from "@rebasepro/core";
+This package provides a `DataDriver` implementation that bridges Rebase's data layer to a PostgreSQL backend through `@rebasepro/client`'s WebSocket client. It supports full CRUD, realtime collection/entity listeners, unique field validation, entity counting, and admin operations (SQL execution, branch management, table introspection).
+
+## Key Exports
+
+| Export | Type | Description |
+|---|---|---|
+| `usePostgresClientDriver` | Hook | Creates a `PostgresDataDriver` from a `RebaseWebSocketClient` |
+| `PostgresDataDriverConfig` | Type | Config object: `{ wsClient: RebaseWebSocketClient }` |
+| `PostgresDataDriver` | Type | Extends `DataDriver` with a `client` reference and `admin` methods |
+
+### `PostgresDataDriver` Methods
+
+| Method | Description |
+|---|---|
+| `fetchCollection(props)` | Fetch a list of entities with filtering, sorting, pagination, and search |
+| `fetchEntity(props)` | Fetch a single entity by path and ID |
+| `saveEntity(props)` | Create or update an entity |
+| `deleteEntity(props)` | Delete an entity |
+| `checkUniqueField(path, name, value, entityId?, collection?)` | Check if a field value is unique |
+| `countEntities(props)` | Count entities matching filter criteria |
+| `listenCollection(props)` | Subscribe to realtime collection updates. Returns an unsubscribe function |
+| `listenEntity(props)` | Subscribe to realtime entity updates. Returns an unsubscribe function |
+| `isFilterCombinationValid()` | Always returns `true` — PostgreSQL supports complex filter combinations |
+
+### Admin Methods (`driver.admin`)
+
+| Method | Description |
+|---|---|
+| `executeSql(sql, options?)` | Execute raw SQL. Options: `{ database?, role? }` |
+| `fetchAvailableDatabases()` | List available databases |
+| `fetchAvailableRoles()` | List available roles |
+| `fetchCurrentDatabase()` | Get the current database name |
+| `fetchUnmappedTables(mappedPaths?)` | Find tables not yet mapped to collections |
+| `fetchTableMetadata(tableName)` | Get column/constraint metadata for a table |
+| `createBranch(name, options?)` | Create a database branch. Options: `{ source? }` |
+| `deleteBranch(name)` | Delete a database branch |
+| `listBranches()` | List all branches |
+
+## Quick Start
+
+```tsx
+import { usePostgresClientDriver } from "@rebasepro/client-postgresql";
+import { RebaseWebSocketClient } from "@rebasepro/client";
+
+const wsClient = new RebaseWebSocketClient({ url: "ws://localhost:4100" });
 
 function App() {
-    const dataSource = usePostgresDataSource({
-        baseUrl: "http://localhost:3001",
-        websocketUrl: "ws://localhost:3001", // Optional, will be inferred from baseUrl
-        headers: { // Optional
-            "Authorization": "Bearer your-token"
-        }
-    });
+    const driver = usePostgresClientDriver({ wsClient });
 
+    // Pass to your Rebase app as the data driver
     return (
-        <Rebase
-            dataSource={dataSource}
-            collections={collections}
-            // ... other props
-        />
+        <Rebase driver={driver} /* ...other props */ />
     );
 }
 ```
 
-### Creating Data Source Directly
+## Related Packages
 
-```typescript
-import { createPostgresDataSource } from "@rebasepro/postgresql";
-
-const dataSource = createPostgresDataSource({
-    baseUrl: "http://localhost:3001",
-    websocketUrl: "ws://localhost:3001"
-});
-```
-
-## Features
-
-- **Real-time Synchronization**: WebSocket-based real-time updates for collections and entities
-- **Automatic Reconnection**: Built-in reconnection logic with exponential backoff
-- **Type Safety**: Full TypeScript support with Rebase core types
-- **Error Handling**: Comprehensive error handling with custom error types
-- **Connection Management**: Connection status monitoring and queue management
-
-## API
-
-### Configuration
-
-```typescript
-interface PostgresDataSourceConfig {
-    baseUrl: string;           // Backend server URL
-    websocketUrl?: string;     // WebSocket URL (optional)
-    headers?: Record<string, string>; // Custom headers (optional)
-}
-```
-
-### Methods
-
-The PostgreSQL data source implements all Rebase `DataSource` methods:
-
-- `fetchCollection<M>(props): Promise<Entity<M>[]>`
-- `fetchEntity<M>(props): Promise<Entity<M> | undefined>`
-- `saveEntity<M>(props): Promise<Entity<M>>`
-- `deleteEntity<M>(props): Promise<void>`
-- `checkUniqueField(...): Promise<boolean>`
-- `generateEntityId(...): string`
-- `countEntities<M>(props): Promise<number>`
-- `listenCollection<M>(props): () => void`
-- `listenEntity<M>(props): () => void`
-
-## Backend Requirements
-
-This client expects a WebSocket-enabled backend that handles the following message types:
-
-- `FETCH_COLLECTION`
-- `FETCH_ENTITY`
-- `SAVE_ENTITY`
-- `DELETE_ENTITY`
-- `CHECK_UNIQUE_FIELD`
-- `GENERATE_ENTITY_ID`
-- `COUNT_ENTITIES`
-- `subscribe_collection`
-- `subscribe_entity`
-- `unsubscribe`
-
-## Development
-
-This package is part of the Rebase monorepo. For development instructions, see the main repository README.
-
-## License
-
-MIT
+- `@rebasepro/client` — Provides `RebaseWebSocketClient` used for communication
+- `@rebasepro/types` — Shared types (`DataDriver`, `Entity`, `EntityCollection`, etc.)

@@ -1,84 +1,142 @@
-## Rebase UI
+# @rebasepro/ui
 
-
-**Rebase UI** is a high quality set of components that you can use to build your own custom views. You can
-use these components to build your own Rebase views, or in any other React application. You just need to install
-`tailwindcss` and the `@rebasepro/ui` package.
-
-### Why build this UI kit?
-Rebase was using MUI until version 3.0. MUI provides ready to use components with intuitive APIs, but it also
-comes with a lot of complexity and overhead. We wanted to build a simpler and more flexible UI kit that could be used
-in any React project, not just in Rebase.
-We also wanted to make it easy to transition from MUI to our new UI kit, so we kept the API as similar as possible.
-The result it a set of components that are easy to use, easy to customize, **much more performant** and with a smaller bundle size.
-
-The components are primarily built using **Radix UI** primitives and **tailwindcss**. This means that you can easily customize them
-using tailwindcss classes or override the styles using CSS.
-
-See the full list of components in https://rebase.pro/docs/components
-
-
-> All the components are exported from the `@rebasepro/ui` package. These are the same components used internally in **Rebase**.
-
+React component library and design system for the Rebase ecosystem. Built on Radix UI primitives, Tailwind CSS, and lucide-react icons.
 
 ## Installation
 
-If you are using Rebase, you don't need to install this package, as it is already included, and
-configured for you.
-
-To use the components in your own project, you need to install the `@rebasepro/ui` package:
-
 ```bash
-yarn add @rebasepro/ui
-```
-or
-```bash
-npm install @rebasepro/ui
+pnpm add @rebasepro/ui
 ```
 
-You also need to install `tailwindcss`:
+### Peer Dependencies
 
-```bash
-yarn add tailwindcss @tailwindcss/typography
+- `react` >= 19.0.0
+- `react-dom` >= 19.0.0
+
+## What This Package Does
+
+`@rebasepro/ui` provides all the shared UI primitives used across Rebase packages (`@rebasepro/studio`, `@rebasepro/admin`, etc.). It wraps Radix UI components with Rebase's design tokens and Tailwind styling, and re-exports lucide-react icons so other packages don't need direct icon dependencies.
+
+Import the stylesheet in your app:
+
+```typescript
+import "@rebasepro/ui/index.css";
 ```
 
-And initialize it in your project:
+## Key Exports
 
-```bash
-npx tailwindcss init
+### Components
+
+| Component | Description |
+|---|---|
+| `Alert` | Status messages and notifications |
+| `Autocomplete` | Text input with suggestions |
+| `Avatar` | User avatar display |
+| `Badge` | Small status indicator |
+| `BooleanSwitch` / `BooleanSwitchWithLabel` | Toggle switch |
+| `Button` / `IconButton` / `LoadingButton` | Action buttons |
+| `Card` | Content container card |
+| `CenteredView` | Horizontally/vertically centered layout |
+| `Checkbox` | Checkbox input (Radix) |
+| `Chip` / `FilterChip` | Tag-like chips |
+| `CircularProgress` / `CircularProgressCenter` | Loading spinners |
+| `Collapse` | Collapsible content (Radix) |
+| `ColorPicker` | Color selection input |
+| `Container` | Max-width content wrapper |
+| `DateTimeField` | Date/time picker input |
+| `DebouncedTextField` | Text field with debounced onChange |
+| `Dialog` / `DialogTitle` / `DialogContent` / `DialogActions` | Modal dialogs (Radix) |
+| `ErrorBoundary` | React error boundary |
+| `ExpandablePanel` | Expandable/collapsible panel |
+| `FileUpload` | Drag-and-drop file upload (react-dropzone) |
+| `InputLabel` / `InfoLabel` / `Label` | Form labels |
+| `Markdown` | Markdown renderer (markdown-it) |
+| `Menu` / `Menubar` | Dropdown and menu bar (Radix) |
+| `MultiSelect` | Multi-value select input |
+| `Paper` | Elevated surface |
+| `Popover` | Popover overlay (Radix) |
+| `RadioGroup` | Radio button group (Radix) |
+| `ResizablePanels` | Resizable split panes |
+| `SearchBar` | Search input with icon |
+| `Select` | Single-value select (Radix) |
+| `Separator` | Visual divider (Radix) |
+| `Sheet` | Slide-out panel |
+| `Skeleton` | Loading placeholder |
+| `Slider` | Range slider (Radix) |
+| `Table` / `VirtualTable` | Data tables (VirtualTable uses react-window) |
+| `Tabs` | Tab navigation (Radix) |
+| `TextareaAutosize` | Auto-resizing textarea |
+| `TextField` | Text input field |
+| `ToggleButtonGroup` | Segmented toggle buttons |
+| `Tooltip` | Hover tooltip (Radix) |
+| `Typography` | Text with variant styling |
+
+### Re-exported Radix Primitives
+
+```typescript
+import { Portal, PopoverPrimitive, Slot } from "@rebasepro/ui";
 ```
 
-And add then add the rebase preset in your `tailwind.config.js`:
+### Style Mixins
 
-```javascript
-import rebaseConfig from "@rebasepro/ui/tailwind.config.js";
+Tailwind class-string constants for consistent styling:
 
-export default {
-    presets: [rebaseConfig],
-    content: [
-        "./index.html",
-        "./src/**/*.{js,ts,jsx,tsx}",
-        "./node_modules/@rebasepro/**/src/**/*.{js,ts,jsx,tsx}"
-    ]
-};
-```
-(You might need to adjust the paths in the `content` array to match your project structure)
+| Export | Description |
+|---|---|
+| `focusedClasses` | Ring styles for focused elements |
+| `fieldBackgroundMixin` | Standard field background |
+| `fieldBackgroundHoverMixin` | Hover state for fields |
+| `defaultBorderMixin` | Default border color |
+| `paperMixin` | Paper/card surface style |
+| `cardMixin` / `cardClickableMixin` / `cardSelectedMixin` | Card variants |
 
-Finally, you need to define your primary and secondary colors in your `index.css` file:
+### Utilities
 
-```css
-@import 'tailwindcss';
-@import "@rebasepro/ui/index.css" layer(base);
+| Export | Description |
+|---|---|
+| `cls(...)` | Class name merge utility (wraps `clsx`) |
+| `debounce` | Debounce function |
+| `chipColors` | Color palette for chips |
+| `keyToIconComponent` | Map icon string key to lucide component |
 
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+### Hooks
 
-@source "../index.html";
-@source "./**/*.{js,ts,jsx,tsx}";
-@source "../node_modules/@rebasepro/**/*.{js,ts,jsx,tsx}";
+| Hook | Description |
+|---|---|
+| `useInjectStyles` | Inject CSS into the document head |
+| `useOutsideAlerter` | Detect clicks outside a ref |
+| `useDebouncedCallback` | Debounced callback hook |
+| `useDebounceCallback` | Callback debounce variant |
+| `useDebounceValue` | Debounced value hook |
+| `PortalContainerContext` | Context for portal target container |
 
-:root {
-    --color-primary: #0070F4;
-    --color-secondary: #FF5B79;
+### Icons
+
+Re-exports ~100 individual lucide-react icon components (e.g. `ArrowRightIcon`, `SearchIcon`, `PlusIcon`), the full `lucideIcons` map, the `Icon` component, `GitHubIcon`, `HandleIcon`, `iconKeys`, and `coolIconKeys`.
+
+## Quick Start
+
+```tsx
+import { Button, TextField, Typography, cls } from "@rebasepro/ui";
+import { SearchIcon } from "@rebasepro/ui";
+import "@rebasepro/ui/index.css";
+
+function MyForm() {
+    return (
+        <div className={cls("flex flex-col gap-4 p-4")}>
+            <Typography variant="h6">Search</Typography>
+            <TextField placeholder="Type to search..." />
+            <Button variant="filled">
+                <SearchIcon size={16} />
+                Search
+            </Button>
+        </div>
+    );
 }
 ```
 
+## Related Packages
+
+- `@rebasepro/studio` — Dev tools layer (depends on this package)
+- `@rebasepro/admin` — CMS layer (depends on this package)
+- `@rebasepro/core` — Core framework (uses this for shared UI)

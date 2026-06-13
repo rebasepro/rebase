@@ -1,216 +1,1095 @@
 ---
 name: rebase-auth
-description: Guide for setting up and using Rebase Authentication, roles, and Row-Level Security (RLS) policies. Use this skill when the user needs to add authentication, manage users and roles, or secure data access with RLS policies.
+description: Guide for setting up and using Rebase Authentication, roles, Row-Level Security (RLS) policies, MFA, API keys, OAuth providers, custom auth adapters, and lifecycle hooks. Use this skill when the user needs to add authentication, manage users and roles, secure data access, configure OAuth, set up MFA, create API keys, or customize the auth pipeline.
 ---
 
 # Rebase Authentication
 
-Rebase provides built-in authentication with role-based access control (RBAC) and application-level Row-Level Security (RLS) for all auto-generated APIs.
+Rebase ships a complete, built-in authentication system with JWT sessions, OAuth, MFA/TOTP, API keys, Row-Level Security, and lifecycle hooks — or you can plug in an external provider (Clerk, Auth0, Firebase Auth) via the `AuthAdapter` interface.
 
-## Core Concepts
+> **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first. The auth system is configured inside `initializeRebaseBackend()` which is covered there.
 
-### Users
+## Table of Contents
 
-Users are managed through the Rebase user management system. Each user has:
-- `uid`: Unique identifier
-- `email`: User's email address
-- `displayName`: Display name
-- `roles`: Array of role IDs assigned to the user
+- [Server-Side Configuration (RebaseAuthConfig)](#server-side-configuration)
+- [OAuth Providers](#oauth-providers)
+- [Auth Lifecycle Hooks](#auth-lifecycle-hooks)
+- [MFA / TOTP](#mfa--totp)
+- [API Keys](#api-keys)
+- [REST Endpoints](#rest-endpoints)
+- [Client SDK (auth module)](#client-sdk)
+- [Row-Level Security (RLS)](#row-level-security)
+- [Rate Limiting](#rate-limiting)
+- [Custom Auth Adapters](#custom-auth-adapters)
+- [Roles & Permissions](#roles--permissions)
+- [Backend Hooks](#backend-hooks)
+- [Email Configuration](#email-configuration)
+- [Security Concepts](#security-concepts)
+- [References](#references)
 
-### Roles
+---
 
-Roles define what a user can see and do. Each role has:
-- `id`: Unique string identifier (e.g., `"admin"`, `"editor"`, `"viewer"`)
-- `name`: Human-readable name
-- `isAdmin`: Boolean flag for full access
+## Server-Side Configuration
 
-Roles are stored as string IDs on user objects and resolved to full role objects at runtime.
+Authentication is configured via the `auth` property of `initializeRebaseBackend()`. It accepts **either** a `RebaseAuthConfig` object (built-in auth) or an `AuthAdapter` (external auth).
 
-### RLS Policies (Row-Level Security)
+### RebaseAuthConfig
 
-Rebase implements **application-level** RLS policies (not PostgreSQL native RLS). These policies are evaluated by the backend before executing database operations.
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `collection` | `EntityCollection` | Built-in users collection | The collection used for auth user storage. Import `defaultUsersCollection` from `@rebasepro/common` or pass a custom collection with required auth fields. |
+| `jwtSecret` | `string` | — | **Required.** Secret for signing JWT access tokens. |
+| `accessExpiresIn` | `string` | `"1h"` | Access token lifetime (e.g. `"15m"`, `"2h"`). |
+| `refreshExpiresIn` | `string` | `"30d"` | Refresh token lifetime. |
+| `requireAuth` | `boolean` | `true` | When `true`, data routes return 401 for unauthenticated requests. Set to `false` to rely entirely on Postgres RLS. |
+| `allowRegistration` | `boolean` | `false` | Enable self-service registration via `POST /auth/register`. |
+| `serviceKey` | `string` | — | Static secret for server-to-server auth. Must be ≥ 32 characters. Requests with `Authorization: Bearer <serviceKey>` get admin access. |
+| `defaultRole` | `string` | — | Role ID assigned to new users (except the first user, who always gets `"admin"`). **Must NOT be `"admin"`** — throws a security error at startup. |
+| `providers` | `OAuthProvider<any>[]` | `[]` | Custom OAuth providers (use alongside the shorthand configs below). |
+| `hooks` | `AuthHooks` | — | [Lifecycle hooks](#auth-lifecycle-hooks) to customize passwords, credentials, and auth events. |
+| `email` | `EmailConfig` | — | [Email configuration](#email-configuration) for password resets, verification, and welcome emails. |
+| `google` | `{ clientId, clientSecret? }` | — | Google OAuth shorthand. |
+| `github` | `{ clientId, clientSecret }` | — | GitHub OAuth shorthand. |
+| `microsoft` | `{ clientId, clientSecret, tenantId? }` | — | Microsoft/Entra ID shorthand. `tenantId` defaults to `"common"`. |
+| `apple` | `{ clientId, teamId, keyId, privateKey }` | — | Apple Sign In shorthand. `privateKey` is the raw PEM (.p8) contents. |
+| `facebook` | `{ clientId, clientSecret }` | — | Facebook/Meta OAuth. |
+| `twitter` | `{ clientId, clientSecret }` | — | Twitter/X OAuth 2.0 with PKCE. |
+| `discord` | `{ clientId, clientSecret }` | — | Discord OAuth. |
+| `gitlab` | `{ clientId, clientSecret, baseUrl? }` | — | GitLab OAuth. `baseUrl` defaults to `"https://gitlab.com"` (supports self-hosted). |
+| `linkedin` | `{ clientId, clientSecret }` | — | LinkedIn OAuth (OIDC). |
+| `bitbucket` | `{ clientId, clientSecret }` | — | Bitbucket OAuth. |
+| `slack` | `{ clientId, clientSecret }` | — | Slack OAuth (OIDC). |
+| `spotify` | `{ clientId, clientSecret }` | — | Spotify OAuth. |
 
-#### Available Auth Context Functions
-
-Inside RLS policy expressions, you have access to:
-
-| Function | Returns | Description |
-|----------|---------|-------------|
-| `auth.uid()` | `string` | The authenticated user's UID |
-| `auth.jwt()` | `object` | The decoded JWT token claims |
-| `auth.roles()` | `string[]` | Array of role IDs assigned to the current user |
-
-**Important:** These are custom functions injected by the Rebase backend, NOT standard PostgreSQL functions.
-
-## Setting Up Authentication
-
-### 1. Configure Auth in Backend
-
-Auth is configured via the `auth` field in `initializeRebaseBackend()`. The database driver is provided through the **bootstrapper protocol**:
+### Minimal Example
 
 ```typescript
-import { initializeRebaseBackend, HonoEnv } from "@rebasepro/server-core";
-import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createPostgresAdapter } from "@rebasepro/server-postgresql";
 
-const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
-
-const backend = await initializeRebaseBackend({
-    server,
-    app,
-    bootstrappers: [
-        createPostgresBootstrapper({
-            connection: db,
-            schema: { tables, enums, relations },
-            adminConnectionString: process.env.DATABASE_URL,
-            connectionString
-        })
-    ],
-    auth: {
-        jwtSecret: process.env.JWT_SECRET!,
-        accessExpiresIn: "1h",       // Access token TTL
-        refreshExpiresIn: "30d",     // Refresh token TTL
-        allowRegistration: false,    // First user can always register
-        seedDefaultRoles: true,      // Create default admin/editor/viewer roles
-        defaultRole: "viewer",        // Default role for new users (cannot be "admin")
-        serviceKey: process.env.REBASE_SERVICE_KEY, // Optional: service-to-service auth
-        google: {                    // Optional: Google OAuth
-            clientId: process.env.GOOGLE_CLIENT_ID!,
-        },
-        hooks: {                     // Optional: Auth lifecycle and operation hooks
-            afterUserCreate: async (user) => {
-                console.log(`User created: ${user.email}`);
-            }
-        }
+await initializeRebaseBackend({
+  server,
+  app,
+  database: createPostgresAdapter({ connection: db, schema }),
+  auth: {
+    jwtSecret: process.env.JWT_SECRET!,
+    allowRegistration: true,
+    serviceKey: process.env.REBASE_SERVICE_KEY,
+    defaultRole: "member",
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     },
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+    email: {
+      from: "noreply@myapp.com",
+      smtp: {
+        host: "smtp.resend.com",
+        port: 465,
+        secure: true,
+        auth: { user: "resend", pass: process.env.RESEND_API_KEY! },
+      },
+      appName: "MyApp",
+      resetPasswordUrl: "https://myapp.com",
+      verifyEmailUrl: "https://myapp.com",
+    },
+  },
 });
 ```
 
-> [!WARNING]
-> **JWT Dual-Package Hazard (Monorepos / pnpm)**
-> When running a backend inside a monorepo workspace (especially with tools like `tsx` and `--preserve-symlinks`), you may encounter a `RebaseApiError: JWT secret not configured. Call configureJwt() first` error. This occurs because Node.js resolves two different module instances of `@rebasepro/server-core`.
->
-> **Prevention:** You must explicitly call `configureJwt` in your backend application's entry point (`index.ts`) before `initializeRebaseBackend`:
-> ```typescript
-> import { initializeRebaseBackend, configureJwt } from "@rebasepro/server-core";
->
-> configureJwt({
->     secret: process.env.JWT_SECRET!,
->     accessExpiresIn: "1h",
->     refreshExpiresIn: "30d"
-> });
->
-> const backend = await initializeRebaseBackend({ ... });
-> ```
+### First-User Bootstrap
 
-Auth tables (`rebase.users`, `rebase.roles`, etc.) are auto-created on first startup.
+> **IMPORTANT FOR AGENTS:** The very first user registered (via `POST /auth/register` or OAuth) is automatically promoted to `"admin"`. This prevents the chicken-and-egg problem. All subsequent users receive the `defaultRole`.
 
-### Auth Options
+---
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `jwtSecret` | `string` | — | JWT signing secret (≥32 chars) |
-| `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
-| `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |
-| `allowRegistration` | `boolean` | `true` | Allow new user registration |
-| `seedDefaultRoles` | `boolean` | `false` | Create admin/editor/viewer roles |
-| `defaultRole` | `string` | — | Default role for new users |
-| `serviceKey` | `string` | — | Service-to-service auth key |
-| `google` | `{ clientId }` | — | Google OAuth configuration |
-| `hooks` | `AuthHooks` | — | Auth lifecycle and operation hooks (e.g. `afterUserCreate`) |
+## OAuth Providers
 
-### 2. Define Roles
+Rebase supports 12 built-in OAuth providers. Each provider is configured via a shorthand property on `RebaseAuthConfig` and automatically mounts a `POST /api/auth/{providerId}` endpoint.
 
-Roles can be defined in collection configuration or managed via the Studio UI:
+### Provider Reference
+
+| Provider | ID | Config Properties | Client Payload |
+|---|---|---|---|
+| Google | `google` | `clientId`, `clientSecret?` | `{ idToken }` OR `{ accessToken }` OR `{ code, redirectUri }` |
+| GitHub | `github` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+| Microsoft | `microsoft` | `clientId`, `clientSecret`, `tenantId?` | `{ code, redirectUri }` |
+| Apple | `apple` | `clientId`, `teamId`, `keyId`, `privateKey` | `{ code, redirectUri, user? }` |
+| Facebook | `facebook` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+| Twitter/X | `twitter` | `clientId`, `clientSecret` | `{ code, redirectUri, codeVerifier }` |
+| Discord | `discord` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+| GitLab | `gitlab` | `clientId`, `clientSecret`, `baseUrl?` | `{ code, redirectUri }` |
+| LinkedIn | `linkedin` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+| Bitbucket | `bitbucket` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+| Slack | `slack` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+| Spotify | `spotify` | `clientId`, `clientSecret` | `{ code, redirectUri }` |
+
+### Google Three-Path Support
+
+Google is unique — it supports three verification paths:
+
+1. **ID Token** (One Tap / Sign In button) — `{ idToken }`. Cryptographic verification via Google's public keys. No `clientSecret` needed.
+2. **Access Token** (popup via `initTokenClient`) — `{ accessToken }`. Validated via Google's userinfo endpoint. No `clientSecret` needed.
+3. **Authorization Code** (most secure) — `{ code, redirectUri }`. Requires `clientSecret`. Tokens never touch the browser.
+
+### Apple Special Behavior
+
+- Apple only sends the user's name on the **first** authorization. The frontend must capture and forward it: `{ code, redirectUri, user: { name: { firstName, lastName }, email } }`.
+- Apple does not provide a profile photo (`photoUrl` is always `null`).
+- The `privateKey` is the raw PEM contents of the `.p8` file downloaded from Apple Developer.
+
+### Twitter PKCE
+
+Twitter uses OAuth 2.0 with PKCE. The client must send `codeVerifier` alongside `code` and `redirectUri`.
+
+### OAuth Account Linking
+
+When an OAuth user signs in:
+1. If an identity record exists for `(providerId, provider)` → log in that user.
+2. If no identity exists but a user with the same email exists → **link** the provider to the existing account.
+3. If neither exists → create a new user, link the identity, assign `defaultRole`.
+
+### Custom OAuth Provider
+
+You can register any OAuth provider by implementing the `OAuthProvider<T>` interface:
 
 ```typescript
-const roles = [
-    { id: "admin", name: "Administrator", isAdmin: true },
-    { id: "editor", name: "Editor", isAdmin: false },
-    { id: "viewer", name: "Viewer", isAdmin: false },
-];
-```
+import { z } from "zod";
+import type { OAuthProvider, OAuthProviderProfile } from "@rebasepro/server-core";
 
-### 3. Apply Security Rules (RLS)
-
-Security rules are defined per-collection via the `securityRules` array:
-
-```typescript
-import { PostgresCollection } from "@rebasepro/types";
-
-const postsCollection: PostgresCollection = {
-    name: "Posts",
-    table: "posts",
-    securityRules: [
-        // Any authenticated user can read
-        { operation: "select", access: "authenticated" },
-        // Only editors can create
-        { operation: "insert", roles: ["editor"] },
-        // Only the author can update their own posts
-        { operation: "update", ownerField: "author_id" },
-        // Only admins can delete
-        { operation: "delete", roles: ["admin"] }
-    ],
-    properties: {
-        // ...
-    }
+const myProvider: OAuthProvider<{ token: string }> = {
+  id: "my-provider",
+  schema: z.object({ token: z.string().min(1) }),
+  verify: async (payload): Promise<OAuthProviderProfile | null> => {
+    const userInfo = await verifyExternalToken(payload.token);
+    if (!userInfo) return null;
+    return {
+      providerId: userInfo.id,
+      email: userInfo.email,
+      displayName: userInfo.name || null,
+      photoUrl: userInfo.avatar || null,
+    };
+  },
 };
-```
 
-## Frontend Auth Setup
-
-The frontend uses a composition pattern for authentication:
-
-```tsx
-import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
-import { Rebase } from "@rebasepro/core";
-import { createRebaseClient } from "@rebasepro/client";
-
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
-
-function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({ baseUrl: API_URL }), []);
-
-    const authController = useRebaseAuthController({
-        client: rebaseClient,
-        googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID
-    });
-
-    const userManagement = useBackendUserManagement({
-        client: rebaseClient,
-        currentUser: authController.user
-    });
-
-    return (
-        <Rebase client={rebaseClient} authController={authController} userManagement={userManagement}>
-            <RebaseAuth/>
-            {/* ... rest of app */}
-        </Rebase>
-    );
+// Use in config:
+auth: {
+  jwtSecret: "...",
+  providers: [myProvider],
 }
 ```
 
-## User Management
+---
 
-### Via MCP Server
+## Auth Lifecycle Hooks
 
-| Tool | Description |
-|------|-------------|
-| `list_users` | List all users and their roles |
-| `add_user` | Invite a new user |
-| `update_user_roles` | Change a user's assigned roles |
-| `remove_user` | Remove a user |
+The `AuthHooks` interface lets you customize specific behaviors of the built-in auth system. Every hook is optional — unset hooks fall through to built-in defaults.
 
-### Via Studio UI
+### Hook Reference
 
-The Rebase Studio includes a built-in user management panel for visual role assignment.
+| Hook | Signature | Default | Behavior |
+|---|---|---|---|
+| `hashPassword` | `(password: string) => Promise<string>` | scrypt (Node crypto, 64-byte key, 32-byte salt) | Hash a cleartext password for storage. |
+| `verifyPassword` | `(password: string, storedHash: string) => Promise<boolean>` | scrypt with timing-safe comparison | Verify cleartext password against stored hash. |
+| `validatePasswordStrength` | `(password: string) => PasswordValidationResult` | Min 8 chars, 1 uppercase, 1 lowercase, 1 digit | Return `{ valid: boolean, errors: string[] }`. |
+| `verifyCredentials` | `(email, password, repo: AuthRepository) => Promise<UserData \| null>` | `getUserByEmail` + `verifyPassword` | Override the entire login credential check. Return user or `null`. |
+| `onAuthenticated` | `(user: UserData, method: AuthMethod) => Promise<void>` | — | Called after **any** successful auth event. Fire-and-forget. |
+| `beforeUserCreate` | `(data: CreateUserData) => Promise<CreateUserData>` | Passthrough | Modify or reject user creation. Throw to abort. |
+| `afterUserCreate` | `(user: UserData) => Promise<void>` | — | Called after user creation. Fire-and-forget. |
+| `beforeLogin` | `(email: string, method: AuthMethod) => Promise<void>` | — | Pre-login validation. Throw to reject (e.g. account lockout). |
+| `afterLogout` | `(userId: string) => Promise<void>` | — | Post-logout cleanup. Fire-and-forget. |
+| `onMfaVerified` | `(userId: string, factorId: string) => Promise<void>` | — | Called after successful MFA verification. Fire-and-forget. |
+| `customizeAccessToken` | `(claims: Record<string, unknown>, user: UserData) => Promise<Record<string, unknown>>` | — | Modify JWT access token claims before signing. |
+| `onPasswordReset` | `(userId: string) => Promise<void>` | — | Called after successful password reset. Fire-and-forget. |
+| `beforeUserDelete` | `(userId: string) => Promise<void>` | — | Throw to prevent deletion. |
+| `afterUserDelete` | `(userId: string) => Promise<void>` | — | Post-deletion cleanup. Fire-and-forget. |
 
-## Dev Mode & Role Simulation
+### AuthMethod Values
 
-The Studio supports:
-- **Dev/Editor mode toggle**: Switch between developer view and end-user preview
-- **Effective Role simulation**: In Dev Mode, developers can select an "effective role" to preview exactly what a specific role can see and do
+`"login"` | `"register"` | `"oauth"` | `"refresh"` | `"password-reset"` | `"anonymous"` | `"magic-link"` | `"mfa"`
+
+### PasswordValidationResult
+
+```typescript
+interface PasswordValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+```
+
+### Example: bcrypt Passwords
+
+```typescript
+import bcrypt from "bcrypt";
+
+auth: {
+  jwtSecret: "...",
+  hooks: {
+    hashPassword: (pw) => bcrypt.hash(pw, 12),
+    verifyPassword: (pw, hash) => bcrypt.compare(pw, hash),
+    validatePasswordStrength: (pw) => ({
+      valid: pw.length >= 6,
+      errors: pw.length < 6 ? ["Password must be at least 6 characters"] : [],
+    }),
+  },
+}
+```
+
+### Example: Custom JWT Claims
+
+```typescript
+hooks: {
+  customizeAccessToken: async (claims, user) => ({
+    ...claims,
+    org_id: user.metadata?.organizationId,
+    plan: user.metadata?.plan || "free",
+  }),
+}
+```
+
+### Example: Audit Logging
+
+```typescript
+hooks: {
+  onAuthenticated: async (user, method) => {
+    await auditLog.write({
+      event: "auth.success",
+      userId: user.id,
+      method,
+      timestamp: new Date(),
+    });
+  },
+  beforeLogin: async (email, method) => {
+    const isBlocked = await checkAccountLockout(email);
+    if (isBlocked) throw new Error("Account is locked");
+  },
+}
+```
+
+---
+
+## MFA / TOTP
+
+Rebase supports Multi-Factor Authentication via TOTP (Time-based One-Time Password). The flow uses an enrollment → verify → challenge pattern with recovery codes.
+
+### MFA Flow
+
+1. **Enroll** — `POST /api/auth/mfa/enroll` returns a TOTP secret, URI (for QR), and 10 recovery codes.
+2. **Verify enrollment** — `POST /api/auth/mfa/verify` with a 6-digit TOTP code to confirm the factor.
+3. **Challenge on login** — After normal login (aal1), call `POST /api/auth/mfa/challenge` to create a challenge.
+4. **Complete challenge** — `POST /api/auth/mfa/challenge/verify` with TOTP or recovery code. Upgrades token from `aal1` → `aal2`.
+
+### MFA Endpoints
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/mfa/enroll` | Required | Start enrollment. Returns `{ factor, totp: { secret, uri, qrUri }, recoveryCodes }`. |
+| `POST` | `/api/auth/mfa/verify` | Required | Verify enrollment with `{ factorId, code }` (6-digit TOTP). |
+| `POST` | `/api/auth/mfa/challenge` | Required | Create challenge with `{ factorId }`. Returns `{ challengeId, factorId, expiresAt }`. Challenge expires in 5 minutes. |
+| `POST` | `/api/auth/mfa/challenge/verify` | Required | Complete challenge with `{ challengeId, code }`. Returns new tokens with `aal2`. Accepts TOTP (6 digits) or recovery code (>6 chars). |
+| `GET` | `/api/auth/mfa/factors` | Required | List enrolled factors: `{ factors: [{ id, factorType, friendlyName, verified, createdAt }] }`. |
+| `DELETE` | `/api/auth/mfa/unenroll` | Required | Remove factor with `{ factorId }` in body. Auto-cleans recovery codes when no verified factors remain. |
+
+### MFA Types
+
+```typescript
+interface MfaFactor {
+  id: string;
+  userId: string;
+  factorType: "totp";       // Only TOTP is supported
+  friendlyName?: string;
+  verified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MfaChallengeInfo {
+  id: string;
+  factorId: string;
+  createdAt: Date;
+  verifiedAt?: Date;
+  ipAddress?: string;
+}
+```
+
+### AAL (Authentication Assurance Levels)
+
+| Level | Meaning |
+|---|---|
+| `aal1` | Standard authentication (email/password, OAuth). |
+| `aal2` | Elevated after MFA challenge verification. |
+
+---
+
+## API Keys
+
+API keys provide machine-to-machine authentication for scripts, cron jobs, and third-party integrations. They are scoped to specific collections and operations.
+
+### Key Format
+
+- Prefix: `rk_` (e.g. `rk_live_abc123...`)
+- Storage: SHA-256 hash of the full key. The plaintext key is returned **exactly once** at creation.
+- Display: Only the first 12 characters (`key_prefix`) are shown in subsequent API responses.
+
+### API Key Admin Endpoints
+
+All endpoints are mounted under `/api/admin/api-keys` and require **admin** authentication (JWT with admin role or service key).
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/admin/api-keys` | List all API keys (masked — no hashes). |
+| `POST` | `/api/admin/api-keys` | Create a new API key. Returns the full plaintext key once. |
+| `GET` | `/api/admin/api-keys/:id` | Get single API key details (masked). |
+| `PUT` | `/api/admin/api-keys/:id` | Update name, permissions, rate_limit, or expires_at. |
+| `DELETE` | `/api/admin/api-keys/:id` | Revoke (soft-delete) an API key. |
+
+### Create API Key Request
+
+```typescript
+interface CreateApiKeyRequest {
+  name: string;
+  permissions: ApiKeyPermission[];
+  rate_limit?: number | null;    // Requests per 15-min window. null = unlimited
+  expires_at?: string | null;    // ISO-8601 timestamp. null = no expiration
+}
+
+interface ApiKeyPermission {
+  collection: string;            // Collection slug, or "*" for all collections
+  operations: ("read" | "write" | "delete")[];
+}
+```
+
+### Example: Create an API Key
+
+```bash
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <admin-token-or-service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Analytics Pipeline",
+    "permissions": [
+      { "collection": "events", "operations": ["read", "write"] },
+      { "collection": "users", "operations": ["read"] }
+    ],
+    "rate_limit": 500,
+    "expires_at": "2025-12-31T23:59:59Z"
+  }'
+```
+
+### Using an API Key
+
+```bash
+curl http://localhost:3000/api/data/events \
+  -H "Authorization: Bearer rk_live_abc123..."
+```
+
+### API Key Middleware Behavior
+
+When a request arrives with a `rk_` prefixed bearer token:
+1. The token is SHA-256 hashed and looked up in the `_rebase_api_keys` table.
+2. Expiry and revocation status are checked.
+3. Permissions are validated against the requested collection and HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`).
+4. The DataDriver is scoped with `withAuth()` using the key's created_by user, effectively **bypassing RLS** (the key operates as a service account).
+5. Per-key rate limiting is enforced if `rate_limit` is set.
+
+> **WARNING FOR AGENTS:** API keys bypass RLS. They are designed for trusted server-side use only. Never expose API keys to client-side code.
+
+### API Key Response Types
+
+```typescript
+// Returned once at creation (includes the full plaintext key)
+interface ApiKeyWithSecret {
+  id: string;
+  name: string;
+  key_prefix: string;       // First 12 chars, for display
+  key: string;              // FULL plaintext key — save this immediately
+  permissions: ApiKeyPermission[];
+  rate_limit: number | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+
+// All subsequent reads (no hash, no full key)
+interface ApiKeyMasked {
+  id: string;
+  name: string;
+  key_prefix: string;
+  permissions: ApiKeyPermission[];
+  rate_limit: number | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+```
+
+---
+
+## REST Endpoints
+
+All auth endpoints are mounted under `/api/auth`. Admin endpoints are under `/api/admin`.
+
+### Public Auth Endpoints
+
+| Method | Endpoint | Rate Limit | Auth | Description |
+|---|---|---|---|---|
+| `POST` | `/auth/register` | default (200/15min) | No | Create account. Body: `{ email, password, displayName? }`. |
+| `POST` | `/auth/login` | default | No | Email/password login. Body: `{ email, password }`. |
+| `POST` | `/auth/{providerId}` | default | No | OAuth sign-in. Body varies by provider. |
+| `POST` | `/auth/refresh` | — | No | Refresh access token. Body: `{ refreshToken }`. Rotates refresh token. |
+| `POST` | `/auth/logout` | — | No | Invalidate refresh token. Body: `{ refreshToken? }`. |
+| `POST` | `/auth/anonymous` | strict (50/15min) | No | Create anonymous user with temp credentials. |
+| `POST` | `/auth/forgot-password` | strict | No | Request password reset email. Body: `{ email }`. Always returns success (security). |
+| `POST` | `/auth/reset-password` | strict | No | Reset password with token. Body: `{ token, password }`. Invalidates all sessions. |
+| `GET` | `/auth/verify-email` | — | No | Verify email. Query: `?token=<token>`. |
+| `GET` | `/auth/config` | default | No | Get auth capabilities for frontend: `{ needsSetup, registrationEnabled, emailServiceEnabled, enabledProviders }`. |
+
+### Authenticated Endpoints
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/auth/me` | Required | Get current user profile + roles. |
+| `PATCH` | `/auth/me` | Required | Update profile. Body: `{ displayName?, photoURL? }`. |
+| `POST` | `/auth/change-password` | Required | Change password. Body: `{ oldPassword, newPassword }`. Invalidates all sessions. |
+| `POST` | `/auth/send-verification` | Required | Send email verification link. Requires email service. |
+| `GET` | `/auth/sessions` | Required | List active sessions (refresh tokens). |
+| `DELETE` | `/auth/sessions` | Required | Revoke all sessions (remote logout). |
+| `DELETE` | `/auth/sessions/:id` | Required | Revoke a specific session. |
+| `POST` | `/auth/anonymous/link` | Required | Upgrade anonymous → permanent. Body: `{ email, password }`. |
+
+### Auth Response Format
+
+All login/register/OAuth endpoints return:
+
+```json
+{
+  "user": {
+    "uid": "uuid",
+    "email": "user@example.com",
+    "displayName": "John",
+    "photoURL": null,
+    "roles": ["member"],
+    "metadata": {}
+  },
+  "tokens": {
+    "accessToken": "eyJ...",
+    "refreshToken": "hex-string",
+    "accessTokenExpiresAt": 1700000000000
+  }
+}
+```
+
+### Error Response Format
+
+```json
+{
+  "error": {
+    "message": "Invalid email or password",
+    "code": "INVALID_CREDENTIALS"
+  }
+}
+```
+
+### Common Error Codes
+
+| Code | HTTP | Description |
+|---|---|---|
+| `INVALID_CREDENTIALS` | 401 | Wrong email/password. |
+| `INVALID_TOKEN` | 401 | Invalid or expired refresh/reset token. |
+| `TOKEN_EXPIRED` | 401 | Refresh token has expired. |
+| `REGISTRATION_DISABLED` | 403 | `allowRegistration` is `false`. |
+| `EMAIL_EXISTS` | 409 | Email already registered. |
+| `WEAK_PASSWORD` | 400 | Password fails strength validation. |
+| `INVALID_INPUT` | 400 | Zod validation failure. |
+| `EMAIL_NOT_CONFIGURED` | 503 | Email service not set up (password reset/verification unavailable). |
+| `ALREADY_VERIFIED` | 400 | Email already verified. |
+| `NOT_ANONYMOUS` | 400 | User is not anonymous (cannot link). |
+| `RATE_LIMITED` | 429 | Too many requests. |
+
+---
+
+## Client SDK
+
+The client SDK's `auth` module is created via `createAuth(transport, options?)`. It manages tokens, auto-refresh, session persistence, and state change listeners.
+
+### CreateAuthOptions
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `storage` | `AuthStorage` | `localStorage` (browser) or in-memory | Token persistence backend. |
+| `authPath` | `string` | `"/auth"` | Base path for auth endpoints. |
+| `autoRefresh` | `boolean` | `true` | Auto-refresh access tokens 2 minutes before expiry. |
+| `persistSession` | `boolean` | `true` | Persist session to storage between page loads. |
+
+### Client SDK Methods
+
+```typescript
+const { auth } = createRebaseClient({ baseUrl: "http://localhost:3000" });
+
+// Email/password
+await auth.signInWithEmail(email, password);
+await auth.signUp(email, password, displayName?);
+
+// OAuth (all return { user, accessToken, refreshToken })
+await auth.signInWithGoogle({ idToken });
+await auth.signInWithGoogle({ accessToken });
+await auth.signInWithGoogle({ code, redirectUri });
+await auth.signInWithGitHub(code, redirectUri);
+await auth.signInWithMicrosoft(code, redirectUri);
+await auth.signInWithApple(code, redirectUri, user?);
+await auth.signInWithFacebook(code, redirectUri);
+await auth.signInWithTwitter(code, redirectUri, codeVerifier);
+await auth.signInWithDiscord(code, redirectUri);
+await auth.signInWithGitLab(code, redirectUri);
+await auth.signInWithLinkedin(code, redirectUri);
+await auth.signInWithBitbucket(code, redirectUri);
+await auth.signInWithSlack(code, redirectUri);
+await auth.signInWithSpotify(code, redirectUri);
+await auth.signInWithOAuth(providerId, payload); // Generic
+
+// Session
+await auth.signOut();
+await auth.refreshSession();
+auth.getSession();                    // Returns RebaseSession | null (sync)
+
+// Profile
+await auth.getUser();                 // GET /auth/me
+await auth.updateUser({ displayName?, photoURL? });
+
+// Password
+await auth.resetPasswordForEmail(email);
+await auth.resetPassword(token, newPassword);
+await auth.changePassword(oldPassword, newPassword);
+
+// Email verification
+await auth.sendVerificationEmail();
+await auth.verifyEmail(token);
+
+// Sessions
+await auth.getSessions();             // List active sessions
+await auth.revokeSession(sessionId);
+await auth.revokeAllSessions();       // Revokes all + signs out locally
+
+// Config
+await auth.getAuthConfig();           // GET /auth/config
+
+// State listener
+const unsubscribe = auth.onAuthStateChange((event, session) => {
+  // event: "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED"
+  console.log(event, session?.user);
+});
+```
+
+### Client Types
+
+```typescript
+interface RebaseUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  emailVerified?: boolean;
+  roles?: string[];
+  providerId: string;
+  isAnonymous: boolean;
+}
+
+interface RebaseSession {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;           // Timestamp (ms)
+  user: RebaseUser;
+}
+
+type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED";
+```
+
+### Custom Storage Backends
+
+```typescript
+import { createMemoryStorage, createCookieStorage } from "@rebasepro/client";
+
+// In-memory (Node.js / SSR)
+const auth = createAuth(transport, {
+  storage: createMemoryStorage(),
+});
+
+// Cookie-based (SSR-friendly)
+const auth = createAuth(transport, {
+  storage: createCookieStorage({
+    path: "/",
+    sameSite: "Lax",
+    secure: true,
+    domain: ".myapp.com",
+    maxAge: 365 * 24 * 60 * 60,    // 1 year (default)
+  }),
+});
+```
+
+### Session Restoration
+
+On initialization (when `persistSession` is `true`):
+1. Load stored session from storage.
+2. If access token is still valid → restore session and schedule refresh.
+3. If access token is expired but refresh token exists → immediately attempt refresh.
+4. If refresh fails → clear session and emit `SIGNED_OUT`.
+
+---
+
+## Row-Level Security
+
+Rebase implements RLS by scoping the DataDriver via `withAuth()` before each request. This injects the authenticated user's identity into the database context.
+
+### How RLS Scoping Works
+
+1. Auth middleware verifies the JWT (or API key / service key).
+2. The middleware calls `scopeDataDriver(driver, { uid, roles })`.
+3. If the driver supports `withAuth()` (e.g. Postgres), it returns a scoped clone with Postgres session variables set:
+   - `auth.uid()` — the user's ID
+   - `auth.jwt()` — the JWT claims
+   - `auth.roles()` — the user's role IDs
+4. All subsequent queries in that request use the scoped driver with RLS policies applied.
+
+### Fail-Closed Security
+
+> **IMPORTANT FOR AGENTS:** If `withAuth()` throws an error, the request is **rejected** with 500. The system never falls back to unscoped access. This is by design (fail-closed).
+
+### Anonymous Users
+
+When `requireAuth` is `false` and no token is provided, the driver is scoped with:
+- `uid: "anon"`
+- `roles: ["anon"]`
+
+This allows Postgres RLS policies to handle public access explicitly.
+
+### Service Key Scoping
+
+Requests with the `serviceKey` bypass RLS — they receive admin-level access with `uid: "service"` and `roles: ["admin"]`.
+
+### API Key Scoping
+
+API keys bypass RLS entirely. The driver is scoped using the key's `created_by` user with admin-like access, since API keys are meant for trusted server-to-server use.
+
+---
+
+## Rate Limiting
+
+Rebase uses an in-memory sliding-window rate limiter with IP-based keying.
+
+### Pre-configured Limiters
+
+| Limiter | Window | Limit | Applied To |
+|---|---|---|---|
+| `defaultAuthLimiter` | 15 minutes | 200 requests | `/auth/register`, `/auth/login`, `/auth/{provider}`, `/auth/config` |
+| `strictAuthLimiter` | 15 minutes | 50 requests | `/auth/forgot-password`, `/auth/reset-password`, `/auth/anonymous` |
+
+### Rate Limit Response Headers
+
+All rate-limited endpoints include:
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Limit` | Maximum requests in the window. |
+| `X-RateLimit-Remaining` | Remaining requests in current window. |
+| `X-RateLimit-Reset` | Unix timestamp (seconds) when the window resets. |
+| `Retry-After` | Seconds until the client can retry (only on 429). |
+
+### API Key Rate Limiting
+
+API keys have their own per-key rate limiter. The `rate_limit` on each key specifies requests per 15-minute window. When `rate_limit` is `null`, a default of 1000 requests per 15 minutes is applied.
+
+### Rate Limit Error Response
+
+```json
+{
+  "error": {
+    "message": "Too many requests, please try again later.",
+    "code": "RATE_LIMITED"
+  }
+}
+```
+
+### Custom Rate Limiter
+
+```typescript
+import { createRateLimiter } from "@rebasepro/server-core";
+
+const myLimiter = createRateLimiter({
+  windowMs: 60 * 1000,         // 1 minute
+  limit: 10,                   // 10 requests per minute
+  message: "Slow down!",
+  keyGenerator: (c) => {
+    // Custom keying (e.g., by user ID)
+    const user = c.get("user");
+    return user?.userId || c.req.header("x-forwarded-for") || "unknown";
+  },
+});
+```
+
+---
+
+## Custom Auth Adapters
+
+For external auth systems (Clerk, Auth0, Firebase Auth, or custom JWT), use the `AuthAdapter` interface or the `createCustomAuthAdapter()` helper.
+
+### AuthAdapter Interface
+
+```typescript
+interface AuthAdapter {
+  readonly id: string;
+  verifyRequest(request: Request): Promise<AuthenticatedUser | null>;
+  verifyToken?(token: string): Promise<AuthenticatedUser | null>;
+  userManagement?: UserManagementAdapter;
+  createAuthRoutes?(): Hono<any> | undefined;
+  createAdminRoutes?(): Hono<any> | undefined;
+  getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
+  initialize?(): Promise<void>;
+  destroy?(): Promise<void>;
+  serviceKey?: string;
+}
+
+interface AuthenticatedUser {
+  uid: string;
+  email: string;
+  displayName?: string | null;
+  photoUrl?: string | null;
+  roles: string[];
+  isAdmin: boolean;
+  rawToken?: string;
+  claims?: Record<string, unknown>;
+}
+```
+
+### createCustomAuthAdapter
+
+The simplest way to plug an existing auth system into Rebase. Only `verifyRequest` is required:
+
+```typescript
+import { createCustomAuthAdapter } from "@rebasepro/server-core";
+import jwt from "jsonwebtoken";
+
+const auth = createCustomAuthAdapter({
+  verifyRequest: async (request) => {
+    const token = request.headers.get("Authorization")?.replace("Bearer ", "");
+    if (!token) return null;
+
+    try {
+      const decoded = jwt.verify(token, MY_SECRET) as any;
+      return {
+        uid: decoded.sub,
+        email: decoded.email,
+        displayName: decoded.name,
+        roles: decoded.roles || [],
+        isAdmin: decoded.roles?.includes("admin") ?? false,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  // Optional: separate token verification for WebSocket auth
+  verifyToken: async (token) => {
+    // Same as above but receives just the token string
+    // Default: synthesizes a Request and calls verifyRequest
+  },
+
+  // Optional: enable user management in admin panel
+  userManagement: { ... },
+
+  // Optional: static service key
+  serviceKey: process.env.REBASE_SERVICE_KEY,
+
+  // Optional: override default capabilities
+  capabilities: {
+    emailPasswordLogin: false,
+    registration: false,
+    enabledProviders: ["google"],
+  },
+});
+
+// Pass to initializeRebaseBackend:
+await initializeRebaseBackend({
+  server, app,
+  database: createPostgresAdapter({ connection: db, schema }),
+  auth, // AuthAdapter directly
+});
+```
+
+### AuthAdapterCapabilities
+
+The frontend reads these from `GET /api/auth/config` to dynamically show/hide UI:
+
+```typescript
+interface AuthAdapterCapabilities {
+  hasBuiltInAuthRoutes: boolean;    // true for built-in, false for external
+  emailPasswordLogin: boolean;
+  registration: boolean;
+  passwordReset: boolean;
+  sessionManagement: boolean;
+  profileUpdate: boolean;
+  emailVerification: boolean;
+  enabledProviders: string[];       // e.g. ["google", "github"]
+  externalLoginUrl?: string;        // Redirect URL for external auth
+  needsSetup?: boolean;             // true when no users exist
+  registrationEnabled?: boolean;
+}
+```
+
+### Default Capabilities for Custom Adapters
+
+When using `createCustomAuthAdapter`, all capabilities default to `false`/`[]` unless overridden via `capabilities`.
+
+---
+
+## Roles & Permissions
+
+### Role Data Structure
+
+```typescript
+interface RoleData {
+  id: string;
+  name: string;
+  isAdmin: boolean;
+  defaultPermissions: {
+    read?: boolean;
+    create?: boolean;
+    edit?: boolean;
+    delete?: boolean;
+  } | null;
+  collectionPermissions: Record<string, {
+    read?: boolean;
+    create?: boolean;
+    edit?: boolean;
+    delete?: boolean;
+  }> | null;
+}
+```
+
+### Built-in Role Behavior
+
+- The **first user** in the system is automatically assigned the `"admin"` role.
+- Subsequent users get the `defaultRole` (if configured).
+- Setting `defaultRole: "admin"` throws a startup error to prevent privilege escalation.
+- Admin status is determined by having a role with `id === "admin"` or `id === "schema-admin"`.
+
+### Admin Routes for User/Role Management
+
+Admin user and role management is handled via dedicated admin routes (mounted under `/api/admin`) which require `requireAuth` + `requireAdmin` middleware.
+
+---
+
+## Backend Hooks
+
+Backend hooks intercept data at the **API boundary** (after DB operations, before API responses). They are separate from auth hooks and collection-level `EntityCallbacks`.
+
+### BackendHooks Interface
+
+```typescript
+interface BackendHooks {
+  users?: UserHooks;
+  data?: DataHooks;
+}
+```
+
+### UserHooks (Admin User Management)
+
+| Hook | Signature | Description |
+|---|---|---|
+| `afterRead` | `(user, context) => AdminUser \| null` | Transform user after DB read. Return `null` to hide. |
+| `beforeSave` | `(data, context) => data` | Transform before write. Throw to abort. |
+| `afterSave` | `(user, context) => void` | After user create/update. Side effects. |
+| `beforeDelete` | `(userId, context) => void` | Throw to prevent deletion. |
+| `afterDelete` | `(userId, context) => void` | After user deleted. |
+
+### DataHooks (All Collection Entities)
+
+| Hook | Signature | Description |
+|---|---|---|
+| `afterRead` | `(slug, entity, context) => entity \| null` | Transform entity after read. Return `null` to filter out. |
+| `beforeSave` | `(slug, values, entityId, context) => values` | Transform before write. Throw to abort. |
+| `afterSave` | `(slug, entity, context) => void` | After entity create/update. Side effects. |
+| `beforeDelete` | `(slug, entityId, context) => void` | Throw to prevent deletion. |
+| `afterDelete` | `(slug, entityId, context) => void` | After entity deleted. |
+
+### BackendHookContext
+
+```typescript
+interface BackendHookContext {
+  requestUser?: { userId: string; roles: string[] };
+  method: "GET" | "POST" | "PUT" | "DELETE";
+}
+```
+
+### Example: PII Masking
+
+```typescript
+const hooks: BackendHooks = {
+  data: {
+    afterRead(slug, entity, ctx) {
+      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
+        return { ...entity, email: "***" };
+      }
+      return entity;
+    },
+  },
+  users: {
+    afterRead(user, ctx) {
+      // Hide system users from admin panel
+      if (user.email.endsWith("@system.internal")) return null;
+      return user;
+    },
+  },
+};
+
+await initializeRebaseBackend({
+  // ...
+  hooks,
+});
+```
+
+---
+
+## Email Configuration
+
+Email is required for password reset, email verification, and welcome emails. Configure via `auth.email`.
+
+### EmailConfig
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `from` | `string` | Yes | Sender address (e.g. `"MyApp <noreply@myapp.com>"`). |
+| `smtp` | `SMTPConfig` | One of `smtp` or `sendEmail` | SMTP server configuration. |
+| `sendEmail` | `(options) => Promise<void>` | One of `smtp` or `sendEmail` | Custom email sending function (e.g. AWS SES, Resend SDK). |
+| `resetPasswordUrl` | `string` | No | Base URL for reset links: `{url}/reset-password?token=xxx`. |
+| `verifyEmailUrl` | `string` | No | Base URL for verification links: `{url}/verify-email?token=xxx`. |
+| `appName` | `string` | No | App name in email templates. Defaults to `"Rebase"`. |
+| `templates` | Object | No | Custom template functions (see below). |
+
+### SMTPConfig
+
+```typescript
+interface SMTPConfig {
+  host: string;
+  port: number;
+  secure?: boolean;
+  auth?: { user: string; pass: string };
+  name?: string;
+}
+```
+
+### Custom Email Templates
+
+```typescript
+email: {
+  from: "noreply@myapp.com",
+  smtp: { host: "smtp.example.com", port: 587 },
+  templates: {
+    passwordReset: (resetUrl, user) => ({
+      subject: "Reset your password",
+      html: `<p>Hi ${user.displayName || user.email},</p><p><a href="${resetUrl}">Reset</a></p>`,
+      text: `Reset your password: ${resetUrl}`,
+    }),
+    emailVerification: (verifyUrl, user) => ({
+      subject: "Verify your email",
+      html: `<a href="${verifyUrl}">Verify</a>`,
+    }),
+    welcomeEmail: (user, appName) => ({
+      subject: `Welcome to ${appName}!`,
+      html: `<p>Welcome, ${user.displayName || user.email}!</p>`,
+    }),
+    userInvitation: (setPasswordUrl, user) => ({
+      subject: "You've been invited",
+      html: `<p>Set your password: <a href="${setPasswordUrl}">here</a></p>`,
+    }),
+  },
+}
+```
+
+### Custom Email Provider (Non-SMTP)
+
+```typescript
+import { Resend } from "resend";
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+email: {
+  from: "noreply@myapp.com",
+  sendEmail: async (options) => {
+    await resend.emails.send({
+      from: options.from || "noreply@myapp.com",
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    });
+  },
+  appName: "MyApp",
+  resetPasswordUrl: "https://myapp.com",
+}
+```
+
+---
+
+## Security Concepts
+
+### Service Key
+
+A static secret for server-to-server authentication. Generate with:
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
+```
+
+When a request includes `Authorization: Bearer <serviceKey>`:
+- It bypasses JWT verification.
+- It receives admin-level access (`uid: "service"`, `roles: ["admin"]`).
+- Comparison is done with constant-time comparison to prevent timing attacks.
+- Must be ≥ 32 characters (validated at startup).
+
+### Token Rotation
+
+Refresh tokens are rotated on every use:
+1. Client sends refresh token to `POST /auth/refresh`.
+2. Server deletes the old refresh token and creates a new one.
+3. New access + refresh tokens are returned.
+
+### Password Reset Security
+
+- `POST /auth/forgot-password` always returns success (doesn't reveal whether email exists).
+- Reset tokens are stored as SHA-256 hashes.
+- Tokens expire in 1 hour.
+- After password reset, **all sessions are invalidated** (all refresh tokens deleted).
+
+### Zod Input Validation
+
+All auth endpoints validate input with Zod schemas:
+
+| Field | Validation |
+|---|---|
+| `email` | Valid email, max 255 chars |
+| `password` | Min 1 char, max 128 chars |
+| `displayName` | Max 255 chars |
+| `photoURL` | Valid URL, max 2048 chars |
+| `refreshToken` | Min 1 char |
+
+---
 
 ## References
 
-- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
-- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
+- Source: `packages/server-core/src/auth/` — All auth implementation
+- Source: `packages/server-core/src/auth/routes.ts` — REST auth endpoints
+- Source: `packages/server-core/src/auth/auth-hooks.ts` — Lifecycle hooks
+- Source: `packages/server-core/src/auth/api-keys/` — API key system
+- Source: `packages/server-core/src/auth/rate-limiter.ts` — Rate limiting
+- Source: `packages/server-core/src/init.ts` — `RebaseAuthConfig` and backend init
+- Source: `packages/client/src/auth.ts` — Client SDK auth module
+- Source: `packages/types/src/types/auth_adapter.ts` — `AuthAdapter` interface
+- Source: `packages/server-core/src/auth/rls-scope.ts` — RLS scoping
+- Source: `packages/server-core/src/email/types.ts` — Email configuration
