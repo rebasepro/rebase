@@ -1171,18 +1171,14 @@ message: "Session revoked successfully" });
             throw ApiError.notFound("MFA factor not found");
         }
 
-        // Check if this is a recovery code (10 chars with hyphen) or TOTP (6 digits)
-        const isRecoveryCode = code.length > 6;
-        let isValid = false;
+        // Try TOTP verification first (standard 6-digit codes)
+        const secretBuffer = base32Decode(factor.secretEncrypted);
+        let isValid = verifyTotp(secretBuffer, code);
 
-        if (isRecoveryCode) {
-            // Try recovery code
+        // Fall back to recovery code verification if TOTP didn't match
+        if (!isValid) {
             const codeHash = hashRecoveryCode(code);
             isValid = await authRepo.useRecoveryCode(userCtx.userId, codeHash);
-        } else {
-            // Verify TOTP
-            const secretBuffer = base32Decode(factor.secretEncrypted);
-            isValid = verifyTotp(secretBuffer, code);
         }
 
         if (!isValid) {

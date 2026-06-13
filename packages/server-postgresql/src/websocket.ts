@@ -4,9 +4,8 @@ import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, 
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-// @ts-ignore
 import { extractUserFromToken, AccessTokenPayload } from "@rebasepro/server-core";
-// @ts-ignore
+// @ts-expect-error — AuthConfig is not re-exported from server-core barrel yet
 import { AuthConfig } from "@rebasepro/server-core";
 
 /**
@@ -27,7 +26,7 @@ interface ClientSession {
     messageWindowStart: number;
 }
 
-const clientSessions = new Map<string, ClientSession>();
+
 
 /** Maximum messages per client per window */
 const WS_RATE_LIMIT = 2000;
@@ -87,6 +86,10 @@ export function createPostgresWebSocket(
     authConfig?: AuthConfig,
     authAdapter?: AuthAdapter
 ) {
+    // Session map scoped to this factory invocation — prevents stale sessions
+    // leaking across hot reloads or multiple factory calls.
+    const clientSessions = new Map<string, ClientSession>();
+
     const isProduction = process.env.NODE_ENV === "production";
     /** Debug logger that is suppressed in production to prevent PII/data leaks */
     const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };

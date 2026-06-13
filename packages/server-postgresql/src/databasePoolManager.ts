@@ -18,7 +18,7 @@ export class DatabasePoolManager {
         }
     }
 
-    public getDrizzle(databaseName: string): NodePgDatabase<any> {
+    public getDrizzle(databaseName: string): NodePgDatabase<Record<string, never>> {
         const existing = this.drizzleInstances.get(databaseName);
         if (existing) {
             return existing;
@@ -81,5 +81,6 @@ export class DatabasePoolManager {
         }
         await Promise.all(promises);
         this.pools.clear();
+        this.drizzleInstances.clear();
     }
 }

@@ -451,9 +451,8 @@ function resolveRelationDisplayName(
 
             // Helper to check if a property is hidden/internal
             const isHiddenProp = (p: Property): boolean => {
-                const ui = (p as any).ui;
-                if (ui?.hideFromCollection) return true;
-                if (ui?.disabled?.hidden) return true;
+                if (p.ui?.hideFromCollection) return true;
+                if (typeof p.ui?.disabled === "object" && p.ui.disabled.hidden) return true;
                 return false;
             };
 
@@ -502,7 +501,7 @@ function resolveRelationDisplayName(
     // 2. Try the entity cache (sessionStorage) as a fallback
     if (id !== undefined && targetCollection) {
         try {
-            const slug = targetCollection.slug ?? (targetCollection as any).table;
+            const slug = targetCollection.slug ?? (targetCollection as EntityCollection & { table?: string }).table;
             if (slug) {
                 const cacheKey = `${slug}/${id}`;
                 const cached = getEntityFromCache(cacheKey) as { values?: Record<string, unknown> } | undefined;

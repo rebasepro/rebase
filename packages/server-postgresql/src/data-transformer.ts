@@ -272,41 +272,19 @@ export function serializePropertyToServer(value: unknown, property: Property): u
             return value;
         }
 
-        case "binary":
-            if (typeof value === "string") {
-                if (value.startsWith("data:application/octet-stream;base64,")) {
-                    const base64Data = value.split(",")[1];
-                    if (base64Data) {
-                        return Buffer.from(base64Data, "base64");
-                    }
-                }
-            }
-            if (Buffer.isBuffer(value)) {
-                return value;
-            }
+        case "binary": {
+            const decoded = tryDecodeBase64DataUrl(value);
+            if (decoded) return decoded;
+            if (Buffer.isBuffer(value)) return value;
             return value;
+        }
 
         case "string":
-            if (typeof value === "string") {
-                if (value.startsWith("data:application/octet-stream;base64,")) {
-                    const base64Data = value.split(",")[1];
-                    if (base64Data) {
-                        return Buffer.from(base64Data, "base64");
-                    }
-                }
-            }
+        default: {
+            const decoded = tryDecodeBase64DataUrl(value);
+            if (decoded) return decoded;
             return value;
-
-        default:
-            if (typeof value === "string") {
-                if (value.startsWith("data:application/octet-stream;base64,")) {
-                    const base64Data = value.split(",")[1];
-                    if (base64Data) {
-                        return Buffer.from(base64Data, "base64");
-                    }
-                }
-            }
-            return value;
+        }
     }
 }
 
@@ -486,24 +464,53 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 }
 
 /**
- * Parse a single property value from database format to frontend format
+ * Try to decode a `data:application/octet-stream;base64,...` data URL string
+ * into a Buffer. Returns null if the value is not a matching data URL.
  */
-export function parsePropertyFromServer(value: unknown, property: Property, collection: EntityCollection, propertyKey?: string): unknown {
-    if (value === null || value === undefined) {
-        return value;
+function tryDecodeBase64DataUrl(value: unknown): Buffer | null {
+    if (typeof value !== "string") return null;
+    if (!value.startsWith("data:application/octet-stream;base64,")) return null;
+    const base64Data = value.split(",")[1];
+    return base64Data ? Buffer.from(base64Data, "base64") : null;
+}
+
+/**
+ * Try to resolve an unknown value into a Buffer.
+ * Handles native Buffers and `{ type: "Buffer", data: number[] }` objects (from JSON deserialization).
+ * Returns null if the value is not a buffer.
+ */
+function tryResolveBuffer(value: unknown): Buffer | null {
+    if (Buffer.isBuffer(value)) return value;
+    if (typeof value === "object" && value !== null) {
+        const rawVal = value as Record<string, unknown>;
+        if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
+            return Buffer.from(rawVal.data as number[]);
+        }
     }
+    return null;
+}
+
+/**
+ * Convert a Buffer to a UTF-8 string if all bytes are printable ASCII,
+ * otherwise return a base64 data URL.
+ */
+function bufferToStringOrBase64(buf: Buffer): string {
+    for (let i = 0; i < buf.length; i++) {
+        const b = buf[i];
+        // Allow standard printable ASCII + common whitespace (\r, \n, \t)
+        if ((b < 32 || b > 126) && b !== 9 && b !== 10 && b !== 13) {
+            return `data:application/octet-stream;base64,${buf.toString("base64")}`;
+        }
+    }
+    return buf.toString("utf8");
+}
+
+export function parsePropertyFromServer(value: unknown, property: Property, collection: EntityCollection, propertyKey?: string): unknown {
+    if (value === null || value === undefined) return value;
 
     switch (property.type) {
         case "binary": {
-            let buf: Buffer | null = null;
-            if (Buffer.isBuffer(value)) {
-                buf = value;
-            } else if (typeof value === "object" && value !== null) {
-                const rawVal = value as Record<string, unknown>;
-                if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
-                    buf = Buffer.from(rawVal.data as number[]);
-                }
-            }
+            const buf = tryResolveBuffer(value);
             if (buf) {
                 return `data:application/octet-stream;base64,${buf.toString("base64")}`;
             }
@@ -514,32 +521,9 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
             if (typeof value === "string") return value;
             
             // Handle Buffer objects (e.g. from PostgreSQL bytea columns)
-            let isBuffer = false;
-            let buf: Buffer | null = null;
-            
-            if (Buffer.isBuffer(value)) {
-                isBuffer = true;
-                buf = value;
-            } else if (typeof value === "object" && value !== null) {
-                const rawVal = value as Record<string, unknown>;
-                if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
-                    isBuffer = true;
-                    buf = Buffer.from(rawVal.data as number[]);
-                }
-            }
-            
-            if (isBuffer && buf) {
-                // Heuristic: if all bytes are printable ASCII, return utf8, else base64
-                let isPrintable = true;
-                for (let i = 0; i < buf.length; i++) {
-                    const b = buf[i];
-                    // Allow standard printable ASCII + common whitespace (\r, \n, \t)
-                    if ((b < 32 || b > 126) && b !== 9 && b !== 10 && b !== 13) {
-                        isPrintable = false;
-                        break;
-                    }
-                }
-                return isPrintable ? buf.toString("utf8") : `data:application/octet-stream;base64,${buf.toString("base64")}`;
+            const buf = tryResolveBuffer(value);
+            if (buf) {
+                return bufferToStringOrBase64(buf);
             }
             
             if (typeof value === "object" && value !== null) {
@@ -665,32 +649,10 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 
         default: {
             // Fallback for buffers in case they are mapped to something other than string
-            let isBuffer = false;
-            let buf: Buffer | null = null;
-            
-            if (Buffer.isBuffer(value)) {
-                isBuffer = true;
-                buf = value;
-            } else if (typeof value === "object" && value !== null) {
-                const rawVal = value as Record<string, unknown>;
-                if (rawVal.type === "Buffer" && Array.isArray(rawVal.data)) {
-                    isBuffer = true;
-                    buf = Buffer.from(rawVal.data as number[]);
-                }
+            const buf = tryResolveBuffer(value);
+            if (buf) {
+                return bufferToStringOrBase64(buf);
             }
-            
-            if (isBuffer && buf) {
-                let isPrintable = true;
-                for (let i = 0; i < buf.length; i++) {
-                    const b = buf[i];
-                    if ((b < 32 || b > 126) && b !== 9 && b !== 10 && b !== 13) {
-                        isPrintable = false;
-                        break;
-                    }
-                }
-                return isPrintable ? buf.toString("utf8") : `data:application/octet-stream;base64,${buf.toString("base64")}`;
-            }
-            
             return value;
         }
     }

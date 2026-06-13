@@ -1079,7 +1079,7 @@ roles: this.user?.roles ?? [] };
     }
 
     async deleteAll(path: string): Promise<void> {
-        return this.delegate.deleteAll(path);
+        return this.withTransaction((delegate) => delegate.deleteAll(path));
     }
 
     async checkUniqueField(

@@ -386,6 +386,8 @@ entityId };
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
+            const hookCtx = this.buildHookContext(c, "GET");
+
             if (parsed.entityId === "count") {
                 // GET /parent/:parentId/child/count — count child entities
                 const queryDict = c.req.queries();
@@ -406,7 +408,12 @@ entityId };
                     entityId: parsed.entityId
                 });
                 if (!entity) throw ApiError.notFound("Entity not found");
-                return c.json(this.flattenEntity(entity));
+
+                const flatResult = this.flattenEntity(entity);
+                const hookResult = await this.applyAfterRead(c.req.param("parent"), flatResult, hookCtx);
+                if (!hookResult) throw ApiError.notFound("Entity not found");
+
+                return c.json(hookResult);
             } else {
                 // GET /parent/:parentId/child — list entities
                 const queryDict = c.req.queries();
@@ -420,13 +427,23 @@ entityId };
                     order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
                     searchString
                 });
+
+                let flatEntities = entities.map(e => this.flattenEntity(e));
+                flatEntities = await this.applyAfterReadBatch(c.req.param("parent"), flatEntities, hookCtx);
+
+                const total = driver.countEntities ? await driver.countEntities({
+                    path: parsed.collectionPath,
+                    filter: queryOptions.where as FetchCollectionProps["filter"],
+                    searchString
+                }) : flatEntities.length;
+
                 return c.json({
-                    data: entities.map(e => this.flattenEntity(e)),
+                    data: flatEntities,
                     meta: {
-                        total: entities.length,
+                        total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: false
+                        hasMore: (queryOptions.offset || 0) + flatEntities.length < total
                     }
                 });
             }
@@ -441,9 +458,14 @@ entityId };
             if (!parsed || parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
+            const hookCtx = this.buildHookContext(c, "POST");
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
-            const body = await c.req.json().catch(() => ({}));
+            let body = await c.req.json().catch(() => ({}));
+
+            if (this.dataHooks?.beforeSave) {
+                body = await this.dataHooks.beforeSave(parsed.collectionPath, body, undefined, hookCtx);
+            }
 
             const entity = await driver.saveEntity({
                 path: parsed.collectionPath,
@@ -451,7 +473,15 @@ entityId };
                 status: "new"
             });
 
-            return c.json(this.formatResponse(entity), 201);
+            const response = this.formatResponse(entity);
+
+            if (this.dataHooks?.afterSave) {
+                Promise.resolve(this.dataHooks.afterSave(parsed.collectionPath, response as Record<string, unknown>, hookCtx)).catch(err => {
+                    console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                });
+            }
+
+            return c.json(response, 201);
         });
 
         // PUT /<subcollection-path>/:id — update entity
@@ -463,10 +493,15 @@ entityId };
             if (!parsed || !parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
+            const hookCtx = this.buildHookContext(c, "PUT");
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
-            const body = await c.req.json().catch(() => ({}));
+            let body = await c.req.json().catch(() => ({}));
+
+            if (this.dataHooks?.beforeSave) {
+                body = await this.dataHooks.beforeSave(parsed.collectionPath, body, parsed.entityId, hookCtx);
+            }
 
             const entity = await driver.saveEntity({
                 path: parsed.collectionPath,
@@ -475,7 +510,15 @@ entityId };
                 status: "existing"
             });
 
-            return c.json(this.formatResponse(entity));
+            const response = this.formatResponse(entity);
+
+            if (this.dataHooks?.afterSave) {
+                Promise.resolve(this.dataHooks.afterSave(parsed.collectionPath, response as Record<string, unknown>, hookCtx)).catch(err => {
+                    console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                });
+            }
+
+            return c.json(response);
         });
 
         // DELETE /<subcollection-path>/:id — delete entity
@@ -487,6 +530,7 @@ entityId };
             if (!parsed || !parsed.entityId) return next();
 
             const driver = c.get("driver") || this.driver;
+            const hookCtx = this.buildHookContext(c, "DELETE");
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
@@ -497,7 +541,17 @@ entityId };
 
             if (!existingEntity) throw ApiError.notFound("Entity not found");
 
+            if (this.dataHooks?.beforeDelete) {
+                await this.dataHooks.beforeDelete(parsed.collectionPath, parsed.entityId, hookCtx);
+            }
+
             await driver.deleteEntity({ entity: existingEntity });
+
+            if (this.dataHooks?.afterDelete) {
+                Promise.resolve(this.dataHooks.afterDelete(parsed.collectionPath, parsed.entityId, hookCtx)).catch(err => {
+                    console.error("[BackendHooks] data.afterDelete error:", err instanceof Error ? err.message : err);
+                });
+            }
 
             return new Response(null, { status: 204 });
         });
