@@ -8,6 +8,7 @@ FROM node:22-alpine AS builder
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV CI=true
 RUN corepack enable
 
 RUN apk add --no-cache python3 make g++
@@ -60,8 +61,11 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/app ./app
 
-# Create uploads directory
-RUN mkdir -p /app/app/backend/uploads && chown -R rebase:rebase /app
+# Uploads are already present from builder (app/uploads/ copied via COPY app ./app)
+# Set STORAGE_PATH so the app resolves to the correct location at runtime
+RUN mkdir -p /app/app/uploads && chown -R rebase:rebase /app
+
+ENV STORAGE_PATH=/app/app/uploads
 
 USER rebase
 

@@ -1,12 +1,18 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo, isSQLAdmin, isSchemaAdmin, AuthAdapter } from "@rebasepro/types";
+import type { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
+import { isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload } from "@rebasepro/server-core";
-// @ts-expect-error — AuthConfig is not re-exported from server-core barrel yet
-import { AuthConfig } from "@rebasepro/server-core";
+
+/** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
+interface WsAuthConfig {
+    requireAuth?: boolean;
+    jwtSecret?: string;
+}
 
 /**
  * Normalized user identity for WebSocket sessions.
@@ -51,14 +57,14 @@ const ADMIN_ONLY_TYPES = new Set([
  */
 function extractErrorMessage(error: unknown): string {
     if (!error) return "Unknown error";
-    if (typeof error === "object") {
-        const err = error as Record<string, unknown> & { cause?: unknown; message?: string };
-        if (err.cause) {
-            return extractErrorMessage(err.cause);
+    if (error instanceof Error) {
+        if ("cause" in error && error.cause) {
+            return extractErrorMessage(error.cause);
         }
-        if (typeof err.message === "string") {
-            return err.message;
-        }
+        return error.message;
+    }
+    if (typeof error === "object" && "message" in error && typeof (error as { message: unknown }).message === "string") {
+        return (error as { message: string }).message;
     }
     return String(error);
 }
@@ -71,19 +77,14 @@ function isAdminSession(session: ClientSession | undefined): boolean {
     // Fast path: new adapter-aware sessions set isAdmin directly
     if (session.user.isAdmin) return true;
     if (!session.user.roles) return false;
-    return session.user.roles.some((r: unknown) => {
-        if (typeof r === "string") return r === "admin";
-        if (r && typeof r === "object" && "isAdmin" in r) return (r as { isAdmin: boolean }).isAdmin;
-        if (r && typeof r === "object" && "id" in r) return (r as { id: string }).id === "admin";
-        return false;
-    });
+    return session.user.roles.some((r) => r === "admin");
 }
 
 export function createPostgresWebSocket(
     server: Server,
     realtimeService: RealtimeService,
     driver: PostgresBackendDriver,
-    authConfig?: AuthConfig,
+    authConfig?: WsAuthConfig,
     authAdapter?: AuthAdapter
 ) {
     // Session map scoped to this factory invocation — prevents stale sessions
@@ -252,18 +253,29 @@ code } }
                 // Helper to get correctly scoped delegate for the current request
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     const session = clientSessions.get(clientId);
-                    if ("withAuth" in driver && typeof (driver as unknown as Record<string, unknown>).withAuth === "function") {
+                    // Check if the driver supports RLS-scoped delegates
+                    if (typeof driver.withAuth === "function") {
                         try {
-                            const userForAuth = session?.user
+                            const userForAuth: User = session?.user
                                 ? {
                                     uid: session.user.userId,
+                                    displayName: null,
+                                    email: null,
+                                    photoURL: null,
+                                    providerId: "websocket",
+                                    isAnonymous: false,
                                     roles: session.user.roles ?? []
                                 }
                                 : {
                                     uid: "anon",
+                                    displayName: null,
+                                    email: null,
+                                    photoURL: null,
+                                    providerId: "websocket",
+                                    isAnonymous: true,
                                     roles: ["anon"]
                                 };
-                            return await (driver as unknown as { withAuth: (user: Record<string, unknown>) => Promise<DataDriver> }).withAuth(userForAuth);
+                            return await driver.withAuth(userForAuth);
                         } catch (e) {
                             console.error("Failed to create RLS scoped delegate for WS request", e);
                             throw new Error("Internal authentication error");

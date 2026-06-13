@@ -46,9 +46,9 @@ const extractColumns = (collection: EntityCollection): ColumnInfo[] => {
         if (prop.type === "relation") continue; // Relations are shown as edges, not columns
 
         const isPk =
-            ("isId" in prop && Boolean((prop as unknown as Record<string, unknown>).isId)) ||
+            ("isId" in prop && Boolean(prop.isId)) ||
             (!Object.values(properties).some(
-                (p) => "isId" in p && Boolean((p as unknown as Record<string, unknown>).isId)
+                (p) => "isId" in p && Boolean(p.isId)
             ) &&
                 propName === "id");
 

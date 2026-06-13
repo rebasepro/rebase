@@ -1,6 +1,7 @@
 import { eq, getTableName, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { getTableConfig, PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
+import { getTableConfig } from "drizzle-orm/pg-core";
+import type { RebasePgTable } from "../types";
 import { users, refreshTokens, passwordResetTokens, userIdentities } from "../schema/auth-schema";
 import {
     UserRepository,
@@ -27,14 +28,14 @@ import { toSnakeCase, camelCase } from "@rebasepro/utils";
 export type { Role };
 
 export interface AuthSchemaTables {
-    users: PgTable & Record<string, AnyPgColumn>;
-    refreshTokens: PgTable & Record<string, AnyPgColumn>;
-    passwordResetTokens: PgTable & Record<string, AnyPgColumn>;
-    appConfig: PgTable & Record<string, AnyPgColumn>;
-    userIdentities: PgTable & Record<string, AnyPgColumn>;
+    users: RebasePgTable;
+    refreshTokens: RebasePgTable;
+    passwordResetTokens: RebasePgTable;
+    appConfig: RebasePgTable;
+    userIdentities: RebasePgTable;
 }
 
-function getColumnKey(table: (PgTable & Record<string, AnyPgColumn>) | undefined, ...keys: string[]): string | undefined {
+function getColumnKey(table: RebasePgTable | undefined, ...keys: string[]): string | undefined {
     if (!table) return undefined;
     for (const key of keys) {
         if (key in table) return key;
@@ -46,7 +47,7 @@ function getColumnKey(table: (PgTable & Record<string, AnyPgColumn>) | undefined
     return undefined;
 }
 
-function getColumn(table: (PgTable & Record<string, AnyPgColumn>) | undefined, ...keys: string[]): AnyPgColumn | undefined {
+function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebasePgTable[string] | undefined {
     if (!table) return undefined;
     const key = getColumnKey(table, ...keys);
     return key ? table[key] : undefined;
@@ -57,21 +58,21 @@ function getColumn(table: (PgTable & Record<string, AnyPgColumn>) | undefined, .
  * Handles all user-related database operations using Drizzle ORM.
  */
 export class UserService implements UserRepository {
-    private usersTable: PgTable & Record<string, AnyPgColumn>;
-    private userIdentitiesTable: PgTable & Record<string, AnyPgColumn>;
+    private usersTable: RebasePgTable;
+    private userIdentitiesTable: RebasePgTable;
 
     constructor(
         private db: NodePgDatabase,
-        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+        tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).users)) {
             const tables = tableOrTables as Partial<AuthSchemaTables>;
-            this.usersTable = (tables.users || users) as unknown as PgTable & Record<string, AnyPgColumn>;
-            this.userIdentitiesTable = (tables.userIdentities || userIdentities) as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.usersTable = (tables.users || users) as RebasePgTable;
+            this.userIdentitiesTable = (tables.userIdentities || userIdentities) as RebasePgTable;
         } else {
-            const table = tableOrTables as (PgTable & Record<string, AnyPgColumn>) | undefined;
-            this.usersTable = table || (users as unknown as PgTable & Record<string, AnyPgColumn>);
-            this.userIdentitiesTable = userIdentities as unknown as PgTable & Record<string, AnyPgColumn>;
+            const table = tableOrTables as RebasePgTable | undefined;
+            this.usersTable = table || (users as unknown as RebasePgTable);
+            this.userIdentitiesTable = userIdentities as unknown as RebasePgTable;
         }
     }
 
@@ -82,7 +83,7 @@ export class UserService implements UserRepository {
     }
 
     private mapRowToUser(row: Record<string, unknown>): UserData {
-        if (!row) return row as unknown as UserData;
+        if (!row) return row as UserData;
 
         const id = (row.id ?? row.uid) as string;
         const email = row.email as string;
@@ -497,16 +498,16 @@ export class UserService implements UserRepository {
 
 
 export class RefreshTokenService {
-    private refreshTokensTable: PgTable & Record<string, AnyPgColumn>;
+    private refreshTokensTable: RebasePgTable;
 
     constructor(
         private db: NodePgDatabase,
-        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+        tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
-            this.refreshTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || refreshTokens) as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.refreshTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || refreshTokens) as RebasePgTable;
         } else {
-            this.refreshTokensTable = (tableOrTables as unknown as PgTable & Record<string, AnyPgColumn>) || (refreshTokens as unknown as PgTable & Record<string, AnyPgColumn>);
+            this.refreshTokensTable = (tableOrTables as RebasePgTable) || (refreshTokens as unknown as RebasePgTable);
         }
     }
 
@@ -595,16 +596,16 @@ export class RefreshTokenService {
  * Password reset token service
  */
 export class PasswordResetTokenService {
-    private passwordResetTokensTable: PgTable & Record<string, AnyPgColumn>;
+    private passwordResetTokensTable: RebasePgTable;
 
     constructor(
         private db: NodePgDatabase,
-        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+        tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
-            this.passwordResetTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || passwordResetTokens) as unknown as PgTable & Record<string, AnyPgColumn>;
+            this.passwordResetTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).passwordResetTokens || passwordResetTokens) as RebasePgTable;
         } else {
-            this.passwordResetTokensTable = (tableOrTables as unknown as PgTable & Record<string, AnyPgColumn>) || (passwordResetTokens as unknown as PgTable & Record<string, AnyPgColumn>);
+            this.passwordResetTokensTable = (tableOrTables as RebasePgTable) || (passwordResetTokens as unknown as RebasePgTable);
         }
     }
 
@@ -704,7 +705,7 @@ export class PostgresTokenRepository implements TokenRepository {
 
     constructor(
         private db: NodePgDatabase,
-        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+        tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         this.refreshTokenService = new RefreshTokenService(db, tableOrTables);
         this.passwordResetTokenService = new PasswordResetTokenService(db, tableOrTables);
@@ -770,7 +771,7 @@ export class PostgresAuthRepository implements AuthRepository {
 
     constructor(
         private db: NodePgDatabase,
-        tableOrTables?: (PgTable & Record<string, AnyPgColumn>) | Partial<AuthSchemaTables>
+        tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
     ) {
         this.userService = new UserService(db, tableOrTables);
         this.tokenRepository = new PostgresTokenRepository(db, tableOrTables);

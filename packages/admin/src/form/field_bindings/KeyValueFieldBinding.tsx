@@ -348,7 +348,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                                         value={arrayValue[index]}
                                         disabled={disabled || !fieldKey}
                                         setValue={(newValue) => {
-                                            const newArrayValue = [...arrayValue] as any[];
+                                            const newArrayValue = [...arrayValue] as unknown[];
                                             newArrayValue[index] = newValue;
                                             setValue({
                                                 ...value,

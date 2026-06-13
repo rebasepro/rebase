@@ -119,12 +119,6 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
-            // The decoded JWT may contain additional claims beyond the typed payload
-            const extendedPayload = payload as AccessTokenPayload & {
-                email?: string;
-                displayName?: string;
-            };
-
             // Resolve roles from the repository
             let roles: string[] = payload.roles || [];
             try {
@@ -137,8 +131,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
             return {
                 uid: payload.userId,
-                email: extendedPayload.email ?? "",
-                displayName: extendedPayload.displayName ?? null,
+                email: payload.email ?? "",
+                displayName: payload.displayName ?? null,
                 roles,
                 isAdmin,
                 rawToken: token,
@@ -163,11 +157,6 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
-            const extendedPayload = payload as AccessTokenPayload & {
-                email?: string;
-                displayName?: string;
-            };
-
             let roles: string[] = payload.roles || [];
             try {
                 roles = await authRepository.getUserRoleIds(payload.userId);
@@ -179,8 +168,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
             return {
                 uid: payload.userId,
-                email: extendedPayload.email ?? "",
-                displayName: extendedPayload.displayName ?? null,
+                email: payload.email ?? "",
+                displayName: payload.displayName ?? null,
                 roles,
                 isAdmin,
                 rawToken: token,

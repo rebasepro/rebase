@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
-import { ApiError } from "../errors";
+import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
@@ -234,9 +234,10 @@ export class RestApiGenerator {
 
                 return c.json(response, 201);
             } catch (error) {
-                const err = error as Error & { code?: string };
-                err.code = err.code || "BAD_REQUEST";
-                throw err;
+                if (isRebaseApiError(error) && !error.code) {
+                    error.code = "BAD_REQUEST";
+                }
+                throw error;
             }
         });
 
@@ -282,9 +283,10 @@ export class RestApiGenerator {
 
                 return c.json(response);
             } catch (error) {
-                const err = error as Error & { code?: string };
-                err.code = err.code || "BAD_REQUEST";
-                throw err;
+                if (isRebaseApiError(error) && !error.code) {
+                    error.code = "BAD_REQUEST";
+                }
+                throw error;
             }
         });
 

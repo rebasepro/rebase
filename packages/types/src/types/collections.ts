@@ -399,7 +399,25 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      */
     Actions?: ComponentRef<CollectionActionsProps>[];
 
+    /**
+     * The database table name for this collection.
+     * Automatically set for PostgreSQL collections.
+     * For non-SQL backends, this may be undefined.
+     */
+    table?: string;
 
+    /**
+     * Relations defined for this collection.
+     * Populated at normalization time from inline relation properties
+     * or explicit relation definitions.
+     */
+    relations?: Relation[];
+
+    /**
+     * Security rules for this collection (Row Level Security).
+     * When defined, the backend enforces access control policies.
+     */
+    securityRules?: SecurityRule[];
 }
 
 // ── Driver-specific collection types ──────────────────────────────────
@@ -517,7 +535,10 @@ export type EntityCollection<M extends Record<string, unknown> = Record<string, 
 // Use these after a `getDataSourceCapabilities()` guard to safely access
 // driver-specific fields without coupling to a concrete driver type.
 
-/** An EntityCollection that supports SQL-style relations (e.g. Postgres). */
+/**
+ * An EntityCollection that supports SQL-style relations (e.g. Postgres).
+ * @deprecated Use `EntityCollection` directly — `table`, `relations`, and `securityRules` are now on `BaseEntityCollection`.
+ */
 export type CollectionWithRelations<M extends Record<string, unknown> = Record<string, unknown>> =
     EntityCollection<M> & { table?: string; relations?: Relation[]; securityRules?: SecurityRule[] };
 

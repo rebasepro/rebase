@@ -29,6 +29,9 @@
             "@rebasepro/types": [
                 "../types/src"
             ],
+            "@rebasepro/common": [
+                "../common/src"
+            ],
             "@rebasepro/server-core": [
                 "../server-core/src"
             ]

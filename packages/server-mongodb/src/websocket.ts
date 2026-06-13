@@ -1,9 +1,10 @@
-import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin } from "@rebasepro/types";
+import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-// @ts-ignore
-import { extractUserFromToken, AccessTokenPayload, AuthConfig } from "@rebasepro/server-core";
+import type { AccessTokenPayload } from "@rebasepro/server-core";
+import { extractUserFromToken } from "@rebasepro/server-core";
+import type { RebaseAuthConfig } from "@rebasepro/server-core";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
 
@@ -41,19 +42,14 @@ const ADMIN_ONLY_TYPES = new Set([
 
 function isAdminSession(session: ClientSession | undefined): boolean {
     if (!session?.user?.roles) return false;
-    return session.user.roles.some((r: unknown) => {
-        if (typeof r === "string") return r === "admin";
-        if (r && typeof r === "object" && "isAdmin" in r) return (r as { isAdmin: boolean }).isAdmin;
-        if (r && typeof r === "object" && "id" in r) return (r as { id: string }).id === "admin";
-        return false;
-    });
+    return session.user.roles.includes("admin");
 }
 
 export function createMongoWebSocket(
     server: Server,
     realtimeService: MongoRealtimeService,
     driver: MongoDriver,
-    authConfig?: AuthConfig,
+    authConfig?: RebaseAuthConfig,
     admin?: DatabaseAdmin
 ) {
     const isProduction = process.env.NODE_ENV === "production";
@@ -148,14 +144,16 @@ export function createMongoWebSocket(
                     const session = clientSessions.get(clientId);
                     if (session?.user && isDriverWithAuth(driver)) {
                         try {
-                            const userForAuth = {
-                                uid: (session.user as any).userId,
-                                email: (session.user as any).email ?? "",
-                                displayName: (session.user as any).displayName ?? "",
-                                photoURL: (session.user as any).photoURL ?? "",
-                                roles: (session.user as any).roles ?? []
+                            const userForAuth: User = {
+                                uid: session.user.userId,
+                                email: session.user.email ?? "",
+                                displayName: session.user.displayName ?? "",
+                                photoURL: session.user.photoURL ?? "",
+                                providerId: "jwt",
+                                isAnonymous: false,
+                                roles: session.user.roles ?? []
                             };
-                            return await driver.withAuth(userForAuth as any);
+                            return await driver.withAuth(userForAuth);
                         } catch (e) {
                             console.error("Failed to create authenticated delegate for WS request", e);
                             return driver;

@@ -501,7 +501,7 @@ function resolveRelationDisplayName(
     // 2. Try the entity cache (sessionStorage) as a fallback
     if (id !== undefined && targetCollection) {
         try {
-            const slug = targetCollection.slug ?? (targetCollection as EntityCollection & { table?: string }).table;
+            const slug = targetCollection.slug ?? ("table" in targetCollection ? targetCollection.table : undefined);
             if (slug) {
                 const cacheKey = `${slug}/${id}`;
                 const cached = getEntityFromCache(cacheKey) as { values?: Record<string, unknown> } | undefined;

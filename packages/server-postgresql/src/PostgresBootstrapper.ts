@@ -6,7 +6,8 @@
 
 import { getTableName, isTable, Relations, sql, Table } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PgEnum, PgTable, getTableConfig, AnyPgColumn } from "drizzle-orm/pg-core";
+import { PgEnum, PgTable, getTableConfig } from "drizzle-orm/pg-core";
+import type { RebasePgTable } from "./types";
 import {
     BackendBootstrapper,
     InitializedDriver,
@@ -207,7 +208,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     : authCollection.slug)
                 : undefined;
             const usersTable = tableName
-                ? registry.getTable(tableName) as (PgTable & Record<string, AnyPgColumn>) | undefined
+                ? registry.getTable(tableName) as RebasePgTable | undefined
                 : undefined;
 
             let usersSchemaName = "rebase";
@@ -217,7 +218,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             const authTables = createAuthSchema(usersSchemaName) as unknown as AuthSchemaTables;
             if (usersTable) {
-                authTables.users = usersTable as unknown as PgTable & Record<string, AnyPgColumn>;
+                authTables.users = usersTable as RebasePgTable;
             }
 
             const userService = new UserService(db, authTables);

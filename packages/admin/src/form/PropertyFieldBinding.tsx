@@ -219,7 +219,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         collection: context.collection,
         propertyKey: propertyKey,
         property: property,
-        Component: Component as any, // Cast component here since it is a generic component type
+        Component: Component as ComponentType<FieldProps<Property, unknown, M>>,
         plugins: plugins
     });
     const UsedComponent: ComponentType<FieldProps<Property, any, any>> = WrappedComponent ?? Component;

@@ -528,7 +528,7 @@ export function EnumConditionsEditor({ disabled, collectionProperties }: EnumCon
     const allEnumIds = propertyEnumValues.map(ev => String(ev.id));
 
     // Get conditions from the correct path: values.conditions
-    const conditions = (values as PropertyWithId & { conditions?: Record<string, unknown> }).conditions ?? {};
+    const conditions = values.conditions ?? {};
 
     // Parse existing enum conditions
     const activeConditions: { type: EnumConditionType; config: EnumConditionConfig }[] = [];

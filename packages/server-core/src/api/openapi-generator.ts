@@ -314,7 +314,7 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
         };
 
         // ── Subcollection routes ──────────────────────────────────────
-        const relations = (collection as EntityCollection & { relations?: Relation[] }).relations;
+        const relations = collection.relations;
         if (relations && relations.length > 0) {
             for (const relation of relations) {
                 const relationName = relation.relationName;

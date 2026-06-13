@@ -17,6 +17,18 @@ import { EntityFetchService } from "./EntityFetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 
+/** Shape of PostgreSQL errors with diagnostic metadata. */
+interface PostgresError extends Error {
+    code?: string;
+    detail?: string;
+    hint?: string;
+    constraint?: string;
+    column?: string;
+    table?: string;
+    dataType?: string;
+    cause?: unknown;
+}
+
 /**
  * Service for handling all entity write operations.
  * Handles saving, deleting, and updating entities.
@@ -391,14 +403,14 @@ export class EntityPersistService {
      */
     private extractCauseMessage(error: unknown): string | null {
         if (!error || typeof error !== "object") return null;
-        const err = error as Error & { cause?: unknown };
+        if (!(error instanceof Error)) return null;
 
-        if (err.cause && typeof err.cause === "object") {
-            const deeper = this.extractCauseMessage(err.cause);
+        if (error.cause && typeof error.cause === "object") {
+            const deeper = this.extractCauseMessage(error.cause);
             if (deeper) return deeper;
             // The cause itself has a message
-            if (err.cause instanceof Error && err.cause.message) {
-                return err.cause.message;
+            if (error.cause instanceof Error && error.cause.message) {
+                return error.cause.message;
             }
         }
         return null;
@@ -420,19 +432,24 @@ export class EntityPersistService {
      * Extract the underlying PostgreSQL error from a Drizzle wrapper.
      * Drizzle wraps PG errors in a `cause` property.
      */
-    private extractPgError(error: unknown): (Error & { code?: string; detail?: unknown; hint?: unknown; constraint?: unknown; column?: unknown; table?: unknown; dataType?: unknown }) | null {
+    private extractPgError(error: unknown): PostgresError | null {
         if (!error || typeof error !== "object") return null;
-
-        const err = error as Error & { code?: string; cause?: unknown; detail?: unknown };
+        if (!(error instanceof Error)) {
+            // Check non-Error objects for a cause chain (Drizzle sometimes wraps oddly)
+            if ("cause" in error && (error as Record<string, unknown>).cause && typeof (error as Record<string, unknown>).cause === "object") {
+                return this.extractPgError((error as Record<string, unknown>).cause);
+            }
+            return null;
+        }
 
         // Check if the error itself has a PG error code
-        if (err.code && /^[0-9A-Z]{5}$/.test(err.code)) {
-            return err as Error & { code: string; detail?: unknown; hint?: unknown; constraint?: unknown; column?: unknown; table?: unknown; dataType?: unknown };
+        if ("code" in error && typeof (error as PostgresError).code === "string" && /^[0-9A-Z]{5}$/.test((error as PostgresError).code!)) {
+            return error as PostgresError;
         }
 
         // Check the cause chain (Drizzle wraps PG errors)
-        if (err.cause && typeof err.cause === "object") {
-            return this.extractPgError(err.cause);
+        if (error.cause && typeof error.cause === "object") {
+            return this.extractPgError(error.cause);
         }
 
         return null;

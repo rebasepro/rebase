@@ -1,6 +1,8 @@
 "use client";
-import React, { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { TextField, TextFieldProps } from "./index";
+
+type TextFieldChangeEvent = React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
 
 export function DebouncedTextField<T extends string | number>(props: TextFieldProps<T>) {
 
@@ -24,7 +26,7 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
         };
     }, []);
 
-    const flushChange = useCallback((value: T | string, event?: ChangeEvent<any>) => {
+    const flushChange = useCallback((value: T | string, event?: TextFieldChangeEvent) => {
         if (timerRef.current) {
             clearTimeout(timerRef.current);
             timerRef.current = undefined;
@@ -38,12 +40,12 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
                     value: value,
                     name: props.name
                 }
-            };
-            props.onChange(e as any);
+            } as TextFieldChangeEvent;
+            props.onChange(e);
         }
     }, [props.value, props.onChange, props.name]);
 
-    const internalOnChange = useCallback((event: ChangeEvent<any>) => {
+    const internalOnChange = useCallback((event: TextFieldChangeEvent) => {
         const newValue = event.target.value;
         setInternalValue(newValue);
 
@@ -58,17 +60,17 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
         };
 
         timerRef.current = setTimeout(() => {
-            flushChange(newValue, eventCopy as any);
+            flushChange(newValue, eventCopy as TextFieldChangeEvent);
         }, 150);
     }, [flushChange]);
 
-    const internalOnBlur = useCallback((event: React.FocusEvent<any>) => {
-        flushChange(internalValue, event as any);
+    const internalOnBlur = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
+        flushChange(internalValue, event as TextFieldChangeEvent);
         props.onBlur?.(event);
     }, [internalValue, flushChange, props.onBlur]);
 
     return <TextField {...props}
         onChange={internalOnChange}
         onBlur={internalOnBlur}
-        value={internalValue as T}/>
+        value={internalValue as T}/>;
 }

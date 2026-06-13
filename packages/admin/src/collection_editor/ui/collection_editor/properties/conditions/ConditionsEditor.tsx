@@ -18,6 +18,7 @@ import {
 } from "@rebasepro/ui";
 import { getFieldConfig, DEFAULT_FIELD_CONFIGS } from "../../../../_cms_internals";
 import { Properties, Property, EnumValueConfig } from "@rebasepro/types";
+import type { PropertyConditions } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { PropertyWithId } from "../../PropertyEditView";
 import { getPropertyPaths } from "./property_paths";
@@ -817,7 +818,7 @@ export function ConditionsEditor({ disabled, collectionProperties }: ConditionsE
         : [];
 
     // Get current conditions from form values
-    const conditions: Record<string, unknown> = (values as PropertyWithId & { conditions?: Record<string, unknown> }).conditions ?? {};
+    const conditions: PropertyConditions = values.conditions ?? {};
 
     const activeConditions: { type: ConditionType; group: ConditionGroup }[] = [];
 

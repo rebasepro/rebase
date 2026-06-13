@@ -71,12 +71,31 @@ export interface ErrorResponse {
 }
 
 /**
+ * General shape of errors that flow through the API error handler.
+ * Extends Error with optional HTTP status, error code, and details.
+ */
+export interface RebaseApiError extends Error {
+    statusCode?: number;
+    code?: string;
+    details?: unknown;
+}
+
+/**
+ * Type guard for errors that carry optional API metadata (statusCode, code, details).
+ * Returns true for any Error instance — the optional properties are then
+ * checked via normal property access.
+ */
+export function isRebaseApiError(error: unknown): error is RebaseApiError {
+    return error instanceof Error;
+}
+
+/**
  * Hono error-handling middleware (`app.onError`).
  * Converts any error into the canonical `{ error: { message, code } }` shape.
  */
 export const errorHandler: ErrorHandler = (err, c) => {
     // Typecast custom error properties
-    const error = err as Error & { statusCode?: number; code?: string; details?: unknown, name?: string };
+    const error: RebaseApiError = err;
 
     if (error instanceof ApiError || error.name === "ApiError") {
         // Operational errors — log at warn level

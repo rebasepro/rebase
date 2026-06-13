@@ -50,7 +50,8 @@ import { MarkdownPropertyField } from "./properties/MarkdownPropertyField";
 import { isValidRegExp, mergeDeep } from "@rebasepro/utils";
 
 export type PropertyWithId = Property & {
-    id?: string
+    id?: string;
+    conditions?: import('@rebasepro/types').PropertyConditions;
 };
 
 export type OnPropertyChangedParams = {

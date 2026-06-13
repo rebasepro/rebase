@@ -1,5 +1,5 @@
 import { Db, MongoClient } from "mongodb";
-import {
+import type {
     BackendBootstrapper,
     InitializedDriver,
     BootstrappedAuth,
@@ -26,6 +26,21 @@ export interface MongoDriverInternals {
     driver: MongoDriver;
 }
 
+/** Shape of the config object passed to `initializeDriver` by the coordinator. */
+interface DriverInitConfig {
+    collections?: EntityCollection[];
+}
+
+/** Shape of the auth config passed to `initializeAuth`. */
+interface AuthInitConfig {
+    email?: unknown;
+}
+
+/** Shape of the history config passed to `initializeHistory`. */
+interface HistoryInitConfig {
+    retention?: number;
+}
+
 export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): BackendBootstrapper {
     // Cached admin object, set during getAdmin() and used by initializeWebsockets
     let cachedAdmin: DatabaseAdmin | undefined;
@@ -34,7 +49,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
         type: "mongodb",
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
-            const { collections } = config as { collections?: EntityCollection[] };
+            const { collections } = config as DriverInitConfig;
 
             const registry = new MongoCollectionRegistry();
             if (collections) {
@@ -79,8 +94,8 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
 
             // @ts-ignore
             const { createEmailService } = await import("@rebasepro/server-core");
-            const authConfig = config as { email?: any } | undefined;
-            let emailService: any;
+            const authConfig = config as AuthInitConfig | undefined;
+            let emailService: unknown;
             if (authConfig?.email) {
                 emailService = createEmailService(authConfig.email);
             }
@@ -97,8 +112,8 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             };
         },
 
-        async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: any } | undefined> {
-            const historyConfig = config as { retention?: number } | undefined;
+        async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: unknown } | undefined> {
+            const historyConfig = config as HistoryInitConfig | undefined;
             if (!historyConfig) return undefined;
 
             const internals = driverResult.internals as MongoDriverInternals;

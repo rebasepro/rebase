@@ -3,6 +3,9 @@
   "compilerOptions": {
     "skipLibCheck": true,
     "noCheck": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "config": ["../config/index"]
+    }
   }
 }

@@ -166,7 +166,7 @@ function detectCollectionsInResult(
     for (const slug of mentionedSlugs) {
         const normalised = toSnakeCase(slug);
         const col = collections.find(c => {
-            const tableName = (c as EntityCollection & { table?: string }).table || toSnakeCase(c.slug);
+            const tableName = ("table" in c ? c.table : undefined) || toSnakeCase(c.slug);
             return c.slug === slug || tableName === normalised || toSnakeCase(c.slug) === normalised;
         });
         if (col) {

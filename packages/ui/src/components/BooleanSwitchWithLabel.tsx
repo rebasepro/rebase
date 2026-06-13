@@ -86,9 +86,10 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
             )}
             onClick={disabled ? undefined : (e) => {
                 if (props.allowIndeterminate) {
-                    if (value === null || value === undefined) onValueChange?.(true)
-                    else if (value) onValueChange?.(false)
-                    else onValueChange?.(null as unknown as boolean); // SAFETY: null represents indeterminate state when allowIndeterminate is true
+                    const onChange = onValueChange as ((newValue: boolean | null) => void) | undefined;
+                    if (value === null || value === undefined) onChange?.(true)
+                    else if (value) onChange?.(false)
+                    else onChange?.(null);
                 } else {
                     onValueChange?.(!value);
                 }

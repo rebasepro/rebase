@@ -1,4 +1,4 @@
-import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata } from "@rebasepro/types";
+import type { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
 
 /**
  * Maps a PostgreSQL column data type to a Rebase property type.
@@ -212,13 +212,7 @@ export function buildCollectionFromTableMetadata(
         localKey?: string;
         through?: { table: string; sourceColumn: string; targetColumn: string };
     }> = [];
-    const securityRules: Array<{
-        name: string;
-        operations: string[];
-        roles: string[];
-        qual: string | null | undefined;
-        with_check: string | null | undefined;
-    }> = [];
+    const securityRules: SecurityRule[] = [];
 
     // Parse columns
     for (const column of metadata.columns) {
@@ -271,22 +265,31 @@ export function buildCollectionFromTableMetadata(
         for (const policy of metadata.policies) {
             // Attempt to map typical cmds to operations.
             // Postgres cmd: SELECT, INSERT, UPDATE, DELETE, ALL
-            let operations: string[] = [];
+            let operations: SecurityOperation[] = [];
             switch (policy.cmd) {
-                case "ALL": operations = ["read", "create", "update", "delete"]; break;
-                case "SELECT": operations = ["read"]; break;
-                case "INSERT": operations = ["create"]; break;
+                case "ALL": operations = ["all"]; break;
+                case "SELECT": operations = ["select"]; break;
+                case "INSERT": operations = ["insert"]; break;
                 case "UPDATE": operations = ["update"]; break;
                 case "DELETE": operations = ["delete"]; break;
             }
-            securityRules.push({
-                name: policy.policy_name,
-                operations,
-                // roles is string[] e.g., ["public", "authenticated"]
-                roles: policy.roles ?? [],
-                qual: policy.qual,
-                with_check: policy.with_check
-            });
+            const qual = policy.qual ?? undefined;
+            const withCheck = policy.with_check ?? undefined;
+            if (qual) {
+                securityRules.push({
+                    name: policy.policy_name,
+                    operations,
+                    roles: policy.roles ?? [],
+                    using: qual,
+                    ...(withCheck ? { withCheck } : {})
+                });
+            } else {
+                securityRules.push({
+                    name: policy.policy_name,
+                    operations,
+                    roles: policy.roles ?? [],
+                });
+            }
         }
     }
 

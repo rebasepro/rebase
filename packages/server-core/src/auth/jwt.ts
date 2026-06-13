@@ -13,6 +13,16 @@ export interface AccessTokenPayload {
     uid?: string;
     /** Authentication Assurance Level: aal1 = password/oauth, aal2 = MFA verified */
     aal?: "aal1" | "aal2";
+    /** Email claim from the JWT, if present */
+    email?: string;
+    /** Display name claim from the JWT, if present */
+    displayName?: string;
+    /** Photo URL claim from the JWT, if present */
+    photoURL?: string;
+    /** Whether MFA has been verified for this session */
+    mfa_verified?: boolean;
+    /** Authentication Methods Reference — list of methods used (e.g. 'pwd', 'otp') */
+    amr?: string[];
 }
 
 let jwtConfig: JwtConfig = {

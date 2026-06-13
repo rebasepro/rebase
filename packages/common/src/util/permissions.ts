@@ -1,6 +1,15 @@
-import { AuthController, CollectionWithRelations, Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
+import { CollectionWithRelations, Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
 
-function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlString: string, auth: AuthController<USER>, entity: Entity<M> | null): boolean {
+/**
+ * Minimal auth context for permission checking.
+ * Only requires the user object — avoids forcing callers to construct
+ * a full AuthController just to check permissions.
+ */
+export interface AuthContext<USER extends User = User> {
+    user: USER | null;
+}
+
+function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlString: string, auth: AuthContext<USER>, entity: Entity<M> | null): boolean {
     // This is a client-side SQL evaluator used *only* for optimistic UI updates.
     // It parses basic AND / OR statements to evaluate RLS without backend roundtrips.
     if (!entity) return true;
@@ -111,7 +120,7 @@ function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlSt
     return true; // Optimistic fallback for anything else
 }
 
-function evaluateRule<USER extends User, M extends Record<string, unknown>>(rule: SecurityRule, auth: AuthController<USER>, entity: Entity<M> | null): boolean {
+function evaluateRule<USER extends User, M extends Record<string, unknown>>(rule: SecurityRule, auth: AuthContext<USER>, entity: Entity<M> | null): boolean {
 
     if (rule.access === "public") return true;
 
@@ -137,15 +146,12 @@ function evaluateRule<USER extends User, M extends Record<string, unknown>>(rule
 
 export function checkOperation<M extends Record<string, unknown>, USER extends User>(
     collection: EntityCollection<M>,
-    authController: AuthController<USER>,
+    authContext: AuthContext<USER>,
     entity: Entity<M> | null,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): boolean {
     const securityRules = getDataSourceCapabilities(collection.driver).supportsRLS ? (collection as CollectionWithRelations).securityRules : undefined;
     if (!securityRules || securityRules.length === 0) {
-        // According to our plan: Postgres RLS implicitly denies if enabled without rules.
-        // But for Rebase we default to true if securityRules is undefined,
-        // so as not to break everything without rules. Let's assume true for now.
         return true;
     }
 
@@ -158,15 +164,13 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 
     if (applicableRules.length === 0) return false;
 
-    // In Postgres, policies ONLY apply if the user matching the targeted roles.
-    const userRoleIds = authController.user?.roles ?? [];
+    const userRoleIds = authContext.user?.roles ?? [];
     const userRoles = [...userRoleIds, "public"];
     const roleApplicableRules = applicableRules.filter((rule: SecurityRule) => {
-        if (!rule.roles || rule.roles.length === 0) return true; // APPLIES TO PUBLIC
+        if (!rule.roles || rule.roles.length === 0) return true;
         return rule.roles.some((r: string) => userRoles.includes(r));
     });
 
-    // If no rules apply to this user's roles, the operation is implicitly denied.
     if (roleApplicableRules.length === 0) return false;
 
     let grantedByPermissive = false;
@@ -174,11 +178,11 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 
     for (const rule of roleApplicableRules) {
         const mode = rule.mode || "permissive";
-        const passed = evaluateRule(rule, authController, entity);
+        const passed = evaluateRule(rule, authContext, entity);
 
         if (mode === "restrictive" && !passed) {
             deniedByRestrictive = true;
-            break; // Immediate deny
+            break;
         }
 
         if (mode === "permissive" && passed) {
@@ -199,37 +203,37 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 export function canReadCollection<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
-        authController: AuthController<USER>
+        authContext: AuthContext<USER>
     ): boolean {
-    return checkOperation(collection, authController, null, "select");
+    return checkOperation(collection, authContext, null, "select");
 }
 
 export function canEditEntity<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
-        authController: AuthController<USER>,
+        authContext: AuthContext<USER>,
         path: string,
         entity: Entity<M> | null
     ): boolean {
-    return checkOperation(collection, authController, entity, "update");
+    return checkOperation(collection, authContext, entity, "update");
 }
 
 export function canCreateEntity<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
-        authController: AuthController<USER>,
+        authContext: AuthContext<USER>,
         path: string,
         entity: Entity<M> | null
     ): boolean {
-    return checkOperation(collection, authController, entity, "insert");
+    return checkOperation(collection, authContext, entity, "insert");
 }
 
 export function canDeleteEntity<M extends Record<string, unknown>, USER extends User>
     (
         collection: EntityCollection<M>,
-        authController: AuthController<USER>,
+        authContext: AuthContext<USER>,
         path: string,
         entity: Entity<M> | null
     ): boolean {
-    return checkOperation(collection, authController, entity, "delete");
+    return checkOperation(collection, authContext, entity, "delete");
 }

@@ -105,7 +105,7 @@ export function resolveQueryCollections(
     for (const table of tables) {
         // Match table name against collection table or slug->snake_case
         const matched = collections.find(c => {
-            const tableName = (c as EntityCollection & { table?: string }).table || toSnakeCase(c.slug);
+            const tableName = ("table" in c ? c.table : undefined) || toSnakeCase(c.slug);
             return tableName === table.name;
         });
 

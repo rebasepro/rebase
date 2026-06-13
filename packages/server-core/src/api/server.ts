@@ -120,7 +120,7 @@ export class RebaseApiServer {
                 singularName: col.singularName,
                 description: col.description,
                 properties: Object.keys(col.properties),
-                relations: (col as EntityCollection & { relations?: Relation[] }).relations?.map((r: Relation) => ({
+                relations: col.relations?.map((r: Relation) => ({
                     relationName: r.relationName,
                     target: typeof r.target === "function" ? r.target().slug : r.target,
                     cardinality: r.cardinality,

@@ -21,7 +21,6 @@ import {
     User,
     RebaseClient,
     RebaseData,
-    AuthController,
     SecurityRule
 } from "@rebasepro/types";
 import { MongoEntityService } from "../db/MongoEntityService";
@@ -72,7 +71,11 @@ export class MongoDriver implements DataDriver {
         return new Date();
     }
 
-    private resolveCollectionCallbacks<M extends Record<string, unknown>>(
+    /**
+     * Resolve a collection's callbacks and property callbacks from the registry.
+     * Used by AuthenticatedMongoDriver to apply callbacks after RLS filtering.
+     */
+    resolveCollectionCallbacks<M extends Record<string, unknown>>(
         collection: EntityCollection<M> | undefined,
         path: string
     ) {
@@ -625,7 +628,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
     }
 
     async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
-        const { collection: resolvedCollection } = (this.delegate as any).resolveCollectionCallbacks(props.collection, props.path);
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const rlsFilter = buildMongoFilterFromSecurityRules(resolvedCollection, this.user, "select");
         if (rlsFilter === null) {
             return [];
@@ -646,9 +649,9 @@ export class AuthenticatedMongoDriver implements DataDriver {
             ...props,
             rawQuery: combinedQuery,
             collection: resolvedCollection
-        } as any);
+        });
 
-        const { callbacks, propertyCallbacks } = (this.delegate as any).resolveCollectionCallbacks(props.collection, props.path);
+        const { callbacks, propertyCallbacks } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
         if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = {
@@ -686,20 +689,20 @@ export class AuthenticatedMongoDriver implements DataDriver {
     listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
         const unsubscribe = this.delegate.listenCollection(props);
         const authContext = { userId: this.user.uid, roles: this.user.roles ?? [] };
-        const lastEntry = Array.from((this.delegate.getRealtimeService() as any).subscriptions.entries()).pop();
-        const lastSub = (lastEntry as any)?.[1] as Record<string, unknown> | undefined;
-        if (lastSub && lastSub.clientId === "driver") {
+        const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
+        const lastEntry = Array.from(subscriptions.entries()).pop();
+        const lastSub = lastEntry?.[1];
+        if (lastSub && lastSub.config.clientId === "driver") {
             lastSub.authContext = authContext;
         }
         return unsubscribe;
     }
 
     async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
-        const { collection: resolvedCollection } = (this.delegate as any).resolveCollectionCallbacks(props.collection, props.path);
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const entity = await this.delegate.fetchEntity(props);
         if (entity) {
-            const authController = { user: this.user } as unknown as AuthController;
-            const authorized = checkOperation(resolvedCollection as EntityCollection, authController, entity as Entity, "select");
+            const authorized = checkOperation(resolvedCollection as EntityCollection, { user: this.user }, entity as Entity, "select");
             if (!authorized) {
                 return undefined;
             }
@@ -710,26 +713,26 @@ export class AuthenticatedMongoDriver implements DataDriver {
     listenEntity<M extends Record<string, any>>(props: ListenEntityProps<M>): () => void {
         const unsubscribe = this.delegate.listenEntity(props);
         const authContext = { userId: this.user.uid, roles: this.user.roles ?? [] };
-        const lastEntry = Array.from((this.delegate.getRealtimeService() as any).subscriptions.entries()).pop();
-        const lastSub = (lastEntry as any)?.[1] as Record<string, unknown> | undefined;
-        if (lastSub && lastSub.clientId === "driver") {
+        const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
+        const lastEntry = Array.from(subscriptions.entries()).pop();
+        const lastSub = lastEntry?.[1];
+        if (lastSub && lastSub.config.clientId === "driver") {
             lastSub.authContext = authContext;
         }
         return unsubscribe;
     }
 
     async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
-        const { collection: resolvedCollection } = (this.delegate as any).resolveCollectionCallbacks(props.collection, props.path);
-        const authController = { user: this.user } as unknown as AuthController;
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
         if (props.status === "existing" && props.entityId) {
             const existing = await this.delegate.fetchEntity({ path: props.path, entityId: props.entityId, collection: resolvedCollection });
-            if (!existing || !checkOperation(resolvedCollection as EntityCollection, authController, existing as Entity, "update")) {
+            if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "update")) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
             const tempEntity = { id: props.entityId || "new", path: props.path, values: props.values } as Entity;
-            if (!checkOperation(resolvedCollection as EntityCollection, authController, tempEntity, "insert")) {
+            if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, tempEntity, "insert")) {
                 throw ApiError.forbidden("Forbidden");
             }
         }
@@ -740,7 +743,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
         });
 
         // After save / withCheck rules verification
-        if (!checkOperation(resolvedCollection as EntityCollection, authController, saved as Entity, props.status === "existing" ? "update" : "insert")) {
+        if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, saved as Entity, props.status === "existing" ? "update" : "insert")) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -748,11 +751,10 @@ export class AuthenticatedMongoDriver implements DataDriver {
     }
 
     async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {
-        const { collection: resolvedCollection } = (this.delegate as any).resolveCollectionCallbacks(props.collection, props.entity.path);
-        const authController = { user: this.user } as unknown as AuthController;
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.entity.path);
 
         const existing = await this.delegate.fetchEntity({ path: props.entity.path, entityId: props.entity.id, collection: resolvedCollection });
-        if (!existing || !checkOperation(resolvedCollection as EntityCollection, authController, existing as Entity, "delete")) {
+        if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "delete")) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -774,7 +776,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
     }
 
     async countEntities<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
-        const { collection: resolvedCollection } = (this.delegate as any).resolveCollectionCallbacks(props.collection, props.path);
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const rlsFilter = buildMongoFilterFromSecurityRules(resolvedCollection, this.user, "select");
         if (rlsFilter === null) {
             return 0;
@@ -794,7 +796,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
         return originalService.countEntities(props.path, {
             ...props,
             rawQuery: combinedQuery
-        } as any);
+        });
     }
 
     isReady(): boolean {
@@ -930,11 +932,11 @@ function buildMongoFilterFromSecurityRules<M extends Record<string, any>>(
     user: User,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): Filter<Document> | null {
-    if (!collection || !(collection as any).securityRules || (collection as any).securityRules.length === 0) {
+    if (!collection || !collection.securityRules || collection.securityRules.length === 0) {
         return {};
     }
 
-    const applicableRules = ((collection as any).securityRules as SecurityRule[]).filter((r: SecurityRule) =>
+    const applicableRules = collection.securityRules.filter((r: SecurityRule) =>
         r.operation === targetOperation ||
         r.operation === "all" ||
         r.operations?.includes(targetOperation) ||

@@ -85,7 +85,7 @@ export function CollectionRelationsTab() {
                     <Button variant="filled" color="neutral" onClick={() => {
                         setEditingRelationIndex(-1);
                         setEditingRelationState({ relationName: "",
-target: "" as unknown as Relation["target"],
+target: "",
 cardinality: "many",
 direction: "owning" });
                     }}>
@@ -134,7 +134,7 @@ direction: "owning" });
                         <Button variant="text" onClick={() => {
                             setEditingRelationIndex(-1);
                             setEditingRelationState({ relationName: "",
-target: "" as unknown as Relation["target"],
+target: "",
 cardinality: "many",
 direction: "owning" });
                         }}>Create your first relation</Button>

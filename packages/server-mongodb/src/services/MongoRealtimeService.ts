@@ -146,7 +146,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                 entities = await authenticatedDriver.fetchCollection({
                     path: config.path,
                     collection: registryCollection,
-                    filter: config.filter as any,
+                    filter: config.filter as FilterValues<string> | undefined,
                     orderBy: config.orderBy,
                     order: config.order,
                     limit: config.limit,
@@ -398,7 +398,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                         startAfter: message.payload?.startAfter,
                         searchString: message.payload?.searchString,
                         authContext
-                    } as any,
+                    },
                     (entities) => {
                         ws.send(JSON.stringify({
                             type: "collection_update",
@@ -420,7 +420,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                         path: message.payload?.path,
                         entityId: message.payload?.entityId,
                         authContext
-                    } as any,
+                    },
                     (entity) => {
                         ws.send(JSON.stringify({
                             type: "entity_update",

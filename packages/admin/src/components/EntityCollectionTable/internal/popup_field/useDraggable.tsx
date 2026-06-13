@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect } from "react";
 
+/** Tracks events originating inside the inner (non-draggable) area. */
+const innerClicked = new WeakSet<MouseEvent>();
+
 interface DraggableProps {
     containerRef: React.RefObject<HTMLDivElement | null>,
     innerRef: React.RefObject<HTMLDivElement | null>,
@@ -22,7 +25,7 @@ export function useDraggable({
     const listeningRef = React.useRef(false);
 
     const onMouseDown = useCallback((event: MouseEvent) => {
-        if (event.button !== 0 || !containerRef.current || event.defaultPrevented || (event as MouseEvent & { innerClicked?: boolean }).innerClicked) {
+        if (event.button !== 0 || !containerRef.current || event.defaultPrevented || innerClicked.has(event)) {
             return;
         }
 
@@ -41,7 +44,7 @@ export function useDraggable({
     }, [containerRef, onMove]);
 
     const onMouseDownInner = useCallback((event: MouseEvent) => {
-        (event as MouseEvent & { innerClicked?: boolean }).innerClicked = true;
+        innerClicked.add(event);
     }, [])
 
     const onSelect = useCallback((event: Event) => {

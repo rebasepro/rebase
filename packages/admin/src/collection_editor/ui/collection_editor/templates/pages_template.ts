@@ -1,4 +1,4 @@
-import { EntityCollection } from "@rebasepro/types";
+import type { EntityCollection } from "@rebasepro/types";
 
 export const pagesCollectionTemplate = {
     slug: "pages",

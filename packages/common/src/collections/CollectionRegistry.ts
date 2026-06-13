@@ -305,7 +305,7 @@ export class CollectionRegistry {
             const relation = relations.find(r => r.relationName === name);
             if (relation) {
                 // we attach the resolved relation to the property
-                (relationProperty as RelationProperty & { relation?: Relation }).relation = relation;
+                relationProperty.relation = relation;
             } else {
                 console.warn(`Could not find relation for property '${key}' with relationName: ${name}`);
             }

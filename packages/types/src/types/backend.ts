@@ -1,5 +1,6 @@
 import type { Entity } from "./entities";
 import type { EntityCollection, FilterValues, WhereFilterOp } from "./collections";
+import type { AuthAdapter } from "./auth_adapter";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -281,6 +282,24 @@ export interface RealtimeProvider {
         entity: Entity | null,
         databaseId?: string
     ): Promise<void>;
+
+    /**
+     * Called when the HTTP server is ready and listening.
+     * Useful for providers that need the server address for callbacks.
+     */
+    onServerReady?(serverInfo: { port: number; hostname?: string }): void;
+
+    /**
+     * Gracefully shut down the realtime provider.
+     * Called during server shutdown to clean up resources.
+     */
+    destroy?(): Promise<void>;
+
+    /**
+     * Stop the internal LISTEN client (e.g., PostgreSQL LISTEN/NOTIFY).
+     * Called during graceful shutdown before closing database connections.
+     */
+    stopListening?(): Promise<void>;
 }
 
 // =============================================================================
@@ -639,6 +658,25 @@ export interface BackendBootstrapper {
     type: string;
 
     /**
+     * Unique identifier for this bootstrapper instance.
+     * Used to register the driver in the driver registry.
+     * Defaults to `type` if not set.
+     */
+    id?: string;
+
+    /**
+     * Whether this bootstrapper provides the default driver.
+     * When true, the coordinator uses this driver as the primary one.
+     */
+    isDefault?: boolean;
+
+    /**
+     * Run database migrations for this driver.
+     * Called by the coordinator after all drivers are initialized.
+     */
+    runMigrations?(config: unknown, driverResult: InitializedDriver): Promise<void>;
+
+    /**
      * Create a DataDriver from the given config.
      * This is the only **required** method.
      */
@@ -676,7 +714,7 @@ export interface BackendBootstrapper {
     /**
      * Initialize WebSocket server for realtime operations.
      */
-    initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown): Promise<void> | void;
+    initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter): Promise<void> | void;
 }
 
 /**

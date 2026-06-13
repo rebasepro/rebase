@@ -395,7 +395,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {
-        const b = bootstrapper as BackendBootstrapper & { id?: string; isDefault?: boolean };
+        const b = bootstrapper;
         logger.info("Running bootstrapper for driver", { driverId: b.id || bootstrapper.type });
         if (b.isDefault) {
             defaultDriverId = b.id || bootstrapper.type;
@@ -413,7 +413,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (bootstrapper.initializeRealtime) {
             const realtime = await bootstrapper.initializeRealtime({}, driverResult);
-            realtimeServices[b.id || bootstrapper.type] = realtime as RealtimeProvider;
+            if (realtime) {
+                realtimeServices[b.id || bootstrapper.type] = realtime;
+            }
         }
     }
 
@@ -424,9 +426,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (!defaultDriver || !defaultDriverResult) {
         throw new Error("Default driver not initialized by bootstrappers");
     }
-    const defaultBootstrapper = bootstrappers.find(b => (b as BackendBootstrapper & {
-        id?: string
-    }).id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
+    const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
 
     // 2. Initialize Auth & History via the default driver's bootstrapper
@@ -721,7 +721,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // maxFileSize (default 50MB), which overrides the global API body limit.
         const storageMaxSize = (
             config.storage && typeof config.storage === "object" && "type" in config.storage
-                ? (config.storage as BackendStorageConfig & { maxFileSize?: number }).maxFileSize
+                ? (config.storage as BackendStorageConfig).maxFileSize
                 : undefined
         ) ?? 50 * 1024 * 1024;
 
@@ -998,12 +998,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    if ((defaultBootstrapper as BackendBootstrapper & {
-        initializeWebsockets?: (...args: unknown[]) => unknown
-    }).initializeWebsockets) {
-        await (defaultBootstrapper as BackendBootstrapper & {
-            initializeWebsockets: (...args: unknown[]) => unknown
-        }).initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth, authAdapter);
+    if (defaultBootstrapper.initializeWebsockets && defaultRealtimeService) {
+        await defaultBootstrapper.initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth, authAdapter);
     }
 
     logger.info("Rebase Backend Initialized");
@@ -1061,15 +1057,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 //    timer callbacks don't fire against a closed pool.
                 for (const [key, rt] of Object.entries(realtimeServices)) {
                     try {
-                        const rtWithLifecycle = rt as RealtimeProvider & {
-                            destroy?: () => Promise<void>;
-                            stopListening?: () => Promise<void>
-                        };
-                        if (typeof rtWithLifecycle.destroy === "function") {
-                            await rtWithLifecycle.destroy();
+                        if (typeof rt.destroy === "function") {
+                            await rt.destroy();
                             logger.info(`Realtime service "${key}" destroyed`);
-                        } else if (typeof rtWithLifecycle.stopListening === "function") {
-                            await rtWithLifecycle.stopListening();
+                        } else if (typeof rt.stopListening === "function") {
+                            await rt.stopListening();
                             logger.info(`Realtime service "${key}" LISTEN client stopped`);
                         }
                     } catch (err) {
