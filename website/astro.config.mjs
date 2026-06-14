@@ -184,7 +184,8 @@ export default defineConfig({
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),
-                "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src")
+                "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src"),
+                "@firecms/neat": path.resolve(new URL(".", import.meta.url).pathname, "../../neat/lib/src")
             }
         },
         optimizeDeps: {
@@ -197,11 +198,11 @@ export default defineConfig({
             ]
         },
         ssr: {
-            noExternal: ["lucide-react"]
+            noExternal: ["lucide-react", "@firecms/neat"]
         },
         server: {
             fs: {
-                allow: [path.resolve(new URL(".", import.meta.url).pathname, ".."), path.resolve(new URL(".", import.meta.url).pathname, ".")]
+                allow: [path.resolve(new URL(".", import.meta.url).pathname, ".."), path.resolve(new URL(".", import.meta.url).pathname, "."), path.resolve(new URL(".", import.meta.url).pathname, "../../neat")]
             }
         }
     }

@@ -11,6 +11,7 @@ import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo';
 import RoadmapSection from '../../components/RoadmapSection.astro';
 import ABVariant from '../../components/ABVariant.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 
 
 import ClientLogos from '../../components/ClientLogos.astro';
@@ -28,12 +29,13 @@ const translatePath = useTranslatedPath(lang);
     <main class="flex flex-col">
 
         <!-- Hero -->
-        <section id="s-hero" class="relative isolate overflow-hidden bg-black pt-16 pb-24 sm:pt-20 sm:pb-28 lg:pt-24 lg:pb-32">
-            <!-- Background gradient top shape -->
-            <!-- Centered radial gradient glow -->
+        <section id="s-hero" class="relative isolate overflow-hidden bg-black -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
+            <!-- Animated WebGL gradient background (Neat - funky preset) -->
+            <NeatHeroBackground client:load />
+            <!-- Subtle radial glow over the gradient for text readability -->
             <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 45% 32% at 50% 35%, rgba(0, 112, 244, 0.18) 0%, rgba(0, 80, 200, 0.08) 45%, transparent 80%);"></div>
 
-            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+            <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
                 <!-- Badge -->
                 <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll fade-in">
                     <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400">
@@ -45,7 +47,7 @@ const translatePath = useTranslatedPath(lang);
                 <!-- Headline -->
                 <div class="relative">
                     <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 112, 244, 0.10) 0%, rgba(0, 80, 200, 0.05) 45%, transparent 75%); filter: blur(20px);"></div>
-                    <h1 class="relative mb-6 text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                    <h1 class="relative mb-6 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
                         {t('hero.title.part1')}<br/><span class="text-primary subtle-shimmer">{t('hero.title.part2')}</span>
                     </h1>
                 </div>
@@ -134,7 +136,7 @@ const translatePath = useTranslatedPath(lang);
                         <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
                             <!-- Glow effect behind terminal -->
                             <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500" aria-hidden="true" style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 0;"></div>
-                            
+
                             <div class="relative z-10 flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
                                 <div class="flex items-center gap-1.5">
                                     <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
@@ -142,7 +144,7 @@ const translatePath = useTranslatedPath(lang);
                                     <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                                 </div>
                                 <div class="text-[11px] font-mono font-medium text-surface-500 flex items-center gap-2">
-                                    
+
 <svg
   class="lucide lucide-terminal"
   xmlns="http://www.w3.org/2000/svg"
@@ -163,7 +165,7 @@ const translatePath = useTranslatedPath(lang);
                                 </div>
                                 <div class="w-12"></div> <!-- spacer -->
                             </div>
-                            
+
                             <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
                                 <div>
                                     <div class="flex gap-3 items-center justify-between">
@@ -172,7 +174,7 @@ const translatePath = useTranslatedPath(lang);
                                             <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                         </div>
                                         <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init" class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
-                                            
+
 <svg
   class="lucide lucide-copy"
   xmlns="http://www.w3.org/2000/svg"
@@ -193,7 +195,7 @@ const translatePath = useTranslatedPath(lang);
                                     </div>
                                     <div class="text-surface-500 text-xs mt-1 ml-6">{t('demo.init')}</div>
                                 </div>
-                                
+
                                 <div>
                                     <div class="flex gap-3 items-center justify-between">
                                         <div class="flex gap-3 items-center">
@@ -201,7 +203,7 @@ const translatePath = useTranslatedPath(lang);
                                             <span class="text-white">pnpm rebase introspect</span>
                                         </div>
                                         <button data-track-copy="demo-introspect" data-command="pnpm rebase introspect" class="copy-btn text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
-                                            
+
 <svg
   class="lucide lucide-copy"
   xmlns="http://www.w3.org/2000/svg"
@@ -222,7 +224,7 @@ const translatePath = useTranslatedPath(lang);
                                     </div>
                                     <div class="text-surface-500 text-xs mt-1 ml-6">{t('demo.pull')}</div>
                                 </div>
-                                
+
                                 <div>
                                     <div class="flex gap-3 items-center justify-between">
                                         <div class="flex gap-3 items-center">
@@ -230,7 +232,7 @@ const translatePath = useTranslatedPath(lang);
                                             <span class="text-white">pnpm dev</span>
                                         </div>
                                         <button data-track-copy="demo-dev" data-command="pnpm dev" class="copy-btn text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
-                                            
+
 <svg
   class="lucide lucide-copy"
   xmlns="http://www.w3.org/2000/svg"
@@ -292,7 +294,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                             <div class="relative z-10 flex items-start gap-4">
                                 <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-none ring-1 ring-primary/20">
-                                    
+
 <svg
   class="lucide lucide-database"
   xmlns="http://www.w3.org/2000/svg"
@@ -325,7 +327,7 @@ const translatePath = useTranslatedPath(lang);
                                                 <span class="h-2 w-2 rounded-full bg-emerald-400/80"></span>
                                             </div>
                                             <span class="text-[10px] font-medium text-surface-500 font-mono flex items-center gap-1.5">
-                                                
+
 <svg
   class="lucide lucide-terminal"
   xmlns="http://www.w3.org/2000/svg"
@@ -352,7 +354,7 @@ const translatePath = useTranslatedPath(lang);
                                                 <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                             </div>
                                             <button data-track-copy="how-it-works" data-command="pnpm dlx @rebasepro/cli init" class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
-                                                
+
 <svg
   class="lucide lucide-copy"
   xmlns="http://www.w3.org/2000/svg"
@@ -381,7 +383,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                             <div class="relative z-10 flex items-start gap-4">
                                 <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-none ring-1 ring-primary/20">
-                                    
+
 <svg
   class="lucide lucide-sparkles"
   xmlns="http://www.w3.org/2000/svg"
@@ -415,7 +417,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                             <div class="relative z-10 flex items-start gap-4">
                                 <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-none ring-1 ring-primary/20">
-                                    
+
 <svg
   class="lucide lucide-code"
   xmlns="http://www.w3.org/2000/svg"
@@ -514,7 +516,7 @@ const translatePath = useTranslatedPath(lang);
                         <div class="relative z-10 p-5">
                             <div class="flex items-center gap-2 mb-2">
                                 <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                    
+
 <svg
   class="lucide lucide-history"
   xmlns="http://www.w3.org/2000/svg"
@@ -569,7 +571,7 @@ const translatePath = useTranslatedPath(lang);
                         <div class="relative z-10 p-5">
                             <div class="flex items-center gap-2 mb-2">
                                 <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                    
+
 <svg
   class="lucide lucide-upload"
   xmlns="http://www.w3.org/2000/svg"
@@ -616,7 +618,7 @@ const translatePath = useTranslatedPath(lang);
                             <div>
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                        
+
 <svg
   class="lucide lucide-webhook"
   xmlns="http://www.w3.org/2000/svg"
@@ -693,7 +695,7 @@ const translatePath = useTranslatedPath(lang);
                         <div class="relative z-10 p-5">
                             <div class="flex items-center gap-2 mb-2">
                                 <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                    
+
 <svg
   class="lucide lucide-refresh-cw"
   xmlns="http://www.w3.org/2000/svg"
@@ -738,7 +740,7 @@ const translatePath = useTranslatedPath(lang);
                 <div class="absolute -bottom-40 left-1/3 w-[700px] h-[700px] rounded-full bg-primary/5 blur-3xl opacity-50"></div>
                 <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
             </div>
-            
+
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
                     <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t('ai.badge')}</p>
@@ -750,7 +752,7 @@ const translatePath = useTranslatedPath(lang);
 
                 <!-- Agent Infrastructure Feature Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100">
-                    
+
                     <!-- Vector Similarity Search -->
                     <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
@@ -947,7 +949,7 @@ const translatePath = useTranslatedPath(lang);
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="flex gap-4">
                                         <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
                                             <svg class="lucide lucide-video" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
@@ -985,7 +987,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="relative animate-on-scroll fade-in-up delay-100 flex items-center justify-center mt-12 lg:mt-0">
                                 <!-- Background glow -->
                                 <div class="absolute inset-0 bg-gradient-to-tr from-rose-500/20 to-primary/20 blur-3xl rounded-full opacity-50"></div>
-                                
+
                                 <div class="relative w-full max-w-lg">
                                     <!-- Top screenshot (App) -->
                                     <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-[-60px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
@@ -1077,7 +1079,7 @@ const translatePath = useTranslatedPath(lang);
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="flex gap-4">
                                         <div class="flex-shrink-0 mt-1 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
                                             <svg class="lucide lucide-table" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1124,7 +1126,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="relative animate-on-scroll fade-in-up delay-100 flex items-center justify-center mt-12 lg:mt-0">
                                 <!-- Background glow -->
                                 <div class="absolute inset-0 bg-gradient-to-tr from-primary/20 to-surface-800/20 blur-3xl rounded-full opacity-50"></div>
-                                
+
                                 <div class="relative w-full max-w-lg">
                                     <!-- Top screenshot (App) — with fake job listing rows -->
                                     <div class="relative z-20 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/80 backdrop-blur-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-[-60px] w-5/6 mr-auto transform transition-transform hover:-translate-y-2 duration-500">
@@ -1225,16 +1227,16 @@ const translatePath = useTranslatedPath(lang);
                     const slider = document.getElementById('case-studies-slider');
                     const prevBtn = document.getElementById('case-prev');
                     const nextBtn = document.getElementById('case-next');
-                    
+
                     if (slider && prevBtn && nextBtn) {
                         let currentSlide = 0;
                         const totalSlides = slider.children.length;
-                        
+
                         const goTo = (index: number) => {
                             currentSlide = Math.max(0, Math.min(index, totalSlides - 1));
                             slider.style.transform = `translateX(-${currentSlide * 100}%)`;
                         };
-                        
+
                         prevBtn.addEventListener('click', () => goTo(currentSlide - 1));
                         nextBtn.addEventListener('click', () => goTo(currentSlide + 1));
                     }
@@ -1258,7 +1260,7 @@ const translatePath = useTranslatedPath(lang);
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
                         <div class="relative z-10">
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
-                                
+
 <svg
   class="lucide lucide-shield-check"
   xmlns="http://www.w3.org/2000/svg"
@@ -1289,7 +1291,7 @@ const translatePath = useTranslatedPath(lang);
                             <a href={translatePath("/studio")}
                                class="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-primary transition-colors">
                                 {t('security.link')}
-                                
+
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"
@@ -1315,7 +1317,7 @@ const translatePath = useTranslatedPath(lang);
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%);"></div>
                         <div class="relative z-10">
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
-                                
+
 <svg
   class="lucide lucide-git-fork"
   xmlns="http://www.w3.org/2000/svg"
@@ -1348,7 +1350,7 @@ const translatePath = useTranslatedPath(lang);
                             <a href={translatePath("/developers")}
                                class="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-primary transition-colors">
                                 {t('opensource.link1')}
-                                
+
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"
@@ -1442,7 +1444,7 @@ const translatePath = useTranslatedPath(lang);
                                     <span class="h-2.5 w-2.5 rounded-full bg-emerald-400/80"></span>
                                 </div>
                                 <span class="text-[11px] font-medium text-surface-500 font-mono flex items-center gap-1.5">
-                                    
+
 <svg
   class="lucide lucide-terminal"
   xmlns="http://www.w3.org/2000/svg"
@@ -1469,7 +1471,7 @@ const translatePath = useTranslatedPath(lang);
                                     <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                 </div>
                                 <button data-track-copy="bottom-cta" data-command="pnpm dlx @rebasepro/cli init" class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors" aria-label="Copy command" title="Copy to clipboard">
-                                    
+
 <svg
   class="lucide lucide-copy"
   xmlns="http://www.w3.org/2000/svg"
@@ -1498,7 +1500,7 @@ const translatePath = useTranslatedPath(lang);
                        target="_blank" rel="noopener noreferrer"
                        class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
                         {t('cta.button.demo')}
-                        
+
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"
@@ -1521,7 +1523,7 @@ const translatePath = useTranslatedPath(lang);
                        id="cta-view-docs"
                        class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
                         {t('cta.button.docs')}
-                        
+
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"

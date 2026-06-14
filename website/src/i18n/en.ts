@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "One TypeScript Schema.",
   "hero.title.part2": "Admin, APIs, SDK — Instantly.",
   "hero.subtitle":
-    "Drop Rebase onto any PostgreSQL database—or define your model in TypeScript. Instantly get a beautiful spreadsheet-like Admin UI, instant REST/GraphQL APIs, and a type-safe SDK. 100% Open-source, self-hosted, and agent-native.",
+    "Point it at any Postgres — or define your model in TypeScript. Open-source, self-hosted, and agent-native.",
   "hero.category": "The open-source Postgres app platform — CMS, BaaS, and internal tools in one.",
   "hero.cta.demo": "Try the Demo",
   "hero.cta.github": "View on GitHub",
