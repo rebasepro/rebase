@@ -1,0 +1,29 @@
+---
+const { lang, t } = Astro.props;
+import InteractiveDemo from '../demos/InteractiveDemo';
+import SectionBackgroundAccents from '../SectionBackgroundAccents.astro';
+---
+
+<main class="bg-black text-white min-h-screen">
+    <!-- Hero Section -->
+    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40 lg:pb-16">
+        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+            <h1 class="mb-4 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans">
+                {t('demo.page.title')}
+            </h1>
+            <p class="mb-6 text-base leading-7 text-surface-300 lg:text-lg sm:px-16 xl:px-48">
+                {t('demo.page.subtitle')}
+            </p>
+        </div>
+        <SectionBackgroundAccents bottomLine={true}/>
+    </section>
+
+    <!-- Demo Section -->
+    <section class="bg-black pb-24 relative">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="relative">
+                <InteractiveDemo client:load />
+            </div>
+        </div>
+    </section>
+</main>

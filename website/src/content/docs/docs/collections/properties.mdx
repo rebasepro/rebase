@@ -1,0 +1,554 @@
+---
+title: Properties
+sidebar_label: Properties
+description: Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
+---
+
+import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
+
+## Overview
+
+Properties define the columns in your database table and how they are rendered in the admin UI. Each property has a `type` that determines:
+
+- The **database column type** (via Drizzle schema generation)
+- The **form field** component
+- The **table cell** renderer
+- The **validation** rules
+
+## Property Types
+
+| Type | Description | PostgreSQL Column |
+|------|-------------|-------------------|
+| `string` | Text, select, markdown, file upload, URL, email | `varchar`, `text`, `jsonb` |
+| `number` | Integer, decimal, currency | `integer`, `numeric`, `bigint`, `serial` |
+| `boolean` | True/false toggle | `boolean` |
+| `date` | Date, datetime, timestamp | `timestamp`, `date` |
+| `array` | Ordered list of values | `jsonb` |
+| `map` | Key-value object | `jsonb` |
+| `geopoint` | Latitude/longitude pair | `jsonb` |
+| `reference` | Embedded reference to another entity | `varchar` (stores ID) |
+| `relation` | SQL foreign key relation | Uses the `relations` array |
+
+## Common Properties
+
+All property types share these options:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `string` | **Required.** Data type (see above) |
+| `name` | `string` | **Required.** Display label |
+| `description` | `string` | Help text shown below the field |
+| `defaultValue` | `any` | Default value for new entities |
+| `validation` | `object` | Validation rules |
+| `propertyConfig` | `string` | Registered property config key |
+| `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
+| `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
+| `dynamicProps` | `function` | Dynamic property builder (see Conditional Fields) |
+| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions |
+
+### UI Configuration (`ui`)
+
+UI-related options are nested under the `ui` sub-object:
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    ui: {
+        readOnly: true,
+        columnWidth: 120,
+        hideFromCollection: false
+    }
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ui.readOnly` | `boolean` | Prevent editing |
+| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
+| `ui.hideFromCollection` | `boolean` | Hide from table view |
+| `ui.columnWidth` | `number` | Column width in pixels (table view) |
+| `ui.widthPercentage` | `number` | Field width as a percentage in the form view |
+| `ui.Field` | `React.ComponentType` | Custom field component |
+| `ui.Preview` | `React.ComponentType` | Custom table cell component |
+
+## String Properties
+
+The `string` type is the most versatile — depending on the options you set, it renders as different widgets.
+
+### Text field
+
+A basic single-line text input.
+
+```typescript
+name: {
+    type: "string",
+    name: "Name",
+    validation: { required: true, min: 2, max: 200 }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="text" />
+
+### Multiline text
+
+Set `multiline: true` to render as a textarea.
+
+```typescript
+description: {
+    type: "string",
+    name: "Description",
+    multiline: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multiline" />
+
+### Markdown editor
+
+Set `markdown: true` to render a full markdown editor with toolbar.
+
+```typescript
+body: {
+    type: "string",
+    name: "Blog text",
+    markdown: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="markdown" />
+
+### Email field
+
+Set `email: true` to add email format validation and render with an email icon.
+
+```typescript
+email: {
+    type: "string",
+    name: "User email",
+    email: true,
+    validation: { required: true }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="email" />
+
+### URL field
+
+Set `url: true` to add URL format validation and render with a link icon.
+
+```typescript
+website: {
+    type: "string",
+    name: "Amazon link",
+    url: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="url" />
+
+### File upload
+
+Set `storage` to render a file upload dropzone.
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+### Select (enum)
+
+Set `enum` to render a select dropdown. See the [Enum Values](#enum-values) section for details.
+
+```typescript
+category: {
+    type: "string",
+    name: "Category",
+    enum: [
+        { id: "electronics", label: "Electronics", color: "blueDark" },
+        { id: "clothing", label: "Clothing", color: "pinkLight" },
+    ]
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="select" />
+
+### Multi-select
+
+Set `enum` + `multiSelect: true` to allow picking multiple values.
+
+```typescript
+locales: {
+    type: "string",
+    name: "Available locales",
+    multiSelect: true,
+    enum: [
+        { id: "es", label: "Spanish", color: "pinkLight" },
+        { id: "en", label: "English", color: "blueLight" },
+        { id: "fr", label: "French", color: "purpleLight" },
+    ]
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_select" />
+
+### String Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `multiline` | `boolean` | Render as textarea |
+| `markdown` | `boolean` | Render as markdown editor |
+| `email` | `boolean` | Email format validation |
+| `url` | `boolean` | URL format validation |
+| `storage` | `StorageConfig` | Enable file upload |
+| `enum` | `EnumValues` | Render as select dropdown |
+| `multiSelect` | `boolean` | Allow multiple enum selections |
+| `columnType` | `string` | Database column: `"varchar"`, `"text"` |
+| `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
+| `userSelect` | `boolean` | Render as a user picker |
+| `previewAsTag` | `boolean` | Render this string as a tag in previews |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+
+## Number Properties
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    validation: { required: true, min: 0 }
+}
+
+quantity: {
+    type: "number",
+    name: "Quantity",
+    columnType: "integer"  // Store as integer
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="number" />
+
+Number fields render as a standard text input with numeric validation.
+
+### Number Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `enum` | `EnumValues` | Render as select with numeric values |
+| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `isId` | `string` | ID generation strategy |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+
+## Boolean Properties
+
+```typescript
+active: {
+    type: "boolean",
+    name: "Selectable",
+    defaultValue: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="boolean" />
+
+Booleans render as a toggle switch.
+
+## Date Properties
+
+### Date only
+
+Set `mode: "date"` to show a date picker without time.
+
+```typescript
+event_date: {
+    type: "date",
+    name: "Expiry date",
+    mode: "date"
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="date" />
+
+### Date and time
+
+The default mode `"date_time"` includes both date and time.
+
+```typescript
+arrival_time: {
+    type: "date",
+    name: "Arrival time",
+    mode: "date_time"
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="date_time" />
+
+### Auto timestamps
+
+Use `autoValue` to automatically set timestamps on create or update.
+
+```typescript
+created_at: {
+    type: "date",
+    name: "Created At",
+    autoValue: "on_create",
+    ui: { readOnly: true }
+}
+
+updated_at: {
+    type: "date",
+    name: "Updated At",
+    autoValue: "on_update"
+}
+```
+
+### Date Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
+| `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
+| `columnType` | `string` | `"timestamp"`, `"date"` |
+| `timezone` | `string` | Timezone string to evaluate the date in |
+| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+
+## Array Properties
+
+### Simple repeat
+
+Use `of` to define a repeatable list of items.
+
+```typescript
+tags: {
+    type: "array",
+    name: "Tags",
+    of: { type: "string" }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="repeat" />
+
+### Multi file upload
+
+Combine `of` with `storage` for a multi-file upload.
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+### Block editor
+
+Use `oneOf` to create a block editor with multiple content types. Each key creates a card type that users can pick from.
+
+```typescript
+content: {
+    type: "array",
+    name: "Content",
+    oneOf: {
+        properties: {
+            text: {
+                type: "map",
+                properties: {
+                    body: { type: "string", name: "Text", markdown: true }
+                }
+            },
+            image: {
+                type: "map",
+                properties: {
+                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
+                    caption: { type: "string", name: "Caption" }
+                }
+            }
+        }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="block" />
+
+### Array Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Property schema for array items |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
+| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `sortable` | `boolean` | Can elements be reordered (default: true) |
+| `canAddElements` | `boolean` | Can new elements be added (default: true) |
+
+## Map Properties
+
+### Group (structured)
+
+Use `properties` to define a structured object with named fields.
+
+```typescript
+address: {
+    type: "map",
+    name: "Address",
+    properties: {
+        street: { type: "string", name: "Street" },
+        zip: { type: "string", name: "Postal code" }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="group" />
+
+### Key-value (free-form)
+
+Set `keyValue: true` to render an arbitrary key-value pairs editor.
+
+```typescript
+metadata: {
+    type: "map",
+    name: "Key value",
+    keyValue: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="key_value" />
+
+### Map Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `properties` | `Properties` | Record of properties included in the map |
+| `propertiesOrder` | `string[]` | Ordered keys for rendering |
+| `previewProperties` | `string[]` | Which properties to show in the table preview |
+| `spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
+
+## Reference Properties
+
+References link to entities in another collection. They render as a preview card showing the referenced entity's details.
+
+```typescript
+client: {
+    type: "reference",
+    name: "Related client",
+    path: "clients",
+    previewProperties: ["first_name", "last_name", "email"]
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="reference" />
+
+## Enum Values
+
+Used with string or number properties to render selects:
+
+```typescript
+// Simple array
+enum: ["draft", "published", "archived"]
+
+// With labels
+enum: [
+    { id: "draft", label: "Draft" },
+    { id: "published", label: "Published" },
+    { id: "archived", label: "Archived" }
+]
+
+// With colors (for Kanban columns and chips)
+enum: [
+    { id: "draft", label: "Draft", color: "grayDark" },
+    { id: "published", label: "Published", color: "greenDark" },
+    { id: "archived", label: "Archived", color: "orangeDark" }
+]
+```
+
+## Validation
+
+```typescript
+validation: {
+    required: true,             // Field is required
+    unique: true,               // Must be unique in the table
+    requiredMessage: "Custom error message",
+
+    // String-specific
+    min: 2,                     // Minimum length
+    max: 200,                   // Maximum length
+    matches: /^[a-z]+$/,       // Regex pattern
+    email: true,                // Email format
+    url: true,                  // URL format
+
+    // Number-specific
+    min: 0,                     // Minimum value
+    max: 1000,                  // Maximum value
+    integer: true,              // Must be integer
+
+    // Array-specific
+    min: 1,                     // Minimum items
+    max: 10,                    // Maximum items
+}
+```
+
+## Conditional Fields
+
+You can make fields dynamic so they react to the entity's values. There are two ways to do this:
+
+### 1. JSON Logic Conditions (Declarative)
+
+You can use the `conditions` property to define declarative JSON Logic rules that can be serialized and modified visually in the collection editor.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    conditions: {
+        disabled: { "==": [{ "var": "values.is_free" }, true] },
+        required: { "!=": [{ "var": "values.is_free" }, true] },
+        min: 0,
+        clearOnDisabled: true // Set to null if field gets disabled
+    }
+}
+```
+
+The conditions object gives you access to:
+- `disabled`, `hidden`, `readOnly`
+- `required`, `min`, `max`
+- `defaultValue`
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
+- `referencePath`, `referenceFilter`
+- `canAddElements`, `sortable` (for arrays)
+
+### 2. Property Builders (Programmatic)
+
+For complex behavior that can't be expressed via JSON Logic, you can use `dynamicProps` which evaluates a Javascript function.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    dynamicProps: ({ values, user }) => ({
+        disabled: values.is_free === true || !user.roles.includes("admin"),
+        validation: values.is_free ? {} : { required: true, min: 0 }
+    })
+}
+```
+
+## Next Steps
+
+- **[Relations](/docs/collections/relations)** — Foreign keys and joins
+- **[Security Rules](/docs/collections/security-rules)** — Row Level Security
+- **[Custom Fields](/docs/frontend/custom-fields)** — Build custom field components

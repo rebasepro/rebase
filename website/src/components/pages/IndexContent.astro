@@ -10,8 +10,8 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
 import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo';
 import RoadmapSection from '../../components/RoadmapSection.astro';
-import ABVariant from '../../components/ABVariant.astro';
 import { NeatHeroBackground } from '../../components/NeatHeroBackground';
+import { NeatSectionDivider } from '../../components/NeatSectionDivider';
 
 
 import ClientLogos from '../../components/ClientLogos.astro';
@@ -113,7 +113,7 @@ const translatePath = useTranslatedPath(lang);
         </section>
 
         <!-- Social proof -->
-        <section id="s-social-proof" class="bg-black py-20 sm:py-28">
+        <section id="s-social-proof" class="relative z-0 bg-black py-20 sm:py-28">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <p class="text-center text-sm text-surface-500 mb-8 animate-on-scroll fade-in">{t('social.title')}</p>
                 <ClientLogos />
@@ -122,7 +122,7 @@ const translatePath = useTranslatedPath(lang);
 
 
         <!-- Product demo -->
-        <section id="s-demo-terminal" class="bg-black border-b border-surface-900 relative pt-32 pb-40 sm:pt-48 sm:pb-56">
+        <section id="s-demo-terminal" class="relative z-0 bg-black border-b border-surface-900 pt-32 pb-40 sm:pt-48 sm:pb-56">
             <!-- subtle separator line -->
             <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-surface-700/40 to-transparent"></div>
 
@@ -260,8 +260,13 @@ const translatePath = useTranslatedPath(lang);
             </div>
         </section>
 
+        <!-- Neat gradient divider -->
+        <div class="relative -my-48 z-10 pointer-events-none" style="height: 700px;">
+            <NeatSectionDivider variant="a" client:visible />
+        </div>
 
-        <section id="s-demo-carousel" class="bg-black relative py-24 sm:py-32">
+
+        <section id="s-demo-carousel" class="relative z-0 bg-black py-24 sm:py-32">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
                 <div style="min-height: 700px;">
@@ -276,8 +281,9 @@ const translatePath = useTranslatedPath(lang);
 
 
 
+
         <!-- How it works -->
-        <section id="s-how-it-works" class="relative py-28 sm:py-36 overflow-hidden bg-black">
+        <section id="s-how-it-works" class="relative z-0 py-28 sm:py-36 overflow-hidden bg-black">
             <div class="mx-auto max-w-7xl px-6 lg:px-12">
                 <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
                     <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">{t('howitworks.badge')}</h2>
@@ -462,7 +468,7 @@ const translatePath = useTranslatedPath(lang);
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
                     <!-- TypeScript SDK -->
-                    <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -494,7 +500,7 @@ const translatePath = useTranslatedPath(lang);
                     </div>
 
                     <!-- Data history & audit -->
-                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
+                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -545,7 +551,7 @@ const translatePath = useTranslatedPath(lang);
                     </div>
 
                     <!-- Import & export -->
-                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
+                    <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -600,7 +606,7 @@ const translatePath = useTranslatedPath(lang);
                     </div>
 
                     <!-- Instant REST & GraphQL -->
-                    <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
+                    <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -649,7 +655,7 @@ const translatePath = useTranslatedPath(lang);
                     </div>
 
                     <!-- Extreme Customization -->
-                    <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
+                    <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -678,7 +684,7 @@ const translatePath = useTranslatedPath(lang);
                     </div>
 
                     <!-- Real-time everywhere -->
-                    <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-300">
+                    <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-300">
                         <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                         <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                             <!-- Window controls -->
@@ -728,7 +734,12 @@ const translatePath = useTranslatedPath(lang);
             </div>
         </section>
 
-        <div id="s-collection-power">
+        <!-- Neat gradient divider -->
+        <div class="relative -my-48 z-10 pointer-events-none" style="height: 700px;">
+            <NeatSectionDivider variant="b" client:visible />
+        </div>
+
+        <div id="s-collection-power" class="relative z-0">
             <!-- One Collection. Everything. -->
             <CollectionPowerSection/>
         </div>

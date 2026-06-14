@@ -1,0 +1,554 @@
+---
+title: Propriedades
+sidebar_label: Propriedades
+description: Os tipos de propriedades definem o tipo de dado, validação e renderização da UI para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
+---
+
+import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
+
+## Visão Geral
+
+As propriedades definem as colunas na sua tabela de banco de dados e como elas são renderizadas na UI de administração. Cada propriedade tem um `type` que determina:
+
+- O **tipo de coluna do banco de dados** (via geração de esquema Drizzle)
+- O componente de **campo de formulário**
+- O renderizador de **célula de tabela**
+- As regras de **validação**
+
+## Tipos de Propriedade
+
+| Tipo | Descrição | Coluna PostgreSQL |
+|------|-------------|-------------------|
+| `string` | Texto, seleção, markdown, upload de arquivo, URL, e-mail | `varchar`, `text`, `jsonb` |
+| `number` | Inteiro, decimal, moeda | `integer`, `numeric`, `bigint`, `serial` |
+| `boolean` | Alternador verdadeiro/falso | `boolean` |
+| `date` | Data, data/hora, timestamp | `timestamp`, `date` |
+| `array` | Lista ordenada de valores | `jsonb` |
+| `map` | Objeto chave-valor | `jsonb` |
+| `geopoint` | Par latitude/longitude | `jsonb` |
+| `reference` | Referência incorporada a outra entidade | `varchar` (armazena ID) |
+| `relation` | Relação de chave estrangeira SQL | Usa o array `relations` |
+
+## Propriedades Comuns
+
+Todos os tipos de propriedades compartilham estas opções:
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `type` | `string` | **Obrigatório.** Tipo de dado (veja acima) |
+| `name` | `string` | **Obrigatório.** Rótulo de exibição |
+| `description` | `string` | Texto de ajuda exibido abaixo do campo |
+| `defaultValue` | `any` | Valor padrão para novas entidades |
+| `validation` | `object` | Regras de validação |
+| `propertyConfig` | `string` | Chave de configuração de propriedade registrada |
+| `columnName` | `string` | Nome explícito da coluna do banco de dados (ignora conversão para snake_case) |
+| `callbacks` | `PropertyCallbacks` | Hooks para transformações `afterRead` e `beforeSave` |
+| `dynamicProps` | `function` | Construtor de propriedades dinâmicas (ver Campos Condicionais) |
+| `conditions` | `PropertyConditions` | Condições declarativas com JSON Logic |
+
+### Configuração de UI (`ui`)
+
+As opções relacionadas à UI são aninhadas sob o sub-objeto `ui`:
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    ui: {
+        readOnly: true,
+        columnWidth: 120,
+        hideFromCollection: false
+    }
+}
+```
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `ui.readOnly` | `boolean` | Impedir edição |
+| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Desabilitar com tooltip opcional |
+| `ui.hideFromCollection` | `boolean` | Ocultar da visualização de tabela |
+| `ui.columnWidth` | `number` | Largura da coluna em pixels (visualização de tabela) |
+| `ui.widthPercentage` | `number` | Largura do campo como porcentagem na visualização de formulário |
+| `ui.Field` | `React.ComponentType` | Componente de campo personalizado |
+| `ui.Preview` | `React.ComponentType` | Componente de célula de tabela personalizado |
+
+## Propriedades de String
+
+O tipo `string` é o mais versátil — dependendo das opções que você configurar, ele é renderizado como diferentes widgets.
+
+### Campo de texto
+
+Um campo de texto básico de uma única linha.
+
+```typescript
+name: {
+    type: "string",
+    name: "Name",
+    validation: { required: true, min: 2, max: 200 }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="text" />
+
+### Texto multilinha
+
+Configure `multiline: true` para renderizar como um textarea.
+
+```typescript
+description: {
+    type: "string",
+    name: "Description",
+    multiline: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multiline" />
+
+### Editor Markdown
+
+Configure `markdown: true` para renderizar um editor de markdown completo com barra de ferramentas.
+
+```typescript
+body: {
+    type: "string",
+    name: "Blog text",
+    markdown: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="markdown" />
+
+### Campo de e-mail
+
+Configure `email: true` para adicionar validação de formato de e-mail e renderizar com um ícone de e-mail.
+
+```typescript
+email: {
+    type: "string",
+    name: "User email",
+    email: true,
+    validation: { required: true }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="email" />
+
+### Campo de URL
+
+Configure `url: true` para adicionar validação de formato de URL e renderizar com um ícone de link.
+
+```typescript
+website: {
+    type: "string",
+    name: "Amazon link",
+    url: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="url" />
+
+### Upload de arquivo
+
+Configure `storage` para renderizar uma zona de upload de arquivo.
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+### Seleção (enum)
+
+Configure `enum` para renderizar um menu suspenso. Consulte a seção [Valores de Enum](#valores-de-enum) para detalhes.
+
+```typescript
+category: {
+    type: "string",
+    name: "Category",
+    enum: [
+        { id: "electronics", label: "Electronics", color: "blueDark" },
+        { id: "clothing", label: "Clothing", color: "pinkLight" },
+    ]
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="select" />
+
+### Seleção múltipla
+
+Configure `enum` + `multiSelect: true` para permitir a seleção de múltiplos valores.
+
+```typescript
+locales: {
+    type: "string",
+    name: "Available locales",
+    multiSelect: true,
+    enum: [
+        { id: "es", label: "Spanish", color: "pinkLight" },
+        { id: "en", label: "English", color: "blueLight" },
+        { id: "fr", label: "French", color: "purpleLight" },
+    ]
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_select" />
+
+### Opções de String
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `multiline` | `boolean` | Renderizar como textarea |
+| `markdown` | `boolean` | Renderizar como editor de markdown |
+| `email` | `boolean` | Validação de formato de e-mail |
+| `url` | `boolean` | Validação de formato de URL |
+| `storage` | `StorageConfig` | Habilitar upload de arquivo |
+| `enum` | `EnumValues` | Renderizar como seletor dropdown |
+| `multiSelect` | `boolean` | Permitir múltiplas seleções de enum |
+| `columnType` | `string` | Coluna de banco de dados: `"varchar"`, `"text"` |
+| `isId` | `string` | Geração de ID: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
+| `userSelect` | `boolean` | Renderizar como um seletor de usuário |
+| `previewAsTag` | `boolean` | Renderizar esta string como uma tag nas pré-visualizações |
+| `clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
+
+## Propriedades Numéricas
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    validation: { required: true, min: 0 }
+}
+
+quantity: {
+    type: "number",
+    name: "Quantity",
+    columnType: "integer"  // Armazenar como inteiro
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="number" />
+
+Campos numéricos são renderizados como um campo de texto padrão com validação numérica.
+
+### Opções Numéricas
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `enum` | `EnumValues` | Renderizar como seletor com valores numéricos |
+| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `isId` | `string` | Estratégia de geração de ID |
+| `clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
+
+## Propriedades Booleanas
+
+```typescript
+active: {
+    type: "boolean",
+    name: "Selectable",
+    defaultValue: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="boolean" />
+
+Campos booleanos são renderizados como um interruptor de alternância.
+
+## Propriedades de Data
+
+### Apenas data
+
+Configure `mode: "date"` para mostrar um seletor de data sem hora.
+
+```typescript
+event_date: {
+    type: "date",
+    name: "Expiry date",
+    mode: "date"
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="date" />
+
+### Data e hora
+
+O modo padrão `"date_time"` inclui tanto data quanto hora.
+
+```typescript
+arrival_time: {
+    type: "date",
+    name: "Arrival time",
+    mode: "date_time"
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="date_time" />
+
+### Timestamps automáticos
+
+Use `autoValue` para definir timestamps automaticamente ao criar ou atualizar.
+
+```typescript
+created_at: {
+    type: "date",
+    name: "Created At",
+    autoValue: "on_create",
+    ui: { readOnly: true }
+}
+
+updated_at: {
+    type: "date",
+    name: "Updated At",
+    autoValue: "on_update"
+}
+```
+
+### Opções de Data
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `mode` | `"date" \| "date_time"` | Apenas data ou data + hora (padrão: `"date_time"`) |
+| `autoValue` | `"on_create" \| "on_update"` | Definir timestamps automaticamente |
+| `columnType` | `string` | `"timestamp"`, `"date"` |
+| `timezone` | `string` | String de fuso horário para avaliar a data |
+| `clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
+
+## Propriedades de Array
+
+### Repetição simples
+
+Use `of` para definir uma lista repetível de itens.
+
+```typescript
+tags: {
+    type: "array",
+    name: "Tags",
+    of: { type: "string" }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="repeat" />
+
+### Upload de múltiplos arquivos
+
+Combine `of` com `storage` para um upload de múltiplos arquivos.
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+### Editor de blocos
+
+Use `oneOf` para criar um editor de blocos com múltiplos tipos de conteúdo. Cada chave cria um tipo de cartão que os usuários podem selecionar.
+
+```typescript
+content: {
+    type: "array",
+    name: "Content",
+    oneOf: {
+        properties: {
+            text: {
+                type: "map",
+                properties: {
+                    body: { type: "string", name: "Text", markdown: true }
+                }
+            },
+            image: {
+                type: "map",
+                properties: {
+                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
+                    caption: { type: "string", name: "Caption" }
+                }
+            }
+        }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="block" />
+
+### Opções de Array
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Esquema de propriedade para itens do array |
+| `oneOf` | `object` | Array de objetos tipados com múltiplos tipos discriminadores |
+| `expanded` | `boolean` | O campo deve ser inicialmente expandido? (padrão: true) |
+| `minimalistView` | `boolean` | Exibir propriedades filhas diretamente sem painel extensível |
+| `sortable` | `boolean` | Os elementos podem ser reordenados? (padrão: true) |
+| `canAddElements` | `boolean` | Novos elementos podem ser adicionados? (padrão: true) |
+
+## Propriedades de Mapa
+
+### Grupo (estruturado)
+
+Use `properties` para definir um objeto estruturado com campos nomeados.
+
+```typescript
+address: {
+    type: "map",
+    name: "Address",
+    properties: {
+        street: { type: "string", name: "Street" },
+        zip: { type: "string", name: "Postal code" }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="group" />
+
+### Chave-valor (livre)
+
+Configure `keyValue: true` para renderizar um editor de pares chave-valor arbitrários.
+
+```typescript
+metadata: {
+    type: "map",
+    name: "Key value",
+    keyValue: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="key_value" />
+
+### Opções de Mapa
+
+| Propriedade | Tipo | Descrição |
+|----------|------|-------------|
+| `properties` | `Properties` | Registro de propriedades incluídas no mapa |
+| `propertiesOrder` | `string[]` | Chaves ordenadas para renderização |
+| `previewProperties` | `string[]` | Quais propriedades mostrar na pré-visualização da tabela |
+| `spreadChildren` | `boolean` | Renderizar propriedades filhas como colunas separadas na visualização de tabela |
+| `minimalistView` | `boolean` | Exibir propriedades sem um painel de envoltório |
+| `expanded` | `boolean` | O campo deve ser inicialmente expandido? (padrão: true) |
+| `keyValue` | `boolean` | Renderizar como editor de pares chave-valor arbitrários |
+
+## Propriedades de Referência
+
+As referências linkam a entidades em outra coleção. Elas são renderizadas como um cartão de pré-visualização mostrando os detalhes da entidade referenciada.
+
+```typescript
+client: {
+    type: "reference",
+    name: "Related client",
+    path: "clients",
+    previewProperties: ["first_name", "last_name", "email"]
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="reference" />
+
+## Valores de Enum
+
+Usado com propriedades de string ou numéricas para renderizar seleções:
+
+```typescript
+// Array simples
+enum: ["draft", "published", "archived"]
+
+// Com rótulos
+enum: [
+    { id: "draft", label: "Draft" },
+    { id: "published", label: "Published" },
+    { id: "archived", label: "Archived" }
+]
+
+// Com cores (para colunas Kanban e chips)
+enum: [
+    { id: "draft", label: "Draft", color: "grayDark" },
+    { id: "published", label: "Published", color: "greenDark" },
+    { id: "archived", label: "Archived", color: "orangeDark" }
+]
+```
+
+## Validação
+
+```typescript
+validation: {
+    required: true,             // Campo obrigatório
+    unique: true,               // Deve ser único na tabela
+    requiredMessage: "Custom error message",
+
+    // Específico para strings
+    min: 2,                     // Comprimento mínimo
+    max: 200,                   // Comprimento máximo
+    matches: /^[a-z]+$/,       // Padrão regex
+    email: true,                // Formato de e-mail
+    url: true,                  // Formato de URL
+
+    // Específico para números
+    min: 0,                     // Valor mínimo
+    max: 1000,                  // Valor máximo
+    integer: true,              // Deve ser inteiro
+
+    // Específico para arrays
+    min: 1,                     // Número mínimo de itens
+    max: 10,                    // Número máximo de itens
+}
+```
+
+## Campos Condicionais
+
+Você pode tornar os campos dinâmicos para que reajam aos valores da entidade. Existem duas maneiras de fazer isso:
+
+### 1. Condições JSON Logic (Declarativas)
+
+Você pode usar a propriedade `conditions` para definir regras JSON Logic declarativas que podem ser serializadas e modificadas visualmente no editor de coleção.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    conditions: {
+        disabled: { "==": [{ "var": "values.is_free" }, true] },
+        required: { "!=": [{ "var": "values.is_free" }, true] },
+        min: 0,
+        clearOnDisabled: true // Definir como null se o campo for desabilitado
+    }
+}
+```
+
+O objeto conditions dá acesso a:
+- `disabled`, `hidden`, `readOnly`
+- `required`, `min`, `max`
+- `defaultValue`
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
+- `referencePath`, `referenceFilter`
+- `canAddElements`, `sortable` (para arrays)
+
+### 2. Construtores de Propriedades (Programáticos)
+
+Para comportamentos complexos que não podem ser expressos via JSON Logic, você pode usar `dynamicProps`, que avalia uma função Javascript.
+
+```typescript
+price: {
+    type: "number",
+    name: "Price",
+    dynamicProps: ({ values, user }) => ({
+        disabled: values.is_free === true || !user.roles.includes("admin"),
+        validation: values.is_free ? {} : { required: true, min: 0 }
+    })
+}
+```
+
+## Próximos Passos
+
+- **[Relações](/docs/collections/relations)** — Chaves estrangeiras e junções
+- **[Regras de Segurança](/docs/collections/security-rules)** — Segurança em Nível de Linha
+- **[Campos Personalizados](/docs/frontend/custom-fields)** — Construir componentes de campo personalizados

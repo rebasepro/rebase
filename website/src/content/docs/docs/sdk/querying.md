@@ -1,0 +1,302 @@
+---
+title: Querying Data
+sidebar_label: Querying Data
+description: CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
+---
+
+## Accessing Collections
+
+Access any collection through `client.data.<collectionName>` (camelCase, auto-converted to snake_case) or `client.data.collection("slug")` (explicit slug):
+
+```typescript
+// Property-style access (camelCase → snake_case slug)
+client.data.blogPosts       // → slug "blog_posts"
+client.data.users           // → slug "users"
+
+// Dynamic access by slug
+client.data.collection("blog_posts")
+```
+
+## CRUD Operations
+
+### Find (List)
+
+```typescript
+// All products (default limit: 20)
+const { data, meta } = await client.data.products.find();
+
+// With pagination, filtering, and sorting
+const { data, meta } = await client.data.products.find({
+    where: { active: true, price: [">=", 100] },
+    orderBy: "created_at:desc",
+    limit: 25,
+    offset: 0
+});
+
+// data is Entity<M>[]  — each item has { id, values, path }
+// meta has { total, limit, offset, hasMore }
+```
+
+### Find by ID
+
+```typescript
+const product = await client.data.products.findById(42);
+// Returns Entity<M> | undefined
+```
+
+### Create
+
+```typescript
+const newProduct = await client.data.products.create({
+    name: "New Product",
+    price: 29.99,
+    active: true
+});
+
+// With a specific ID
+const newProduct = await client.data.products.create(
+    { name: "Custom ID Product" },
+    "my-custom-id"
+);
+```
+
+### Update
+
+```typescript
+const updated = await client.data.products.update(42, {
+    name: "Updated Name",
+    price: 39.99
+});
+```
+
+### Delete
+
+```typescript
+await client.data.products.delete(42);
+```
+
+### Count
+
+```typescript
+const total = await client.data.products.count();
+
+// With filters
+const activeCount = await client.data.products.count({
+    where: { active: true }
+});
+```
+
+## Fluent Query Builder
+
+Chain methods for more expressive queries:
+
+```typescript
+const { data } = await client.data.products
+    .where("price", ">=", 100)
+    .where("active", "==", true)
+    .orderBy("created_at", "desc")
+    .limit(10)
+    .find();
+```
+
+### Available Methods
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
+| `.orderBy(field, dir)` | Sort results | `.orderBy("name", "asc")` |
+| `.limit(n)` | Limit result count | `.limit(25)` |
+| `.offset(n)` | Skip first N results | `.offset(50)` |
+| `.search(text)` | Full-text search | `.search("laptop")` |
+| `.include(...relations)` | Include related entities | `.include("author", "tags")` |
+| `.find()` | Execute the query | Returns `FindResponse<M>` |
+| `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
+
+### Filter Operators
+
+| Operator | Alias | Description |
+|----------|-------|-------------|
+| `"=="` | `"eq"` | Equal |
+| `"!="` | `"neq"` | Not equal |
+| `">"` | `"gt"` | Greater than |
+| `">="` | `"gte"` | Greater than or equal |
+| `"<"` | `"lt"` | Less than |
+| `"<="` | `"lte"` | Less than or equal |
+| `"in"` | | Value in array |
+| `"not-in"` | `"nin"` | Value not in array |
+| `"array-contains"` | `"cs"` | Array field contains value |
+| `"array-contains-any"` | `"csa"` | Array field contains any of values |
+
+### Where Clause Syntaxes
+
+The `where` parameter in `find()` supports three formats:
+
+```typescript
+// 1. Equality shorthand — raw JS values
+await client.data.products.find({
+    where: { status: "active", featured: true }
+});
+
+// 2. Tuple syntax — [operator, value]
+await client.data.products.find({
+    where: {
+        price: [">=", 100],
+        category: ["in", ["electronics", "gadgets"]],
+        deleted_at: ["!=", null]
+    }
+});
+
+// 3. PostgREST string syntax
+await client.data.products.find({
+    where: { status: "eq.published", price: "gte.100" }
+});
+```
+
+## Pagination
+
+```typescript
+// Offset-based pagination
+const page1 = await client.data.products.find({ limit: 20, offset: 0 });
+const page2 = await client.data.products.find({ limit: 20, offset: 20 });
+
+// Check if more pages exist
+if (page1.meta.hasMore) {
+    // fetch next page
+}
+
+// Page-number pagination (1-indexed)
+const page = await client.data.products.find({ page: 2, limit: 20 });
+```
+
+## Sorting
+
+```typescript
+// Sort by field (format: "field:direction")
+const { data } = await client.data.products.find({
+    orderBy: "created_at:desc"
+});
+
+// Fluent style
+const { data } = await client.data.products
+    .orderBy("price", "asc")
+    .find();
+```
+
+## Full-Text Search
+
+```typescript
+// Via find params
+const { data } = await client.data.products.find({
+    searchString: "wireless headphones"
+});
+
+// Fluent style
+const { data } = await client.data.products
+    .search("wireless headphones")
+    .limit(10)
+    .find();
+```
+
+## Fetching Relations
+
+Relations can be included so that related entities are returned alongside the primary data, instead of just their foreign key IDs.
+
+### Using `include()` (Fluent)
+
+```typescript
+// Include specific relations
+const { data } = await client.data.posts
+    .include("author", "categories")
+    .find();
+
+// Include all defined relations
+const { data } = await client.data.posts
+    .include("*")
+    .find();
+```
+
+### Using `find({ include })` (Params)
+
+```typescript
+const { data } = await client.data.posts.find({
+    include: ["author", "categories"]
+});
+```
+
+### Combining with Filters
+
+```typescript
+const { data } = await client.data.posts
+    .where("status", "==", "published")
+    .include("author")
+    .orderBy("published_at", "desc")
+    .limit(10)
+    .find();
+```
+
+### Reading Relation Data
+
+When relations are included, the response contains **both** the scalar foreign key and the hydrated relation object:
+
+```typescript
+const { data } = await client.data.posts
+    .include("author")
+    .find();
+
+for (const post of data) {
+    // Scalar foreign key — always present
+    console.log(post.values.author_id);    // "uuid-1234"
+
+    // Hydrated relation — present when included
+    console.log(post.values.author?.name); // "Jane Doe"
+}
+```
+
+> **Note:** Without `.include("author")`, only the scalar `author_id` field is returned. The hydrated `author` object will be `undefined`.
+
+### Relation Names
+
+The relation names you pass to `include()` must match the `relationName` defined in the collection's `relations` array:
+
+```typescript
+// Collection definition
+relations: [
+    { relationName: "author", target: () => usersCollection, ... },
+    { relationName: "categories", target: () => categoriesCollection, ... }
+]
+
+// SDK usage — names must match
+client.data.articles.include("author", "categories").find()
+```
+
+## Custom Endpoints
+
+Call custom server endpoints registered via the functions system:
+
+```typescript
+// Using client.functions.invoke()
+const result = await client.functions.invoke<{ summary: string }>(
+    "generate-summary",
+    { articleId: 42 }
+);
+
+// With options
+const result = await client.functions.invoke<{ status: string }>(
+    "process-order",
+    { orderId: 123 },
+    { method: "POST", path: "status/check" }
+);
+
+// Legacy shorthand via client.call()
+const result = await client.call<{ summary: string }>(
+    "generate-summary",
+    { articleId: 42 }
+);
+```
+
+## Next Steps
+
+- **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
+- **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
+- **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
+- **[Relations](/docs/collections/relations)** — Define relations between collections
