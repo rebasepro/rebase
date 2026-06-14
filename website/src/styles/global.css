@@ -287,3 +287,6 @@ h6 {
     }
 }
 
+a[href="https://neat.firecms.co"] {
+    display: none !important;
+}

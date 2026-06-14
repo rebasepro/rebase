@@ -9,8 +9,8 @@ const VARIANTS: Record<string, Partial<NeatConfig>> = {
         textureSeed: 217,
         planeBend: 0.2,
         planeTwist: 0.8,
-        cameraX: 29.5,
-        cameraY: 1.5,
+        cameraX: 25.5,
+        cameraY: 10.5,
         cameraRotationX: 0.61,
         cameraRotationY: 0.483,
         cameraZoom: 2.05,
@@ -45,7 +45,7 @@ export function NeatSectionDivider({ variant = "a" }: { variant?: "a" | "b" }) {
 
         const baseOffset = config.yOffset ?? 12000;
         const handleScroll = () => {
-            neat.yOffset = baseOffset + window.scrollY * 0.15;
+            neat.yOffset = baseOffset + window.scrollY * 0.3;
         };
         window.addEventListener("scroll", handleScroll, { passive: true });
 
