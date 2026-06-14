@@ -83,3 +83,9 @@ app/uploads/
 /eslint_report.json
 /scratch/
 /test-cli-init-project/
+
+# Test results
+test-results/
+
+# Backend scratch files
+app/backend/scratch/
