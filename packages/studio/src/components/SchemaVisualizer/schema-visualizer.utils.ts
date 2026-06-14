@@ -4,9 +4,9 @@ import type { Node, Edge } from "@xyflow/react";
 // ─── Layout Constants ─────────────────────────────────────────────────
 export const NODE_WIDTH = 280;
 /** Header with a single line of text (junction tables or tableName === collectionName). */
-export const HEADER_HEIGHT_SINGLE = 33;
+const HEADER_HEIGHT_SINGLE = 33;
 /** Header with two lines (name + subtitle when collectionName !== tableName). */
-export const HEADER_HEIGHT_DOUBLE = 47;
+const HEADER_HEIGHT_DOUBLE = 47;
 const ROW_HEIGHT = 28; // height per column row
 
 /**
@@ -26,7 +26,7 @@ export const getHeaderHeight = (opts: {
 /**
  * Estimate the pixel height of a table node based on column count.
  */
-export const estimateNodeHeight = (columnCount: number, headerHeight: number = HEADER_HEIGHT_DOUBLE): number =>
+const estimateNodeHeight = (columnCount: number, headerHeight: number = HEADER_HEIGHT_DOUBLE): number =>
     headerHeight + Math.max(columnCount, 1) * ROW_HEIGHT + 4; // +4 for bottom padding
 
 /**

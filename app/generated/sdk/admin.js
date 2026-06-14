@@ -183,4 +183,3 @@ function createAdmin(transport, options) {
     };
 }
 
-export { createAdmin };

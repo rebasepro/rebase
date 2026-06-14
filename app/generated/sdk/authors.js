@@ -47,6 +47,6 @@ import { createCollectionClient } from "./client.js";
  * Relations:
  *   Available relations: "profile", "posts"
  */
-export function createAuthorsClient(transport) {
+function createAuthorsClient(transport) {
     return createCollectionClient(transport, "authors");
 }

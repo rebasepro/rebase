@@ -1,32 +1,30 @@
 {
-    "name": "rebase-app-backend",
-    "version": "0.2.2",
-    "description": "Custom PostgreSQL backend for Rebase with real-time sync",
-    "main": "src/index.ts",
-    "type": "module",
-    "scripts": {
-        "dev": "tsx watch --watch=\"../config/**/*\" --watch=\"../../packages/server-core/src/**/*\" --conditions development src/index.ts",
-        "build": "tsc",
-        "start": "node dist/src/index.js",
-        "start:dev": "tsx src/index.ts"
-    },
-    "dependencies": {
-        "@aws-sdk/client-s3": "^3.1050.0",
-        "@hono/node-server": "^1.19.14",
-        "@rebasepro/server-core": "workspace:*",
-        "@rebasepro/server-postgresql": "workspace:*",
-        "dotenv": "^16.6.1",
-        "drizzle-orm": "^0.44.7",
-        "hono": "^4.12.21"
-    },
-    "devDependencies": {
-        "@faker-js/faker": "10.4.0",
-        "@types/node": "^20.19.41",
-        "drizzle-kit": "^0.31.10",
-        "tsc-alias": "1.8.17",
-        "tsx": "^4.22.3",
-        "typescript": "^5.9.3"
-    },
-    "gitHead": "e42be25c08d53e4b59790f8619ba848cce455363",
-    "private": true
+  "name": "rebase-app-backend",
+  "version": "0.2.2",
+  "description": "Custom PostgreSQL backend for Rebase with real-time sync",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --watch=\"../config/**/*\" --watch=\"../../packages/server-core/src/**/*\" --conditions development src/index.ts",
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "start:dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1050.0",
+    "@hono/node-server": "^1.19.14",
+    "@rebasepro/server-core": "workspace:*",
+    "@rebasepro/server-postgresql": "workspace:*",
+    "dotenv": "^16.6.1",
+    "drizzle-orm": "^0.44.7",
+    "hono": "^4.12.21"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^20.19.41",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.3"
+  },
+  "gitHead": "e42be25c08d53e4b59790f8619ba848cce455363",
+  "private": true
 }

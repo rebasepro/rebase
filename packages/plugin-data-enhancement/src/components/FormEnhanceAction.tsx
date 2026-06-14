@@ -220,15 +220,6 @@ export function FormEnhanceAction({
     );
 }
 
-export interface EnhanceDialogProps {
-    open: boolean;
-    onClose: () => void;
-    selectReferences: () => void;
-    loading: boolean;
-    enhance: (instructions: string) => void;
-    samplePrompts?: string[];
-}
-
 function getPromptsForExistingEntities(properties: Properties): SamplePrompt[] {
 
     const multilineProperties = Object.values(properties).filter((p: Property) => {

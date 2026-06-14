@@ -75,11 +75,10 @@
     "fast-equals": "6.0.0",
     "lucide-react": "1.14.0",
     "markdown-it": "^14.1.1",
-    "react-compiler-runtime": "1.0.0",
+    "tailwind-merge": "^2.6.1",
     "react-dropzone": "^14.4.1",
     "react-use-measure": "^2.1.7",
-    "react-window": "^1.8.11",
-    "tailwind-merge": "^2.6.1"
+    "react-window": "^1.8.11"
   },
   "peerDependencies": {
     "react": ">=19.0.0",

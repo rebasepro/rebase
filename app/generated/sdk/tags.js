@@ -42,6 +42,6 @@ import { createCollectionClient } from "./client.js";
  * Relations:
  *   Available relations: "posts"
  */
-export function createTagsClient(transport) {
+function createTagsClient(transport) {
     return createCollectionClient(transport, "tags");
 }

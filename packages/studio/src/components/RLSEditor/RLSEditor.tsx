@@ -50,7 +50,7 @@ export interface PostgresPolicy {
     status?: "live" | "code_only" | "both";
 }
 
-export interface TableRLSStatus {
+interface TableRLSStatus {
     schemaName: string;
     tableName: string;
     rlsEnabled: boolean;

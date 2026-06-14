@@ -19,9 +19,9 @@ import { getSimplifiedProperties } from "../utils/properties";
 import { useEditorAIController } from "../editor/useEditorAIController";
 import { getValueInPath } from "@rebasepro/utils";
 
-export const DataEnhancementControllerContext = React.createContext<DataEnhancementController>(null! as DataEnhancementController);
+const DataEnhancementControllerContext = React.createContext<DataEnhancementController>(null! as DataEnhancementController);
 
-export type DataEnhancementControllerProviderProps = {
+type DataEnhancementControllerProviderProps = {
 
     apiKey: string;
 

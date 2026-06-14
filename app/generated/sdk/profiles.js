@@ -48,6 +48,6 @@ import { createCollectionClient } from "./client.js";
  * Relations:
  *   Available relations: "author"
  */
-export function createProfilesClient(transport) {
+function createProfilesClient(transport) {
     return createCollectionClient(transport, "profiles");
 }

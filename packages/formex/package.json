@@ -30,8 +30,7 @@
     "react-dom": ">=19.0.0"
   },
   "dependencies": {
-    "fast-equals": "6.0.0",
-    "react-compiler-runtime": "1.0.0"
+    "fast-equals": "6.0.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",

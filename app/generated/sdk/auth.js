@@ -537,4 +537,3 @@ newPassword })
     };
 }
 
-export { createAuth, createMemoryStorage };

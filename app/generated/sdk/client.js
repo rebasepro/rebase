@@ -237,4 +237,3 @@ function createCollectionClient(transport, slug) {
     };
 }
 
-export { RebaseApiError, buildQueryString, createTransport, createCollectionClient };

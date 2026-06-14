@@ -3,7 +3,7 @@
 import { primaryKey, pgTable, integer, varchar, text, char, boolean, timestamp, date, time, jsonb, json, pgEnum, numeric, real, doublePrecision, bigint, serial, bigserial, pgPolicy, uuid, pgSchema } from 'drizzle-orm/pg-core';
 import { relations as drizzleRelations, sql } from 'drizzle-orm';
 
-export const rebaseSchema = pgSchema("rebase");
+const rebaseSchema = pgSchema("rebase");
 
 export const exercisesDifficulty = pgEnum("exercises_difficulty", ['beginner', 'intermediate', 'advanced']);
 export const exercisesCategory = pgEnum("exercises_category", ['strength', 'cardio', 'flexibility', 'balance', 'plyometrics', 'calisthenics']);
@@ -196,7 +196,7 @@ export const tickets = pgTable("tickets", {
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
-export const users = rebaseSchema.table("users", {
+const users = rebaseSchema.table("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     email: varchar("email").unique().notNull(),
     displayName: varchar("display_name").notNull(),
@@ -211,15 +211,15 @@ export const users = rebaseSchema.table("users", {
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }).enableRLS();
 
-export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
+const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
     "posts": many(posts, { relationName: "posts_author_id" })
 }));
 
-export const customersRelations = drizzleRelations(customers, ({ one, many }) => ({
+const customersRelations = drizzleRelations(customers, ({ one, many }) => ({
     "orders": many(orders, { relationName: "orders_customer_id" })
 }));
 
-export const orderItemsRelations = drizzleRelations(orderItems, ({ one, many }) => ({
+const orderItemsRelations = drizzleRelations(orderItems, ({ one, many }) => ({
     "order": one(orders, {
         fields: [orderItems.order_id],
         references: [orders.id],
@@ -232,7 +232,7 @@ export const orderItemsRelations = drizzleRelations(orderItems, ({ one, many }) 
     })
 }));
 
-export const ordersRelations = drizzleRelations(orders, ({ one, many }) => ({
+const ordersRelations = drizzleRelations(orders, ({ one, many }) => ({
     "order_items": many(orderItems, { relationName: "order_items_order_id" }),
     "customer": one(customers, {
         fields: [orders.customer_id],
@@ -241,7 +241,7 @@ export const ordersRelations = drizzleRelations(orders, ({ one, many }) => ({
     })
 }));
 
-export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({
+const postsRelations = drizzleRelations(posts, ({ one, many }) => ({
     "author": one(authors, {
         fields: [posts.author_id],
         references: [authors.id],
@@ -250,7 +250,7 @@ export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({
     "tags": many(postsTags, { relationName: "tags" })
 }));
 
-export const postsTagsRelations = drizzleRelations(postsTags, ({ one, many }) => ({
+const postsTagsRelations = drizzleRelations(postsTags, ({ one, many }) => ({
     "post_id": one(posts, {
         fields: [postsTags.post_id],
         references: [posts.id],
@@ -263,7 +263,7 @@ export const postsTagsRelations = drizzleRelations(postsTags, ({ one, many }) =>
     })
 }));
 
-export const productLocalesRelations = drizzleRelations(productLocales, ({ one, many }) => ({
+const productLocalesRelations = drizzleRelations(productLocales, ({ one, many }) => ({
     "product": one(products, {
         fields: [productLocales.product_id],
         references: [products.id],
@@ -271,15 +271,15 @@ export const productLocalesRelations = drizzleRelations(productLocales, ({ one, 
     })
 }));
 
-export const productsRelations = drizzleRelations(products, ({ one, many }) => ({
+const productsRelations = drizzleRelations(products, ({ one, many }) => ({
     "product_locales": many(productLocales, { relationName: "product_locales_product_id" })
 }));
 
-export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
+const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
     "posts": many(postsTags, { relationName: "posts" })
 }));
 
-export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
+const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
     "customer": one(customers, {
         fields: [tickets.customer_id],
         references: [customers.id],

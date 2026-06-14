@@ -83,7 +83,7 @@ function Text({ markdownText }: {
     </Container>;
 }
 
-export function StorageImage({ storagePath }: {
+function StorageImage({ storagePath }: {
     storagePath: string
 }) {
 
