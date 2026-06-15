@@ -1,0 +1,196 @@
+import { useEffect, useRef } from "react";
+import { NeatGradient } from "@firecms/neat";
+import type { NeatConfig } from "@firecms/neat";
+
+const NEAT_BASE_CONFIG = {
+    licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
+    colors: [
+        { color: "#FB5066", enabled: true },
+        { color: "#36CCD6", enabled: true },
+        { color: "#FFC600", enabled: true },
+        { color: "#8B6AE6", enabled: true },
+        { color: "#2E0EC7", enabled: true },
+        { color: "#FF9A9E", enabled: true },
+    ],
+    speed: 0.3,
+    horizontalPressure: 3,
+    verticalPressure: 3,
+    waveFrequencyX: 3,
+    waveFrequencyY: 5,
+    waveAmplitude: 10,
+    shadows: 2,
+    highlights: 6,
+    colorBrightness: 0.25,
+    colorSaturation: 1,
+    wireframe: false,
+    colorBlending: 3,
+    backgroundColor: "#000000",
+    backgroundAlpha: 0,
+    grainScale: 0,
+    grainSparsity: 0,
+    grainIntensity: 0,
+    grainSpeed: 2.4,
+    resolution: 0.05,
+    yOffset: 18063.63558959961,
+    yOffsetWaveMultiplier: 7.2,
+    yOffsetColorMultiplier: 6.8,
+    yOffsetFlowMultiplier: 7.7,
+    flowDistortionA: 0.4,
+    flowDistortionB: 2.6,
+    flowScale: 1.9,
+    flowEase: 0.94,
+    flowEnabled: true,
+    enableProceduralTexture: true,
+    transparentTextureVoid: false,
+    textureVoidLikelihood: 0.59,
+    textureVoidWidthMin: 120,
+    textureVoidWidthMax: 330,
+    textureBandDensity: 0.1,
+    textureColorBlending: 0,
+    textureSeed: 478,
+    textureEase: 0.86,
+    proceduralBackgroundColor: "#000000",
+    textureShapeTriangles: 51,
+    textureShapeCircles: 0,
+    textureShapeBars: 15,
+    textureShapeSquiggles: 0,
+    domainWarpEnabled: false,
+    domainWarpIntensity: 0,
+    domainWarpScale: 3,
+    vignetteIntensity: 0,
+    vignetteRadius: 0.8,
+    fresnelEnabled: false,
+    fresnelPower: 2,
+    fresnelIntensity: 0.5,
+    fresnelColor: "#FFFFFF",
+    iridescenceEnabled: false,
+    iridescenceIntensity: 0.5,
+    iridescenceSpeed: 1,
+    bloomIntensity: 0,
+    bloomThreshold: 0.7,
+    chromaticAberration: 0,
+    shapeType: "ribbon" as const,
+    shapeRotationX: 0,
+    shapeRotationY: 0,
+    shapeRotationZ: 0,
+    shapeAutoRotateSpeedX: 0,
+    shapeAutoRotateSpeedY: 0,
+    sphereRadius: 30,
+    torusRadius: 15,
+    torusTube: 5,
+    cylinderRadius: 10,
+    cylinderHeight: 40,
+    planeBend: -0.8,
+    planeTwist: 1,
+    silhouetteFade: 0,
+    cylinderFade: 0.08,
+    ribbonFade: 0,
+    flatShading: true,
+    cameraLock: false,
+    cameraX: 0,
+    cameraY: -11.5,
+    cameraZ: 0,
+    cameraRotationX: 0.7310000000000001,
+    cameraRotationY: 0.483,
+    cameraRotationZ: 0,
+    cameraZoom: 2.05,
+};
+
+const VARIANT_OVERRIDES: Record<string, Partial<NeatConfig>> = {
+    hero: {},
+    a: {
+        yOffset: 0,
+        textureSeed: 217,
+        planeBend: 0.2,
+        planeTwist: 0.8,
+        cameraX: 25.5,
+        cameraY: 10.5,
+        cameraRotationX: 0.61,
+        cameraRotationY: 0.483,
+        cameraZoom: 2.05,
+        speed: 0.2,
+    },
+    b: {
+        yOffset: 0,
+        textureSeed: 891,
+        planeBend: 0.2,
+        planeTwist: 0.8,
+        cameraX: -29.5,
+        cameraY: 1.5,
+        cameraRotationX: 0.61,
+        cameraRotationY: 0.483,
+        cameraZoom: 2.05,
+        speed: 0.2,
+    },
+};
+
+export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | "b" }) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        if (!canvasRef.current) return;
+
+        const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
+        const neat = new NeatGradient({
+            ref: canvasRef.current,
+            ...config,
+        });
+
+        const baseOffset = config.yOffset ?? 0;
+        const canvas = canvasRef.current;
+
+        const handleScroll = () => {
+            if (variant === "hero") {
+                neat.yOffset = baseOffset + window.scrollY * 0.3;
+            } else {
+                const rect = canvas.getBoundingClientRect();
+                const viewportCenter = window.innerHeight / 2;
+                const offset = (rect.top - viewportCenter) * 0.3;
+                neat.yOffset = baseOffset + offset;
+            }
+        };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        handleScroll();
+
+        return () => {
+            window.removeEventListener("scroll", handleScroll);
+            neat.destroy();
+        };
+    }, [variant]);
+
+    if (variant === "hero") {
+        return (
+            <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
+                <canvas
+                    ref={canvasRef}
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        opacity: 0.55,
+                        isolation: "isolate",
+                    }}
+                    aria-hidden="true"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
+            <canvas
+                ref={canvasRef}
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0.55,
+                }}
+                aria-hidden="true"
+            />
+        </div>
+    );
+}

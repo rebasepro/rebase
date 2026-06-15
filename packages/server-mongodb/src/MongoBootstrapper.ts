@@ -97,7 +97,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             const authConfig = config as AuthInitConfig | undefined;
             let emailService: unknown;
             if (authConfig?.email) {
-                emailService = createEmailService(authConfig.email);
+                emailService = createEmailService(authConfig.email as any);
             }
 
             const userService = new MongoUserService(db);
