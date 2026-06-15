@@ -136,13 +136,13 @@ export function BodyPartsDemo() {
                 <div className="rounded-xl border border-surface-800 bg-surface-900 p-2 flex-shrink-0">
                     <div className="flex gap-2">
                         <div className="flex flex-col items-center">
-                            {renderBodyView("front", "/img/body_front.png")}
+                            {renderBodyView("front", "/img/body_front.webp")}
                             <span className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-surface-500">
                                 Front
                             </span>
                         </div>
                         <div className="flex flex-col items-center">
-                            {renderBodyView("back", "/img/body_back.png")}
+                            {renderBodyView("back", "/img/body_back.webp")}
                             <span className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-wider text-surface-500">
                                 Back
                             </span>

@@ -3,8 +3,7 @@ export const fr = {
   "hero.title.part1": "Le Panneau d'Administration & Capa de API",
   "hero.title.part2": "pour votre Postgres Existant.",
   "hero.subtitle":
-    "Déployez Rebase sur n'importe quelle base de données PostgreSQL—ou définissez votre modèle en TypeScript. Obtenez instantanément une belle interface d'administration sous forme de tableur, des API REST/GraphQL instantanées et un SDK sécurisé. 100% open-source, auto-hébergé et natif d'agents.",
-  "hero.category": "La plateforme d'applications Postgres open-source : CMS, BaaS et outils internes en un.",
+    "La plateforme d'applications Postgres open-source — auto-hébergée et native d'agents.",
   "hero.cta.demo": "Essayer la Démo",
   "hero.cta.github": "Voir sur GitHub",
   "demo.badge": "Trois commandes. Zéro boilerplate.",

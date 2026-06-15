@@ -3,6 +3,7 @@
  * Single source of truth for the hero and section dividers.
  */
 export const NEAT_BASE_CONFIG = {
+    licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
     colors: [
         { color: "#FB5066", enabled: true },
         { color: "#36CCD6", enabled: true },
@@ -19,12 +20,12 @@ export const NEAT_BASE_CONFIG = {
     waveAmplitude: 10,
     shadows: 2,
     highlights: 6,
-    colorBrightness: 0.3,
+    colorBrightness: 0.25,
     colorSaturation: 1,
     wireframe: false,
     colorBlending: 3,
     backgroundColor: "#000000",
-    backgroundAlpha: 1,
+    backgroundAlpha: 0,
     grainScale: 0,
     grainSparsity: 0,
     grainIntensity: 0,

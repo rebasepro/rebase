@@ -203,7 +203,7 @@ export const EXPERIMENTS: Experiment[] = [
  * Get the assigned variant for an experiment.
  * Returns the variant string, or null if the experiment isn't active.
  */
-export function getVariant(experimentId: string): string | null {
+function getVariant(experimentId: string): string | null {
     if (typeof document === "undefined") return null;
     return document.documentElement.getAttribute(`data-ab-${experimentId}`);
 }

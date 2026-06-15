@@ -58,7 +58,9 @@ properties: {
     brand_color: {
         type: "string",
         name: "Brand Color",
-        Field: ColorPickerField
+        ui: {
+            Field: ColorPickerField
+        }
     }
 }
 ```
@@ -71,9 +73,11 @@ Registra un tipo di campo riutilizzabile:
 const colorPropertyConfig: PropertyConfig = {
     key: "color_picker",
     name: "Color Picker",
-    Field: ColorPickerField,
     property: {
-        type: "string"
+        type: "string",
+        ui: {
+            Field: ColorPickerField
+        }
     }
 };
 
@@ -157,8 +161,10 @@ properties: {
     color: {
         type: "string",
         name: "Color",
-        Field: ColorPickerField,
-        Preview: ColorPreview
+        ui: {
+            Field: ColorPickerField,
+            Preview: ColorPreview
+        }
     }
 }
 ```

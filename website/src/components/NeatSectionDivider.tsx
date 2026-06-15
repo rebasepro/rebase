@@ -43,11 +43,16 @@ export function NeatSectionDivider({ variant = "a" }: { variant?: "a" | "b" }) {
             ...config,
         });
 
-        const baseOffset = config.yOffset ?? 12000;
+        const baseOffset = config.yOffset ?? 0;
+        const canvas = canvasRef.current;
         const handleScroll = () => {
-            neat.yOffset = baseOffset + window.scrollY * 0.3;
+            const rect = canvas.getBoundingClientRect();
+            const viewportCenter = window.innerHeight / 2;
+            const offset = (rect.top - viewportCenter) * 0.3;
+            neat.yOffset = baseOffset + offset;
         };
         window.addEventListener("scroll", handleScroll, { passive: true });
+        handleScroll();
 
         return () => {
             window.removeEventListener("scroll", handleScroll);
@@ -59,12 +64,10 @@ export function NeatSectionDivider({ variant = "a" }: { variant?: "a" | "b" }) {
         <canvas
             ref={canvasRef}
             style={{
-                position: "absolute",
-                inset: 0,
+                display: "block",
                 width: "100%",
                 height: "100%",
                 opacity: 0.55,
-                isolation: "isolate",
             }}
             aria-hidden="true"
         />

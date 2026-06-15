@@ -263,7 +263,7 @@ maxWidth: width }}
         </div>
         {showFilter && (
           <div className="relative inline-block">
-            <button className="p-1 rounded-full text-surface-400 hover:bg-surface-200/50 dark:hover:bg-surface-800/50">
+            <button aria-label="Filter column" className="p-1 rounded-full text-surface-400 hover:bg-surface-200/50 dark:hover:bg-surface-800/50">
               <MI size={18}>filter_list</MI>
             </button>
           </div>
@@ -310,10 +310,10 @@ width: 138 }}
       >
         <div className="h-full flex items-center justify-center flex-col bg-surface-50/90 dark:bg-surface-900/90">
           <div className="w-34 flex justify-center gap-0.5">
-            <button className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
+            <button aria-label="Edit" className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
               <MI size={18}>edit</MI>
             </button>
-            <button className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
+            <button aria-label="More options" className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
               <MI size={20}>more_vert</MI>
             </button>
             <div className="p-1">
@@ -857,12 +857,12 @@ width: "100%" }}
         </div>
 
         {/* Language toggle placeholder */}
-        <button className="p-2 text-surface-400 rounded-full">
+        <button aria-label="Change language" className="p-2 text-surface-400 rounded-full">
           <MI size={20}>translate</MI>
         </button>
 
         {/* Dark mode — DarkModeIcon */}
-        <button className="p-2 text-surface-400 rounded-full">
+        <button aria-label="Toggle dark mode" className="p-2 text-surface-400 rounded-full">
           <MI size={20}>dark_mode</MI>
         </button>
 
@@ -981,7 +981,7 @@ width: "100%" }}
                   </button>
                 ))}
               </div>
-              <button className="p-1.5 rounded-full text-surface-500 hover:bg-surface-200/50 dark:hover:bg-surface-800">
+              <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500 hover:bg-surface-200/50 dark:hover:bg-surface-800">
                 <MI size={18}>filter_list</MI>
               </button>
             </div>
@@ -992,13 +992,13 @@ width: "100%" }}
                 <MI size={16} className="text-surface-400">search</MI>
                 <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
               </div>
-              <button className="p-1.5 rounded-full text-surface-500">
+              <button aria-label="Settings" className="p-1.5 rounded-full text-surface-500">
                 <MI size={18}>settings</MI>
               </button>
-              <button className="p-1.5 rounded-full text-surface-500 opacity-50">
+              <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50">
                 <MI size={18}>delete</MI>
               </button>
-              <button className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm">
+              <button aria-label="Add new entry" className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm">
                 <MI size={18}>add</MI>
               </button>
             </div>
@@ -1118,7 +1118,7 @@ width: "100%" }}
                         <span className="text-xs text-surface-500 dark:text-surface-400 mr-1">
                           {col.cards.length}
                         </span>
-                        <button className="p-1 rounded-full opacity-60 hover:opacity-100 text-surface-500 dark:text-surface-400">
+                        <button aria-label="Add card" className="p-1 rounded-full opacity-60 hover:opacity-100 text-surface-500 dark:text-surface-400">
                           <MI size={18}>add</MI>
                         </button>
                       </div>
@@ -1258,14 +1258,14 @@ width: "100%" }}
           <>
             {/* Panel top bar */}
             <div className="h-14 flex items-center px-3 border-b border-surface-200/20 dark:border-surface-700/30 shrink-0 gap-1">
-              <button className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
+              <button aria-label="Close panel" className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
                 <MI size={18}>close</MI>
               </button>
-              <button className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
+              <button aria-label="Expand to full screen" className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
                 <MI size={16}>open_in_full</MI>
               </button>
               <div className="flex-1"/>
-              <button className="px-3 py-2 text-xs text-surface-500">
+              <button aria-label="View code" className="px-3 py-2 text-xs text-surface-500">
                 <MI size={16}>code</MI>
               </button>
               <button className="px-3 py-2 text-xs text-surface-900 dark:text-white font-medium border-b-2 border-primary">
@@ -1419,10 +1419,10 @@ width: "100%" }}
             {/* Panel bottom bar */}
             <div className="flex items-center justify-between px-3 py-2.5 border-t border-surface-200/20 dark:border-surface-700/30 bg-white dark:bg-surface-900 shrink-0">
               <div className="flex items-center gap-1">
-                <button className="p-1.5 rounded text-surface-500">
+                <button aria-label="Copy" className="p-1.5 rounded text-surface-500">
                   <MI size={16}>content_copy</MI>
                 </button>
-                <button className="p-1.5 rounded text-surface-500">
+                <button aria-label="Delete" className="p-1.5 rounded text-surface-500">
                   <MI size={16}>delete</MI>
                 </button>
               </div>

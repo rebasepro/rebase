@@ -543,14 +543,14 @@ sql: DEFAULT_SQL }];
                                 )}
                             </button>
                         ))}
-                        <button onClick={addTab} className="p-2 text-surface-500 hover:text-surface-300 transition-colors">
+                        <button onClick={addTab} aria-label="Add new query tab" className="p-2 text-surface-500 hover:text-surface-300 transition-colors">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
                         </button>
                     </div>
 
                     {/* Right toolbar */}
                     <div className="flex shrink-0 items-center gap-1.5 pr-2">
-                        <button className="p-1.5 text-surface-500 hover:text-surface-300 transition-colors" title="Format SQL">
+                        <button className="p-1.5 text-surface-500 hover:text-surface-300 transition-colors" title="Format SQL" aria-label="Format SQL">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16"/></svg>
                         </button>
                         <button className="px-2 py-1 text-[10px] text-surface-500 hover:text-surface-300 transition-colors">EXPLAIN</button>
@@ -612,6 +612,7 @@ sql: DEFAULT_SQL }];
                                 }}
                                 className="absolute inset-0 py-3 px-4 text-[12px] font-mono leading-[1.6rem] bg-transparent text-transparent caret-primary resize-none outline-none w-full h-full"
                                 spellCheck={false}
+                                aria-label="SQL query editor"
                             />
                         </div>
                     </div>

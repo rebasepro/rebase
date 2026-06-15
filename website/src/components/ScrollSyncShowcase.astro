@@ -77,7 +77,7 @@ const t = useTranslations(lang);
                             <div class="relative rounded-2xl p-[1px]">
                                 <div class="relative rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950">
                                     <div class="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl"></div>
-                                    <EntityViewDemo client:load />
+                                    <EntityViewDemo client:visible />
                                 </div>
                             </div>
                         </section>
@@ -116,12 +116,16 @@ const t = useTranslations(lang);
     </div>
 
     <script>
-        const root = document.getElementById("scroll-sync-showcase");
-        const wrappers = (root?.querySelectorAll("[id^='screen-']") as NodeListOf<HTMLElement>) || null;
-        const screens = (root?.querySelectorAll("[data-screen]") as NodeListOf<HTMLElement>) || null;
-        const indexItems = (root?.querySelectorAll("[data-index-item]") as NodeListOf<HTMLAnchorElement>) || null;
+        function initScrollSync() {
+            const root = document.getElementById("scroll-sync-showcase");
+            if (!root) return;
 
-        if (wrappers && screens && indexItems) {
+            const wrappers = root.querySelectorAll("[id^='screen-']") as NodeListOf<HTMLElement>;
+            const screens = root.querySelectorAll("[data-screen]") as NodeListOf<HTMLElement>;
+            const indexItems = root.querySelectorAll("[data-index-item]") as NodeListOf<HTMLAnchorElement>;
+
+            if (!wrappers.length || !screens.length || !indexItems.length) return;
+
             const byId = new Map<string, HTMLAnchorElement>();
             indexItems.forEach((a) => {
                 const id = a.getAttribute("href")?.replace("#", "") || "";
@@ -130,7 +134,6 @@ const t = useTranslations(lang);
                     e.preventDefault();
                     const target = document.getElementById(id);
                     if (target) {
-                        // Use scrollTo for vertical-only scrolling to prevent horizontal shift
                         const targetRect = target.getBoundingClientRect();
                         const scrollMargin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
                         const targetY = window.scrollY + targetRect.top - scrollMargin;
@@ -145,20 +148,21 @@ const t = useTranslations(lang);
             let currentActive = "";
 
             const activate = (id: string) => {
-                if (currentActive === id) return; // Prevent unnecessary updates
+                if (currentActive === id) return;
                 currentActive = id;
                 indexItems.forEach((a) => a.setAttribute("data-active", "false"));
                 const el = byId.get(id);
                 if (el) el.setAttribute("data-active", "true");
             };
 
-            // Track all intersecting sections
-            const intersectionState = new Map<string, IntersectionObserverEntry>();
+            // Activate first item immediately
+            const firstId = wrappers[0]?.id;
+            if (firstId) activate(firstId);
 
+            const intersectionState = new Map<string, IntersectionObserverEntry>();
             let updateTimeout: number | null = null;
 
             const updateActiveSection = () => {
-                // Find the section with highest intersection ratio
                 let bestEntry: IntersectionObserverEntry | null = null;
                 let bestRatio = 0;
 
@@ -177,29 +181,25 @@ const t = useTranslations(lang);
                 }
             };
 
-            // Keep IO for index activation only
             const io = new IntersectionObserver(
                 (entries) => {
-                    // Update the state for each entry
                     entries.forEach((entry) => {
                         intersectionState.set(entry.target.id, entry);
                     });
-
-                    // Debounce the activation to prevent flashing
                     if (updateTimeout) clearTimeout(updateTimeout);
                     updateTimeout = window.setTimeout(updateActiveSection, 50);
                 },
                 {
-                    rootMargin: "-20% 0px -30% 0px",
-                    threshold: [0.1, 0.5]
+                    rootMargin: "-10% 0px -20% 0px",
+                    threshold: [0, 0.1, 0.25, 0.5, 0.75]
                 }
             );
             wrappers.forEach((w) => io.observe(w));
 
             // Scroll-bound animation
             const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            const maxOffsetPx = 32; // slide distance
-            const minOpacity = 0.25; // ensure minimum opacity is not 0 for subtlety
+            const maxOffsetPx = 32;
+            const minOpacity = 0.25;
 
             const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v));
 
@@ -216,7 +216,6 @@ const t = useTranslations(lang);
                         s.style.transform = "translate3d(0,0,0)";
                         return;
                     }
-                    // progress 0..1 based on section top moving from start to end
                     const p = clamp((end - rect.top) / span, 0, 1);
                     const tx = (1 - p) * maxOffsetPx;
                     const op = minOpacity + p * (1 - minOpacity);
@@ -237,8 +236,10 @@ const t = useTranslations(lang);
 
             window.addEventListener("scroll", requestTick, { passive: true });
             window.addEventListener("resize", requestTick);
-            // Initial paint
             requestTick();
         }
+
+        // Run on initial load and after view transition navigation
+        document.addEventListener("astro:page-load", initScrollSync);
     </script>
 </section>

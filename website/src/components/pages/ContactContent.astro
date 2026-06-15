@@ -5,7 +5,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 
-
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 
 
 ---
@@ -13,33 +13,27 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
   <main>
     <!-- Big Appointment CTA Section -->
-    <section class="bg-black pt-24 pb-12 sm:pt-32 sm:pb-16">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <!-- Big CTA for Booking -->
-        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-blue-600 p-12 md:p-20 text-center ring-1 ring-inset ring-white/10 shadow-2xl">
-          <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
-          <div class="relative z-10">
-            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-8">
-              <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
-              </svg>
-            </div>
-            <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">We Are Open!</h1>
-            <p class="text-lg md:text-xl text-white/90 mb-6 max-w-2xl mx-auto">Schedule a call with our team to discuss your project, get a demo, or just say hello.</p>
-            <p class="text-base text-white/80 mb-8">Or reach us at <a href="mailto:hello@rebase.pro" class="font-semibold underline hover:text-white transition-colors">hello@rebase.pro</a></p>
-            <a href="https://calendar.app.google/UDSmMagx6AEwar8P8"
-               target="_blank"
-               rel="noopener noreferrer"
-               data-track
-               id="contact-book-call-hero"
-               class="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-semibold text-primary shadow-lg hover:bg-surface-50 transition-all duration-200">
-              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-              </svg>
-              Book a Call Now
-            </a>
-          </div>
-        </div>
+    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <NeatHeroBackground client:only="react" />
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+        <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
+          We Are Open!
+        </h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+          Schedule a call with our team to discuss your project, get a demo, or just say hello.
+          Or reach us at <a href="mailto:hello@rebase.pro" class="font-semibold underline hover:text-white transition-colors">hello@rebase.pro</a>
+        </p>
+        <a href="https://calendar.app.google/UDSmMagx6AEwar8P8"
+           target="_blank"
+           rel="noopener noreferrer"
+           data-track
+           id="contact-book-call-hero"
+           class="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-lg hover:bg-primary-dark transition-all duration-200 btn-glow">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+          </svg>
+          Book a Call Now
+        </a>
       </div>
     </section>
 

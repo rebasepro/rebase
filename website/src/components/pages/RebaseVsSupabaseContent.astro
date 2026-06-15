@@ -6,6 +6,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 
 
 
@@ -13,14 +14,14 @@ import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.
 
   <main>
     <!-- Hero Section -->
-    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
+    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <NeatHeroBackground client:only="react" />
       
-      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
-        <h1 class="mb-8 text-5xl font-extrabold tracking-tight leading-none md:text-6xl text-white font-sans">
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+        <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
           Rebase vs Supabase
         </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl mx-auto">
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
           Supabase is a fantastic platform, but its "Firebase alternative" marketing hides the operational overhead of managing raw PostgreSQL in production. See how Rebase solves the biggest pain points developers face when scaling.
         </p>
       </div>
@@ -88,7 +89,7 @@ import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.
 
                       <h4 class="text-white font-semibold">The Supabase Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">PostgreSQL Row Level Security (RLS) policies are notoriously difficult to write, test, and debug. Poorly written policies destroy performance via implicit JOINs, and Supabase lacks a built-in out-of-the-box RBAC UI.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">PostgreSQL Row Level Security (RLS) policies are notoriously difficult to write, test, and debug. Poorly written policies destroy performance via implicit JOINs, and Supabase requires writing raw SQL for RLS policies without a visual, code-free RBAC policy builder.</p>
                   </div>
                 </div>
 

@@ -7,6 +7,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import ClientLogos from '../../components/ClientLogos.astro';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 import BrowserFrame from '../../components/BrowserFrame.astro';
 import UsageExamples from '../../components/UsageExamples.astro';
 import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
@@ -19,12 +20,13 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
     <main class="flex-grow">
         <!-- Hero Section -->
         <section
-                class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
-                <h1 class="mb-6 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans animate-on-scroll fade-in-up">
+                class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+            <NeatHeroBackground client:only="react" />
+            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+                <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
                     {t('agencies.hero.title')}
                 </h1>
-                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48 animate-on-scroll fade-in-up delay-100" set:html={t('agencies.hero.subtitle')}>
+                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48" set:html={t('agencies.hero.subtitle')}>
                 </p>
             </div>
         </section>

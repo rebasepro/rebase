@@ -25,13 +25,13 @@ const translatePath = useTranslatedPath(lang);
 ---
 
 
-<main class="flex flex-col">
+<div class="flex flex-col isolate">
 
     <!-- Hero -->
     <section id="s-hero"
              class="relative isolate overflow-hidden bg-black -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
         <!-- Animated WebGL gradient background (Neat - funky preset) -->
-        <NeatHeroBackground client:load/>
+        <NeatHeroBackground client:idle/>
         <!-- Subtle radial glow over the gradient for text readability -->
         <div class="absolute inset-0 pointer-events-none" aria-hidden="true"
              style="background: radial-gradient(ellipse 45% 32% at 50% 55%, rgba(0, 112, 244, 0.18) 0%, rgba(0, 80, 200, 0.08) 45%, transparent 80%);"></div>
@@ -55,7 +55,36 @@ const translatePath = useTranslatedPath(lang);
             </div>
             <p class="mb-4 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up"
                set:html={t("hero.subtitle")}/>
-            <p class="mb-8 text-sm font-medium text-surface-500 tracking-wide animate-on-scroll fade-in-up">{t("hero.category")}</p>
+
+            <!-- Hero CLI command -->
+            <div class="mt-12 max-w-md mx-auto animate-on-scroll fade-in-up">
+                <div class="group relative">
+                    <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
+                         aria-hidden="true"></div>
+                    <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
+                        <div class="px-5 py-4 flex items-center justify-between">
+                            <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                                <span class="text-primary font-bold mr-3">~</span>
+                                <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+                            </div>
+                            <button data-track-copy="hero" data-command="pnpm dlx @rebasepro/cli init"
+                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                    aria-label="Copy command" title="Copy to clipboard">
+                                <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
+                                     height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="px-5 pb-3 -mt-1">
+                            <span class="font-mono text-xs text-surface-400">or: npx @rebasepro/cli init</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
             <!-- Hero CTA Buttons -->
             <div class="mt-8 mb-10 flex flex-wrap items-center justify-center gap-y-4 gap-x-6 sm:gap-x-8 animate-on-scroll fade-in-up">
@@ -93,35 +122,6 @@ const translatePath = useTranslatedPath(lang);
                 </a>
             </div>
 
-            <!-- Hero CLI command -->
-            <div class="mt-12 max-w-md mx-auto animate-on-scroll fade-in-up">
-                <div class="group relative">
-                    <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                         aria-hidden="true"></div>
-                    <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                        <div class="px-5 py-4 flex items-center justify-between">
-                            <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-bold mr-3">~</span>
-                                <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                            </div>
-                            <button data-track-copy="hero" data-command="pnpm dlx @rebasepro/cli init"
-                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                    aria-label="Copy command" title="Copy to clipboard">
-                                <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
-                                     height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="px-5 pb-3 -mt-1">
-                            <span class="font-mono text-xs text-surface-500">or: npx @rebasepro/cli init</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
 
         </div>
     </section>
@@ -129,162 +129,15 @@ const translatePath = useTranslatedPath(lang);
     <!-- Social proof -->
     <section id="s-social-proof" class="relative z-0 bg-black py-20 sm:py-28">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <p class="text-center text-sm text-surface-500 mb-8 animate-on-scroll fade-in">{t("social.title")}</p>
+            <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">{t("social.title")}</p>
             <ClientLogos/>
         </div>
     </section>
 
 
-    <!-- Product demo -->
-    <section id="s-demo-terminal" class="relative z-0 pt-32 pb-40 sm:pt-48 sm:pb-56">
-        <!-- subtle separator line -->
-        <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-surface-700/40 to-transparent"></div>
-
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("demo.badge")}</p>
-                <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-                    {t("demo.title")}
-                </h2>
-                <div class="mt-8 max-w-2xl mx-auto">
-                    <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
-                        <!-- Glow effect behind terminal -->
-                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500"
-                             aria-hidden="true"
-                             style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 0;"></div>
-
-                        <div class="relative z-10 flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            </div>
-                            <div class="text-[11px] font-mono font-medium text-surface-500 flex items-center gap-2">
-
-                                <svg
-                                        class="lucide lucide-terminal"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                >
-                                    <path d="M12 19h8"/>
-                                    <path d="m4 17 6-6-6-6"/>
-                                </svg>
-
-                                bash
-                            </div>
-                            <div class="w-12"></div> <!-- spacer -->
-                        </div>
-
-                        <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
-                            <div>
-                                <div class="flex gap-3 items-center justify-between">
-                                    <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                        <span class="text-primary font-bold">~</span>
-                                        <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                                    </div>
-                                    <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init"
-                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                            aria-label="Copy command" title="Copy to clipboard">
-
-                                        <svg
-                                                class="lucide lucide-copy"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                        >
-                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                        </svg>
-
-                                    </button>
-                                </div>
-                                <div class="text-surface-500 text-xs mt-1 ml-6">{t("demo.init")}</div>
-                            </div>
-
-                            <div>
-                                <div class="flex gap-3 items-center justify-between">
-                                    <div class="flex gap-3 items-center">
-                                        <span class="text-primary font-bold">~</span>
-                                        <span class="text-white">pnpm rebase introspect</span>
-                                    </div>
-                                    <button data-track-copy="demo-introspect" data-command="pnpm rebase introspect"
-                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
-                                            aria-label="Copy command" title="Copy to clipboard">
-
-                                        <svg
-                                                class="lucide lucide-copy"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                        >
-                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                        </svg>
-
-                                    </button>
-                                </div>
-                                <div class="text-surface-500 text-xs mt-1 ml-6">{t("demo.pull")}</div>
-                            </div>
-
-                            <div>
-                                <div class="flex gap-3 items-center justify-between">
-                                    <div class="flex gap-3 items-center">
-                                        <span class="text-primary font-bold">~</span>
-                                        <span class="text-white">pnpm dev</span>
-                                    </div>
-                                    <button data-track-copy="demo-dev" data-command="pnpm dev"
-                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
-                                            aria-label="Copy command" title="Copy to clipboard">
-
-                                        <svg
-                                                class="lucide lucide-copy"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                        >
-                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                        </svg>
-
-                                    </button>
-                                </div>
-                                <div class="text-emerald-400/90 text-xs mt-1 ml-6">{t("demo.dev")}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- Neat gradient divider -->
-    <div class="relative -my-72 -z-10 pointer-events-none" style="height: 600px;">
-        <NeatSectionDivider variant="a" client:visible/>
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatSectionDivider variant="a" client:only="react"/>
     </div>
 
 
@@ -294,7 +147,7 @@ const translatePath = useTranslatedPath(lang);
             <div style="min-height: 700px;">
                 <AdminDemoCarousel client:load/>
             </div>
-            <p class="mt-2 text-center text-xs sm:text-sm text-surface-500">
+            <p class="mt-2 text-center text-xs sm:text-sm text-surface-400">
                 A quick tour of the generated Rebase admin panel.
             </p>
         </div>
@@ -356,7 +209,7 @@ const translatePath = useTranslatedPath(lang);
                                             <span class="h-2 w-2 rounded-full bg-amber-400/80"></span>
                                             <span class="h-2 w-2 rounded-full bg-emerald-400/80"></span>
                                         </div>
-                                        <span class="text-[10px] font-medium text-surface-500 font-mono flex items-center gap-1.5">
+                                        <span class="text-[10px] font-medium text-surface-400 font-mono flex items-center gap-1.5">
 
 <svg
         class="lucide lucide-terminal"
@@ -488,7 +341,7 @@ const translatePath = useTranslatedPath(lang);
 
 
     <!-- Power features with videos -->
-    <section id="s-power-features" class="relative py-28 sm:py-36 overflow-hidden">
+    <section id="s-power-features" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <SectionBackgroundAccents blob={{
             position: "bottom",
             size: "lg"
@@ -511,7 +364,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-500">app.ts</div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">app.ts</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
                             <SdkMiniDemo client:load/>
@@ -553,7 +406,7 @@ const translatePath = useTranslatedPath(lang);
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden">
                             <img
-                                    src="/img/history.png"
+                                    src="/img/history.webp"
                                     alt="Data history and audit view"
                                     width="800"
                                     height="600"
@@ -660,7 +513,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-500">api.demo.rebase.dev</div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.dev</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
                             <ApiMiniDemo client:load/>
@@ -750,7 +603,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-500">websocket: sync</div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">websocket: sync</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
                             <RealtimeMiniDemo client:load/>
@@ -793,8 +646,8 @@ const translatePath = useTranslatedPath(lang);
     </section>
 
     <!-- Neat gradient divider -->
-    <div class="relative -my-72 -z-10 pointer-events-none" style="height: 600px;">
-        <NeatSectionDivider variant="b" client:visible/>
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatSectionDivider variant="b" client:only="react"/>
     </div>
 
     <div id="s-collection-power" class="relative z-0">
@@ -802,9 +655,156 @@ const translatePath = useTranslatedPath(lang);
         <CollectionPowerSection/>
     </div>
 
+    <!-- Product demo -->
+    <section id="s-demo-terminal" class="relative z-0 pt-32 pb-40 sm:pt-48 sm:pb-56">
+
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("demo.badge")}</p>
+                <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                    {t("demo.title")}
+                </h2>
+                <div class="mt-8 max-w-2xl mx-auto">
+                    <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
+                        <!-- Glow effect behind terminal -->
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500"
+                             aria-hidden="true"
+                             style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 0;"></div>
+
+                        <div class="relative z-10 flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            </div>
+                            <div class="text-[11px] font-mono font-medium text-surface-400 flex items-center gap-2">
+
+                                <svg
+                                        class="lucide lucide-terminal"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M12 19h8"/>
+                                    <path d="m4 17 6-6-6-6"/>
+                                </svg>
+
+                                bash
+                            </div>
+                            <div class="w-12"></div> <!-- spacer -->
+                        </div>
+
+                        <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+                                    </div>
+                                    <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init"
+                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.init")}</div>
+                            </div>
+
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm rebase introspect</span>
+                                    </div>
+                                    <button data-track-copy="demo-introspect" data-command="pnpm rebase introspect"
+                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.pull")}</div>
+                            </div>
+
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm dev</span>
+                                    </div>
+                                    <button data-track-copy="demo-dev" data-command="pnpm dev"
+                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-emerald-400/90 text-xs mt-1 ml-6">{t("demo.dev")}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+
     <!-- AI & Agents Section -->
     <section id="s-ai-apps"
-             class="relative isolate bg-black py-28 sm:py-36 overflow-hidden border-t border-surface-900">
+             class="relative isolate bg-black py-28 sm:py-36 overflow-hidden ">
         <SectionBackgroundAccents blob={{
             position: "top",
             size: "lg"
@@ -851,12 +851,12 @@ const translatePath = useTranslatedPath(lang);
                             DB needed.</p>
                         <div class="rounded-lg bg-surface-950/80 p-3 ring-1 ring-surface-800/50">
                             <code class="text-xs font-mono text-surface-300">
-                                <span class="text-surface-500">GET</span> <span
+                                <span class="text-surface-400">GET</span> <span
                                     class="text-emerald-400">/api/docs</span><br/>
-                                <span class="text-surface-500">&nbsp;&nbsp;?vector_search=</span><span
+                                <span class="text-surface-400">&nbsp;&nbsp;?vector_search=</span><span
                                     class="text-amber-400">embedding</span><br/>
-                                <span class="text-surface-500">&nbsp;&nbsp;&vector=</span><span class="text-primary">[0.1,0.2,...]</span><br/>
-                                <span class="text-surface-500">&nbsp;&nbsp;&vector_distance=</span><span
+                                <span class="text-surface-400">&nbsp;&nbsp;&vector=</span><span class="text-primary">[0.1,0.2,...]</span><br/>
+                                <span class="text-surface-400">&nbsp;&nbsp;&vector_distance=</span><span
                                     class="text-cyan-400">cosine</span>
                             </code>
                         </div>
@@ -920,7 +920,7 @@ const translatePath = useTranslatedPath(lang);
                             <code class="text-xs font-mono text-surface-300">
                                 <span class="text-blue-400">export default</span> <span
                                     class="text-amber-400">async</span> (req, res) => {"{"}
-                                <br/>&nbsp;&nbsp;<span class="text-surface-500">// Full typed access to driver</span>
+                                <br/>&nbsp;&nbsp;<span class="text-surface-400">// Full typed access to driver</span>
                                 <br/>&nbsp;&nbsp;<span class="text-blue-400">const</span> docs = <span
                                     class="text-blue-400">await</span> <span class="text-amber-400">data</span>.docs.find();
                                 <br/>{"}"}
@@ -1034,8 +1034,8 @@ const translatePath = useTranslatedPath(lang);
     </section>
 
     <!-- Visual Mosaic Showcase -->
-    <section id="s-mosaic-showcase"
-             class="relative isolate bg-black py-28 sm:py-36 overflow-hidden border-t border-surface-900">
+    <section id="s-mosaic-showcase" 
+             class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("mosaic.badge")}</p>
@@ -1048,13 +1048,18 @@ const translatePath = useTranslatedPath(lang);
             </div>
 
             <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;">
-                <RebaseMosaicDemo client:load/>
+                <RebaseMosaicDemo client:visible/>
             </div>
         </div>
     </section>
 
+        <!-- Neat gradient divider -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 700px;">
+            <NeatSectionDivider variant="a" client:only="react" />
+        </div>
+
     <!-- Built With Rebase: SustenTalent Use Case -->
-    <section id="s-case-study" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+    <section id="s-case-study" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl lg:text-center animate-on-scroll fade-in-up">
                 <p class="text-base font-semibold leading-7 text-primary">{t("showcase.badge")}</p>
@@ -1641,19 +1646,19 @@ const translatePath = useTranslatedPath(lang);
     </section>
 
 
-    <div id="s-roadmap">
+    <div id="s-roadmap" class="relative z-0">
         <!-- Roadmap -->
         <RoadmapSection/>
     </div>
 
         <!-- Neat gradient divider -->
-        <div class="relative -my-72 -z-10 pointer-events-none" style="height: 700px;">
-            <NeatSectionDivider variant="a" client:visible />
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 700px;">
+            <NeatSectionDivider variant="a" client:only="react" />
         </div>
 
     <!-- Final CTA -->
-    <section id="s-final-cta" class="relative py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents topLine={true} blob={{
+    <section id="s-final-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+        <SectionBackgroundAccents blob={{
             position: "top",
             size: "lg"
         }}/>
@@ -1793,7 +1798,7 @@ const translatePath = useTranslatedPath(lang);
     </section>
 
 
-</main>
+</div>
 
 
 

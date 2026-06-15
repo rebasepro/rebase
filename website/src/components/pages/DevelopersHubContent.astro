@@ -2,6 +2,7 @@
 const { lang, t } = Astro.props;
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 import { CodeBlock } from '../../components/CodeBlock.tsx';
 import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
 import { RebaseEditorDemo } from '../../components/RebaseEditorDemo.tsx';
@@ -55,19 +56,16 @@ const cliCommands = [
 <main>
 
   <!-- HERO -->
-  <section class="relative isolate overflow-hidden bg-black pt-28 pb-20 sm:pt-36 sm:pb-28 lg:pt-44 lg:pb-32">
-    <div class="pointer-events-none absolute inset-0 -z-10">
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] rounded-full bg-blue-500/8 blur-[120px]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px] opacity-20"></div>
-    </div>
-    <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
-      <h1 class="mb-6 text-4xl font-bold tracking-tight leading-[1.1] md:text-6xl lg:text-7xl text-white animate-on-scroll fade-in-up">
+  <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+    <NeatHeroBackground client:only="react" />
+    <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+      <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
         Built for developers.<br/><span class="text-primary">By developers.</span>
       </h1>
-      <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48 animate-on-scroll fade-in-up delay-100">
+      <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
         TypeScript SDK with full type safety. CLI for schema management. React extensibility. Self-hosted, open-source, MIT licensed.
       </p>
-      <div class="flex items-center justify-center gap-x-4 animate-on-scroll fade-in-up delay-200">
+      <div class="flex items-center justify-center gap-x-4">
         <a href="/docs" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all btn-glow">
           Get Started
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
@@ -78,7 +76,7 @@ const cliCommands = [
         </a>
       </div>
     </div>
-    <SectionBackgroundAccents bottomLine={true}/>
+
   </section>
 
 
@@ -157,11 +155,11 @@ const cliCommands = [
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
         <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-          <CodeBlock language="typescript" code={`import { buildCollection } from "@rebasepro/core";
+          <CodeBlock language="typescript" code={`import { buildCollection } from "@rebasepro/common";
 
 export const productsCollection = buildCollection({
     name: "Products",
-    path: "products",
+    slug: "products",
     callbacks: {
         onSave: async ({ values }) => {
             await sendSlackMessage("Product updated");

@@ -92,6 +92,10 @@
     @apply list-disc;
 }
 
+.sl-markdown-content ol {
+    @apply list-decimal;
+}
+
 .sl-markdown-content li {
     @apply ml-6;
 }

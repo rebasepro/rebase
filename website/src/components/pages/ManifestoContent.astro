@@ -4,24 +4,21 @@ const { lang, t } = Astro.props;
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 ---
 
 <main class="manifesto">
     <!-- Hero — minimal, editorial -->
-    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40 lg:pb-20">
-      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 40 }} />
-      <div class="pointer-events-none absolute inset-0 -z-10">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:60px_60px] opacity-10"></div>
-      </div>
-
-      <div class="px-4 mx-auto max-w-3xl text-center lg:px-12">
+    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <NeatHeroBackground client:only="react" />
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
           <span class="text-sm font-medium">{t("manifesto.badge")}</span>
         </div>
-        <h1 class="mb-6 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans leading-tight">
+        <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
           {t("manifesto.hero.title")}
         </h1>
-        <p class="text-lg leading-8 text-surface-400 lg:text-xl">
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
           {t("manifesto.hero.subtitle")}
         </p>
       </div>

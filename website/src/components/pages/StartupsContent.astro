@@ -7,6 +7,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 // src/pages/startups.astro
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 // The Layout component should handle the Header and Footer
 // import Header from '../../components/Header.astro';
 // import Footer from '../../components/Footer.astro';
@@ -25,16 +26,10 @@ const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" vi
 
   <main>
     <!-- Hero Section -->
-    <section class="relative isolate overflow-hidden bg-linear-to-br from-black to-surface-950 pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-      <!-- Background accents and subtle grid -->
-      <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg", opacity: 60 }}/>
-      <div class="pointer-events-none absolute inset-0 -z-10">
-        <div class="absolute -bottom-40 right-1/3 w-[700px] h-[700px] rounded-full bg-blue-500/5 blur-3xl opacity-50"></div>
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
-      </div>
-
-      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
-        <h1 class="mb-6 text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl text-white font-sans">
+    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+      <NeatHeroBackground client:only="react" />
+      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+        <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
           Ship your back-office in a sprint.<br/>Extend it forever.
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">

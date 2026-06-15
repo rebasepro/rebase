@@ -51,7 +51,7 @@ const translatePath = useTranslatedPath(lang);
         <!-- Large Editorial Banner Text -->
         <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-white max-w-3xl mx-auto font-sans">
             <ABVariant experiment="manifesto-banner-text" variant="control" class="inline">
-                {t("banner.title.control")}
+                <span set:html={t("banner.title.control")} />
             </ABVariant>
             <ABVariant experiment="manifesto-banner-text" variant="mission" class="inline">
                 {t("banner.title.mission")}

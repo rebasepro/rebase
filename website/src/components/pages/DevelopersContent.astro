@@ -5,6 +5,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import { CodeBlock } from '../../components/CodeBlock.tsx';
 import ClientLogos from '../../components/ClientLogos.astro';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
+import { NeatHeroBackground } from '../../components/NeatHeroBackground';
 import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
 import AlternativesComparison from '../AlternativesComparison.astro';
 
@@ -55,21 +56,17 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
 <main class="bg-black text-surface-300 overflow-hidden font-sans">
     
     <!-- -- HERO SECTION -- -->
-    <section class="relative isolate overflow-hidden pt-24 pb-20 sm:pt-32 sm:pb-28 lg:pt-40 lg:pb-32 bg-radial-at-t from-surface-900/50 via-black to-black border-b border-surface-800/40">
+    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+        <NeatHeroBackground client:only="react" />
         <!-- Background accents and subtle grid -->
-        <div class="pointer-events-none absolute inset-0 -z-10">
-            <div class="absolute -top-40 left-1/3 w-[800px] h-[800px] rounded-full bg-primary/10 blur-3xl opacity-60"></div>
-            <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
-        </div>
-
-        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12">
+        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6 animate-pulse">
                 <span>*</span> Open Source Schema-as-Code Framework
             </div>
-            <h1 class="mb-6 text-4xl font-extrabold tracking-tight md:text-5xl lg:text-7xl text-white font-sans leading-none">
+            <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
                 Your admin panel shouldn't<br class="hidden sm:inline"/> make you write CRUD.
             </h1>
-            <p class="mb-10 text-lg leading-8 text-surface-400 lg:text-xl max-w-3xl mx-auto font-medium">
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
                 Define your data schema in pure TypeScript. Rebase instantly handles database migrations, generates API endpoints, and delivers a premium React admin console.
             </p>
             <div class="flex justify-center items-center">
@@ -84,7 +81,6 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
                 </div>
             </div>
         </div>
-        <SectionBackgroundAccents bottomLine={false}/>
     </section>
 
     <!-- -- CLIENT LOGOS SECTION -- -->
@@ -168,14 +164,14 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2">
                         <!-- TypeScript Editor Mock -->
-                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildCollection</span>, <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/core"</span>;
+                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildCollection</span>, <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
 
 <span class="text-purple-400">export const</span> posts = <span class="text-blue-400">buildCollection</span>(&#123;
   name: <span class="text-green-400">"Posts"</span>,
   properties: &#123;
-    id: <span class="text-blue-400">buildProperty</span>(&#123; dataType: <span class="text-green-400">"string"</span> &#125;),
-    title: <span class="text-blue-400">buildProperty</span>(&#123; dataType: <span class="text-green-400">"string"</span> &#125;),
-<span class="text-green-300/80 bg-green-500/5 pl-1 border-l-2 border-green-500 inline-block w-full">    status: <span class="text-blue-400">buildProperty</span>(&#123; dataType: <span class="text-green-400">"string"</span> &#125;)</span>
+    id: <span class="text-blue-400">buildProperty</span>(&#123; type: <span class="text-green-400">"string"</span> &#125;),
+    title: <span class="text-blue-400">buildProperty</span>(&#123; type: <span class="text-green-400">"string"</span> &#125;),
+<span class="text-green-300/80 bg-green-500/5 pl-1 border-l-2 border-green-500 inline-block w-full">    status: <span class="text-blue-400">buildProperty</span>(&#123; type: <span class="text-green-400">"string"</span> &#125;)</span>
   &#125;
 &#125;);</div>
                         <!-- Live visual builder preview -->
@@ -240,13 +236,13 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2">
                         <!-- Custom Component Registration -->
-                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/core"</span>;
+                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
 <span class="text-purple-400">import</span> &#123; <span class="text-blue-300">ColorPicker</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"./widgets"</span>;
 
 <span class="text-purple-400">export const</span> brand = <span class="text-blue-400">buildProperty</span>(&#123;
   name: <span class="text-green-400">"Brand Color"</span>,
-  dataType: <span class="text-green-400">"string"</span>,
-  customFieldWidget: <span class="text-blue-300">ColorPicker</span>,
+  type: <span class="text-green-400">"string"</span>,
+  ui: &#123; Field: <span class="text-blue-300">ColorPicker</span> &#125;,
   validation: &#123; required: <span class="text-amber-400">true</span> &#125;
 &#125;);</div>
                         <!-- Live widget panel -->

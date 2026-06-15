@@ -3,8 +3,7 @@ export const en = {
   "hero.title.part1": "One TypeScript Schema.",
   "hero.title.part2": "Admin, APIs, SDK — Instantly.",
   "hero.subtitle":
-    "Point it at any Postgres — or define your model in TypeScript. Open-source, self-hosted, and agent-native.",
-  "hero.category": "The open-source Postgres app platform — CMS, BaaS, and internal tools in one.",
+    "The open-source Postgres app platform — Self-hosted, and agent-native.",
   "hero.cta.demo": "Try the Demo",
   "hero.cta.github": "View on GitHub",
   "demo.badge": "Three commands. Zero boilerplate.",
@@ -95,7 +94,7 @@ export const en = {
     '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; Rebase never hosts or copies your data.',
   "faq.q2": "How is Rebase different from Retool or Supabase?",
   "faq.a2":
-    "Unlike Retool, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike Supabase, Rebase works with <em class=\"text-white\">your existing</em> Postgres database — it doesn't own your infrastructure. You keep full control.",
+    "Unlike Retool, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike Supabase, Rebase connects directly to your <em class=\"text-white\">existing</em> Postgres database — no new infrastructure to manage, no vendor-managed instance. Your schema, your data, your rules.",
   "faq.q3": "Can I use Rebase with an existing database?",
   "faq.a3":
     "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
@@ -563,7 +562,7 @@ export const en = {
   "manifesto.cta.github": "View on GitHub",
 
   // Manifesto Banner
-  "banner.title.control": "Stop renting your database. Own your stack.",
+  "banner.title.control": "Stop renting your database.<br/> Own your stack.",
   "banner.title.mission": "We are taking back control of our stack.",
   "banner.title.founders": "An open letter to developers who care about data ownership.",
   "banner.cta": "Read the Manifesto",

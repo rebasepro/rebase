@@ -157,15 +157,15 @@ export function DeveloperPlayground() {
                                 <div className="space-y-4">
                                     <div className="text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-2">TypeScript Model definition</div>
                                     <pre className="text-surface-300">
-                                        <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">buildCollection</span>, <span className="text-blue-300">buildProperty</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/core"</span>;{"\n\n"}
+                                        <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">buildCollection</span>, <span className="text-blue-300">buildProperty</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/common"</span>;{"\n\n"}
                                         <span className="text-purple-400">export const</span> postsCollection = <span className="text-blue-400">buildCollection</span>(&#123;{"\n"}
                                         {"  "}name: <span className="text-green-400">"Posts"</span>,{"\n"}
-                                        {"  "}path: <span className="text-green-400">"posts"</span>,{"\n"}
+                                        {"  "}slug: <span className="text-green-400">"posts"</span>,{"\n"}
                                         {"  "}properties: &#123;{"\n"}
-                                        {"    "}id: <span className="text-blue-400">buildProperty</span>(&#123; dataType: <span className="text-green-400">"string"</span>, validation: &#123; required: <span className="text-amber-400">true</span> &#125; &#125;),{"\n"}
-                                        {"    "}title: <span className="text-blue-400">buildProperty</span>(&#123; dataType: <span className="text-green-400">"string"</span> &#125;),{"\n"}
+                                        {"    "}id: <span className="text-blue-400">buildProperty</span>(&#123; type: <span className="text-green-400">"string"</span>, validation: &#123; required: <span className="text-amber-400">true</span> &#125; &#125;),{"\n"}
+                                        {"    "}title: <span className="text-blue-400">buildProperty</span>(&#123; type: <span className="text-green-400">"string"</span> &#125;),{"\n"}
                                         <span className={schemaStatus === "synced" ? "text-green-300 bg-green-500/10 border-l border-green-500 pl-1 animate-pulse" : "text-surface-400 opacity-60"}>
-                                            {"    "}status: <span className="text-blue-400">buildProperty</span>(&#123; dataType: <span className="text-green-400">"string"</span>, validation: &#123; required: <span className="text-amber-400">true</span> &#125; &#125;)
+                                            {"    "}status: <span className="text-blue-400">buildProperty</span>(&#123; type: <span className="text-green-400">"string"</span>, validation: &#123; required: <span className="text-amber-400">true</span> &#125; &#125;)
                                         </span>{"\n"}
                                         {"  "}&#125;{"\n"}
                                         &#125;);
@@ -246,12 +246,12 @@ export function DeveloperPlayground() {
                                 <div className="space-y-4">
                                     <div className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Custom widget registration</div>
                                     <pre className="text-surface-300">
-                                        <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">buildProperty</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/core"</span>;{"\n"}
+                                        <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">buildProperty</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/common"</span>;{"\n"}
                                         <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">RatingField</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"./widgets"</span>;{"\n\n"}
                                         <span className="text-purple-400">export const</span> ratingProperty = <span className="text-blue-400">buildProperty</span>(&#123;{"\n"}
                                         {"  "}name: <span className="text-green-400">"Rating"</span>,{"\n"}
-                                        {"  "}dataType: <span className="text-green-400">"number"</span>,{"\n"}
-                                        {"  "}customFieldWidget: <span className="text-blue-300">RatingField</span>,{"\n"}
+                                        {"  "}type: <span className="text-green-400">"number"</span>,{"\n"}
+                                        {"  "}ui: &#123; Field: <span className="text-blue-300">RatingField</span> &#125;,{"\n"}
                                         {"  "}validation: &#123;{"\n"}
                                         {"    "}min: <span className="text-amber-400">0</span>,{"\n"}
                                         {"    "}max: <span className="text-amber-400">5</span>{"\n"}

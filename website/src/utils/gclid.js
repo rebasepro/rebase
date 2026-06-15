@@ -8,7 +8,7 @@ const TRACKING_PARAMS = ["gclid", "utm_source", "utm_medium", "utm_campaign", "u
 /**
  * Get tracking parameters from the current URL
  */
-export function getTrackingParamsFromUrl() {
+function getTrackingParamsFromUrl() {
     if (typeof window === "undefined") return {};
     const urlParams = new URLSearchParams(window.location.search);
     const params = {};
@@ -26,7 +26,7 @@ export function getTrackingParamsFromUrl() {
 /**
  * Get stored tracking parameters from localStorage
  */
-export function getStoredTrackingParams() {
+function getStoredTrackingParams() {
     if (typeof window === "undefined") return {};
 
     try {
@@ -57,7 +57,7 @@ export function getStoredTrackingParams() {
 /**
  * Store tracking parameters in localStorage with timestamp
  */
-export function setStoredTrackingParams(params) {
+function setStoredTrackingParams(params) {
     if (typeof window === "undefined" || !params || Object.keys(params).length === 0) return;
 
     try {
@@ -74,7 +74,7 @@ export function setStoredTrackingParams(params) {
 /**
  * Get current tracking parameters (URL takes precedence over stored)
  */
-export function getCurrentTrackingParams() {
+function getCurrentTrackingParams() {
     const urlParams = getTrackingParamsFromUrl();
     const storedParams = getStoredTrackingParams();
 
@@ -101,7 +101,7 @@ export function captureTrackingParams() {
 /**
  * Append tracking parameters to a URL
  */
-export function appendTrackingParamsToUrl(url, params) {
+function appendTrackingParamsToUrl(url, params) {
     if (!params || Object.keys(params).length === 0) return url;
 
     try {

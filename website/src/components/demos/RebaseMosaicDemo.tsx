@@ -34,7 +34,7 @@ const MOCK_PRODUCTS: ProductItem[] = [
         name: "Cowboy Hat",
         price: "85",
         description: "Premium black felt cowboy hat with stitched band.",
-        imageUrl: "/img/product_cowboy_hat.png"
+        imageUrl: "/img/product_cowboy_hat.webp"
     },
     {
         id: "02",
@@ -42,7 +42,7 @@ const MOCK_PRODUCTS: ProductItem[] = [
         name: "Minimal Logo Tee",
         price: "39",
         description: "100% organic cotton tee with glowing front design.",
-        imageUrl: "/img/product_logo_tee.png"
+        imageUrl: "/img/product_logo_tee.webp"
     },
     {
         id: "03",
@@ -50,7 +50,7 @@ const MOCK_PRODUCTS: ProductItem[] = [
         name: "Black Outline Tee",
         price: "45",
         description: "Classic crewneck featuring visual schematics outline.",
-        imageUrl: "/img/product_logo_tee.png"
+        imageUrl: "/img/product_logo_tee.webp"
     },
     {
         id: "04",
@@ -58,7 +58,7 @@ const MOCK_PRODUCTS: ProductItem[] = [
         name: "Logo Cap",
         price: "25",
         description: "Adjustable 6-panel strapback with silver embroidery.",
-        imageUrl: "/img/product_logo_cap.png"
+        imageUrl: "/img/product_logo_cap.webp"
     }
 ];
 
@@ -701,7 +701,7 @@ export default function RebaseMosaicDemo() {
                                     className="rounded-xl border border-neutral-800/60 bg-neutral-950/40 p-1 hover:border-primary/20 transition-all duration-300">
                                     <div className="aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 relative">
                                         <img
-                                            src="/img/dam_asset_blue.png"
+                                            src="/img/dam_asset_blue.webp"
                                             alt="DAM Blue Fluid"
                                             className="w-full h-full object-cover"
                                         />
@@ -715,7 +715,7 @@ export default function RebaseMosaicDemo() {
                                     className="rounded-xl border border-neutral-800/60 bg-neutral-950/40 p-1 hover:border-primary/20 transition-all duration-300">
                                     <div className="aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 relative">
                                         <img
-                                            src="/img/dam_asset_gold.png"
+                                            src="/img/dam_asset_gold.webp"
                                             alt="DAM Gold Fluid"
                                             className="w-full h-full object-cover"
                                         />
@@ -729,7 +729,7 @@ export default function RebaseMosaicDemo() {
                                     className="rounded-xl border border-neutral-800/60 bg-neutral-950/40 p-1 hover:border-primary/20 transition-all duration-300">
                                     <div className="aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 relative">
                                         <img
-                                            src="/img/dam_asset_green.png"
+                                            src="/img/dam_asset_green.webp"
                                             alt="DAM Green Fluid"
                                             className="w-full h-full object-cover"
                                         />

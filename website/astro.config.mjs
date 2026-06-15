@@ -175,17 +175,43 @@ export default defineConfig({
         })
     ],
     vite: {
+        build: {
+            rollupOptions: {
+                output: {
+                    manualChunks(id) {
+                        // Merge Astro's prefetch into ClientRouter
+                        if (id.includes("astro/dist/assets/prefetch") ||
+                            id.includes("ClientRouter") ||
+                            id.includes("astro/transitions")) {
+                            return "astro-router";
+                        }
+                        // Bundle React runtime into a single vendor chunk
+                        if (id.includes("node_modules/react/") ||
+                            id.includes("node_modules/react-dom/") ||
+                            id.includes("react-compiler-runtime") ||
+                            id.includes("node_modules/scheduler/") ||
+                            id.includes("node_modules/clsx")) {
+                            return "react-vendor";
+                        }
+                        // Bundle @firecms/neat together with NeatBackground
+                        if (id.includes("@firecms/neat") ||
+                            id.includes("NeatBackground")) {
+                            return "neat";
+                        }
+                    }
+                }
+            }
+        },
         plugins: [
             tailwindcss(),
             yaml()
         ],
         resolve: {
-            dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+            dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "react-compiler-runtime"],
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),
-                "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src"),
-                "@firecms/neat": path.resolve(new URL(".", import.meta.url).pathname, "../../neat/lib/src")
+                "@rebasepro/admin": path.resolve(new URL(".", import.meta.url).pathname, "../packages/admin/src")
             }
         },
         optimizeDeps: {
@@ -194,7 +220,8 @@ export default defineConfig({
                 "react-dom",
                 "react/jsx-runtime",
                 "react/jsx-dev-runtime",
-                "react-dom/client"
+                "react-dom/client",
+                "react-compiler-runtime"
             ]
         },
         ssr: {

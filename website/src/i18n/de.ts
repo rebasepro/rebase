@@ -3,8 +3,7 @@ export const de = {
   "hero.title.part1": "Das Admin-Panel & API-Layer",
   "hero.title.part2": "für dein bestehendes Postgres.",
   "hero.subtitle":
-    "Verbinde Rebase mit jeder PostgreSQL-Datenbank – oder definiere dein Modell in TypeScript. Erhalte sofort eine ansprechende tabellenähnliche Admin-Oberfläche, direkte REST/GraphQL-APIs und ein typsicheres SDK. 100 % Open-Source, selbst gehostet und agenten-nativ.",
-  "hero.category": "Die Open-Source Postgres App-Plattform – CMS, BaaS und interne Tools in einem.",
+    "Die Open-Source Postgres App-Plattform – selbst gehostet und agenten-nativ.",
   "hero.cta.demo": "Demo ausprobieren",
   "hero.cta.github": "Auf GitHub ansehen",
   "demo.badge": "Drei Befehle. Kein Boilerplate.",
@@ -428,7 +427,7 @@ export const de = {
   "pricing.meta.description": "Wähle den passenden Plan für dein Team. Von freiem Open-Source-Self-Hosting bis hin zu Unternehmens-Zusammenarbeit und serverlosem Branching.",
 
   // Manifesto Banner
-  "banner.title.control": "Hör auf, deine Datenbank zu mieten. Besitze deinen Stack.",
+  "banner.title.control": "Hör auf, deine Datenbank zu mieten.<br/> Besitze deinen Stack.",
   "banner.title.mission": "Wir holen uns die Kontrolle über unseren Stack zurück.",
   "banner.title.founders": "Ein offener Brief an Entwickler, denen Datensouveränität wichtig ist.",
   "banner.cta": "Das Manifest lesen",

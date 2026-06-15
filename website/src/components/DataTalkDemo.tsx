@@ -45,7 +45,7 @@ const defaultExchanges: Exchange[] = [
 
 export function DataTalkDemo({
                                  exchanges = defaultExchanges,
-                                 height
+                                 height = "480px"
                              }: {
     height?: string | number;
     exchanges?: Exchange[]
@@ -238,7 +238,7 @@ const categoryColors = [
     "bg-indigo-950 text-indigo-200"
 ];
 
-export function ProductsDemoTable() {
+function ProductsDemoTable() {
 
     return (
         <div
@@ -327,7 +327,7 @@ const statusColors: Record<string, string> = {
     "Pending": "bg-yellow-950 text-yellow-200"
 };
 
-export function UsersDemoTable() {
+function UsersDemoTable() {
     return (
         <div
             className="h-full w-full flex flex-col rounded-xl border border-surface-800 bg-surface-950/70 backdrop-blur-sm shadow-lg shadow-black/20">

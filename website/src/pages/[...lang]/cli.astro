@@ -1,5 +1,5 @@
 ---
-import { languages, defaultLang, useTranslations, useTranslatedPath } from '../../i18n/ui';
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({
@@ -17,21 +17,11 @@ import CliContent from '../../components/pages/CliContent.astro';
 const title = t("cli.meta.title");
 const description = t("cli.meta.description");
 
-const translatePath = useTranslatedPath(currentLang as keyof typeof languages);
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },
     { name: "CLI & Tooling", url: "https://rebase.pro/cli" }
 ];
 ---
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>
-    <script is:inline slot="head" define:vars={{ targetUrl: translatePath("/developers") }}>
-      (function() {
-        try {
-          if (document.documentElement.getAttribute('data-ab-navigation-structure') === 'flat-nav') {
-            window.location.replace(targetUrl);
-          }
-        } catch(e) {}
-      })();
-    </script>
     <CliContent lang={currentLang} t={t} />
 </Layout>

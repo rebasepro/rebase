@@ -3,8 +3,7 @@ export const es = {
   "hero.title.part1": "El Panel de Administración y Capa de API",
   "hero.title.part2": "para tu Postgres Existente.",
   "hero.subtitle":
-    "Coloca Rebase en cualquier base de datos PostgreSQL—o define tu modelo en TypeScript. Obtén instantáneamente una hermosa interfaz de administración tipo hoja de cálculo, APIs REST/GraphQL instantáneas y un SDK seguro. 100% de código abierto, autohospedado y nativo de agentes.",
-  "hero.category": "La plataforma de aplicaciones Postgres de código abierto: CMS, BaaS y herramientas internas en uno.",
+    "La plataforma de aplicaciones Postgres de código abierto — autoalojada y nativa de agentes.",
   "hero.cta.demo": "Probar la Demo",
   "hero.cta.github": "Ver en GitHub",
   "demo.badge": "Tres comandos. Cero boilerplate.",
@@ -438,7 +437,7 @@ export const es = {
   "pricing.meta.description": "Elige el plan adecuado para tu equipo. Desde alojamiento propio gratuito de código abierto hasta colaboración empresarial y ramificación sin servidor.",
 
   // Manifesto Banner
-  "banner.title.control": "Deja de alquilar tu base de datos. Sé dueño de tu infraestructura.",
+  "banner.title.control": "Deja de alquilar tu base de datos.<br/> Sé dueño de tu infraestructura.",
   "banner.title.mission": "Estamos recuperando el control de nuestra infraestructura.",
   "banner.title.founders": "Una carta abierta para desarrolladores que valoran la propiedad de sus datos.",
   "banner.cta": "Leer el Manifiesto",
