@@ -179,7 +179,7 @@ const postsCollection: PostgresCollection = {
 The `drizzle.config.ts` includes multiple layers of safety to ensure tables/objects in the database that are **not** part of the Rebase schema are never modified or dropped:
 
 1. **`tablesFilter`** — Only tables exported from `schema.generated.ts` are managed. All other tables are invisible to drizzle-kit.
-2. **`schemaFilter: ["public"]`** — Restricts drizzle-kit to the `public` PostgreSQL schema. Tables in other schemas (e.g. `rebase`, extension schemas) are untouched.
+2. **`schemaFilter`** — Restricts drizzle-kit to the schemas defined in your collections (excluding the system `"rebase"` schema). Tables in other schemas (e.g. `rebase`, extension schemas) are untouched.
 3. **`entities.roles: false`** — Prevents drizzle-kit from managing database roles.
 4. **`extensionsFilters: ["postgis"]`** — Ignores helper tables created by PostGIS and similar extensions.
 5. **`--strict --verbose` flags on `db push`** — Always prompts before destructive operations and shows all SQL being executed.

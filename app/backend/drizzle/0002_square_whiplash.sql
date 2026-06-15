@@ -1,4 +1,4 @@
--- We skip CREATE SCHEMA "rebase"; and CREATE TABLE "rebase"."users" because they already exist in the database.
+-- We skip CREATE SCHEMA IF NOT EXISTS "rebase"; and CREATE TABLE "rebase"."users" because they already exist in the database.
 
 -- Ensure roles exist in the database
 DO $$

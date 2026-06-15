@@ -16,15 +16,18 @@ if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is not set. Make sure .env file exists in the project root and contains DATABASE_URL");
 }
 
-// Extract table names from the generated schema.
-// This ensures drizzle-kit ONLY manages tables defined in the schema.
-// Any tables in the database that are NOT part of the Rebase schema are left untouched.
-const tableNames = Object.values(tables).map(table => getTableName(table as PgTable));
+// Extract table names from the generated schema, excluding system tables in the 'rebase' schema.
+// This ensures drizzle-kit ONLY manages tables defined in the schema, and ignores the system tables
+// managed by Rebase's own bootstrapper.
+const tableNames = Object.values(tables)
+    .filter(table => getTableConfig(table as PgTable).schema !== "rebase")
+    .map(table => getTableName(table as PgTable));
 
-// Dynamically extract all schemas defined in the generated tables to ensure Drizzle Kit manages them.
+// Dynamically extract all schemas defined in the generated tables (excluding 'rebase') to ensure Drizzle Kit manages them.
 const schemas = Array.from(new Set(
     Object.values(tables)
         .map(table => getTableConfig(table as PgTable).schema || "public")
+        .filter(schema => schema !== "rebase")
 ));
 
 export default defineConfig({

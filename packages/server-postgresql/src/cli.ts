@@ -436,15 +436,28 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
         // dotenv may not be available — fall through
     }
 
-    const interactive = ["generate", "push"].includes(action);
+    const interactive = ["generate", "push"].includes(action) && Boolean(process.stdout.isTTY);
 
     // For push: always use --strict (prompts before destructive ops) and --verbose
     // (shows all SQL). This ensures unmapped tables are never silently dropped.
     const drizzleKitArgs = [action];
     if (action === "push") {
         drizzleKitArgs.push("--strict", "--verbose");
-        if (_rawArgs.includes("--force")) {
-            drizzleKitArgs.push("--force");
+    }
+
+    // Forward any additional arguments, excluding schema-generator-specific options
+    const excludedFlags = ["--collections", "-c", "--output", "-o", "--watch", "-w"];
+    for (let i = 2; i < _rawArgs.length; i++) {
+        const arg = _rawArgs[i];
+        if (excludedFlags.includes(arg)) {
+            // Skip this flag and its value if it takes a parameter
+            if (["--collections", "-c", "--output", "-o"].includes(arg)) {
+                i++; // Skip the next arg (the value)
+            }
+            continue;
+        }
+        if (!drizzleKitArgs.includes(arg)) {
+            drizzleKitArgs.push(arg);
         }
     }
 
@@ -456,7 +469,7 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
                 env
             });
         } else {
-            const child = execa(drizzleKitBin, [action], {
+            const child = execa(drizzleKitBin, drizzleKitArgs, {
                 cwd: process.cwd(),
                 env,
                 reject: false
@@ -473,20 +486,28 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
             const stdout = stripAnsi(result.stdout || "").trim();
             const stderr = stripAnsi(result.stderr || "").trim();
 
-            if (result.exitCode !== 0) {
+            const hasTtyError = stdout.includes("Interactive prompts require a TTY terminal") || 
+                               stderr.includes("Interactive prompts require a TTY terminal");
+
+            if (result.exitCode !== 0 || hasTtyError) {
                 console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
-                const errorOutput = stderr || stdout;
-                if (errorOutput) {
-                    const lines = errorOutput.split("\n").filter((l: string) => l.trim());
-                    let printedCount = 0;
-                    for (const line of lines) {
-                        if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
-                            console.error(chalk.red(`  ${line.trim()}`));
-                            printedCount++;
+                if (hasTtyError) {
+                    console.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
+                    console.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
+                } else {
+                    const errorOutput = stderr || stdout;
+                    if (errorOutput) {
+                        const lines = errorOutput.split("\n").filter((l: string) => l.trim());
+                        let printedCount = 0;
+                        for (const line of lines) {
+                            if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
+                                console.error(chalk.red(`  ${line.trim()}`));
+                                printedCount++;
+                            }
                         }
-                    }
-                    if (printedCount === 0) {
-                        lines.slice(0, 10).forEach(line => console.error(chalk.red(`  ${line.trim()}`)));
+                        if (printedCount === 0) {
+                            lines.slice(0, 10).forEach(line => console.error(chalk.red(`  ${line.trim()}`)));
+                        }
                     }
                 }
                 console.error("");
@@ -498,15 +519,21 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
         // eslint-disable-next-line no-control-regex
         const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
         const cleaned = stripAnsi(msg).trim();
+        const hasTtyError = cleaned.includes("Interactive prompts require a TTY terminal");
         console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
-        const lines = cleaned.split("\n").filter((l: string) => l.trim());
-        for (const line of lines) {
-            if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates")) {
-                console.error(chalk.red(`  ${line.trim()}`));
+        if (hasTtyError) {
+            console.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
+            console.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
+        } else {
+            const lines = cleaned.split("\n").filter((l: string) => l.trim());
+            for (const line of lines) {
+                if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates")) {
+                    console.error(chalk.red(`  ${line.trim()}`));
+                }
             }
-        }
-        if (lines.length === 0) {
-            console.error(chalk.gray(`  ${cleaned}`));
+            if (lines.length === 0) {
+                console.error(chalk.gray(`  ${cleaned}`));
+            }
         }
         console.error("");
         process.exit(1);

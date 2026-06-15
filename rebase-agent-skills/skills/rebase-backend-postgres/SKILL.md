@@ -473,11 +473,14 @@ import { tables } from "./src/schema.generated";
 import { getTableName } from "drizzle-orm";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 
-const tableNames = Object.values(tables).map(table => getTableName(table as PgTable));
+const tableNames = Object.values(tables)
+    .filter(table => getTableConfig(table as PgTable).schema !== "rebase")
+    .map(table => getTableName(table as PgTable));
 
 const schemas = Array.from(new Set(
     Object.values(tables)
         .map(table => getTableConfig(table as PgTable).schema || "public")
+        .filter(schema => schema !== "rebase")
 ));
 
 export default defineConfig({
