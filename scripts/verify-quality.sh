@@ -39,8 +39,17 @@ else
     err "ESLint checks failed. Please fix style or React rules violations."
 fi
 
-# 3. Unit Tests Check
-section "3. Unit Tests Suite"
+# 3. Fallow Dead Code & Structural Analysis
+section "3. Dead Code & Structural Analysis (Fallow)"
+echo "Running Fallow analysis..."
+if npx fallow --quiet --fail-on-issues 2>/dev/null; then
+    ok "No dead code or structural issues found."
+else
+    warn "Fallow found dead code or structural issues. Run 'npx fallow' for details."
+fi
+
+# 4. Unit Tests Check
+section "4. Unit Tests Suite"
 echo "Running unit tests (pnpm test)..."
 if pnpm test; then
     ok "All unit tests passed successfully."
@@ -48,8 +57,8 @@ else
     err "Some unit tests failed."
 fi
 
-# 4. E2E Tests Check
-section "4. Playwright E2E Integration Suite"
+# 5. E2E Tests Check
+section "5. Playwright E2E Integration Suite"
 echo "Running Playwright E2E tests (including SQL Console and Collection Editor)..."
 if pnpm run e2e; then
     ok "All E2E integration tests passed successfully."
@@ -57,8 +66,8 @@ else
     err "Playwright E2E tests failed."
 fi
 
-# 5. Build Health Check (Vite & Bundles)
-section "5. Bundle ESM/CJS Health Check"
+# 6. Build Health Check (Vite & Bundles)
+section "6. Bundle ESM/CJS Health Check"
 if [ -f "./scripts/check-packages.sh" ]; then
     echo "Running build-health package check..."
     if ./scripts/check-packages.sh; then

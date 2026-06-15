@@ -1,3 +1,4 @@
+trustLockfile: true
 packages:
   - packages/*
   - app
@@ -21,4 +22,7 @@ allowBuilds:
   puppeteer: true
   sharp: true
   ssh2: true
-
+minimumReleaseAgeExclude:
+  - '@firecms/neat@0.9.2'
+  - '@firecms/neat@0.9.3-canary.20260615000629'
+  - '@firecms/neat@0.9.3-canary.20260615103956'

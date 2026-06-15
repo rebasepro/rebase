@@ -32,6 +32,14 @@ function findParentDir(currentDir: string, targetName: string): string | null {
 
 const cliRoot = findParentDir(__dirname, "cli");
 
+export type TemplatePreset = "blog" | "ecommerce" | "blank";
+
+const PRESET_CHOICES: Array<{ name: string; value: TemplatePreset; short: string }> = [
+    { name: "Blog         — Posts, Authors, Tags (with markdown editor)", value: "blog", short: "Blog" },
+    { name: "E-commerce   — Products, Categories, Orders", value: "ecommerce", short: "E-commerce" },
+    { name: "Blank        — Empty project, just authentication", value: "blank", short: "Blank" }
+];
+
 export interface InitOptions {
     projectName: string;
     git: boolean;
@@ -40,6 +48,8 @@ export interface InitOptions {
     templateDirectory: string;
     databaseUrl?: string;
     introspect?: boolean;
+    /** Starter template preset. */
+    preset: TemplatePreset;
     /** Detected package manager (pnpm or npm). */
     pm: PackageManager;
     /** Command helpers for the detected PM. */
@@ -63,9 +73,11 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             "--install": Boolean,
             "--database-url": String,
             "--introspect": Boolean,
+            "--template": String,
             "--yes": Boolean,
             "-g": "--git",
             "-i": "--install",
+            "-t": "--template",
             "-y": "--yes"
         },
         {
@@ -77,6 +89,12 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     // The first positional arg after "init" is the project name
     const nameArg = args._[0];
     const isNonInteractive = args["--yes"] || false;
+
+    const templateArg = args["--template"] as TemplatePreset | undefined;
+    if (templateArg && !PRESET_CHOICES.some(p => p.value === templateArg)) {
+        console.error(chalk.red(`Unknown template "${templateArg}". Available: ${PRESET_CHOICES.map(p => p.value).join(", ")}`));
+        process.exit(1);
+    }
 
     if (isNonInteractive) {
         const projectName = nameArg || "my-rebase-app";
@@ -92,6 +110,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             templateDirectory,
             databaseUrl: args["--database-url"] || undefined,
             introspect: args["--introspect"] || false,
+            preset: templateArg || "blog",
             pm,
             pmCommands
         };
@@ -112,6 +131,16 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
                 }
                 return true;
             }
+        });
+    }
+
+    if (!templateArg) {
+        questions.push({
+            type: "list",
+            name: "preset",
+            message: "Choose a starter template:",
+            choices: PRESET_CHOICES,
+            default: "blog"
         });
     }
 
@@ -169,6 +198,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         templateDirectory,
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
         introspect: answers.introspect || false,
+        preset: templateArg || (answers.preset as TemplatePreset) || "blog",
         pm,
         pmCommands
     };
@@ -208,6 +238,9 @@ async function createProject(options: InitOptions) {
         console.error(`${chalk.red.bold("ERROR")} Failed to copy template files: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
     }
+
+    // Apply the selected template preset (swap collection files)
+    await applyPreset(options.targetDirectory, options.preset);
 
     // Replace placeholder project name in package.json files
     await replacePlaceholders(options);
@@ -311,6 +344,55 @@ async function createProject(options: InitOptions) {
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
     console.log(chalk.gray("GitHub: https://github.com/rebasepro/rebase"));
     console.log("");
+}
+
+/**
+ * Apply a template preset by replacing the default collection files.
+ *
+ * The template ships with blog collections at the top level and
+ * preset alternatives under `config/collections/presets/<name>/`.
+ * This function swaps the active collection files and removes the
+ * presets directory so the final project is clean.
+ */
+async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<void> {
+    const collectionsDir = path.join(targetDirectory, "config", "collections");
+    const presetsDir = path.join(collectionsDir, "presets");
+
+    if (preset !== "blog") {
+        const presetDir = path.join(presetsDir, preset);
+        if (!fs.existsSync(presetDir)) {
+            console.warn(chalk.yellow(`  Warning: Preset "${preset}" not found, falling back to blog template.`));
+            cleanupPresets(presetsDir);
+            return;
+        }
+
+        // Remove the default blog collection files (keep users.ts — it's shared)
+        const blogFiles = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
+        for (const file of blogFiles) {
+            const filePath = path.join(collectionsDir, file);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+
+        // Copy preset files into the collections directory
+        const presetFiles = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
+        for (const file of presetFiles) {
+            fs.copyFileSync(
+                path.join(presetDir, file),
+                path.join(collectionsDir, file)
+            );
+        }
+    }
+
+    // Always clean up the presets directory — it shouldn't ship with the final project
+    cleanupPresets(presetsDir);
+}
+
+function cleanupPresets(presetsDir: string): void {
+    if (fs.existsSync(presetsDir)) {
+        fs.rmSync(presetsDir, { recursive: true, force: true });
+    }
 }
 
 async function replacePlaceholders(options: InitOptions) {

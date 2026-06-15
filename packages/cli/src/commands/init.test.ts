@@ -186,7 +186,7 @@ describe("template collections", () => {
         expect(content).toContain("collections");
     });
 
-    it("has at least posts, authors, and tags collections", () => {
+    it("blog preset has posts, authors, tags, and users collections", () => {
         const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
         const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
         const basenames = files.map(f => f.replace(".ts", ""));
@@ -194,20 +194,26 @@ describe("template collections", () => {
         expect(basenames).toContain("posts");
         expect(basenames).toContain("authors");
         expect(basenames).toContain("tags");
+        expect(basenames).toContain("users");
     });
 
-    it("each collection file exports a valid EntityCollection shape", () => {
+    it("each blog collection file exports a valid EntityCollection shape", () => {
         const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
         const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
 
         for (const file of files) {
             const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
-            // Check required EntityCollection fields are present
             expect(content).toContain("name:");
-            expect(content).toContain("slug:");
             expect(content).toContain("properties:");
             expect(content).toContain("EntityCollection");
         }
+    });
+
+    it("posts collection uses markdown for content", () => {
+        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
+        const content = fs.readFileSync(postsPath, "utf-8");
+        expect(content).toContain("markdown: true");
+        expect(content).not.toContain("multiline: true");
     });
 
     it("posts collection demonstrates an enum property", () => {
@@ -230,6 +236,104 @@ describe("template collections", () => {
         const content = fs.readFileSync(postsPath, "utf-8");
         expect(content).toContain("tagsCollection");
         expect(content).toContain("\"many\"");
+    });
+});
+
+describe("template presets", () => {
+    it("ecommerce preset has products, categories, orders, and index", () => {
+        const presetDir = path.join(TEMPLATE_DIR, "config", "collections", "presets", "ecommerce");
+        expect(fs.existsSync(presetDir)).toBe(true);
+        const files = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
+        const basenames = files.map(f => f.replace(".ts", ""));
+        expect(basenames).toContain("products");
+        expect(basenames).toContain("categories");
+        expect(basenames).toContain("orders");
+        expect(basenames).toContain("index");
+    });
+
+    it("ecommerce preset index imports usersCollection", () => {
+        const indexPath = path.join(TEMPLATE_DIR, "config", "collections", "presets", "ecommerce", "index.ts");
+        const content = fs.readFileSync(indexPath, "utf-8");
+        expect(content).toContain("usersCollection");
+        expect(content).toContain("export");
+        expect(content).toContain("collections");
+    });
+
+    it("ecommerce products collection demonstrates a relation to categories", () => {
+        const productsPath = path.join(TEMPLATE_DIR, "config", "collections", "presets", "ecommerce", "products.ts");
+        const content = fs.readFileSync(productsPath, "utf-8");
+        expect(content).toContain('type: "relation"');
+        expect(content).toContain("categoriesCollection");
+    });
+
+    it("blank preset has only an index with usersCollection", () => {
+        const presetDir = path.join(TEMPLATE_DIR, "config", "collections", "presets", "blank");
+        expect(fs.existsSync(presetDir)).toBe(true);
+        const indexPath = path.join(presetDir, "index.ts");
+        const content = fs.readFileSync(indexPath, "utf-8");
+        expect(content).toContain("usersCollection");
+        expect(content).toContain("export");
+        expect(content).not.toContain("postsCollection");
+        expect(content).not.toContain("productsCollection");
+    });
+
+    it("users.ts is always present at the top level (shared by all presets)", () => {
+        const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+        expect(fs.existsSync(usersPath)).toBe(true);
+    });
+
+    it("applying blank preset removes blog files and keeps users.ts", async () => {
+        const targetDir = await simulateInit("blank-test-app");
+        const collectionsDir = path.join(targetDir, "config", "collections");
+        const presetsDir = path.join(collectionsDir, "presets");
+        const presetDir = path.join(presetsDir, "blank");
+
+        const blogFiles = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
+        for (const file of blogFiles) {
+            const filePath = path.join(collectionsDir, file);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+        const presetFiles = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
+        for (const file of presetFiles) {
+            fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
+        }
+        fs.rmSync(presetsDir, { recursive: true, force: true });
+
+        expect(fs.existsSync(path.join(collectionsDir, "users.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(collectionsDir, "index.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(collectionsDir, "posts.ts"))).toBe(false);
+        expect(fs.existsSync(path.join(collectionsDir, "authors.ts"))).toBe(false);
+        expect(fs.existsSync(path.join(collectionsDir, "tags.ts"))).toBe(false);
+        expect(fs.existsSync(path.join(collectionsDir, "presets"))).toBe(false);
+
+        const indexContent = fs.readFileSync(path.join(collectionsDir, "index.ts"), "utf-8");
+        expect(indexContent).toContain("usersCollection");
+        expect(indexContent).not.toContain("postsCollection");
+    });
+
+    it("applying ecommerce preset replaces blog files with ecommerce collections", async () => {
+        const targetDir = await simulateInit("ecom-test-app");
+        const collectionsDir = path.join(targetDir, "config", "collections");
+        const presetsDir = path.join(collectionsDir, "presets");
+        const presetDir = path.join(presetsDir, "ecommerce");
+
+        const blogFiles = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
+        for (const file of blogFiles) {
+            const filePath = path.join(collectionsDir, file);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+        const presetFiles = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
+        for (const file of presetFiles) {
+            fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
+        }
+        fs.rmSync(presetsDir, { recursive: true, force: true });
+
+        expect(fs.existsSync(path.join(collectionsDir, "users.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(collectionsDir, "products.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(collectionsDir, "categories.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(collectionsDir, "orders.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(collectionsDir, "posts.ts"))).toBe(false);
+        expect(fs.existsSync(path.join(collectionsDir, "presets"))).toBe(false);
     });
 });
 

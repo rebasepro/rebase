@@ -26,7 +26,7 @@ const postsCollection: EntityCollection = {
         content: {
             name: "Content",
             type: "string",
-            multiline: true
+            markdown: true
         },
         status: {
             name: "Status",
