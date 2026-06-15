@@ -38,7 +38,7 @@ export function NavigationCardBinding({
 }) {
 
     const userConfigurationPersistence = useUserConfigurationPersistence();
-    const collectionIcon = <IconForView collectionOrView={collection ?? view}/>;
+    const collectionIcon = <IconForView collectionOrView={collection ?? view} size={"small"}/>;
 
     const navigate = useNavigate();
     const context = useRebaseContext();
