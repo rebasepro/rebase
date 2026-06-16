@@ -17,11 +17,9 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 1 — HERO
          ═══════════════════════════════════════════════════════════════ -->
-    <section class="relative isolate overflow-hidden bg-black -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
+    <section class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
         <NeatHeroBackground client:idle />
         <!-- Radial glow for readability -->
-        <div class="absolute inset-0 pointer-events-none" aria-hidden="true"
-             style="background: radial-gradient(ellipse 45% 32% at 50% 55%, rgba(0, 112, 244, 0.18) 0%, rgba(0, 80, 200, 0.08) 45%, transparent 80%);"></div>
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
             <!-- Badge -->
@@ -34,8 +32,6 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
 
             <!-- Headline -->
             <div class="relative">
-                <div class="absolute inset-0 pointer-events-none" aria-hidden="true"
-                     style="background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 112, 244, 0.10) 0%, rgba(0, 80, 200, 0.05) 45%, transparent 75%); filter: blur(20px);"></div>
                 <h1 class="relative mb-6 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
                     Why developers choose<br /><span class="text-primary subtle-shimmer">Rebase</span>
                 </h1>
@@ -98,7 +94,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 2 — SOCIAL PROOF
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-social-proof" class="relative z-0 bg-black py-20 sm:py-28">
+    <section id="why-social-proof" class="relative z-0 py-20 sm:py-28">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">Trusted by developers and teams at</p>
             <ClientLogos />
@@ -118,7 +114,6 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 4 — "SEE IT IN ACTION" — PRODUCT SHOWCASE BENTO GRID
          ═══════════════════════════════════════════════════════════════ -->
     <section id="why-showcase" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents blob={{ position: "bottom", size: "lg" }} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">See it in action</h2>
@@ -298,8 +293,8 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 5 — DATA OWNERSHIP: "YOUR POSTGRES. YOUR RULES."
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-data-ownership" class="relative z-0 py-28 sm:py-36 overflow-hidden bg-black">
-        <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "md" }} />
+    <section id="why-data-ownership" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+        <SectionBackgroundAccents topLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 items-center">
                 <!-- Text side -->
@@ -503,8 +498,8 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 8 — "CHOOSE YOUR PATH" — PERSONA CARDS
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-personas" class="relative z-0 py-28 sm:py-36 overflow-hidden bg-black">
-        <SectionBackgroundAccents topLine={true} blob={{ position: "bottom", size: "sm" }} />
+    <section id="why-personas" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+        <SectionBackgroundAccents topLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center mb-14 animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Explore deeper</h2>
@@ -593,8 +588,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 9 — FINAL CTA
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden bg-black">
-        <SectionBackgroundAccents blob={{ position: "bottom", size: "lg" }} />
+    <section id="why-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
             <div class="animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Get started</h2>

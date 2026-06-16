@@ -2,6 +2,8 @@
   "extends": "../../packages/core/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
+    "rootDir": "../..",
+    "types": [],
     "useDefineForClassFields": true,
     "lib": [
       "DOM",

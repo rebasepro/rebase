@@ -29,12 +29,10 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Hero -->
     <section id="s-hero"
-             class="relative isolate overflow-hidden bg-black -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
+             class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
         <!-- Animated WebGL gradient background (Neat - funky preset) -->
         <NeatHeroBackground client:idle/>
-        <!-- Subtle radial glow over the gradient for text readability -->
-        <div class="absolute inset-0 pointer-events-none" aria-hidden="true"
-             style="background: radial-gradient(ellipse 45% 32% at 50% 55%, rgba(0, 112, 244, 0.18) 0%, rgba(0, 80, 200, 0.08) 45%, transparent 80%);"></div>
+
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
             <!-- Badge -->
@@ -47,8 +45,7 @@ const translatePath = useTranslatedPath(lang);
 
             <!-- Headline -->
             <div class="relative">
-                <div class="absolute inset-0 pointer-events-none" aria-hidden="true"
-                     style="background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 112, 244, 0.10) 0%, rgba(0, 80, 200, 0.05) 45%, transparent 75%); filter: blur(20px);"></div>
+
                 <h1 class="relative mb-6 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
                     {t("hero.title.part1")}<br/><span class="text-primary subtle-shimmer">{t("hero.title.part2")}</span>
                 </h1>
@@ -127,7 +124,7 @@ const translatePath = useTranslatedPath(lang);
     </section>
 
     <!-- Social proof -->
-    <section id="s-social-proof" class="relative z-0 bg-black py-20 sm:py-28">
+    <section id="s-social-proof" class="relative z-0 py-20 sm:py-28">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">{t("social.title")}</p>
             <ClientLogos/>
@@ -155,7 +152,7 @@ const translatePath = useTranslatedPath(lang);
 
 
     <!-- How it works -->
-    <section id="s-how-it-works" class="relative z-0 py-28 sm:py-36 overflow-hidden bg-black">
+    <section id="s-how-it-works" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-12">
             <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">{t("howitworks.badge")}</h2>
@@ -342,10 +339,7 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Power features with videos -->
     <section id="s-power-features" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents blob={{
-            position: "bottom",
-            size: "lg"
-        }}/>
+
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{t("features.title")}</h2>
@@ -804,13 +798,9 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- AI & Agents Section -->
     <section id="s-ai-apps"
-             class="relative isolate bg-black py-28 sm:py-36 overflow-hidden ">
-        <SectionBackgroundAccents blob={{
-            position: "top",
-            size: "lg"
-        }}/>
+             class="relative isolate py-28 sm:py-36 overflow-hidden ">
+
         <div class="pointer-events-none absolute inset-0 -z-10">
-            <div class="absolute -bottom-40 left-1/3 w-[700px] h-[700px] rounded-full bg-primary/5 blur-3xl opacity-50"></div>
             <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
         </div>
 
@@ -1462,11 +1452,8 @@ const translatePath = useTranslatedPath(lang);
     </div>
 
     <!-- Two big punches — sell feelings, link to depth -->
-    <section id="s-security" class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents blob={{
-            position: "bottom",
-            size: "md"
-        }}/>
+    <section id="s-security" class="relative isolate py-28 sm:py-36 overflow-hidden">
+
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
@@ -1600,7 +1587,7 @@ const translatePath = useTranslatedPath(lang);
     </section>
 
     <!-- FAQ -->
-    <section id="s-faq" class="bg-black py-28 sm:py-36">
+    <section id="s-faq" class="py-28 sm:py-36">
         <div class="mx-auto max-w-7xl px-6">
             <div class="mx-auto max-w-3xl text-center animate-on-scroll fade-in-up">
                 <h2 class="text-3xl sm:text-4xl font-semibold text-white">{t("faq.title")}</h2>
@@ -1658,10 +1645,7 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Final CTA -->
     <section id="s-final-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents blob={{
-            position: "top",
-            size: "lg"
-        }}/>
+
         <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4 animate-on-scroll fade-in-up">
                 {t("cta.title")}

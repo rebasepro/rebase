@@ -7,6 +7,20 @@ import {
   Info, Package, X, Maximize2, Code
 } from "lucide-react";
 
+/* ─── Responsive hook ─── */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia(query);
+    setMatches(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
 /* ─── Types ─── */
 interface Order {
   id: string;
@@ -114,13 +128,13 @@ function OrderRow({ order, isHovered, isSelected, onHover, onLeave }: {
           </span>
         </div>
       </div>
-      <div className="flex-shrink-0 mx-4">
-        <span className="rounded-md inline-flex items-center px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+      <div className="flex-shrink-0 mx-2 sm:mx-4">
+        <span className="rounded-md inline-flex items-center px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-medium whitespace-nowrap"
           style={{ backgroundColor: statusColor.bg, color: statusColor.text }}>
           {order.status}
         </span>
       </div>
-      <div className="flex-shrink-0 w-16 text-right text-xs text-surface-400 dark:text-surface-500">{order.date}</div>
+      <div className="flex-shrink-0 w-16 text-right text-xs text-surface-400 dark:text-surface-500 hidden sm:block">{order.date}</div>
     </div>
   );
 }
@@ -232,6 +246,9 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
   const [highlightedKPI, setHighlightedKPI] = useState<number | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [highlightedField, setHighlightedField] = useState<string | null>(null);
+
+  const isMobile = useMediaQuery("(max-width: 639px)");
+  const isMedium = useMediaQuery("(min-width: 640px) and (max-width: 767px)");
 
   const panelOpen = selectedOrderId !== null;
   const selectedOrder = MOCK_ORDERS.find((o) => o.id === selectedOrderId);
@@ -427,14 +444,23 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
 
           {/* Content area — list + panel split */}
           <div className="h-full w-full flex bg-white dark:bg-surface-950 overflow-hidden relative">
-            {/* Left: list content (shrinks when panel opens) */}
-            <div className="flex flex-col overflow-auto transition-all duration-150 ease-out" style={{ width: panelOpen ? "45%" : "100%" }}>
+            {/* Left: list content (shrinks when panel opens; hidden on mobile when panel is open) */}
+            <div
+              className="flex flex-col overflow-auto transition-all duration-150 ease-out"
+              style={{
+                width: panelOpen
+                  ? isMobile ? "0%" : isMedium ? "35%" : "45%"
+                  : "100%",
+                opacity: panelOpen && isMobile ? 0 : 1,
+                ...(panelOpen && isMobile ? { overflow: "hidden" } : {}),
+              }}
+            >
               {/* Title + KPIs — hidden when split panel is open */}
               {!panelOpen && (
                 <>
-                  <div className="px-6 pt-4 pb-3 max-w-3xl mx-auto w-full">
+                  <div className="px-4 sm:px-6 pt-4 pb-3 max-w-3xl mx-auto w-full">
                     <div className="text-lg font-bold text-surface-900 dark:text-white mb-3">Orders</div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                       <KPICard title="Confirmed" subtitle="" value="15.0"
                         change={{ value: "+18.0%", positive: true }} icon={<Info size={14} />}
                         isHighlighted={highlightedKPI === 0} />
@@ -464,12 +490,15 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
               </div>
             </div>
 
-            {/* Right: detail panel (split view) */}
+            {/* Right: detail panel (split view; full-width overlay on mobile) */}
             <div
               className="border-l border-surface-200/20 dark:border-surface-700/30 bg-white dark:bg-surface-900 shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col transition-all duration-150 ease-out overflow-hidden"
               style={{
-                width: panelOpen ? "55%" : "0%",
+                width: panelOpen
+                  ? isMobile ? "100%" : isMedium ? "65%" : "55%"
+                  : "0%",
                 opacity: panelOpen ? 1 : 0,
+                ...(panelOpen && isMobile ? { borderLeft: "none" } : {}),
               }}
             >
               {selectedOrder && (

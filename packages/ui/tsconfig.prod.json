@@ -1,10 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "rootDir": "./src",
     "types": [
       "vite/client",
       "node"
-    ]
+    ],
+    "paths": {}
   },
   "exclude": [
     "node_modules",

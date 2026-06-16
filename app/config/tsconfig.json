@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "rootDir": "../../",
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -12,6 +14,7 @@
     "declaration": true,
     "outDir": "./dist",
     "skipLibCheck": true,
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "baseUrl": "../../",

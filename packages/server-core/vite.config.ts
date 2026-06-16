@@ -10,8 +10,8 @@ const ReactCompilerConfig = {
 
 /**
  * Only externalize dependencies that the consumer app installs directly.
- * Everything else (transitive deps like jsonwebtoken, ws, zod, etc.)
- * gets inlined so linked consumers work without installing them.
+ * Everything else gets inlined so linked consumers work without installing them.
+ * The createRequire banner in output config provides require() for inlined CJS deps.
  */
 const CONSUMER_EXTERNALS = [
     "hono",
@@ -25,7 +25,7 @@ const CONSUMER_EXTERNALS = [
     "fsevents",
     "ws",
     "ts-morph",
-    "sharp"
+    "sharp",
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
@@ -34,8 +34,8 @@ const isExternal = (id: string) => {
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
     // Externalize Node built-ins
-    if (["fs", "path", "url", "util", "crypto", "http", "https", "net", "tls", "stream", "events", "os", "child_process", "buffer", "assert", "dns", "zlib", "querystring", "node:"].some(b => id === b || id.startsWith("node:") || id.startsWith(b + "/"))) return true;
-    // Inline everything else (jsonwebtoken, ws, zod, etc.)
+    if (["fs", "path", "url", "util", "crypto", "http", "https", "net", "tls", "stream", "events", "os", "child_process", "buffer", "assert", "dns", "zlib", "querystring", "process", "module", "worker_threads", "v8", "vm", "string_decoder", "node:"].some(b => id === b || id.startsWith("node:") || id.startsWith(b + "/"))) return true;
+    // Inline everything else — createRequire banner handles require() for CJS deps
     return false;
 };
 
@@ -55,6 +55,7 @@ export default defineConfig(() => ({
         rollupOptions: {
             external: isExternal,
             output: {
+                banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);',
                 globals: {
                     "json-logic-js": "jsonLogic",
                     "fast-equals": "fastEquals",

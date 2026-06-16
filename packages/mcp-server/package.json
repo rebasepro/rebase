@@ -16,11 +16,11 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@rebasepro/client": "workspace:*",
-    "dotenv": "^16.6.1"
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
-    "@types/node": "^20.19.41",
-    "typescript": "^5.9.3"
+    "@types/node": "^25.9.3",
+    "typescript": "^6.0.3"
   },
   "files": [
     "bin/",

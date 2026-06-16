@@ -1,6 +1,4 @@
 import { useEffect, useRef } from "react";
-import { NeatGradient } from "@firecms/neat";
-import type { NeatConfig } from "@firecms/neat";
 
 const NEAT_BASE_CONFIG = {
     licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
@@ -131,31 +129,37 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         if (!canvasRef.current) return;
 
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
-        const neat = new NeatGradient({
-            ref: canvasRef.current,
-            ...config,
+        let neat: any;
+        let scrollHandler: (() => void) | null = null;
+
+        import("@firecms/neat").then(({ NeatGradient }) => {
+            if (!canvasRef.current) return;
+            neat = new NeatGradient({
+                ref: canvasRef.current,
+                ...config,
+            });
+
+            const baseOffset = config.yOffset ?? 0;
+            const canvas = canvasRef.current;
+
+            scrollHandler = () => {
+                if (variant === "hero") {
+                    neat.yOffset = baseOffset + window.scrollY * 0.3;
+                } else {
+                    const rect = canvas.getBoundingClientRect();
+                    const viewportCenter = window.innerHeight / 2;
+                    const offset = (rect.top - viewportCenter) * 0.3;
+                    neat.yOffset = baseOffset + offset;
+                }
+            };
+
+            window.addEventListener("scroll", scrollHandler, { passive: true });
+            scrollHandler();
         });
 
-        const baseOffset = config.yOffset ?? 0;
-        const canvas = canvasRef.current;
-
-        const handleScroll = () => {
-            if (variant === "hero") {
-                neat.yOffset = baseOffset + window.scrollY * 0.3;
-            } else {
-                const rect = canvas.getBoundingClientRect();
-                const viewportCenter = window.innerHeight / 2;
-                const offset = (rect.top - viewportCenter) * 0.3;
-                neat.yOffset = baseOffset + offset;
-            }
-        };
-
-        window.addEventListener("scroll", handleScroll, { passive: true });
-        handleScroll();
-
         return () => {
-            window.removeEventListener("scroll", handleScroll);
-            neat.destroy();
+            if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
+            if (neat) neat.destroy();
         };
     }, [variant]);
 

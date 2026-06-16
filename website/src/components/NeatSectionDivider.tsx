@@ -1,6 +1,4 @@
 import { useEffect, useRef } from "react";
-import { NeatGradient } from "@firecms/neat";
-import type { NeatConfig } from "@firecms/neat";
 import { NEAT_BASE_CONFIG } from "./neatConfig";
 
 const VARIANTS: Record<string, Partial<NeatConfig>> = {
@@ -38,25 +36,30 @@ export function NeatSectionDivider({ variant = "a" }: { variant?: "a" | "b" }) {
 
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANTS[variant] ?? {}) };
 
-        const neat = new NeatGradient({
-            ref: canvasRef.current,
-            ...config,
+        let neat: any;
+        let scrollHandler: (() => void) | null = null;
+        import("@firecms/neat").then(({ NeatGradient }) => {
+            if (!canvasRef.current) return;
+            neat = new NeatGradient({
+                ref: canvasRef.current,
+                ...config,
+            });
+
+            const baseOffset = config.yOffset ?? 0;
+            const canvas = canvasRef.current;
+            scrollHandler = () => {
+                const rect = canvas.getBoundingClientRect();
+                const viewportCenter = window.innerHeight / 2;
+                const offset = (rect.top - viewportCenter) * 0.3;
+                neat.yOffset = baseOffset + offset;
+            };
+            window.addEventListener("scroll", scrollHandler, { passive: true });
+            scrollHandler();
         });
 
-        const baseOffset = config.yOffset ?? 0;
-        const canvas = canvasRef.current;
-        const handleScroll = () => {
-            const rect = canvas.getBoundingClientRect();
-            const viewportCenter = window.innerHeight / 2;
-            const offset = (rect.top - viewportCenter) * 0.3;
-            neat.yOffset = baseOffset + offset;
-        };
-        window.addEventListener("scroll", handleScroll, { passive: true });
-        handleScroll();
-
         return () => {
-            window.removeEventListener("scroll", handleScroll);
-            neat.destroy();
+            if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
+            if (neat) neat.destroy();
         };
     }, [variant]);
 

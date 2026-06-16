@@ -196,7 +196,7 @@ export class MongoEntityService implements EntityRepository {
         });
 
         // Build find options
-        const findOptions: FindOptions<Document> = {};
+        const findOptions: FindOptions = {};
 
         // Apply sorting
         const sort = MongoConditionBuilder.buildSort(options.orderBy, options.order);

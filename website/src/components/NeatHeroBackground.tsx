@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { NeatGradient } from "@firecms/neat";
 
 /**
  * Inlined config (duplicated from neatConfig.ts) to avoid a separate chunk
@@ -101,27 +100,33 @@ const NEAT_BASE_CONFIG = {
 } as const;
 export function NeatHeroBackground() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const neatRef = useRef<NeatGradient | null>(null);
+    const neatRef = useRef<any>(null);
 
     useEffect(() => {
         if (!canvasRef.current) return;
 
-        const neat = new NeatGradient({
-            ref: canvasRef.current,
-            ...NEAT_BASE_CONFIG,
+        let neat: any;
+        let scrollHandler: (() => void) | null = null;
+
+        import("@firecms/neat").then(({ NeatGradient }) => {
+            if (!canvasRef.current) return;
+            neat = new NeatGradient({
+                ref: canvasRef.current,
+                ...NEAT_BASE_CONFIG,
+            });
+            neatRef.current = neat;
+
+            const baseOffset = NEAT_BASE_CONFIG.yOffset;
+            scrollHandler = () => {
+                neat.yOffset = baseOffset + window.scrollY * 0.3;
+            };
+
+            window.addEventListener("scroll", scrollHandler, { passive: true });
         });
-        neatRef.current = neat;
-
-        const baseOffset = NEAT_BASE_CONFIG.yOffset;
-        const handleScroll = () => {
-            neat.yOffset = baseOffset + window.scrollY * 0.3;
-        };
-
-        window.addEventListener("scroll", handleScroll, { passive: true });
 
         return () => {
-            window.removeEventListener("scroll", handleScroll);
-            neat.destroy();
+            if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
+            if (neat) neat.destroy();
             neatRef.current = null;
         };
     }, []);

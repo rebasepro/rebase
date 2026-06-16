@@ -5,6 +5,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  if (context.isPrerendered) {
+    return next();
+  }
+
   const acceptHeader = context.request.headers.get("accept") || "";
   const url = new URL(context.request.url);
   const formatParam = url.searchParams.get("format");

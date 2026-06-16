@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
-        "rootDir": "src",
+        "ignoreDeprecations": "6.0",
+        "rootDir": ".",
         "outDir": "dist",
         "module": "es2022",
         "target": "ESNEXT",

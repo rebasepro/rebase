@@ -2,6 +2,7 @@
 
 @import "tailwindcss";
 @import "@rebasepro/ui/index.css" layer(base);
+@import "@fontsource/rubik";
 
 
 
@@ -59,7 +60,6 @@
 }
 
 /* Rubik — variable font (single file covers all weights 300-900) */
-@import "@fontsource-variable/rubik";
 
 /* JetBrains Mono — self-hosted, latin-ext */
 @font-face {

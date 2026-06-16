@@ -10,7 +10,7 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "dependencies": {
-    "@firebase/auth": "^1.13.1",
+    "@firebase/auth": "^1.13.2",
     "@rebasepro/admin": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/core": "workspace:*",
@@ -18,8 +18,8 @@
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",
     "fast-equals": "6.0.0",
-    "fuse.js": "^7.3.0",
-    "react-router-dom": "^7.15.1"
+    "fuse.js": "^7.4.2",
+    "react-router-dom": "^7.17.0"
   },
   "peerDependencies": {
     "firebase": "^10.12.2 || ^11.0.0 || ^12.0.0",
@@ -42,22 +42,22 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@firebase/app": "^0.14.12",
-    "@firebase/app-check": "^0.11.3",
+    "@firebase/app": "^0.14.13",
+    "@firebase/app-check": "^0.11.4",
     "@firebase/database": "^1.1.3",
-    "@firebase/firestore": "^4.14.1",
-    "@firebase/functions": "^0.13.4",
+    "@firebase/firestore": "^4.15.0",
+    "@firebase/functions": "^0.13.5",
     "@firebase/storage": "^0.14.3",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^20.19.41",
-    "@types/react": "^19.2.15",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.0.2",
     "babel-plugin-react-compiler": "19.0.0-beta-ebf51a3-20250411",
-    "firebase": "^12.13.0",
-    "typescript": "^5.9.3",
-    "typesense": "^2.1.0",
-    "vite": "^7.3.3"
+    "firebase": "^12.14.0",
+    "typescript": "^6.0.3",
+    "typesense": "^3.0.6",
+    "vite": "^8.0.16"
   },
   "scripts": {
     "dev": "vite",

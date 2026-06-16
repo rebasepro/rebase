@@ -13,10 +13,10 @@
     "@rebasepro/core": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
-    "firebase": "^12.13.0",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1"
+    "firebase": "^12.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.17.0"
   },
   "scripts": {
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
@@ -38,22 +38,22 @@
     ]
   },
   "devDependencies": {
-    "@tailwindcss/typography": "^0.5.19",
-    "@tailwindcss/vite": "^4.3.0",
-    "@types/react": "^19.2.15",
+    "@tailwindcss/typography": "^0.5.20",
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^8.59.4",
-    "vite-plugin-svgr": "^4.5.0",
-    "@vitejs/plugin-react": "^4.7.0",
-    "eslint": "^9.39.4",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^10.5.0",
     "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-n": "^18.1.0",
     "eslint-plugin-promise": "^7.3.0",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.26",
-    "tailwindcss": "^4.3.0",
-    "typescript": "^5.9.3",
-    "vite": "^5.4.21"
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-svgr": "^5.2.0"
   }
 }

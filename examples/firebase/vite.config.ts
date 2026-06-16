@@ -13,7 +13,7 @@ export default defineConfig({
     build: {
         minify: true,
         outDir: "./build",
-        target: "ESNEXT",
+        target: "es2022",
         sourcemap: true
     },
     optimizeDeps: { include: ["react/jsx-runtime"] },

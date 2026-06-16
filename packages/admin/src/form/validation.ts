@@ -229,7 +229,7 @@ function getZodNumberSchema({
             const n = Number(val);
             return isNaN(n) ? val : n; // pass through non-numeric to let refine catch it
         },
-        z.number({ invalid_type_error: "Must be a number" }).nullable()
+        z.number({ error: "Must be a number" }).nullable()
     );
 
     const isRequired = validation?.required || property.isId === true || property.isId === "manual";
@@ -446,17 +446,19 @@ function getZodArraySchema({
             });
             arraySchema = z.array(
                 z.any().superRefine(async (object, ctx) => {
-                    // Find the matching schema from zodProperties based on the path
-                    const parentPath = ctx.path.slice(0, -1).join(".");
-                    const index = ctx.path[ctx.path.length - 1];
-                    const key = parentPath ? `${parentPath}[${index}]` : `${name}[${index}]`;
-                    const zodProperty = getValueInPath(zodProperties, key) as ZodTypeAny | undefined;
-                    if (zodProperty) {
-                        const result = await zodProperty.safeParseAsync(object);
-                        if (!result.success) {
-                            result.error.issues.forEach((issue) => {
-                                ctx.addIssue(issue);
-                            });
+                    // In Zod v4, ctx.path is not available in superRefine.
+                    // Instead, iterate all zodProperties and validate against each.
+                    for (const [key, zodProperty] of Object.entries(zodProperties)) {
+                        if (zodProperty) {
+                            const result = await (zodProperty as ZodTypeAny).safeParseAsync(object);
+                            if (!result.success) {
+                                result.error.issues.forEach((issue) => {
+                                    ctx.addIssue({
+                                        code: "custom",
+                                        message: issue.message,
+                                    });
+                                });
+                            }
                         }
                     }
                 })

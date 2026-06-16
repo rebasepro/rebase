@@ -22,7 +22,7 @@ export default defineConfig({
     build: {
         minify: true,
         outDir: "./dist",
-        target: "ESNEXT",
+        target: "es2022",
         sourcemap: true,
         rollupOptions: {
             output: {

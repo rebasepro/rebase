@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Search, ShoppingCart, ChevronRight, X, ChevronDown, Check, Code, Globe, Play } from "lucide-react";
+import { Search, ShoppingCart, X, ChevronDown, Check, Code, Globe, Play } from "lucide-react";
 
 /* ─── Types ─── */
 interface Order {
