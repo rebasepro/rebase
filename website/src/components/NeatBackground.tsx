@@ -1,4 +1,8 @@
 import { useEffect, useRef } from "react";
+import * as neatModule from "@firecms/neat";
+
+// @ts-ignore
+const NeatGradient = neatModule.NeatGradient || neatModule.default?.NeatGradient || (neatModule.default as any)?.default?.NeatGradient;
 
 const NEAT_BASE_CONFIG = {
     licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
@@ -94,7 +98,7 @@ const NEAT_BASE_CONFIG = {
     cameraZoom: 2.05,
 };
 
-const VARIANT_OVERRIDES: Record<string, Partial<NeatConfig>> = {
+const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     hero: {},
     a: {
         yOffset: 0,
@@ -132,30 +136,27 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         let neat: any;
         let scrollHandler: (() => void) | null = null;
 
-        import("@firecms/neat").then(({ NeatGradient }) => {
-            if (!canvasRef.current) return;
-            neat = new NeatGradient({
-                ref: canvasRef.current,
-                ...config,
-            });
-
-            const baseOffset = config.yOffset ?? 0;
-            const canvas = canvasRef.current;
-
-            scrollHandler = () => {
-                if (variant === "hero") {
-                    neat.yOffset = baseOffset + window.scrollY * 0.3;
-                } else {
-                    const rect = canvas.getBoundingClientRect();
-                    const viewportCenter = window.innerHeight / 2;
-                    const offset = (rect.top - viewportCenter) * 0.3;
-                    neat.yOffset = baseOffset + offset;
-                }
-            };
-
-            window.addEventListener("scroll", scrollHandler, { passive: true });
-            scrollHandler();
+        neat = new NeatGradient({
+            ref: canvasRef.current,
+            ...config,
         });
+
+        const baseOffset = config.yOffset ?? 0;
+        const canvas = canvasRef.current;
+
+        scrollHandler = () => {
+            if (variant === "hero") {
+                neat.yOffset = baseOffset + window.scrollY * 0.3;
+            } else {
+                const rect = canvas.getBoundingClientRect();
+                const viewportCenter = window.innerHeight / 2;
+                const offset = (rect.top - viewportCenter) * 0.3;
+                neat.yOffset = baseOffset + offset;
+            }
+        };
+
+        window.addEventListener("scroll", scrollHandler, { passive: true });
+        scrollHandler();
 
         return () => {
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
@@ -168,6 +169,7 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
             <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
                 <canvas
                     ref={canvasRef}
+                    id="neat-hero-canvas"
                     style={{
                         position: "absolute",
                         inset: 0,
@@ -182,19 +184,17 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         );
     }
 
+    // Divider variants ("a", "b")
     return (
-        <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
-            <canvas
-                ref={canvasRef}
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    opacity: 0.55,
-                }}
-                aria-hidden="true"
-            />
-        </div>
+        <canvas
+            ref={canvasRef}
+            style={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                opacity: 0.55,
+            }}
+            aria-hidden="true"
+        />
     );
 }

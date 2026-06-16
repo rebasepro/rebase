@@ -6,7 +6,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
-import { NeatHeroBackground } from '../../components/NeatHeroBackground';
+import { NeatBackground } from '../../components/NeatBackground';
 
 
 
@@ -74,9 +74,9 @@ const commands = [
   <main>
     <!-- Hero -->
     <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-      <NeatHeroBackground client:only="react" />
+      <NeatBackground client:only="react" />
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-        <h1 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl text-white">
+        <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
           CLI & Tooling
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">

@@ -4,8 +4,7 @@ const { lang, t } = Astro.props;
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
-import { NeatHeroBackground } from '../../components/NeatHeroBackground';
-import { NeatSectionDivider } from '../../components/NeatSectionDivider';
+import { NeatBackground } from '../../components/NeatBackground';
 import ClientLogos from '../../components/ClientLogos.astro';
 import SpotlightCard from '../../components/SpotlightCard.astro';
 import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo';
@@ -18,7 +17,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 1 — HERO
          ═══════════════════════════════════════════════════════════════ -->
     <section class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
-        <NeatHeroBackground client:idle />
+        <NeatBackground client:idle />
         <!-- Radial glow for readability -->
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
@@ -106,7 +105,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 3 — NEAT GRADIENT DIVIDER
          ═══════════════════════════════════════════════════════════════ -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatSectionDivider variant="a" client:only="react" />
+        <NeatBackground variant="a" client:visible />
     </div>
 
 
@@ -382,7 +381,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 6 — NEAT GRADIENT DIVIDER
          ═══════════════════════════════════════════════════════════════ -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatSectionDivider variant="b" client:only="react" />
+        <NeatBackground variant="b" client:visible />
     </div>
 
 

@@ -105,7 +105,7 @@ export function AdminDemoCarousel({
         </div>
 
         {/* Demo content area */}
-        <div className="relative w-full" style={{ height }}>
+        <div className="relative w-full" style={{ height }} inert={true} aria-hidden="true">
           {TABS.map((tab, index) => (
             <div
               key={tab.id}

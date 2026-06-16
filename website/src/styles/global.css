@@ -2,7 +2,6 @@
 
 @import "tailwindcss";
 @import "@rebasepro/ui/index.css" layer(base);
-@import "@fontsource/rubik";
 
 
 
@@ -286,3 +285,11 @@ h6 {
 a[href="https://neat.firecms.co"] {
     display: none !important;
 }
+
+/* Fix alignment and spacing of checkmarks in comparison lists */
+li.flex.items-start > svg.lucide-check {
+    margin-right: 0.5rem;
+    margin-top: 0.25rem;
+    flex-shrink: 0;
+}
+

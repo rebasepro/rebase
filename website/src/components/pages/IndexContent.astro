@@ -13,8 +13,7 @@ import { ApiMiniDemo } from "../../components/demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../../components/demos/SdkMiniDemo";
 import { RealtimeMiniDemo } from "../../components/demos/RealtimeMiniDemo";
 import RoadmapSection from "../../components/RoadmapSection.astro";
-import { NeatHeroBackground } from "../../components/NeatHeroBackground";
-import { NeatSectionDivider } from "../../components/NeatSectionDivider";
+import { NeatBackground } from '../../components/NeatBackground';
 
 
 import ClientLogos from "../../components/ClientLogos.astro";
@@ -31,7 +30,7 @@ const translatePath = useTranslatedPath(lang);
     <section id="s-hero"
              class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
         <!-- Animated WebGL gradient background (Neat - funky preset) -->
-        <NeatHeroBackground client:idle/>
+        <NeatBackground client:idle/>
 
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
@@ -134,7 +133,7 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatSectionDivider variant="a" client:only="react"/>
+        <NeatBackground variant="a" client:visible/>
     </div>
 
 
@@ -360,7 +359,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-[10px] font-mono text-surface-400">app.ts</div>
                         </div>
-                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
+                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <SdkMiniDemo client:load/>
                         </div>
                     </div>
@@ -509,7 +508,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.dev</div>
                         </div>
-                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
+                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <ApiMiniDemo client:load/>
                         </div>
                     </div>
@@ -559,7 +558,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                         </div>
-                        <div class="relative flex-1 w-full overflow-hidden">
+                        <div class="relative flex-1 w-full overflow-hidden" inert aria-hidden="true">
                             <BodyPartsDemo client:load/>
                         </div>
                     </div>
@@ -599,7 +598,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-[10px] font-mono text-surface-400">websocket: sync</div>
                         </div>
-                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
+                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <RealtimeMiniDemo client:load/>
                         </div>
                     </div>
@@ -641,7 +640,7 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatSectionDivider variant="b" client:only="react"/>
+        <NeatBackground variant="b" client:visible/>
     </div>
 
     <div id="s-collection-power" class="relative z-0">
@@ -1037,7 +1036,7 @@ const translatePath = useTranslatedPath(lang);
                 </p>
             </div>
 
-            <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;">
+            <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;" inert aria-hidden="true">
                 <RebaseMosaicDemo client:visible/>
             </div>
         </div>
@@ -1045,7 +1044,7 @@ const translatePath = useTranslatedPath(lang);
 
         <!-- Neat gradient divider -->
         <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 700px;">
-            <NeatSectionDivider variant="a" client:only="react" />
+            <NeatBackground variant="a" client:visible />
         </div>
 
     <!-- Built With Rebase: SustenTalent Use Case -->
@@ -1202,7 +1201,7 @@ const translatePath = useTranslatedPath(lang);
                                         </div>
                                     </div>
                                     <!-- Interactive Custom Field -->
-                                    <div class="bg-gradient-to-t from-surface-950/50 to-transparent">
+                                    <div class="bg-gradient-to-t from-surface-950/50 to-transparent" inert aria-hidden="true">
                                         <BodyPartsDemo client:load/>
                                     </div>
                                 </div>
@@ -1640,7 +1639,7 @@ const translatePath = useTranslatedPath(lang);
 
         <!-- Neat gradient divider -->
         <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 700px;">
-            <NeatSectionDivider variant="a" client:only="react" />
+            <NeatBackground variant="a" client:visible />
         </div>
 
     <!-- Final CTA -->

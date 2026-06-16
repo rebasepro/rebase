@@ -365,8 +365,8 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
           <button className="px-3 py-1 text-xs font-semibold rounded-md bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400">Content</button>
           <button className="px-3 py-1 text-xs font-semibold rounded-md text-surface-500 hover:text-surface-900 dark:hover:text-white">Studio</button>
         </div>
-        <button className="p-2 text-surface-400 rounded-full"><Languages size={20} /></button>
-        <button className="p-2 text-surface-400 rounded-full"><Moon size={20} /></button>
+        <button aria-label="Change language" className="p-2 text-surface-400 rounded-full"><Languages size={20} /></button>
+        <button aria-label="Toggle dark mode" className="p-2 text-surface-400 rounded-full"><Moon size={20} /></button>
         <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-surface-200 dark:bg-surface-700 text-sm font-medium text-surface-700 dark:text-white">F</div>
       </div>
 
@@ -431,10 +431,10 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
                 <Search size={16} className="text-surface-400" />
                 <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
               </div>
-              <button className="p-1.5 rounded-full text-surface-500"><Upload size={16} /></button>
-              <button className="p-1.5 rounded-full text-surface-500"><Download size={16} /></button>
-              <button className="p-1.5 rounded-full text-surface-500"><Settings size={16} /></button>
-              <button className="p-1.5 rounded-full text-surface-500 opacity-50"><Trash2 size={16} /></button>
+              <button aria-label="Upload" className="p-1.5 rounded-full text-surface-500"><Upload size={16} /></button>
+              <button aria-label="Download" className="p-1.5 rounded-full text-surface-500"><Download size={16} /></button>
+              <button aria-label="Settings" className="p-1.5 rounded-full text-surface-500"><Settings size={16} /></button>
+              <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50"><Trash2 size={16} /></button>
               <span className="text-xs text-surface-400 mx-1">(0)</span>
               <button className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm">
                 <Plus size={16} /><span className="text-xs font-medium">Add Order</span>

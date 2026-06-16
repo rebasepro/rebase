@@ -193,8 +193,8 @@ export function ContentEditorDemo() {
                     <button className="px-3 py-1 text-xs font-semibold rounded-md bg-surface-900 shadow-sm text-primary">Content</button>
                     <button className="px-3 py-1 text-xs font-semibold rounded-md text-surface-500">Studio</button>
                 </div>
-                <button className="p-2 text-surface-400"><MI size={20}>translate</MI></button>
-                <button className="p-2 text-surface-400"><MI size={20}>dark_mode</MI></button>
+                <button aria-label="Change language" className="p-2 text-surface-400"><MI size={20}>translate</MI></button>
+                <button aria-label="Toggle dark mode" className="p-2 text-surface-400"><MI size={20}>dark_mode</MI></button>
                 <div className="w-9 h-9 rounded-full bg-surface-700 flex items-center justify-center text-sm font-medium text-white">F</div>
             </div>
 
@@ -242,14 +242,14 @@ export function ContentEditorDemo() {
                                 <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-surface-500"><MI size={14}>format_list_bulleted</MI></button>
                                 <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-surface-900 shadow-sm text-primary"><MI size={14}>list</MI><span>Table</span></button>
                             </div>
-                            <button className="p-1.5 rounded-full text-surface-500"><MI size={18}>filter_list</MI></button>
+                            <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500"><MI size={18}>filter_list</MI></button>
                         </div>
                         <div className="flex items-center gap-1">
                             <div className="flex items-center rounded-md bg-surface-800 px-2.5 py-1 gap-1.5 min-w-[140px]">
                                 <MI size={16} className="text-surface-400">search</MI>
                                 <span className="text-xs text-surface-400">Search</span>
                             </div>
-                            <button className="p-1.5 text-surface-500"><MI size={18}>settings</MI></button>
+                            <button aria-label="Settings" className="p-1.5 text-surface-500"><MI size={18}>settings</MI></button>
                             <button className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm"><MI size={18}>add</MI></button>
                         </div>
                     </div>
