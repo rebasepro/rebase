@@ -6,7 +6,11 @@
   ],
   "ignorePatterns": [
     "app/generated/**",
-    "packages/cli/templates/**"
+    "packages/cli/templates/**",
+    "app/backend/functions/**",
+    "app/backend/crons/**",
+    "saas/backend/functions/**",
+    "saas/backend/crons/**"
   ],
   "ignoreDependencies": [
     "@rebasepro/admin",

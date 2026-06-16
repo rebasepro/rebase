@@ -26,6 +26,7 @@ export type DialogProps = {
      */
     disableInitialFocus?: boolean;
     portalContainer?: HTMLElement | null;
+    "aria-describedby"?: string;
 };
 
 const widthClasses = {
@@ -60,7 +61,8 @@ export const Dialog = ({
                            onPointerDownOutside,
                            onInteractOutside,
                            disableInitialFocus = true,
-                           portalContainer
+                           portalContainer,
+                           "aria-describedby": ariaDescribedby
                        }: DialogProps) => {
     const [displayed, setDisplayed] = useState(false);
 
@@ -111,6 +113,7 @@ export const Dialog = ({
                         }}
                         onPointerDownOutside={onPointerDownOutside}
                         onInteractOutside={onInteractOutside}
+                        aria-describedby={ariaDescribedby}
                         className={cls("h-full outline-none flex justify-center items-center z-60 opacity-100 transition-all duration-200 ease-in-out")}
                     >
                         <div

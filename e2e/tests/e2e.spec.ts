@@ -1,6 +1,24 @@
 import { test, expect } from '@playwright/test';
 
 test('Full E2E: Sign in and view dashboard', async ({ page }) => {
+  // Fail on any console error
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      const text = msg.text();
+      if (text.includes('ERR_CONNECTION_REFUSED') || text.includes('Failed to load resource')) {
+        return;
+      }
+      throw new Error(`Console error: ${text}`);
+    }
+  });
+
+  // Fail on any failed API request
+  page.on('response', response => {
+    if (response.url().includes('/api/') && response.status() >= 400) {
+      throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
+    }
+  });
+
   await page.goto('/');
 
   // Accept privacy policy
