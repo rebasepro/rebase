@@ -117,6 +117,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                         size={props.size}
                         reference={new EntityReference({ id: value,
 path: stringProperty.reference.path })}
+                        textOnly={props.textOnly}
                     />;
                 } else {
                     content = <EmptyValue/>;
@@ -213,6 +214,7 @@ path: stringProperty.reference.path })}
                     includeEntityLink={property.includeEntityLink}
                     size={props.size}
                     reference={value as EntityReference}
+                    textOnly={props.textOnly}
                 />;
             } else {
                 content = buildWrongValueType(propertyKey, property.type, value);
@@ -241,6 +243,7 @@ path: stringProperty.reference.path })}
                                     includeEntityLink={property.includeEntityLink}
                                     size={"small"}
                                     relation={entityRelation}
+                                    textOnly={props.textOnly}
                                 />
                             </div>
                         );
@@ -258,6 +261,7 @@ path: stringProperty.reference.path })}
                     includeEntityLink={property.includeEntityLink}
                     size={props.size}
                     relation={relationValue}
+                    textOnly={props.textOnly}
                 />;
             } else {
                 content = buildWrongValueType(propertyKey, property.type, value);

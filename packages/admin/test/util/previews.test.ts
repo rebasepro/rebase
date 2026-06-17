@@ -3,7 +3,8 @@
  */
 import {
     getEntityPreviewKeys,
-    getEntityTitlePropertyKey
+    getEntityTitlePropertyKey,
+    resolveTitleToString
 } from "../../src/util/previews";
 import type { AuthController, EntityCollection, PropertyConfig, Property } from "@rebasepro/types";
 
@@ -326,3 +327,65 @@ name: "Flag" } as Property
         expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
     });
 });
+
+describe("resolveTitleToString", () => {
+    it("handles primitives correctly", () => {
+        expect(resolveTitleToString("hello")).toBe("hello");
+        expect(resolveTitleToString(123)).toBe("123");
+        expect(resolveTitleToString(true)).toBe("true");
+        expect(resolveTitleToString(null)).toBe("");
+        expect(resolveTitleToString(undefined)).toBe("");
+    });
+
+    it("handles relation objects correctly", () => {
+        const relationWithEagerValues = {
+            __type: "relation",
+            id: "author-1",
+            path: "authors",
+            data: {
+                id: "author-1",
+                path: "authors",
+                values: {
+                    name: "John Doe",
+                    bio: "Writer"
+                }
+            }
+        };
+        expect(resolveTitleToString(relationWithEagerValues)).toBe("John Doe");
+
+        const relationWithIdOnly = {
+            __type: "relation",
+            id: "author-2",
+            path: "authors"
+        };
+        expect(resolveTitleToString(relationWithIdOnly)).toBe("author-2");
+    });
+
+    it("handles reference objects correctly", () => {
+        const reference = {
+            id: "ref-1",
+            path: "refs",
+            isEntityReference: () => true
+        };
+        expect(resolveTitleToString(reference)).toBe("ref-1");
+    });
+
+    it("handles dates correctly", () => {
+        const date = new Date("2026-06-17T00:00:00.000Z");
+        expect(resolveTitleToString(date)).toBe(date.toLocaleDateString());
+    });
+
+    it("handles generic objects fallback using properties", () => {
+        const customObj = {
+            title: "My Special Title",
+            description: "Some desc"
+        };
+        expect(resolveTitleToString(customObj)).toBe("My Special Title");
+
+        const anotherObj = {
+            name: "Object Name"
+        };
+        expect(resolveTitleToString(anotherObj)).toBe("Object Name");
+    });
+});
+

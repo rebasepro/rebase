@@ -4,7 +4,7 @@ import { Card, cls, Container, Typography } from "@rebasepro/ui";
 import { ArrowRightIcon, iconSize } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/core";
 import { useNavigate } from "react-router-dom";
-import { useStudioBreadcrumbs, BootstrapAdminBanner } from "@rebasepro/core";
+import { useStudioBreadcrumbs, BootstrapAdminBanner, SchemaDriftBanner } from "@rebasepro/core";
 
 /* ═══════════════════════════════════════════════════════════════
    Static studio tool definitions
@@ -106,8 +106,9 @@ export function StudioHomePage({
     return (
         <div ref={containerRef} className="py-2 overflow-auto h-full w-full">
             <Container maxWidth="6xl">
-                <div className="mb-4">
+                <div className="mb-4 flex flex-col gap-2">
                     <BootstrapAdminBanner />
+                    <SchemaDriftBanner />
                 </div>
 
                 {(additionalActions || pluginActions) && (

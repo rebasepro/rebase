@@ -2,6 +2,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import { useEffect, useState, useMemo } from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
+import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 /**
  * @group Hooks and utilities
  */
@@ -83,6 +84,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
         searchString
     }: CollectionFetchProps<M>): CollectionFetchResult<M> {
     const dataClient = useData();
+    const { reportSchemaDrift } = useSchemaDriftContext();
 
     const sortByProperty = sortBy ? sortBy[0] : undefined;
     const currentSort = sortBy ? sortBy[1] : undefined;
@@ -137,6 +139,10 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
             setData([]);
             setDataLoadingError(error);
             setTotalCount(undefined);
+            // Report schema drift to the global banner context
+            if (isSchemaDriftError(error)) {
+                reportSchemaDrift(error.message);
+            }
         };
 
         const accessor = dataClient.collection(path);

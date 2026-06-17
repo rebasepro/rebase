@@ -56,4 +56,9 @@ export interface PropertyPreviewProps<P extends Property | Property, CustomProps
      */
     fill?: boolean;
 
+    /**
+     * If true, relations/references will render as plain text strings rather than full cards.
+     */
+    textOnly?: boolean;
+
 }

@@ -49,6 +49,32 @@ export function BootstrapAdminBanner({
         try {
             await bootstrapAdmin();
             snackbarController.open({ type: "success", message: t("bootstrap_admin_success") || "Admin successfully created" });
+            // Update stored auth data so the auth controller picks up the
+            // newly assigned admin role on reload.  Two things must happen:
+            //   1. Add "admin" to user.roles for immediate UI state
+            //   2. Force-expire the access token so the auth controller
+            //      performs a token refresh and gets a new JWT with the
+            //      admin role baked into it (the server reads roles from
+            //      the DB during refresh).
+            try {
+                const raw = localStorage.getItem("rebase_react_auth");
+                if (raw) {
+                    const stored = JSON.parse(raw);
+                    if (stored?.user) {
+                        const roles: string[] = stored.user.roles || [];
+                        if (!roles.includes("admin")) {
+                            stored.user.roles = [...roles, "admin"];
+                        }
+                    }
+                    if (stored?.tokens) {
+                        // Set expiry to the past so the restore flow
+                        // triggers a refresh instead of reusing the
+                        // stale JWT.
+                        stored.tokens.accessTokenExpiresAt = 0;
+                    }
+                    localStorage.setItem("rebase_react_auth", JSON.stringify(stored));
+                }
+            } catch (_) { /* ignore */ }
             window.location.reload();
         } catch (error: unknown) {
             snackbarController.open({ type: "error", message: error instanceof Error ? error.message : t("failed_to_bootstrap_admin") || "Failed to bootstrap admin" });

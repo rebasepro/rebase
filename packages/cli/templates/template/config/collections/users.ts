@@ -108,6 +108,8 @@ const usersCollection: EntityCollection = {
         metadata: {
             name: "Metadata",
             type: "map",
+            keyValue: true,
+            properties: {},
             defaultValue: {},
             ui: {
                 hideFromCollection: true,

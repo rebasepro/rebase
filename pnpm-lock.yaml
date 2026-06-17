@@ -1888,6 +1888,9 @@ importers:
       '@rebasepro/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rebasepro/studio':
+        specifier: workspace:*
+        version: link:../../packages/studio
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../../packages/types

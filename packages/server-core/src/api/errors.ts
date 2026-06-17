@@ -1,12 +1,34 @@
 import { ErrorHandler } from "hono";
 import { ContentfulStatusCode } from "hono/utils/http-status";
 
+/** Tracks whether we've already shown the doctor hint (once per process). */
+let _schemaDriftHinted = false;
+
 /** Shape of Postgres / network errors with diagnostic codes */
 interface PgLikeError {
     code?: string;
     address?: string;
     port?: number;
     message?: string;
+    table?: string;
+    column?: string;
+    schema?: string;
+}
+
+/**
+ * Extract the missing table or column name from a PG error.
+ * PG 42P01 messages look like: 'relation "my_table" does not exist'
+ * PG 42703 messages look like: 'column "my_col" does not exist' or 'column my_table.my_col does not exist'
+ */
+function extractMissingIdentifier(pgMessage?: string): string | null {
+    if (!pgMessage) return null;
+    // Match quoted identifier: relation "xxx" / column "xxx"
+    const quoted = pgMessage.match(/(?:relation|column|table)\s+"([^"]+)"/i);
+    if (quoted) return quoted[1];
+    // Match unquoted: column table.col does not exist
+    const unquoted = pgMessage.match(/(?:relation|column|table)\s+([\w.]+)\s+does not exist/i);
+    if (unquoted) return unquoted[1];
+    return null;
 }
 
 /**
@@ -112,7 +134,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
     }
 
     const statusCode = error.statusCode || codeToStatus(error.code) || 500;
-    const code = error.code || "INTERNAL_ERROR";
+    let code = error.code || "INTERNAL_ERROR";
 
     // Handle DB connection and specific system errors for better logging
     let logMessage = error.message;
@@ -123,26 +145,47 @@ export const errorHandler: ErrorHandler = (err, c) => {
         } else if (cause.code === "ECONNREFUSED") {
             logMessage = `Connection refused to database at ${cause.address}:${cause.port}.`;
         } else if (cause.code === "42703" || cause.code === "42P01") {
+            code = "SCHEMA_DRIFT";
             const issue = cause.code === "42703" ? "column" : "table";
-            logMessage = `Database schema mismatch (${issue} missing): ${cause.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
+            const identifier = cause.table || cause.column || extractMissingIdentifier(cause.message) || "unknown";
+            logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. Run \`pnpm db:push\` to sync your schema, or \`pnpm db:migrate\` to apply pending migrations.`;
         }
     } else if ("code" in error && error.code === "ENETUNREACH") {
          const netErr = error as PgLikeError;
          logMessage = `Network unreachable. Cannot connect to service at ${netErr.address}:${netErr.port}.`;
     } else if ("code" in error && (error.code === "42703" || error.code === "42P01")) {
+        code = "SCHEMA_DRIFT";
         const issue = error.code === "42703" ? "column" : "table";
-        logMessage = `Database schema mismatch (${issue} missing): ${error.message}. Did you forget to run migrations ('pnpm db:push' or 'pnpm db:migrate')?`;
+        const pgErr = error as PgLikeError;
+        const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(error.message) || "unknown";
+        logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. Run \`pnpm db:push\` to sync your schema, or \`pnpm db:migrate\` to apply pending migrations.`;
     }
 
     const causePg = (error.cause && typeof error.cause === "object") ? (error.cause as PgLikeError) : undefined;
     const pgErrorCode = causePg?.code || error.code;
-    const isDbSchemaMismatch = pgErrorCode === "42703" || pgErrorCode === "42P01";
+    const isDbSchemaMismatch = code === "SCHEMA_DRIFT" || pgErrorCode === "42703" || pgErrorCode === "42P01";
 
     if (isDbSchemaMismatch) {
         // Database schema mismatch is logged as a warning instead of a fatal error
         console.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
         );
+        // In dev mode, show a one-time hint to run `rebase doctor`
+        if (!_schemaDriftHinted && process.env.NODE_ENV !== "production") {
+            _schemaDriftHinted = true;
+            console.warn([
+                "",
+                "┌──────────────────────────────────────────────────────────────┐",
+                "│  💡 TIP: Run `rebase doctor` for full schema diagnostics    │",
+                "│                                                             │",
+                "│  Quick fixes:                                               │",
+                "│    pnpm db:push      sync schema to database (dev)          │",
+                "│    pnpm db:migrate   generate + apply migration (prod)      │",
+                "│    rebase doctor     full 3-way drift report                │",
+                "└──────────────────────────────────────────────────────────────┘",
+                ""
+            ].join("\n"));
+        }
     } else {
         // Unexpected errors — log at error level
         console.error(
@@ -165,9 +208,11 @@ export const errorHandler: ErrorHandler = (err, c) => {
     } else if (error instanceof ApiError || error.name === "ApiError") {
         // We already handled ApiError above, but just in case
         clientMessage = error.message;
-    } else if (pgErrorCode === "42703" || pgErrorCode === "42P01") {
-        const issue = pgErrorCode === "42703" ? "column" : "table";
-        clientMessage = `Database schema mismatch (${issue} missing). Ensure backend migrations are up to date!`;
+    } else if (code === "SCHEMA_DRIFT") {
+        const pgErr = causePg || (error as PgLikeError);
+        const issue = (pgErr.code === "42703" || pgErrorCode === "42703") ? "column" : "table";
+        const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
+        clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. Run \`pnpm db:push\` to sync your schema.`;
     } else if (code === "INTERNAL_ERROR") {
         clientMessage = "Internal Server Error";
     }
@@ -198,6 +243,7 @@ function codeToStatus(code?: string): number | undefined {
         CONFLICT: 409,
         EMAIL_EXISTS: 409,
         ROLE_EXISTS: 409,
+        SCHEMA_DRIFT: 500,
         INTERNAL_ERROR: 500,
         NOT_CONFIGURED: 503,
         SERVICE_UNAVAILABLE: 503

@@ -112,10 +112,16 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     const [hasAdminUsers, setHasAdminUsers] = useState(false);
     const userRoles = currentUser?.roles ?? [];
     const isUserAdmin = userRoles.some(r => r === "admin" || r === "schema-admin");
+    // Users with NO roles at all are in the "pre-bootstrap" state.
+    // We still need to check whether admins exist so the BootstrapAdminBanner
+    // can decide whether to show.  Only skip for users with non-admin roles
+    // (they'd get a 403 anyway).
+    const hasNoRoles = userRoles.length === 0;
+    const shouldLoadAdminCheck = isUserAdmin || hasNoRoles;
 
     const [loading, setLoading] = useState(() => {
         if (!currentUser) return false;
-        if (!isUserAdmin) return false;
+        if (!shouldLoadAdminCheck) return false;
         return true;
     });
     const [usersError, setUsersError] = useState<Error | undefined>();
@@ -124,7 +130,7 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
     // Prevents redundant refetches on React StrictMode double-mounts.
     const lastLoadedUidRef = useRef<string | null>(null);
 
-    const effectiveLoading = loading || !!(currentUser && isUserAdmin && lastLoadedUidRef.current !== currentUser.uid);
+    const effectiveLoading = loading || !!(currentUser && shouldLoadAdminCheck && lastLoadedUidRef.current !== currentUser.uid);
 
     /** Merge one or more users into the cache without replacing the whole Map. */
     const mergeIntoCache = useCallback((incoming: User[]) => {
@@ -275,9 +281,12 @@ export function useBackendUserManagement(config: BackendUserManagementConfig): U
 
         // Skip admin API calls for non-admin users — they'd get 403 anyway.
         // This avoids a spurious warning in backend logs on every non-admin login.
+        // HOWEVER, users with NO roles at all may be in the pre-bootstrap state,
+        // so we still run the lightweight admin check for them.
         const userRoles = currentUser.roles ?? [];
         const isUserAdmin = userRoles.some(r => r === "admin" || r === "schema-admin");
-        if (!isUserAdmin) {
+        const hasNoRoles = userRoles.length === 0;
+        if (!isUserAdmin && !hasNoRoles) {
             setLoading(false);
             return;
         }

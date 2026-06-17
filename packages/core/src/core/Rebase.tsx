@@ -18,6 +18,7 @@ import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
 import { ModeControllerProvider, AdminModeControllerProvider, SnackbarProvider } from "../contexts";
 import { RebaseI18nProvider } from "../i18n/RebaseI18nProvider";
 import { RebaseRegistryProvider } from "../hooks/useRebaseRegistry";
+import { SchemaDriftProvider } from "../components/SchemaDriftBanner";
 import { useBuildModeController } from "../hooks/useBuildModeController";
 import { useBuildAdminModeController } from "../hooks/useBuildAdminModeController";
 import { RebaseClientInstanceContext } from "../contexts/RebaseClientInstanceContext";
@@ -203,12 +204,14 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                                     <InternalUserManagementContext.Provider value={userManagement}>
                                         <EffectiveRoleControllerContext.Provider value={activeEffectiveRoleController}>
                                             <DialogsProvider>
+                                                <SchemaDriftProvider>
                                                 <RebaseRegistryProvider>
                                                     <RebaseInternal
                                                         loading={loading}>
                                                         {children}
                                                     </RebaseInternal>
                                                 </RebaseRegistryProvider>
+                                                </SchemaDriftProvider>
                                             </DialogsProvider>
                                         </EffectiveRoleControllerContext.Provider>
                                     </InternalUserManagementContext.Provider>

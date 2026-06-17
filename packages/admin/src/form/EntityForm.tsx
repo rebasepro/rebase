@@ -31,7 +31,7 @@ import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 
-import { getEntityTitlePropertyKey } from "../util/previews";
+import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";
 import { getValueInPath, isObject, mergeDeep } from "@rebasepro/utils";
 import { useCollectionRegistryController, useSideEntityController, useCMSContext } from "../index";
 
@@ -534,9 +534,10 @@ export function EntityForm<M extends Record<string, unknown>>({
     const pluginFormAfter = useSlot("form.after", formActionProps);
 
     const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
-    const title = (formex.values && titlePropertyKey ? getValueInPath(formex.values, titlePropertyKey) as React.ReactNode : undefined)
-        ?? collection.singularName
-        ?? collection.name;
+    const rawTitle = formex.values && titlePropertyKey ? getValueInPath(formex.values, titlePropertyKey) : undefined;
+    const title = rawTitle !== undefined && rawTitle !== null
+        ? resolveTitleToString(rawTitle)
+        : (collection.singularName ?? collection.name);
 
     useEffect(() => {
         if (!autoSave) {

@@ -163,6 +163,65 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 }
             }
 
+            // ── Startup Schema Validation ────────────────────────────────────
+            // One-directional: only checks collections → DB (extra DB tables
+            // that aren't mapped to collections are perfectly fine).
+            try {
+                const registeredCollections = registry.getCollections();
+                if (registeredCollections.length > 0) {
+                    const result = await schemaAwareDb.execute(sql`
+                        SELECT table_name
+                        FROM information_schema.tables
+                        WHERE table_schema = 'public'
+                          AND table_type = 'BASE TABLE'
+                    `);
+                    const dbTables = new Set(
+                        (result.rows as Array<{ table_name: string }>).map(r => r.table_name)
+                    );
+                    const missing: Array<{ slug: string; table: string }> = [];
+                    for (const col of registeredCollections) {
+                        const tableName = registry.hasTableForCollection(
+                            (col as any).table ?? col.slug
+                        )
+                            ? ((col as any).table ?? col.slug)
+                            : col.slug;
+                        // Resolve the actual table name the registry stored
+                        const resolvedTable = Array.from(
+                            (registry as any).tables?.keys?.() ?? []
+                        ).find((k: unknown) =>
+                            (k as string) === tableName ||
+                            (k as string) === col.slug
+                        ) as string | undefined;
+                        const checkName = resolvedTable ?? tableName;
+                        if (!dbTables.has(checkName)) {
+                            missing.push({ slug: col.slug, table: checkName });
+                        }
+                    }
+                    if (missing.length > 0) {
+                        const lines = missing.map(
+                            m => `    • collection "${m.slug}" → table "${m.table}"`
+                        );
+                        logger.warn([
+                            "",
+                            "┌──────────────────────────────────────────────────────────────┐",
+                            "│  ⚠️  SCHEMA DRIFT — Missing tables in database               │",
+                            "├──────────────────────────────────────────────────────────────┤",
+                            ...lines.map(l => `│ ${l.padEnd(60)}│`),
+                            "├──────────────────────────────────────────────────────────────┤",
+                            "│  Run one of:                                                 │",
+                            "│    pnpm db:push      (dev — fast, no migration files)        │",
+                            "│    pnpm db:migrate   (prod — creates migration files)        │",
+                            "└──────────────────────────────────────────────────────────────┘",
+                            ""
+                        ].join("\n"));
+                    }
+                }
+            } catch (err) {
+                logger.warn("⚠️ Startup schema validation could not run", {
+                    error: err instanceof Error ? err.message : String(err)
+                });
+            }
+
             const internals: PostgresDriverInternals = {
                 db: schemaAwareDb,
                 readDb,

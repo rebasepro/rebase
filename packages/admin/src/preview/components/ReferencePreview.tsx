@@ -9,6 +9,8 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
 import { EntityPreview, EntityPreviewContainer } from "../../components/EntityPreview";
 import { useCollectionRegistryController } from "../../index";
+import { getEntityTitlePropertyKey } from "../../util/previews";
+import { getValueInPath } from "@rebasepro/utils";
 
 export type ReferencePreviewProps = {
     disabled?: boolean;
@@ -19,6 +21,7 @@ export type ReferencePreviewProps = {
     hover?: boolean;
     includeEntityLink?: boolean;
     includeId?: boolean;
+    textOnly?: boolean;
 };
 
 /**
@@ -28,6 +31,9 @@ export const ReferencePreview = function ReferencePreview(props: ReferencePrevie
     const reference = props.reference;
     if (!(typeof reference === "object" && "isEntityReference" in reference && reference.isEntityReference())) {
         console.warn("Reference preview received value of type", typeof reference);
+        if (props.textOnly) {
+            return <span>{String(reference)}</span>;
+        }
         return <EntityPreviewContainer
             onClick={props.onClick}
             size={props.size ?? "medium"}>
@@ -48,7 +54,8 @@ function ReferencePreviewInternal({
     hover,
     onClick,
     includeEntityLink = true,
-    includeId = true
+    includeId = true,
+    textOnly
 }: ReferencePreviewProps) {
 
     const customizationController = useCustomizationController();
@@ -60,6 +67,9 @@ function ReferencePreviewInternal({
         if (customizationController.components?.missingReference) {
             return <customizationController.components.missingReference path={reference.path}/>;
         } else {
+            if (textOnly) {
+                return <span>{reference.path}</span>;
+            }
             return <EntityPreviewContainer
                 onClick={onClick}
                 size={size ?? "medium"}>
@@ -78,6 +88,7 @@ function ReferencePreviewInternal({
         includeEntityLink={includeEntityLink}
         includeId={includeId}
         onClick={onClick}
+        textOnly={textOnly}
         hover={hover}/>
 }
 
@@ -90,10 +101,13 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     includeEntityLink,
     includeId,
     onClick,
-    hover
+    hover,
+    textOnly
 }: ReferencePreviewProps & {
     collection: EntityCollection<M>
 }) {
+
+    const customizationController = useCustomizationController();
 
     const {
         entity,
@@ -121,6 +135,9 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
             tooltip={reference.path}/>;
     }
     if (body) {
+        if (textOnly) {
+            return <span>{reference.id}</span>;
+        }
 
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
@@ -132,6 +149,9 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     }
 
     if (dataLoading && !usedEntity) {
+        if (textOnly) {
+            return <Skeleton className="inline-block w-20 h-4" />;
+        }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
@@ -142,6 +162,9 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     }
 
     if (!usedEntity) {
+        if (textOnly) {
+            return <span>{reference.id}</span>;
+        }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
@@ -149,6 +172,13 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
                 <ErrorView error={"Entity not found"}/>
             </EntityPreviewContainer>
         );
+    }
+
+    if (textOnly) {
+        const titleProperty = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
+        const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(reference.id);
+        return <span className="truncate">{displayValue}</span>;
     }
 
     return <EntityPreview size={size}

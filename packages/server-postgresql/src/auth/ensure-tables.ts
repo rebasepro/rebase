@@ -20,16 +20,17 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
         let usersTableName = '"rebase"."users"';
         let userIdType = "TEXT";
         let usersSchema = "rebase";
+        let resolvedTable = "users";
         if (collection) {
-            const rawTable = ("table" in collection && typeof collection.table === "string")
+            resolvedTable = ("table" in collection && typeof collection.table === "string")
                 ? collection.table
                 : collection.slug;
             usersSchema = ("schema" in collection && typeof collection.schema === "string")
                 ? collection.schema
                 : "public";
             usersTableName = usersSchema === "public"
-                ? `"${rawTable}"`
-                : `"${usersSchema}"."${rawTable}"`;
+                ? `"${resolvedTable}"`
+                : `"${usersSchema}"."${resolvedTable}"`;
 
             // Derive ID column type from collection properties
             const idProp = collection.properties?.id;
@@ -42,6 +43,31 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
                 }
                 // Otherwise keep TEXT as default
             }
+        }
+
+        // Introspect the database to find the actual type of usersTableName's ID column if the table exists
+        try {
+            const result = await db.execute(sql`
+                SELECT data_type 
+                FROM information_schema.columns 
+                WHERE table_schema = ${usersSchema} 
+                  AND table_name = ${resolvedTable} 
+                  AND column_name = 'id'
+            `);
+            if (result && result.rows && result.rows.length > 0) {
+                const dbType = String((result.rows[0] as { data_type: string }).data_type).toUpperCase();
+                if (dbType === "UUID") {
+                    userIdType = "UUID";
+                } else if (dbType === "INTEGER" || dbType === "SMALLINT" || dbType === "BIGINT") {
+                    userIdType = "INTEGER";
+                } else {
+                    userIdType = "TEXT";
+                }
+                logger.info(`✨ Detected ${usersTableName}.id type from database: ${dbType}. Using user_id type: ${userIdType}`);
+            }
+        } catch (err) {
+            // Ignore introspection errors, fallback to derived/default type
+            logger.warn(`⚠️ Failed to introspect ${usersTableName}.id type from database, falling back to config type: ${userIdType}`, { error: err });
         }
 
 

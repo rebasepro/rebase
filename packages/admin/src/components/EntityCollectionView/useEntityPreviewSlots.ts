@@ -166,31 +166,38 @@ export function resolveCollectionSlotKeys(
         }
     }
 
-    // Relations: collect ALL relation property keys.
-    // We iterate properties (not a hardcoded key list) and check the
-    // resolved relation metadata for type === "relation".
+    // Relations: collect relation property keys for chip rendering.
+    // When propertiesOrder is explicitly set, skip this — relations will
+    // be shown in the developer-defined order, not as separate chips.
+    const hasExplicitOrder = !!(collection.propertiesOrder as string[] | undefined);
     const relationKeys: string[] = [];
-    for (const [key, prop] of Object.entries(collection.properties)) {
-        const p = prop as Property;
-        if (p.type === "relation") {
-            relationKeys.push(key);
+    if (!hasExplicitOrder) {
+        for (const [key, prop] of Object.entries(collection.properties)) {
+            const p = prop as Property;
+            if (p.type === "relation") {
+                relationKeys.push(key);
+            }
         }
     }
 
-    // Subtitle: first preview key that isn't title/image/status/date/relation/id.
+    // Subtitle: first preview key that isn't title/image/status/date/id.
+    // When propertiesOrder is not set, also exclude relation keys (they render as chips).
     // Prefer string fields (especially multiline/description-like) over numbers.
     const excludeKeys = new Set([titleKey, imageKey, statusKey, dateKey, ...relationKeys]);
     const previewKeys = getEntityPreviewKeys(authController, collection, propertyConfigs, undefined, 10)
         .filter(k => !excludeKeys.has(k) && k !== "id");
 
-    // Sort: strings first (prefer multiline → good description candidate), then others
-    const sortedPreviewKeys = [...previewKeys].sort((a, b) => {
-        const propA = collection.properties[a] as Property | undefined;
-        const propB = collection.properties[b] as Property | undefined;
-        const scoreA = propA?.type === "string" ? (propA.multiline ? 2 : 1) : 0;
-        const scoreB = propB?.type === "string" ? (propB.multiline ? 2 : 1) : 0;
-        return scoreB - scoreA;
-    });
+    // When propertiesOrder is set, respect the developer-defined order (no re-sorting).
+    // When not set, sort: strings first (prefer multiline → good description candidate).
+    const sortedPreviewKeys = hasExplicitOrder
+        ? previewKeys
+        : [...previewKeys].sort((a, b) => {
+            const propA = collection.properties[a] as Property | undefined;
+            const propB = collection.properties[b] as Property | undefined;
+            const scoreA = propA?.type === "string" ? (propA.multiline ? 2 : 1) : 0;
+            const scoreB = propB?.type === "string" ? (propB.multiline ? 2 : 1) : 0;
+            return scoreB - scoreA;
+        });
     const subtitleKey = sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined;
 
     return { titleKey,

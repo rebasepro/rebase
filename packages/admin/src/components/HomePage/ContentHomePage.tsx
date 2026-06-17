@@ -22,7 +22,7 @@ import { toArray } from "@rebasepro/utils";
 import { useCollapsedGroups, buildCollapsedDefaults, useCustomizationController, useTranslation, useSlot, useAdminModeController, useRebaseRegistry } from "@rebasepro/core";
 import { useRestoreScroll } from "@rebasepro/core";
 
-import { BootstrapAdminBanner } from "@rebasepro/core";
+import { BootstrapAdminBanner, SchemaDriftBanner } from "@rebasepro/core";
 import { useBreadcrumbsController, useCMSContext } from "../../index";
 
 export const DEFAULT_GROUP_NAME = "Views";
@@ -320,8 +320,9 @@ export function ContentHomePage({
     return (
         <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
             <Container maxWidth="6xl">
-                <div className="mb-4">
+                <div className="mb-4 flex flex-col gap-2">
                     <BootstrapAdminBanner />
+                    <SchemaDriftBanner />
                 </div>
                 {/* search & actions */}
                 <div

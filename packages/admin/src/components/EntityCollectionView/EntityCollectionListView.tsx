@@ -761,7 +761,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     return (
         <div
             className={cls(
-                "flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full",
+                "@container flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full",
                 rowClasses,
                 isActive
                     ? "bg-surface-accent-100 dark:bg-surface-accent-950 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-950"
@@ -812,7 +812,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             )}
 
             {/* PRIMARY slot → Title + subtitle + byline */}
-            <div className={cls("min-w-[180px] overflow-hidden", useColumnMode ? "flex-1" : "flex-1")}>
+            <div className={cls("min-w-0 overflow-hidden", useColumnMode ? "flex-1" : "flex-1")}>
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -821,6 +821,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                                 value={slots.title.value}
                                 property={slots.title.property}
                                 size="small"
+                                textOnly={true}
                             />
                         </Typography>
                     ) : (
@@ -830,22 +831,24 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     )}
                 </div>
 
-                {/* SUBTITLE slot — always plain truncated text */}
+                {/* SUBTITLE slot */}
                 {slots.subtitle && (
                     <div className="truncate mt-0.5">
-                        <Typography variant="caption" className="text-surface-500 dark:text-surface-400 truncate">
-                            {typeof slots.subtitle.value === "string"
-                                ? slots.subtitle.value
-                                : slots.subtitle.value != null
-                                    ? String(slots.subtitle.value)
-                                    : "—"}
+                        <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
+                            <PropertyPreview
+                                propertyKey={slots.subtitle.propertyKey}
+                                value={slots.subtitle.value}
+                                property={slots.subtitle.property}
+                                size="small"
+                                textOnly={true}
+                            />
                         </Typography>
                     </div>
                 )}
 
                 {/* RELATION CHIPS slot — compact chips for all relations */}
                 {!useColumnMode && slots.relations.length > 0 && (
-                    <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-full">
+                    <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-full @max-[350px]:hidden">
                         {slots.relations.map((rel) => (
                             rel.items.map((item) => (
                                 <Chip
@@ -920,9 +923,9 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             ) : (
                 /* ── SLOT MODE (editorial scanner layout) ── */
                 <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
-                    {/* STATUS slot */}
+                    {/* STATUS slot — hidden when row is narrow */}
                     {slots.status && (
-                        <div className="flex-shrink-0">
+                        <div className="flex-shrink-0 @max-[400px]:hidden">
                             <PropertyPreview
                                 propertyKey={slots.status.propertyKey}
                                 value={slots.status.value}
@@ -934,7 +937,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 
                     {/* DATE slot */}
                     {slots.date && (
-                        <div className="flex-shrink-0 text-right w-[80px]">
+                        <div className="flex-shrink-0 text-right w-[80px] @max-[500px]:hidden">
                             <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
                                 {slots.date.formatted ?? "—"}
                             </Typography>

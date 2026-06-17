@@ -325,6 +325,32 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             // When auto-generation is disabled, watch the config/collections dir directly so the dev server
             // still reloads automatically when files there are edited/updated manually.
             watchArgs.splice(1, 0, `--watch="${path.join("..", "config", "**", "*")}"`);
+
+            // Watch collections folder and warn about potential schema drift
+            const collectionsDir = path.join(projectRoot, "config", "collections");
+            if (fs.existsSync(collectionsDir)) {
+                let driftDebounce: NodeJS.Timeout | null = null;
+                fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
+                    if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
+                    if (driftDebounce) clearTimeout(driftDebounce);
+                    driftDebounce = setTimeout(() => {
+                        console.log([
+                            "",
+                            chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
+                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(filename!.padEnd(29)) + chalk.yellow("│"),
+                            chalk.yellow("  │                                                              │"),
+                            chalk.yellow("  │  Your schema may be out of sync. Run:                        │"),
+                            chalk.yellow("  │    ") + chalk.cyan("pnpm schema:generate") + chalk.yellow("   regenerate Drizzle schema        │"),
+                            chalk.yellow("  │    ") + chalk.cyan("pnpm db:push         ") + chalk.yellow("   sync schema to database          │"),
+                            chalk.yellow("  │    ") + chalk.cyan("rebase doctor        ") + chalk.yellow("   check for drift                  │"),
+                            chalk.yellow("  │                                                              │"),
+                            chalk.yellow("  │  TIP: Use ") + chalk.bold("rebase dev --generate") + chalk.yellow(" for auto-regeneration    │"),
+                            chalk.yellow("  └──────────────────────────────────────────────────────────────┘"),
+                            ""
+                        ].join("\n"));
+                    }, 500);
+                });
+            }
         }
 
         const backendChild = execa(

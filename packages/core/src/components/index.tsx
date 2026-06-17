@@ -23,3 +23,5 @@ export * from "./LoginView";
 export * from "./RebaseAuth";
 
 export * from "./BootstrapAdminBanner";
+
+export * from "./SchemaDriftBanner";

@@ -38,7 +38,7 @@ export function MapFieldBinding({
     const { t } = useTranslation();
 
     if (!property.properties) {
-        throw Error(`You need to specify a 'properties' prop (or specify a custom field) in your map property ${propertyKey}`);
+        throw Error(`You need to specify a 'properties' prop (or specify a custom field) in your map property '${propertyKey}'${property.name ? ` ("${property.name}")` : ""}`);
     }
 
     const mapProperties = property.properties;

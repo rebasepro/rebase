@@ -7,6 +7,8 @@ import { useCustomizationController, useEntityFetch, ErrorView } from "@rebasepr
 import { Skeleton } from "@rebasepro/ui";
 import { EntityPreview, EntityPreviewContainer } from "../../components";
 import { useCollectionRegistryController } from "../../index";
+import { getEntityTitlePropertyKey } from "../../util/previews";
+import { getValueInPath } from "@rebasepro/utils";
 
 export type RelationPreviewProps = {
     disabled?: boolean;
@@ -17,6 +19,7 @@ export type RelationPreviewProps = {
     hover?: boolean;
     includeEntityLink?: boolean;
     includeId?: boolean;
+    textOnly?: boolean;
 };
 
 /**
@@ -26,6 +29,9 @@ export const RelationPreview = function RelationPreview(props: RelationPreviewPr
     const relation = props.relation;
     if (!(typeof relation === "object" && "isEntityRelation" in relation && relation.isEntityRelation())) {
         console.warn("Relation preview received value of type", typeof relation);
+        if (props.textOnly) {
+            return <span>{String(relation)}</span>;
+        }
         return <EntityPreviewContainer
             onClick={props.onClick}
             size={props.size}>
@@ -44,7 +50,8 @@ function RelationPreviewInternal({
     hover,
     onClick,
     includeEntityLink = true,
-    includeId = true
+    includeId = true,
+    textOnly
 }: RelationPreviewProps) {
 
     const customizationController = useCustomizationController();
@@ -56,6 +63,9 @@ function RelationPreviewInternal({
         if (customizationController.components?.missingReference) {
             return <customizationController.components.missingReference path={relation.path}/>;
         } else {
+            if (textOnly) {
+                return <span>{relation.path}</span>;
+            }
             return <EntityPreviewContainer size={size}>
                 <ErrorView error={`Collection not found: ${relation.path}`}/>
             </EntityPreviewContainer>;
@@ -71,6 +81,7 @@ function RelationPreviewInternal({
         includeEntityLink={includeEntityLink}
         includeId={includeId}
         onClick={onClick}
+        textOnly={textOnly}
         hover={hover}/>
 }
 
@@ -83,12 +94,14 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     includeEntityLink,
     includeId,
     onClick,
-    hover
+    hover,
+    textOnly
 }: RelationPreviewProps & {
     collection: EntityCollection<M>
 }) {
 
     const passedEntity = relation.data;
+    const customizationController = useCustomizationController();
 
     const {
         entity,
@@ -117,6 +130,9 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (body) {
+        if (textOnly) {
+            return <span>{relation.id}</span>;
+        }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
@@ -127,6 +143,9 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (dataLoading && !usedEntity) {
+        if (textOnly) {
+            return <Skeleton className="inline-block w-20 h-4" />;
+        }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
@@ -137,6 +156,9 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (!usedEntity) {
+        if (textOnly) {
+            return <span>{relation.id}</span>;
+        }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
@@ -145,6 +167,14 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
             </EntityPreviewContainer>
         );
     }
+
+    if (textOnly) {
+        const titleProperty = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
+        const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(relation.id);
+        return <span className="truncate">{displayValue}</span>;
+    }
+
     return <EntityPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}

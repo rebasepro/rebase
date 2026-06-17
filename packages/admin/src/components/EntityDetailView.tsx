@@ -42,7 +42,7 @@ import {
 import { useUrlController, useCollectionRegistryController } from "../index";
 import { useNavigate } from "react-router-dom";
 import { getValueInPath } from "@rebasepro/utils";
-import { getEntityTitlePropertyKey } from "../util/previews";
+import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";
 import { EntityJsonPreview } from "../components/EntityJsonPreview";
 
 const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
@@ -237,9 +237,10 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
 
     // Title resolution
     const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
-    const title = (usedEntity?.values && titlePropertyKey ? getValueInPath(usedEntity.values, titlePropertyKey) as React.ReactNode : undefined)
-        ?? collection.singularName
-        ?? collection.name;
+    const rawTitle = usedEntity?.values && titlePropertyKey ? getValueInPath(usedEntity.values, titlePropertyKey) : undefined;
+    const title = rawTitle !== undefined && rawTitle !== null
+        ? resolveTitleToString(rawTitle)
+        : (collection.singularName ?? collection.name);
 
     // Non-action custom views
     const nonActionCustomViews = useMemo(() =>
