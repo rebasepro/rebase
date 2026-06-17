@@ -193,7 +193,7 @@ accessExpiresIn: "1h" });
 
     describe("Configuration Security", () => {
         it("throws an error when defaultRole is set to 'admin'", () => {
-            expect(() => createApp({ defaultRole: "admin" })).toThrowError(/CRITICAL SECURITY ERROR/);
+            expect(() => createApp({ defaultRole: "admin" })).toThrow(/CRITICAL SECURITY ERROR/);
         });
     });
 

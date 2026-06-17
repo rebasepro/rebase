@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+
 
 
 /**
@@ -16,11 +17,18 @@ export class RestApiGenerator {
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
     private dataHooks?: DataHooks;
+    private authAdapter?: AuthAdapter;
 
-    constructor(collections: EntityCollection[], driver: DataDriver, dataHooks?: DataHooks) {
+    constructor(
+        collections: EntityCollection[],
+        driver: DataDriver,
+        dataHooks?: DataHooks,
+        authAdapter?: AuthAdapter
+    ) {
         this.collections = collections;
         this.driver = driver;
         this.dataHooks = dataHooks;
+        this.authAdapter = authAdapter;
         this.router = new Hono<HonoEnv>();
     }
 
@@ -215,6 +223,44 @@ export class RestApiGenerator {
 
                 if (this.dataHooks?.beforeSave) {
                     body = await this.dataHooks.beforeSave(path, body, undefined, hookCtx);
+                }
+
+                const isAuth = (collection as any).auth;
+                const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+
+                if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
+                    const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
+                    const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
+
+                    const entity = await driver.saveEntity({
+                        path,
+                        values: prepared.values,
+                        collection: resolvedCollection,
+                        status: "new"
+                    });
+
+                    const result = prepared.hookHandledEmail
+                        ? { temporaryPassword: prepared.clearPassword, invitationSent: prepared.invitationSent }
+                        : this.authAdapter.finalizeUserCreation
+                            ? await this.authAdapter.finalizeUserCreation(
+                                { id: entity.id as string, values: entity.values as Record<string, unknown> },
+                                prepared.clearPassword
+                            )
+                            : { invitationSent: false };
+
+                    const response = this.formatResponse(entity) as Record<string, unknown>;
+
+                    if (this.dataHooks?.afterSave) {
+                        Promise.resolve(this.dataHooks.afterSave(path, response, hookCtx)).catch(err => {
+                            console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                        });
+                    }
+
+                    return c.json({
+                        ...response,
+                        invitationSent: result.invitationSent,
+                        ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {})
+                    }, 201);
                 }
 
                 const entity = await driver.saveEntity({

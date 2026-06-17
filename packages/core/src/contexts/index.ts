@@ -8,6 +8,5 @@ export * from "./AnalyticsContext";
 export * from "./StorageSourceContext";
 export * from "./UserConfigurationPersistenceContext";
 export * from "./DialogsProvider";
-export * from "./InternalUserManagementContext";
 export * from "./RebaseClientInstanceContext";
 export * from "./CustomizationControllerContext";

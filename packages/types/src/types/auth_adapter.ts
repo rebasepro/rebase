@@ -183,6 +183,41 @@ export interface UserManagementAdapter {
     setUserRoles(userId: string, roleIds: string[]): Promise<void>;
 }
 
+// ─── User Creation Lifecycle ─────────────────────────────────────────────────
+
+/**
+ * Result of `AuthAdapter.prepareUserCreation()`.
+ *
+ * Contains the processed values ready for persistence and metadata
+ * needed by the finalization step.
+ *
+ * @group Auth
+ */
+export interface UserCreationPrepareResult {
+    /** Processed values to persist (passwordHash instead of raw password, etc.). */
+    values: Record<string, unknown>;
+    /** Cleartext password for post-save processing (email or admin display). */
+    clearPassword?: string;
+    /** Whether the hook already handled the invitation (email, etc.). */
+    hookHandledEmail: boolean;
+    /** Whether an invitation was sent (only relevant when hookHandledEmail is true). */
+    invitationSent: boolean;
+}
+
+/**
+ * Result of `AuthAdapter.finalizeUserCreation()`.
+ *
+ * Returned to the REST API for inclusion in the response.
+ *
+ * @group Auth
+ */
+export interface UserCreationFinalizeResult {
+    /** If set, returned to the admin in the API response. */
+    temporaryPassword?: string;
+    /** Whether an invitation email was sent. */
+    invitationSent: boolean;
+}
+
 // ─── Auth Adapter ────────────────────────────────────────────────────────────
 
 /**
@@ -270,10 +305,7 @@ export interface AuthAdapter {
     createAuthRoutes?(): Hono<any, any, any> | undefined;
 
     /**
-     * Mount admin routes for user management.
-     *
-     * Same typing rationale as `createAuthRoutes` — the sub-app env is
-     * unconstrained to support arbitrary adapter implementations.
+     * Mount admin routes (e.g. password reset for users).
      *
      * @returns A Hono sub-app with admin routes, or `undefined` to skip.
      */
@@ -303,6 +335,40 @@ export interface AuthAdapter {
      * Use for closing connections, flushing caches, etc.
      */
     destroy?(): Promise<void>;
+
+    // ── Collection User Creation (for auth collections) ───────────────
+
+    /**
+     * Prepare values for creating a user via the auth collection's REST API.
+     *
+     * Called on POST to a collection with `auth: true`. Handles password
+     * hashing, email normalization, and any collection/backend-level hooks.
+     *
+     * If not implemented, the collection saves values as-is (no password hashing).
+     *
+     * @param values - Raw request body from the client.
+     * @param collectionAuth - The parsed `AuthCollectionConfig` from the collection (if `auth` is an object).
+     * @returns Processed values ready for `driver.saveEntity()`, plus metadata for the post-save step.
+     */
+    prepareUserCreation?(
+        values: Record<string, unknown>,
+        collectionAuth?: unknown
+    ): Promise<UserCreationPrepareResult>;
+
+    /**
+     * Finalize a user creation after the entity has been persisted.
+     *
+     * Handles post-save work: sending invitation emails, generating
+     * password-reset tokens, or falling back to returning a temporary password.
+     *
+     * @param entity - The persisted entity (id + values).
+     * @param clearPassword - The cleartext password from the prepare step (if any).
+     * @returns Metadata for the API response (temporary password, invitation status).
+     */
+    finalizeUserCreation?(
+        entity: { id: string; values: Record<string, unknown> },
+        clearPassword?: string
+    ): Promise<UserCreationFinalizeResult>;
 
     // ── Service Key (optional) ──────────────────────────────────────────
 

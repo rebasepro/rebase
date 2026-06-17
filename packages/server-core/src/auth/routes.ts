@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes } from "crypto";
+import { generateSecureToken, hashToken } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 import type { AuthHooks } from "./auth-hooks";
@@ -68,19 +69,7 @@ function buildAuthResponse(
     };
 }
 
-/**
- * Generate a secure random token
- */
-function generateSecureToken(): string {
-    return randomBytes(40).toString("hex");
-}
 
-/**
- * Hash a token for database storage
- */
-function hashToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
-}
 
 /**
  * Get password reset token expiry (1 hour from now)
@@ -102,8 +91,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     router.onError(errorHandler);
 
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, allowRegistration = false, authHooks } = config;
-    const ops = resolveAuthHooks(authHooks);
+    const { emailService, emailConfig, allowRegistration = false } = config;
+    const ops = resolveAuthHooks(config.authHooks);
 
     // ── Zod input schemas ──────────────────────────────────────────────
     const registerSchema = z.object({
@@ -195,11 +184,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
 
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
-        if (authHooks?.customizeAccessToken) {
+        if (ops.customizeAccessToken) {
             const user = await authRepo.getUserById(userId);
             if (user) {
                 const defaultClaims: Record<string, unknown> = { userId, roles: roleIds, aal: "aal1" };
-                customClaims = await authHooks.customizeAccessToken(defaultClaims, user);
+                customClaims = await ops.customizeAccessToken(defaultClaims, user);
             }
         }
 
@@ -253,8 +242,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             passwordHash,
             displayName: displayName || undefined
         };
-        if (authHooks?.beforeUserCreate) {
-            createData = await authHooks.beforeUserCreate(createData);
+        if (ops.beforeUserCreate) {
+            createData = await ops.beforeUserCreate(createData);
         }
         const user = await authRepo.createUser(createData);
 
@@ -282,17 +271,17 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
 displayName: user.displayName });
 
         // Fire afterUserCreate hook
-        if (authHooks?.afterUserCreate) {
+        if (ops.afterUserCreate) {
             try {
-                await authHooks.afterUserCreate(user);
+                await ops.afterUserCreate(user);
             } catch (err) {
                 console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
             }
         }
 
         // Fire onAuthenticated hook (fire-and-forget)
-        if (authHooks?.onAuthenticated) {
-            authHooks.onAuthenticated(user, "register").catch(err => {
+        if (ops.onAuthenticated) {
+            ops.onAuthenticated(user, "register").catch(err => {
                 console.error("[AuthHooks] onAuthenticated error:", err instanceof Error ? err.message : err);
             });
         }
@@ -308,15 +297,15 @@ displayName: user.displayName });
         const { email, password } = parseBody(loginSchema, await c.req.json());
 
         // Call beforeLogin hook if provided (throw to reject)
-        if (authHooks?.beforeLogin) {
-            await authHooks.beforeLogin(email, "login");
+        if (ops.beforeLogin) {
+            await ops.beforeLogin(email, "login");
         }
 
         let user;
 
-        if (authHooks?.verifyCredentials) {
+        if (ops.verifyCredentials) {
             // Full credential verification override
-            user = await authHooks.verifyCredentials(email, password, authRepo);
+            user = await ops.verifyCredentials(email, password, authRepo);
             if (!user) {
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
@@ -344,8 +333,8 @@ displayName: user.displayName });
         );
 
         // Fire onAuthenticated hook (fire-and-forget)
-        if (authHooks?.onAuthenticated) {
-            authHooks.onAuthenticated(user, "login").catch(err => {
+        if (ops.onAuthenticated) {
+            ops.onAuthenticated(user, "login").catch(err => {
                 console.error("[AuthHooks] onAuthenticated error:", err instanceof Error ? err.message : err);
             });
         }
@@ -399,9 +388,9 @@ displayName: user.displayName });
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
 
                         // Fire afterUserCreate hook
-                        if (authHooks?.afterUserCreate) {
+                        if (ops.afterUserCreate) {
                             try {
-                                await authHooks.afterUserCreate(user);
+                                await ops.afterUserCreate(user);
                             } catch (err) {
                                 console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
                             }
@@ -531,8 +520,8 @@ displayName: user.displayName }, appName);
         await authRepo.deleteAllRefreshTokensForUser(storedToken.userId);
 
         // Fire onPasswordReset hook (fire-and-forget)
-        if (authHooks?.onPasswordReset) {
-            authHooks.onPasswordReset(storedToken.userId).catch(err => {
+        if (ops.onPasswordReset) {
+            ops.onPasswordReset(storedToken.userId).catch(err => {
                 console.error("[AuthHooks] onPasswordReset error:", err instanceof Error ? err.message : err);
             });
         }
@@ -686,11 +675,11 @@ message: "Email verified successfully" });
 
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
-        if (authHooks?.customizeAccessToken) {
+        if (ops.customizeAccessToken) {
             const user = await authRepo.getUserById(storedToken.userId);
             if (user) {
                 const defaultClaims: Record<string, unknown> = { userId: storedToken.userId, roles: roleIds, aal: "aal1" };
-                customClaims = await authHooks.customizeAccessToken(defaultClaims, user);
+                customClaims = await ops.customizeAccessToken(defaultClaims, user);
             }
         }
 
@@ -734,11 +723,11 @@ message: "Email verified successfully" });
         // Call afterLogout hook (fire-and-forget)
         // Extract userId from the access token if present
         const authHeader = c.req.header("authorization");
-        if (authHooks?.afterLogout && authHeader?.startsWith("Bearer ")) {
+        if (ops.afterLogout && authHeader?.startsWith("Bearer ")) {
             const { verifyAccessToken } = await import("./jwt");
             const payload = verifyAccessToken(authHeader.substring(7));
             if (payload) {
-                authHooks.afterLogout(payload.userId).catch(err => {
+                ops.afterLogout(payload.userId).catch(err => {
                     console.error("[AuthHooks] afterLogout error:", err instanceof Error ? err.message : err);
                 });
             }
@@ -922,8 +911,8 @@ message: "Session revoked successfully" });
             isAnonymous: true
         };
 
-        if (authHooks?.beforeUserCreate) {
-            createData = await authHooks.beforeUserCreate(createData);
+        if (ops.beforeUserCreate) {
+            createData = await ops.beforeUserCreate(createData);
         }
 
         const user = await authRepo.createUser(createData);
@@ -940,15 +929,15 @@ message: "Session revoked successfully" });
         );
 
         // Fire afterUserCreate hook
-        if (authHooks?.afterUserCreate) {
-            authHooks.afterUserCreate(user).catch(err => {
+        if (ops.afterUserCreate) {
+            ops.afterUserCreate(user).catch(err => {
                 console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
             });
         }
 
         // Fire onAuthenticated hook
-        if (authHooks?.onAuthenticated) {
-            authHooks.onAuthenticated(user, "anonymous").catch(err => {
+        if (ops.onAuthenticated) {
+            ops.onAuthenticated(user, "anonymous").catch(err => {
                 console.error("[AuthHooks] onAuthenticated error:", err instanceof Error ? err.message : err);
             });
         }
@@ -1204,8 +1193,8 @@ message: "Session revoked successfully" });
         );
 
         // Fire onMfaVerified hook
-        if (authHooks?.onMfaVerified) {
-            authHooks.onMfaVerified(userCtx.userId, factor.id).catch(err => {
+        if (ops.onMfaVerified) {
+            ops.onMfaVerified(userCtx.userId, factor.id).catch(err => {
                 console.error("[AuthHooks] onMfaVerified error:", err instanceof Error ? err.message : err);
             });
         }

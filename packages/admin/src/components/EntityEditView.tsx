@@ -1,8 +1,9 @@
-import type { ComponentRef, EntityCollection, EntityCustomViewParams, FormViewConfig } from "@rebasepro/types";
+import type { ComponentRef, EntityCollection, EntityCustomViewParams, FormViewConfig, UserCreationResult } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus } from "@rebasepro/types";
+import { CreationResultDialog } from "./admin/CreationResultDialog";
 import { PluginProviderStack, resolveComponentRef } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
@@ -511,8 +512,42 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
                     ...params,
                     selectedTab: MAIN_TAB_VALUE === selectedTab ? undefined : selectedTab
                 };
-                onSaved?.(res);
-                formProps?.onSaved?.(res);
+
+                const isAuth = (collection as any).auth;
+                const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+
+                if (isAuthCollection && (params.entity.values.invitationSent !== undefined || params.entity.values.temporaryPassword !== undefined) && context.dialogsController) {
+                    const creationResult: UserCreationResult = {
+                        user: {
+                            uid: params.entity.id as string,
+                            email: params.entity.values.email as string,
+                            displayName: params.entity.values.displayName as string,
+                            roles: params.entity.values.roles as string[],
+                            photoURL: (params.entity.values.photoURL || params.entity.values.photoUrl || null) as string | null,
+                            providerId: "password",
+                            isAnonymous: false,
+                        },
+                        invitationSent: !!params.entity.values.invitationSent,
+                        temporaryPassword: params.entity.values.temporaryPassword as string | undefined,
+                    };
+
+                    const { closeDialog } = context.dialogsController.open({
+                        key: "user_creation_result",
+                        Component: () => (
+                            <CreationResultDialog
+                                result={creationResult}
+                                onClose={() => {
+                                    closeDialog();
+                                    onSaved?.(res);
+                                    formProps?.onSaved?.(res);
+                                }}
+                            />
+                        )
+                    });
+                } else {
+                    onSaved?.(res);
+                    formProps?.onSaved?.(res);
+                }
             }}
             Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
         />

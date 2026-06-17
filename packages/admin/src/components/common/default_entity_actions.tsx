@@ -1,6 +1,6 @@
 import { CopyIcon, iconSize, KeyRoundIcon, PencilIcon, Trash2Icon } from "@rebasepro/ui";
 import type { EntityAction, User, UserCreationResult } from "@rebasepro/types";
-import { ConfirmationDialog, useInternalUserManagementController, useSnackbarController, useTranslation } from "@rebasepro/core";
+import { ConfirmationDialog, useSnackbarController, useTranslation, useRebaseClient, useAuthController } from "@rebasepro/core";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../EntityCollectionView/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
@@ -168,26 +168,43 @@ export function ResetPasswordActionDialog({
     open: boolean;
     onClose: () => void;
 }) {
-    const userManagement = useInternalUserManagementController();
+    const client = useRebaseClient<{ baseUrl?: string }>();
+    const { getAuthToken } = useAuthController();
     const snackbarController = useSnackbarController();
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [creationResult, setCreationResult] = useState<UserCreationResult | null>(null);
 
     const handleConfirm = async () => {
-        if (!userManagement?.resetPassword) return;
         setLoading(true);
         try {
-            const result = await userManagement.resetPassword(user);
-            setCreationResult(result);
+            const baseUrl = client?.baseUrl || '';
+            const token = await getAuthToken?.();
+            const response = await fetch(`${baseUrl}/api/admin/users/${user.uid}/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || 'Failed to reset password');
+            }
+            const data = await response.json();
+            setCreationResult({
+                user,
+                invitationSent: data.invitationSent ?? false,
+                temporaryPassword: data.temporaryPassword
+            });
             snackbarController.open({
-                type: "success",
-                message: t("reset_password_success") || "Password reset successfully"
+                type: 'success',
+                message: t('reset_password_success') || 'Password reset successfully'
             });
         } catch (error: unknown) {
             snackbarController.open({
-                type: "error",
-                message: error instanceof Error ? error.message : (t("error_resetting_password") || "Error resetting password")
+                type: 'error',
+                message: error instanceof Error ? error.message : (t('error_resetting_password') || 'Error resetting password')
             });
             onClose();
         } finally {

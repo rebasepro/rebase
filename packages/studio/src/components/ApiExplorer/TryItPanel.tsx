@@ -56,19 +56,12 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
     const [validationError, setValidationError] = useState<string | null>(null);
 
     const rebaseContext = useRebaseContext();
-    const userManagement = rebaseContext.userManagement;
     const currentUser = rebaseContext.authController?.user;
 
     const users = useMemo((): SelectableUser[] => {
-        const managed = (userManagement?.users ?? []).map(u => ({
-            uid: u.uid,
-            displayName: u.displayName,
-            email: u.email,
-            photoURL: u.photoURL,
-            roles: u.roles
-        }));
-        if (currentUser && !managed.some(u => u.uid === currentUser.uid)) {
-            managed.unshift({
+        const managed: SelectableUser[] = [];
+        if (currentUser) {
+            managed.push({
                 uid: currentUser.uid,
                 displayName: currentUser.displayName,
                 email: currentUser.email,
@@ -77,7 +70,7 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
             });
         }
         return managed;
-    }, [userManagement?.users, currentUser]);
+    }, [currentUser]);
 
     const currentSelectableUser = useMemo((): SelectableUser | null => {
         if (!currentUser) return null;
@@ -193,7 +186,7 @@ time: elapsed });
                     selectedUser={selectedUser}
                     setSelectedUser={setSelectedUser}
                     users={users}
-                    loading={userManagement?.loading}
+                    loading={false}
                     currentUser={currentSelectableUser}
                 />
 

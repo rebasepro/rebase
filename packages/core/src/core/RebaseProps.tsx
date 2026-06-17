@@ -1,5 +1,5 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, UserManagementDelegate, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations } from "@rebasepro/types";
 
 /** DeepPartial helper — allows partial overrides at any nesting level */
 type DeepPartial<T> = T extends object
@@ -111,19 +111,7 @@ export type RebaseProps<USER extends User> = {
      */
     entityLinkBuilder?: EntityLinkBuilder;
 
-    /**
-     * You can use this props to provide your own user management implementation.
-     * Note that this will not affect the UI, but it will be used to show user information
-     * in various places of the CMS, for example, to show who created or modified an entity,
-     * or to assign ownership of an entity.
-     *
-     * You can also use this data to be retrieved in your custom properties,
-     * for example, to show a list of users in a dropdown.
-     *
-     * If you are using the Rebase user management plugin, this
-     * prop will be implemented automatically.
-     */
-    userManagement?: UserManagementDelegate<USER>;
+
 
     /**
      * Plugins loaded in the CMS

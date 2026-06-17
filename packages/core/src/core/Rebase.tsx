@@ -4,7 +4,7 @@ import type { CustomizationController, RebasePlugin, SlotContribution } from "@r
 
 import React, { useMemo } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
-import { RebaseContext, User, UserManagementDelegate, CollectionRegistryController } from "@rebasepro/types";
+import { RebaseContext, User, CollectionRegistryController } from "@rebasepro/types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext } from "../contexts";
@@ -26,7 +26,7 @@ import { DialogsProvider } from "../contexts/DialogsProvider";
 import { buildRebaseData, CollectionRegistry } from "@rebasepro/common";
 import { CustomizationControllerContext } from "../contexts/CustomizationControllerContext";
 import { AnalyticsContext } from "../contexts/AnalyticsContext";
-import { InternalUserManagementContext } from "../contexts/InternalUserManagementContext";
+
 import { EffectiveRoleControllerContext } from "../contexts/EffectiveRoleController";
 import { useBuildEffectiveRoleController } from "../hooks/useBuildEffectiveRoleController";
 
@@ -63,7 +63,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         entityActions,
         components,
         apiKey,
-        userManagement: _userManagement,
+
         effectiveRoleController,
         apiUrl,
         translations
@@ -85,13 +85,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         ...((plugins ?? []).flatMap((p) => p.slots ?? []))
     ], [directSlots, plugins]);
 
-    const userManagement = useMemo(() => plugins?.find((p) => p.userManagement)?.userManagement
-        ?? _userManagement
-        ?? {
-            loading: false,
-            users: [],
-            getUser: (uid: string) => null
-        } as UserManagementDelegate<USER>, [plugins, _userManagement]);
+
 
     // Auth fallback logic
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);
@@ -201,7 +195,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                                 value={resolvedDatabaseAdmin}>
                                 <AuthControllerContext.Provider
                                     value={authController}>
-                                    <InternalUserManagementContext.Provider value={userManagement}>
                                         <EffectiveRoleControllerContext.Provider value={activeEffectiveRoleController}>
                                             <DialogsProvider>
                                                 <SchemaDriftProvider>
@@ -214,7 +207,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                                                 </SchemaDriftProvider>
                                             </DialogsProvider>
                                         </EffectiveRoleControllerContext.Provider>
-                                    </InternalUserManagementContext.Provider>
                                 </AuthControllerContext.Provider>
                             </DatabaseAdminContext.Provider>
                         </RebaseDataContext.Provider>

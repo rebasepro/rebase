@@ -158,6 +158,12 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      */
     disableDefaultActions?: ("edit" | "copy" | "delete")[];
 
+    /**
+     * Mark this collection as an authentication collection.
+     * When true, this collection is used for user management, login, password hashing, and invitation flows.
+     */
+    auth?: boolean | AuthCollectionConfig;
+
 
 
     /**
@@ -1119,4 +1125,123 @@ export interface RolesOnlySecurityRule extends SecurityRuleBase {
     access?: never;
     using?: never;
     withCheck?: never;
+}
+
+/**
+ * Configuration for authentication collections.
+ *
+ * Controls what happens when admins create users, reset passwords,
+ * and which entity actions are auto-injected.
+ *
+ * Use `auth: true` as sugar for `{ enabled: true }` with all defaults.
+ *
+ * @example Override user creation
+ * ```ts
+ * auth: {
+ *     enabled: true,
+ *     onCreateUser: async (values, ctx) => {
+ *         const hash = await ctx.hashPassword("welcome123");
+ *         return {
+ *             values: { ...values, passwordHash: hash, emailVerified: true },
+ *             temporaryPassword: "welcome123",
+ *         };
+ *     },
+ * }
+ * ```
+ *
+ * @example Disable the reset-password entity action
+ * ```ts
+ * auth: {
+ *     enabled: true,
+ *     actions: { resetPassword: false },
+ * }
+ * ```
+ *
+ * @group Models
+ */
+export interface AuthCollectionConfig {
+    /** Set to true to mark this collection as the authentication collection. */
+    enabled: boolean;
+
+    /**
+     * Called when an admin creates a user via the collection REST API.
+     *
+     * Default: generate password → hash → normalize email → save →
+     *          send invitation email (or return temp password if no email configured).
+     *
+     * Override to implement custom invitation flows, LDAP sync, etc.
+     */
+    onCreateUser?: (
+        values: Record<string, unknown>,
+        ctx: AuthCollectionContext
+    ) => Promise<AuthCollectionCreateResult>;
+
+    /**
+     * Called when an admin resets a user's password via the admin panel.
+     *
+     * Default: generate reset token → send email (or generate + return temp password).
+     * Override for custom reset flows.
+     */
+    onResetPassword?: (
+        userId: string,
+        ctx: AuthCollectionContext
+    ) => Promise<AuthCollectionResetResult>;
+
+    /**
+     * Control which auth-specific entity actions are auto-injected.
+     *
+     * Default: `{ resetPassword: true }` — the framework auto-injects
+     * the built-in `resetPasswordAction` into the collection's entity actions.
+     *
+     * Set to `false` to disable, or pass a custom `EntityAction` to replace the UI.
+     */
+    actions?: {
+        resetPassword?: boolean | EntityAction;
+    };
+}
+
+/**
+ * Context provided to collection-level auth hooks.
+ *
+ * This is a simplified facade over the server internals —
+ * it exposes only what's needed for custom auth flows without
+ * coupling collection config to internal interfaces.
+ *
+ * @group Models
+ */
+export interface AuthCollectionContext {
+    /** Hash a password using the configured algorithm (scrypt by default). */
+    hashPassword: (password: string) => Promise<string>;
+    /** Send an email. Only available when email service is configured. */
+    sendEmail?: (options: { to: string; subject: string; html: string; text?: string }) => Promise<void>;
+    /** Whether the email service is configured and available. */
+    emailConfigured: boolean;
+    /** The app name from email config (for templates). */
+    appName: string;
+    /** The base URL for password reset links. */
+    resetPasswordUrl: string;
+}
+
+/**
+ * Result of a collection-level `onCreateUser` hook.
+ * @group Models
+ */
+export interface AuthCollectionCreateResult {
+    /** Processed values to persist (must include passwordHash, NOT raw password). */
+    values: Record<string, unknown>;
+    /** If set, shown to the admin in the creation result dialog. */
+    temporaryPassword?: string;
+    /** Whether an invitation email was sent. */
+    invitationSent?: boolean;
+}
+
+/**
+ * Result of a collection-level `onResetPassword` hook.
+ * @group Models
+ */
+export interface AuthCollectionResetResult {
+    /** If set, shown to the admin. */
+    temporaryPassword?: string;
+    /** Whether a reset email was sent. */
+    invitationSent?: boolean;
 }

@@ -6,7 +6,7 @@
  * when the user passes a plain `RebaseAuthConfig` object.
  *
  * This is NOT a rewrite — it delegates to the existing `createAuthRoutes()`,
- * `createAdminRoutes()`, and `verifyAccessToken()` functions. The goal is to
+ * `createResetPasswordRoute()`, and `verifyAccessToken()` functions. The goal is to
  * present the same functionality through the pluggable `AuthAdapter` contract.
  */
 
@@ -20,16 +20,16 @@ import type {
     AuthUserData,
     AuthCreateUserData,
     BootstrappedAuth,
-    BackendHooks,
 } from "@rebasepro/types";
 
 import type { Hono } from "hono";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
-import { createAdminRoutes } from "./admin-routes";
+import { createResetPasswordRoute } from "./reset-password-admin";
+import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
-import type { AuthHooks, ResolvedAuthOperations } from "./auth-hooks";
+import type { AuthHooks, ResolvedAuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
@@ -57,10 +57,10 @@ export interface BuiltinAuthAdapterConfig {
     oauthProviders?: OAuthProvider<any>[];
     /** Static service key for server-to-server auth. */
     serviceKey?: string;
-    /** Backend hooks for intercepting admin data. */
-    hooks?: BackendHooks;
     /** Auth hooks for customizing password, credentials, lifecycle, etc. */
     authHooks?: AuthHooks;
+    /** The parsed auth config from the collection (if `auth` is an object, not just `true`). */
+    collectionAuthConfig?: import("@rebasepro/types").AuthCollectionConfig;
 }
 
 /**
@@ -79,8 +79,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         defaultRole,
         oauthProviders = [],
         serviceKey,
-        hooks,
         authHooks,
+        collectionAuthConfig,
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -176,7 +176,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             };
         },
 
-        userManagement: createUserManagementFromRepo(authRepository, resolvedOps, authHooks),
+        userManagement: createUserManagementFromRepo(authRepository, resolvedOps),
 
 
 
@@ -193,13 +193,34 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         },
 
         createAdminRoutes(): Hono<HonoEnv> | undefined {
-            return createAdminRoutes({
+            return createResetPasswordRoute({
                 authRepo: authRepository,
                 emailService,
                 emailConfig,
                 serviceKey,
-                hooks,
                 authHooks,
+                collectionAuthConfig,
+            });
+        },
+
+        async prepareUserCreation(values, collectionAuth) {
+            const parsedCollectionAuth = collectionAuth as import("@rebasepro/types").AuthCollectionConfig | undefined;
+            return prepareAdminUserValues(values, {
+                authRepo: authRepository,
+                emailService,
+                emailConfig,
+                resolvedHooks: resolvedOps,
+                collectionAuthConfig: parsedCollectionAuth ?? collectionAuthConfig,
+            });
+        },
+
+        async finalizeUserCreation(entity, clearPassword) {
+            return finalizeAdminUserCreation(entity, clearPassword, {
+                authRepo: authRepository,
+                emailService,
+                emailConfig,
+                resolvedHooks: resolvedOps,
+                collectionAuthConfig,
             });
         },
 
@@ -235,7 +256,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
-function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: ResolvedAuthOperations, authHooks?: AuthHooks): UserManagementAdapter {
+function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: ResolvedAuthHooks): UserManagementAdapter {
     return {
         async listUsers(options?: AuthUserListOptions): Promise<AuthUserListResult> {
             const result = await repo.listUsersPaginated({
@@ -268,13 +289,13 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 photoUrl: data.photoUrl,
                 metadata: data.metadata,
             };
-            if (authHooks?.beforeUserCreate) {
-                createData = await authHooks.beforeUserCreate(createData);
+            if (resolvedOps.beforeUserCreate) {
+                createData = await resolvedOps.beforeUserCreate(createData);
             }
             const user = await repo.createUser(createData);
-            if (authHooks?.afterUserCreate) {
+            if (resolvedOps.afterUserCreate) {
                 try {
-                    await authHooks.afterUserCreate(user);
+                    await resolvedOps.afterUserCreate(user);
                 } catch (err) {
                     console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
                 }
@@ -297,15 +318,15 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
 
         async deleteUser(id: string): Promise<void> {
             // Call beforeUserDelete hook (throw to prevent deletion)
-            if (authHooks?.beforeUserDelete) {
-                await authHooks.beforeUserDelete(id);
+            if (resolvedOps.beforeUserDelete) {
+                await resolvedOps.beforeUserDelete(id);
             }
 
             await repo.deleteUser(id);
 
             // Fire afterUserDelete hook (fire-and-forget)
-            if (authHooks?.afterUserDelete) {
-                authHooks.afterUserDelete(id).catch(err => {
+            if (resolvedOps.afterUserDelete) {
+                resolvedOps.afterUserDelete(id).catch(err => {
                     console.error("[AuthHooks] afterUserDelete error:", err instanceof Error ? err.message : err);
                 });
             }

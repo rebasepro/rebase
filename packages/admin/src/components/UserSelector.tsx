@@ -21,9 +21,92 @@ import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { User } from "@rebasepro/types";
-import { useUserSelector, UserSelectorItem } from "@rebasepro/core";
-import { UserDisplay } from "@rebasepro/core";
+import { useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/core";
 import { EmptyValue } from "../preview";
+
+interface UserSelectorItem {
+    uid: string;
+    label: string;
+    description?: string;
+    user: User;
+}
+
+const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * Local hook to fetch users from the collection REST API with search and pagination.
+ */
+function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number } = {}) {
+    const client = useRebaseClient<{ baseUrl?: string }>();
+    const { getAuthToken } = useAuthController();
+
+    const [items, setItems] = useState<UserSelectorItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [currentSearch, setCurrentSearch] = useState("");
+    const offsetRef = useRef(0);
+    const userCacheRef = useRef<Map<string, User>>(new Map());
+
+    const fetchUsers = useCallback(async (searchStr: string, offset: number, append: boolean) => {
+        if (!client?.baseUrl) return;
+        setIsLoading(true);
+        try {
+            const token = await getAuthToken?.();
+            const params = new URLSearchParams({
+                limit: String(pageSize),
+                offset: String(offset),
+            });
+            if (searchStr) params.set("search", searchStr);
+            const response = await fetch(`${client.baseUrl}/api/users?${params}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (!response.ok) throw new Error("Failed to fetch users");
+            const data = await response.json();
+            const rows: Record<string, unknown>[] = data.data ?? data.users ?? [];
+            const newItems: UserSelectorItem[] = rows.map((r: Record<string, unknown>) => {
+                const user: User = {
+                    uid: (r.id as string) ?? "",
+                    email: (r.email as string) ?? "",
+                    displayName: (r.displayName as string) ?? (r.display_name as string) ?? null,
+                    photoURL: (r.photoURL as string) ?? (r.photo_url as string) ?? null,
+                    providerId: "custom",
+                    isAnonymous: false,
+                    roles: (r.roles as string[]) ?? [],
+                };
+                userCacheRef.current.set(user.uid, user);
+                return { uid: user.uid, label: user.displayName ?? user.email ?? user.uid, user };
+            });
+            setItems(prev => append ? [...prev, ...newItems] : newItems);
+            setHasMore(newItems.length >= pageSize);
+            offsetRef.current = offset + newItems.length;
+        } catch {
+            setHasMore(false);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [client?.baseUrl, getAuthToken, pageSize]);
+
+    useEffect(() => {
+        offsetRef.current = 0;
+        fetchUsers("", 0, false);
+    }, [fetchUsers]);
+
+    const search = useCallback((searchStr: string) => {
+        setCurrentSearch(searchStr);
+        offsetRef.current = 0;
+        fetchUsers(searchStr, 0, false);
+    }, [fetchUsers]);
+
+    const loadMore = useCallback(() => {
+        fetchUsers(currentSearch, offsetRef.current, true);
+    }, [fetchUsers, currentSearch]);
+
+    const getUser = useCallback((uid: string): User | null => {
+        return userCacheRef.current.get(uid) ?? null;
+    }, []);
+
+    return { items, isLoading, hasMore, search, loadMore, getUser };
+}
 
 export interface UserSelectorProps {
     className?: string;

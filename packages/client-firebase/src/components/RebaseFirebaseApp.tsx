@@ -26,7 +26,7 @@ import {
     SideEntityProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { Entity, PropertyConfig, RebaseContext, UserManagementDelegate } from "@rebasepro/types";
+import { Entity, PropertyConfig, RebaseContext } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";
@@ -90,8 +90,7 @@ export function RebaseFirebaseApp({
     autoOpenDrawer,
     firestoreIndexesBuilder,
     components,
-    localTextSearchEnabled = false,
-    userManagement
+    localTextSearchEnabled = false
 }: RebaseFirebaseAppProps) {
 
     /**
@@ -186,7 +185,6 @@ export function RebaseFirebaseApp({
         dataSourceDelegate: firestoreDelegate
     });
     
-    const activeUserManagement = userManagement ?? defaultUserManagement;
 
     const navigationStateController = useBuildNavigationStateController({
         collections,
@@ -197,8 +195,7 @@ export function RebaseFirebaseApp({
         plugins,
         collectionRegistryController,
         urlController,
-        adminMode: adminModeController.mode,
-        userManagement: activeUserManagement as unknown as UserManagementDelegate
+        adminMode: adminModeController.mode
     });
 
     if (firebaseConfigLoading || !firebaseApp || loading) {
@@ -225,7 +222,6 @@ export function RebaseFirebaseApp({
                         dateTimeFormat={dateTimeFormat}
                         driver={firestoreDelegate}
                         storageSource={storageSource}
-                        userManagement={activeUserManagement}
                         entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
                         locale={locale}
                         onAnalyticsEvent={onAnalyticsEvent}

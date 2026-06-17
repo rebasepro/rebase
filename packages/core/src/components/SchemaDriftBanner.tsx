@@ -75,7 +75,6 @@ export interface SchemaDriftBannerProps {
 
 /**
  * Persistent banner shown when a schema drift error is detected.
- * Place alongside `<BootstrapAdminBanner />` in the layout.
  */
 export function SchemaDriftBanner({ className }: SchemaDriftBannerProps) {
     const { schemaDriftMessage, dismiss } = useSchemaDriftContext();

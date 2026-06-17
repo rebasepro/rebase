@@ -43,6 +43,7 @@
     "dev": "cd app && run-s dev",
     "web": "cd website && run-s dev",
     "saas": "cd saas && pnpm run dev",
+    "saas:prod": "./saas/scripts/dev-prod.sh",
     "deploy:web": "cd website && run-s deploy",
     "build": "pnpm --filter './packages/*' -r run build && pnpm --filter './app' -r run build",
     "build:stream": "lerna run build --stream --loglevel=info",

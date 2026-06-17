@@ -44,6 +44,7 @@ import {
 } from "./password";
 import type { PasswordValidationResult } from "./password";
 import type { AuthRepository, UserData, CreateUserData } from "./interfaces";
+import type { EmailService, EmailConfig } from "../email";
 
 /**
  * Authentication method identifier for lifecycle hooks.
@@ -205,28 +206,67 @@ export interface AuthHooks {
      * This is fire-and-forget — errors are logged but do not fail the request.
      */
     afterUserDelete?(userId: string): Promise<void>;
+
+    /**
+     * Optional hook to customize or override the default user creation flow via the admin panel/REST API.
+     * When provided, this replaces the built-in password generation, hashing, and invitation email logic.
+     */
+    onAdminCreateUser?(
+        values: Record<string, unknown>,
+        ctx: {
+            authRepo: AuthRepository;
+            emailService?: EmailService;
+            emailConfig?: EmailConfig;
+            hashPassword: (password: string) => Promise<string>;
+        }
+    ): Promise<{
+        values: Record<string, unknown>;
+        temporaryPassword?: string;
+        invitationSent?: boolean;
+    }>;
+
+    /**
+     * Optional hook to customize or override the default password reset flow via the admin panel.
+     * When provided, this replaces the built-in password reset token generation, hashing, and email logic.
+     */
+    onAdminResetPassword?(
+        userId: string,
+        ctx: {
+            authRepo: AuthRepository;
+            emailService?: EmailService;
+            emailConfig?: EmailConfig;
+        }
+    ): Promise<{
+        temporaryPassword?: string;
+        invitationSent?: boolean;
+    }>;
 }
 
 /**
- * Resolved auth operations — every method is guaranteed to exist.
+ * Resolved auth hooks — password operations are guaranteed to exist,
+ * all other hooks are passed through as-is (optional).
+ *
  * Created by `resolveAuthHooks()` which merges user hooks
  * with built-in defaults.
+ *
+ * Consumers should use the resolved object exclusively —
+ * never access the raw `AuthHooks` directly.
  */
-export interface ResolvedAuthOperations {
-    hashPassword(password: string): Promise<string>;
-    verifyPassword(password: string, storedHash: string): Promise<boolean>;
-    validatePasswordStrength(password: string): PasswordValidationResult;
-}
+export type ResolvedAuthHooks =
+    Required<Pick<AuthHooks, 'hashPassword' | 'verifyPassword' | 'validatePasswordStrength'>>
+    & Omit<AuthHooks, 'hashPassword' | 'verifyPassword' | 'validatePasswordStrength'>;
 
 /**
  * Merge user-provided hooks with the built-in defaults to produce
- * a complete set of resolved operations.
+ * a complete set of resolved hooks.
  *
  * This is the single point where defaults are applied — all consumers
- * call this once and use the resolved operations throughout.
+ * call this once and use the resolved hooks throughout.
  */
-export function resolveAuthHooks(hooks?: AuthHooks): ResolvedAuthOperations {
+export function resolveAuthHooks(hooks?: AuthHooks): ResolvedAuthHooks {
     return {
+        ...hooks,
+
         hashPassword: hooks?.hashPassword
             ?? defaultHashPassword,
 

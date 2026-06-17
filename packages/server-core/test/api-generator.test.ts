@@ -497,4 +497,69 @@ values: { title: "UUID" } } as any
             expect(mockDriver.deleteEntity).not.toHaveBeenCalled();
         });
     });
+
+    describe("Auth Hook Overrides (onAdminCreateUser via AuthAdapter)", () => {
+
+        it("calls adapter.prepareUserCreation and saves user with returned values", async () => {
+            const mockPrepare = jest.fn().mockResolvedValue({
+                values: { email: "custom@example.com", name: "Custom Name", passwordHash: "custom-hash" },
+                clearPassword: "custom-temp-password",
+                hookHandledEmail: true,
+                invitationSent: true
+            });
+
+            const mockAuthAdapter = {
+                id: "test-adapter",
+                verifyRequest: jest.fn(),
+                getCapabilities: jest.fn(),
+                prepareUserCreation: mockPrepare,
+            };
+
+            const app = new Hono();
+            app.onError(errorHandler);
+            
+            const authCollections = [
+                {
+                    slug: "users",
+                    name: "Users",
+                    singularName: "User",
+                    auth: true,
+                    properties: {}
+                } as any
+            ];
+
+            const generator = new RestApiGenerator(authCollections, mockDriver, undefined, mockAuthAdapter as any);
+            app.route("/api", generator.generateRoutes());
+
+            mockDriver.saveEntity.mockResolvedValue({
+                id: "custom-id",
+                path: "users",
+                values: { email: "custom@example.com", name: "Custom Name", passwordHash: "custom-hash" }
+            } as any);
+
+            const res = await app.request("/api/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: "original@example.com", name: "Original Name" })
+            });
+
+            expect(res.status).toBe(201);
+            const body = await res.json() as any;
+            expect(body.email).toBe("custom@example.com");
+            expect(body.invitationSent).toBe(true);
+            expect(body.temporaryPassword).toBe("custom-temp-password");
+
+            expect(mockPrepare).toHaveBeenCalledWith(
+                expect.objectContaining({ email: "original@example.com", name: "Original Name" }),
+                undefined // auth: true → collectionAuthConfig is undefined
+            );
+            expect(mockDriver.saveEntity).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: "users",
+                    values: { email: "custom@example.com", name: "Custom Name", passwordHash: "custom-hash" },
+                    status: "new"
+                })
+            );
+        });
+    });
 });

@@ -11,6 +11,7 @@ export const defaultUsersCollection: PostgresCollection = {
     name: "Users",
     singularName: "User",
     slug: "users",
+    auth: true,
     table: "users",
     schema: "rebase",
     icon: "Users",

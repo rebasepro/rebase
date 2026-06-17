@@ -194,7 +194,6 @@ export function JSEditor() {
     const { t } = useTranslation();
 
     // User management for the "Run as" picker
-    const userManagement = rebaseContext.userManagement;
     const currentUser = rebaseContext.authController?.user;
 
     // State
@@ -252,16 +251,10 @@ code: DEFAULT_CODE }])
 
     // Users list for the picker — mapped to SelectableUser shape
     const users = useMemo((): SelectableUser[] => {
-        const managed = (userManagement?.users ?? []).map(u => ({
-            uid: u.uid,
-            displayName: u.displayName,
-            email: u.email,
-            photoURL: u.photoURL,
-            roles: u.roles
-        }));
+        const managed: SelectableUser[] = [];
         // Ensure the current user is in the list
-        if (currentUser && !managed.some(u => u.uid === currentUser.uid)) {
-            managed.unshift({
+        if (currentUser) {
+            managed.push({
                 uid: currentUser.uid,
                 displayName: currentUser.displayName,
                 email: currentUser.email,
@@ -270,7 +263,7 @@ code: DEFAULT_CODE }])
             });
         }
         return managed;
-    }, [userManagement?.users, currentUser]);
+    }, [currentUser]);
 
     // Current user as SelectableUser for the popover
     const currentSelectableUser = useMemo((): SelectableUser | null => {
@@ -725,7 +718,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     selectedUser={selectedUser}
                                                     setSelectedUser={setSelectedUser}
                                                     users={users}
-                                                    loading={userManagement?.loading}
+                                                    loading={false}
                                                     currentUser={currentSelectableUser}
                                                 />
                                             </div>

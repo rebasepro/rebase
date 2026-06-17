@@ -10,7 +10,7 @@ import { useCustomizationController } from "./useCustomizationController";
 import { useAnalyticsController } from "./useAnalyticsController";
 import { useEffectiveRoleController } from "./useEffectiveRoleController";
 import React, { useEffect, useContext } from "react";
-import { useInternalUserManagementController } from "./useInternalUserManagementController";
+
 
 // DatabaseAdmin is provided by <Rebase> via DatabaseAdminContext.
 import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
@@ -37,7 +37,7 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     const customizationController = useCustomizationController();
     const analyticsController = useAnalyticsController();
     const effectiveRoleController = useEffectiveRoleController();
-    const userManagement = useInternalUserManagementController<USER>();
+
 
     // Will get `databaseAdmin` from context
     const databaseAdmin = useContext(DatabaseAdminContext);
@@ -51,7 +51,6 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
         dialogsController,
         customizationController,
         analyticsController,
-        userManagement,
         effectiveRoleController,
         databaseAdmin,
         client: client! // Client should be provided
@@ -67,13 +66,12 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
             dialogsController,
             customizationController,
             analyticsController,
-            userManagement,
             effectiveRoleController,
             databaseAdmin,
             client: client!
         };
     }, [authController, data, storageSource, snackbarController, userConfigPersistence,
-        dialogsController, customizationController, analyticsController, userManagement,
+        dialogsController, customizationController, analyticsController,
         effectiveRoleController, databaseAdmin, client]);
 
     return rebaseContextRef.current;

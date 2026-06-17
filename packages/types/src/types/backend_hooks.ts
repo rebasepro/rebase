@@ -1,4 +1,3 @@
-import type { AdminUser } from "../controllers/client";
 
 /**
  * Context passed to every backend hook.
@@ -12,49 +11,6 @@ export interface BackendHookContext {
     method: "GET" | "POST" | "PUT" | "DELETE";
 }
 
-/**
- * Hooks for intercepting Admin User data at the API boundary.
- *
- * These hooks run on the server after the database operation completes
- * but before the response is sent to the client.
- *
- * @group Backend Hooks
- */
-export interface UserHooks {
-    /**
-     * Transform a user record after it's read from the database,
-     * before it's returned to the client.
-     *
-     * Return the modified user, or `null` to filter it out entirely
-     * (the user won't appear in listings or individual fetches).
-     */
-    afterRead?(user: AdminUser, context: BackendHookContext): AdminUser | null | Promise<AdminUser | null>;
-
-    /**
-     * Transform user data before it's written to the database.
-     * Runs on POST (create) and PUT (update).
-     *
-     * Return the (possibly modified) data to proceed with the save.
-     * Throw an error to abort the operation.
-     */
-    beforeSave?(data: { email?: string; displayName?: string; roles?: string[] }, context: BackendHookContext): { email?: string; displayName?: string; roles?: string[] } | Promise<{ email?: string; displayName?: string; roles?: string[] }>;
-
-    /**
-     * Called after a user is successfully created or updated.
-     * Useful for side-effects like sending notifications.
-     */
-    afterSave?(user: AdminUser, context: BackendHookContext): void | Promise<void>;
-
-    /**
-     * Called before a user is deleted. Throw to prevent deletion.
-     */
-    beforeDelete?(userId: string, context: BackendHookContext): void | Promise<void>;
-
-    /**
-     * Called after a user is successfully deleted.
-     */
-    afterDelete?(userId: string, context: BackendHookContext): void | Promise<void>;
-}
 
 /**
  * Hooks for intercepting collection entity data at the REST API boundary.
@@ -130,9 +86,6 @@ export interface DataHooks {
  * These hooks run server-side after database operations complete and before
  * API responses are sent.
  *
- * - `users` — intercept admin user management endpoints
- * - `data` — intercept ALL collection entity data flowing through the REST API
- *
  * `data` hooks complement per-collection `EntityCallbacks`. Entity callbacks
  * run inside the DataDriver (close to the DB); data hooks run at the HTTP
  * boundary (close to the client). Use data hooks for cross-cutting concerns
@@ -149,12 +102,6 @@ export interface DataHooks {
  *             }
  *             return entity;
  *         }
- *     },
- *     users: {
- *         afterRead(user, ctx) {
- *             if (user.email.endsWith("@system.internal")) return null;
- *             return user;
- *         }
  *     }
  * };
  * ```
@@ -162,8 +109,6 @@ export interface DataHooks {
  * @group Backend Hooks
  */
 export interface BackendHooks {
-    /** Hooks for intercepting user management data */
-    users?: UserHooks;
     /** Hooks for intercepting ALL collection entity data via the REST API */
     data?: DataHooks;
 }

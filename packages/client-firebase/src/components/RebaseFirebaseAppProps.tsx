@@ -2,7 +2,7 @@ import React from "react";
 
 import { AnalyticsEvent, AppView, AppViewsBuilder, EntityCollection, EntityCollectionsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/types";
 import { FirebaseAccessGate } from "../hooks/useFirebaseAccessGate";
-import { UserManagementDelegate } from "@rebasepro/types";
+
 import { FirebaseApp } from "@firebase/app";
 import { FirebaseLoginViewProps } from "./FirebaseLoginView";
 import {
@@ -160,11 +160,6 @@ export type RebaseFirebaseAppProps = {
     localTextSearchEnabled?: boolean;
 
     components?: ComponentsRegistry;
-
-    /**
-     * Delegate for user and role management. Provides the admin views if specified.
-     */
-    userManagement?: UserManagementDelegate<FirebaseUserWrapper>;
 
 };
 

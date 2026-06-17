@@ -7,8 +7,11 @@ export type { JwtConfig, AccessTokenPayload } from "./jwt";
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
 export type { PasswordValidationResult } from "./password";
 
-export type { AuthHooks, AuthMethod, ResolvedAuthOperations } from "./auth-hooks";
+export type { AuthHooks, AuthMethod, ResolvedAuthHooks } from "./auth-hooks";
 export { resolveAuthHooks } from "./auth-hooks";
+
+export { generateSecurePassword, generateSecureToken, hashToken, prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
+export type { AdminUserContext, AdminUserPrepareResult } from "./admin-user-ops";
 
 // OAuth Providers
 export { createGoogleProvider } from "./google-oauth";
@@ -32,7 +35,8 @@ export type { AuthMiddlewareOptions, AuthResult } from "./middleware";
 export { createAuthRoutes } from "./routes";
 export type { AuthModuleConfig } from "./routes";
 
-export { createAdminRoutes } from "./admin-routes";
+export { createResetPasswordRoute } from "./reset-password-admin";
+export type { ResetPasswordRouteConfig } from "./reset-password-admin";
 
 
 export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter, createApiKeyRateLimiter, apiKeyKeyGenerator } from "./rate-limiter";

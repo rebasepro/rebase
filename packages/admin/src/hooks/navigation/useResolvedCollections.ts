@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { AuthController, CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
-import { UserManagementDelegate } from "@rebasepro/types";
+
 
 import { resolveCollections } from "./useNavigationResolution";
 import { areCollectionListsEqual } from "./utils";
@@ -16,7 +16,7 @@ export type UseResolvedCollectionsProps<EC extends EntityCollection, USER extend
     plugins?: RebasePlugin[];
     disabled?: boolean;
     collectionRegistryController: CollectionRegistryController<EC> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
-    userManagement?: UserManagementDelegate<USER>;
+
 };
 
 export type UseResolvedCollectionsResult = {
@@ -47,8 +47,7 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
         data,
         plugins,
         disabled,
-        collectionRegistryController,
-        userManagement
+        collectionRegistryController
     } = props;
 
     const [loading, setLoading] = useState(true);
@@ -70,8 +69,7 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
     authControllerRef.current = authController;
     const pluginsRef = useRef(plugins);
     pluginsRef.current = plugins;
-    const userManagementRef = useRef(userManagement);
-    userManagementRef.current = userManagement;
+
 
     // Ref for resolved collections change detection
     const resolvedCollectionsRef = useRef<EntityCollection[]>([]);

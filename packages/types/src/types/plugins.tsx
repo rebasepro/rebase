@@ -6,7 +6,7 @@ import type { InferPropertyType, Property } from "./properties";
 import type { FormContext } from "./entity_views";
 import type { RebaseContext } from "../rebase_context";
 import type { NavigationGroupMapping, AppView } from "../controllers/navigation";
-import type { UserManagementDelegate } from "./user_management_delegate";
+
 import type { User } from "../users";
 import type { SlotContribution } from "./slots";
 
@@ -136,10 +136,7 @@ export interface RebasePlugin {
      */
     views?: AppView[];
 
-    /**
-     * User management delegate from this plugin.
-     */
-    userManagement?: UserManagementDelegate;
+
 
     /**
      * Optional lifecycle hooks. Called by the Rebase runtime

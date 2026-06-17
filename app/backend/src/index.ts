@@ -121,17 +121,19 @@ async function startServer() {
             ? { origin: allowedOrigins }
             : undefined, // dev defaults are applied by server-core
         hooks: {
-            users: {
-                afterRead(user) {
+            data: {
+                afterRead(slug, entity) {
+                    if (slug !== "users") return entity;
                     // Mask user emails in the demo: "alice@gmail.com" → "a***@gmail.com"
-                    if (user.email) {
-                        const [local, domain] = user.email.split("@");
+                    const email = entity.email as string | undefined;
+                    if (email) {
+                        const [local, domain] = email.split("@");
                         if (local && domain) {
                             const masked = local[0] + "***";
-                            user = { ...user, email: `${masked}@${domain}` };
+                            entity = { ...entity, email: `${masked}@${domain}` };
                         }
                     }
-                    return user;
+                    return entity;
                 }
             }
         }

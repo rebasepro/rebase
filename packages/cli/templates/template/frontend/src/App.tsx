@@ -3,7 +3,7 @@ import React from "react";
 import "@fontsource/jetbrains-mono";
 import "@fontsource/rubik";
 
-import { useRebaseAuthController, useBackendUserManagement } from "@rebasepro/auth";
+import { useRebaseAuthController } from "@rebasepro/auth";
 import { Rebase, RebaseAuth } from "@rebasepro/core";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -25,17 +25,11 @@ export function App() {
         googleClientId: GOOGLE_CLIENT_ID
     });
 
-    const userManagement = useBackendUserManagement({
-        client: rebaseClient,
-        currentUser: authController.user
-    });
-
     return (
         <ErrorBoundary fullPage>
             <Rebase
                 client={rebaseClient}
                 authController={authController}
-                userManagement={userManagement}
             >
                 <RebaseAuth />
                 <RebaseCMS

@@ -24,7 +24,6 @@ import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import {
     createAuthRoutes,
-    createAdminRoutes,
     requireAuth,
     requireAdmin,
     logger
@@ -169,17 +168,24 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             try {
                 const registeredCollections = registry.getCollections();
                 if (registeredCollections.length > 0) {
-                    const result = await schemaAwareDb.execute(sql`
-                        SELECT table_name
+                    const schemasToCheck = Array.from(new Set(
+                        registeredCollections.map(c => (c as any).schema || "public")
+                    ));
+                    const schemasList = schemasToCheck.map(s => `'${s}'`).join(",");
+                    const result = await schemaAwareDb.execute(sql.raw(`
+                        SELECT table_name, table_schema
                         FROM information_schema.tables
-                        WHERE table_schema = 'public'
+                        WHERE table_schema IN (${schemasList})
                           AND table_type = 'BASE TABLE'
-                    `);
+                    `));
                     const dbTables = new Set(
-                        (result.rows as Array<{ table_name: string }>).map(r => r.table_name)
+                        (result.rows as Array<{ table_name: string; table_schema: string }>).map(r =>
+                            r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
+                        )
                     );
                     const missing: Array<{ slug: string; table: string }> = [];
                     for (const col of registeredCollections) {
+                        const schemaName = (col as any).schema || "public";
                         const tableName = registry.hasTableForCollection(
                             (col as any).table ?? col.slug
                         )
@@ -193,7 +199,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                             (k as string) === col.slug
                         ) as string | undefined;
                         const checkName = resolvedTable ?? tableName;
-                        if (!dbTables.has(checkName)) {
+                        const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
+                        if (!dbTables.has(fullCheckName)) {
                             missing.push({ slug: col.slug, table: checkName });
                         }
                     }

@@ -5,7 +5,7 @@ import { AuthController, RebaseData, CollectionRegistryController, User } from "
 import type { EntityCollectionsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 
-import { UserManagementDelegate } from "@rebasepro/types";
+
 
 import { useResolvedCollections } from "./useResolvedCollections";
 import { useResolvedViews } from "./useResolvedViews";
@@ -25,7 +25,7 @@ export type BuildNavigationStateProps<EC extends EntityCollection, USER extends 
     urlController: UrlController;
     adminMode?: "content" | "studio" | "settings";
     effectiveRoleController?: EffectiveRoleController;
-    userManagement?: UserManagementDelegate<USER>;
+
 };
 
 /**
@@ -55,8 +55,7 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         collectionRegistryController,
         urlController,
         adminMode = "content",
-        effectiveRoleController,
-        userManagement
+        effectiveRoleController
     } = props;
 
     const {
@@ -70,8 +69,7 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         data,
         plugins,
         disabled,
-        collectionRegistryController,
-        userManagement
+        collectionRegistryController
     });
 
     const {

@@ -38,7 +38,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/localhost:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/localhost:5432\/rebase/);
     });
 
     it("should fail validation in production if DATABASE_URL contains 127.0.0.1", () => {
@@ -47,7 +47,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/127\.0\.0\.1:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/127\.0\.0\.1:5432\/rebase/);
     });
 
     it("should fail validation in production if DATABASE_URL contains an IPv6 loopback [::1]", () => {
@@ -56,7 +56,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/\[::1\]:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/\[::1\]:5432\/rebase/);
     });
 
     it("should fail validation in production if DATABASE_URL contains a loopback in the 127.x.x.x range", () => {
@@ -65,7 +65,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/127\.0\.0\.2:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/127\.0\.0\.2:5432\/rebase/);
     });
 
     it("should succeed validation in production with a non-localhost DATABASE_URL", () => {
@@ -117,7 +117,7 @@ describe("env configuration and localhost validation", () => {
             }),
         };
 
-        expect(() => loadEnv(extension)).toThrowError(/https:\/\/localhost:8080\/api/);
+        expect(() => loadEnv(extension)).toThrow(/https:\/\/localhost:8080\/api/);
     });
 
     it("should validate and block plain host string matching localhost", () => {
@@ -133,6 +133,6 @@ describe("env configuration and localhost validation", () => {
             }),
         };
 
-        expect(() => loadEnv(extension)).toThrowError(/localhost/);
+        expect(() => loadEnv(extension)).toThrow(/localhost/);
     });
 });

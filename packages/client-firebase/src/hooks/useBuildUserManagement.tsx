@@ -6,8 +6,7 @@ import {
     AuthController,
     DataDriver,
     Entity,
-    User,
-    UserManagementDelegate
+    User
 } from "@rebasepro/types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";
 
@@ -75,7 +74,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
      usersPath = "__FIRECMS/config/users",
      rolesPath = "__FIRECMS/config/roles",
      allowDefaultRolesCreation
- }: UserManagementDelegateParams<CONTROLLER>): UserManagementDelegate<USER> & CONTROLLER {
+ }: UserManagementDelegateParams<CONTROLLER>) {
 
     if (!authController) {
         throw Error("useBuildUserManagement: You need to provide an authController since version 3.0.0-beta.11. Check https://firecms.co/docs/pro/migrating_from_v3_beta");

@@ -40,39 +40,49 @@ async function run() {
     // 3. Click Submit
     console.log("Submitting login form...");
     await page.click('button[type="submit"]');
-    await page.waitForTimeout(2000);
+    // Wait for registration to complete and redirect to the dashboard
+    await page.waitForURL('**/org/*/projects', { timeout: 15000 });
     await page.screenshot({ path: path.join(screenshotDir, "3-dashboard-projects.png") });
 
     // 4. Navigate to Create Project
     console.log("Clicking 'New Project'...");
-    await page.goto("http://localhost:5174/projects/new");
-    await page.waitForTimeout(1000);
+    await page.click('button:has-text("Create Project")');
+    await page.waitForURL('**/org/*/projects/new', { timeout: 10000 });
     await page.screenshot({ path: path.join(screenshotDir, "4-create-project-step1.png") });
 
     // 5. Fill Step 1
-    console.log("Filling Step 1 (Repo info)...");
+    console.log("Filling Step 1 (Project Basics)...");
     await page.getByLabel("Project Name").fill("My E2E Project");
-    await page.getByLabel("GitHub Repository URL").fill("https://github.com/rebasepro/saas-e2e-demo");
+    // Wait for subdomain availability check to complete to avoid "Checking availability..." validation blocking Continue
+    await page.waitForSelector("text=This subdomain is available", { timeout: 10000 });
     await page.screenshot({ path: path.join(screenshotDir, "5-create-project-step1-filled.png") });
     await page.click('button:has-text("Continue")');
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotDir, "6-create-project-step2.png") });
 
-    // 6. Fill Step 2 (Database selection)
-    console.log("Selecting database settings...");
+    // 6. Fill Step 2 (Choose Your Infrastructure)
+    console.log("Selecting infrastructure settings...");
     await page.click('button:has-text("Continue")');
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotDir, "7-create-project-step3.png") });
 
-    // 7. Fill Step 3 (Infra)
-    console.log("Selecting cloud provider and instance...");
+    // 7. Fill Step 3 (Database & Storage)
+    console.log("Selecting database & storage settings...");
     await page.click('button:has-text("Continue")');
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotDir, "8-create-project-step4.png") });
 
-    // 8. Select plan and deploy (checkout cancel flow first)
+    // 8. Fill Step 4 (Connect Repository)
+    console.log("Filling Step 4 (Repo info)...");
+    await page.getByLabel("GitHub Repository URL").fill("https://github.com/rebasepro/saas-e2e-demo");
+    await page.screenshot({ path: path.join(screenshotDir, "8b-create-project-step4-filled.png") });
+    await page.click('button:has-text("Continue")');
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: path.join(screenshotDir, "8c-create-project-step5.png") });
+
+    // 9. Select plan and deploy (checkout cancel flow first)
     console.log("Deploying project...");
-    await page.click('button:has-text("Subscribe & Deploy")');
+    await page.click('button:has-text("Create Project")');
     console.log("Waiting for Stripe Checkout redirect...");
     await page.waitForTimeout(3000);
     await page.screenshot({ path: path.join(screenshotDir, "9-stripe-checkout-project.png") });

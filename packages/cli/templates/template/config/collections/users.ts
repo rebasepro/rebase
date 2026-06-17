@@ -1,10 +1,10 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { resetPasswordAction, deleteEntityAction } from "@rebasepro/admin";
 
 const usersCollection: EntityCollection = {
     name: "Users",
     singularName: "User",
     slug: "users",
+    auth: { enabled: true },
     table: "users",
     schema: "rebase",
     icon: "Users",
@@ -14,13 +14,6 @@ const usersCollection: EntityCollection = {
     securityRules: [
         { operation: "select", roles: ["admin"] },
         { operations: ["insert", "update", "delete"], roles: ["admin"] }
-    ],
-    entityActions: [
-        resetPasswordAction,
-        {
-            ...deleteEntityAction,
-            collapsed: false
-        }
     ],
     sort: ["createdAt", "desc"],
     properties: {

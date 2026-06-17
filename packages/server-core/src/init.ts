@@ -223,9 +223,9 @@ export interface RebaseBackendConfig {
         origin: string | string[] | ((origin: string) => boolean);
     };
     /**
-     * Backend-level hooks for intercepting admin data (users, roles)
-     * at the API boundary. These run server-side after database reads
-     * and before API responses are sent.
+     * Backend-level hooks for intercepting collection entity data
+     * at the REST API boundary. These run server-side after database
+     * operations and before API responses are sent.
      *
      * Complement the per-collection `EntityCallbacks` system which
      * handles collection CRUD operations.
@@ -454,6 +454,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         } else {
             // ── RebaseAuthConfig — wrap in built-in adapter ──
             const safeAuthConfig = config.auth as RebaseAuthConfig;
+
+            // Auto-discover the auth collection from activeCollections if not explicitly set
+            if (!safeAuthConfig.collection) {
+                const foundAuthCollection = activeCollections.find(c => {
+                    const isAuth = (c as any).auth;
+                    return isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+                });
+                if (foundAuthCollection) {
+                    safeAuthConfig.collection = foundAuthCollection;
+                    logger.info("Auto-discovered auth collection from collection definitions", { slug: foundAuthCollection.slug });
+                }
+            }
+
+            // Extract the collection-level auth config (if `auth` is an object, not just `true`)
+            const collectionAuth = safeAuthConfig.collection ? (safeAuthConfig.collection as any).auth : undefined;
+            const collectionAuthConfig = (typeof collectionAuth === "object" && collectionAuth !== null) ? collectionAuth : undefined;
             if (safeAuthConfig.jwtSecret) {
                 configureJwt({
                     secret: safeAuthConfig.jwtSecret,
@@ -491,8 +507,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         defaultRole: safeAuthConfig.defaultRole,
                         oauthProviders,
                         serviceKey,
-                        hooks: config.hooks,
                         authHooks: safeAuthConfig.hooks,
+                        collectionAuthConfig,
                     });
                 }
 
@@ -648,6 +664,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
 
             // Re-create the built-in adapter with all resolved OAuth providers
+            const reCollectionAuth = safeAuthConfig.collection ? (safeAuthConfig.collection as any).auth : undefined;
+            const collectionAuthConfig = (typeof reCollectionAuth === "object" && reCollectionAuth !== null) ? reCollectionAuth : undefined;
             authAdapter = createBuiltinAuthAdapter({
                 authRepository: authConfigResult!.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult!.userService as import("./auth/interfaces").AuthRepository,
                 emailService: authConfigResult!.emailService as import("./email").EmailService,
@@ -656,8 +674,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,
                 serviceKey,
-                hooks: config.hooks,
                 authHooks: safeAuthConfig.hooks,
+                collectionAuthConfig,
             });
         }
 
@@ -798,7 +816,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             dataRouter.route("/", historyRoutes);
         }
 
-        const restGenerator = new RestApiGenerator(activeCollections, defaultDriver, config.hooks?.data);
+        const restGenerator = new RestApiGenerator(
+            activeCollections,
+            defaultDriver,
+            config.hooks?.data,
+            authAdapter
+        );
         dataRouter.route("/", restGenerator.generateRoutes());
 
         config.app.route(`${basePath}/data`, dataRouter);

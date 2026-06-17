@@ -1,10 +1,11 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { resetPasswordAction, deleteEntityAction } from "@rebasepro/admin";
+import { resetPasswordAction } from "@rebasepro/admin";
 
 const usersCollection: EntityCollection = {
     name: "Users",
     singularName: "User",
     slug: "users",
+    auth: true,
     table: "users",
     schema: "rebase",
     icon: "Users",
@@ -12,11 +13,7 @@ const usersCollection: EntityCollection = {
     openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
     entityActions: [
-        resetPasswordAction,
-        {
-            ...deleteEntityAction,
-            collapsed: false
-        }
+        resetPasswordAction
     ],
     sort: ["createdAt", "desc"],
     properties: {

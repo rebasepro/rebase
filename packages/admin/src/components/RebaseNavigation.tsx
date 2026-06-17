@@ -6,7 +6,6 @@ import {
     useCustomizationController,
     useAdminModeController,
     useBuildLocalConfigurationPersistence,
-    useInternalUserManagementController,
     useRebaseClient,
     StudioBridgeRegistryProvider,
     useBridgeRegistration,
@@ -67,7 +66,6 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const registry = useRebaseRegistry();
     const context = useRebaseContext();
     const adminModeController = useAdminModeController();
-    const userManagement = useInternalUserManagementController();
     const userConfigPersistence = useBuildLocalConfigurationPersistence();
 
     // ── Collection Editor resolution ──────────────────────────────────
@@ -147,8 +145,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         data: context.data,
         collectionRegistryController,
         urlController,
-        adminMode: adminModeController?.mode,
-        userManagement
+        adminMode: adminModeController?.mode
     });
 
     // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
