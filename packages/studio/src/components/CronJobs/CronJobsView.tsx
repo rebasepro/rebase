@@ -21,7 +21,7 @@ import {
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController } from "@rebasepro/core";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
-import type { RebaseClient } from "@rebasepro/client";
+import type { RebaseClient } from "@rebasepro/types";
 
 function formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;

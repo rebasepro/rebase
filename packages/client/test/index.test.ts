@@ -1,12 +1,12 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { createRebaseClient as _createRebaseClient, RebaseClient, CreateRebaseClientOptions } from "../src/index";
+import { createRebaseClient as _createRebaseClient, CreateRebaseClientResult, CreateRebaseClientOptions } from "../src/index";
 import { createMemoryStorage } from "../src/auth";
 import { CollectionClient } from "../src/collection";
 
 describe("createRebaseClient", () => {
-    let clients: RebaseClient<any>[] = [];
+    let clients: CreateRebaseClientResult<any>[] = [];
 
-    const createRebaseClient = <DB = Record<string, unknown>>(options: CreateRebaseClientOptions): RebaseClient<DB> => {
+    const createRebaseClient = <DB = Record<string, unknown>>(options: CreateRebaseClientOptions): CreateRebaseClientResult<DB> => {
         const client = _createRebaseClient<DB>(options);
         clients.push(client);
         return client;

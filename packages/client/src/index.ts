@@ -4,7 +4,10 @@ import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createCollectionClient, CollectionClient } from "./collection";
 import { createFunctionsClient } from "./functions";
-import type { FunctionsClient } from "./functions";
+import { createStorage } from "./storage";
+import { RebaseWebSocketClient } from "./websocket";
+import { RebaseClient, RebaseData, StorageSource } from "@rebasepro/types";
+import { toSnakeCase } from "@rebasepro/utils";
 
 export * from "./transport";
 export * from "./auth";
@@ -16,6 +19,7 @@ export * from "./websocket";
 export * from "./storage";
 export * from "./reviver";
 export * from "./functions";
+export type { Entity, FindResponse } from "@rebasepro/types";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
@@ -23,17 +27,34 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
     cron?: CreateCronOptions;
 }
 
-import { RebaseWebSocketClient } from "./websocket";
-import { RebaseClient as BaseRebaseClient, RebaseData, CollectionAccessor, StorageSource } from "@rebasepro/types";
-export type { Entity, FindResponse } from "@rebasepro/types";
-import { toSnakeCase } from "@rebasepro/utils";
+// ─── Typed Data Proxy ────────────────────────────────────────────────────────
+// Adds typed collection accessors when `DB` is provided via the SDK generator.
 
 type KebabToCamelCase<S extends string> =
   S extends `${infer T}-${infer U}`
     ? `${T}${Capitalize<KebabToCamelCase<U>>}`
     : S;
 
-export type RebaseClient<DB = Record<string, unknown>> = Omit<BaseRebaseClient<DB>, "data"> & {
+type TypedDataLayer<DB> = {
+    collection<S extends string>(slug: S): CollectionClient<
+        KebabToCamelCase<S> extends keyof DB
+            ? (DB[KebabToCamelCase<S>] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>)
+            : Record<string, unknown>
+    >;
+} & {
+    [K in keyof DB]: CollectionClient<
+        DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
+    >;
+} & RebaseData;
+
+/**
+ * The return type of `createRebaseClient<DB>()`.
+ *
+ * This is `RebaseClient` (from `@rebasepro/types`) with all optional
+ * capabilities populated and the `data` layer narrowed to provide
+ * typed collection accessors when a `DB` schema generic is supplied.
+ */
+export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient, "data"> & {
     setToken: (token: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -41,24 +62,14 @@ export type RebaseClient<DB = Record<string, unknown>> = Omit<BaseRebaseClient<D
     auth: ReturnType<typeof createAuth>;
     admin: ReturnType<typeof createAdmin>;
     cron: ReturnType<typeof createCron>;
-    functions: FunctionsClient;
+    functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
-    storage?: StorageSource;
+    storage: StorageSource;
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
-    data: {
-        collection<S extends string>(slug: S): CollectionClient<
-            KebabToCamelCase<S> extends keyof DB
-                ? (DB[KebabToCamelCase<S>] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>)
-                : Record<string, unknown>
-        >;
-    } & {
-        [K in keyof DB]: CollectionClient<
-            DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
-        >;
-    } & RebaseData;
+    data: TypedDataLayer<DB>;
 };
 
-import { createStorage } from "./storage";
+// ─── Factory ─────────────────────────────────────────────────────────────────
 
 /**
  * Derive a WebSocket URL from an HTTP base URL.
@@ -94,7 +105,7 @@ function deriveWebSocketUrl(baseUrl?: string): string {
         .replace(/\/$/, "");
 }
 
-export function createRebaseClient<DB = Record<string, unknown>>(options: CreateRebaseClientOptions): RebaseClient<DB> {
+export function createRebaseClient<DB = Record<string, unknown>>(options: CreateRebaseClientOptions): CreateRebaseClientResult<DB> {
     const transport = createTransport(options);
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
@@ -206,7 +217,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         },
         data: dataProxy,
         email: undefined
-    } as unknown as RebaseClient<DB>;
+    } as unknown as CreateRebaseClientResult<DB>;
 
     return target;
 }
+

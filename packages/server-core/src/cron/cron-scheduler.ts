@@ -5,7 +5,7 @@ import type {
     CronJobRunState,
     CronJobContext
 } from "@rebasepro/types";
-import type { RebaseClient } from "@rebasepro/client";
+import type { RebaseClient } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
 import { logger } from "../utils/logger.js";
