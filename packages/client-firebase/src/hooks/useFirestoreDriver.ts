@@ -666,11 +666,10 @@ value: (data as { toArray: () => number[] }).toArray() };
         return new GeoPoint(data.latitude, data.longitude);
     }
     if (data instanceof DocumentReference) {
-        // @ts-ignore
-        const databaseId = data?.firestore?._databaseId?.database;
+        const databaseId = (data?.firestore as unknown as { _databaseId?: { database?: string } })?._databaseId?.database;
         return new EntityReference({ id: data.id,
-path: getCMSPathFromFirestorePath(data.path),
-databaseId });
+            path: getCMSPathFromFirestorePath(data.path),
+            databaseId });
     }
     if (Array.isArray(data)) {
         return data.map(firestoreToCMSModel).filter(v => v !== undefined);

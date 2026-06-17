@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "rootDir": ".",
     "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "module": "ESNEXT",

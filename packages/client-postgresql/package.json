@@ -39,6 +39,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
+    "testEnvironment": "jsdom",
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
     "moduleFileExtensions": [
       "ts",
@@ -77,6 +78,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "ts-jest": "^29.4.11",
     "typescript": "^6.0.3",
     "vite": "^8.0.16"

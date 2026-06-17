@@ -4,8 +4,6 @@ import React, { createContext, forwardRef, RefObject, useCallback, useEffect, us
 
 import { deepEqual as equal } from "fast-equals"
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore -- react-window v2 types may not fully align
 import { List } from "react-window";
 import useMeasure from "react-use-measure";
 
@@ -620,8 +618,34 @@ function MemoizedList({
     itemSize: number;
     includeAddColumn?: boolean;
 }) {
-    const AnyList = List as any;
-    return <AnyList
+    /**
+     * react-window v2 exposes row-based props (`rowComponent`, `rowCount`,
+     * `rowHeight`, `rowProps`) that are not reflected in the published
+     * type definitions. Define the actual shape we use so we can cast
+     * `List` to a concrete `ComponentType` instead of `any`.
+     */
+    interface ReactWindowV2ListProps {
+        ref: RefObject<HTMLDivElement | null>;
+        style: React.CSSProperties;
+        overscanCount: number;
+        rowCount: number;
+        onScroll?: (params: {
+            scrollDirection: "forward" | "backward";
+            scrollOffset: number;
+            scrollUpdateWasRequested: boolean;
+        }) => void;
+        rowHeight: number;
+        rowComponent: React.ComponentType<{
+            index: number;
+            style: React.CSSProperties;
+            includeAddColumn?: boolean;
+            ariaAttributes: unknown;
+        }>;
+        rowProps: Record<string, unknown>;
+    }
+
+    const TypedList = List as React.ComponentType<ReactWindowV2ListProps>;
+    return <TypedList
         ref={outerRef}
         style={{ width, height }}
         overscanCount={4}

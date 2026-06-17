@@ -181,12 +181,9 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         const userExists = users.find(u => u.email?.toLowerCase() === email);
         const data = {
             ...user,
-            roles: roleIds ?? []
+            roles: roleIds ?? [],
+            ...(userExists ? {} : { created_on: new Date() })
         };
-        if (!userExists) {
-            // @ts-ignore
-            data.created_on = new Date();
-        }
         // delete the previous user entry if it exists and the uid has changed
         if (userExists && userExists.uid !== user.uid) {
             const entity: Entity<any> = {

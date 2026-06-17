@@ -31,7 +31,6 @@ import {
     RestFetchService
 } from "@rebasepro/types";
 import { buildRebaseData } from "@rebasepro/common";
-// @ts-ignore
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 

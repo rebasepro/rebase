@@ -53,7 +53,7 @@ export type TextFieldProps<T extends string | number> = {
      * @default 1
      */
     minRows?: number | string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "size" | "value">;
 
 export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | number>>(
     <T extends string | number>(
@@ -92,8 +92,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
         const hasValue = value !== undefined && value !== null && value !== "";
 
         useEffect(() => {
-            // @ts-ignore
-            if (inputRef.current && document.activeElement === inputRef.current) {
+            const element = inputRef && "current" in inputRef ? inputRef.current : null;
+            if (element && document.activeElement === element) {
                 setFocused(true);
             }
         }, []);

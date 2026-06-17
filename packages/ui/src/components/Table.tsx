@@ -137,6 +137,14 @@ export const TableCell = React.memo(({
     );
 });
 
+interface ReactFiber {
+    return: ReactFiber;
+    type: string | Function;
+    elementType?: {
+        name?: string;
+    };
+}
+
 // This is highly experimental and might break in the future
 function getParentName(element: HTMLElement | null): string | undefined {
     if (element) {
@@ -146,19 +154,19 @@ function getParentName(element: HTMLElement | null): string | undefined {
                 key.startsWith("__reactInternalInstance$")
             );
         });
-        // @ts-ignore
-        const domFiber = element[key];
-        // @ts-ignore
-        const getComponentFiber = (fiber) => {
-            let parentFiber = fiber.return;
-            while (typeof parentFiber.type === "string") {
-                parentFiber = parentFiber.return;
-            }
-            return parentFiber;
-        };
-        let fiber = getComponentFiber(domFiber);
-        fiber = getComponentFiber(fiber);
-        return fiber?.elementType?.name;
+        if (key) {
+            const domFiber = (element as unknown as Record<string, ReactFiber>)[key];
+            const getComponentFiber = (fiber: ReactFiber): ReactFiber => {
+                let parentFiber = fiber.return;
+                while (parentFiber && typeof parentFiber.type === "string") {
+                    parentFiber = parentFiber.return;
+                }
+                return parentFiber;
+            };
+            let fiber = getComponentFiber(domFiber);
+            fiber = getComponentFiber(fiber);
+            return fiber?.elementType?.name;
+        }
     }
     return undefined;
 }

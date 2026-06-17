@@ -12,6 +12,7 @@ import { createSchemaEditorRoutes } from "./schema-editor-routes";
 import { createAuthMiddleware, requireAuth, requireAdmin } from "../auth/middleware";
 import { errorHandler } from "./errors";
 import { generateOpenApiSpec } from "./openapi-generator";
+import { requestId } from "../utils/request-id";
 
 /**
  * Simplified API server that leverages existing Rebase infrastructure
@@ -69,6 +70,9 @@ export class RebaseApiServer {
      * Setup Hono middleware
      */
     private setupMiddleware(): void {
+        // Request ID — must be first so all downstream middleware can access it
+        this.router.use("/*", requestId());
+
         // Security headers — use same-origin-allow-popups for COOP so that
         // OAuth popup flows (Google, etc.) can postMessage back to the opener.
         this.router.use("/*", secureHeaders({
@@ -86,6 +90,12 @@ export class RebaseApiServer {
                     : (origin ?? "*"),
                 credentials: this.config.cors.credentials ?? false
             }));
+        } else if (process.env.NODE_ENV !== "production") {
+            console.warn(
+                "⚠️  [RebaseApiServer] No CORS configuration provided. " +
+                "The API will accept requests from any origin. " +
+                "Pass a `cors` option or configure CORS on your Hono app."
+            );
         }
 
         // Auth middleware

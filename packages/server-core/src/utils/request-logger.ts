@@ -45,6 +45,12 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
             latencyMs
         };
 
+        // Include request correlation ID if available
+        const reqId = c.get("requestId");
+        if (reqId) {
+            data.requestId = reqId;
+        }
+
         if (contentLength) {
             data.contentLength = parseInt(contentLength, 10);
         }

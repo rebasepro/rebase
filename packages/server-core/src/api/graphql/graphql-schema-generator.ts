@@ -184,8 +184,8 @@ export class GraphQLSchemaGenerator {
                     id: { type: new GraphQLNonNull(GraphQLString) }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver: DataDriver };
-                    const ds = ctx.driver || this.driver;
+                    const ctx = context as { driver?: DataDriver } | undefined;
+                    const ds = ctx?.driver || this.driver;
                     const entity = await ds.fetchEntity({
                         path: collection.slug,
                         entityId: args.id,
@@ -207,8 +207,8 @@ defaultValue: 0 },
                     orderBy: { type: GraphQLString }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver: DataDriver };
-                    const ds = ctx.driver || this.driver;
+                    const ctx = context as { driver?: DataDriver } | undefined;
+                    const ds = ctx?.driver || this.driver;
                     let filter: FetchCollectionProps["filter"] | undefined;
                     if (args.where) {
                         try {
@@ -259,8 +259,8 @@ defaultValue: 0 },
                     input: { type: new GraphQLNonNull(inputType) }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver: DataDriver };
-                    const ds = ctx.driver || this.driver;
+                    const ctx = context as { driver?: DataDriver } | undefined;
+                    const ds = ctx?.driver || this.driver;
                     const path = collection.slug;
                     const entity = await ds.saveEntity({
                         path,
@@ -280,8 +280,8 @@ defaultValue: 0 },
                     input: { type: new GraphQLNonNull(inputType) }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver: DataDriver };
-                    const ds = ctx.driver || this.driver;
+                    const ctx = context as { driver?: DataDriver } | undefined;
+                    const ds = ctx?.driver || this.driver;
                     const entity = await ds.saveEntity({
                         path: collection.slug,
                         entityId: args.id,
@@ -301,8 +301,8 @@ defaultValue: 0 },
                 },
                 resolve: async (_, args, context: unknown) => {
                     try {
-                        const ctx = context as { driver: DataDriver };
-                        const ds = ctx.driver || this.driver;
+                        const ctx = context as { driver?: DataDriver } | undefined;
+                        const ds = ctx?.driver || this.driver;
                         const existingEntity = await ds.fetchEntity({
                             path: collection.slug,
                             entityId: args.id,

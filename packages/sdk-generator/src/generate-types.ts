@@ -42,21 +42,21 @@ function propertyToTypeScriptType(prop: Property): string {
                     .join(" ");
                 return `{ ${inner} }`;
             }
-            return "Record<string, any>";
+            return "Record<string, unknown>";
         }
         case "array": {
             const arrProp = prop as ArrayProperty;
             if (arrProp.of) {
                 return `Array<${propertyToTypeScriptType(arrProp.of as Property)}>`;
             }
-            return "Array<any>";
+            return "Array<unknown>";
         }
         case "vector":
             return "number[]";
         case "binary":
             return "string";
         default:
-            return "any";
+            return "unknown";
     }
 }
 
@@ -130,7 +130,7 @@ export function generateTypedefs(collections: EntityCollection[]): string {
                 if (emittedKeys.has(key)) continue;
                 const relation = resolvedRelations[key];
                 const isArray = relation?.cardinality === "many";
-                const relType = "{ id: string | number; path: string; __type: \"relation\"; data?: any }";
+                const relType = "{ id: string | number; path: string; __type: \"relation\"; data?: unknown }";
                 const tsType = isArray ? `Array<${relType}>` : relType;
                 lines.push(`      ${toSafeIdentifier(key)}?: ${tsType};`);
                 emittedKeys.add(key);

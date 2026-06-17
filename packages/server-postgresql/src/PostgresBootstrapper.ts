@@ -16,7 +16,8 @@ import {
     RealtimeProvider,
     type DataDriver,
     type AuthAdapter,
-    EntityCollection
+    EntityCollection,
+    PostgresCollection
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService } from "./services/realtimeService";
@@ -27,23 +28,29 @@ import {
     requireAuth,
     requireAdmin,
     logger
-// @ts-ignore
 } from "@rebasepro/server-core";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { UserService, PostgresAuthRepository, AuthSchemaTables } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 
-// @ts-ignore
 import { createEmailService, type EmailConfig, type EmailService } from "@rebasepro/server-core";
-// @ts-ignore
 import { createHistoryRoutes } from "@rebasepro/server-core";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
-// @ts-ignore
-import type { AuthConfig, PostgresDriverConfig, HistoryConfig } from "@rebasepro/server-core";
 import type { Hono } from "hono";
-// @ts-ignore
 import type { HonoEnv } from "@rebasepro/server-core";
+
+export interface PostgresDriverConfig {
+    connectionString?: string;
+    adminConnectionString?: string;
+    readConnectionString?: string;
+    connection?: unknown;
+    schema?: {
+        tables?: Record<string, unknown>;
+        enums?: Record<string, unknown>;
+        relations?: Record<string, unknown>;
+    };
+}
 
 /**
  * Opaque internals bag that PostgresBootstrapper stores during `initializeDriver()`
@@ -107,9 +114,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 ...(pgConfig.schema?.relations || {})
             };
             const { drizzle: createDrizzle } = await import("drizzle-orm/node-postgres");
-            const rawClient = ("$client" in pgConfig.connection
-                ? (pgConfig.connection as Record<string, unknown>).$client
-                : pgConfig.connection) as import("pg").Pool;
+            const connection = pgConfig.connection;
+            const rawClient = (connection && typeof connection === "object" && "$client" in connection
+                ? (connection as Record<string, unknown>).$client
+                : connection) as import("pg").Pool;
             const schemaAwareDb = createDrizzle(rawClient, { schema: mergedSchema });
 
             // Verify connection
@@ -169,7 +177,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 const registeredCollections = registry.getCollections();
                 if (registeredCollections.length > 0) {
                     const schemasToCheck = Array.from(new Set(
-                        registeredCollections.map(c => (c as any).schema || "public")
+                        registeredCollections.map(c => "schema" in c && c.schema ? c.schema : "public")
                     ));
                     const schemasList = schemasToCheck.map(s => `'${s}'`).join(",");
                     const result = await schemaAwareDb.execute(sql.raw(`
@@ -185,19 +193,17 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     );
                     const missing: Array<{ slug: string; table: string }> = [];
                     for (const col of registeredCollections) {
-                        const schemaName = (col as any).schema || "public";
+                        const schemaName = "schema" in col && col.schema ? col.schema : "public";
                         const tableName = registry.hasTableForCollection(
-                            (col as any).table ?? col.slug
+                            col.table ?? col.slug
                         )
-                            ? ((col as any).table ?? col.slug)
+                            ? (col.table ?? col.slug)
                             : col.slug;
                         // Resolve the actual table name the registry stored
-                        const resolvedTable = Array.from(
-                            (registry as any).tables?.keys?.() ?? []
-                        ).find((k: unknown) =>
-                            (k as string) === tableName ||
-                            (k as string) === col.slug
-                        ) as string | undefined;
+                        const resolvedTable = registry.getTableNames().find((k) =>
+                            k === tableName ||
+                            k === col.slug
+                        );
                         const checkName = resolvedTable ?? tableName;
                         const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
                         if (!dbTables.has(fullCheckName)) {
@@ -297,7 +303,7 @@ authRepository };
         },
 
         async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: HistoryService } | undefined> {
-            const historyConfig = config as HistoryConfig | boolean | undefined;
+            const historyConfig = config as { retention?: number } | boolean | undefined;
             if (!historyConfig) return undefined;
 
             const internals = driverResult.internals as PostgresDriverInternals;
@@ -333,7 +339,7 @@ authRepository };
                 server as import("http").Server,
                 realtimeService as RealtimeService,
                 driver as PostgresBackendDriver,
-                config as AuthConfig,
+                config as { requireAuth?: boolean },
                 adapter as AuthAdapter | undefined
             );
         }

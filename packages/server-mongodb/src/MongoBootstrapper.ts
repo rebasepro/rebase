@@ -33,7 +33,7 @@ interface DriverInitConfig {
 
 /** Shape of the auth config passed to `initializeAuth`. */
 interface AuthInitConfig {
-    email?: unknown;
+    email?: import("@rebasepro/server-core").EmailConfig;
 }
 
 /** Shape of the history config passed to `initializeHistory`. */
@@ -92,12 +92,11 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             const { ensureAuthCollectionsExist } = await import("./auth/ensure-collections");
             await ensureAuthCollectionsExist(db);
 
-            // @ts-ignore
             const { createEmailService } = await import("@rebasepro/server-core");
             const authConfig = config as AuthInitConfig | undefined;
             let emailService: unknown;
             if (authConfig?.email) {
-                emailService = createEmailService(authConfig.email as any);
+                emailService = createEmailService(authConfig.email);
             }
 
             const userService = new MongoUserService(db);

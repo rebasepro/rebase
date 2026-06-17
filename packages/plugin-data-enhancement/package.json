@@ -64,6 +64,7 @@
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
+    "testEnvironment": "jsdom",
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
     "moduleFileExtensions": [
       "ts",
@@ -72,7 +73,15 @@
       "jsx",
       "json",
       "node"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
+      "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
+      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+      "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
+      "^@rebasepro/admin$": "<rootDir>/../admin/src/index.ts",
+      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
+    }
   },
   "files": [
     "dist",

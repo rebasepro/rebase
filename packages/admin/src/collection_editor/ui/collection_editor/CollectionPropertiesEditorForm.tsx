@@ -100,15 +100,19 @@ export function CollectionPropertiesEditorForm({
 
     const inferPropertiesFromData = doCollectionInference
         ? (): void => {
-            if (!doCollectionInference || configController?.readOnly)
+            const inferenceFn = doCollectionInference;
+            if (!inferenceFn || configController?.readOnly)
                 return;
 
             setInferringProperties(true);
 
             console.debug("CollectionEditor: inferring properties from data", values);
-            // @ts-ignore
-            doCollectionInference(values)
-                .then((newCollection) => {
+            const promise = inferenceFn(values);
+            if (!promise) {
+                setInferringProperties(false);
+                return;
+            }
+            promise.then((newCollection) => {
 
                     if (!newCollection) {
                         snackbarController.open({

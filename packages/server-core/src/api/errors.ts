@@ -1,5 +1,6 @@
-import { ErrorHandler } from "hono";
-import { ContentfulStatusCode } from "hono/utils/http-status";
+import type { ErrorHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { HonoEnv } from "./types";
 
 /** Tracks whether we've already shown the doctor hint (once per process). */
 let _schemaDriftHinted = false;
@@ -89,6 +90,8 @@ export interface ErrorResponse {
         message: string;
         code: string;
         details?: unknown;
+        /** Request correlation ID for tracing (echoes X-Request-ID). */
+        requestId?: string;
     };
 }
 
@@ -115,20 +118,23 @@ export function isRebaseApiError(error: unknown): error is RebaseApiError {
  * Hono error-handling middleware (`app.onError`).
  * Converts any error into the canonical `{ error: { message, code } }` shape.
  */
-export const errorHandler: ErrorHandler = (err, c) => {
+export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Typecast custom error properties
     const error: RebaseApiError = err;
+    const reqId = typeof c.get === "function" ? c.get("requestId") : undefined;
 
     if (error instanceof ApiError || error.name === "ApiError") {
         // Operational errors — log at warn level
         console.warn(
-            `⚠️ [API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}`
+            `⚠️ [API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
+            (reqId ? ` [${reqId}]` : "")
         );
         return c.json({
             error: {
                 message: error.message,
                 code: error.code || "INTERNAL_ERROR",
-                ...(error.details !== undefined && { details: error.details })
+                ...(error.details !== undefined && { details: error.details }),
+                ...(reqId && { requestId: reqId })
             }
         } satisfies ErrorResponse, (error.statusCode || 500) as ContentfulStatusCode);
     }
@@ -168,7 +174,8 @@ export const errorHandler: ErrorHandler = (err, c) => {
     if (isDbSchemaMismatch) {
         // Database schema mismatch is logged as a warning instead of a fatal error
         console.warn(
-            `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
+            `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
+            (reqId ? ` [${reqId}]` : "")
         );
         // In dev mode, show a one-time hint to run `rebase doctor`
         if (!_schemaDriftHinted && process.env.NODE_ENV !== "production") {
@@ -189,7 +196,8 @@ export const errorHandler: ErrorHandler = (err, c) => {
     } else {
         // Unexpected errors — log at error level
         console.error(
-            `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}`
+            `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
+            (reqId ? ` [${reqId}]` : "")
         );
     }
 
@@ -221,7 +229,8 @@ export const errorHandler: ErrorHandler = (err, c) => {
         error: {
             message: clientMessage,
             code,
-            ...(error.details !== undefined && { details: error.details })
+            ...(error.details !== undefined && { details: error.details }),
+            ...(reqId && { requestId: reqId })
         }
     } satisfies ErrorResponse, statusCode as ContentfulStatusCode);
 };

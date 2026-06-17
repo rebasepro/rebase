@@ -1,7 +1,6 @@
 import { DatabaseAdapter, InitializedDriver, RealtimeProvider, DataDriver, DatabaseAdmin, BootstrappedAuth } from "@rebasepro/types";
 import { createPostgresBootstrapper } from "./PostgresBootstrapper";
-// @ts-ignore
-import type { PostgresDriverConfig } from "@rebasepro/server-core";
+import type { PostgresDriverConfig } from "./PostgresBootstrapper";
 
 /**
  * Creates a Postgres database adapter for Rebase.

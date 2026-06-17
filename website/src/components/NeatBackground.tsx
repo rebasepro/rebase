@@ -1,8 +1,30 @@
 import { useEffect, useRef } from "react";
 import * as neatModule from "@firecms/neat";
 
-// @ts-ignore
-const NeatGradient = neatModule.NeatGradient || neatModule.default?.NeatGradient || (neatModule.default as any)?.default?.NeatGradient;
+interface NeatGradientConfig {
+    ref: HTMLCanvasElement;
+    [key: string]: unknown;
+}
+
+interface NeatGradientInstance {
+    yOffset: number;
+    destroy: () => void;
+}
+
+interface NeatModuleShape {
+    NeatGradient?: new (config: NeatGradientConfig) => NeatGradientInstance;
+    default?: {
+        NeatGradient?: new (config: NeatGradientConfig) => NeatGradientInstance;
+        default?: {
+            NeatGradient?: new (config: NeatGradientConfig) => NeatGradientInstance;
+        };
+    };
+}
+
+const neatModuleTyped = neatModule as unknown as NeatModuleShape;
+const NeatGradient = neatModuleTyped.NeatGradient || 
+                     neatModuleTyped.default?.NeatGradient || 
+                     neatModuleTyped.default?.default?.NeatGradient;
 
 const NEAT_BASE_CONFIG = {
     licenseKey: "NEAT-eyJkb21haW4iOiJyZWJhc2UucHJvIiwiZW1haWwiOiJmcmFuY2VzY29AZmlyZWNtcy5jbyIsImlhdCI6MTc4MTQ4MTE5NX0.0gblm3vGqyk_e9WJ8OTO5SHQ8qF8HmgJQkt_qElKskW5YqOiHPc24ppKmpI6utufEtqbyJ58Vt_uAB2HNtprFQ",
@@ -133,13 +155,15 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         if (!canvasRef.current) return;
 
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
-        let neat: any;
+        let neat: NeatGradientInstance | undefined;
         let scrollHandler: (() => void) | null = null;
 
-        neat = new NeatGradient({
-            ref: canvasRef.current,
-            ...config,
-        });
+        if (NeatGradient) {
+            neat = new NeatGradient({
+                ref: canvasRef.current,
+                ...config,
+            });
+        }
 
         const baseOffset = config.yOffset ?? 0;
         const canvas = canvasRef.current;

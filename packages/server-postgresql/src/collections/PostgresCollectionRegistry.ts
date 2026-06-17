@@ -33,6 +33,13 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
     }
 
     /**
+     * Returns all registered table names.
+     */
+    getTableNames(): string[] {
+        return Array.from(this.tables.keys());
+    }
+
+    /**
      * Finds collections assigned to a specific driver that do not have a registered table.
      */
     getCollectionsWithoutTables(driverId = "(default)"): EntityCollection[] {

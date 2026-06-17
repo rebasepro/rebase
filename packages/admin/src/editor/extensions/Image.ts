@@ -8,8 +8,8 @@ export async function onFileRead(view: EditorView, readerEvent: ProgressEvent<Fi
 
     const { schema } = view.state;
 
-    // @ts-ignore
-    const plugin = view.state.plugins.find((p: Plugin) => p.key === ImagePluginKey.key);
+    const state = view.state as typeof view.state & { plugins: Plugin[] };
+    const plugin = state.plugins.find((p: Plugin) => p.spec.key === ImagePluginKey);
     if (!plugin) {
         console.error("Image plugin not found");
         return;

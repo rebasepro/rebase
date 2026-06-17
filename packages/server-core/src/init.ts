@@ -30,6 +30,7 @@ import { HonoEnv } from "./api/types";
 import { configureLogLevel } from "./utils/logging";
 import { logger } from "./utils/logger";
 import { requestLogger } from "./utils/request-logger";
+import { requestId } from "./utils/request-id";
 import { configureJwt, requireAdmin, requireAuth } from "./auth";
 import {
     BackendStorageConfig,
@@ -309,6 +310,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const basePath = config.basePath || "/api";
     const isProduction = process.env.NODE_ENV === "production";
 
+    // ─── Request ID (correlation) ────────────────────────────────────────
+    // Generates or propagates X-Request-ID on every request so all log
+    // entries, error responses, and downstream services share a single
+    // trace identifier.
+    config.app.use(`${basePath}/*`, requestId());
+
     // ─── Request Body Size Limit ─────────────────────────────────────────
     const maxBodySize = config.maxBodySize ?? 10 * 1024 * 1024; // 10MB default
     if (maxBodySize > 0) {
@@ -335,6 +342,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             origin: config.csrf.origin
         }));
         logger.info("CSRF protection enabled");
+    }
+
+    // ─── CORS Warning ────────────────────────────────────────────────────
+    // Detect missing CORS configuration. In production the env validation
+    // already enforces CORS_ORIGINS / FRONTEND_URL, but in development
+    // it's easy to forget — leaving the API open to requests from any origin.
+    if (!isProduction && !process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
+        logger.warn(
+            "No CORS configuration detected (CORS_ORIGINS / FRONTEND_URL not set). " +
+            "The API will accept requests from any origin. " +
+            "Set CORS_ORIGINS in your .env file to restrict access."
+        );
     }
 
     // ─── Request Logging ─────────────────────────────────────────────────
@@ -458,7 +477,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // Auto-discover the auth collection from activeCollections if not explicitly set
             if (!safeAuthConfig.collection) {
                 const foundAuthCollection = activeCollections.find(c => {
-                    const isAuth = (c as any).auth;
+                    const isAuth = c.auth;
                     return isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
                 });
                 if (foundAuthCollection) {
@@ -468,7 +487,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
 
             // Extract the collection-level auth config (if `auth` is an object, not just `true`)
-            const collectionAuth = safeAuthConfig.collection ? (safeAuthConfig.collection as any).auth : undefined;
+            const collectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
             const collectionAuthConfig = (typeof collectionAuth === "object" && collectionAuth !== null) ? collectionAuth : undefined;
             if (safeAuthConfig.jwtSecret) {
                 configureJwt({
@@ -664,7 +683,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
 
             // Re-create the built-in adapter with all resolved OAuth providers
-            const reCollectionAuth = safeAuthConfig.collection ? (safeAuthConfig.collection as any).auth : undefined;
+            const reCollectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
             const collectionAuthConfig = (typeof reCollectionAuth === "object" && reCollectionAuth !== null) ? reCollectionAuth : undefined;
             authAdapter = createBuiltinAuthAdapter({
                 authRepository: authConfigResult!.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult!.userService as import("./auth/interfaces").AuthRepository,

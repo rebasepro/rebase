@@ -21,7 +21,6 @@ import {
     MfaFactor,
     MfaChallengeInfo,
     RoleData as Role
-// @ts-ignore
 } from "@rebasepro/server-core";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
 

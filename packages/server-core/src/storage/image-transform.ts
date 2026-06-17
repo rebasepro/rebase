@@ -13,7 +13,6 @@ let sharpFactory: ((input: Buffer | Uint8Array) => any) | undefined;
 async function getSharp(): Promise<(input: Buffer | Uint8Array) => any> {
     if (!sharpFactory) {
         try {
-            // @ts-ignore - sharp is an optional dependency
             const mod = await import("sharp");
             sharpFactory = mod.default;
         } catch (err) {

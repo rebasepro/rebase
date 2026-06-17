@@ -14,6 +14,8 @@ export type HonoEnv = {
         driver?: DataDriver;
         /** Set when the request is authenticated via a Service API Key. */
         apiKey?: ApiKeyMasked;
+        /** Unique request correlation ID (generated or propagated from X-Request-ID header). */
+        requestId?: string;
     }
 };
 

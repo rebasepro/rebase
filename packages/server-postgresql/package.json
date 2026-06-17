@@ -50,6 +50,7 @@
       "node"
     ],
     "moduleNameMapper": {
+      "^chalk$": "<rootDir>/test/mocks/chalk.cjs",
       "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",

@@ -24,7 +24,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
 
     columns: VirtualTableColumn[];
 
-    cellRenderer: React.ComponentType<CellRendererParams<Entity<M>>>;
+    cellRenderer: (props: CellRendererParams<Entity<M>>) => React.ReactNode;
 
     /**
      * Builder for creating the buttons in each row
@@ -247,8 +247,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                 <VirtualTable
                     data={data as unknown as Record<string, unknown>[]}
                     columns={columns}
-                    // @ts-ignore
-                    cellRenderer={cellRenderer}
+                    cellRenderer={(props) => cellRenderer(props as unknown as CellRendererParams<Entity<M>>)}
                     onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}
                     onEndReached={loadNextPage}
                     onResetPagination={resetPagination}

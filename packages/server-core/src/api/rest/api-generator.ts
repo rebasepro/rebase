@@ -225,7 +225,7 @@ export class RestApiGenerator {
                     body = await this.dataHooks.beforeSave(path, body, undefined, hookCtx);
                 }
 
-                const isAuth = (collection as any).auth;
+                const isAuth = collection.auth;
                 const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
 
                 if (isAuthCollection && this.authAdapter?.prepareUserCreation) {

@@ -1,47 +1,67 @@
-import type { AppView, AppViewsBuilder, EntityAction, EntityCollection, FirebaseCollection, RebasePlugin, AuthCollectionConfig } from "@rebasepro/types";
-import { AuthController, DataDriver, User, RebaseData } from "@rebasepro/types";
-import type { EntityCollectionsBuilder } from "@rebasepro/types";
+import type {
+    AppView,
+    AppViewsBuilder,
+    AuthCollectionConfig,
+    EntityAction,
+    EntityCollection,
+    EntityCollectionsBuilder,
+    RebaseContext,
+    RebasePlugin,
+    UserCreationResult
+} from "@rebasepro/types";
+import { type AuthController, isFirebaseCollection, type User, type RebaseData } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
 import { resetPasswordAction } from "../../components/common/default_entity_actions";
+import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
+import React from "react";
 
-export function filterOutNotAllowedCollections(resolvedCollections: EntityCollection[], authController: AuthController<User>): EntityCollection[] {
+/**
+ * Check whether a `RebaseCallContext` is actually the full frontend
+ * `RebaseContext` (which carries `dialogsController`).
+ */
+function isRebaseContext(ctx: unknown): ctx is RebaseContext {
+    return typeof ctx === "object" && ctx !== null && "dialogsController" in ctx;
+}
+
+export function filterOutNotAllowedCollections(resolvedCollections: EntityCollection[], authController: AuthController): EntityCollection[] {
     return resolvedCollections
         .filter((c) => canReadCollection(c, authController))
         .map((c) => {
-            if (!("subcollections" in c) || !c.subcollections) return c;
+            if (!isFirebaseCollection(c) || !c.subcollections) return c;
             return {
                 ...c,
-                subcollections: () => filterOutNotAllowedCollections((c as FirebaseCollection).subcollections?.() ?? [], authController)
-            } as FirebaseCollection;
+                subcollections: () => filterOutNotAllowedCollections(c.subcollections?.() ?? [], authController)
+            };
         });
 }
 
-export function applyPluginModifyCollection(resolvedCollections: EntityCollection[], modifyCollection: (collection: EntityCollection) => EntityCollection) {
-    return resolvedCollections.map((collection: EntityCollection): EntityCollection => {
+export function applyPluginModifyCollection(resolvedCollections: EntityCollection[], modifyCollection: (collection: EntityCollection) => EntityCollection): EntityCollection[] {
+    return resolvedCollections.map((collection): EntityCollection => {
         const modifiedCollection = modifyCollection(collection);
-        if ("subcollections" in modifiedCollection && modifiedCollection.subcollections) {
+        if (isFirebaseCollection(modifiedCollection) && modifiedCollection.subcollections) {
             return {
                 ...modifiedCollection,
-                subcollections: () => applyPluginModifyCollection((modifiedCollection as FirebaseCollection).subcollections?.() ?? [], modifyCollection)
-            } as FirebaseCollection;
+                subcollections: () => applyPluginModifyCollection(modifiedCollection.subcollections?.() ?? [], modifyCollection)
+            };
         }
         return modifiedCollection;
     });
 }
 
 /**
- * Auto-inject auth-specific entity actions for collections with `auth: true`.
+ * Auto-inject auth-specific entity actions and callbacks for collections
+ * with `auth: true` or `auth: { enabled: true }`.
  *
- * Resolution:
- * - `auth: true` or `auth: { enabled: true }` (no actions config) → inject `resetPasswordAction`
- * - `auth: { enabled: true, actions: { resetPassword: false } }` → skip injection
- * - `auth: { enabled: true, actions: { resetPassword: customAction } }` → inject the custom action
+ * Injections:
+ * 1. **resetPasswordAction** — adds the entity action unless explicitly disabled
+ * 2. **afterSave callback** — shows the `CreationResultDialog` when a new user
+ *    is created with `invitationSent` or `temporaryPassword` in the response
  *
- * Skips injection if the collection already has an action with key `"reset_password"`.
+ * Skips injection if the collection already has the action/callback present.
  */
-function injectAuthEntityActions(collections: EntityCollection[]): EntityCollection[] {
+function injectAuthCollectionConfig(collections: EntityCollection[]): EntityCollection[] {
     return collections.map((collection) => {
-        const authProp = (collection as any).auth;
+        const authProp = collection.auth;
         if (!authProp) return collection;
 
         const isAuth = authProp === true || (typeof authProp === "object" && authProp.enabled === true);
@@ -49,40 +69,89 @@ function injectAuthEntityActions(collections: EntityCollection[]): EntityCollect
 
         const authConfig: AuthCollectionConfig | undefined = typeof authProp === "object" ? authProp : undefined;
 
-        // Determine which action to inject (if any)
+        let result = collection;
+
+        // ─── Entity Action injection (resetPassword) ─────────────────────
         const resetPref = authConfig?.actions?.resetPassword;
         let actionToInject: EntityAction | undefined;
 
         if (resetPref === false) {
-            // Explicitly disabled
             actionToInject = undefined;
         } else if (typeof resetPref === "object") {
-            // Custom EntityAction provided
             actionToInject = resetPref;
         } else {
-            // true, undefined, or auth: true (shorthand) → use default
             actionToInject = resetPasswordAction;
         }
 
-        if (!actionToInject) return collection;
+        if (actionToInject) {
+            const injectedAction = actionToInject;
+            const existing = result.entityActions ?? [];
+            const alreadyHas = existing.some(
+                (a) => a.key != null && a.key === injectedAction.key
+            );
+            if (!alreadyHas) {
+                result = {
+                    ...result,
+                    entityActions: [...existing, injectedAction],
+                };
+            }
+        }
 
-        // Don't double-inject if already present
-        const existing = collection.entityActions ?? [];
-        const alreadyHas = existing.some(
-            (a: EntityAction) => typeof a === "object" && a.key === (actionToInject as EntityAction).key
-        );
-        if (alreadyHas) return collection;
+        // ─── afterSave callback (creation result dialog) ─────────────────
+        const existingAfterSave = result.callbacks?.afterSave;
+        result = {
+            ...result,
+            callbacks: {
+                ...result.callbacks,
+                afterSave: async (props) => {
+                    await existingAfterSave?.(props);
 
-        return {
-            ...collection,
-            entityActions: [...existing, actionToInject],
+                    const { values, status, context } = props;
+                    if (status !== "new" && status !== "copy") return;
+
+                    const hasCreationInfo = values.invitationSent !== undefined || values.temporaryPassword !== undefined;
+                    if (!hasCreationInfo || !isRebaseContext(context) || !context.dialogsController) return;
+
+                    const { dialogsController } = context;
+
+                    const creationResult: UserCreationResult = {
+                        user: {
+                            uid: String(props.entityId),
+                            email: typeof values.email === "string" ? values.email : "",
+                            displayName: typeof values.displayName === "string" ? values.displayName : "",
+                            roles: Array.isArray(values.roles) ? values.roles as string[] : [],
+                            photoURL: typeof values.photoURL === "string"
+                                ? values.photoURL
+                                : typeof values.photoUrl === "string"
+                                    ? values.photoUrl
+                                    : null,
+                            providerId: "password",
+                            isAnonymous: false,
+                        },
+                        invitationSent: !!values.invitationSent,
+                        temporaryPassword: typeof values.temporaryPassword === "string" ? values.temporaryPassword : undefined,
+                    };
+
+                    const { closeDialog } = dialogsController.open({
+                        key: "user_creation_result",
+                        Component: () => (
+                            React.createElement(CreationResultDialog, {
+                                result: creationResult,
+                                onClose: () => closeDialog()
+                            })
+                        )
+                    });
+                },
+            },
         };
+
+        return result;
     });
 }
 
-export async function resolveCollections<U extends User, EC extends EntityCollection>(
-    collections: undefined | EC[] | EntityCollectionsBuilder<EC>,
-    authController: AuthController<U>,
+export async function resolveCollections(
+    collections: undefined | EntityCollection[] | EntityCollectionsBuilder,
+    authController: AuthController,
     data: RebaseData,
     plugins: RebasePlugin[] | undefined
 ): Promise<EntityCollection[]> {
@@ -104,24 +173,24 @@ export async function resolveCollections<U extends User, EC extends EntityCollec
             }
 
             if (plugin.hooks?.injectCollections) {
-                resolvedCollections = plugin.hooks.injectCollections(resolvedCollections ?? []);
+                resolvedCollections = plugin.hooks.injectCollections(resolvedCollections);
             }
         }
     }
 
-    // Auto-inject auth entity actions (resetPassword, etc.)
-    resolvedCollections = injectAuthEntityActions(resolvedCollections);
+    // Auto-inject auth entity actions and callbacks (resetPassword, creation dialog, etc.)
+    resolvedCollections = injectAuthCollectionConfig(resolvedCollections);
 
     resolvedCollections = filterOutNotAllowedCollections(resolvedCollections, authController);
     return resolvedCollections;
 }
 
-export async function resolveAppViews<U extends User>(
+export async function resolveAppViews(
     baseViews: AppView[] | AppViewsBuilder | undefined,
-    authController: AuthController<U>,
+    authController: AuthController,
     data: RebaseData,
     plugins?: RebasePlugin[]
-) {
+): Promise<AppView[]> {
     let resolvedViews: AppView[] = [];
     if (typeof baseViews === "function") {
         resolvedViews = await baseViews({

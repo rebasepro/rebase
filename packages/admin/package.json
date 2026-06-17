@@ -138,7 +138,7 @@
   },
   "jest": {
     "transform": {
-      "^.+\\.tsx?$": "ts-jest"
+      "^.+\\.[jt]sx?$": "ts-jest"
     },
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
     "moduleFileExtensions": [
@@ -152,6 +152,9 @@
     "testEnvironment": "jsdom",
     "testPathIgnorePatterns": [
       "/node_modules/"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!.*fractional-indexing)/"
     ],
     "setupFilesAfterEnv": [
       "<rootDir>/test/setupTests.ts"

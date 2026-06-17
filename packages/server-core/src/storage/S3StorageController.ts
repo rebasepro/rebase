@@ -213,8 +213,7 @@ export class S3StorageController implements StorageController {
 
             // Convert stream to buffer
             const chunks: Uint8Array[] = [];
-            // @ts-ignore - Body is a ReadableStream in Node.js
-            for await (const chunk of response.Body) {
+            for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
                 chunks.push(chunk);
             }
             const buffer = Buffer.concat(chunks);

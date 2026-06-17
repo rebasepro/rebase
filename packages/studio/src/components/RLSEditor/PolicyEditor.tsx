@@ -232,7 +232,6 @@ export const PolicyEditor = ({
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_name")}</Typography>
                             <TextField
-                                // @ts-ignore
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder={t("studio_policy_name_placeholder")}

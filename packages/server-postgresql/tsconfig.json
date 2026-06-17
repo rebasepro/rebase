@@ -37,6 +37,9 @@
       ],
       "@rebasepro/common": [
         "../common/src"
+      ],
+      "@rebasepro/server-core": [
+        "../server-core/src"
       ]
     }
   },

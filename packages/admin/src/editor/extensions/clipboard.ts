@@ -16,8 +16,8 @@ export function serializeForClipboard(view: EditorView, slice: Slice) {
         openStart--
         openEnd--
         const node = content.firstChild!
-        // @ts-ignore
-        context.push(node.type.name, node.attrs != node.type.defaultAttrs ? node.attrs : null)
+        const nodeType = node.type as typeof node.type & { defaultAttrs?: unknown };
+        context.push(node.type.name, node.attrs != nodeType.defaultAttrs ? node.attrs : null)
         content = node.content
     }
 

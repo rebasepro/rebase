@@ -44,6 +44,7 @@ export * from "./storage";
 export * from "./utils/logging";
 export * from "./utils/logger";
 export * from "./utils/request-logger";
+export * from "./utils/request-id";
 export * from "./utils/sql";
 
 // Entity history

@@ -75,11 +75,11 @@ async function getClient(): Promise<RebaseClient> {
 
 // ── MCP Server ──────────────────────────────────────────────────────────────
 
-const server = new Server(
+export const server = new Server(
     { name: "rebase-mcp-server",
-version: "0.0.1" },
+      version: "0.0.1" },
     { capabilities: { tools: {},
-resources: {} } }
+      resources: {} } }
 );
 
 // ── Tool Definitions ────────────────────────────────────────────────────────
@@ -313,7 +313,7 @@ properties: {} }
     }
 ];
 
-const ALL_TOOLS: ToolDef[] = [
+export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...DATA_TOOLS,
     ...ADMIN_TOOLS,
@@ -598,4 +598,6 @@ async function main() {
     await server.connect(transport);
 }
 
-main().catch(console.error);
+if (process.env.NODE_ENV !== "test") {
+    main().catch(console.error);
+}

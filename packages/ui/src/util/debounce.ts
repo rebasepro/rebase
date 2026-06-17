@@ -5,9 +5,8 @@
 export function debounce<T extends (...args: any[]) => unknown>(func: T, wait = 166) {
     let timeout: ReturnType<typeof setTimeout>;
 
-    function debounced(...args: Parameters<T>) {
+    function debounced(this: unknown, ...args: Parameters<T>) {
         const later = () => {
-            // @ts-ignore
             func.apply(this, args);
         };
         clearTimeout(timeout);

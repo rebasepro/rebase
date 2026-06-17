@@ -96,7 +96,7 @@ describe("propertyToTypeScriptType mapping", () => {
         expect(ts).toContain("ref?: string | number;");
         expect(ts).toContain("vec?: number[];");
         expect(ts).toContain("bin?: string;");
-        expect(ts).toContain("unknown?: any;");
+        expect(ts).toContain("unknown?: unknown;");
     });
 
     describe("string enum mapping", () => {
@@ -235,7 +235,7 @@ describe("propertyToTypeScriptType mapping", () => {
             } as unknown as EntityCollection;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("metadata?: Record<string, any>;");
+            expect(ts).toContain("metadata?: Record<string, unknown>;");
         });
     });
 
@@ -266,7 +266,7 @@ describe("propertyToTypeScriptType mapping", () => {
             } as unknown as EntityCollection;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("generic?: Array<any>;");
+            expect(ts).toContain("generic?: Array<unknown>;");
         });
     });
 });
@@ -491,7 +491,7 @@ describe("Collection relations and FK resolutions", () => {
         const ts = generateTypedefs([postsCol, tagsCol]);
 
         // Row should have relation helper field
-        expect(ts).toContain("tags?: Array<{ id: string | number; path: string; __type: \"relation\"; data?: any }>;");
+        expect(ts).toContain("tags?: Array<{ id: string | number; path: string; __type: \"relation\"; data?: unknown }>;");
     });
 });
 
