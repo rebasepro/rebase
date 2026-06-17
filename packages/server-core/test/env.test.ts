@@ -1,32 +1,22 @@
-import { z } from "zod";
 import { loadEnv } from "../src/env";
+import { z } from "zod";
 
 describe("env configuration and localhost validation", () => {
-    let originalEnv: NodeJS.ProcessEnv;
+    const originalEnv = { ...process.env };
 
     beforeEach(() => {
-        // Save a backup of the original process.env
-        originalEnv = { ...process.env };
-        // Clear env vars that might interfere with tests
-        delete process.env.NODE_ENV;
-        delete process.env.DATABASE_URL;
-        delete process.env.ADMIN_CONNECTION_STRING;
-        delete process.env.JWT_SECRET;
-        delete process.env.FRONTEND_URL;
-        delete process.env.CORS_ORIGINS;
-        delete process.env.ALLOW_LOCALHOST_IN_PRODUCTION;
+        // Clear process.env to ensure fresh test runs
+        process.env = {};
+        // Add basic fallback requirements to prevent bootstrap crashes
+        process.env.DATABASE_URL = "postgresql://localhost:5432/rebase";
+        process.env.JWT_SECRET = "super-secret-jwt-key-must-be-long-long-long";
     });
 
     afterEach(() => {
-        // Restore process.env after each test
-        process.env = originalEnv;
+        process.env = { ...originalEnv };
     });
 
-    it("should allow localhost URLs in development mode", () => {
-        process.env.NODE_ENV = "development";
-        process.env.DATABASE_URL = "postgresql://localhost:5432/rebase";
-        process.env.JWT_SECRET = "12345678901234567890123456789012";
-
+    it("should parse default env variables in development mode", () => {
         expect(() => loadEnv()).not.toThrow();
         const env = loadEnv();
         expect(env.DATABASE_URL).toBe("postgresql://localhost:5432/rebase");
@@ -38,7 +28,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/localhost:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/localhost:5432\/rebase/);
     });
 
     it("should fail validation in production if DATABASE_URL contains 127.0.0.1", () => {
@@ -47,7 +37,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/127\.0\.0\.1:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/127\.0\.0\.1:5432\/rebase/);
     });
 
     it("should fail validation in production if DATABASE_URL contains an IPv6 loopback [::1]", () => {
@@ -56,7 +46,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/\[::1\]:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/\[::1\]:5432\/rebase/);
     });
 
     it("should fail validation in production if DATABASE_URL contains a loopback in the 127.x.x.x range", () => {
@@ -65,7 +55,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrowError(/postgresql:\/\/127\.0\.0\.2:5432\/rebase/);
+        expect(() => loadEnv()).toThrow(/postgresql:\/\/127\.0\.0\.2:5432\/rebase/);
     });
 
     it("should succeed validation in production with a non-localhost DATABASE_URL", () => {
@@ -117,7 +107,7 @@ describe("env configuration and localhost validation", () => {
             }),
         };
 
-        expect(() => loadEnv(extension)).toThrowError(/https:\/\/localhost:8080\/api/);
+        expect(() => loadEnv(extension)).toThrow(/https:\/\/localhost:8080\/api/);
     });
 
     it("should validate and block plain host string matching localhost", () => {
@@ -133,6 +123,6 @@ describe("env configuration and localhost validation", () => {
             }),
         };
 
-        expect(() => loadEnv(extension)).toThrowError(/localhost/);
+        expect(() => loadEnv(extension)).toThrow(/localhost/);
     });
 });

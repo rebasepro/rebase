@@ -83,6 +83,7 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                 // generate a placeholder email — the user can update it later.
                 // For apps with elevated access, fetch from v1.1 endpoint.
                 let email: string | null = null;
+                let emailVerified = false;
                 try {
                     const emailResponse = await fetch(
                         "https://api.twitter.com/1.1/account/verify_credentials.json?include_email=true",
@@ -93,6 +94,9 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                     if (emailResponse.ok) {
                         const emailData = await emailResponse.json() as { email?: string };
                         email = emailData.email || null;
+                        if (email) {
+                            emailVerified = true;
+                        }
                     }
                 } catch {
                     // Elevated access not available — fall through
@@ -103,13 +107,16 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                     // This allows the account to be created and linked; the user should
                     // update their email through the profile settings.
                     email = `${profileData.id}@twitter.placeholder.rebase`;
+                    // Placeholder emails are NOT verified — prevents auto-linking to existing accounts
+                    emailVerified = false;
                 }
 
                 return {
                     providerId: profileData.id,
                     email,
                     displayName: profileData.name || profileData.username || null,
-                    photoUrl: profileData.profile_image_url?.replace("_normal", "_400x400") || null
+                    photoUrl: profileData.profile_image_url?.replace("_normal", "_400x400") || null,
+                    emailVerified
                 };
             } catch (error) {
                 console.error("Twitter OAuth error:", error);

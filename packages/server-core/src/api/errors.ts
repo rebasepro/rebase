@@ -138,12 +138,26 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
     // Handle DB connection and specific system errors for better logging
     let logMessage = error.message;
+
+    // Resolve the actual cause — Node's net module wraps dual-stack failures
+    // in an AggregateError whose inner errors carry the real address/port.
+    let resolvedCause: PgLikeError | undefined;
     if (error.cause && typeof error.cause === "object" && error.cause !== null && "code" in error.cause) {
-        const cause = error.cause as PgLikeError;
+        const cause = error.cause as PgLikeError & { errors?: PgLikeError[] };
+        if (cause.code === "ECONNREFUSED" && !cause.address && Array.isArray(cause.errors)) {
+            // AggregateError — pick the first inner error that has address info
+            resolvedCause = cause.errors.find(e => e.address) || cause;
+        } else {
+            resolvedCause = cause;
+        }
+    }
+
+    if (resolvedCause) {
+        const cause = resolvedCause;
         if (cause.code === "ENETUNREACH") {
             logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
         } else if (cause.code === "ECONNREFUSED") {
-            logMessage = `Connection refused to database at ${cause.address}:${cause.port}.`;
+            logMessage = `Connection refused to database at ${cause.address}:${cause.port}. Is PostgreSQL running?`;
         } else if (cause.code === "42703" || cause.code === "42P01") {
             code = "SCHEMA_DRIFT";
             const issue = cause.code === "42703" ? "column" : "table";

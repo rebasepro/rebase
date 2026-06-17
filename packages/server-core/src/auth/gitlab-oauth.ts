@@ -59,7 +59,8 @@ export function createGitLabProvider(config: {
                     providerId: String(p.id),
                     email: p.email,
                     displayName: p.name || p.username || null,
-                    photoUrl: p.avatar_url || null
+                    photoUrl: p.avatar_url || null,
+                    emailVerified: true
                 };
             } catch (error) {
                 console.error("GitLab OAuth error:", error);

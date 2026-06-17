@@ -3,6 +3,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, createHash } from "crypto";
 import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
+import type { AccessTokenPayload } from "./jwt";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { requireAuth } from "./middleware";
@@ -12,6 +13,8 @@ import { HonoEnv } from "../api/types";
 import { defaultAuthLimiter, strictAuthLimiter } from "./rate-limiter";
 import { z } from "zod";
 import { generateTotpSecret, verifyTotp, base32Decode, generateRecoveryCodes, hashRecoveryCode } from "./mfa";
+import { encryptTotpSecret, decryptTotpSecret } from "./mfa-crypto";
+import { logger } from "../utils/logger";
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -318,21 +321,47 @@ displayName: user.displayName });
             // Full credential verification override
             user = await authHooks.verifyCredentials(email, password, authRepo);
             if (!user) {
+                logger.warn("🔒 [Security Audit] Auth login failure (verifyCredentials override returned null)", {
+                    email,
+                    ipAddress: c.req.header("x-forwarded-for") || "unknown",
+                    userAgent: c.req.header("user-agent") || "unknown",
+                    eventType: "auth.login.failure"
+                });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
         } else {
             // Default: email lookup + password hash verification
             user = await authRepo.getUserByEmail(email);
             if (!user) {
+                logger.warn("🔒 [Security Audit] Auth login failure (user not found)", {
+                    email,
+                    ipAddress: c.req.header("x-forwarded-for") || "unknown",
+                    userAgent: c.req.header("user-agent") || "unknown",
+                    eventType: "auth.login.failure"
+                });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
 
             if (!user.passwordHash) {
+                logger.warn("🔒 [Security Audit] Auth login failure (no password hash)", {
+                    email,
+                    userId: user.id,
+                    ipAddress: c.req.header("x-forwarded-for") || "unknown",
+                    userAgent: c.req.header("user-agent") || "unknown",
+                    eventType: "auth.login.failure"
+                });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
 
             const isValidPassword = await ops.verifyPassword(password, user.passwordHash);
             if (!isValidPassword) {
+                logger.warn("🔒 [Security Audit] Auth login failure (incorrect password)", {
+                    email,
+                    userId: user.id,
+                    ipAddress: c.req.header("x-forwarded-for") || "unknown",
+                    userAgent: c.req.header("user-agent") || "unknown",
+                    eventType: "auth.login.failure"
+                });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
         }
@@ -342,6 +371,14 @@ displayName: user.displayName });
             c.req.header("user-agent") || "unknown",
             c.req.header("x-forwarded-for") || "unknown"
         );
+
+        logger.info("🔒 [Security Audit] Auth login success", {
+            userId: user.id,
+            email: user.email,
+            ipAddress: c.req.header("x-forwarded-for") || "unknown",
+            userAgent: c.req.header("user-agent") || "unknown",
+            eventType: "auth.login.success"
+        });
 
         // Fire onAuthenticated hook (fire-and-forget)
         if (authHooks?.onAuthenticated) {
@@ -380,6 +417,15 @@ displayName: user.displayName });
                     user = await authRepo.getUserByEmail(externalUser.email);
 
                     if (user) {
+                        // Only auto-link if the OAuth provider confirmed the email is verified.
+                        // This prevents account takeover when an attacker controls an OAuth
+                        // account with the victim's email address.
+                        if (!externalUser.emailVerified) {
+                            throw ApiError.forbidden(
+                                "Cannot auto-link account: email not verified by the OAuth provider. Please log in with your password first and link the provider from your profile.",
+                                "EMAIL_NOT_VERIFIED"
+                            );
+                        }
                         // Link Provider to existing account
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
 
@@ -452,6 +498,11 @@ displayName: user.displayName });
         if (!isEmailConfigured()) {
             throw ApiError.serviceUnavailable("Email service not configured. Password reset is not available.", "EMAIL_NOT_CONFIGURED");
         }
+
+        logger.info("🔒 [Security Audit] Auth password reset requested", {
+            email,
+            eventType: "auth.password_reset_request"
+        });
 
         // Always return success (security: don't reveal if email exists)
         // But only send email if user exists
@@ -530,6 +581,11 @@ displayName: user.displayName }, appName);
         // Invalidate all refresh tokens (security: log out all sessions)
         await authRepo.deleteAllRefreshTokensForUser(storedToken.userId);
 
+        logger.info("🔒 [Security Audit] Auth password reset success", {
+            userId: storedToken.userId,
+            eventType: "auth.password_reset_success"
+        });
+
         // Fire onPasswordReset hook (fire-and-forget)
         if (authHooks?.onPasswordReset) {
             authHooks.onPasswordReset(storedToken.userId).catch(err => {
@@ -578,8 +634,13 @@ message: "Password has been reset successfully" });
         // Invalidate all refresh tokens (security: log out all sessions)
         await authRepo.deleteAllRefreshTokensForUser(user.id);
 
+        logger.info("🔒 [Security Audit] Auth password changed", {
+            userId: user.id,
+            eventType: "auth.password_change"
+        });
+
         return c.json({ success: true,
-message: "Password has been changed successfully" });
+            message: "Password has been changed successfully" });
     });
 
     /**
@@ -734,15 +795,24 @@ message: "Email verified successfully" });
         // Call afterLogout hook (fire-and-forget)
         // Extract userId from the access token if present
         const authHeader = c.req.header("authorization");
-        if (authHooks?.afterLogout && authHeader?.startsWith("Bearer ")) {
+        let userId = "unknown";
+        if (authHeader?.startsWith("Bearer ")) {
             const { verifyAccessToken } = await import("./jwt");
             const payload = verifyAccessToken(authHeader.substring(7));
             if (payload) {
-                authHooks.afterLogout(payload.userId).catch(err => {
-                    console.error("[AuthHooks] afterLogout error:", err instanceof Error ? err.message : err);
-                });
+                userId = payload.userId;
+                if (authHooks?.afterLogout) {
+                    authHooks.afterLogout(payload.userId).catch(err => {
+                        console.error("[AuthHooks] afterLogout error:", err instanceof Error ? err.message : err);
+                    });
+                }
             }
         }
+
+        logger.info("🔒 [Security Audit] Auth logout success", {
+            userId,
+            eventType: "auth.logout"
+        });
 
         return c.json({ success: true });
     });
@@ -1040,11 +1110,14 @@ message: "Session revoked successfully" });
         // Generate TOTP secret
         const { secret, uri } = generateTotpSecret(issuer, user.email);
 
+        // Encrypt the TOTP secret before persisting (AES-256-GCM envelope encryption)
+        const encryptedSecret = encryptTotpSecret(secret);
+
         // Store the factor (unverified until user confirms with a valid code)
         const factor = await authRepo.createMfaFactor(
             user.id,
             "totp",
-            secret, // In production, encrypt this before storage
+            encryptedSecret,
             friendlyName
         );
 
@@ -1094,8 +1167,9 @@ message: "Session revoked successfully" });
             throw ApiError.badRequest("Factor is already verified", "ALREADY_VERIFIED");
         }
 
-        // Verify the TOTP code
-        const secretBuffer = base32Decode(factor.secretEncrypted);
+        // Decrypt the stored secret and verify the TOTP code
+        const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
+        const secretBuffer = base32Decode(decryptedSecret);
         const isValid = verifyTotp(secretBuffer, code);
 
         if (!isValid) {
@@ -1172,7 +1246,8 @@ message: "Session revoked successfully" });
         }
 
         // Try TOTP verification first (standard 6-digit codes)
-        const secretBuffer = base32Decode(factor.secretEncrypted);
+        const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
+        const secretBuffer = base32Decode(decryptedSecret);
         let isValid = verifyTotp(secretBuffer, code);
 
         // Fall back to recovery code verification if TOTP didn't match
@@ -1202,6 +1277,11 @@ message: "Session revoked successfully" });
             c.req.header("user-agent") || "unknown",
             c.req.header("x-forwarded-for") || "unknown"
         );
+
+        logger.info("🔒 [Security Audit] Auth MFA verified", {
+            userId: userCtx.userId,
+            eventType: "auth.mfa_verified"
+        });
 
         // Fire onMfaVerified hook
         if (authHooks?.onMfaVerified) {
@@ -1246,9 +1326,18 @@ message: "Session revoked successfully" });
      * Remove an MFA factor
      */
     router.delete("/mfa/unenroll", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
+        }
+
+        // Require aal2 (MFA-verified session) to unenroll an MFA factor.
+        // This prevents a stolen aal1 session token from disabling MFA.
+        if (userCtx.aal !== "aal2") {
+            throw ApiError.forbidden(
+                "MFA verification required to unenroll. Please re-authenticate with your second factor.",
+                "AAL2_REQUIRED"
+            );
         }
 
         const unenrollSchema = z.object({

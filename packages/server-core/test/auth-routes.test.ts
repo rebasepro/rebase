@@ -17,6 +17,18 @@ import { configureJwt, generateAccessToken, hashRefreshToken } from "../src/auth
 
 jest.mock("../src/auth/password");
 
+jest.mock("../src/utils/logger", () => {
+    return {
+        logger: {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+            child: jest.fn().mockReturnThis()
+        }
+    };
+});
+
 // Bypass rate limiters — they share state across tests and cause 429s
 jest.mock("../src/auth/rate-limiter", () => {
     const passthrough = async (_c: unknown, next: () => Promise<void>) => next();
@@ -28,6 +40,7 @@ jest.mock("../src/auth/rate-limiter", () => {
 });
 
 import { hashPassword, verifyPassword, validatePasswordStrength } from "../src/auth/password";
+import { logger } from "../src/utils/logger";
 import { z } from "zod";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -139,15 +152,18 @@ verifyEmailUrl: "https://app.test" } : undefined,
                     if (idToken === "link-token") return { providerId: "g-456",
 email: "existing@test.com",
 displayName: "Existing",
-photoUrl: null };
+photoUrl: null,
+emailVerified: true };
                     if (idToken === "returning-token") return { providerId: "g-789",
 email: "returning@test.com",
 displayName: "Updated Name",
-photoUrl: "https://new-photo.url" };
+photoUrl: "https://new-photo.url",
+emailVerified: true };
                     if (idToken === "valid-token") return { providerId: "g-123",
 email: "google@test.com",
 displayName: "Google User",
-photoUrl: "https://photo.url" };
+photoUrl: "https://photo.url",
+emailVerified: true };
                     return null;
                 }
             }
@@ -193,7 +209,7 @@ accessExpiresIn: "1h" });
 
     describe("Configuration Security", () => {
         it("throws an error when defaultRole is set to 'admin'", () => {
-            expect(() => createApp({ defaultRole: "admin" })).toThrowError(/CRITICAL SECURITY ERROR/);
+            expect(() => createApp({ defaultRole: "admin" })).toThrow(/CRITICAL SECURITY ERROR/);
         });
     });
 
@@ -361,8 +377,42 @@ password: "Any1" }));
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
 
             await app.request("/auth/login", json({ email: "test@example.com",
-password: "ValidPass1" }));
+                password: "ValidPass1" }));
             expect(mockAuthRepo.createRefreshToken).toHaveBeenCalledTimes(1);
+        });
+
+        it("emits a structured security audit log on successful login", async () => {
+            const app = createApp();
+            const user = mockUser({ passwordHash: "salt:hash" });
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(user);
+
+            await app.request("/auth/login", json({ email: "test@example.com", password: "ValidPass1" }));
+            
+            expect(logger.info).toHaveBeenCalledWith(
+                expect.stringContaining("[Security Audit] Auth login success"),
+                expect.objectContaining({
+                    userId: "user-1",
+                    email: "test@example.com",
+                    eventType: "auth.login.success"
+                })
+            );
+        });
+
+        it("emits a structured security audit log on failed login (wrong password)", async () => {
+            const app = createApp();
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
+            (verifyPassword as jest.Mock).mockResolvedValueOnce(false);
+
+            await app.request("/auth/login", json({ email: "test@example.com", password: "WrongPassword" }));
+            
+            expect(logger.warn).toHaveBeenCalledWith(
+                expect.stringContaining("[Security Audit] Auth login failure"),
+                expect.objectContaining({
+                    email: "test@example.com",
+                    userId: "user-1",
+                    eventType: "auth.login.failure"
+                })
+            );
         });
     });
 

@@ -402,6 +402,15 @@ colors: true }));
                             if (process.env.NODE_ENV !== "production") {
                                 wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                             }
+                            const auditSession = clientSessions.get(clientId);
+                            console.log("[SQL Audit] WebSocket SQL execution", JSON.stringify({
+                                sql: typeof sql === "string" ? sql.substring(0, 500) : sql,
+                                options,
+                                resultRows: Array.isArray(result) ? result.length : "unknown",
+                                userId: auditSession?.user?.userId ?? "unknown",
+                                roles: auditSession?.user?.roles ?? [],
+                                isAdmin: auditSession?.user?.isAdmin ?? false,
+                            }));
                             const response = {
                                 type: "EXECUTE_SQL_SUCCESS",
                                 payload: { result },

@@ -9,7 +9,7 @@ describe("rebase singleton", () => {
     });
 
     it("should throw when accessing properties before initialization", () => {
-        expect(() => rebase.data).toThrowError(/server not initialized yet/);
+        expect(() => rebase.data).toThrow(/server not initialized yet/);
     });
 
     it("should allow property access after initialization", () => {
@@ -24,7 +24,7 @@ describe("rebase singleton", () => {
 
         expect(() => {
             (rebase as Record<string, unknown>).data = "overwritten";
-        }).toThrowError(/Cannot set rebase\.data directly/);
+        }).toThrow(/Cannot set rebase\.data directly/);
     });
 
     it("should reset properly with _resetRebaseMock", () => {
@@ -32,14 +32,14 @@ describe("rebase singleton", () => {
         expect(() => rebase.data).not.toThrow();
 
         _resetRebaseMock();
-        expect(() => rebase.data).toThrowError(/server not initialized yet/);
+        expect(() => rebase.data).toThrow(/server not initialized yet/);
     });
 
     it("should throw if _setRebaseMock is called outside test env", () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = "production";
 
-        expect(() => _setRebaseMock({} as Partial<RebaseClient>)).toThrowError(
+        expect(() => _setRebaseMock({} as Partial<RebaseClient>)).toThrow(
             /can only be called in a test environment/
         );
 
@@ -50,7 +50,7 @@ describe("rebase singleton", () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = "production";
 
-        expect(() => _resetRebaseMock()).toThrowError(
+        expect(() => _resetRebaseMock()).toThrow(
             /can only be called in a test environment/
         );
 

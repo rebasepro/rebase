@@ -61,7 +61,8 @@ export function createFacebookProvider(config: { clientId: string; clientSecret:
                     providerId: profileData.id,
                     email: profileData.email,
                     displayName: profileData.name || null,
-                    photoUrl: profileData.picture?.data?.url || null
+                    photoUrl: profileData.picture?.data?.url || null,
+                    emailVerified: true
                 };
             } catch (error) {
                 console.error("Facebook OAuth error:", error);

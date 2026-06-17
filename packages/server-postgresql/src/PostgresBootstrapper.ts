@@ -60,6 +60,27 @@ export interface PostgresDriverInternals {
 }
 
 /**
+ * Detect whether an error (or AggregateError wrapping multiple attempts)
+ * represents an ECONNREFUSED — i.e. the database is simply not running.
+ */
+function isEconnrefused(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    const e = err as { code?: string; cause?: unknown; errors?: unknown[] };
+    if (e.code === "ECONNREFUSED") return true;
+    // AggregateError from Node net (dual-stack IPv4 + IPv6)
+    if (Array.isArray(e.errors)) {
+        return e.errors.some(inner =>
+            inner && typeof inner === "object" && (inner as { code?: string }).code === "ECONNREFUSED"
+        );
+    }
+    // Drizzle wraps the pg error in `cause`
+    if (e.cause && typeof e.cause === "object") {
+        return isEconnrefused(e.cause);
+    }
+    return false;
+}
+
+/**
  * Default PostgreSQL bootstrapper.
  *
  * Use it to register Postgres with `initializeRebaseBackend()`:
@@ -113,10 +134,39 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 : pgConfig.connection) as import("pg").Pool;
             const schemaAwareDb = createDrizzle(rawClient, { schema: mergedSchema });
 
-            // Verify connection
+            // Verify connection — fail fast if the database is unreachable
             try {
                 await schemaAwareDb.execute(sql`SELECT 1`);
-            } catch (err) {
+            } catch (err: unknown) {
+                const isConnectionRefused = isEconnrefused(err);
+                if (isConnectionRefused) {
+                    // Parse host/port from connection string for a helpful message
+                    let hostInfo = pgConfig.connectionString || "unknown";
+                    try {
+                        const parsed = new URL(pgConfig.connectionString || "");
+                        hostInfo = `${parsed.hostname}:${parsed.port || 5432}`;
+                    } catch { /* use raw string */ }
+
+                    const message =
+                        `\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `  ❌  Cannot connect to PostgreSQL at ${hostInfo}\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `\n` +
+                        `  The database server is not running or is not accepting\n` +
+                        `  connections. Common fixes:\n` +
+                        `\n` +
+                        `    • brew services start postgresql@18\n` +
+                        `    • docker compose up -d postgres\n` +
+                        `    • Verify DATABASE_URL in your .env file\n` +
+                        `\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    logger.error(message);
+                    throw new Error(`Cannot connect to PostgreSQL at ${hostInfo}: connection refused. Is the database running?`);
+                }
+
+                // For other errors (timeouts, auth failures, etc.) warn but continue —
+                // the pool may recover on subsequent attempts.
                 logger.error("❌ Failed to connect to PostgreSQL", { error: err });
                 logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
             }

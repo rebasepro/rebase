@@ -54,14 +54,30 @@ export default defineConfig(() => ({
         sourcemap: true,
         rollupOptions: {
             external: isExternal,
-            output: {
-                banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);',
-                globals: {
-                    "json-logic-js": "jsonLogic",
-                    "fast-equals": "fastEquals",
-                    "lodash/cloneDeep.js": "cloneDeep"
+            output: [
+                {
+                    format: "es",
+                    entryFileNames: "index.es.js",
+                    banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);',
+                    sourcemap: true,
+                    globals: {
+                        "json-logic-js": "jsonLogic",
+                        "fast-equals": "fastEquals",
+                        "lodash/cloneDeep.js": "cloneDeep"
+                    }
+                },
+                {
+                    format: "umd",
+                    entryFileNames: "index.umd.js",
+                    name: "Rebase Backend",
+                    sourcemap: true,
+                    globals: {
+                        "json-logic-js": "jsonLogic",
+                        "fast-equals": "fastEquals",
+                        "lodash/cloneDeep.js": "cloneDeep"
+                    }
                 }
-            }
+            ]
         }
     },
     resolve: {
