@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Twitter/X OAuth 2.0 Provider integration.
@@ -47,7 +48,7 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Twitter access token:", await tokenResponse.text());
+                    logger.error("Failed to get Twitter access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -63,7 +64,7 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                 );
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Twitter user info:", await profileResponse.text());
+                    logger.error("Failed to get Twitter user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -112,7 +113,7 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                     photoUrl: profileData.profile_image_url?.replace("_normal", "_400x400") || null
                 };
             } catch (error) {
-                console.error("Twitter OAuth error:", error);
+                logger.error("Twitter OAuth error", { error: error });
                 return null;
             }
         }

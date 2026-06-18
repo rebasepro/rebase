@@ -12,6 +12,7 @@
  */
 
 import { StorageController } from "./types";
+import { logger } from "../utils/logger";
 
 /**
  * The default storage identifier used when:
@@ -98,7 +99,7 @@ export class DefaultStorageRegistry implements StorageRegistry {
                 // If no explicit "(default)", use the first one as default
                 const firstId = Object.keys(input).find(k => isStorageController(input[k]));
                 if (firstId) {
-                    console.warn(
+                    logger.warn(
                         `[StorageRegistry] No "${DEFAULT_STORAGE_ID}" storage provided. ` +
                         `Using "${firstId}" as the default.`
                     );
@@ -112,7 +113,7 @@ export class DefaultStorageRegistry implements StorageRegistry {
 
     register(id: string, controller: StorageController): void {
         if (this.controllers.has(id)) {
-            console.warn(`[StorageRegistry] Overwriting storage with id "${id}"`);
+            logger.warn(`[StorageRegistry] Overwriting storage with id "${id}"`);
         }
         this.controllers.set(id, controller);
     }
@@ -148,7 +149,7 @@ export class DefaultStorageRegistry implements StorageRegistry {
         }
 
         // Fallback to default with warning
-        console.warn(
+        logger.warn(
             `[StorageRegistry] Storage "${id}" not found, falling back to "${DEFAULT_STORAGE_ID}"`
         );
         return this.getDefault();

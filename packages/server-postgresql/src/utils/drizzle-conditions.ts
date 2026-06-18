@@ -4,6 +4,7 @@ import { FilterValues, WhereFilterOp, Relation, JoinStep, LogicalCondition, Filt
 import { getColumnName, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
+import { logger } from "@rebasepro/server-core";
 
 /** Drizzle dynamic query builder — accepts innerJoin + where chaining */
 
@@ -48,7 +49,7 @@ export class DrizzleConditionBuilder {
             }
 
             if (!fieldColumn) {
-                console.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);
+                logger.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);
                 continue;
             }
 
@@ -90,7 +91,7 @@ export class DrizzleConditionBuilder {
                 }
             }
             if (!fieldColumn) {
-                console.warn(`Filtering by field '${cond.column}', but it does not exist in table for collection '${collectionPath}'`);
+                logger.warn(`Filtering by field '${cond.column}', but it does not exist in table for collection '${collectionPath}'`);
                 return null;
             }
             return this.buildSingleFilterCondition(fieldColumn, cond.operator as WhereFilterOp, cond.value);
@@ -147,7 +148,7 @@ export class DrizzleConditionBuilder {
                 }
                 return null;
             default:
-                console.warn(`Unsupported filter operation: ${op}`);
+                logger.warn(`Unsupported filter operation: ${op}`);
                 return null;
         }
     }
@@ -247,7 +248,7 @@ export class DrizzleConditionBuilder {
                 );
                 whereConditions.push(simpleCondition);
             } else {
-                console.error("🔍 [buildRelationConditions] Failed to find junction table info and no foreign key specified");
+                logger.error("🔍 [buildRelationConditions] Failed to find junction table info and no foreign key specified");
                 throw new Error(`Cannot resolve inverse many relation '${relation.relationName}'. Either specify 'through' property, ensure corresponding owning relation exists with junction table configuration, or specify 'foreignKeyOnTarget' for one-to-many relationships.`);
             }
         } else {
@@ -1058,7 +1059,7 @@ export class DrizzleConditionBuilder {
             console.debug("🔍 [findCorrespondingJunctionTable] Returning junction info:", result);
             return result;
         } catch (error) {
-            console.error(`🔍 [findCorrespondingJunctionTable] Error finding corresponding junction table for relation '${relation.relationName}':`, error);
+            logger.error(`🔍 [findCorrespondingJunctionTable] Error finding corresponding junction table for relation '${relation.relationName}'`, { error: error });
             return null;
         }
     }

@@ -1,6 +1,7 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
 import jwt from "jsonwebtoken";
+import { logger } from "../utils/logger";
 /**
  * Creates an Apple Sign In OAuth Provider integration.
  *
@@ -75,7 +76,7 @@ export function createAppleProvider(config: {
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Apple access token:", await tokenResponse.text());
+                    logger.error("Failed to get Apple access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -95,7 +96,7 @@ export function createAppleProvider(config: {
                 // the user object from the first auth for us to capture the name.
                 const email = decoded.email || payload.user?.email;
                 if (!email) {
-                    console.error("Apple user has no email");
+                    logger.error("Apple user has no email");
                     return null;
                 }
 
@@ -112,7 +113,7 @@ export function createAppleProvider(config: {
                     photoUrl: null // Apple does not provide a profile photo
                 };
             } catch (error) {
-                console.error("Apple OAuth error:", error);
+                logger.error("Apple OAuth error", { error: error });
                 return null;
             }
         }

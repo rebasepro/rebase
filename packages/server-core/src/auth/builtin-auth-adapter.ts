@@ -34,6 +34,7 @@ import { resolveAuthHooks } from "./auth-hooks";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
+import { logger } from "../utils/logger";
 
 /**
  * Configuration for the built-in Rebase auth adapter.
@@ -296,7 +297,7 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 try {
                     await resolvedOps.afterUserCreate(user);
                 } catch (err) {
-                    console.error("[AuthHooks] afterUserCreate error:", err instanceof Error ? err.message : err);
+                    logger.error("[AuthHooks] afterUserCreate error", { error: err instanceof Error ? err.message : err });
                 }
             }
             return toAuthUserData(user);
@@ -326,7 +327,7 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
             // Fire afterUserDelete hook (fire-and-forget)
             if (resolvedOps.afterUserDelete) {
                 resolvedOps.afterUserDelete(id).catch(err => {
-                    console.error("[AuthHooks] afterUserDelete error:", err instanceof Error ? err.message : err);
+                    logger.error("[AuthHooks] afterUserDelete error", { error: err instanceof Error ? err.message : err });
                 });
             }
         },

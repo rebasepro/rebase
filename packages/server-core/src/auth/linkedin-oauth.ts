@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 export interface LinkedinUserInfo {
     linkedinId: string;
@@ -38,7 +39,7 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
 
                 if (!tokenResponse.ok) {
                     const errBody = await tokenResponse.text();
-                    console.error("Failed to get LinkedIn access token:", errBody);
+                    logger.error("Failed to get LinkedIn access token", { detail: errBody });
                     return null;
                 }
 
@@ -54,7 +55,7 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
 
                 if (!profileResponse.ok) {
                     const errBody = await profileResponse.text();
-                    console.error("Failed to get LinkedIn user info:", errBody);
+                    logger.error("Failed to get LinkedIn user info", { detail: errBody });
                     return null;
                 }
 
@@ -73,7 +74,7 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
                     photoUrl: profileData.picture || null
                 };
             } catch (error) {
-                console.error("LinkedIn OAuth error:", error);
+                logger.error("LinkedIn OAuth error", { error: error });
                 return null;
             }
         }

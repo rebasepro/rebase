@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
+import { logger } from "@rebasepro/server-core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,7 +41,7 @@ export async function runPluginCommand(args: string[]) {
     } else if (domain === "doctor") {
         await doctorPluginCommand(args);
     } else {
-        console.error(chalk.red(`Unknown domain command: ${domain}`));
+        logger.error(chalk.red(`Unknown domain command: ${domain}`));
         process.exit(1);
     }
 }
@@ -48,7 +49,7 @@ export async function runPluginCommand(args: string[]) {
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const VALID_ACTIONS = ["push", "generate", "migrate", "studio", "branch"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
-        console.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
+        logger.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);
     }
 
@@ -58,44 +59,44 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     }
 
     if (subcommand === "generate") {
-        console.log("");
-        console.log(chalk.bold("  📦 Rebase DB Generate"));
-        console.log(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.bold("  📦 Rebase DB Generate"));
+        logger.info(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
+        logger.info("");
         await schemaCommand("generate", rawArgs);
-        console.log("");
-        console.log(chalk.gray("  Step 2/2: Generating SQL migration files..."));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.gray("  Step 2/2: Generating SQL migration files..."));
+        logger.info("");
         await runDrizzleKit("generate", rawArgs);
         await fixMigrationStatementOrder();
-        console.log("");
-        console.log(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
-        console.log("");
+        logger.info("");
+        logger.info(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
+        logger.info("");
     } else if (subcommand === "pull") {
-        console.log("");
-        console.log(chalk.yellow("  ⚠ \"rebase db pull\" has been removed."));
-        console.log(chalk.gray("  Use \"rebase schema introspect\" instead."));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.yellow("  ⚠ \"rebase db pull\" has been removed."));
+        logger.info(chalk.gray("  Use \"rebase schema introspect\" instead."));
+        logger.info("");
         process.exit(1);
     } else {
-        console.log("");
-        console.log(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
+        logger.info("");
 
         if (subcommand === "push") {
-            console.log(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
-            console.log("");
+            logger.info(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
+            logger.info("");
             await schemaCommand("generate", rawArgs);
-            console.log("");
-            console.log(chalk.gray("  Step 2/2: Pushing schema to database..."));
-            console.log("");
+            logger.info("");
+            logger.info(chalk.gray("  Step 2/2: Pushing schema to database..."));
+            logger.info("");
             await runDrizzleKit("push", rawArgs);
         } else if (subcommand === "migrate") {
             await runDrizzleKit("migrate", rawArgs);
         } else if (subcommand === "studio") {
             const schemaPath = path.join(process.cwd(), "src", "schema.generated.ts");
             if (!fs.existsSync(schemaPath)) {
-                console.log(chalk.yellow("  ⚠ schema.generated.ts not found. Generating schema first..."));
+                logger.info(chalk.yellow("  ⚠ schema.generated.ts not found. Generating schema first..."));
                 await schemaCommand("generate", rawArgs);
             }
             await runDrizzleKit("studio", rawArgs);
@@ -103,9 +104,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             await runDrizzleKit(subcommand, rawArgs);
         }
 
-        console.log("");
-        console.log(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
+        logger.info("");
     }
 }
 
@@ -132,7 +133,7 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
 
     const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
     if (!databaseUrl) {
-        console.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
 
@@ -156,8 +157,8 @@ max: 3 });
             case "create": {
                 const name = rawArgs[3];
                 if (!name) {
-                    console.error(chalk.red("✗ Branch name is required."));
-                    console.log(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
+                    logger.error(chalk.red("✗ Branch name is required."));
+                    logger.info(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
                     process.exit(1);
                 }
                 let source: string | undefined;
@@ -165,81 +166,81 @@ max: 3 });
                 if (fromIdx !== -1 && rawArgs[fromIdx + 1]) {
                     source = rawArgs[fromIdx + 1];
                 }
-                console.log("");
-                console.log(chalk.bold("  🌿 Creating database branch..."));
-                console.log(chalk.gray(`  Name:   ${name}`));
-                if (source) console.log(chalk.gray(`  Source: ${source}`));
-                console.log("");
+                logger.info("");
+                logger.info(chalk.bold("  🌿 Creating database branch..."));
+                logger.info(chalk.gray(`  Name:   ${name}`));
+                if (source) logger.info(chalk.gray(`  Source: ${source}`));
+                logger.info("");
                 const branch = await branchService.createBranch(name, source ? { source } : undefined);
-                console.log(chalk.green(`  ✓ Branch "${branch.name}" created successfully.`));
-                console.log(chalk.gray(`    Database: rb_${branch.name}`));
-                console.log(chalk.gray(`    Parent:   ${branch.parentDatabase}`));
-                console.log("");
+                logger.info(chalk.green(`  ✓ Branch "${branch.name}" created successfully.`));
+                logger.info(chalk.gray(`    Database: rb_${branch.name}`));
+                logger.info(chalk.gray(`    Parent:   ${branch.parentDatabase}`));
+                logger.info("");
                 break;
             }
 
             case "list": {
                 const branches = await branchService.listBranches();
-                console.log("");
+                logger.info("");
                 if (branches.length === 0) {
-                    console.log(chalk.gray("  No branches found. Create one with: rebase db branch create <name>"));
+                    logger.info(chalk.gray("  No branches found. Create one with: rebase db branch create <name>"));
                 } else {
-                    console.log(chalk.bold(`  🌿 ${branches.length} branch(es):`));
-                    console.log("");
+                    logger.info(chalk.bold(`  🌿 ${branches.length} branch(es):`));
+                    logger.info("");
                     for (const b of branches) {
                         const size = b.sizeBytes != null
                             ? chalk.gray(` (${formatBytes(b.sizeBytes)})`)
                             : "";
                         const age = chalk.gray(` — created ${timeAgo(b.createdAt)}`);
-                        console.log(`  ${chalk.green("●")} ${chalk.bold(b.name)}${size}${age}`);
-                        console.log(chalk.gray(`    from ${b.parentDatabase}`));
+                        logger.info(`  ${chalk.green("●")} ${chalk.bold(b.name)}${size}${age}`);
+                        logger.info(chalk.gray(`    from ${b.parentDatabase}`));
                     }
                 }
-                console.log("");
+                logger.info("");
                 break;
             }
 
             case "delete": {
                 const name = rawArgs[3];
                 if (!name) {
-                    console.error(chalk.red("✗ Branch name is required."));
-                    console.log(chalk.gray("  Usage: rebase db branch delete <name>"));
+                    logger.error(chalk.red("✗ Branch name is required."));
+                    logger.info(chalk.gray("  Usage: rebase db branch delete <name>"));
                     process.exit(1);
                 }
-                console.log("");
-                console.log(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
+                logger.info("");
+                logger.info(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
                 await branchService.deleteBranch(name);
-                console.log(chalk.green(`  ✓ Branch "${name}" deleted.`));
-                console.log("");
+                logger.info(chalk.green(`  ✓ Branch "${name}" deleted.`));
+                logger.info("");
                 break;
             }
 
             case "info": {
                 const name = rawArgs[3];
                 if (!name) {
-                    console.error(chalk.red("✗ Branch name is required."));
-                    console.log(chalk.gray("  Usage: rebase db branch info <name>"));
+                    logger.error(chalk.red("✗ Branch name is required."));
+                    logger.info(chalk.gray("  Usage: rebase db branch info <name>"));
                     process.exit(1);
                 }
                 const info = await branchService.getBranchInfo(name);
-                console.log("");
+                logger.info("");
                 if (!info) {
-                    console.error(chalk.red(`  ✗ Branch "${name}" not found.`));
+                    logger.error(chalk.red(`  ✗ Branch "${name}" not found.`));
                 } else {
-                    console.log(chalk.bold(`  🌿 Branch: ${info.name}`));
-                    console.log(chalk.gray(`    Database: rb_${info.name}`));
-                    console.log(chalk.gray(`    Parent:   ${info.parentDatabase}`));
-                    console.log(chalk.gray(`    Created:  ${info.createdAt.toISOString()}`));
+                    logger.info(chalk.bold(`  🌿 Branch: ${info.name}`));
+                    logger.info(chalk.gray(`    Database: rb_${info.name}`));
+                    logger.info(chalk.gray(`    Parent:   ${info.parentDatabase}`));
+                    logger.info(chalk.gray(`    Created:  ${info.createdAt.toISOString()}`));
                     if (info.sizeBytes != null) {
-                        console.log(chalk.gray(`    Size:     ${formatBytes(info.sizeBytes)}`));
+                        logger.info(chalk.gray(`    Size:     ${formatBytes(info.sizeBytes)}`));
                     }
                 }
-                console.log("");
+                logger.info("");
                 break;
             }
 
             default:
-                console.error(chalk.red(`Unknown branch action: "${branchAction}".`));
+                logger.error(chalk.red(`Unknown branch action: "${branchAction}".`));
                 printBranchHelp();
                 process.exit(1);
         }
@@ -250,7 +251,7 @@ max: 3 });
 }
 
 function printBranchHelp() {
-    console.log(`
+    logger.info(`
 ${chalk.bold("rebase db branch")} — Database branching commands
 
 ${chalk.green.bold("Usage")}
@@ -398,14 +399,14 @@ idx }));
     const reordered = stmtEntries.map(e => e.stmt).join(DELIMITER);
     fs.writeFileSync(latestFile, reordered, "utf-8");
 
-    console.log(chalk.yellow(`  \u26A0 Reordered migration statements in ${sqlFiles[0].name} (DROP POLICY before ALTER COLUMN)`));
+    logger.info(chalk.yellow(`  \u26A0 Reordered migration statements in ${sqlFiles[0].name} (DROP POLICY before ALTER COLUMN)`));
 }
 
 async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> {
     const drizzleKitBin = resolveLocalBin("drizzle-kit");
     if (!drizzleKitBin) {
-        console.error(chalk.red("✗ Could not find drizzle-kit binary."));
-        console.error(chalk.gray("  Install it with: pnpm add -D drizzle-kit"));
+        logger.error(chalk.red("✗ Could not find drizzle-kit binary."));
+        logger.error(chalk.gray("  Install it with: pnpm add -D drizzle-kit"));
         process.exit(1);
     }
 
@@ -490,10 +491,10 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
                                stderr.includes("Interactive prompts require a TTY terminal");
 
             if (result.exitCode !== 0 || hasTtyError) {
-                console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
+                logger.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
                 if (hasTtyError) {
-                    console.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
-                    console.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
+                    logger.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
+                    logger.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
                 } else {
                     const errorOutput = stderr || stdout;
                     if (errorOutput) {
@@ -501,16 +502,16 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
                         let printedCount = 0;
                         for (const line of lines) {
                             if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
-                                console.error(chalk.red(`  ${line.trim()}`));
+                                logger.error(chalk.red(`  ${line.trim()}`));
                                 printedCount++;
                             }
                         }
                         if (printedCount === 0) {
-                            lines.slice(0, 10).forEach(line => console.error(chalk.red(`  ${line.trim()}`)));
+                            lines.slice(0, 10).forEach(line => logger.error(chalk.red(`  ${line.trim()}`)));
                         }
                     }
                 }
-                console.error("");
+                logger.error("");
                 process.exit(1);
             }
         }
@@ -520,22 +521,22 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
         const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
         const cleaned = stripAnsi(msg).trim();
         const hasTtyError = cleaned.includes("Interactive prompts require a TTY terminal");
-        console.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
+        logger.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
         if (hasTtyError) {
-            console.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
-            console.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
+            logger.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
+            logger.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
         } else {
             const lines = cleaned.split("\n").filter((l: string) => l.trim());
             for (const line of lines) {
                 if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates")) {
-                    console.error(chalk.red(`  ${line.trim()}`));
+                    logger.error(chalk.red(`  ${line.trim()}`));
                 }
             }
             if (lines.length === 0) {
-                console.error(chalk.gray(`  ${cleaned}`));
+                logger.error(chalk.gray(`  ${cleaned}`));
             }
         }
-        console.error("");
+        logger.error("");
         process.exit(1);
     }
 }
@@ -561,13 +562,13 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         // If installed in node_modules, __dirname is node_modules/@rebasepro/server-postgresql/dist or src.
         const generatorScript = path.join(__dirname, "schema", "generate-drizzle-schema.ts");
         if (!fs.existsSync(generatorScript)) {
-            console.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
+            logger.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
             process.exit(1);
         }
 
         const tsxBin = resolveLocalBin("tsx");
         if (!tsxBin) {
-            console.error(chalk.red("✗ Could not find tsx binary."));
+            logger.error(chalk.red("✗ Could not find tsx binary."));
             process.exit(1);
         }
 
@@ -575,9 +576,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
         const watch = argsList["--watch"] || false;
 
-        console.log("");
-        console.log(chalk.bold("  🔧 Rebase Schema Generator"));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.bold("  🔧 Rebase Schema Generator"));
+        logger.info("");
 
         const cmdParts = [
             tsxBin,
@@ -596,7 +597,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            console.error(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
+            logger.error(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
             process.exit(1);
         }
     } else if (subcommand === "introspect") {
@@ -618,21 +619,21 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         const introspectScript = path.join(__dirname, "schema", "introspect-db.ts");
         if (!fs.existsSync(introspectScript)) {
-            console.error(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
+            logger.error(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
             process.exit(1);
         }
 
         const tsxBin = resolveLocalBin("tsx");
         if (!tsxBin) {
-            console.error(chalk.red("✗ Could not find tsx binary."));
+            logger.error(chalk.red("✗ Could not find tsx binary."));
             process.exit(1);
         }
 
         const outputPath = argsList["--output"] || argsList["--collections"] || path.join("..", "config", "collections");
 
-        console.log("");
-        console.log(chalk.bold("  🔍 Rebase Schema Introspector"));
-        console.log("");
+        logger.info("");
+        logger.info(chalk.bold("  🔍 Rebase Schema Introspector"));
+        logger.info("");
 
         const cmdParts = [
             tsxBin,
@@ -649,11 +650,11 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            console.error(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
+            logger.error(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
             process.exit(1);
         }
     } else {
-        console.error(chalk.red("Unknown schema command."));
+        logger.error(chalk.red("Unknown schema command."));
         process.exit(1);
     }
 }
@@ -676,13 +677,13 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 
     const doctorScript = path.join(__dirname, "schema", "doctor-cli.ts");
     if (!fs.existsSync(doctorScript)) {
-        console.error(chalk.red(`✗ Could not find doctor.ts at ${doctorScript}`));
+        logger.error(chalk.red(`✗ Could not find doctor.ts at ${doctorScript}`));
         process.exit(1);
     }
 
     const tsxBin = resolveLocalBin("tsx");
     if (!tsxBin) {
-        console.error(chalk.red("✗ Could not find tsx binary."));
+        logger.error(chalk.red("✗ Could not find tsx binary."));
         process.exit(1);
     }
 

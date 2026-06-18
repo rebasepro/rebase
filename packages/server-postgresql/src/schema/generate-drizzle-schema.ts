@@ -5,6 +5,7 @@ import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { EntityCollection } from "@rebasepro/types";
+import { logger } from "@rebasepro/server-core";
 
 
 // --- Helper Functions ---
@@ -48,7 +49,7 @@ const formatTerminalText = (text: string, options: {
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
     try {
         if (!collectionsFilePath) {
-            console.error("Error: No collections file path provided. Skipping schema generation.");
+            logger.error("Error: No collections file path provided. Skipping schema generation.");
             return;
         }
 
@@ -74,7 +75,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
                         }
                     } catch (err: unknown) {
                         const message = err instanceof Error ? err.message : String(err);
-                        console.error(`Error loading ${file}:`, message);
+                        logger.error(`Error loading ${file}`, { detail: message });
                     }
                 }
             }
@@ -100,20 +101,20 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             const outputDir = path.dirname(outputPath);
             await fsPromises.mkdir(outputDir, { recursive: true });
             await fsPromises.writeFile(outputPath, schemaContent);
-            console.log("✅ Drizzle schema generated successfully at", outputPath);
+            logger.info("✅ Drizzle schema generated successfully at", { detail: outputPath });
         } else {
-            console.log("✅ Drizzle schema generated successfully.");
-            console.log(schemaContent);
+            logger.info("✅ Drizzle schema generated successfully.");
+            logger.info(String(schemaContent));
         }
 
-        console.log(`You can now run ${formatTerminalText("rebase db generate", {
+        logger.info(`You can now run ${formatTerminalText("rebase db generate", {
             bold: true,
             backgroundColor: "blue",
             textColor: "black"
         })} to generate the SQL migration files.`);
 
     } catch (error) {
-        console.error("Error generating schema:", error);
+        logger.error("Error generating schema", { error: error });
     }
 };
 
@@ -127,7 +128,7 @@ const main = () => {
     const watch = process.argv.includes("--watch");
 
     if (!collectionsFilePath) {
-        console.log("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
+        logger.info("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
         return;
     }
 
@@ -135,14 +136,14 @@ const main = () => {
     const resolvedOutputPath = outputPath ? path.resolve(process.cwd(), outputPath) : undefined;
 
     if (watch) {
-        console.log(`Watching for changes in ${resolvedPath}...`);
+        logger.info(`Watching for changes in ${resolvedPath}...`);
         const watcher = chokidar.watch(resolvedPath, {
             persistent: true,
             ignoreInitial: false
         });
 
         watcher.on("all", (event, filePath) => {
-            console.log(`[${event}] ${filePath}. Regenerating schema...`);
+            logger.info(`[${event}] ${filePath}. Regenerating schema...`);
             runGeneration(resolvedPath, resolvedOutputPath);
         });
     } else {

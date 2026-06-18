@@ -1,4 +1,5 @@
-import { EntityCollection } from "@rebasepro/types";
+import { DataType, EntityCollection } from "@rebasepro/types";
+
 
 /**
  * Valid dataType values for properties
@@ -17,7 +18,6 @@ const VALID_DATA_TYPES = [
     "binary"
 ] as const;
 
-type DataType = typeof VALID_DATA_TYPES[number];
 
 /**
  * Validation error with path and message

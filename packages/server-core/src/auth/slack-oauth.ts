@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Slack OAuth Provider integration (OAuth 2.0 / "Sign in with Slack").
@@ -27,13 +28,13 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Slack access token:", await tokenResponse.text());
+                    logger.error("Failed to get Slack access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
                 const tokenData = await tokenResponse.json() as { ok: boolean; access_token?: string; error?: string };
                 if (!tokenData.ok || !tokenData.access_token) {
-                    console.error("Slack token exchange failed:", tokenData.error);
+                    logger.error("Slack token exchange failed", { detail: tokenData.error });
                     return null;
                 }
 
@@ -42,7 +43,7 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Slack user info:", await profileResponse.text());
+                    logger.error("Failed to get Slack user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -52,7 +53,7 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                 };
 
                 if (!p.ok || !p.email) {
-                    console.error("Slack user has no email");
+                    logger.error("Slack user has no email");
                     return null;
                 }
 
@@ -63,7 +64,7 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                     photoUrl: p.picture || null
                 };
             } catch (error) {
-                console.error("Slack OAuth error:", error);
+                logger.error("Slack OAuth error", { error: error });
                 return null;
             }
         }

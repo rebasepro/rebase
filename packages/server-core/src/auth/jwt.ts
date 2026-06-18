@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { createHash, randomBytes } from "crypto";
+import { logger } from "../utils/logger";
 
 export interface JwtConfig {
     secret: string;
@@ -62,14 +63,14 @@ export function configureJwt(config: JwtConfig): void {
     if (!config.secret || config.secret.length < 32) {
         throw new Error(
             "JWT secret is too short. Must be at least 32 characters. " +
-            "Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
+            "Generate one with: node -e \"logger.info(require('crypto').randomBytes(48).toString('base64'))\""
         );
     }
 
     if (weakSecrets.has(config.secret.toLowerCase())) {
         throw new Error(
             "JWT secret is a known default/weak value. Please use a strong, randomly generated secret. " +
-            "Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
+            "Generate one with: node -e \"logger.info(require('crypto').randomBytes(48).toString('base64'))\""
         );
     }
 
@@ -148,7 +149,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
         const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[]; aal?: string };
         const id = decoded.userId || decoded.uid || decoded.sub;
         if (!id) {
-            console.error("[JWT] Verification failed: missing id in payload", decoded);
+            logger.error("[JWT] Verification failed: missing id in payload", { detail: decoded });
             return null;
         }
 
@@ -160,7 +161,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
             aal
         };
     } catch (error) {
-        console.error("[JWT] Verification failed:", error, "Token start:", token.substring(0, 15));
+        logger.error("[JWT] Verification failed", { error: error, detail: token.substring(0, 15) });
         return null;
     }
 }

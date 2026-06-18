@@ -1,6 +1,7 @@
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { HonoEnv } from "./types";
+import { logger } from "../utils/logger";
 
 /** Tracks whether we've already shown the doctor hint (once per process). */
 let _schemaDriftHinted = false;
@@ -125,7 +126,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
 
     if (error instanceof ApiError || error.name === "ApiError") {
         // Operational errors — log at warn level
-        console.warn(
+        logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
             (reqId ? ` [${reqId}]` : "")
         );
@@ -173,14 +174,14 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
 
     if (isDbSchemaMismatch) {
         // Database schema mismatch is logged as a warning instead of a fatal error
-        console.warn(
+        logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
             (reqId ? ` [${reqId}]` : "")
         );
         // In dev mode, show a one-time hint to run `rebase doctor`
         if (!_schemaDriftHinted && process.env.NODE_ENV !== "production") {
             _schemaDriftHinted = true;
-            console.warn([
+            logger.warn([
                 "",
                 "┌──────────────────────────────────────────────────────────────┐",
                 "│  💡 TIP: Run `rebase doctor` for full schema diagnostics    │",
@@ -195,7 +196,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         }
     } else {
         // Unexpected errors — log at error level
-        console.error(
+        logger.error(
             `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
             (reqId ? ` [${reqId}]` : "")
         );
@@ -204,7 +205,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Suppress the huge stack trace for known DB errors (it's noisy and leaks SQL)
     const suppressStack = isDbSchemaMismatch || (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
-        console.error(error.stack || error);
+        logger.error(String(error.stack || error));
     }
 
     // Sanitize the message for the client to prevent leaking sensitive details

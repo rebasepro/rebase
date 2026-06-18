@@ -55,7 +55,7 @@ export interface RebaseAuthControllerProps {
         resolveToken?: () => Promise<string | null>;
         setAuthTokenGetter?: (getter: () => Promise<string | null>) => void;
         setOnUnauthorized?: (handler: () => Promise<boolean>) => void;
-        ws?: { setAuthTokenGetter: (getter: () => Promise<string>) => void };
+        ws?: { setAuthTokenGetter: (getter: () => Promise<string | null>) => void };
     };
     /** Base URL of the backend API */
     apiUrl?: string;

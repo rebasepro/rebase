@@ -1,0 +1,341 @@
+import { Hono } from "hono";
+import { z } from "zod";
+import { randomBytes } from "crypto";
+import { ApiError } from "../api/errors";
+import { HonoEnv } from "../api/types";
+import { requireAuth } from "./middleware";
+import { logger } from "../utils/logger";
+import { strictAuthLimiter, defaultAuthLimiter } from "./rate-limiter";
+import { hashRefreshToken } from "./jwt";
+import type { AuthModuleConfig } from "./routes";
+import { resolveAuthHooks } from "./auth-hooks";
+import type { CreateUserData } from "./interfaces";
+
+interface SessionRoutesConfig {
+    router: Hono<HonoEnv>;
+    config: AuthModuleConfig;
+    ops: ReturnType<typeof resolveAuthHooks>;
+    parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
+    buildAuthResponse: (
+        user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; metadata?: Record<string, unknown> | null },
+        roleIds: string[],
+        accessToken: string,
+        refreshToken: string
+    ) => unknown;
+    createSessionAndTokens: (userId: string, userAgent: string, ipAddress: string) => Promise<{
+        roleIds: string[];
+        accessToken: string;
+        refreshToken: string;
+    }>;
+}
+
+export function mountSessionRoutes(opts: SessionRoutesConfig): void {
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens } = opts;
+    const authRepo = config.authRepo;
+
+    const logoutSchema = z.object({
+        refreshToken: z.string().optional()
+    });
+
+    const linkSchema = z.object({
+        email: z.string().email("Invalid email address").max(255),
+        password: z.string().min(1, "Password is required").max(128)
+    });
+
+    const updateProfileSchema = z.object({
+        displayName: z.string().max(255).optional(),
+        photoURL: z.string().url().max(2048).optional()
+    });
+
+    const isEmailConfigured = () => !!(config.emailService && config.emailService.isConfigured());
+
+    /**
+     * POST /auth/logout
+     */
+    router.post("/logout", async (c) => {
+        const { refreshToken } = parseBody(logoutSchema, await c.req.json());
+
+        if (refreshToken) {
+            const tokenHash = hashRefreshToken(refreshToken);
+            await authRepo.deleteRefreshToken(tokenHash);
+        }
+
+        // Call afterLogout hook (fire-and-forget)
+        // Extract userId from the access token if present
+        const authHeader = c.req.header("authorization");
+        if (ops.afterLogout && authHeader?.startsWith("Bearer ")) {
+            const { verifyAccessToken } = await import("./jwt");
+            const payload = verifyAccessToken(authHeader.substring(7));
+            if (payload) {
+                ops.afterLogout(payload.userId).catch((err) => {
+                    logger.error("[AuthHooks] afterLogout error", {
+                        error: err instanceof Error ? err.message : err
+                    });
+                });
+            }
+        }
+
+        return c.json({ success: true });
+    });
+
+    /**
+     * GET /auth/sessions
+     * Get active refresh tokens (sessions) for the current user
+     */
+    router.get("/sessions", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const currentRefreshToken = c.req.header("x-refresh-token") as string;
+        const currentTokenHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : null;
+
+        const sessions = await authRepo.listRefreshTokensForUser(userCtx.userId);
+
+        const mappedSessions = sessions.map((s) => ({
+            id: s.id,
+            userAgent: s.userAgent,
+            ipAddress: s.ipAddress,
+            createdAt: s.createdAt,
+            isCurrentSession: currentTokenHash ? s.tokenHash === currentTokenHash : false
+        }));
+
+        return c.json({ sessions: mappedSessions });
+    });
+
+    /**
+     * DELETE /auth/sessions
+     * Delete all refresh tokens for the current user (remote logout every device)
+     */
+    router.delete("/sessions", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        await authRepo.deleteAllRefreshTokensForUser(userCtx.userId);
+        return c.json({
+            success: true,
+            message: "All sessions revoked successfully"
+        });
+    });
+
+    /**
+     * DELETE /auth/sessions/:id
+     * Delete a specific refresh token (remote logout)
+     */
+    router.delete("/sessions/:id", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const id = c.req.param("id");
+        if (!id) {
+            throw ApiError.badRequest("Session ID is required", "INVALID_INPUT");
+        }
+
+        await authRepo.deleteRefreshTokenById(id, userCtx.userId);
+        return c.json({
+            success: true,
+            message: "Session revoked successfully"
+        });
+    });
+
+    /**
+     * GET /auth/me
+     * Get current authenticated user
+     */
+    router.get("/me", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const result = await authRepo.getUserWithRoles(userCtx.userId);
+        if (!result) {
+            throw ApiError.notFound("User not found");
+        }
+
+        return c.json({
+            user: {
+                uid: result.user.id,
+                email: result.user.email,
+                displayName: result.user.displayName,
+                photoURL: result.user.photoUrl,
+                emailVerified: result.user.emailVerified,
+                roles: result.roles.map((r) => r.id),
+                metadata: result.user.metadata ?? {}
+            }
+        });
+    });
+
+    /**
+     * PATCH /auth/me
+     * Update current authenticated user profile
+     */
+    router.patch("/me", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const { displayName, photoURL } = parseBody(updateProfileSchema, await c.req.json());
+
+        const updatedUser = await authRepo.updateUser(userCtx.userId, {
+            displayName: displayName !== undefined ? displayName : undefined,
+            photoUrl: photoURL !== undefined ? photoURL : undefined
+        });
+
+        if (!updatedUser) {
+            throw ApiError.notFound("User not found");
+        }
+
+        const result = await authRepo.getUserWithRoles(userCtx.userId);
+        if (!result) {
+            throw ApiError.notFound("User not found");
+        }
+
+        return c.json({
+            user: {
+                uid: result.user.id,
+                email: result.user.email,
+                displayName: result.user.displayName,
+                photoURL: result.user.photoUrl,
+                emailVerified: result.user.emailVerified,
+                roles: result.roles.map((r) => r.id),
+                metadata: result.user.metadata ?? {}
+            }
+        });
+    });
+
+    /**
+     * GET /auth/config
+     * Get public auth configuration
+     */
+    router.get("/config", defaultAuthLimiter, async (c) => {
+        let needsSetup: boolean;
+        if (config.isBootstrapCompleted) {
+            needsSetup = !(await config.isBootstrapCompleted());
+        } else {
+            const allUsers = await authRepo.listUsers();
+            needsSetup = allUsers.length === 0;
+        }
+
+        const registrationAllowed = needsSetup || !!config.allowRegistration;
+        const enabledProviders = (config.oauthProviders || []).map((p) => p.id);
+
+        return c.json({
+            needsSetup,
+            registrationEnabled: registrationAllowed,
+            emailServiceEnabled: isEmailConfigured(),
+            enabledProviders
+        });
+    });
+
+    /**
+     * POST /auth/anonymous
+     * Create an anonymous user with temporary credentials
+     */
+    router.post("/anonymous", strictAuthLimiter, async (c) => {
+        const anonId = randomBytes(16).toString("hex");
+        const anonEmail = `anon_${anonId.slice(0, 8)}@anonymous.local`;
+
+        let createData: CreateUserData = {
+            email: anonEmail,
+            emailVerified: false,
+            isAnonymous: true
+        };
+
+        if (ops.beforeUserCreate) {
+            createData = await ops.beforeUserCreate(createData);
+        }
+
+        const user = await authRepo.createUser(createData);
+
+        // Assign default role (follow register route pattern, but never auto-admin)
+        if (config.defaultRole) {
+            await authRepo.assignDefaultRole(user.id, config.defaultRole);
+        }
+
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
+        );
+
+        // Fire afterUserCreate hook
+        if (ops.afterUserCreate) {
+            ops.afterUserCreate(user).catch((err) => {
+                logger.error("[AuthHooks] afterUserCreate error", {
+                    error: err instanceof Error ? err.message : err
+                });
+            });
+        }
+
+        // Fire onAuthenticated hook
+        if (ops.onAuthenticated) {
+            ops.onAuthenticated(user, "anonymous").catch((err) => {
+                logger.error("[AuthHooks] onAuthenticated error", {
+                    error: err instanceof Error ? err.message : err
+                });
+            });
+        }
+
+        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
+    });
+
+    /**
+     * POST /auth/anonymous/link
+     * Upgrade an anonymous user to a permanent account with email/password
+     */
+    router.post("/anonymous/link", requireAuth, async (c) => {
+        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        const user = await authRepo.getUserById(userCtx.userId);
+        if (!user?.isAnonymous) {
+            throw ApiError.badRequest("User is not anonymous", "NOT_ANONYMOUS");
+        }
+
+        const { email, password } = parseBody(linkSchema, await c.req.json());
+
+        // Validate password strength
+        const passwordValidation = ops.validatePasswordStrength(password);
+        if (!passwordValidation.valid) {
+            throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
+        }
+
+        // Check if email is already taken
+        const existingUser = await authRepo.getUserByEmail(email.toLowerCase());
+        if (existingUser) {
+            throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+        }
+
+        // Hash password
+        const passwordHash = await ops.hashPassword(password);
+
+        // Update user: set email, password, remove anonymous flag
+        const updatedUser = await authRepo.updateUser(user.id, {
+            email: email.toLowerCase(),
+            passwordHash,
+            isAnonymous: false
+        });
+
+        if (!updatedUser) {
+            throw ApiError.notFound("User not found");
+        }
+
+        // Generate new tokens with updated identity
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
+        );
+
+        return c.json(buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken));
+    });
+}

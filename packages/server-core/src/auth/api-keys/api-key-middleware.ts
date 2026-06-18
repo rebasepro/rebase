@@ -20,6 +20,7 @@ import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
 import { scopeDataDriver } from "../rls-scope";
+import { logger } from "../../utils/logger";
 
 /**
  * Check whether a token looks like a Rebase API key.
@@ -115,7 +116,7 @@ roles: [] });
         });
         c.set("driver", scopedDriver);
     } catch (error) {
-        console.error("[AUTH] RLS scoping failed for API key:", error);
+        logger.error("[AUTH] RLS scoping failed for API key", { error: error });
         return c.json({
             error: { message: "Internal authentication error",
 code: "INTERNAL_ERROR" }

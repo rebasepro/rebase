@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a GitLab OAuth Provider integration.
@@ -33,7 +34,7 @@ export function createGitLabProvider(config: {
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get GitLab access token:", await tokenResponse.text());
+                    logger.error("Failed to get GitLab access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -44,7 +45,7 @@ export function createGitLabProvider(config: {
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get GitLab user info:", await profileResponse.text());
+                    logger.error("Failed to get GitLab user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -53,7 +54,7 @@ export function createGitLabProvider(config: {
                     email: string; avatar_url?: string | null;
                 };
 
-                if (!p.email) { console.error("GitLab user has no email"); return null; }
+                if (!p.email) { logger.error("GitLab user has no email"); return null; }
 
                 return {
                     providerId: String(p.id),
@@ -62,7 +63,7 @@ export function createGitLabProvider(config: {
                     photoUrl: p.avatar_url || null
                 };
             } catch (error) {
-                console.error("GitLab OAuth error:", error);
+                logger.error("GitLab OAuth error", { error: error });
                 return null;
             }
         }

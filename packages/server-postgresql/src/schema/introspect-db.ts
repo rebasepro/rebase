@@ -20,6 +20,7 @@ import {
     mergeIndexContent,
     safeHostFromUrl
 } from "./introspect-db-logic";
+import { logger } from "@rebasepro/server-core";
 
 async function main() {
     const args = arg(
@@ -67,7 +68,7 @@ async function main() {
 
     const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
     if (!databaseUrl) {
-        console.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
 
@@ -76,15 +77,15 @@ async function main() {
     try {
         await client.connect();
     } catch (err) {
-        console.error(chalk.red(`✗ Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`));
-        console.error(chalk.gray("  Check your DATABASE_URL and ensure the database is reachable."));
+        logger.error(chalk.red(`✗ Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`));
+        logger.error(chalk.gray("  Check your DATABASE_URL and ensure the database is reachable."));
         process.exit(1);
     }
 
     // Log the host portion safely — handle URLs without "@"
     const hostPart = safeHostFromUrl(databaseUrl);
-    console.log(chalk.gray(`Connected to database: ${hostPart}`));
-    console.log(chalk.gray(`Introspecting schema '${pgSchema}'...`));
+    logger.info(chalk.gray(`Connected to database: ${hostPart}`));
+    logger.info(chalk.gray(`Introspecting schema '${pgSchema}'...`));
 
     try {
         // 1. Get Tables
@@ -162,7 +163,7 @@ async function main() {
         const tablesMap = buildTablesMap(tables, columns, pks, fks);
         const joinTables = identifyJoinTables(tablesMap);
 
-        console.log(chalk.blue(`Found ${tablesMap.size} tables (including ${joinTables.size} detected join tables).`));
+        logger.info(chalk.blue(`Found ${tablesMap.size} tables (including ${joinTables.size} detected join tables).`));
 
         let runDataInference = false;
         if (args["--data-inference"] !== undefined) {
@@ -178,7 +179,7 @@ async function main() {
         }
 
         if (runDataInference) {
-            console.log(chalk.gray("Sampling database rows for data inference..."));
+            logger.info(chalk.gray("Sampling database rows for data inference..."));
         }
 
         // Generate Collections
@@ -205,7 +206,7 @@ async function main() {
                         const { rows } = await client.query(`SELECT * FROM "${pgSchema}"."${tableName}" LIMIT 100`);
                         sampleData = rows;
                     } catch (err) {
-                        console.error(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
+                        logger.error(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
                     }
                 }
 
@@ -221,7 +222,7 @@ async function main() {
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");
                 generatedFiles.push(tableName);
-                console.log(chalk.green(`  ✓ ${filePath}`));
+                logger.info(chalk.green(`  ✓ ${filePath}`));
             }));
         }
 
@@ -238,21 +239,21 @@ async function main() {
                 const indexContent = generateIndexContent(generatedFiles);
                 fs.writeFileSync(indexPath, indexContent, "utf-8");
             }
-            console.log(chalk.green(`  ✓ ${indexPath}`));
+            logger.info(chalk.green(`  ✓ ${indexPath}`));
         }
 
-        console.log("");
+        logger.info("");
         if (skippedFiles.length > 0) {
-            console.log(chalk.yellow(`⚠ Skipped ${skippedFiles.length} existing file(s): ${skippedFiles.join(", ")}`));
-            console.log(chalk.gray("  Use --force to overwrite existing files."));
-            console.log("");
+            logger.info(chalk.yellow(`⚠ Skipped ${skippedFiles.length} existing file(s): ${skippedFiles.join(", ")}`));
+            logger.info(chalk.gray("  Use --force to overwrite existing files."));
+            logger.info("");
         }
-        console.log(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));
-        console.log(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
-        console.log("");
+        logger.info(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));
+        logger.info(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
+        logger.info("");
 
     } catch (e) {
-        console.error(chalk.red(`✗ Error introspecting database: ${e instanceof Error ? e.message : String(e)}`));
+        logger.error(chalk.red(`✗ Error introspecting database: ${e instanceof Error ? e.message : String(e)}`));
         process.exit(1);
     } finally {
         await client.end();
@@ -260,6 +261,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    console.error(err);
+    logger.error(String(err));
     process.exit(1);
 });

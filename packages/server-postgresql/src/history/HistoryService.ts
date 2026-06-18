@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { logger } from "@rebasepro/server-core";
 
 export interface HistoryEntry {
     id: string;
@@ -99,10 +100,10 @@ export class HistoryService {
 
             // Non-blocking prune for this specific entity
             this.pruneEntity(tableName, entityId).catch(err =>
-                console.error("History prune failed:", err)
+                logger.error("History prune failed", { error: err })
             );
         } catch (error) {
-            console.error("Failed to record entity history:", error);
+            logger.error("Failed to record entity history", { error: error });
         }
     }
 

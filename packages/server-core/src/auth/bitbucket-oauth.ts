@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Bitbucket OAuth Provider integration (OAuth 2.0 consumer).
@@ -29,7 +30,7 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Bitbucket access token:", await tokenResponse.text());
+                    logger.error("Failed to get Bitbucket access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -41,7 +42,7 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Bitbucket user info:", await profileResponse.text());
+                    logger.error("Failed to get Bitbucket user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -65,7 +66,7 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                     email = primary?.email || null;
                 }
 
-                if (!email) { console.error("Bitbucket user has no verified email"); return null; }
+                if (!email) { logger.error("Bitbucket user has no verified email"); return null; }
 
                 return {
                     providerId: p.uuid,
@@ -74,7 +75,7 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                     photoUrl: p.links?.avatar?.href || null
                 };
             } catch (error) {
-                console.error("Bitbucket OAuth error:", error);
+                logger.error("Bitbucket OAuth error", { error: error });
                 return null;
             }
         }

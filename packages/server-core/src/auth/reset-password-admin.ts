@@ -18,6 +18,7 @@ import { getPasswordResetTemplate } from "../email/templates";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AuthCollectionConfig } from "@rebasepro/types";
+import { logger } from "../utils/logger";
 
 export interface ResetPasswordRouteConfig {
     authRepo: AuthRepository;
@@ -109,7 +110,7 @@ displayName: existing.displayName }, appName);
                     });
                     invitationSent = true;
                 } catch (emailError: unknown) {
-                    console.error("Failed to send reset email:", emailError instanceof Error ? emailError.message : emailError);
+                    logger.error("Failed to send reset email", { error: emailError instanceof Error ? emailError.message : emailError });
                     // Fall back to returning the temporary password
                     const clearPassword = generateSecurePassword();
                     const passwordHash = await ops.hashPassword(clearPassword);

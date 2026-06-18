@@ -3,23 +3,15 @@ import type {
     CollectionRegistryController,
     SideEntityController,
     UrlController,
-    NavigationStateController
+    NavigationStateController,
+    BreadcrumbEntry,
+    BreadcrumbsController
 } from "@rebasepro/types";
 
-// ─── Breadcrumbs (defined here so studio doesn't need CMS) ──────────
+export type { BreadcrumbEntry, BreadcrumbsController };
 
-export interface BreadcrumbEntry {
-    title: string;
-    url: string;
-    count?: number | null;
-    id?: string;
-}
+// ─── Breadcrumbs ──────────────────────────────────────────────────
 
-export interface BreadcrumbsController {
-    breadcrumbs: BreadcrumbEntry[];
-    set: (props: { breadcrumbs: BreadcrumbEntry[] }) => void;
-    updateCount: (id: string, count: number | null | undefined) => void;
-}
 
 // ─── Bridge interface ───────────────────────────────────────────────
 

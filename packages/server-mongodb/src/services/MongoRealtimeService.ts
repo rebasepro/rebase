@@ -19,6 +19,7 @@ import { WebSocket } from "ws";
 import { MongoEntityService } from "../db/MongoEntityService";
 
 import { MongoDriver } from "./MongoDriver";
+import { logger } from "@rebasepro/server-core";
 
 interface Subscription {
     type: "collection" | "entity";
@@ -106,12 +107,12 @@ export class MongoRealtimeService implements RealtimeProvider {
             });
 
             changeStream.on("error", (error: Error) => {
-                console.error(`Change stream error for subscription ${subscriptionId}:`, error);
+                logger.error(`Change stream error for subscription ${subscriptionId}`, { error: error });
             });
 
         } catch (error) {
             // Change streams might not be available (e.g., standalone MongoDB)
-            console.warn("Change streams not available, falling back to polling:", error);
+            logger.warn("Change streams not available, falling back to polling", { error: error });
 
             // Store subscription without change stream for manual notifications
             const subscription: Subscription = {
@@ -170,7 +171,7 @@ roles: config.authContext.roles } as User;
                 callback(entities);
             }
         } catch (error) {
-            console.error(`Error fetching collection for subscription ${subscriptionId}:`, error);
+            logger.error(`Error fetching collection for subscription ${subscriptionId}`, { error: error });
         }
     }
 
@@ -232,11 +233,11 @@ roles: config.authContext.roles } as User;
             });
 
             changeStream.on("error", (error: Error) => {
-                console.error(`Change stream error for subscription ${subscriptionId}:`, error);
+                logger.error(`Change stream error for subscription ${subscriptionId}`, { error: error });
             });
 
         } catch (error) {
-            console.warn("Change streams not available, falling back to polling:", error);
+            logger.warn("Change streams not available, falling back to polling", { error: error });
 
             const subscription: Subscription = {
                 type: "entity",
@@ -281,7 +282,7 @@ roles: config.authContext.roles } as User;
                 callback(entity || null);
             }
         } catch (error) {
-            console.error(`Error fetching entity for subscription ${subscriptionId}:`, error);
+            logger.error(`Error fetching entity for subscription ${subscriptionId}`, { error: error });
         }
     }
 
@@ -292,7 +293,7 @@ roles: config.authContext.roles } as User;
         const subscription = this.subscriptions.get(subscriptionId);
         if (subscription) {
             if (subscription.changeStream) {
-                subscription.changeStream.close().catch(console.error);
+                subscription.changeStream.close().catch((err) => logger.error("Operation failed", { error: err }));
             }
             this.subscriptions.delete(subscriptionId);
         }
@@ -358,7 +359,7 @@ roles: config.authContext.roles } as User;
         });
 
         ws.on("error", (error) => {
-            console.error("WebSocket error for client", clientId, error);
+            logger.error("WebSocket error for client", { detail: clientId, error });
             this.removeClient(clientId);
         });
     }

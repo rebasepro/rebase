@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Auto-create the entity history table if it doesn't exist.
@@ -7,7 +8,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
  * pattern as `ensureAuthTablesExist`.
  */
 export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void> {
-    console.log("🔍 Checking entity history table...");
+    logger.info("🔍 Checking entity history table...");
 
     try {
         // Create the rebase schema (idempotent — may already exist from auth init)
@@ -37,9 +38,9 @@ export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void
             ON rebase.entity_history(table_name, entity_id, updated_at DESC)
         `);
 
-        console.log("✅ Entity history table ready");
+        logger.info("✅ Entity history table ready");
     } catch (error) {
-        console.error("❌ Failed to create entity history table:", error);
-        console.warn("⚠️ Continuing without creating history table.");
+        logger.error("❌ Failed to create entity history table", { error: error });
+        logger.warn("⚠️ Continuing without creating history table.");
     }
 }

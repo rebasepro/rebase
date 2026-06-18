@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Spotify OAuth Provider integration.
@@ -30,7 +31,7 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Spotify access token:", await tokenResponse.text());
+                    logger.error("Failed to get Spotify access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -41,7 +42,7 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Spotify user info:", await profileResponse.text());
+                    logger.error("Failed to get Spotify user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -50,7 +51,7 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                     email?: string; images?: Array<{ url: string }>;
                 };
 
-                if (!p.email) { console.error("Spotify user has no email"); return null; }
+                if (!p.email) { logger.error("Spotify user has no email"); return null; }
 
                 return {
                     providerId: p.id,
@@ -59,7 +60,7 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                     photoUrl: p.images?.[0]?.url || null
                 };
             } catch (error) {
-                console.error("Spotify OAuth error:", error);
+                logger.error("Spotify OAuth error", { error: error });
                 return null;
             }
         }

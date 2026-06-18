@@ -7,6 +7,7 @@ import { extractUserFromToken } from "@rebasepro/server-core";
 import type { RebaseAuthConfig } from "@rebasepro/server-core";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
+import { logger } from "@rebasepro/server-core";
 
 interface DriverWithAuth extends DataDriver {
     withAuth(user: Record<string, unknown>): Promise<DataDriver>;
@@ -58,7 +59,7 @@ export function createMongoWebSocket(
 
     wss.on("error", (err: NodeJS.ErrnoException) => {
         if (err.code === "EADDRINUSE") return;
-        console.error("❌ [WebSocket Server] Error:", err);
+        logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
     const requireAuth = authConfig?.requireAuth !== false && authConfig?.jwtSecret;
@@ -164,7 +165,7 @@ roles: user.roles } }));
                             };
                             return await driver.withAuth(userForAuth);
                         } catch (e) {
-                            console.error("Failed to create authenticated delegate for WS request", e);
+                            logger.error("Failed to create authenticated delegate for WS request", { error: e });
                             return driver;
                         }
                     }
@@ -282,7 +283,7 @@ roles: session.user.roles ?? [] } : undefined;
                         break;
                     }
                     default:
-                        console.error("❌ [WebSocket Server] Unknown message type:", type);
+                        logger.error("❌ [WebSocket Server] Unknown message type", { detail: type });
                 }
             } catch (error: unknown) {
                 const errorMessage = process.env.NODE_ENV === "production" ? "An unexpected error occurred" : (error instanceof Error ? error.message : "An unexpected error occurred");

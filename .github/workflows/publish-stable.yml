@@ -113,8 +113,8 @@ jobs:
             echo "$NOTES" > /tmp/release-notes.md
             echo "📝 Found release notes for v$VERSION in CHANGELOG.md"
           else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "📝 No release notes found in CHANGELOG.md — will use GitHub auto-generated notes"
+            echo "❌ No release notes found for v$VERSION in CHANGELOG.md. Release notes are required to continue."
+            exit 1
           fi
 
       # ── Version bump ────────────────────────────────────────

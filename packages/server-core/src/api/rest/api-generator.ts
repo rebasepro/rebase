@@ -5,6 +5,7 @@ import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+import { logger } from "../../utils/logger";
 
 
 /**
@@ -254,7 +255,7 @@ values: entity.values as Record<string, unknown> },
 
                     if (this.dataHooks?.afterSave) {
                         Promise.resolve(this.dataHooks.afterSave(path, response, hookCtx)).catch(err => {
-                            console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                            logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
                         });
                     }
 
@@ -276,7 +277,7 @@ values: entity.values as Record<string, unknown> },
 
                 if (this.dataHooks?.afterSave) {
                     Promise.resolve(this.dataHooks.afterSave(path, response as Record<string, unknown>, hookCtx)).catch(err => {
-                        console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                        logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
                     });
                 }
 
@@ -325,7 +326,7 @@ values: entity.values as Record<string, unknown> },
 
                 if (this.dataHooks?.afterSave) {
                     Promise.resolve(this.dataHooks.afterSave(collection.slug, response as Record<string, unknown>, hookCtx)).catch(err => {
-                        console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                        logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
                     });
                 }
 
@@ -366,7 +367,7 @@ values: entity.values as Record<string, unknown> },
 
             if (this.dataHooks?.afterDelete) {
                 Promise.resolve(this.dataHooks.afterDelete(collection.slug, String(id), hookCtx)).catch(err => {
-                    console.error("[BackendHooks] data.afterDelete error:", err instanceof Error ? err.message : err);
+                    logger.error("[BackendHooks] data.afterDelete error", { error: err instanceof Error ? err.message : err });
                 });
             }
 
@@ -527,7 +528,7 @@ entityId };
 
             if (this.dataHooks?.afterSave) {
                 Promise.resolve(this.dataHooks.afterSave(parsed.collectionPath, response as Record<string, unknown>, hookCtx)).catch(err => {
-                    console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                    logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
                 });
             }
 
@@ -564,7 +565,7 @@ entityId };
 
             if (this.dataHooks?.afterSave) {
                 Promise.resolve(this.dataHooks.afterSave(parsed.collectionPath, response as Record<string, unknown>, hookCtx)).catch(err => {
-                    console.error("[BackendHooks] data.afterSave error:", err instanceof Error ? err.message : err);
+                    logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
                 });
             }
 
@@ -599,7 +600,7 @@ entityId };
 
             if (this.dataHooks?.afterDelete) {
                 Promise.resolve(this.dataHooks.afterDelete(parsed.collectionPath, parsed.entityId, hookCtx)).catch(err => {
-                    console.error("[BackendHooks] data.afterDelete error:", err instanceof Error ? err.message : err);
+                    logger.error("[BackendHooks] data.afterDelete error", { error: err instanceof Error ? err.message : err });
                 });
             }
 

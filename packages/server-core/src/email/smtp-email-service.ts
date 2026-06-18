@@ -1,5 +1,6 @@
 import { createTransport, Transporter } from "nodemailer";
 import { EmailService, EmailSendOptions, EmailConfig } from "./types";
+import { logger } from "../utils/logger";
 
 /**
  * Safely parse a hostname from a URL string
@@ -90,7 +91,7 @@ export class SMTPEmailService implements EmailService {
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error("Failed to send email:", message);
+            logger.error("Failed to send email", { detail: message });
             throw new Error(`Failed to send email: ${message}`);
         }
     }
@@ -108,7 +109,7 @@ export class SMTPEmailService implements EmailService {
             return true;
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error("SMTP connection verification failed:", message);
+            logger.error("SMTP connection verification failed", { detail: message });
             return false;
         }
     }

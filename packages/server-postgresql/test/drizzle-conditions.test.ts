@@ -1017,7 +1017,7 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
                 42
             );
             expect(condition).toBeNull();
-            expect(warnSpy).toHaveBeenCalledWith("Unsupported filter operation: unknown-op");
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Unsupported filter operation: unknown-op"));
             warnSpy.mockRestore();
         });
     });

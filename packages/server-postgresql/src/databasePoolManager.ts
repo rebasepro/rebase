@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { logger } from "@rebasepro/server-core";
 
 export class DatabasePoolManager {
     private pools: Map<string, Pool> = new Map();
@@ -47,7 +48,7 @@ export class DatabasePoolManager {
 
         // Prevent idle client errors from crashing the Node.js process
         pool.on("error", (err) => {
-            console.error(`[DatabasePoolManager] Unexpected error on idle client for db ${databaseName}`, err);
+            logger.error(`[DatabasePoolManager] Unexpected error on idle client for db ${databaseName}`, { error: err });
         });
 
         this.pools.set(databaseName, pool);
@@ -76,7 +77,7 @@ export class DatabasePoolManager {
     public async shutdown(): Promise<void> {
         const promises = [];
         for (const [dbName, pool] of this.pools.entries()) {
-            console.log(`[DatabasePoolManager] Shutting down pool for ${dbName}`);
+            logger.info(`[DatabasePoolManager] Shutting down pool for ${dbName}`);
             promises.push(pool.end());
         }
         await Promise.all(promises);

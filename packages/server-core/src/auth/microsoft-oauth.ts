@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Microsoft / Entra ID (Azure AD) OAuth Provider integration.
@@ -41,7 +42,7 @@ export function createMicrosoftProvider(config: {
                 );
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Microsoft access token:", await tokenResponse.text());
+                    logger.error("Failed to get Microsoft access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -54,7 +55,7 @@ export function createMicrosoftProvider(config: {
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Microsoft user info:", await profileResponse.text());
+                    logger.error("Failed to get Microsoft user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -67,7 +68,7 @@ export function createMicrosoftProvider(config: {
 
                 const email = profileData.mail || profileData.userPrincipalName;
                 if (!email) {
-                    console.error("Microsoft user has no email");
+                    logger.error("Microsoft user has no email");
                     return null;
                 }
 
@@ -80,7 +81,7 @@ export function createMicrosoftProvider(config: {
                     photoUrl: null
                 };
             } catch (error) {
-                console.error("Microsoft OAuth error:", error);
+                logger.error("Microsoft OAuth error", { error: error });
                 return null;
             }
         }

@@ -1,40 +1,8 @@
 import { useContext } from "react";
 import { BreadcrumbContext } from "../contexts/BreacrumbsContext";
+import { BreadcrumbEntry, BreadcrumbsController } from "@rebasepro/types";
 
-/**
- * @group Hooks and utilities
- */
-export interface BreadcrumbsController {
-    breadcrumbs: BreadcrumbEntry[];
-    set: (props: {
-        breadcrumbs: BreadcrumbEntry[];
-    }) => void;
-    /**
-     * Update the count for a specific breadcrumb by ID.
-     */
-    updateCount: (id: string, count: number | null | undefined) => void;
-}
-
-
-/**
- * @group Hooks and utilities
- */
-export interface BreadcrumbEntry {
-    title: string;
-    url: string;
-    /**
-     * Optional entity count for collection breadcrumbs.
-     * - undefined: not applicable (e.g., entity breadcrumb, custom view)
-     * - null: loading
-     * - number: loaded count
-     */
-    count?: number | null;
-    /**
-     * Unique identifier for this breadcrumb (e.g., collection path).
-     * Used to update count without replacing entire breadcrumb array.
-     */
-    id?: string;
-}
+export type { BreadcrumbEntry, BreadcrumbsController };
 
 
 /**

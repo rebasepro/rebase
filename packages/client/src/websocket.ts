@@ -43,7 +43,7 @@ errorCode };
 export interface RebaseWebSocketConfig {
     websocketUrl: string;
     /** Optional auth token getter for WebSocket authentication */
-    getAuthToken?: () => Promise<string>;
+    getAuthToken?: () => Promise<string | null>;
     /** Optional WebSocket constructor to override globalThis.WebSocket (e.g. for Node environments) */
     WebSocket?: typeof WebSocket;
     /** Callback to handle unauthorized requests or token expiration (refreshes auth session) */
@@ -67,7 +67,7 @@ export class ApiError extends Error {
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;
-    public getAuthToken?: () => Promise<string>;
+    public getAuthToken?: () => Promise<string | null>;
     private subscriptions = new Map<string, {
         onUpdate: (data: WebSocketMessage) => void,
         onError?: (error: Error) => void
@@ -191,7 +191,7 @@ export class RebaseWebSocketClient {
     /**
      * Set the auth token getter function
      */
-    setAuthTokenGetter(getAuthToken: () => Promise<string>): void {
+    setAuthTokenGetter(getAuthToken: () => Promise<string | null>): void {
         this.getAuthToken = getAuthToken;
         // Auto-authenticate if we are already connected but didn't have the token getter yet
         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
@@ -700,15 +700,13 @@ export class RebaseWebSocketClient {
         throw lastError;
     }
 
-    /**
-     * Force re-authentication (call after token refresh)
-     */
     async reauthenticate(): Promise<void> {
         if (!this.getAuthToken) return;
 
         this.isAuthenticated = false;
         try {
             const token = await this.getAuthToken();
+            if (!token) throw new Error("user not logged in");
             await this.authenticate(token);
             console.debug("WebSocket reauthenticated successfully");
         } catch (error) {

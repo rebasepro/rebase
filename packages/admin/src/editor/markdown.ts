@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/triple-slash-reference */
+/// <reference path="./markdown-it-plugins.d.ts" />
 import {
     MarkdownParser,
     MarkdownSerializer,
@@ -5,11 +7,8 @@ import {
     defaultMarkdownSerializer
 } from "prosemirror-markdown";
 import markdownIt from "markdown-it";
-// @ts-expect-error -- markdown-it-task-lists does not ship type declarations
 import markdownItTaskLists from "markdown-it-task-lists";
-// @ts-expect-error -- markdown-it-mark does not ship type declarations
 import markdownItMark from "markdown-it-mark";
-// @ts-expect-error -- markdown-it-ins does not ship type declarations
 import markdownItIns from "markdown-it-ins";
 
 import { schema } from "./schema";

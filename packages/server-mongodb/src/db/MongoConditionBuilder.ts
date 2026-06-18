@@ -6,6 +6,7 @@
 
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Filter, Document } from "mongodb";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Mapping from Rebase filter operators to MongoDB query operators
@@ -54,7 +55,7 @@ export class MongoConditionBuilder {
             const mongoOp = REBASE_TO_MONGO_OP[op];
 
             if (!mongoOp) {
-                console.warn(`Unsupported filter operator: ${op}`);
+                logger.warn(`Unsupported filter operator: ${op}`);
                 continue;
             }
 

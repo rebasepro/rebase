@@ -1,4 +1,6 @@
 import { RebaseApiError, Transport } from "./transport";
+import { AuthChangeEvent } from "@rebasepro/types";
+
 
 export interface RebaseUser {
     uid: string;
@@ -24,7 +26,8 @@ export interface RebaseSession {
     user: RebaseUser;
 }
 
-export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED";
+export type { AuthChangeEvent };
+
 
 export interface AuthConfig {
     needsSetup: boolean;

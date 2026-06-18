@@ -147,9 +147,8 @@ if [ -n "$RELEASE_NOTES" ]; then
   echo "$RELEASE_NOTES"
   echo "────────────────────────────────"
 else
-  warn "No release notes found for v$NEW_VERSION in CHANGELOG.md"
-  info "The GitHub Release will use auto-generated notes from PRs"
-  USE_AUTO_NOTES=true
+  err "No release notes found for v$NEW_VERSION in CHANGELOG.md. Release notes are required to continue."
+  exit 1
 fi
 
 if $DRY_RUN; then

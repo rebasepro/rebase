@@ -21,6 +21,7 @@ import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { scopeDataDriver } from "./rls-scope";
 import { validateApiKey } from "./api-keys/api-key-middleware";
+import { logger } from "../utils/logger";
 
 export interface AdapterAuthMiddlewareOptions {
     /** The auth adapter to delegate verification to. */
@@ -78,7 +79,7 @@ code: "UNAUTHORIZED" } }, 401);
                     roles: authenticatedUser.roles
                 }));
             } catch (error) {
-                console.error("[AUTH-ADAPTER] RLS scoping failed for authenticated user:", error);
+                logger.error("[AUTH-ADAPTER] RLS scoping failed for authenticated user", { error: error });
                 return c.json({ error: { message: "Internal authentication error",
 code: "INTERNAL_ERROR" } }, 500);
             }
@@ -88,7 +89,7 @@ code: "INTERNAL_ERROR" } }, 500);
                 c.set("driver", await scopeDataDriver(driver, { uid: "anon",
 roles: ["anon"] }));
             } catch (error) {
-                console.error("[AUTH-ADAPTER] Failed to create anon-scoped driver:", error);
+                logger.error("[AUTH-ADAPTER] Failed to create anon-scoped driver", { error: error });
                 return c.json({ error: { message: "Server configuration error",
 code: "INTERNAL_ERROR" } }, 500);
             }

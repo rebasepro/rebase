@@ -1,5 +1,93 @@
 # Changelog
 
+## [0.6.0] - 2026-06-18
+
+### Features & Improvements
+
+- **Schema Drift & Previews** — Added a schema drift notification banner to Starlight and Studio home page, and improved previews for collection reference/relation properties.
+- **Rebase Client & Types** — Consolidated RebaseClient context hooks, aligned types in `@rebasepro/client` and reconciled data controllers for cleaner imports.
+- **Observability** — Integrated structured request-logger middleware and an `X-Request-ID` correlation header to trace client requests across core backend services.
+- **Code Quality & Testing** — Added robust unit/integration tests across `@rebasepro/ui` components, StudioHomePage, and data plugins. Cleaned up Vite configuration targets, and strengthened type-safety checks.
+
+### Fixes
+
+- **Auth Refactoring** — Resolved auth issues and cleaned up redundant user management hooks, admin routes, and legacy decorators.
+- **Studio & UI Components** — Corrected icon sizing bugs in navigation cards, restored and stabilized SQLEditor panel logic, improved tab scroll styles, and updated third-party dependencies across all packages.
+
+---
+
+## [0.5.0] - 2026-06-15
+
+### Features & Improvements
+
+- **Aesthetic Landing Page** — Added high-performance custom NEAT canvas background gradients, revamped hero illustrations, and introduced localized documentation and responsive demo page structures.
+- **Developer Workspaces** — Added curated development skills rules (covering cron jobs, design-language, email, history, and SDK specs) directly into the agent workspace configs.
+- **Data Insights & Migrations** — Integrated database migration `0002` schema changes and a seed script, and introduced an automated insights calculator service.
+- **CLI Improvements** — Hardened CLI initialization options for PostgreSQL 18.
+
+### Fixes
+
+- **RLS & Security** — Resolved critical security gaps in Postgres Row-Level Security (RLS) policies.
+- **Multi-DB Drivers** — Cleaned up type-safety and package path dependencies for `server-mongodb` and `server-postgresql`.
+
+---
+
+## [0.4.0] - 2026-06-11
+
+### Features & Improvements
+
+- **Unified Authentication** — Redesigned default auth routing, eliminated the `defaultUsersCollection` construct, and streamlined default view redirects.
+- **Email Config** — Added custom `SMTP_NAME` parameter configuration in SMTP email delivery properties.
+
+### Fixes
+
+- **Layout & Sizing** — Resolved side navigation alignment glitches, added scroll-overflow fixes in entity data grids, and corrected `ReadOnlyFieldBinding` form fields.
+- **Missing Build Configurations** — Added missing `tsconfig.prod.json` compiler files and stabilized workspace-level packaging dependencies.
+
+---
+
+## [0.2.5] - 2026-06-09
+
+### Features & Improvements
+
+- **Role Model Simplification** — Removed roles as an independent table/collection, simplifying permissions into a standard DB enum column directly in the `users` table.
+- **SDK & Client Methods** — Extended Rebase client drivers with new data persistence methods.
+
+### Fixes
+
+- **Types & Layouts** — Extended schema types to support native UUID format in string fields, adjusted scroll behaviors in tab grids, and solved pnpm lockfile conflicts.
+
+---
+
+## [0.2.4] - 2026-06-08
+
+### Features & Improvements
+
+- **PostgreSQL 18** — Upgraded core infrastructure and Docker configurations to support PostgreSQL v18.
+- **Scaffold Configurations** — Added VPC and S3-compatible cloud storage setup inputs directly into the CLI project-creation prompts.
+- **Auth Hooks & Orgs** — Added basic multi-tenant organization support and renamed `AuthOverrides` to `AuthHooks`.
+- **Advanced Query Operators** — Introduced `array-contains-any` and `not-in` filter clauses for postgres client drivers.
+- **Error Boundaries** — Wrapped main application routes in a robust `ErrorBoundary` with specific full-page and authorization error layouts, and attached global listeners for unhandled promise rejections.
+
+### Fixes
+
+- **Stricter Typing & Logging** — Replaced broad `any` usages with type-safe `unknown` keywords, and migrated core controllers from `console.log` to the structured monorepo logger.
+
+---
+
+## [0.2.3] - 2026-05-31
+
+### Features & Improvements
+
+- **OIDC Publish Workflows** — Migrated package publishing workflows to use GitHub Actions OIDC federation with NPM, removing hardcoded auth tokens and adding secure ID-token scopes.
+- **Dynamic Versions** — Dynamically resolved workspace versions from `lerna.json` during canary package releases.
+
+### Fixes
+
+- **CLI Scaffold** — Fixed CLI template installation bugs, repaired Docker database image configs, and restored correct properties inside template collection schemas.
+
+---
+
 ## [0.2.1] - 2026-05-30
 
 ### Fixes

@@ -2,6 +2,7 @@ import { EntityCollection } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
+import { logger } from "../utils/logger";
 
 /**
  * Asynchronously load collection files from a directory for backend initialization
@@ -10,7 +11,7 @@ export async function loadCollectionsFromDirectory(directory: string): Promise<E
     const collections: EntityCollection[] = [];
     try {
         if (!fs.existsSync(directory)) {
-            console.warn(`[loadCollectionsFromDirectory] Collections directory not found: ${directory}`);
+            logger.warn(`[loadCollectionsFromDirectory] Collections directory not found: ${directory}`);
             return collections;
         }
 
@@ -34,16 +35,16 @@ export async function loadCollectionsFromDirectory(directory: string): Promise<E
                     if (module && module.default) {
                         collections.push(module.default);
                     } else {
-                        console.warn(`[loadCollectionsFromDirectory] File ${file} does not have a default export. Skipping.`);
+                        logger.warn(`[loadCollectionsFromDirectory] File ${file} does not have a default export. Skipping.`);
                     }
                 } catch (err: unknown) {
                     const message = err instanceof Error ? err.message : String(err);
-                    console.error(`[loadCollectionsFromDirectory] Failed to load collection from ${file}: ${message}`);
+                    logger.error(`[loadCollectionsFromDirectory] Failed to load collection from ${file}: ${message}`);
                 }
             }
         }
     } catch (err) {
-        console.error(`[loadCollectionsFromDirectory] Error reading collections directory: ${err}`);
+        logger.error(`[loadCollectionsFromDirectory] Error reading collections directory: ${err}`);
     }
     return collections;
 }

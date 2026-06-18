@@ -1,15 +1,8 @@
 import type { Transport } from "./transport";
+import { AdminUser } from "@rebasepro/types";
 
-export interface AdminUser {
-    uid: string;
-    email: string;
-    displayName: string | null;
-    photoURL: string | null;
-    provider: string;
-    roles: string[];
-    createdAt: string;
-    updatedAt: string;
-}
+export type { AdminUser };
+
 
 export interface CreateAdminOptions {
     adminPath?: string;

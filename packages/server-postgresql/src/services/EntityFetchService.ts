@@ -16,6 +16,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { logger } from "@rebasepro/server-core";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
 type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefined;
@@ -269,7 +270,7 @@ export class EntityFetchService {
                         );
                     }
                 } catch (e) {
-                    console.warn(`Could not resolve joinPath relation '${key}':`, e);
+                    logger.warn(`Could not resolve joinPath relation '${key}'`, { error: e });
                 }
             });
 
@@ -322,7 +323,7 @@ export class EntityFetchService {
                     }
                 }
             } catch (e) {
-                console.warn(`Could not batch resolve joinPath relation '${key}':`, e);
+                logger.warn(`Could not batch resolve joinPath relation '${key}'`, { error: e });
             }
         }
     }
@@ -400,7 +401,7 @@ export class EntityFetchService {
                     }
                 }
             } catch (e) {
-                console.warn(`Could not batch resolve joinPath relation '${key}' for REST:`, e);
+                logger.warn(`Could not batch resolve joinPath relation '${key}' for REST`, { error: e });
             }
         }
     }
@@ -625,10 +626,10 @@ export class EntityFetchService {
                 return entity;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
+                    logger.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
-                console.warn(`[EntityFetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select:`, e);
+                logger.warn(`[EntityFetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select`, { error: e });
             }
         }
 
@@ -675,7 +676,7 @@ export class EntityFetchService {
                                 (values as Record<string, unknown>)[key] = createRelationRef(e.id, e.path);
                             }
                         } catch (e) {
-                            console.warn(`Could not resolve one-to-one relation property: ${key}`, e);
+                            logger.warn(`Could not resolve one-to-one relation property: ${key}`, { error: e });
                         }
                     }
                 }
@@ -749,10 +750,10 @@ export class EntityFetchService {
                 return entities;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
+                    logger.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
-                console.warn(`[EntityFetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select:`, e);
+                logger.warn(`[EntityFetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select`, { error: e });
             }
         }
 
@@ -909,7 +910,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                         }
                     });
                 } catch (e) {
-                    console.warn(`Could not batch load one-to-one relation property: ${key}`, e);
+                    logger.warn(`Could not batch load one-to-one relation property: ${key}`, { error: e });
                 }
             }
 
@@ -936,7 +937,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                         );
                     });
                 } catch (e) {
-                    console.warn(`Could not batch load many relation property: ${key}`, e);
+                    logger.warn(`Could not batch load many relation property: ${key}`, { error: e });
                 }
             }
         }
@@ -1251,10 +1252,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 return restRows;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
+                    logger.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
-                console.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back:`, e);
+                logger.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back`, { error: e });
             }
         }
 
@@ -1291,7 +1292,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     }
                 }
             } catch (e) {
-                console.warn(`[include] Failed to batch load one-to-one '${key}':`, e);
+                logger.warn(`[include] Failed to batch load one-to-one '${key}'`, { error: e });
             }
         }
 
@@ -1310,7 +1311,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     }));
                 }
             } catch (e) {
-                console.warn(`[include] Failed to batch load many '${key}':`, e);
+                logger.warn(`[include] Failed to batch load many '${key}'`, { error: e });
             }
         }
 
@@ -1365,10 +1366,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 return restRow;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
+                    logger.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
-                console.warn(`[fetchEntityForRest] db.query.findFirst failed for ${collectionPath}, falling back:`, e);
+                logger.warn(`[fetchEntityForRest] db.query.findFirst failed for ${collectionPath}, falling back`, { error: e });
             }
         }
 
@@ -1416,7 +1417,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     }));
                 }
             } catch (e) {
-                console.warn(`[include] Failed to load relation '${key}':`, e);
+                logger.warn(`[include] Failed to load relation '${key}'`, { error: e });
             }
         }
 
@@ -1623,7 +1624,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 return flat;
             });
         } catch (e) {
-            console.warn(`[include] Drizzle relational query failed for '${collectionPath}', falling back:`, e);
+            logger.warn(`[include] Drizzle relational query failed for '${collectionPath}', falling back`, { error: e });
             return null;
         }
     }
@@ -1649,7 +1650,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         const relation = resolvedRelations[relationKey];
 
         if (!relation) {
-            console.warn(`[batchFetchManyRelatedEntities] Relation '${relationKey}' not found, skipping`);
+            logger.warn(`[batchFetchManyRelatedEntities] Relation '${relationKey}' not found, skipping`);
             return new Map();
         }
 

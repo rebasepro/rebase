@@ -12,6 +12,7 @@
  */
 
 import { DataDriver } from "@rebasepro/types";
+import { logger } from "../utils/logger";
 
 /**
  * The default driver identifier used when:
@@ -95,7 +96,7 @@ export class DefaultDriverRegistry implements DriverRegistry {
             if (!registry.has(DEFAULT_DRIVER_ID) && registry.size() > 0) {
                 // If no explicit "(default)", use the first one as default
                 const firstId = Object.keys(input)[0];
-                console.warn(
+                logger.warn(
                     `[DriverRegistry] No "${DEFAULT_DRIVER_ID}" driver provided. ` +
                     `Using "${firstId}" as the default.`
                 );
@@ -108,7 +109,7 @@ export class DefaultDriverRegistry implements DriverRegistry {
 
     register(id: string, delegate: DataDriver): void {
         if (this.delegates.has(id)) {
-            console.warn(`[DriverRegistry] Overwriting driver with id "${id}"`);
+            logger.warn(`[DriverRegistry] Overwriting driver with id "${id}"`);
         }
         this.delegates.set(id, delegate);
     }
@@ -144,7 +145,7 @@ export class DefaultDriverRegistry implements DriverRegistry {
         }
 
         // Fallback to default with warning
-        console.warn(
+        logger.warn(
             `[DriverRegistry] Driver "${id}" not found, falling back to "${DEFAULT_DRIVER_ID}"`
         );
         return this.getDefault();

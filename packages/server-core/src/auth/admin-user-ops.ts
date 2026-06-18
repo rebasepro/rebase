@@ -16,6 +16,7 @@ import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { AuthCollectionConfig, AuthCollectionContext } from "@rebasepro/types";
 import { getPasswordResetTemplate } from "../email/templates";
+import { logger } from "../utils/logger";
 
 // ─── Shared Crypto Utilities ────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ displayName: entity.values.displayName as string }, appName);
             });
             return { invitationSent: true };
         } catch (emailError: unknown) {
-            console.error("Failed to send reset email:", emailError instanceof Error ? emailError.message : emailError);
+            logger.error("Failed to send reset email", { error: emailError instanceof Error ? emailError.message : emailError });
             // Fall back to returning the temporary password
             return { temporaryPassword: clearPassword,
 invitationSent: false };

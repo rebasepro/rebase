@@ -13,6 +13,7 @@ import {
 } from "./entity-helpers";
 import { parseDataFromServer } from "../data-transformer";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Service for handling all relation-related operations.
@@ -549,7 +550,7 @@ export class RelationService {
         if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
             const junctionTable = this.registry.getTable(relation.through.table);
             if (!junctionTable) {
-                console.warn(`[batchFetchRelatedEntitiesMany] Junction table '${relation.through.table}' not found`);
+                logger.warn(`[batchFetchRelatedEntitiesMany] Junction table '${relation.through.table}' not found`);
                 return new Map();
             }
 
@@ -557,7 +558,7 @@ export class RelationService {
             const targetJunctionCol = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionCol || !targetJunctionCol) {
-                console.warn(`[batchFetchRelatedEntitiesMany] Junction columns not found in '${relation.through.table}'`);
+                logger.warn(`[batchFetchRelatedEntitiesMany] Junction columns not found in '${relation.through.table}'`);
                 return new Map();
             }
 
@@ -710,7 +711,7 @@ export class RelationService {
                 }
 
                 if (!junctionTable || !sourceJunctionColumn || !targetJunctionColumn) {
-                    console.warn(`Could not determine junction table for relation '${key}' in collection '${collection.slug}'`);
+                    logger.warn(`Could not determine junction table for relation '${key}' in collection '${collection.slug}'`);
                     continue;
                 }
 
@@ -740,7 +741,7 @@ export class RelationService {
                 // Handle many-to-many relations with junction table using 'through' property
                 const junctionTable = this.registry.getTable(relation.through.table);
                 if (!junctionTable) {
-                    console.warn(`Junction table '${relation.through.table}' not found for relation '${key}' in collection '${collection.slug}'`);
+                    logger.warn(`Junction table '${relation.through.table}' not found for relation '${key}' in collection '${collection.slug}'`);
                     continue;
                 }
 
@@ -748,7 +749,7 @@ export class RelationService {
                 const targetJunctionColumn = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
                 if (!sourceJunctionColumn || !targetJunctionColumn) {
-                    console.warn(`Junction columns not found for relation '${key}'`);
+                    logger.warn(`Junction columns not found for relation '${key}'`);
                     continue;
                 }
 
@@ -777,7 +778,7 @@ export class RelationService {
             } else if (relation.through && relation.cardinality === "many" && relation.direction === "inverse") {
                 // Inverse M2M relations should be saved from the owning side.
                 // The owning collection manages the junction table rows.
-                console.warn(`[updateRelationsUsingJoins] Inverse M2M relation '${key}' in collection '${collection.slug}' should be saved from the owning side. Skipping.`);
+                logger.warn(`[updateRelationsUsingJoins] Inverse M2M relation '${key}' in collection '${collection.slug}' should be saved from the owning side. Skipping.`);
             } else if (relation.cardinality === "many" && relation.direction === "inverse" && relation.foreignKeyOnTarget) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
                 const targetTable = getTableForCollection(targetCollection, this.registry);
@@ -787,7 +788,7 @@ export class RelationService {
                 const fkCol = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
 
                 if (!fkCol || !targetIdCol) {
-                    console.warn(`Invalid inverse-many config for relation '${key}' in collection '${collection.slug}'`);
+                    logger.warn(`Invalid inverse-many config for relation '${key}' in collection '${collection.slug}'`);
                     continue;
                 }
 
@@ -817,7 +818,7 @@ export class RelationService {
                         .where(eq(fkCol, parsedParentId));
                 }
             } else {
-                console.warn(`Many relation '${key}' in collection '${collection.slug}' lacks write configuration and will be skipped during save.`);
+                logger.warn(`Many relation '${key}' in collection '${collection.slug}' lacks write configuration and will be skipped during save.`);
             }
         }
     }
@@ -895,13 +896,13 @@ export class RelationService {
 
                 // Handle simple inverse relations
                 if (!relation.foreignKeyOnTarget) {
-                    console.warn(`Inverse relation '${relation.relationName}' is missing foreignKeyOnTarget property. Skipping.`);
+                    logger.warn(`Inverse relation '${relation.relationName}' is missing foreignKeyOnTarget property. Skipping.`);
                     continue;
                 }
 
                 const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget! as keyof typeof targetTable] as AnyPgColumn;
                 if (!foreignKeyColumn) {
-                    console.warn(`Foreign key column '${relation.foreignKeyOnTarget}' not found in target table for relation '${relation.relationName}'`);
+                    logger.warn(`Foreign key column '${relation.foreignKeyOnTarget}' not found in target table for relation '${relation.relationName}'`);
                     continue;
                 }
 
@@ -931,7 +932,7 @@ export class RelationService {
                         .where(eq(targetIdField, parsedNewTargetId));
                 }
             } catch (e) {
-                console.warn(`Failed to update inverse relation '${relation.relationName}':`, e);
+                logger.warn(`Failed to update inverse relation '${relation.relationName}'`, { error: e });
             }
         }
     }
@@ -949,7 +950,7 @@ export class RelationService {
     ) {
         try {
             if (!relation.joinPath || relation.joinPath.length === 0) {
-                console.warn(`Inverse relation '${relation.relationName}' missing joinPath`);
+                logger.warn(`Inverse relation '${relation.relationName}' missing joinPath`);
                 return;
             }
 
@@ -967,7 +968,7 @@ export class RelationService {
                 const junctionTable = this.registry.getTable(junctionTableName);
 
                 if (!junctionTable) {
-                    console.warn(`Junction table '${junctionTableName}' not found for inverse joinPath relation '${relation.relationName}'`);
+                    logger.warn(`Junction table '${junctionTableName}' not found for inverse joinPath relation '${relation.relationName}'`);
                     return;
                 }
 
@@ -996,7 +997,7 @@ export class RelationService {
                 }
 
                 if (!sourceJunctionColumn || !targetJunctionColumn) {
-                    console.warn(`Could not determine junction columns for inverse joinPath relation '${relation.relationName}'`);
+                    logger.warn(`Could not determine junction columns for inverse joinPath relation '${relation.relationName}'`);
                     return;
                 }
 
@@ -1041,7 +1042,7 @@ export class RelationService {
                 }
             }
         } catch (error) {
-            console.error(`Failed to update inverse joinPath relation '${relation.relationName}':`, error);
+            logger.error(`Failed to update inverse joinPath relation '${relation.relationName}'`, { error: error });
             throw error;
         }
     }
@@ -1061,7 +1062,7 @@ export class RelationService {
         try {
             const junctionTable = this.registry.getTable(junctionInfo.table);
             if (!junctionTable) {
-                console.warn(`Junction table '${junctionInfo.table}' not found for many-to-many inverse relation '${relation.relationName}'`);
+                logger.warn(`Junction table '${junctionInfo.table}' not found for many-to-many inverse relation '${relation.relationName}'`);
                 return;
             }
 
@@ -1069,7 +1070,7 @@ export class RelationService {
             const targetJunctionColumn = junctionTable[junctionInfo.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionColumn || !targetJunctionColumn) {
-                console.warn(`Junction columns not found for relation '${relation.relationName}'`);
+                logger.warn(`Junction columns not found for relation '${relation.relationName}'`);
                 return;
             }
 
@@ -1098,7 +1099,7 @@ export class RelationService {
                 }
             }
         } catch (error) {
-            console.error(`Failed to update many-to-many inverse relation '${relation.relationName}':`, error);
+            logger.error(`Failed to update many-to-many inverse relation '${relation.relationName}'`, { error: error });
             throw error;
         }
     }
@@ -1137,11 +1138,11 @@ export class RelationService {
             const targetFKCol = targetTable[targetFKColName as keyof typeof targetTable] as AnyPgColumn;
 
             if (!parentSourceCol) {
-                console.warn(`Parent source column '${parentSourceColName}' not found for joinPath relation '${relation.relationName}'`);
+                logger.warn(`Parent source column '${parentSourceColName}' not found for joinPath relation '${relation.relationName}'`);
                 continue;
             }
             if (!targetFKCol) {
-                console.warn(`Target FK column '${targetFKColName}' not found for joinPath relation '${relation.relationName}'`);
+                logger.warn(`Target FK column '${targetFKColName}' not found for joinPath relation '${relation.relationName}'`);
                 continue;
             }
 
@@ -1174,7 +1175,7 @@ export class RelationService {
                     .set({ [targetFKColName]: null })
                     .where(eq(targetFKCol, String(parentFKValue)));
             } else {
-                console.warn(`Cannot set joinPath relation '${relation.relationName}' because parent FK value is null/undefined`);
+                logger.warn(`Cannot set joinPath relation '${relation.relationName}' because parent FK value is null/undefined`);
                 continue;
             }
 
@@ -1239,7 +1240,7 @@ parentSourceColName };
         try {
             const junctionTable = this.registry.getTable(relation.through!.table);
             if (!junctionTable) {
-                console.warn(`Junction table '${relation.through!.table}' not found for relation '${relationKey}'`);
+                logger.warn(`Junction table '${relation.through!.table}' not found for relation '${relationKey}'`);
                 return;
             }
 
@@ -1247,7 +1248,7 @@ parentSourceColName };
             const targetJunctionColumn = junctionTable[relation.through!.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionColumn || !targetJunctionColumn) {
-                console.warn(`Junction columns not found for relation '${relationKey}'`);
+                logger.warn(`Junction columns not found for relation '${relationKey}'`);
                 return;
             }
 
@@ -1265,9 +1266,9 @@ parentSourceColName };
 
             await tx.insert(junctionTable).values(junctionData);
 
-            console.log(`Created junction table entry for many-to-many relation '${relationKey}': ${JSON.stringify(junctionData)}`);
+            logger.info(`Created junction table entry for many-to-many relation '${relationKey}': ${JSON.stringify(junctionData)}`);
         } catch (error) {
-            console.error(`Failed to create junction table entry for relation '${relationKey}':`, error);
+            logger.error(`Failed to create junction table entry for relation '${relationKey}'`, { error: error });
             throw error;
         }
     }

@@ -6,6 +6,7 @@ import { getTableName, resolveCollectionRelations, findRelation, createRelationR
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/entity-helpers";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Data transformation utilities for converting between frontend and database formats.
@@ -321,7 +322,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             const targetCollection = relation.target();
                             result[propKey] = createRelationRef(fkValue.toString(), targetCollection.slug);
                         } catch (e) {
-                            console.warn(`Could not resolve target collection for relation property: ${propKey}`, e);
+                            logger.warn(`Could not resolve target collection for relation property: ${propKey}`, { error: e });
                         }
                     }
                 } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget && db && registry) {
@@ -359,7 +360,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             }
                         }
                     } catch (e) {
-                        console.warn(`Could not resolve inverse relation property: ${propKey}`, e);
+                        logger.warn(`Could not resolve inverse relation property: ${propKey}`, { error: e });
                     }
                 } else if (relation.direction === "inverse" && relation.joinPath && db && registry) {
                     // Join path relation: Multi-hop relation using joins
@@ -372,7 +373,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             // Build the join query following the join path
                             const sourceTable = registry.getTable(getTableName(collection));
                             if (!sourceTable) {
-                                console.warn(`Source table not found for collection: ${collection.slug}`);
+                                logger.warn(`Source table not found for collection: ${collection.slug}`);
                                 continue;
                             }
 
@@ -383,7 +384,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             for (const join of relation.joinPath) {
                                 const joinTable = registry.getTable(join.table);
                                 if (!joinTable) {
-                                    console.warn(`Join table not found: ${join.table}`);
+                                    logger.warn(`Join table not found: ${join.table}`);
                                     break;
                                 }
 
@@ -401,7 +402,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                 const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
 
                                 if (!fromCol || !toCol) {
-                                    console.warn(`Join columns not found: ${fromColumn} -> ${toColumn}`);
+                                    logger.warn(`Join columns not found: ${fromColumn} -> ${toColumn}`);
                                     break;
                                 }
 
@@ -415,7 +416,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                 query = query.where(eq(sourceIdField, currentEntityId)) as typeof query;
                             } else {
                                 // For composite keys, we would need to map the split parts. For now log a warning.
-                                console.warn(`Join path resolution for composite primary keys is not yet fully supported: ${collection.slug}`);
+                                logger.warn(`Join path resolution for composite primary keys is not yet fully supported: ${collection.slug}`);
                             }
 
                             // Build additional conditions array
@@ -454,7 +455,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             }
                         }
                     } catch (e) {
-                        console.warn(`Could not resolve join path relation property: ${propKey}`, e);
+                        logger.warn(`Could not resolve join path relation property: ${propKey}`, { error: e });
                     }
                 }
             }
@@ -550,7 +551,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                 }
 
                 if (!relationDef) {
-                    console.warn(`Relation not defined in property for key: ${propertyKey || "unknown"}`);
+                    logger.warn(`Relation not defined in property for key: ${propertyKey || "unknown"}`);
                     return value;
                 }
 
@@ -558,7 +559,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                     const targetCollection = relationDef.target();
                     return createRelationRef(value.toString(), targetCollection.slug);
                 } catch (e) {
-                    console.warn(`Could not resolve target collection for relation property: ${propertyKey || "unknown"}`, e);
+                    logger.warn(`Could not resolve target collection for relation property: ${propertyKey || "unknown"}`, { error: e });
                     return value;
                 }
             }

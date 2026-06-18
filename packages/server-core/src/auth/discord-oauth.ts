@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Discord OAuth2 Provider integration.
@@ -30,7 +31,7 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Discord access token:", await tokenResponse.text());
+                    logger.error("Failed to get Discord access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -43,7 +44,7 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Discord user info:", await profileResponse.text());
+                    logger.error("Failed to get Discord user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -57,7 +58,7 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                 };
 
                 if (!profileData.email) {
-                    console.error("Discord user has no email (email scope may not have been granted)");
+                    logger.error("Discord user has no email (email scope may not have been granted)");
                     return null;
                 }
 
@@ -75,7 +76,7 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                     photoUrl
                 };
             } catch (error) {
-                console.error("Discord OAuth error:", error);
+                logger.error("Discord OAuth error", { error: error });
                 return null;
             }
         }

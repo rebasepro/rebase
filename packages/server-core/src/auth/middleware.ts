@@ -6,6 +6,7 @@ import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
 import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
+import { logger } from "../utils/logger";
 
 /**
  * Result from a custom auth validator.
@@ -295,7 +296,7 @@ code: "UNAUTHORIZED" } }, 401);
                             roles: ["admin"]
                         }));
                     } catch (error) {
-                        console.error("[AUTH] RLS scoping failed for service key:", error);
+                        logger.error("[AUTH] RLS scoping failed for service key", { error: error });
                         return c.json({ error: { message: "Internal authentication error",
 code: "INTERNAL_ERROR" } }, 500);
                     }
@@ -322,7 +323,7 @@ roles: payload.roles };
                             c.set("driver", await scopeDataDriver(driver, user));
                         } catch (error) {
                             // withAuth() failed for a valid token — reject (fail closed)
-                            console.error("[AUTH] RLS scoping failed for authenticated user:", error);
+                            logger.error("[AUTH] RLS scoping failed for authenticated user", { error: error });
                             return c.json({ error: { message: "Internal authentication error",
 code: "INTERNAL_ERROR" } }, 500);
                         }
@@ -342,7 +343,7 @@ code: "UNAUTHORIZED" } }, 401);
                     c.set("driver", await scopeDataDriver(driver, { uid: "anon",
 roles: ["anon"] }));
                 } catch (error) {
-                    console.error("[AUTH] Failed to create anon-scoped driver:", error);
+                    logger.error("[AUTH] Failed to create anon-scoped driver", { error: error });
                     return c.json({ error: { message: "Server configuration error",
 code: "INTERNAL_ERROR" } }, 500);
                 }

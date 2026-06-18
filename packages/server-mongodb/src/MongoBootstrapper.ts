@@ -12,6 +12,7 @@ import { MongoDriver } from "./services/MongoDriver";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "./factory";
 import { MongoAuthRepository, MongoUserService, MongoRoleService } from "./auth/services";
+import { logger } from "@rebasepro/server-core";
 
 export interface MongoDriverConfig {
     connection: Db;
@@ -63,7 +64,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             try {
                 await db.command({ ping: 1 });
             } catch (err) {
-                console.error("❌ Failed to connect to MongoDB:", err);
+                logger.error("❌ Failed to connect to MongoDB", { error: err });
             }
 
             const realtimeService = new MongoRealtimeService(db);

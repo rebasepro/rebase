@@ -13,6 +13,7 @@ import { createAuthMiddleware, requireAuth, requireAdmin } from "../auth/middlew
 import { errorHandler } from "./errors";
 import { generateOpenApiSpec } from "./openapi-generator";
 import { requestId } from "../utils/request-id";
+import { logger } from "../utils/logger";
 
 /**
  * Simplified API server that leverages existing Rebase infrastructure
@@ -91,7 +92,7 @@ export class RebaseApiServer {
                 credentials: this.config.cors.credentials ?? false
             }));
         } else if (process.env.NODE_ENV !== "production") {
-            console.warn(
+            logger.warn(
                 "⚠️  [RebaseApiServer] No CORS configuration provided. " +
                 "The API will accept requests from any origin. " +
                 "Pass a `cors` option or configure CORS on your Hono app."
@@ -189,7 +190,7 @@ export class RebaseApiServer {
         // Schema Editor endpoints
         if (this.config.collectionsDir) {
             if (process.env.NODE_ENV === "production") {
-                console.warn("[RebaseApiServer] Schema Editor is disabled in production environments for security.");
+                logger.warn("[RebaseApiServer] Schema Editor is disabled in production environments for security.");
             } else {
                 // Auth middlewares applied to schema-editor via the router prefix
                 // MUST be declared before .route() so they execute first

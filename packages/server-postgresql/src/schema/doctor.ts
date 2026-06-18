@@ -17,6 +17,7 @@ import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/sdk-generator";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Resolve the SQL column name for a property.
@@ -149,7 +150,7 @@ export async function loadCollections(collectionsPath: string): Promise<EntityCo
                     }
                 } catch (err: unknown) {
                     const message = err instanceof Error ? err.message : String(err);
-                    console.error(chalk.yellow(`  ⚠ Could not load ${file}: ${message}`));
+                    logger.error(chalk.yellow(`  ⚠ Could not load ${file}: ${message}`));
                 }
             }
         }
@@ -617,10 +618,10 @@ issues };
 // ── Report Rendering ─────────────────────────────────────────────────────
 
 export function renderReport(report: DoctorReport): void {
-    console.log("");
-    console.log(chalk.bold("  🩺 Rebase Schema Doctor"));
-    console.log(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    console.log("");
+    logger.info("");
+    logger.info(chalk.bold("  🩺 Rebase Schema Doctor"));
+    logger.info(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+    logger.info("");
 
     // Phase 1
     renderPhase(
@@ -644,7 +645,7 @@ export function renderReport(report: DoctorReport): void {
     );
 
     // Summary
-    console.log(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+    logger.info(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
     const { passed, warnings, errors } = report.summary;
 
     const parts: string[] = [];
@@ -652,50 +653,50 @@ export function renderReport(report: DoctorReport): void {
     if (warnings > 0) parts.push(chalk.yellow(`${warnings} warnings`));
     if (errors > 0) parts.push(chalk.red(`${errors} errors`));
 
-    console.log(`  Summary: ${parts.join(", ")}`);
-    console.log("");
+    logger.info(`  Summary: ${parts.join(", ")}`);
+    logger.info("");
 
     if (errors > 0) {
-        console.log(chalk.red.bold("  ✗ Schema drift detected. Run the suggested fixes above."));
+        logger.info(chalk.red.bold("  ✗ Schema drift detected. Run the suggested fixes above."));
     } else if (warnings > 0) {
-        console.log(chalk.yellow.bold("  ⚠ Minor issues detected. Consider running the suggested fixes."));
+        logger.info(chalk.yellow.bold("  ⚠ Minor issues detected. Consider running the suggested fixes."));
     } else {
-        console.log(chalk.green.bold("  ✓ All schemas are in sync!"));
+        logger.info(chalk.green.bold("  ✓ All schemas are in sync!"));
     }
-    console.log("");
+    logger.info("");
 }
 
 function renderPhase(label: string, passed: boolean, issues: DoctorIssue[]): void {
     if (passed) {
-        console.log(`  ${chalk.green("✅")} ${label}: ${chalk.green("In sync")}`);
+        logger.info(`  ${chalk.green("✅")} ${label}: ${chalk.green("In sync")}`);
     } else {
         const errorCount = issues.filter((i) => i.severity === "error").length;
         const warnCount = issues.filter((i) => i.severity === "warning").length;
         const parts: string[] = [];
         if (errorCount > 0) parts.push(`${errorCount} error${errorCount > 1 ? "s" : ""}`);
         if (warnCount > 0) parts.push(`${warnCount} warning${warnCount > 1 ? "s" : ""}`);
-        console.log(`  ${chalk.yellow("⚠️")}  ${label}: ${chalk.yellow(parts.join(", "))}`);
+        logger.info(`  ${chalk.yellow("⚠️")}  ${label}: ${chalk.yellow(parts.join(", "))}`);
     }
-    console.log("");
+    logger.info("");
 
     for (const issue of issues) {
         const severityIcon = issue.severity === "error" ? chalk.red("✗") : chalk.yellow("⚠");
         const categoryLabel = formatCategory(issue.category);
-        console.log(`  ${chalk.gray("┌─")} ${severityIcon} ${chalk.bold(categoryLabel)} ${chalk.gray("─".repeat(Math.max(0, 42 - categoryLabel.length)))}`);
+        logger.info(`  ${chalk.gray("┌─")} ${severityIcon} ${chalk.bold(categoryLabel)} ${chalk.gray("─".repeat(Math.max(0, 42 - categoryLabel.length)))}`);
 
         if (issue.table) {
             const colPart = issue.column ? ` │ Column: ${chalk.cyan(issue.column)}` : "";
-            console.log(`  ${chalk.gray("│")} Table: ${chalk.cyan(issue.table)}${colPart}`);
+            logger.info(`  ${chalk.gray("│")} Table: ${chalk.cyan(issue.table)}${colPart}`);
         }
 
         if (issue.expected && issue.actual) {
-            console.log(`  ${chalk.gray("│")} Expected: ${chalk.green(issue.expected)} │ Actual: ${chalk.red(issue.actual)}`);
+            logger.info(`  ${chalk.gray("│")} Expected: ${chalk.green(issue.expected)} │ Actual: ${chalk.red(issue.actual)}`);
         }
 
-        console.log(`  ${chalk.gray("│")} ${issue.message}`);
-        console.log(`  ${chalk.gray("│")} Fix: ${chalk.blue(issue.fix)}`);
-        console.log(`  ${chalk.gray("└" + "─".repeat(48))}`);
-        console.log("");
+        logger.info(`  ${chalk.gray("│")} ${issue.message}`);
+        logger.info(`  ${chalk.gray("│")} Fix: ${chalk.blue(issue.fix)}`);
+        logger.info(`  ${chalk.gray("└" + "─".repeat(48))}`);
+        logger.info("");
     }
 }
 
@@ -722,33 +723,33 @@ export async function runDoctor(options: {
     sdkPath: string;
     databaseUrl?: string;
 }): Promise<DoctorReport> {
-    console.log("");
-    console.log(chalk.bold("  🩺 Loading collections..."));
+    logger.info("");
+    logger.info(chalk.bold("  🩺 Loading collections..."));
     const collections = await loadCollections(options.collectionsPath);
     if (collections.length === 0) {
-        console.error(chalk.red("  ✗ No collections found."));
+        logger.error(chalk.red("  ✗ No collections found."));
         process.exit(1);
     }
-    console.log(chalk.gray(`  Found ${collections.length} collection(s)`));
-    console.log("");
+    logger.info(chalk.gray(`  Found ${collections.length} collection(s)`));
+    logger.info("");
 
     // Phase 1: Collections ↔ Generated Schema
-    console.log(chalk.gray("  Checking Collections → Generated Schema..."));
+    logger.info(chalk.gray("  Checking Collections → Generated Schema..."));
     const collectionsToSchema = await checkCollectionsVsSchema(collections, options.schemaPath);
 
     // Phase 2: Collections ↔ Database (only if we have a DATABASE_URL)
     let schemaToDatabase: { passed: boolean; issues: DoctorIssue[] } = { passed: true,
 issues: [] };
     if (options.databaseUrl) {
-        console.log(chalk.gray("  Checking Collections → Database..."));
+        logger.info(chalk.gray("  Checking Collections → Database..."));
         schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
     } else {
-        console.log(chalk.yellow("  ⚠ DATABASE_URL not set — skipping database comparison."));
-        console.log(chalk.gray("    Set DATABASE_URL in your .env to enable full drift detection."));
+        logger.info(chalk.yellow("  ⚠ DATABASE_URL not set — skipping database comparison."));
+        logger.info(chalk.gray("    Set DATABASE_URL in your .env to enable full drift detection."));
     }
 
     // Phase 3: Collections ↔ SDK Types
-    console.log(chalk.gray("  Checking Collections → SDK Types..."));
+    logger.info(chalk.gray("  Checking Collections → SDK Types..."));
     const collectionsToSdk = await checkCollectionsVsSdk(collections, options.sdkPath);
 
     const allIssues = [...collectionsToSchema.issues, ...schemaToDatabase.issues, ...collectionsToSdk.issues];

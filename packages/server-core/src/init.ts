@@ -25,19 +25,18 @@ import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { csrf } from "hono/csrf";
 import { HonoEnv } from "./api/types";
 import { configureLogLevel } from "./utils/logging";
 import { logger } from "./utils/logger";
-import { requestLogger } from "./utils/request-logger";
-import { requestId } from "./utils/request-id";
+import { configureMiddlewares } from "./init/middlewares";
+import { initializeStorage } from "./init/storage";
+import { mountOpenApiDocs } from "./init/docs";
+import { createHealthCheck } from "./init/health";
+import { createShutdown } from "./init/shutdown";
 import { configureJwt, requireAdmin, requireAuth } from "./auth";
 import {
     BackendStorageConfig,
-    createStorageController,
     createStorageRoutes,
-    DEFAULT_STORAGE_ID,
-    DefaultStorageRegistry,
     StorageController,
     StorageRegistry
 } from "./storage";
@@ -83,7 +82,7 @@ export interface RebaseAuthConfig {
      * granted admin-level access without JWT verification. This is the
      * Rebase equivalent of a Firebase Service Account key.
      *
-     * Generate with: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+     * Generate with: `node -e "logger.info(require('crypto').randomBytes(48).toString('base64'))"`
      *
      * Set via `REBASE_SERVICE_KEY` in your `.env`.
      * Must be at least 32 characters.
@@ -310,54 +309,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const basePath = config.basePath || "/api";
     const isProduction = process.env.NODE_ENV === "production";
 
-    // ─── Request ID (correlation) ────────────────────────────────────────
-    // Generates or propagates X-Request-ID on every request so all log
-    // entries, error responses, and downstream services share a single
-    // trace identifier.
-    config.app.use(`${basePath}/*`, requestId());
-
-    // ─── Request Body Size Limit ─────────────────────────────────────────
-    const maxBodySize = config.maxBodySize ?? 10 * 1024 * 1024; // 10MB default
-    if (maxBodySize > 0) {
-        config.app.use(`${basePath}/*`, bodyLimit({
-            maxSize: maxBodySize,
-            onError: (c) => {
-                return c.json({
-                    error: {
-                        message: `Request body too large. Maximum size is ${Math.round(maxBodySize / 1024 / 1024)}MB.`,
-                        code: "PAYLOAD_TOO_LARGE"
-                    }
-                }, 413);
-            }
-        }));
-        logger.info("Request body limit configured", { maxSizeMB: Math.round(maxBodySize / 1024 / 1024) });
-    }
-
-    // ─── CSRF Protection (opt-in) ────────────────────────────────────────
-    // BaaS APIs are consumed by mobile apps, SPAs on different origins, and
-    // CLI/SDK tools. CSRF is only enabled when the developer explicitly
-    // configures it with allowed origins.
-    if (config.csrf?.origin) {
-        config.app.use(`${basePath}/*`, csrf({
-            origin: config.csrf.origin
-        }));
-        logger.info("CSRF protection enabled");
-    }
-
-    // ─── CORS Warning ────────────────────────────────────────────────────
-    // Detect missing CORS configuration. In production the env validation
-    // already enforces CORS_ORIGINS / FRONTEND_URL, but in development
-    // it's easy to forget — leaving the API open to requests from any origin.
-    if (!isProduction && !process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
-        logger.warn(
-            "No CORS configuration detected (CORS_ORIGINS / FRONTEND_URL not set). " +
-            "The API will accept requests from any origin. " +
-            "Set CORS_ORIGINS in your .env file to restrict access."
-        );
-    }
-
-    // ─── Request Logging ─────────────────────────────────────────────────
-    config.app.use(`${basePath}/*`, requestLogger());
+    // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
+    configureMiddlewares(config.app, basePath, isProduction, config);
 
     const collectionRegistry = new BackendCollectionRegistry();
     let activeCollections = config.collections || [];
@@ -502,7 +455,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 if (safeAuthConfig.serviceKey.length < 32) {
                     throw new Error(
                         "REBASE_SERVICE_KEY is too short. Must be at least 32 characters. " +
-                        "Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('base64'))\""
+                        "Generate one with: node -e \"logger.info(require('crypto').randomBytes(48).toString('base64'))\""
                     );
                 }
                 serviceKey = safeAuthConfig.serviceKey;
@@ -562,45 +515,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     // 3. Initialize Storage
-    let storageRegistry: StorageRegistry | undefined;
-    let storageController: StorageController | undefined;
-
-    if (config.storage) {
-        logger.info("Configuring storage");
-        const controllers: Record<string, StorageController> = {};
-
-        // Helper: resolve a single storage entry to a controller
-        const toController = (entry: BackendStorageConfig | StorageController, label: string): StorageController => {
-            // Duck-type: if it has putObject, it's already a controller instance
-            if (typeof (entry as StorageController).putObject === "function") {
-                return entry as StorageController;
-            }
-            // Otherwise it's a config object — use the built-in factory
-            const conf = entry as BackendStorageConfig;
-            if (isProduction && conf.type === "local") {
-                logger.warn(`Storage backend "${label}" uses local filesystem in production. ` +
-                    "Files will be lost on container restart. " +
-                    "Configure S3-compatible storage or a custom StorageController.");
-            }
-            return createStorageController(conf);
-        };
-
-        if (typeof config.storage === "object" && ("type" in config.storage || typeof (config.storage as StorageController).putObject === "function")) {
-            // Single storage config or controller
-            controllers[DEFAULT_STORAGE_ID] = toController(config.storage as BackendStorageConfig | StorageController, DEFAULT_STORAGE_ID);
-        } else {
-            // Multi-backend record
-            for (const [storageId, entry] of Object.entries(config.storage as Record<string, BackendStorageConfig | StorageController>)) {
-                controllers[storageId] = toController(entry, storageId);
-            }
-        }
-
-        if (Object.keys(controllers).length > 0) {
-            storageRegistry = DefaultStorageRegistry.create(controllers);
-            storageController = storageRegistry.getDefault();
-            logger.info("Initialized storage backends", { count: Object.keys(controllers).length });
-        }
-    }
+    const { storageRegistry, storageController } = initializeStorage(config.storage, isProduction);
 
     // basePath already resolved above
 
@@ -847,38 +762,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────
-    if (config.enableSwagger !== false && activeCollections.length > 0) {
-        const { generateOpenApiSpec } = await import("./api/openapi-generator");
-
-        config.app.get(`${basePath}/docs`, (c) => {
-            const spec = generateOpenApiSpec(activeCollections, {
-                basePath,
-                requireAuth: resolveRequireAuth(config.auth)
-            });
-            return c.json(spec);
-        });
-
-        if (process.env.NODE_ENV !== "production") {
-            config.app.get(`${basePath}/swagger`, (c) => {
-                return c.html(`<!DOCTYPE html>
-<html>
-<head>
-    <title>Rebase API Documentation</title>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"/>
-    <style>body{margin:0;padding:0;}</style>
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-    <script>SwaggerUIBundle({ url: '${basePath}/docs', dom_id: '#swagger-ui' });</script>
-</body>
-</html>`);
-            });
-            logger.info("Swagger UI available", { path: `${basePath}/swagger` });
-        }
-    }
+    await mountOpenApiDocs(config.app, basePath, config.enableSwagger, activeCollections, resolveRequireAuth(config.auth));
 
     // ─── Server-side singleton ────────────────────────────────────────────
     // Build the admin-level RebaseClient and expose it as the `rebase` singleton.
@@ -1047,86 +931,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     logger.info("Rebase Backend Initialized");
 
     // ── Deep Health Check ─────────────────────────────────────────────────
-    const healthCheck = async (): Promise<HealthCheckResult> => {
-        const start = performance.now();
-        try {
-            // Use admin.executeSql if available (Postgres), otherwise try fetchCollection as a probe
-            const admin = defaultDriver.admin;
-            if (isSQLAdmin(admin)) {
-                await admin.executeSql("SELECT 1");
-            } else {
-                // Fallback: try a lightweight fetch to confirm driver is responsive
-                await defaultDriver.fetchCollection({
-                    path: "__health_check_nonexistent__",
-                    limit: 1
-                });
-            }
-            const latencyMs = Math.round(performance.now() - start);
-            return {
-                healthy: true,
-                latencyMs
-            };
-        } catch (error: unknown) {
-            const latencyMs = Math.round(performance.now() - start);
-            logger.error("Health check failed", {
-                error: error instanceof Error ? error : new Error(String(error)),
-                latencyMs
-            });
-            return {
-                healthy: false,
-                latencyMs,
-                details: {
-                    error: error instanceof Error ? error.message : String(error)
-                }
-            };
-        }
-    };
+    const healthCheck = createHealthCheck(defaultDriver);
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────
-    const shutdown = (timeoutMs = 15_000): Promise<void> => {
-        return new Promise<void>((resolve) => {
-            (async () => {
-                logger.info("Shutting down Rebase Backend...");
-
-                // 1. Stop cron scheduler
-                if (cronScheduler) {
-                    cronScheduler.stop();
-                    logger.info("Cron scheduler stopped");
-                }
-
-                // 2. Tear down realtime services (LISTEN clients, debounce timers,
-                //    subscriptions). Must happen BEFORE pool.end() so that pending
-                //    timer callbacks don't fire against a closed pool.
-                for (const [key, rt] of Object.entries(realtimeServices)) {
-                    try {
-                        if (typeof rt.destroy === "function") {
-                            await rt.destroy();
-                            logger.info(`Realtime service "${key}" destroyed`);
-                        } else if (typeof rt.stopListening === "function") {
-                            await rt.stopListening();
-                            logger.info(`Realtime service "${key}" LISTEN client stopped`);
-                        }
-                    } catch (err) {
-                        logger.warn(`Error destroying realtime service "${key}":`, { error: err });
-                    }
-                }
-
-                // 3. Close the HTTP server (stop accepting, drain in-flight)
-                config.server.close(() => {
-                    logger.info("HTTP server closed");
-                    resolve();
-                });
-
-                // 4. Force-resolve after timeout (unless disabled with 0)
-                if (timeoutMs > 0) {
-                    setTimeout(() => {
-                        logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
-                        resolve();
-                    }, timeoutMs).unref();
-                }
-            })();
-        });
-    };
+    const shutdown = createShutdown({
+        server: config.server,
+        cronScheduler,
+        realtimeServices
+    });
 
     return {
         driverRegistry,

@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a Facebook / Meta OAuth Provider integration.
@@ -26,7 +27,7 @@ export function createFacebookProvider(config: { clientId: string; clientSecret:
                 const tokenResponse = await fetch(tokenUrl.toString());
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get Facebook access token:", await tokenResponse.text());
+                    logger.error("Failed to get Facebook access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
@@ -41,7 +42,7 @@ export function createFacebookProvider(config: { clientId: string; clientSecret:
                 const profileResponse = await fetch(profileUrl.toString());
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get Facebook user info:", await profileResponse.text());
+                    logger.error("Failed to get Facebook user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -53,7 +54,7 @@ export function createFacebookProvider(config: { clientId: string; clientSecret:
                 };
 
                 if (!profileData.email) {
-                    console.error("Facebook user has no email (email permission may not have been granted)");
+                    logger.error("Facebook user has no email (email permission may not have been granted)");
                     return null;
                 }
 
@@ -64,7 +65,7 @@ export function createFacebookProvider(config: { clientId: string; clientSecret:
                     photoUrl: profileData.picture?.data?.url || null
                 };
             } catch (error) {
-                console.error("Facebook OAuth error:", error);
+                logger.error("Facebook OAuth error", { error: error });
                 return null;
             }
         }

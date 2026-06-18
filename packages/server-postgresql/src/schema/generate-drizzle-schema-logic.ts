@@ -3,6 +3,7 @@ import { getPrimaryKeys } from "../services/entity-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
+import { logger } from "@rebasepro/server-core";
 // --- Helper Functions ---
 
 /**
@@ -206,7 +207,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
 
             // The localKey property is the source of truth for the FK column name.
             if (!relation.localKey) {
-                console.warn(`Could not generate column for owning relation '${relation.relationName}' on '${collection.name}': 'localKey' is not defined.`);
+                logger.warn(`Could not generate column for owning relation '${relation.relationName}' on '${collection.name}': 'localKey' is not defined.`);
                 return null;
             }
 
@@ -811,16 +812,16 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                                     const junctionTableVar = getTableVarName(correspondingRelation.through.table);
                                     tableRelations.push(`    "${relationKey}": many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
                                 } else {
-                                    console.warn(`Could not find corresponding owning many-to-many relation for inverse relation '${relationKey}' on '${collection.name}'`);
+                                    logger.warn(`Could not find corresponding owning many-to-many relation for inverse relation '${relationKey}' on '${collection.name}'`);
                                 }
                             } catch (e) {
-                                console.warn(`Could not resolve inverse many-to-many relation '${relationKey}':`, e);
+                                logger.warn(`Could not resolve inverse many-to-many relation '${relationKey}'`, { error: e });
                             }
                         }
                         // joinPath relations don't generate Drizzle relations - they use existing user tables
                     }
                 } catch (e) {
-                    console.warn(`Could not generate relation ${relationKey} for ${collection.name}:`, e);
+                    logger.warn(`Could not generate relation ${relationKey} for ${collection.name}`, { error: e });
                 }
             }
 

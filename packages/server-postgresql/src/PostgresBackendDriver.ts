@@ -33,6 +33,7 @@ import {
 import { buildRebaseData } from "@rebasepro/common";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
+import { logger } from "@rebasepro/server-core";
 
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
@@ -816,7 +817,7 @@ searchString }
             `);
             junctionTables = new Set(junctionResult.map((r: Record<string, unknown>) => r.table_name as string));
         } catch (e) {
-            console.warn("Could not detect junction tables:", e);
+            logger.warn("Could not detect junction tables", { error: e });
         }
 
         const filteredTables = allTables.filter(name => !junctionTables.has(name));
@@ -989,13 +990,13 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         const result = await this.delegate.db.transaction(async (tx) => {
             let userId = this.user?.uid;
             if (!userId) {
-                console.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object:", this.user);
+                logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
                 userId = "anonymous";
             }
 
             const userRoles = this.user?.roles ?? [];
             if (!this.user?.roles) {
-                console.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object:", this.user);
+                logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
             }
             const normalizedRoles = userRoles.map((r: unknown) =>
                 typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
@@ -1030,7 +1031,7 @@ roles: userRoles })}, true)
                     notification.databaseId
                 );
             } catch (e) {
-                console.error("[DataDriver] Error flushing deferred notification:", e);
+                logger.error("[DataDriver] Error flushing deferred notification", { error: e });
             }
         }
 

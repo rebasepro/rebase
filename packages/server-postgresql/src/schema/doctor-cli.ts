@@ -7,6 +7,7 @@ import path from "path";
 import chalk from "chalk";
 import fs from "fs";
 import { runDoctor } from "./doctor";
+import { logger } from "@rebasepro/server-core";
 
 async function main() {
     const collectionsArg = process.argv.find((a) => a.startsWith("--collections="));
@@ -46,6 +47,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    console.error(chalk.red("  ✗ Doctor failed:"), err instanceof Error ? err.message : String(err));
+    logger.error(chalk.red("  ✗ Doctor failed"), { error: err });
     process.exit(1);
 });

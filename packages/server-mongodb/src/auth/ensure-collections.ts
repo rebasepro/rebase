@@ -1,4 +1,5 @@
 import { Db } from "mongodb";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Default roles to seed on first run
@@ -40,7 +41,7 @@ delete: false },
 ];
 
 export async function ensureAuthCollectionsExist(db: Db): Promise<void> {
-    console.log("🔍 Checking MongoDB auth collections and indexes...");
+    logger.info("🔍 Checking MongoDB auth collections and indexes...");
 
     try {
         // Users
@@ -75,9 +76,9 @@ ip_address: 1 }, { unique: true });
         // Seed roles
         await seedDefaultRoles(db);
 
-        console.log("✅ MongoDB Auth collections ready");
+        logger.info("✅ MongoDB Auth collections ready");
     } catch (error) {
-        console.error("❌ Failed to set up MongoDB auth collections:", error);
+        logger.error("❌ Failed to set up MongoDB auth collections", { error: error });
     }
 }
 
@@ -86,11 +87,11 @@ async function seedDefaultRoles(db: Db): Promise<void> {
     const count = await roles.countDocuments();
 
     if (count > 0) {
-        console.log(`📋 Found ${count} existing roles`);
+        logger.info(`📋 Found ${count} existing roles`);
         return;
     }
 
-    console.log("🌱 Seeding default roles...");
+    logger.info("🌱 Seeding default roles...");
 
     for (const role of DEFAULT_ROLES) {
         await roles.updateOne(
@@ -100,5 +101,5 @@ async function seedDefaultRoles(db: Db): Promise<void> {
         );
     }
 
-    console.log("✅ Default roles created: admin, editor, viewer");
+    logger.info("✅ Default roles created: admin, editor, viewer");
 }

@@ -31,6 +31,7 @@ import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server-core";
 import { MongoConditionBuilder } from "../db/MongoConditionBuilder";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * MongoDB DataDriver Delegate
@@ -180,7 +181,7 @@ propertyCallbacks: undefined };
             try {
                 onUpdate(entities as Entity<M>[]);
             } catch (error) {
-                console.error("Error in collection update callback:", error);
+                logger.error("Error in collection update callback", { error: error });
                 if (onError) {
                     onError(error instanceof Error ? error : new Error(String(error)));
                 }
@@ -266,7 +267,7 @@ propertyCallbacks: undefined };
             try {
                 onUpdate(entity as Entity<M>);
             } catch (error) {
-                console.error("Error in entity update callback:", error);
+                logger.error("Error in entity update callback", { error: error });
                 if (onError) {
                     onError(error instanceof Error ? error : new Error(String(error)));
                 }
@@ -419,7 +420,7 @@ propertyCallbacks: undefined };
                     previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
                     updatedBy: this.user?.uid
                 }).catch(err => {
-                    console.error(`Failed to record history for ${path}/${savedEntity.id}:`, err);
+                    logger.error(`Failed to record history for ${path}/${savedEntity.id}`, { error: err });
                 });
             }
 
@@ -540,7 +541,7 @@ propertyCallbacks: undefined };
                 previousValues: entity.values,
                 updatedBy: this.user?.uid
             }).catch(err => {
-                console.error(`Failed to record history for ${entity.path}/${entity.id}:`, err);
+                logger.error(`Failed to record history for ${entity.path}/${entity.id}`, { error: err });
             });
         }
 

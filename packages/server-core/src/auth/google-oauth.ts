@@ -1,6 +1,7 @@
 import { OAuth2Client } from "google-auth-library/build/src/index.js";
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 export interface GoogleUserInfo {
     googleId: string;
@@ -210,7 +211,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 
                 throw new Error("No valid Google credential provided (expected idToken, accessToken, or code+redirectUri)");
             } catch (error) {
-                console.error("Google OAuth verification failed:", error);
+                logger.error("Google OAuth verification failed", { error: error });
                 throw error;
             }
         }

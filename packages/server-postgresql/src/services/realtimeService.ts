@@ -10,6 +10,7 @@ import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, EntitySubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks } from "@rebasepro/common";
+import { logger } from "@rebasepro/server-core";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -218,7 +219,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         });
 
         ws.on("error", (error) => {
-            console.error("WebSocket error for client", clientId, error);
+            logger.error("WebSocket error for client", { detail: clientId, error });
             this.removeClient(clientId);
         });
     }
@@ -321,7 +322,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (!collection) {
                 const registered = this.registry.getCollections().map(c => c.slug).join(", ");
                 const msg = `Collection not found: '${request.path}'. Registered: [${registered}]`;
-                console.error(`[RealtimeService] ${msg}`);
+                logger.error(`[RealtimeService] ${msg}`);
                 this.sendError(clientId, msg, subscriptionId);
                 return;
             }
@@ -373,7 +374,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (!collection) {
                 const registered = this.registry.getCollections().map(c => c.slug).join(", ");
                 const msg = `Collection not found: '${request.path}'. Registered: [${registered}]`;
-                console.error(`[RealtimeService] ${msg}`);
+                logger.error(`[RealtimeService] ${msg}`);
                 this.sendError(clientId, msg, subscriptionId);
                 return;
             }
@@ -441,7 +442,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             try {
                 await this.broadcastChange(path, entityId, databaseId);
             } catch (err) {
-                console.error("❌ [RealtimeService] Failed to broadcast change via pg_notify:", err);
+                logger.error("❌ [RealtimeService] Failed to broadcast change via pg_notify", { error: err });
             }
         }
 
@@ -502,7 +503,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     this.debouncedCollectionRefetch(subscriptionId, notifyPath, subscription);
                 }
             } catch (error) {
-                console.error(`❌ [RealtimeService] Error processing WebSocket subscription ${subscriptionId}:`, error);
+                logger.error(`❌ [RealtimeService] Error processing WebSocket subscription ${subscriptionId}`, { error: error });
                 this.sendError(subscription.clientId, `Failed to process update for subscription ${subscriptionId}`, subscriptionId);
             }
         }
@@ -525,7 +526,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     this.debouncedDriverRefetch(subscriptionId, notifyPath, subscription, callback);
                 }
             } catch (error) {
-                console.error(`❌ [RealtimeService] Error processing DataDriver subscription ${subscriptionId}:`, error);
+                logger.error(`❌ [RealtimeService] Error processing DataDriver subscription ${subscriptionId}`, { error: error });
             }
         }
     }
@@ -551,7 +552,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 const entities = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
                 this.sendCollectionUpdate(subscription.clientId, subscriptionId, entities);
             } catch (error) {
-                console.error(`❌ [RealtimeService] Error in debounced refetch for ${subscriptionId}:`, error);
+                logger.error(`❌ [RealtimeService] Error in debounced refetch for ${subscriptionId}`, { error: error });
                 this.sendError(subscription.clientId, `Failed to process update for subscription ${subscriptionId}`, subscriptionId);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
@@ -577,7 +578,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 const entities = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
                 callback(entities);
             } catch (error) {
-                console.error(`❌ [RealtimeService] Error in debounced driver refetch for ${subscriptionId}:`, error);
+                logger.error(`❌ [RealtimeService] Error in debounced driver refetch for ${subscriptionId}`, { error: error });
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
@@ -728,7 +729,7 @@ roles: activeAuth.roles },
                 const entity = await this.fetchEntityWithAuth(notifyPath, entityId, subscription.authContext);
                 this.sendEntityUpdate(subscription.clientId, subscriptionId, entity || null);
             } catch (error) {
-                console.error(`❌ [RealtimeService] Error in debounced entity refetch for ${subscriptionId}:`, error);
+                logger.error(`❌ [RealtimeService] Error in debounced entity refetch for ${subscriptionId}`, { error: error });
                 this.sendError(subscription.clientId, `Failed to process entity update for subscription ${subscriptionId}`, subscriptionId);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
@@ -755,7 +756,7 @@ roles: activeAuth.roles },
                 const entity = await this.fetchEntityWithAuth(notifyPath, entityId, subscription.authContext);
                 callback(entity || null);
             } catch (error) {
-                console.error(`❌ [RealtimeService] Error in debounced entity driver refetch for ${subscriptionId}:`, error);
+                logger.error(`❌ [RealtimeService] Error in debounced entity driver refetch for ${subscriptionId}`, { error: error });
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
@@ -862,7 +863,7 @@ roles: activeAuth.roles },
     }
 
     private sendError(clientId: string, error: string, subscriptionId?: string) {
-        console.error("Error handling collection subscription:", error);
+        logger.error("Error handling collection subscription", { error: error });
         const message = {
             type: "error" as const,
             subscriptionId,
@@ -1109,7 +1110,7 @@ lastSeen: Date.now() });
      */
     async startListening(connectionString: string): Promise<void> {
         if (this.broadcasting) {
-            console.warn("⚠️ [RealtimeService] startListening called but already listening. Ignoring.");
+            logger.warn("⚠️ [RealtimeService] startListening called but already listening. Ignoring.");
             return;
         }
 
@@ -1118,7 +1119,7 @@ lastSeen: Date.now() });
         // works correctly if the initial connection attempt fails.
         this.broadcasting = true;
         await this.connectListenClient();
-        console.log(`📡 [RealtimeService] Cross-instance realtime enabled (instanceId: ${this.instanceId})`);
+        logger.info(`📡 [RealtimeService] Cross-instance realtime enabled (instanceId: ${this.instanceId})`);
     }
 
     /**
@@ -1136,7 +1137,7 @@ lastSeen: Date.now() });
             } catch { /* ignore close errors */ }
             this.listenClient = undefined;
         }
-        console.log("📡 [RealtimeService] Cross-instance realtime disabled.");
+        logger.info("📡 [RealtimeService] Cross-instance realtime disabled.");
     }
 
     /**
@@ -1163,13 +1164,13 @@ lastSeen: Date.now() });
             const client = new PgClient({ connectionString: this.listenConnectionString });
 
             client.on("error", (err) => {
-                console.error("❌ [RealtimeService] LISTEN client error:", err.message);
+                logger.error("❌ [RealtimeService] LISTEN client error", { detail: err.message });
                 this.scheduleReconnect();
             });
 
             client.on("end", () => {
                 if (this.broadcasting) {
-                    console.warn("⚠️ [RealtimeService] LISTEN client disconnected unexpectedly.");
+                    logger.warn("⚠️ [RealtimeService] LISTEN client disconnected unexpectedly.");
                     this.scheduleReconnect();
                 }
             });
@@ -1216,7 +1217,7 @@ lastSeen: Date.now() });
                     // Trigger local fan-out with broadcast=false to avoid re-broadcasting
                     await this.notifyEntityUpdate(p, eid, entity, db ?? undefined, false);
                 } catch (err) {
-                    console.error("❌ [RealtimeService] Error processing cross-instance notification:", err);
+                    logger.error("❌ [RealtimeService] Error processing cross-instance notification", { error: err });
                 }
             });
 
@@ -1226,7 +1227,7 @@ lastSeen: Date.now() });
 
             this.debugLog(`📡 [RealtimeService] LISTEN client connected on channel "${PG_NOTIFY_CHANNEL}"`);
         } catch (err) {
-            console.error("❌ [RealtimeService] Failed to connect LISTEN client:", err);
+            logger.error("❌ [RealtimeService] Failed to connect LISTEN client", { error: err });
             this.scheduleReconnect();
         }
     }

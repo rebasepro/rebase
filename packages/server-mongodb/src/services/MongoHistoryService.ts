@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * Deep equality without JSON.stringify.
@@ -139,10 +140,10 @@ export class MongoHistoryService {
 
             // Non-blocking prune for this specific entity
             this.pruneHistory(String(entityId), tableName).catch(e => {
-                console.error(`[HistoryService] Failed to prune history for ${tableName}/${entityId}:`, e);
+                logger.error(`[HistoryService] Failed to prune history for ${tableName}/${entityId}`, { error: e });
             });
         } catch (error) {
-            console.error(`[HistoryService] Failed to record history for ${tableName}/${entityId}:`, error);
+            logger.error(`[HistoryService] Failed to record history for ${tableName}/${entityId}`, { error: error });
         }
     }
 

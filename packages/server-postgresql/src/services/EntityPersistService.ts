@@ -16,6 +16,7 @@ import { RelationService } from "./RelationService";
 import { EntityFetchService } from "./EntityFetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { logger } from "@rebasepro/server-core";
 
 /** Shape of PostgreSQL errors with diagnostic metadata. */
 interface PostgresError extends Error {
@@ -140,7 +141,7 @@ export class EntityPersistService {
                                 const targetColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(relevantJoinStep.on.to);
                                 targetColumnName = targetColumnNames[0];
                             } else {
-                                console.warn(`Could not find specific join step for target table ${targetTableName} in relation '${relationKey}'.`);
+                                logger.warn(`Could not find specific join step for target table ${targetTableName} in relation '${relationKey}'.`);
                                 const targetColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to);
                                 targetColumnName = targetColumnNames[0];
                             }
@@ -161,7 +162,7 @@ export class EntityPersistService {
 
                         const existingValue = (effectiveValues as Record<string, unknown>)[targetColumnName];
                         if (existingValue !== undefined && existingValue !== null && existingValue !== parsedParentId) {
-                            console.warn(`Overriding provided value '${existingValue}' for FK '${targetColumnName}' with path parent id '${parsedParentId}'.`);
+                            logger.warn(`Overriding provided value '${existingValue}' for FK '${targetColumnName}' with path parent id '${parsedParentId}'.`);
                         }
                         (effectiveValues as Record<string, unknown>)[targetColumnName] = parsedParentId;
                         break;

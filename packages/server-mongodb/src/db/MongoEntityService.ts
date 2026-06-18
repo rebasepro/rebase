@@ -8,6 +8,7 @@
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
 import { Entity, FilterValues, EntityRepository, EntityCollection } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
+import { logger } from "@rebasepro/server-core";
 
 /**
  * MongoDB Entity Service
@@ -317,7 +318,7 @@ export class MongoEntityService implements EntityRepository {
         const result = await collection.deleteOne({ _id: id } as Filter<Document>);
 
         if (result.deletedCount === 0) {
-            console.warn(`Entity ${entityId} not found in collection ${collectionPath}`);
+            logger.warn(`Entity ${entityId} not found in collection ${collectionPath}`);
         }
     }
 

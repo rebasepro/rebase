@@ -7,6 +7,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload } from "@rebasepro/server-core";
+import { logger } from "@rebasepro/server-core";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
 interface WsAuthConfig {
@@ -104,7 +105,7 @@ export function createPostgresWebSocket(
             // Silently absorbed — listenWithPortRetry will retry the next port
             return;
         }
-        console.error("❌ [WebSocket Server] Error:", err);
+        logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
     // Auth is required when either: an adapter is present (secure by default),
@@ -277,7 +278,7 @@ roles: verifiedUser.roles }
                                 };
                             return await driver.withAuth(userForAuth);
                         } catch (e) {
-                            console.error("Failed to create RLS scoped delegate for WS request", e);
+                            logger.error("Failed to create RLS scoped delegate for WS request", { error: e });
                             throw new Error("Internal authentication error");
                         }
                     }
@@ -590,12 +591,12 @@ roles: ["anon"] };
                     }
 
                     default:
-                        console.error("❌ [WebSocket Server] Unknown message type:", type);
+                        logger.error("❌ [WebSocket Server] Unknown message type", { detail: type });
                 }
             } catch (error: unknown) {
-                console.error("💥 [WebSocket Server] Error handling message:", error);
+                logger.error("💥 [WebSocket Server] Error handling message", { error: error });
                 if (error instanceof Error) {
-                    console.error("Stack trace:", error.stack);
+                    logger.error("Stack trace", { detail: error.stack });
                 }
                 const errorMessage = process.env.NODE_ENV === "production"
                     ? "An unexpected error occurred"

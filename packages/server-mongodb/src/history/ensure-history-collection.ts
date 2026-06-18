@@ -1,7 +1,8 @@
 import { Db } from "mongodb";
+import { logger } from "@rebasepro/server-core";
 
 export async function ensureHistoryCollectionExists(db: Db): Promise<void> {
-    console.log("🔍 Checking MongoDB history collection and indexes...");
+    logger.info("🔍 Checking MongoDB history collection and indexes...");
 
     try {
         const history = db.collection("__rebase_history");
@@ -14,8 +15,8 @@ updated_at: -1 });
         // Index for pruning by date
         await history.createIndex({ updated_at: 1 });
 
-        console.log("✅ MongoDB History collection ready");
+        logger.info("✅ MongoDB History collection ready");
     } catch (error) {
-        console.error("❌ Failed to set up MongoDB history collection:", error);
+        logger.error("❌ Failed to set up MongoDB history collection", { error: error });
     }
 }

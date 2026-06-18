@@ -1,5 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
+import { logger } from "../utils/logger";
 
 /**
  * Creates a GitHub OAuth Provider integration.
@@ -33,13 +34,13 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                 });
 
                 if (!tokenResponse.ok) {
-                    console.error("Failed to get GitHub access token:", await tokenResponse.text());
+                    logger.error("Failed to get GitHub access token", { detail: await tokenResponse.text() });
                     return null;
                 }
 
                 const tokenData = await tokenResponse.json() as { access_token?: string; error?: string };
                 if (tokenData.error || !tokenData.access_token) {
-                    console.error("GitHub token exchange error:", tokenData.error);
+                    logger.error("GitHub token exchange error", { detail: tokenData.error });
                     return null;
                 }
 
@@ -55,7 +56,7 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                 });
 
                 if (!profileResponse.ok) {
-                    console.error("Failed to get GitHub user info:", await profileResponse.text());
+                    logger.error("Failed to get GitHub user info", { detail: await profileResponse.text() });
                     return null;
                 }
 
@@ -91,7 +92,7 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                 }
 
                 if (!email) {
-                    console.error("GitHub user has no verified email");
+                    logger.error("GitHub user has no verified email");
                     return null;
                 }
 
@@ -102,7 +103,7 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                     photoUrl: profileData.avatar_url || null
                 };
             } catch (error) {
-                console.error("GitHub OAuth error:", error);
+                logger.error("GitHub OAuth error", { error: error });
                 return null;
             }
         }
