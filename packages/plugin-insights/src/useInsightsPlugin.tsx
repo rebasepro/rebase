@@ -42,76 +42,79 @@ import { CollectionInsightsInline } from "./components/CollectionInsightsInline"
  */
 export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
     const { insights, cacheTTL } = config;
-    const slots: SlotContribution[] = [];
 
-    // ── Home page insights ────────────────────────────────────────────
-    if (insights.home && insights.home.length > 0) {
-        const homeInsights = insights.home;
-        slots.push({
-            slot: "home.children.start" as const,
-            Component: (props: Record<string, unknown>) => (
-                <HomeInsightsSlot
-                    {...props}
-                    insights={homeInsights}
-                />
-            ),
-            order: 10,
-        });
-    }
+    return React.useMemo(() => {
+        const slots: SlotContribution[] = [];
 
-    // ── Per-collection insights ───────────────────────────────────────
-    // A single `collections.<slug>` definition serves two slots:
-    // 1. collection.insights  → inline scorecards in the list view
-    // 2. home.card.insight    → compact scorecards on the home card
-    if (insights.collections) {
-        for (const [slug, defs] of Object.entries(insights.collections)) {
-            if (defs.length === 0) continue;
-            const collectionInsights = defs;
-
-            // 1. Inline in collection list view
+        // ── Home page insights ────────────────────────────────────────────
+        if (insights.home && insights.home.length > 0) {
+            const homeInsights = insights.home;
             slots.push({
-                slot: "collection.insights" as const,
-                Component: (props: Record<string, unknown>) => {
-                    const path = props.path as string;
-                    const collectionSlug = path?.split("/").filter(Boolean).pop() ?? "";
-                    if (collectionSlug !== slug) return null;
-                    return (
-                        <CollectionInsightsInline
-                            {...props as { path: string; collection: unknown; parentCollectionSlugs: string[], parentEntityIds: string[] }}
-                            insights={collectionInsights}
-                        />
-                    );
-                },
-                order: 10,
-            });
-
-            // 2. Auto-extract scorecards for home page card
-            slots.push({
-                slot: "home.card.insight" as const,
-                Component: (props: Record<string, unknown>) => {
-                    const cardSlug = props.slug as string;
-                    if (cardSlug !== slug) return null;
-                    return (
-                        <HomeCardInsightSlot
-                            {...props as { slug: string; collection: unknown; context: unknown }}
-                            insights={collectionInsights}
-                        />
-                    );
-                },
+                slot: "home.children.start" as const,
+                Component: (props: Record<string, unknown>) => (
+                    <HomeInsightsSlot
+                        {...props}
+                        insights={homeInsights}
+                    />
+                ),
                 order: 10,
             });
         }
-    }
 
-    return {
-        key: "plugin-insights",
-        slots,
-        providers: [
-            {
-                scope: "root" as const,
-                Component: InsightsProvider as React.ComponentType<React.PropsWithChildren<Record<string, unknown>>>,
-                props: { cacheTTL },
-            },
-        ],
-    };
+        // ── Per-collection insights ───────────────────────────────────────
+        // A single `collections.<slug>` definition serves two slots:
+        // 1. collection.insights  → inline scorecards in the list view
+        // 2. home.card.insight    → compact scorecards on the home card
+        if (insights.collections) {
+            for (const [slug, defs] of Object.entries(insights.collections)) {
+                if (defs.length === 0) continue;
+                const collectionInsights = defs;
+
+                // 1. Inline in collection list view
+                slots.push({
+                    slot: "collection.insights" as const,
+                    Component: (props: Record<string, unknown>) => {
+                        const path = props.path as string;
+                        const collectionSlug = path?.split("/").filter(Boolean).pop() ?? "";
+                        if (collectionSlug !== slug) return null;
+                        return (
+                            <CollectionInsightsInline
+                                {...props as { path: string; collection: unknown; parentCollectionSlugs: string[], parentEntityIds: string[] }}
+                                insights={collectionInsights}
+                            />
+                        );
+                    },
+                    order: 10,
+                });
+
+                // 2. Auto-extract scorecards for home page card
+                slots.push({
+                    slot: "home.card.insight" as const,
+                    Component: (props: Record<string, unknown>) => {
+                        const cardSlug = props.slug as string;
+                        if (cardSlug !== slug) return null;
+                        return (
+                            <HomeCardInsightSlot
+                                {...props as { slug: string; collection: unknown; context: unknown }}
+                                insights={collectionInsights}
+                            />
+                        );
+                    },
+                    order: 10,
+                });
+            }
+        }
+
+        return {
+            key: "plugin-insights",
+            slots,
+            providers: [
+                {
+                    scope: "root" as const,
+                    Component: InsightsProvider as React.ComponentType<React.PropsWithChildren<Record<string, unknown>>>,
+                    props: { cacheTTL },
+                },
+            ],
+        };
+    }, [insights, cacheTTL]);
 }

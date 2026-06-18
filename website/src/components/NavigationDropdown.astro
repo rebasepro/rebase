@@ -114,14 +114,22 @@ const { title, href } = Astro.props;
             }, 250);
         }
 
+        let repositionTicking = false;
         function onReposition() {
             if (!activeContainer) return;
-            const panel = activeContainer.querySelector('[data-dropdown-panel]') as HTMLElement;
-            if (panel) positionPanel(activeContainer, panel);
+            if (repositionTicking) return;
+            repositionTicking = true;
+            requestAnimationFrame(() => {
+                if (activeContainer) {
+                    const panel = activeContainer.querySelector('[data-dropdown-panel]') as HTMLElement;
+                    if (panel) positionPanel(activeContainer, panel);
+                }
+                repositionTicking = false;
+            });
         }
 
         window.addEventListener('resize', onReposition);
-        window.addEventListener('scroll', onReposition, true);
+        window.addEventListener('scroll', onReposition, { capture: true, passive: true });
 
         allContainers.forEach(container => {
             const trigger = container.querySelector('[data-dropdown-trigger]') as HTMLElement;

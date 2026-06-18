@@ -2,6 +2,7 @@
 import type { AdditionalFieldDelegate, EntityCollection } from "@rebasepro/types";
 import type { EntityAction, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { deepEqual as equal } from "fast-equals"
 
@@ -227,16 +228,16 @@ export const EntityCollectionView = React.memo(
 
         // View mode priority: URL > saved user config > collection.defaultViewMode
         const defaultViewMode = collection.defaultViewMode ?? "list";
+        const [searchParams, setSearchParams] = useSearchParams();
 
-        // Parse view from URL
-        const getViewFromUrl = useCallback((): ViewMode | null => {
-            const params = new URLSearchParams(window.location.search);
-            const urlView = params.get("__view");
-            if (urlView && ["list", "table", "kanban", "cards"].includes(urlView)) {
-                return urlView as ViewMode;
+        // Read view from React Router's searchParams (reactive on back/forward)
+        const urlView = useMemo((): ViewMode | null => {
+            const v = searchParams.get("__view");
+            if (v && ["list", "table", "kanban", "cards"].includes(v)) {
+                return v as ViewMode;
             }
             return null;
-        }, []);
+        }, [searchParams]);
 
         // Get saved view from local persistence
         const getSavedView = useCallback((): ViewMode | null => {
@@ -246,7 +247,6 @@ export const EntityCollectionView = React.memo(
 
         const [viewMode, setViewModeState] = useState<ViewMode>(() => {
             // Priority: URL > saved config > collection default
-            const urlView = getViewFromUrl();
             if (urlView) return urlView;
             const savedView = getSavedView();
             if (savedView) return savedView;
@@ -257,12 +257,13 @@ export const EntityCollectionView = React.memo(
 
         // Sync URL with current view on init (if view came from saved config)
         useEffect(() => {
-            const urlView = getViewFromUrl();
             if (!urlView && viewMode !== defaultViewMode) {
                 // View came from saved config but URL doesn't have it - update URL without push
-                const url = new URL(window.location.href);
-                url.searchParams.set("__view", viewMode);
-                window.history.replaceState({}, "", url.toString());
+                setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.set("__view", viewMode);
+                    return next;
+                }, { replace: true });
             }
         }, []); // Only on mount
 
@@ -270,33 +271,27 @@ export const EntityCollectionView = React.memo(
         const setViewMode = useCallback((newMode: ViewMode) => {
             setViewModeState(newMode);
 
-            // Update URL with __view param
-            const url = new URL(window.location.href);
-            if (newMode === defaultViewMode) {
-                url.searchParams.delete("__view");
-            } else {
-                url.searchParams.set("__view", newMode);
-            }
-            window.history.pushState({}, "", url.toString());
-        }, [defaultViewMode]);
-
-        // Listen for browser back/forward
-        useEffect(() => {
-            const handlePopState = () => {
-                const urlView = getViewFromUrl();
-                if (urlView) {
-                    // URL has explicit view - use it
-                    setViewModeState(urlView);
+            // Update URL with __view param via React Router
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                if (newMode === defaultViewMode) {
+                    next.delete("__view");
                 } else {
-                    // No URL param - fallback to saved config or collection default
-                    const savedView = getSavedView();
-                    setViewModeState(savedView ?? defaultViewMode);
+                    next.set("__view", newMode);
                 }
-            };
+                return next;
+            });
+        }, [defaultViewMode, setSearchParams]);
 
-            window.addEventListener("popstate", handlePopState);
-            return () => window.removeEventListener("popstate", handlePopState);
-        }, [getViewFromUrl, getSavedView, defaultViewMode]);
+        // Sync viewMode state when URL changes via back/forward navigation
+        useEffect(() => {
+            if (urlView) {
+                setViewModeState(urlView);
+            } else {
+                const savedView = getSavedView();
+                setViewModeState(savedView ?? defaultViewMode);
+            }
+        }, [urlView, getSavedView, defaultViewMode]);
 
         // List view size state - controls row height and info density
         const [listSize, setListSize] = useState<CollectionSize>(collection.defaultSize ?? "m");

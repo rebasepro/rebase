@@ -96,11 +96,13 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
                 const cx = cRect.left + cRect.width / 2 - dRect.left;
                 const cy = cRect.top + cRect.height / 2 - dRect.top;
 
-                // Clear existing paths
+                // Batch all layout reads first to avoid forced reflow
+                const cardRects = Array.from(cards).map(card => card.getBoundingClientRect());
+
+                // Now perform all DOM writes (clear + append)
                 svg.querySelectorAll('path.connector').forEach(p => p.remove());
 
-                cards.forEach(card => {
-                    const r = card.getBoundingClientRect();
+                cardRects.forEach(r => {
                     const cardCx = r.left + r.width / 2 - dRect.left;
                     const cardCy = r.top + r.height / 2 - dRect.top;
 
@@ -164,7 +166,7 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
             } else {
                 window.addEventListener('load', () => setTimeout(update, 100));
             }
-            window.addEventListener('resize', update);
+            window.addEventListener('resize', () => requestAnimationFrame(update));
         })();
         </script>
 

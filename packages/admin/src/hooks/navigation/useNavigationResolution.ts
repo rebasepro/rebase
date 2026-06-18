@@ -9,7 +9,7 @@ import type {
     RebasePlugin,
     UserCreationResult
 } from "@rebasepro/types";
-import { type AuthController, isFirebaseCollection, type User, type RebaseData } from "@rebasepro/types";
+import { type AuthController, type User, type RebaseData } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
 import { resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
@@ -27,10 +27,10 @@ export function filterOutNotAllowedCollections(resolvedCollections: EntityCollec
     return resolvedCollections
         .filter((c) => canReadCollection(c, authController))
         .map((c) => {
-            if (!isFirebaseCollection(c) || !c.subcollections) return c;
+            if (!c.childCollections) return c;
             return {
                 ...c,
-                subcollections: () => filterOutNotAllowedCollections(c.subcollections?.() ?? [], authController)
+                childCollections: () => filterOutNotAllowedCollections(c.childCollections!() ?? [], authController)
             };
         });
 }
@@ -38,10 +38,10 @@ export function filterOutNotAllowedCollections(resolvedCollections: EntityCollec
 export function applyPluginModifyCollection(resolvedCollections: EntityCollection[], modifyCollection: (collection: EntityCollection) => EntityCollection): EntityCollection[] {
     return resolvedCollections.map((collection): EntityCollection => {
         const modifiedCollection = modifyCollection(collection);
-        if (isFirebaseCollection(modifiedCollection) && modifiedCollection.subcollections) {
+        if (modifiedCollection.childCollections) {
             return {
                 ...modifiedCollection,
-                subcollections: () => applyPluginModifyCollection(modifiedCollection.subcollections?.() ?? [], modifyCollection)
+                childCollections: () => applyPluginModifyCollection(modifiedCollection.childCollections!() ?? [], modifyCollection)
             };
         }
         return modifiedCollection;
