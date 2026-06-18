@@ -24,7 +24,8 @@ export function KanbanSetupAction({
     const handleConfigureClick = () => {
         collectionEditorController.editCollection({
             id: collection.slug,
-            parentCollectionSlugs, parentEntityIds,
+            parentCollectionSlugs,
+parentEntityIds,
             initialView: "display",
             expandKanban: true
         });

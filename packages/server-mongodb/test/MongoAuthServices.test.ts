@@ -81,8 +81,10 @@ describe("MongoDB Auth Services", () => {
             const userService = new MongoUserService(db);
             const roleService = new MongoRoleService(db);
 
-            const user1 = await userService.createUser({ email: "alice@rebase.pro", displayName: "Alice Smith" });
-            const user2 = await userService.createUser({ email: "bob@rebase.pro", displayName: "Bob Jones" });
+            const user1 = await userService.createUser({ email: "alice@rebase.pro",
+displayName: "Alice Smith" });
+            const user2 = await userService.createUser({ email: "bob@rebase.pro",
+displayName: "Bob Jones" });
 
             // Test search
             const searchResult = await userService.listUsersPaginated({ search: "alice" });
@@ -90,7 +92,8 @@ describe("MongoDB Auth Services", () => {
             expect(searchResult.users[0].id).toBe(user1.id);
 
             // Test roles mapping
-            await roleService.createRole({ id: "admin", name: "Administrator" });
+            await roleService.createRole({ id: "admin",
+name: "Administrator" });
             await userService.setUserRoles(user1.id, ["admin"]);
 
             const rolesResult = await userService.listUsersPaginated({ roleId: "admin" });

@@ -27,7 +27,7 @@ import type {
     DatabaseAdmin,
     InitializedDriver,
     RealtimeProvider,
-    BootstrappedAuth,
+    BootstrappedAuth
 } from "./backend";
 
 /**

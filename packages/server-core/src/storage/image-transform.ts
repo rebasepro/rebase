@@ -94,7 +94,7 @@ const FORMAT_CONTENT_TYPES: Record<string, string> = {
     webp: "image/webp",
     avif: "image/avif",
     jpeg: "image/jpeg",
-    png: "image/png",
+    png: "image/png"
 };
 
 /** Check whether a content type is a transformable image. */
@@ -121,7 +121,7 @@ export async function transformImage(
             width: options.width,
             height: options.height,
             fit: options.fit || "cover",
-            withoutEnlargement: true,
+            withoutEnlargement: true
         });
     }
 
@@ -144,7 +144,8 @@ export async function transformImage(
     }
 
     const data = await pipeline.toBuffer();
-    return { data, contentType: FORMAT_CONTENT_TYPES[format] };
+    return { data,
+contentType: FORMAT_CONTENT_TYPES[format] };
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +189,8 @@ export class TransformCache {
         // Move to end (most recently used)
         this.cache.delete(cacheKey);
         this.cache.set(cacheKey, entry);
-        return { data: entry.data, contentType: entry.contentType };
+        return { data: entry.data,
+contentType: entry.contentType };
     }
 
     set(cacheKey: string, data: Buffer, contentType: string): void {
@@ -197,6 +199,8 @@ export class TransformCache {
             const oldest = this.cache.keys().next().value;
             if (oldest !== undefined) this.cache.delete(oldest);
         }
-        this.cache.set(cacheKey, { data, contentType, timestamp: Date.now() });
+        this.cache.set(cacheKey, { data,
+contentType,
+timestamp: Date.now() });
     }
 }

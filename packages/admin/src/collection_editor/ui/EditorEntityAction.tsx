@@ -33,7 +33,8 @@ export function EditorEntityAction({
                 ? () => collectionEditorController?.editCollection({
                     id: collection.slug,
                     path,
-                    parentCollectionSlugs, parentEntityIds,
+                    parentCollectionSlugs,
+parentEntityIds,
                     parentCollection: parentCollection as EntityCollection
                 })
                 : undefined}>

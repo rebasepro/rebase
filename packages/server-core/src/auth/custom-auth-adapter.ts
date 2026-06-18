@@ -29,7 +29,7 @@
 import type {
     AuthAdapter,
     AuthAdapterCapabilities,
-    CustomAuthAdapterOptions,
+    CustomAuthAdapterOptions
 } from "@rebasepro/types";
 
 /**
@@ -52,7 +52,7 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
         profileUpdate: false,
         emailVerification: false,
         enabledProviders: [],
-        ...options.capabilities,
+        ...options.capabilities
     };
 
     const resolvedVerifyToken = options.verifyToken
@@ -60,7 +60,7 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
             // Synthesize a minimal Request so adapters that only implement
             // verifyRequest still work for WebSocket token verification.
             const syntheticRequest = new Request("http://localhost/_ws_auth", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}` }
             });
             return options.verifyRequest(syntheticRequest);
         });
@@ -77,9 +77,8 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
         userManagement: options.userManagement,
 
 
-
         getCapabilities() {
             return defaultCapabilities;
-        },
+        }
     };
 }

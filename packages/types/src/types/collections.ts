@@ -165,7 +165,6 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     auth?: boolean | AuthCollectionConfig;
 
 
-
     /**
      * Order in which the properties are displayed.
      * If you are specifying your collection as code, the order is the same as the
@@ -746,7 +745,6 @@ export interface FilterPreset<Key extends string = string> {
      */
     sort?: [Key, "asc" | "desc"];
 }
-
 
 
 /**

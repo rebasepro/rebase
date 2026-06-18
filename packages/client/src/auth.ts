@@ -215,7 +215,9 @@ refreshToken: session.refreshToken };
         const responseBody = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, responseBody, res.statusText);
         const session = handleAuthResponse(responseBody, "SIGNED_IN");
-        return { user: session.user, accessToken: session.accessToken, refreshToken: session.refreshToken };
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
     }
 
     async function signInWithLinkedin(code: string, redirectUri: string) {
@@ -553,7 +555,7 @@ export function createCookieStorage(options: CookieStorageOptions = {}): AuthSto
         setItem(key: string, value: string): void {
             if (typeof document === "undefined") return;
             let cookieStr = `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-            
+
             if (defaultOptions.path) {
                 cookieStr += `; path=${defaultOptions.path}`;
             }
@@ -571,7 +573,7 @@ export function createCookieStorage(options: CookieStorageOptions = {}): AuthSto
             if (defaultOptions.sameSite) {
                 cookieStr += `; samesite=${defaultOptions.sameSite}`;
             }
-            
+
             document.cookie = cookieStr;
         },
         removeItem(key: string): void {

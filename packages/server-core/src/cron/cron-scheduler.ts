@@ -62,33 +62,38 @@ function expandCronField(field: string, min: number, max: number): number[] {
  */
 export function validateCronExpression(schedule: string): { valid: true } | { valid: false; reason: string } {
     if (!schedule || typeof schedule !== "string") {
-        return { valid: false, reason: "Schedule must be a non-empty string" };
+        return { valid: false,
+reason: "Schedule must be a non-empty string" };
     }
     const parts = schedule.trim().split(/\s+/);
     if (parts.length !== 5) {
-        return { valid: false, reason: `Expected 5 fields, got ${parts.length}` };
+        return { valid: false,
+reason: `Expected 5 fields, got ${parts.length}` };
     }
     const fieldRanges: [string, number, number][] = [
         ["minute", 0, 59],
         ["hour", 0, 23],
         ["day of month", 1, 31],
         ["month", 1, 12],
-        ["day of week", 0, 6],
+        ["day of week", 0, 6]
     ];
     for (let i = 0; i < 5; i++) {
         const [name, min, max] = fieldRanges[i];
         try {
             const values = expandCronField(parts[i], min, max);
             if (values.length === 0) {
-                return { valid: false, reason: `${name} field "${parts[i]}" produces no values` };
+                return { valid: false,
+reason: `${name} field "${parts[i]}" produces no values` };
             }
             for (const v of values) {
                 if (v < min || v > max) {
-                    return { valid: false, reason: `${name} field value ${v} out of range [${min}–${max}]` };
+                    return { valid: false,
+reason: `${name} field value ${v} out of range [${min}–${max}]` };
                 }
             }
         } catch (err) {
-            return { valid: false, reason: `${name} field: ${err instanceof Error ? err.message : String(err)}` };
+            return { valid: false,
+reason: `${name} field: ${err instanceof Error ? err.message : String(err)}` };
         }
     }
     return { valid: true };
@@ -362,7 +367,8 @@ export class CronScheduler {
                 finishedAt: new Date().toISOString(),
                 durationMs: 0,
                 success: true,
-                result: { skipped: true, reason: "already_executing" },
+                result: { skipped: true,
+reason: "already_executing" },
                 logs: ["Skipped: job is already running"],
                 manual: true
             };

@@ -22,7 +22,8 @@ class LogRingBuffer {
 
     push(entry: Omit<LogEntry, "id">): void {
         const id = `log_${++this.idCounter}`;
-        this.buffer.push({ ...entry, id });
+        this.buffer.push({ ...entry,
+id });
         if (this.buffer.length > this.maxSize) {
             this.buffer.shift();
         }

@@ -112,7 +112,8 @@ export function EntityCollectionViewActions<M extends Record<string, unknown>>({
     const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
-        parentCollectionSlugs, parentEntityIds,
+        parentCollectionSlugs,
+parentEntityIds,
         collection,
         selectionController,
         context,

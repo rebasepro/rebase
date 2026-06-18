@@ -30,19 +30,21 @@ describe("InsightsCache", () => {
             columns: []
         });
         expect(cache.getInflight("query_key")).toBeNull();
-        
+
         cache.setInflight("query_key", promise);
         expect(cache.getInflight("query_key")).toBe(promise);
 
         // Setting a result should remove the inflight reference
-        const data: InsightDataResult = { data: [], columns: [] };
+        const data: InsightDataResult = { data: [],
+columns: [] };
         cache.set("query_key", data);
         expect(cache.getInflight("query_key")).toBeNull();
     });
 
     it("should invalidate entries", () => {
         const cache = new InsightsCache();
-        const data: InsightDataResult = { data: [], columns: [] };
+        const data: InsightDataResult = { data: [],
+columns: [] };
         cache.set("key_1", data);
         cache.set("key_2", data);
 

@@ -72,12 +72,12 @@ const customersCollection: PostgresCollection = {
         shipping_address: {
             name: "Shipping Address",
             type: "string",
-            ui: { multiline: true },
+            ui: { multiline: true }
         },
         billing_address: {
             name: "Billing Address",
             type: "string",
-            ui: { multiline: true },
+            ui: { multiline: true }
         },
         notes: {
             name: "Notes",
@@ -89,13 +89,15 @@ const customersCollection: PostgresCollection = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true, hideFromCollection: true },
+            ui: { readOnly: true,
+hideFromCollection: true }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true, hideFromCollection: true },
+            ui: { readOnly: true,
+hideFromCollection: true }
         }
     },
     propertiesOrder: [

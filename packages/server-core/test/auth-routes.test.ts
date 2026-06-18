@@ -885,7 +885,8 @@ ipAddress: "1.2.3.4" }
         });
 
         it("returns needsSetup=false when isBootstrapCompleted returns true", async () => {
-            const app = createApp({ allowRegistration: false, isBootstrapCompleted: async () => true });
+            const app = createApp({ allowRegistration: false,
+isBootstrapCompleted: async () => true });
 
             const res = await app.request("/auth/config");
             expect(res.status).toBe(200);
@@ -1029,7 +1030,8 @@ withEmail: false });
             // this test documents the current behavior — it would assign admin.
             // The fix is in the config validation at startup (outside routes).
             // Here we verify the defaultRole IS what's passed, and the auto-escalation is gone.
-            const app = createApp({ allowRegistration: true, defaultRole: "viewer" });
+            const app = createApp({ allowRegistration: true,
+defaultRole: "viewer" });
 
             await app.request("/auth/register", json({
                 email: "new@test.com",

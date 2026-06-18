@@ -11,22 +11,26 @@ import type { ValuesCountEntry } from "../src/types";
 describe("parseReferenceString", () => {
     it("parses a simple path/entityId reference", () => {
         const result = parseReferenceString("users/abc123");
-        expect(result).toEqual({ path: "users", database: undefined });
+        expect(result).toEqual({ path: "users",
+database: undefined });
     });
 
     it("parses a nested path reference", () => {
         const result = parseReferenceString("organizations/org1/members/user1");
-        expect(result).toEqual({ path: "organizations/org1/members", database: undefined });
+        expect(result).toEqual({ path: "organizations/org1/members",
+database: undefined });
     });
 
     it("parses reference with database prefix", () => {
         const result = parseReferenceString("mydb:::users/abc123");
-        expect(result).toEqual({ path: "users", database: "mydb" });
+        expect(result).toEqual({ path: "users",
+database: "mydb" });
     });
 
     it("treats (default) database as undefined", () => {
         const result = parseReferenceString("(default):::users/abc123");
-        expect(result).toEqual({ path: "users", database: undefined });
+        expect(result).toEqual({ path: "users",
+database: undefined });
     });
 
     it("returns null for empty string", () => {
@@ -43,12 +47,14 @@ describe("parseReferenceString", () => {
 
     it("handles path with only one slash", () => {
         const result = parseReferenceString("a/b");
-        expect(result).toEqual({ path: "a", database: undefined });
+        expect(result).toEqual({ path: "a",
+database: undefined });
     });
 
     it("handles database prefix with nested path", () => {
         const result = parseReferenceString("mydb:::a/b/c/d");
-        expect(result).toEqual({ path: "a/b/c", database: "mydb" });
+        expect(result).toEqual({ path: "a/b/c",
+database: "mydb" });
     });
 });
 

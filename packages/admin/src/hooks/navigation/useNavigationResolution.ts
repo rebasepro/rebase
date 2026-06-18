@@ -92,7 +92,7 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
             if (!alreadyHas) {
                 result = {
                     ...result,
-                    entityActions: [...existing, injectedAction],
+                    entityActions: [...existing, injectedAction]
                 };
             }
         }
@@ -126,10 +126,10 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
                                     ? values.photoUrl
                                     : null,
                             providerId: "password",
-                            isAnonymous: false,
+                            isAnonymous: false
                         },
                         invitationSent: !!values.invitationSent,
-                        temporaryPassword: typeof values.temporaryPassword === "string" ? values.temporaryPassword : undefined,
+                        temporaryPassword: typeof values.temporaryPassword === "string" ? values.temporaryPassword : undefined
                     };
 
                     const { closeDialog } = dialogsController.open({
@@ -141,8 +141,8 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
                             })
                         )
                     });
-                },
-            },
+                }
+            }
         };
 
         return result;

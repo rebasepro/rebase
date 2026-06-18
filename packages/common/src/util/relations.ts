@@ -19,7 +19,8 @@ export function sanitizeRelation(
             targetCollection = resolveCollection(rawTarget);
         }
         if (!targetCollection) {
-            targetCollection = { slug: rawTarget, name: rawTarget } as EntityCollection;
+            targetCollection = { slug: rawTarget,
+name: rawTarget } as EntityCollection;
         }
     } else if (typeof rawTarget === "function") {
         const evaluated = rawTarget();
@@ -28,7 +29,8 @@ export function sanitizeRelation(
                 targetCollection = resolveCollection(evaluated);
             }
             if (!targetCollection) {
-                targetCollection = { slug: evaluated, name: evaluated } as EntityCollection;
+                targetCollection = { slug: evaluated,
+name: evaluated } as EntityCollection;
             }
         } else {
             targetCollection = evaluated;
@@ -295,7 +297,7 @@ export function resolvePropertyRelation({
             joinPath: relProp.joinPath,
             onUpdate: relProp.onUpdate,
             onDelete: relProp.onDelete,
-            overrides: relProp.overrides,
+            overrides: relProp.overrides
         } as Relation;
     }
 

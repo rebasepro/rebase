@@ -33,10 +33,14 @@ describe("MongoHistoryService", () => {
 
     describe("changedFields detection", () => {
         it("should correctly identify added, modified, and removed fields", () => {
-            const previous = { a: 1, b: 2, c: 3 };
-            const current = { a: 1, b: 20, d: 4 };
+            const previous = { a: 1,
+b: 2,
+c: 3 };
+            const current = { a: 1,
+b: 20,
+d: 4 };
 
-            // Calling findChangedFields internally happens in recordHistory, 
+            // Calling findChangedFields internally happens in recordHistory,
             const changed = findChangedFields(previous, current)!;
 
             expect(changed).toContain("b");
@@ -46,16 +50,20 @@ describe("MongoHistoryService", () => {
         });
 
         it("should ignore dunder properties", () => {
-            const previous = { a: 1, __rebase_meta: "foo" };
-            const current = { a: 1, __rebase_meta: "bar" };
+            const previous = { a: 1,
+__rebase_meta: "foo" };
+            const current = { a: 1,
+__rebase_meta: "bar" };
 
             const changed = findChangedFields(previous, current);
             expect(changed).toBeNull();
         });
 
         it("should return empty array if objects are deeply equal", () => {
-            const previous = { a: 1, b: { nested: true } };
-            const current = { a: 1, b: { nested: true } };
+            const previous = { a: 1,
+b: { nested: true } };
+            const current = { a: 1,
+b: { nested: true } };
 
             const changed = findChangedFields(previous, current);
             expect(changed).toBeNull();
@@ -86,8 +94,10 @@ describe("MongoHistoryService", () => {
                 action: "update",
                 entityId,
                 tableName: "users",
-                values: { name: "Alice Updated", age: 30 },
-                previousValues: { name: "Alice", age: 30 }
+                values: { name: "Alice Updated",
+age: 30 },
+                previousValues: { name: "Alice",
+age: 30 }
             });
 
             const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).toArray();
@@ -134,20 +144,31 @@ describe("MongoHistoryService", () => {
             });
 
             const entityId = new ObjectId().toString();
-            
+
             // Insert 3 records
-            await customHistoryService.recordHistory({ action: "create", entityId, tableName: "users", values: { a: 1 } });
+            await customHistoryService.recordHistory({ action: "create",
+entityId,
+tableName: "users",
+values: { a: 1 } });
             // add some delay to ensure order
             await new Promise(r => setTimeout(r, 10));
-            await customHistoryService.recordHistory({ action: "update", entityId, tableName: "users", values: { a: 2 }, previousValues: { a: 1 } });
+            await customHistoryService.recordHistory({ action: "update",
+entityId,
+tableName: "users",
+values: { a: 2 },
+previousValues: { a: 1 } });
             await new Promise(r => setTimeout(r, 10));
-            await customHistoryService.recordHistory({ action: "update", entityId, tableName: "users", values: { a: 3 }, previousValues: { a: 2 } });
+            await customHistoryService.recordHistory({ action: "update",
+entityId,
+tableName: "users",
+values: { a: 3 },
+previousValues: { a: 2 } });
 
             // Since it fire-and-forgets pruneHistory, we might need to wait slightly
             await new Promise(r => setTimeout(r, 100));
 
             const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray();
-            
+
             // Only the latest 2 should be kept
             expect(history).toHaveLength(2);
             expect(history[0].values).toEqual({ a: 2 });
@@ -161,7 +182,7 @@ describe("MongoHistoryService", () => {
             });
 
             const entityId = new ObjectId().toString();
-            
+
             // Insert manually to mock older date
             const twoDaysAgo = new Date();
             twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
@@ -187,12 +208,16 @@ describe("MongoHistoryService", () => {
             ]);
 
             // Trigger prune by inserting a new one
-            await customHistoryService.recordHistory({ action: "update", entityId, tableName: "users", values: { a: 3 }, previousValues: { a: 2 } });
+            await customHistoryService.recordHistory({ action: "update",
+entityId,
+tableName: "users",
+values: { a: 3 },
+previousValues: { a: 2 } });
 
             await new Promise(r => setTimeout(r, 100));
 
             const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray();
-            
+
             // The record from twoDaysAgo should be deleted
             expect(history).toHaveLength(2);
             expect(history[0].values).toEqual({ a: 2 });

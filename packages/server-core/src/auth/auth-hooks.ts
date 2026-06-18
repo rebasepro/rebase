@@ -253,8 +253,8 @@ export interface AuthHooks {
  * never access the raw `AuthHooks` directly.
  */
 export type ResolvedAuthHooks =
-    Required<Pick<AuthHooks, 'hashPassword' | 'verifyPassword' | 'validatePasswordStrength'>>
-    & Omit<AuthHooks, 'hashPassword' | 'verifyPassword' | 'validatePasswordStrength'>;
+    Required<Pick<AuthHooks, "hashPassword" | "verifyPassword" | "validatePasswordStrength">>
+    & Omit<AuthHooks, "hashPassword" | "verifyPassword" | "validatePasswordStrength">;
 
 /**
  * Merge user-provided hooks with the built-in defaults to produce
@@ -274,6 +274,6 @@ export function resolveAuthHooks(hooks?: AuthHooks): ResolvedAuthHooks {
             ?? defaultVerifyPassword,
 
         validatePasswordStrength: hooks?.validatePasswordStrength
-            ?? defaultValidatePasswordStrength,
+            ?? defaultValidatePasswordStrength
     };
 }

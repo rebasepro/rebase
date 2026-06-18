@@ -9,7 +9,7 @@ import { InsightWidget } from "./InsightWidget";
  * Renders scorecards in a responsive grid (up to 4 columns).
  */
 export function HomeInsightsSlot({
-    insights,
+    insights
 }: {
     insights: InsightDefinition[];
 }) {

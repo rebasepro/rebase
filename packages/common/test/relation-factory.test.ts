@@ -26,7 +26,9 @@ describe("createRelationRef", () => {
 
     it("is structurally identical to a hand-written literal", () => {
         const factory = createRelationRef("x", "y");
-        const manual = { id: "x", path: "y", __type: "relation" as const };
+        const manual = { id: "x",
+path: "y",
+__type: "relation" as const };
         expect(factory).toEqual(manual);
     });
 });
@@ -70,7 +72,8 @@ describe("resolveCollectionRelations memoization", () => {
         slug: "test",
         path: "test",
         properties: {
-            title: { type: "string", name: "Title" } as Property
+            title: { type: "string",
+name: "Title" } as Property
         },
         collectionType: "postgres",
         tableName: "test"

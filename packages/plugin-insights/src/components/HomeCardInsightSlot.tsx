@@ -10,7 +10,7 @@ import { InsightWidget } from "./InsightWidget";
  */
 export function HomeCardInsightSlot({
     slug,
-    insights,
+    insights
 }: {
     slug: string;
     collection: unknown;

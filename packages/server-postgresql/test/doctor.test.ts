@@ -135,12 +135,17 @@ columnType: "time" } as DateProperty)).toBe("time without time zone");
         it("should map json types correctly", () => {
             expect(getExpectedColumnType({ type: "map" })).toBe("jsonb");
             expect(getExpectedColumnType({ type: "array" })).toBe("jsonb");
-            expect(getExpectedColumnType({ type: "array", columnType: "json" } as ArrayProperty)).toBe("json");
-            
+            expect(getExpectedColumnType({ type: "array",
+columnType: "json" } as ArrayProperty)).toBe("json");
+
             // Native array element type mappings
-            expect(getExpectedColumnType({ type: "array", of: { type: "string" } } as ArrayProperty)).toBe("ARRAY");
-            expect(getExpectedColumnType({ type: "array", of: { type: "number", validation: { integer: true } } } as ArrayProperty)).toBe("ARRAY");
-            expect(getExpectedColumnType({ type: "array", of: { type: "boolean" } } as ArrayProperty)).toBe("ARRAY");
+            expect(getExpectedColumnType({ type: "array",
+of: { type: "string" } } as ArrayProperty)).toBe("ARRAY");
+            expect(getExpectedColumnType({ type: "array",
+of: { type: "number",
+validation: { integer: true } } } as ArrayProperty)).toBe("ARRAY");
+            expect(getExpectedColumnType({ type: "array",
+of: { type: "boolean" } } as ArrayProperty)).toBe("ARRAY");
         });
 
         it("should map enum string to USER-DEFINED", () => {

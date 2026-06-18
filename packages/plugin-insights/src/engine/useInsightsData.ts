@@ -97,5 +97,7 @@ export function useInsightsData(
         };
     }, [definition.id, definition.data, context.path, context.collectionSlug, cacheKey, cache, authReady]);
 
-    return { data, loading, error };
+    return { data,
+loading,
+error };
 }

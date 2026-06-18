@@ -87,7 +87,8 @@ describe("computeNavigationGroups", () => {
 
     it("preserves existing group mappings and adds unassigned to default", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products", "orders"] }
+            { name: "Content",
+entries: ["products", "orders"] }
         ];
 
         const result = computeNavigationGroups({
@@ -113,8 +114,10 @@ describe("computeNavigationGroups", () => {
         } as unknown as AppView;
 
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products"] },
-            { name: "Main", entries: ["dashboard"] }
+            { name: "Content",
+entries: ["products"] },
+            { name: "Main",
+entries: ["dashboard"] }
         ];
 
         const result = computeNavigationGroups({
@@ -134,7 +137,8 @@ describe("computeNavigationGroups", () => {
 
     it("deduplicates entries within groups", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products", "products"] }
+            { name: "Content",
+entries: ["products", "products"] }
         ];
 
         const result = computeNavigationGroups({
@@ -171,7 +175,8 @@ describe("computeNavigationGroups", () => {
 
     it("does not mutate the original input mappings", () => {
         const existingMappings: NavigationGroupMapping[] = [
-            { name: "Content", entries: ["products"] }
+            { name: "Content",
+entries: ["products"] }
         ];
         const originalEntries = [...existingMappings[0].entries];
 
@@ -202,7 +207,8 @@ describe("areCollectionsEqual", () => {
         name: "Products",
         path: "products",
         slug: "products",
-        properties: { title: { type: "string", name: "Title" } }
+        properties: { title: { type: "string",
+name: "Title" } }
     } as unknown as EntityCollection;
 
     const collB: EntityCollection = {
@@ -210,7 +216,8 @@ describe("areCollectionsEqual", () => {
         name: "Products",
         path: "products",
         slug: "products",
-        properties: { title: { type: "string", name: "Title" } }
+        properties: { title: { type: "string",
+name: "Title" } }
     } as unknown as EntityCollection;
 
     it("considers identical collections equal", () => {
@@ -218,14 +225,16 @@ describe("areCollectionsEqual", () => {
     });
 
     it("considers collections with different slugs unequal", () => {
-        const different = { ...collA, slug: "different" } as unknown as EntityCollection;
+        const different = { ...collA,
+slug: "different" } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
     it("considers collections with different properties unequal", () => {
         const different = {
             ...collA,
-            properties: { body: { type: "string", name: "Body" } }
+            properties: { body: { type: "string",
+name: "Body" } }
         } as unknown as EntityCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
@@ -289,7 +298,8 @@ describe("areCollectionListsEqual", () => {
     });
 
     it("returns false for different collections", () => {
-        const col3 = { ...col1, slug: "c" } as unknown as EntityCollection;
+        const col3 = { ...col1,
+slug: "c" } as unknown as EntityCollection;
         expect(areCollectionListsEqual([col1], [col3])).toBe(false);
     });
 

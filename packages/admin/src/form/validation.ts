@@ -455,7 +455,7 @@ function getZodArraySchema({
                                 result.error.issues.forEach((issue) => {
                                     ctx.addIssue({
                                         code: "custom",
-                                        message: issue.message,
+                                        message: issue.message
                                     });
                                 });
                             }
@@ -539,21 +539,21 @@ function getZodVectorSchema({
         },
         z.array(z.number()).nullable().optional()
     );
-    
+
     if (property.dimensions) {
         schema = schema.refine(
             (val: unknown) => val === null || val === undefined || (Array.isArray(val) && val.length === property.dimensions),
             { message: `${property.name ?? "Vector"} must have exactly ${property.dimensions} dimensions` }
         );
     }
-    
+
     if (property.validation?.required) {
         schema = schema.refine(
             (val: unknown) => val !== null && val !== undefined && Array.isArray(val) && val.length > 0,
             { message: property.validation?.requiredMessage ?? "Required" }
         );
     }
-    
+
     return schema;
 }
 

@@ -22,11 +22,21 @@ const ordersCollection: EntityCollection = {
             name: "Status",
             type: "string",
             enum: [
-                { id: "pending", label: "Pending", color: "gray" },
-                { id: "processing", label: "Processing", color: "blue" },
-                { id: "shipped", label: "Shipped", color: "orange" },
-                { id: "delivered", label: "Delivered", color: "green" },
-                { id: "cancelled", label: "Cancelled", color: "red" }
+                { id: "pending",
+label: "Pending",
+color: "gray" },
+                { id: "processing",
+label: "Processing",
+color: "blue" },
+                { id: "shipped",
+label: "Shipped",
+color: "orange" },
+                { id: "delivered",
+label: "Delivered",
+color: "green" },
+                { id: "cancelled",
+label: "Cancelled",
+color: "red" }
             ]
         },
         total: {

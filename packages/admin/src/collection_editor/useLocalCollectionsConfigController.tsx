@@ -3,7 +3,7 @@ import { EntityCollection, Properties } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 export function useLocalCollectionsConfigController(
     clientOrUrl: any,
     baseCollections: EntityCollection[] = [],
@@ -14,10 +14,15 @@ export function useLocalCollectionsConfigController(
 ): CollectionsConfigController {
 
     const parsedCollections = baseCollections;
+    
+    // Store latest options in a ref to prevent stale closures in the `request` function
+    // due to useMemo caching the saveCollection function.
+    const optionsRef = useRef(options);
+    optionsRef.current = options;
 
     const request = async (endpoint: string, payload: Record<string, unknown>) => {
         try {
-            let token = options?.getAuthToken ? await options.getAuthToken() : null;
+            let token = optionsRef.current?.getAuthToken ? await optionsRef.current.getAuthToken() : null;
             let baseUrl = typeof clientOrUrl === "string" ? clientOrUrl : "";
 
             if (typeof clientOrUrl === "object" && clientOrUrl !== null) {

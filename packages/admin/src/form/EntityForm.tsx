@@ -520,7 +520,8 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const formActionProps: PluginFormActionProps = {
         entityId,
-        parentCollectionSlugs, parentEntityIds,
+        parentCollectionSlugs,
+parentEntityIds,
         path: path,
         status,
         collection: collection as EntityCollection,

@@ -17,7 +17,7 @@ const UPDATE_SEARCH_INDEX_WAIT_MS = 220;
 
 
 function toPascalCase(str: string): string {
-    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
+    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
 }
 
 function resolveIcon(iconKey: string): React.ComponentType<{ size: number }> | null {

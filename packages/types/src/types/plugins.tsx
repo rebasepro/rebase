@@ -137,7 +137,6 @@ export interface RebasePlugin {
     views?: AppView[];
 
 
-
     /**
      * Optional lifecycle hooks. Called by the Rebase runtime
      * at appropriate points in the app lifecycle.

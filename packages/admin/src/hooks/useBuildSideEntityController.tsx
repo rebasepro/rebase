@@ -188,7 +188,7 @@ width: newWidth };
         sideDialogsController.open(
             propsToSidePanel({
                 ...props,
-                selectedTab: props.selectedTab ?? defaultSelectedView,
+                selectedTab: props.selectedTab ?? defaultSelectedView
             },
                 urlController.buildUrlCollectionPath,
                 urlController.resolveDatabasePathsFrom,

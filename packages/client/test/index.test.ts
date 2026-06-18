@@ -297,8 +297,10 @@ photoURL: null }
                         ok: false,
                         status: 401,
                         statusText: "Unauthorized",
-                        text: async () => JSON.stringify({ error: { message: "Token expired", code: "UNAUTHORIZED" } }),
-                        json: async () => ({ error: { message: "Token expired", code: "UNAUTHORIZED" } }),
+                        text: async () => JSON.stringify({ error: { message: "Token expired",
+code: "UNAUTHORIZED" } }),
+                        json: async () => ({ error: { message: "Token expired",
+code: "UNAUTHORIZED" } }),
                         headers: new Headers()
                     } as unknown as Response;
                 }
@@ -328,8 +330,12 @@ photoURL: null }
                 return {
                     ok: true,
                     status: 200,
-                    text: async () => JSON.stringify({ data: [{ id: 1, title: "Post" }], meta: { total: 1 } }),
-                    json: async () => ({ data: [{ id: 1, title: "Post" }], meta: { total: 1 } }),
+                    text: async () => JSON.stringify({ data: [{ id: 1,
+title: "Post" }],
+meta: { total: 1 } }),
+                    json: async () => ({ data: [{ id: 1,
+title: "Post" }],
+meta: { total: 1 } }),
                     headers: new Headers()
                 } as unknown as Response;
             }) as unknown as typeof globalThis.fetch;

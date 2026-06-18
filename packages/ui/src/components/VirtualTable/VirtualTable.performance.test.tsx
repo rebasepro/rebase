@@ -9,7 +9,7 @@ import { VirtualTableProps } from "./VirtualTableProps";
 // Mock VirtualTableRow to track renders
 const renderCallback = jest.fn();
 jest.mock("./VirtualTableRow", () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+
     const React = require("react");
     // Ensure it's memoized as in the real component, otherwise it would re-render anyway if parent renders
     // But wait, if parent passes new props, it re-renders.

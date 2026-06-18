@@ -104,7 +104,7 @@ function buildCollectionContext(ctx: AdminUserContext): AuthCollectionContext {
             : undefined,
         emailConfigured: isEmailConfigured,
         appName: ctx.emailConfig?.appName || "Rebase",
-        resetPasswordUrl: ctx.emailConfig?.resetPasswordUrl || "",
+        resetPasswordUrl: ctx.emailConfig?.resetPasswordUrl || ""
     };
 }
 
@@ -132,7 +132,7 @@ export async function prepareAdminUserValues(
             values: hookResult.values,
             clearPassword: hookResult.temporaryPassword,
             hookHandledEmail: true,
-            invitationSent: hookResult.invitationSent ?? false,
+            invitationSent: hookResult.invitationSent ?? false
         };
     }
 
@@ -142,13 +142,13 @@ export async function prepareAdminUserValues(
             authRepo: ctx.authRepo,
             emailService: ctx.emailService,
             emailConfig: ctx.emailConfig,
-            hashPassword: (password: string) => resolvedHooks.hashPassword(password),
+            hashPassword: (password: string) => resolvedHooks.hashPassword(password)
         });
         return {
             values: hookResult.values,
             clearPassword: hookResult.temporaryPassword,
             hookHandledEmail: true,
-            invitationSent: hookResult.invitationSent ?? false,
+            invitationSent: hookResult.invitationSent ?? false
         };
     }
 
@@ -169,7 +169,7 @@ export async function prepareAdminUserValues(
         values,
         clearPassword: password ? undefined : clearPassword,
         hookHandledEmail: false,
-        invitationSent: false,
+        invitationSent: false
     };
 }
 
@@ -209,23 +209,27 @@ export async function finalizeAdminUserCreation(
             const appName = ctx.emailConfig?.appName || "Rebase";
             const templateFn = ctx.emailConfig?.templates?.passwordReset;
             const emailContent = templateFn
-                ? templateFn(setPasswordUrl, { email: entity.values.email as string, displayName: entity.values.displayName as string })
-                : getPasswordResetTemplate(setPasswordUrl, { email: entity.values.email as string, displayName: entity.values.displayName as string }, appName);
+                ? templateFn(setPasswordUrl, { email: entity.values.email as string,
+displayName: entity.values.displayName as string })
+                : getPasswordResetTemplate(setPasswordUrl, { email: entity.values.email as string,
+displayName: entity.values.displayName as string }, appName);
 
             await ctx.emailService!.send({
                 to: entity.values.email as string,
                 subject: emailContent.subject,
                 html: emailContent.html,
-                text: emailContent.text,
+                text: emailContent.text
             });
             return { invitationSent: true };
         } catch (emailError: unknown) {
             console.error("Failed to send reset email:", emailError instanceof Error ? emailError.message : emailError);
             // Fall back to returning the temporary password
-            return { temporaryPassword: clearPassword, invitationSent: false };
+            return { temporaryPassword: clearPassword,
+invitationSent: false };
         }
     }
 
     // No email service — return the temporary password
-    return { temporaryPassword: clearPassword, invitationSent: false };
+    return { temporaryPassword: clearPassword,
+invitationSent: false };
 }

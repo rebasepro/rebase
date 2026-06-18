@@ -36,7 +36,8 @@ describe("PostgresBackendDriver", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         const mockRegistry = {
-            getCollectionByPath: jest.fn().mockReturnValue({ slug: "test_coll", properties: {} }),
+            getCollectionByPath: jest.fn().mockReturnValue({ slug: "test_coll",
+properties: {} }),
             getCollections: jest.fn().mockReturnValue([]),
             getTable: jest.fn().mockReturnValue({})
         } as any;
@@ -683,7 +684,9 @@ status: "new" });
             } as any;
 
             jest.spyOn(delegate.entityService, "fetchCollection").mockResolvedValueOnce([
-                { id: "e1", path: "test_coll", values: {} } as any
+                { id: "e1",
+path: "test_coll",
+values: {} } as any
             ]);
 
             await delegate.fetchCollection({
@@ -712,7 +715,9 @@ status: "new" });
             } as any;
 
             jest.spyOn(delegate.entityService, "fetchEntity").mockResolvedValueOnce(
-                { id: "e1", path: "test_coll", values: {} } as any
+                { id: "e1",
+path: "test_coll",
+values: {} } as any
             );
 
             await delegate.fetchEntity({
@@ -744,7 +749,9 @@ status: "new" });
 
             jest.spyOn(delegate.entityService, "fetchEntity").mockResolvedValue(undefined);
             jest.spyOn(delegate.entityService, "saveEntity").mockResolvedValueOnce(
-                { id: "e1", path: "test_coll", values: { name: "test" } } as any
+                { id: "e1",
+path: "test_coll",
+values: { name: "test" } } as any
             );
 
             await delegate.saveEntity({
@@ -780,7 +787,9 @@ status: "new" });
             jest.spyOn(delegate.entityService, "deleteEntity").mockResolvedValueOnce();
 
             await delegate.deleteEntity({
-                entity: { id: "e1", path: "test_coll", values: {} } as any,
+                entity: { id: "e1",
+path: "test_coll",
+values: {} } as any,
                 collection: mockCollectionWithCallback
             });
 

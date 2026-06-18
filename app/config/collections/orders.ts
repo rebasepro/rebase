@@ -203,25 +203,27 @@ const ordersCollection: PostgresCollection = {
             name: "Shipped Date",
             type: "date",
             mode: "date_time",
-            ui: { clearable: true },
+            ui: { clearable: true }
         },
         delivered_date: {
             name: "Delivered Date",
             type: "date",
             mode: "date_time",
-            ui: { clearable: true },
+            ui: { clearable: true }
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true, hideFromCollection: true },
+            ui: { readOnly: true,
+hideFromCollection: true }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true, hideFromCollection: true },
+            ui: { readOnly: true,
+hideFromCollection: true }
         }
     },
     propertiesOrder: [

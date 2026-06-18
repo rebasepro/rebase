@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { deepEqual as equal } from "fast-equals"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- used as fallback for many array types
+
 const EMPTY_ARRAY: any[] = [];
 const DEFAULT_ENTITY_OPEN_MODE = "split";
 
@@ -41,7 +41,7 @@ import { EntityCollectionListView } from "./EntityCollectionListView";
 import { SplitListView } from "./SplitListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
 import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
-import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, TextField, Tooltip, Typography, VirtualTableColumn , iconSize } from "@rebasepro/ui";
+import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, TextField, Tooltip, Typography, VirtualTableColumn, iconSize } from "@rebasepro/ui";
 import { ArrowRightToLineIcon, ErrorBoundary, PlusIcon, SearchIcon } from "@rebasepro/ui";
 import { setIn } from "@rebasepro/formex";
 import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
@@ -413,14 +413,16 @@ export const EntityCollectionView = React.memo(
 
         const pluginAddColumnComponents = useSlot("collection.add-column", {
             path,
-            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
             tableController
         });
 
         const pluginToolbarWidgets = useSlot("collection.toolbar", {
             path,
-            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection: collection,
             tableController: tableController,
             selectionController: usedSelectionController
@@ -428,7 +430,8 @@ export const EntityCollectionView = React.memo(
 
         const pluginEmptyStates = useSlot("collection.empty-state", {
             path,
-            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
             canCreate: canCreateEntities,
             onNewClick
@@ -436,7 +439,8 @@ export const EntityCollectionView = React.memo(
 
         const pluginInsights = useSlot("collection.insights", {
             path,
-            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection
         });
 
@@ -771,7 +775,8 @@ export const EntityCollectionView = React.memo(
                 path,
                 collection: collection as EntityCollection,
                 tableController: tableController as EntityTableController,
-                parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
+                parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
             };
             return <>{headerActionContributions.map((s, i) => (
                 <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
@@ -814,7 +819,8 @@ export const EntityCollectionView = React.memo(
                     .forEach(plugin => {
                         plugin.hooks!.onColumnsReorder!({
                             fullPath: path,
-                            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY, parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+                            parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                             collection,
                             newPropertiesOrder
                         });
@@ -845,7 +851,8 @@ export const EntityCollectionView = React.memo(
         const pluginErrorViews = useSlot("collection.error", {
             path,
             collection,
-            parentCollectionSlugs, parentEntityIds,
+            parentCollectionSlugs,
+parentEntityIds,
             error: tableController.dataLoadingError as Error
         });
         const pluginErrorView = tableController.dataLoadingError && pluginErrorViews.length > 0

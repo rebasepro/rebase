@@ -305,7 +305,7 @@ code: "INTERNAL_ERROR" } }, 500);
                     // api_keys table instead of JWT verification.
                     const result = await validateApiKey(c, token, {
                         store: apiKeyStore,
-                        driver,
+                        driver
                     });
                     if (result !== true) {
                         return result;

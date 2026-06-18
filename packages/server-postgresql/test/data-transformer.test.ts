@@ -175,10 +175,12 @@ path: "authors" }
 
     // ── Vector property ──
     describe("vector property", () => {
-        const vectorProp: Property = { type: "vector", dimensions: 3 } as Property;
+        const vectorProp: Property = { type: "vector",
+dimensions: 3 } as Property;
 
         it("should serialize a Vector instance to a flat array", () => {
-            const vectorVal = { __type: "Vector", value: [1.5, -2.0, 3.14] };
+            const vectorVal = { __type: "Vector",
+value: [1.5, -2.0, 3.14] };
             expect(serializePropertyToServer(vectorVal, vectorProp)).toEqual([1.5, -2.0, 3.14]);
         });
 

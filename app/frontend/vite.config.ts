@@ -47,7 +47,7 @@ export default defineConfig({
                     if (id.includes("node_modules/tailwind-merge/")) return "vendor-tailwind-merge";
                     if (id.includes("node_modules/notistack/")) return "vendor-notistack";
                     if (id.includes("node_modules/lucide-react/")) return "vendor-lucide-react";
-                    
+
                     if (id.includes("packages/ui/")) return "rebase-ui";
                     if (id.includes("packages/core/")) return "rebase-core";
                     if (id.includes("packages/admin/")) return "rebase-admin";
@@ -63,7 +63,8 @@ export default defineConfig({
         react({}),
         tailwindcss(),
         rebaseCollectionsPlugin({ collectionsDir: "../config/collections" }),
-        visualizer({ filename: "stats.json", template: "raw-data" })
+        visualizer({ filename: "stats.json",
+template: "raw-data" })
     ],
     css: {
         preprocessorOptions: {

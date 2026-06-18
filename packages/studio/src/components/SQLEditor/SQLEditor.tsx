@@ -111,17 +111,18 @@ const QueryLoadingView = () => {
 const STORAGE_KEY_TABS = "rebase_sql_tabs";
 const STORAGE_KEY_ACTIVE_TAB = "rebase_sql_active_tab";
 
-const FixedEditorOverlay = ({ 
-    displayValue, 
-    onSave, 
-    onCancel 
-}: { 
-    displayValue: string, 
-    onSave: (val: string | null) => void, 
-    onCancel: () => void 
+const FixedEditorOverlay = ({
+    displayValue,
+    onSave,
+    onCancel
+}: {
+    displayValue: string,
+    onSave: (val: string | null) => void,
+    onCancel: () => void
 }) => {
     const [rect, setRect] = useState<DOMRect | null>(null);
-    const [windowSize, setWindowSize] = useState({ width: 1000, height: 1000 });
+    const [windowSize, setWindowSize] = useState({ width: 1000,
+height: 1000 });
     const anchorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -129,10 +130,12 @@ const FixedEditorOverlay = ({
             setRect(anchorRef.current.parentElement.getBoundingClientRect());
         }
         if (typeof window !== "undefined") {
-            setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-            const handleResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-            window.addEventListener('resize', handleResize);
-            return () => window.removeEventListener('resize', handleResize);
+            setWindowSize({ width: window.innerWidth,
+height: window.innerHeight });
+            const handleResize = () => setWindowSize({ width: window.innerWidth,
+height: window.innerHeight });
+            window.addEventListener("resize", handleResize);
+            return () => window.removeEventListener("resize", handleResize);
         }
         return undefined;
     }, []);
@@ -149,7 +152,7 @@ const FixedEditorOverlay = ({
     if (left + minWidth > windowSize.width) {
         left = Math.max(10, windowSize.width - minWidth - 10);
     }
-    
+
     // Calculate a max height that doesn't overflow the bottom
     const maxAvailableHeight = Math.max(50, windowSize.height - top - 10);
     const resolvedMaxHeight = Math.min(300, maxAvailableHeight);
@@ -162,13 +165,13 @@ const FixedEditorOverlay = ({
     return (
         <div ref={anchorRef} className="w-full h-full min-h-[20px]">
             {createPortal(
-                <div 
+                <div
                     className="fixed z-[9999] bg-surface-50 dark:bg-surface-900 border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
-                    style={{ 
-                        top, 
-                        left, 
-                        minWidth, 
-                        minHeight, 
+                    style={{
+                        top,
+                        left,
+                        minWidth,
+                        minHeight,
                         maxWidth: Math.min(400, windowSize.width - left - 10)
                     }}
                 >
@@ -176,7 +179,8 @@ const FixedEditorOverlay = ({
                         className="w-full h-full bg-transparent outline-none border-none ring-0 font-mono text-[13px] text-text-primary dark:text-text-primary-dark px-4 py-1.5 resize-none overflow-y-auto"
                         defaultValue={displayValue}
                         autoFocus
-                        style={{ minHeight: '32px', maxHeight: resolvedMaxHeight }}
+                        style={{ minHeight: "32px",
+maxHeight: resolvedMaxHeight }}
                         onFocus={(e) => {
                             const val = e.target.value;
                             e.target.value = "";
@@ -342,7 +346,8 @@ export const SQLEditor = () => {
                     if (actualDb) {
                         setSelectedDatabase(actualDb);
                         localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, actualDb);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.database || !dbs.includes(t.database)) ? { ...t, database: actualDb } : t));
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.database || !dbs.includes(t.database)) ? { ...t,
+database: actualDb } : t));
                     }
 
                     const currentUser = (currentUserResult?.[0] as Record<string, unknown> | undefined)?.role as string | undefined;
@@ -360,7 +365,8 @@ export const SQLEditor = () => {
                     if (actualRole) {
                         setSelectedRole(actualRole);
                         localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, actualRole);
-                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.role || !roles.includes(t.role)) ? { ...t, role: actualRole } : t));
+                        setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.role || !roles.includes(t.role)) ? { ...t,
+role: actualRole } : t));
                     }
                 }
             } catch (err: unknown) {
@@ -384,7 +390,8 @@ export const SQLEditor = () => {
     const handleDatabaseChange = (db: string, tabId?: string) => {
         setSelectedDatabase(db);
         localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, db);
-        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t, database: db } : t));
+        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
+database: db } : t));
         // Reset so the schema will be re-fetched for the new database
         schemaFetchedRef.current = false;
     };
@@ -392,7 +399,8 @@ export const SQLEditor = () => {
     const handleRoleChange = (role: string, tabId?: string) => {
         setSelectedRole(role);
         localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, role);
-        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t, role } : t));
+        setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
+role } : t));
     };
 
     const handleTabChange = useCallback((newTabId: string) => {
@@ -404,14 +412,16 @@ export const SQLEditor = () => {
                 localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, newTab.database);
                 schemaFetchedRef.current = false;
             } else if (!newTab.database && selectedDatabase) {
-                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, database: selectedDatabase } : t));
+                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
+database: selectedDatabase } : t));
             }
 
             if (newTab.role && newTab.role !== selectedRole) {
                 setSelectedRole(newTab.role);
                 localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, newTab.role);
             } else if (!newTab.role && selectedRole) {
-                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, role: selectedRole } : t));
+                setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
+role: selectedRole } : t));
             }
         }
     }, [tabs, selectedDatabase, selectedRole, projectPrefix]);
@@ -777,7 +787,7 @@ execTime: Math.round(performance.now() - start) });
     const executeRun = useCallback(async (sqlOverride?: string) => {
         let sqlToRun = sqlOverride || activeTab.sql;
         const upperSql = sqlToRun.toUpperCase();
-        
+
         const isAggregate = /\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i.test(sqlToRun);
         const isExplain = /\bEXPLAIN\b/i.test(sqlToRun);
 
@@ -1370,8 +1380,8 @@ isFavorite: !s.isFavorite } : s));
                                         >
                                             <DatabaseIcon size={iconSize.small} className="mr-1.5 text-text-disabled dark:text-text-disabled-dark"/>
                                             <span className="max-w-[160px] truncate">
-                                                {isLoadingConfig 
-                                                    ? "..." 
+                                                {isLoadingConfig
+                                                    ? "..."
                                                     : `${selectedDatabase || t("studio_sql_select_db")}${selectedRole ? ` (${selectedRole})` : ""}`}
                                             </span>
                                         </Button>

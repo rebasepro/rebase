@@ -79,7 +79,6 @@ export function ViewModeToggle({
     const { t } = useTranslation();
 
 
-
     // Get icon for current view mode
     const getViewModeIcon = () => {
         if (viewMode === "kanban") return <KanbanIcon size={iconSize.smallest}/>;

@@ -89,7 +89,8 @@ export class MongoUserService implements UserRepository {
     }
 
     async getUserByIdentity(provider: string, providerId: string): Promise<UserData | null> {
-        const identity = await this.identitiesCollection.findOne({ provider, providerId });
+        const identity = await this.identitiesCollection.findOne({ provider,
+providerId });
         if (!identity) return null;
         return this.getUserById(identity.userId);
     }
@@ -110,7 +111,8 @@ export class MongoUserService implements UserRepository {
     async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
         const now = new Date();
         await this.identitiesCollection.updateOne(
-            { provider, providerId },
+            { provider,
+providerId },
             {
                 $setOnInsert: {
                     _id: new ObjectId().toString(),
@@ -130,7 +132,8 @@ export class MongoUserService implements UserRepository {
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
-        const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
+        const updateData: Record<string, unknown> = { ...data,
+updatedAt: new Date() };
         if (typeof updateData.email === "string") updateData.email = updateData.email.toLowerCase();
 
         await this.collection.updateOne({ id }, { $set: updateData });
@@ -161,8 +164,10 @@ export class MongoUserService implements UserRepository {
         if (search) {
             const escapedSearch = escapeRegExp(search);
             query.$or = [
-                { email: { $regex: escapedSearch, $options: "i" } },
-                { displayName: { $regex: escapedSearch, $options: "i" } }
+                { email: { $regex: escapedSearch,
+$options: "i" } },
+                { displayName: { $regex: escapedSearch,
+$options: "i" } }
             ];
         }
 
@@ -189,21 +194,26 @@ export class MongoUserService implements UserRepository {
     async updatePassword(id: string, passwordHash: string): Promise<void> {
         await this.collection.updateOne(
             { id },
-            { $set: { passwordHash, updatedAt: new Date() } }
+            { $set: { passwordHash,
+updatedAt: new Date() } }
         );
     }
 
     async setEmailVerified(id: string, verified: boolean): Promise<void> {
         await this.collection.updateOne(
             { id },
-            { $set: { emailVerified: verified, emailVerificationToken: null, updatedAt: new Date() } }
+            { $set: { emailVerified: verified,
+emailVerificationToken: null,
+updatedAt: new Date() } }
         );
     }
 
     async setVerificationToken(id: string, token: string | null): Promise<void> {
         await this.collection.updateOne(
             { id },
-            { $set: { emailVerificationToken: token, emailVerificationSentAt: token ? new Date() : null, updatedAt: new Date() } }
+            { $set: { emailVerificationToken: token,
+emailVerificationSentAt: token ? new Date() : null,
+updatedAt: new Date() } }
         );
     }
 
@@ -246,8 +256,11 @@ export class MongoUserService implements UserRepository {
 
     async assignDefaultRole(userId: string, roleId: string): Promise<void> {
         await this.userRolesCollection.updateOne(
-            { userId, roleId },
-            { $setOnInsert: { _id: new ObjectId().toString(), userId, roleId } },
+            { userId,
+roleId },
+            { $setOnInsert: { _id: new ObjectId().toString(),
+userId,
+roleId } },
             { upsert: true }
         );
     }
@@ -256,7 +269,8 @@ export class MongoUserService implements UserRepository {
         const user = await this.getUserById(userId);
         if (!user) return null;
         const roles = await this.getUserRoles(userId);
-        return { user, roles };
+        return { user,
+roles };
     }
 }
 
@@ -379,7 +393,8 @@ export class MongoRefreshTokenService {
     }
 
     async deleteById(id: string, userId: string): Promise<void> {
-        await this.collection.deleteOne({ id, userId });
+        await this.collection.deleteOne({ id,
+userId });
     }
 }
 
@@ -391,7 +406,8 @@ export class MongoPasswordResetTokenService {
     }
 
     async createToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.collection.deleteMany({ userId, usedAt: null });
+        await this.collection.deleteMany({ userId,
+usedAt: null });
 
         await this.collection.insertOne({
             _id: new ObjectId().toString(),

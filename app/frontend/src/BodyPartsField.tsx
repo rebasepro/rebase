@@ -26,72 +26,164 @@ interface HotspotZone {
 const HOTSPOT_ZONES: Record<string, HotspotZone[]> = {
     // Head: y=4-18%, x=45-55% (centered head/neck region)
     head_neck: [
-        { top: 4, left: 42, width: 16, height: 15, view: "front" }
+        { top: 4,
+left: 42,
+width: 16,
+height: 15,
+view: "front" }
     ],
     // Shoulders: y=20-24%, the deltoid caps where arms meet torso
     // Front: body widens from ~43% to ~37% at y=20-24%
     shoulders: [
-        { top: 19, left: 36, width: 10, height: 6, view: "front" },
-        { top: 19, left: 54, width: 10, height: 6, view: "front" }
+        { top: 19,
+left: 36,
+width: 10,
+height: 6,
+view: "front" },
+        { top: 19,
+left: 54,
+width: 10,
+height: 6,
+view: "front" }
     ],
     // Chest: y=24-32%, torso center x=36-64%
     chest: [
-        { top: 23, left: 37, width: 26, height: 10, view: "front" }
+        { top: 23,
+left: 37,
+width: 26,
+height: 10,
+view: "front" }
     ],
     // Biceps (front upper arm): y=26-36%, arms at x=33-38% and x=62-67%
     biceps: [
-        { top: 26, left: 33, width: 6, height: 10, view: "front" },
-        { top: 26, left: 61, width: 6, height: 10, view: "front" }
+        { top: 26,
+left: 33,
+width: 6,
+height: 10,
+view: "front" },
+        { top: 26,
+left: 61,
+width: 6,
+height: 10,
+view: "front" }
     ],
     // Triceps (back upper arm): y=26-36%, same arm area on back view
     triceps: [
-        { top: 26, left: 33, width: 7, height: 10, view: "back" },
-        { top: 26, left: 60, width: 7, height: 10, view: "back" }
+        { top: 26,
+left: 33,
+width: 7,
+height: 10,
+view: "back" },
+        { top: 26,
+left: 60,
+width: 7,
+height: 10,
+view: "back" }
     ],
     // Forearms: y=38-50%, arms at x=30-38% and x=62-70%
     forearms: [
-        { top: 37, left: 29, width: 8, height: 13, view: "front" },
-        { top: 37, left: 63, width: 8, height: 13, view: "front" }
+        { top: 37,
+left: 29,
+width: 8,
+height: 13,
+view: "front" },
+        { top: 37,
+left: 63,
+width: 8,
+height: 13,
+view: "front" }
     ],
     // Abs: y=32-44%, center of torso x=43-57%
     abs: [
-        { top: 33, left: 43, width: 14, height: 12, view: "front" }
+        { top: 33,
+left: 43,
+width: 14,
+height: 12,
+view: "front" }
     ],
     // Obliques: y=32-42%, sides of torso x=36-43% and x=57-64%
     obliques: [
-        { top: 33, left: 36, width: 8, height: 10, view: "front" },
-        { top: 33, left: 56, width: 8, height: 10, view: "front" }
+        { top: 33,
+left: 36,
+width: 8,
+height: 10,
+view: "front" },
+        { top: 33,
+left: 56,
+width: 8,
+height: 10,
+view: "front" }
     ],
     // Upper back: y=20-34%, torso x=36-64%
     upper_back: [
-        { top: 20, left: 38, width: 24, height: 14, view: "back" }
+        { top: 20,
+left: 38,
+width: 24,
+height: 14,
+view: "back" }
     ],
     // Lower back: y=34-44%, torso x=40-60%
     lower_back: [
-        { top: 34, left: 40, width: 20, height: 10, view: "back" }
+        { top: 34,
+left: 40,
+width: 20,
+height: 10,
+view: "back" }
     ],
     // Hip flexors: y=44-50%, inner hip area x=42-58%
     hip_flexors: [
-        { top: 44, left: 40, width: 20, height: 7, view: "front" }
+        { top: 44,
+left: 40,
+width: 20,
+height: 7,
+view: "front" }
     ],
     // Glutes: y=44-54%, back hip area x=42-58%
     glutes: [
-        { top: 44, left: 40, width: 20, height: 10, view: "back" }
+        { top: 44,
+left: 40,
+width: 20,
+height: 10,
+view: "back" }
     ],
     // Quads: y=52-66%, legs at x=40-48% and x=52-60%
     quads: [
-        { top: 51, left: 39, width: 10, height: 16, view: "front" },
-        { top: 51, left: 51, width: 10, height: 16, view: "front" }
+        { top: 51,
+left: 39,
+width: 10,
+height: 16,
+view: "front" },
+        { top: 51,
+left: 51,
+width: 10,
+height: 16,
+view: "front" }
     ],
     // Hamstrings: y=54-64%, back of legs same x
     hamstrings: [
-        { top: 54, left: 40, width: 10, height: 12, view: "back" },
-        { top: 54, left: 50, width: 10, height: 12, view: "back" }
+        { top: 54,
+left: 40,
+width: 10,
+height: 12,
+view: "back" },
+        { top: 54,
+left: 50,
+width: 10,
+height: 12,
+view: "back" }
     ],
     // Calves: y=68-84%, lower legs x=41-47% and x=53-59%
     calves: [
-        { top: 68, left: 40, width: 8, height: 16, view: "front" },
-        { top: 68, left: 52, width: 8, height: 16, view: "front" }
+        { top: 68,
+left: 40,
+width: 8,
+height: 16,
+view: "front" },
+        { top: 68,
+left: 52,
+width: 8,
+height: 16,
+view: "front" }
     ]
 };
 
@@ -142,7 +234,6 @@ export default function BodyPartsField({
         },
         [disabled, selected, setValue]
     );
-
 
 
     /** Render one body view with its hotspot overlays */

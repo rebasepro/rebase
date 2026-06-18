@@ -2,14 +2,17 @@ import { flatMapEntityValues } from "../utils/values";
 
 describe("flatMapEntityValues", () => {
     it("returns flat object unchanged", () => {
-        const values = { name: "John", age: 30 };
+        const values = { name: "John",
+age: 30 };
         const result = flatMapEntityValues(values);
-        expect(result).toEqual({ name: "John", age: 30 });
+        expect(result).toEqual({ name: "John",
+age: 30 });
     });
 
     it("flattens nested object to dot-notation keys", () => {
         const values = {
-            address: { city: "NYC", zip: "10001" }
+            address: { city: "NYC",
+zip: "10001" }
         };
         const result = flatMapEntityValues(values);
         expect(result).toEqual({
@@ -66,7 +69,8 @@ describe("flatMapEntityValues", () => {
 
     it("handles numeric values in nested objects", () => {
         const values = {
-            stats: { visits: 100, clicks: 50 }
+            stats: { visits: 100,
+clicks: 50 }
         };
         const result = flatMapEntityValues(values);
         expect(result).toEqual({

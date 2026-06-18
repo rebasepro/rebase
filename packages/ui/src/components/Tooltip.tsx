@@ -65,7 +65,8 @@ export const Tooltip = ({
 
     return (
         <TooltipPrimitive.Provider delayDuration={delayDuration}>
-            <TooltipPrimitive.Root {...(open !== undefined ? { open, onOpenChange } : {})} defaultOpen={defaultOpen}>
+            <TooltipPrimitive.Root {...(open !== undefined ? { open,
+onOpenChange } : {})} defaultOpen={defaultOpen}>
                 {trigger}
                 <TooltipPrimitive.Portal container={finalContainer}>
                     <TooltipPrimitive.Content

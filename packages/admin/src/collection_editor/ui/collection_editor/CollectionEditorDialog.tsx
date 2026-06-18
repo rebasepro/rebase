@@ -212,7 +212,6 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, collectionRegistry.initialised, collectionRegistry.getRawCollection]);
 
 
-
     const initialCollection = collection
         ? {
             ...collection,

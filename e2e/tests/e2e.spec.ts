@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('Full E2E: Sign in and view dashboard', async ({ page }) => {
+test("Full E2E: Sign in and view dashboard", async ({ page }) => {
   // Fail on any console error
-  page.on('console', msg => {
-    if (msg.type() === 'error') {
+  page.on("console", msg => {
+    if (msg.type() === "error") {
       const text = msg.text();
-      if (text.includes('ERR_CONNECTION_REFUSED') || text.includes('Failed to load resource')) {
+      if (text.includes("ERR_CONNECTION_REFUSED") || text.includes("Failed to load resource")) {
         return;
       }
       throw new Error(`Console error: ${text}`);
@@ -13,31 +13,31 @@ test('Full E2E: Sign in and view dashboard', async ({ page }) => {
   });
 
   // Fail on any failed API request
-  page.on('response', response => {
-    if (response.url().includes('/api/') && response.status() >= 400) {
+  page.on("response", response => {
+    if (response.url().includes("/api/") && response.status() >= 400) {
       throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
     }
   });
 
-  await page.goto('/');
+  await page.goto("/");
 
   // Accept privacy policy
-  await page.getByRole('checkbox').check();
-  
+  await page.getByRole("checkbox").check();
+
   // Click sign in button to enter login mode
-  await page.getByRole('button', { name: /Sign in with email/i }).click();
+  await page.getByRole("button", { name: /Sign in with email/i }).click();
 
   // The email and password inputs are pre-filled in DemoLoginView, so we can just click Sign in
-  const signInButton = page.locator('button', { hasText: /^Sign in$/i }).first();
+  const signInButton = page.locator("button", { hasText: /^Sign in$/i }).first();
   await expect(signInButton).toBeVisible();
-  
+
   // Wait for network idle or just click
   await Promise.all([
     signInButton.click(),
-    page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() !== 204, { timeout: 10000 }).catch(() => {})
+    page.waitForResponse(resp => resp.url().includes("/api/") && resp.status() !== 204, { timeout: 10000 }).catch(() => {})
   ]);
 
   // Wait for the Rebase dashboard to load.
   // We wait for the Orders link in the sidebar to appear, ensuring we are logged in
-  await expect(page.getByRole('link').filter({ hasText: 'Orders' }).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("link").filter({ hasText: "Orders" }).first()).toBeVisible({ timeout: 30000 });
 });

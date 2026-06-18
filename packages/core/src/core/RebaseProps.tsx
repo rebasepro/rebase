@@ -112,7 +112,6 @@ export type RebaseProps<USER extends User> = {
     entityLinkBuilder?: EntityLinkBuilder;
 
 
-
     /**
      * Plugins loaded in the CMS
      */

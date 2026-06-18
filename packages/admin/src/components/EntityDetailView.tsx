@@ -149,7 +149,8 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
 
     const defaultSelectedView = useMemo(() => resolveDefaultSelectedView(
         collection.defaultSelectedView,
-        { status: "existing", entityId }
+        { status: "existing",
+entityId }
     ), [collection, entityId]);
 
     // Track whether the user has explicitly clicked a tab in this component

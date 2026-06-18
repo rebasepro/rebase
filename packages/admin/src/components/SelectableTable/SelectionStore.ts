@@ -32,7 +32,9 @@ export function createSelectionStore() {
         listeners.forEach(l => l());
     }
 
-    return { getSnapshot, subscribe, select };
+    return { getSnapshot,
+subscribe,
+select };
 }
 
 export type SelectionStore = ReturnType<typeof createSelectionStore>;
@@ -51,8 +53,12 @@ export function useCellSelected(
     // Memoize a selector that derives a boolean from the store snapshot.
     // useSyncExternalStore calls this on every store notification, but
     // React only re-renders when the returned value !== the previous one.
-    const selectorRef = useRef({ propertyKey, entityPath, entityId });
-    selectorRef.current = { propertyKey, entityPath, entityId };
+    const selectorRef = useRef({ propertyKey,
+entityPath,
+entityId });
+    selectorRef.current = { propertyKey,
+entityPath,
+entityId };
 
     const getSnapshot = useCallback(() => {
         const cell = store.getSnapshot();

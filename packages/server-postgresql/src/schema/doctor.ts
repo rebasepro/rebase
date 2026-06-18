@@ -244,7 +244,8 @@ export async function checkCollectionsVsSdk(
             message: `Generated SDK typedefs file does not exist at "${sdkFilePath}".`,
             fix: "Run `rebase generate-sdk`"
         });
-        return { passed: false, issues };
+        return { passed: false,
+issues };
     }
 
     try {
@@ -277,7 +278,8 @@ export async function checkCollectionsVsSdk(
         });
     }
 
-    return { passed: issues.length === 0, issues };
+    return { passed: issues.length === 0,
+issues };
 }
 
 // ── Phase 2: Collections ↔ Database ──────────────────────────────────────
@@ -326,7 +328,7 @@ export async function checkCollectionsVsDatabase(
              WHERE table_schema = ANY($1) AND table_type = 'BASE TABLE'`,
             [schemas]
         );
-        const existingTables = new Set(tablesResult.rows.map((r) => 
+        const existingTables = new Set(tablesResult.rows.map((r) =>
             r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
         ));
 
@@ -457,8 +459,8 @@ export async function checkCollectionsVsDatabase(
                             targetSchemaName = targetColl.schema || "public";
                         } catch { /* ignore */ }
 
-                        const hasFk = tableFks.some((fk) => 
-                            fk.column_name === fkColName && 
+                        const hasFk = tableFks.some((fk) =>
+                            fk.column_name === fkColName &&
                             fk.foreign_table_name === targetTableName &&
                             fk.foreign_table_schema === targetSchemaName
                         );

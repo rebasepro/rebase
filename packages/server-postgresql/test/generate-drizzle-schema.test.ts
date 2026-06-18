@@ -690,7 +690,8 @@ using: "{is_locked} = false" }
                 name: "Secure Data",
                 properties: { title: { type: "string" } },
                 securityRules: [
-                    { operation: "select", access: "public" }
+                    { operation: "select",
+access: "public" }
                 ]
             }];
 
@@ -1056,14 +1057,14 @@ describe("generateDrizzleSchema columnName support", () => {
                 employee_number_140a: {
                     type: "string",
                     name: "Employee Number 140a",
-                    columnName: "employee_number_140a",
+                    columnName: "employee_number_140a"
                 },
                 contract_number_140a: {
                     type: "string",
                     name: "Contract Number 140a",
-                    columnName: "contract_number_140a",
-                },
-            },
+                    columnName: "contract_number_140a"
+                }
+            }
         }];
 
         const result = await generateSchema(collections);
@@ -1086,10 +1087,10 @@ describe("generateDrizzleSchema columnName support", () => {
             properties: {
                 productName: {
                     type: "string",
-                    name: "Product Name",
+                    name: "Product Name"
                     // No columnName — should derive from key
-                },
-            },
+                }
+            }
         }];
 
         const result = await generateSchema(collections);
@@ -1109,14 +1110,14 @@ describe("generateDrizzleSchema columnName support", () => {
                 fee_number_140a: {
                     type: "string",
                     name: "Fee Number",
-                    columnName: "fee_number_140a",
+                    columnName: "fee_number_140a"
                 },
                 // Manually added: no columnName
                 displayName: {
                     type: "string",
-                    name: "Display Name",
-                },
-            },
+                    name: "Display Name"
+                }
+            }
         }];
 
         const result = await generateSchema(collections);
@@ -1137,24 +1138,24 @@ describe("generateDrizzleSchema columnName support", () => {
                 count_v2: {
                     type: "number",
                     name: "Count V2",
-                    columnName: "count_v2",
+                    columnName: "count_v2"
                 },
                 is_active_v2: {
                     type: "boolean",
                     name: "Is Active V2",
-                    columnName: "is_active_v2",
+                    columnName: "is_active_v2"
                 },
                 created_at_v2: {
                     type: "date",
                     name: "Created At V2",
-                    columnName: "created_at_v2",
+                    columnName: "created_at_v2"
                 },
                 metadata_v2: {
                     type: "map",
                     name: "Metadata V2",
-                    columnName: "metadata_v2",
-                },
-            },
+                    columnName: "metadata_v2"
+                }
+            }
         }];
 
         const result = await generateSchema(collections);
@@ -1173,20 +1174,44 @@ describe("generateDrizzleSchema columnName support", () => {
             table: "company_billing_config",
             name: "Company Billing Config",
             properties: {
-                employee_number_140a: { type: "string", name: "Employee Number", columnName: "employee_number_140a" },
-                contract_number_140a: { type: "string", name: "Contract Number", columnName: "contract_number_140a" },
-                amount: { type: "number", name: "Amount" },
-                id: { type: "number", name: "ID", isId: "increment" },
-                service_provider_140a: { type: "string", name: "Service Provider", columnName: "service_provider_140a" },
-                internal_area_code_140a: { type: "string", name: "Internal Area Code", columnName: "internal_area_code_140a" },
-                fee_number_140a: { type: "string", name: "Fee Number", columnName: "fee_number_140a" },
-                receiver_market_participant_140a: { type: "string", name: "Receiver Market Participant", columnName: "receiver_market_participant_140a" },
-                employee_value_number_140a: { type: "string", name: "Employee Value Number", columnName: "employee_value_number_140a" },
-                sender_market_participant_140a: { type: "string", name: "Sender Market Participant", columnName: "sender_market_participant_140a" },
-                processing_indicator_140a: { type: "string", name: "Processing Indicator", columnName: "processing_indicator_140a" },
-                insurance_id_140a: { type: "string", name: "Insurance ID", columnName: "insurance_id_140a" },
-                company_id: { type: "number", name: "Company ID" },
-            },
+                employee_number_140a: { type: "string",
+name: "Employee Number",
+columnName: "employee_number_140a" },
+                contract_number_140a: { type: "string",
+name: "Contract Number",
+columnName: "contract_number_140a" },
+                amount: { type: "number",
+name: "Amount" },
+                id: { type: "number",
+name: "ID",
+isId: "increment" },
+                service_provider_140a: { type: "string",
+name: "Service Provider",
+columnName: "service_provider_140a" },
+                internal_area_code_140a: { type: "string",
+name: "Internal Area Code",
+columnName: "internal_area_code_140a" },
+                fee_number_140a: { type: "string",
+name: "Fee Number",
+columnName: "fee_number_140a" },
+                receiver_market_participant_140a: { type: "string",
+name: "Receiver Market Participant",
+columnName: "receiver_market_participant_140a" },
+                employee_value_number_140a: { type: "string",
+name: "Employee Value Number",
+columnName: "employee_value_number_140a" },
+                sender_market_participant_140a: { type: "string",
+name: "Sender Market Participant",
+columnName: "sender_market_participant_140a" },
+                processing_indicator_140a: { type: "string",
+name: "Processing Indicator",
+columnName: "processing_indicator_140a" },
+                insurance_id_140a: { type: "string",
+name: "Insurance ID",
+columnName: "insurance_id_140a" },
+                company_id: { type: "number",
+name: "Company ID" }
+            }
         }];
 
         const result = await generateSchema(collections);

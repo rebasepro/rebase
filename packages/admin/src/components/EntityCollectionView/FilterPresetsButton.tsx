@@ -79,8 +79,10 @@ function generateLabel(filterValues: FilterValues<string>): string {
  * Truncate a label if it exceeds MAX_LABEL_LENGTH.
  */
 function truncateLabel(label: string): { display: string; truncated: boolean } {
-    if (label.length <= MAX_LABEL_LENGTH) return { display: label, truncated: false };
-    return { display: label.slice(0, MAX_LABEL_LENGTH - 1) + "…", truncated: true };
+    if (label.length <= MAX_LABEL_LENGTH) return { display: label,
+truncated: false };
+    return { display: label.slice(0, MAX_LABEL_LENGTH - 1) + "…",
+truncated: true };
 }
 
 // ─── Overflow Menu ──────────────────────────────────────────────────

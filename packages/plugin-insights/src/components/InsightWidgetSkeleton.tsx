@@ -21,7 +21,7 @@ export function InsightWidgetSkeleton({
     config,
     compact = false,
     embedded = false,
-    fixedHeight,
+    fixedHeight
 }: {
     /** Scorecard config — used to match optional elements (comparison, dateRange, icon). */
     config: ScorecardConfig;
@@ -54,16 +54,19 @@ export function InsightWidgetSkeleton({
             >
                 {/* Title line */}
                 <div className="bg-surface-200 dark:bg-surface-700 rounded-sm"
-                    style={{ height: 14, width: 48 }}
+                    style={{ height: 14,
+width: 48 }}
                 />
                 {/* Value + optional comparison row */}
                 <div className="flex items-baseline gap-1.5">
                     <div className="bg-surface-200 dark:bg-surface-700 rounded-sm"
-                        style={{ height: 20, width: 40 }}
+                        style={{ height: 20,
+width: 40 }}
                     />
                     {hasComparison && (
                         <div className="bg-surface-200/60 dark:bg-surface-700/60 rounded-sm"
-                            style={{ height: 14, width: 28 }}
+                            style={{ height: 14,
+width: 28 }}
                         />
                     )}
                 </div>
@@ -116,7 +119,7 @@ function StandardSkeleton({
     hasIcon,
     hasDateRange,
     embedded,
-    fixedHeight,
+    fixedHeight
 }: {
     hasComparison: boolean;
     hasIcon: boolean;
@@ -147,10 +150,10 @@ function StandardSkeleton({
     const titleHeight = isSmall ? 15 : 16.5;
     // Value: leading-tight (×1.25) applied on top of font-size
     const valueHeight = isSmall
-        ? 22.5  // text-lg: 18 × 1.25
+        ? 22.5 // text-lg: 18 × 1.25
         : (containerWidth !== null && containerWidth < 300)
-            ? 25    // text-xl: 20 × 1.25
-            : 30;   // text-2xl: 24 × 1.25
+            ? 25 // text-xl: 20 × 1.25
+            : 30; // text-2xl: 24 × 1.25
     // Comparison: text-xs = 12px / 16px line-height (no leading override)
     const comparisonHeight = 16;
     // Icon: 14px when small, 18px otherwise
@@ -171,12 +174,14 @@ function StandardSkeleton({
                 <div className="flex flex-col min-w-0">
                     {/* Title placeholder */}
                     <div className="bg-surface-200 dark:bg-surface-700 rounded"
-                        style={{ height: titleHeight, width: "60%" }}
+                        style={{ height: titleHeight,
+width: "60%" }}
                     />
                     {/* DateRange — hidden when isSmall, same as real view (line 134) */}
                     {hasDateRange && !isSmall && (
                         <div className="bg-surface-200/60 dark:bg-surface-700/60 rounded mt-0.5"
-                            style={{ height: 14, width: "40%" }}
+                            style={{ height: 14,
+width: "40%" }}
                         />
                     )}
                 </div>
@@ -184,7 +189,8 @@ function StandardSkeleton({
                 {hasIcon && (
                     <span className="ml-2 shrink-0">
                         <div className="bg-surface-200 dark:bg-surface-700 rounded"
-                            style={{ height: iconSize, width: iconSize }}
+                            style={{ height: iconSize,
+width: iconSize }}
                         />
                     </span>
                 )}
@@ -192,14 +198,16 @@ function StandardSkeleton({
 
             {/* Main value placeholder */}
             <div className="bg-surface-200 dark:bg-surface-700 rounded"
-                style={{ height: valueHeight, width: "40%" }}
+                style={{ height: valueHeight,
+width: "40%" }}
             />
 
             {/* Comparison placeholder */}
             {hasComparison && (
                 <div className={isSmall ? "mt-0.5" : "mt-1"}>
                     <div className="bg-surface-200/60 dark:bg-surface-700/60 rounded"
-                        style={{ height: comparisonHeight, width: "25%" }}
+                        style={{ height: comparisonHeight,
+width: "25%" }}
                     />
                 </div>
             )}

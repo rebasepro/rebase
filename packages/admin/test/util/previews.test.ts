@@ -139,9 +139,13 @@ name: "Title" } as Property
             name: "Test",
             path: "test",
             properties: {
-                title: { type: "string", name: "Title" } as Property,
-                secret: { type: "string", name: "Secret", ui: { hideFromCollection: true } } as Property,
-                body: { type: "string", name: "Body" } as Property
+                title: { type: "string",
+name: "Title" } as Property,
+                secret: { type: "string",
+name: "Secret",
+ui: { hideFromCollection: true } } as Property,
+                body: { type: "string",
+name: "Body" } as Property
             }
         } as EntityCollection;
 
@@ -319,8 +323,11 @@ name: "Flag" } as Property
             name: "Test",
             path: "test",
             properties: {
-                secret: { type: "string", name: "Secret", ui: { hideFromCollection: true } } as Property,
-                name: { type: "string", name: "Name" } as Property
+                secret: { type: "string",
+name: "Secret",
+ui: { hideFromCollection: true } } as Property,
+                name: { type: "string",
+name: "Name" } as Property
             }
         } as EntityCollection;
 

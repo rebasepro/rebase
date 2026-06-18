@@ -2,7 +2,8 @@ import { QueryBuilder } from "../src/data/query_builder";
 
 function createMockCollection() {
     return {
-        find: jest.fn().mockResolvedValue({ data: [], count: 0 }),
+        find: jest.fn().mockResolvedValue({ data: [],
+count: 0 }),
         listen: jest.fn().mockReturnValue(() => {})
     };
 }
@@ -137,7 +138,8 @@ describe("QueryBuilder", () => {
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    where: { age: [">=", 18], status: ["==", "active"] }
+                    where: { age: [">=", 18],
+status: ["==", "active"] }
                 })
             );
         });
@@ -284,7 +286,8 @@ describe("QueryBuilder", () => {
                 .find();
 
             expect(collection.find).toHaveBeenCalledWith({
-                where: { status: ["==", "active"], age: [">=", 18] },
+                where: { status: ["==", "active"],
+age: [">=", 18] },
                 orderBy: "createdAt:desc",
                 limit: 10,
                 offset: 20,
@@ -297,12 +300,14 @@ describe("QueryBuilder", () => {
     describe("find()", () => {
         it("returns the result from collection.find()", async () => {
             const collection = createMockCollection();
-            collection.find.mockResolvedValue({ data: [{ id: "1" }], count: 1 });
+            collection.find.mockResolvedValue({ data: [{ id: "1" }],
+count: 1 });
 
             const qb = new QueryBuilder(collection as never);
             const result = await qb.find();
 
-            expect(result).toEqual({ data: [{ id: "1" }], count: 1 });
+            expect(result).toEqual({ data: [{ id: "1" }],
+count: 1 });
         });
     });
 

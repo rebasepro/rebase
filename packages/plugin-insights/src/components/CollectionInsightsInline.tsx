@@ -24,9 +24,9 @@ export function CollectionInsightsInline({
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pb-4">
             {insights.map((def) => (
-                <InsightWidget 
-                    key={def.id} 
-                    definition={def} 
+                <InsightWidget
+                    key={def.id}
+                    definition={def}
                     path={path}
                     parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                 />

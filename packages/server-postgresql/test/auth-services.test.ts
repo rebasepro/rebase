@@ -8,7 +8,9 @@ jest.mock("drizzle-orm", () => {
     const actual = jest.requireActual("drizzle-orm");
     return {
         ...actual,
-        eq: jest.fn((field, value) => ({ field, value, type: "eq" })),
+        eq: jest.fn((field, value) => ({ field,
+value,
+type: "eq" })),
         sql: Object.assign(
             jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
                 strings,
@@ -16,8 +18,11 @@ jest.mock("drizzle-orm", () => {
                 type: "sql"
             })),
             {
-                raw: jest.fn((val: string) => ({ val, type: "sql-raw" })),
-                join: jest.fn((parts: unknown[], separator: unknown) => ({ parts, separator, type: "sql-join" }))
+                raw: jest.fn((val: string) => ({ val,
+type: "sql-raw" })),
+                join: jest.fn((parts: unknown[], separator: unknown) => ({ parts,
+separator,
+type: "sql-join" }))
             }
         ),
         relations: jest.fn(() => ({}))
@@ -133,11 +138,11 @@ describe("Auth Services", () => {
                     email: "test@example.com",
                     displayName: "Test User"
                 };
-                const dbReturnedUser = { 
+                const dbReturnedUser = {
                     id: "user-123",
                     ...newUser,
                     createdAt: new Date(),
-                    updatedAt: new Date() 
+                    updatedAt: new Date()
                 };
                 mockInsertReturning.mockResolvedValueOnce([dbReturnedUser]);
 
@@ -154,7 +159,8 @@ describe("Auth Services", () => {
 
         describe("getUserById", () => {
             it("should return user when found", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserById("user-123");
@@ -174,7 +180,8 @@ describe("Auth Services", () => {
 
         describe("getUserByEmail", () => {
             it("should return user when found by email", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserByEmail("test@example.com");
@@ -194,13 +201,15 @@ describe("Auth Services", () => {
 
         describe("getUserByIdentity", () => {
             it("should fetch user by identity", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([{ user: mockUser }]);
 
                 const result = await userService.getUserByIdentity("google", "google-abc");
 
                 expect(db.select).toHaveBeenCalled();
-                expect(result).toEqual(expect.objectContaining({ id: "user-123", email: "test@example.com" }));
+                expect(result).toEqual(expect.objectContaining({ id: "user-123",
+email: "test@example.com" }));
             });
         });
 
@@ -223,10 +232,10 @@ describe("Auth Services", () => {
 
         describe("updateUser", () => {
             it("should update user and return updated record", async () => {
-                const updatedUser = { 
+                const updatedUser = {
                     id: "user-123",
                     email: "test@example.com",
-                    displayName: "Updated Name" 
+                    displayName: "Updated Name"
                 };
                 mockUpdateReturning.mockResolvedValueOnce([updatedUser]);
 
@@ -261,8 +270,10 @@ describe("Auth Services", () => {
         describe("listUsers", () => {
             it("should return all users", async () => {
                 const mockUsers = [
-                    { id: "user-1", email: "user1@example.com" },
-                    { id: "user-2", email: "user2@example.com" }
+                    { id: "user-1",
+email: "user1@example.com" },
+                    { id: "user-2",
+email: "user2@example.com" }
                 ];
                 mockSelectFrom.mockReturnValueOnce(Promise.resolve(mockUsers));
 
@@ -270,8 +281,10 @@ describe("Auth Services", () => {
 
                 expect(db.select).toHaveBeenCalled();
                 expect(result).toEqual([
-                    mockUserData({ id: "user-1", email: "user1@example.com" }),
-                    mockUserData({ id: "user-2", email: "user2@example.com" })
+                    mockUserData({ id: "user-1",
+email: "user1@example.com" }),
+                    mockUserData({ id: "user-2",
+email: "user2@example.com" })
                 ]);
             });
         });
@@ -332,7 +345,8 @@ describe("Auth Services", () => {
 
         describe("getUserByVerificationToken", () => {
             it("should find user by verification token", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
 
                 const result = await userService.getUserByVerificationToken("token-abc");
@@ -396,7 +410,8 @@ describe("Auth Services", () => {
 
         describe("getUserWithRoles", () => {
             it("should return user with roles", async () => {
-                const mockUser = { id: "user-123", email: "test@example.com" };
+                const mockUser = { id: "user-123",
+email: "test@example.com" };
                 mockSelectWhere.mockResolvedValueOnce([mockUser]);
                 mockExecute.mockResolvedValueOnce({
                     rows: [{ roles: ["admin"] }]
@@ -427,7 +442,8 @@ describe("Auth Services", () => {
             it("should return paginated and filtered users list", async () => {
                 mockExecute
                     .mockResolvedValueOnce({ rows: [{ total: 1 }] })
-                    .mockResolvedValueOnce({ rows: [{ id: "user-123", email: "test@example.com" }] });
+                    .mockResolvedValueOnce({ rows: [{ id: "user-123",
+email: "test@example.com" }] });
 
                 const result = await userService.listUsersPaginated({
                     limit: 10,
@@ -439,7 +455,8 @@ describe("Auth Services", () => {
 
                 expect(mockExecute).toHaveBeenCalledTimes(2);
                 expect(result).toEqual({
-                    users: [mockUserData({ id: "user-123", email: "test@example.com" })],
+                    users: [mockUserData({ id: "user-123",
+email: "test@example.com" })],
                     total: 1,
                     limit: 10,
                     offset: 0

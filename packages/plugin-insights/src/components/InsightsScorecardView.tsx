@@ -10,7 +10,7 @@ function formatNumber(value: number, format?: ScorecardFormat): string {
         style: format?.style ?? "decimal",
         notation: format?.notation ?? "standard",
         maximumFractionDigits: format?.decimals ?? 1,
-        minimumFractionDigits: format?.decimals ?? 1,
+        minimumFractionDigits: format?.decimals ?? 1
     };
 
     if (format?.style === "currency") {
@@ -39,7 +39,7 @@ export function InsightsScorecardView({
     title,
     compact = false,
     embedded = false,
-    fixedHeight,
+    fixedHeight
 }: {
     config: ScorecardConfig;
     data: DataRow;

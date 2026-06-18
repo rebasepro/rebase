@@ -40,7 +40,6 @@ export function App() {
     });
 
 
-
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
     // ── Insights Plugin ──────────────────────────────────────────────

@@ -18,7 +18,7 @@ import {
     generateCollectionFile,
     generateIndexContent,
     mergeIndexContent,
-    safeHostFromUrl,
+    safeHostFromUrl
 } from "./introspect-db-logic";
 
 async function main() {
@@ -31,15 +31,15 @@ async function main() {
             "--data-inference": Boolean,
             "-o": "--output",
             "-c": "--collections",
-            "-f": "--force",
+            "-f": "--force"
         },
         { permissive: true }
     );
 
     const cwd = process.cwd();
     const isBackendDir = path.basename(cwd) === "backend";
-    const defaultOutDir = isBackendDir 
-        ? path.resolve(cwd, "..", "config", "collections") 
+    const defaultOutDir = isBackendDir
+        ? path.resolve(cwd, "..", "config", "collections")
         : path.resolve(cwd, "config", "collections");
 
     const outDir = args["--output"] || args["--collections"] || defaultOutDir;
@@ -173,12 +173,12 @@ async function main() {
                 output: process.stdout
             });
             const answer = await new Promise<string>((resolve) => rl.question(chalk.yellow("? Do you want to run comprehensive data inference on sampled rows to auto-detect types, formats, constraints, and UI configurations? (y/N) "), resolve));
-            runDataInference = answer.trim().toLowerCase() === 'y';
+            runDataInference = answer.trim().toLowerCase() === "y";
             rl.close();
         }
 
         if (runDataInference) {
-            console.log(chalk.gray(`Sampling database rows for data inference...`));
+            console.log(chalk.gray("Sampling database rows for data inference..."));
         }
 
         // Generate Collections
@@ -186,11 +186,11 @@ async function main() {
         const skippedFiles: string[] = [];
 
         const tablesToProcess = Array.from(tablesMap.entries()).filter(([tableName]) => !joinTables.has(tableName));
-        
+
         const BATCH_SIZE = 10;
         for (let i = 0; i < tablesToProcess.length; i += BATCH_SIZE) {
             const batch = tablesToProcess.slice(i, i + BATCH_SIZE);
-            
+
             await Promise.all(batch.map(async ([tableName, meta]) => {
                 // ── File overwrite protection ──────────────────────────────
                 const filePath = path.join(outDir, `${tableName}.ts`);
@@ -216,7 +216,7 @@ async function main() {
                     joinTables,
                     tablesMap,
                     enumMap,
-                    sampleData,
+                    sampleData
                 );
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");
@@ -244,7 +244,7 @@ async function main() {
         console.log("");
         if (skippedFiles.length > 0) {
             console.log(chalk.yellow(`⚠ Skipped ${skippedFiles.length} existing file(s): ${skippedFiles.join(", ")}`));
-            console.log(chalk.gray(`  Use --force to overwrite existing files.`));
+            console.log(chalk.gray("  Use --force to overwrite existing files."));
             console.log("");
         }
         console.log(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));

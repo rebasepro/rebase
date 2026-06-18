@@ -171,18 +171,18 @@ export class UserService implements UserRepository {
 
         for (const [key, val] of Object.entries(metadata)) {
             const tableColKey = getColumnKey(this.usersTable, key);
-            if (tableColKey && 
-                tableColKey !== idKey && 
-                tableColKey !== emailKey && 
-                tableColKey !== passwordHashKey && 
-                tableColKey !== displayNameKey && 
-                tableColKey !== photoUrlKey && 
-                tableColKey !== emailVerifiedKey && 
-                tableColKey !== emailVerificationTokenKey && 
-                tableColKey !== emailVerificationSentAtKey && 
+            if (tableColKey &&
+                tableColKey !== idKey &&
+                tableColKey !== emailKey &&
+                tableColKey !== passwordHashKey &&
+                tableColKey !== displayNameKey &&
+                tableColKey !== photoUrlKey &&
+                tableColKey !== emailVerifiedKey &&
+                tableColKey !== emailVerificationTokenKey &&
+                tableColKey !== emailVerificationSentAtKey &&
                 tableColKey !== isAnonymousKey &&
-                tableColKey !== createdAtKey && 
-                tableColKey !== updatedAtKey && 
+                tableColKey !== createdAtKey &&
+                tableColKey !== updatedAtKey &&
                 tableColKey !== metadataKey) {
                 payload[tableColKey] = val;
             } else {
@@ -220,7 +220,7 @@ export class UserService implements UserRepository {
     async getUserByIdentity(provider: string, providerId: string): Promise<UserData | null> {
         const userIdCol = getColumn(this.usersTable, "id");
         if (!userIdCol) return null;
-        
+
         const result = await this.db
             .select({ user: this.usersTable })
             .from(this.usersTable)
@@ -493,7 +493,6 @@ export class UserService implements UserRepository {
             roles };
     }
 }
-
 
 
 export class RefreshTokenService {
@@ -868,9 +867,21 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async listRoles(): Promise<RoleData[]> {
         return [
-            { id: "admin", name: "Admin", isAdmin: true, defaultPermissions: null, collectionPermissions: null },
-            { id: "editor", name: "Editor", isAdmin: false, defaultPermissions: null, collectionPermissions: null },
-            { id: "viewer", name: "Viewer", isAdmin: false, defaultPermissions: null, collectionPermissions: null }
+            { id: "admin",
+name: "Admin",
+isAdmin: true,
+defaultPermissions: null,
+collectionPermissions: null },
+            { id: "editor",
+name: "Editor",
+isAdmin: false,
+defaultPermissions: null,
+collectionPermissions: null },
+            { id: "viewer",
+name: "Viewer",
+isAdmin: false,
+defaultPermissions: null,
+collectionPermissions: null }
         ];
     }
 
@@ -1016,7 +1027,7 @@ export class PostgresAuthRepository implements AuthRepository {
  * Handles all MFA-related database operations.
  */
 export class MfaService implements MfaRepository {
-    constructor(private db: NodePgDatabase, private schemaName: string = "rebase") {}
+    constructor(private db: NodePgDatabase, private schemaName = "rebase") {}
 
     private qualify(tableName: string): string {
         return `"${this.schemaName}"."${tableName}"`;

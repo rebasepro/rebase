@@ -88,7 +88,6 @@ export interface LoginViewProps {
     notAllowedError?: string | Error;
 
 
-
     /**
      * Google client ID for Google OAuth.
      * Required when Google login is enabled via ID token flow.
@@ -208,7 +207,7 @@ export function LoginView({
             // Clear URL search params without page reload
             const cleanUrl = window.location.origin + window.location.pathname;
             window.history.replaceState({}, document.title, cleanUrl);
-            
+
             if (authController.oauthLogin) {
                 authController.oauthLogin(provider, {
                     code,

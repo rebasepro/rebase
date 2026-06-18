@@ -6,7 +6,8 @@ import {
 } from "../src/email/templates";
 
 describe("getPasswordResetTemplate", () => {
-    const user = { email: "john@example.com", displayName: "John Doe" };
+    const user = { email: "john@example.com",
+displayName: "John Doe" };
     const resetUrl = "https://example.com/reset?token=abc123";
 
     it("returns subject, html, and text", () => {
@@ -43,7 +44,8 @@ describe("getPasswordResetTemplate", () => {
     });
 
     it("falls back to email prefix when displayName is null", () => {
-        const userNoName = { email: "jane@example.com", displayName: null };
+        const userNoName = { email: "jane@example.com",
+displayName: null };
         const result = getPasswordResetTemplate(resetUrl, userNoName);
         expect(result.html).toContain("jane");
         expect(result.text).toContain("jane");
@@ -58,7 +60,8 @@ describe("getPasswordResetTemplate", () => {
 });
 
 describe("getEmailVerificationTemplate", () => {
-    const user = { email: "alice@example.com", displayName: "Alice" };
+    const user = { email: "alice@example.com",
+displayName: "Alice" };
     const verifyUrl = "https://example.com/verify?token=xyz789";
 
     it("returns subject, html, and text", () => {
@@ -96,7 +99,8 @@ describe("getEmailVerificationTemplate", () => {
 });
 
 describe("getUserInvitationTemplate", () => {
-    const user = { email: "bob@example.com", displayName: "Bob" };
+    const user = { email: "bob@example.com",
+displayName: "Bob" };
     const setPasswordUrl = "https://example.com/set-password?token=def456";
 
     it("returns subject, html, and text", () => {
@@ -129,7 +133,8 @@ describe("getUserInvitationTemplate", () => {
 });
 
 describe("getWelcomeEmailTemplate", () => {
-    const user = { email: "dave@example.com", displayName: "Dave" };
+    const user = { email: "dave@example.com",
+displayName: "Dave" };
 
     it("returns subject, html, and text", () => {
         const result = getWelcomeEmailTemplate(user);

@@ -15,17 +15,22 @@ vi.mock("node:child_process", () => ({
 const mockClient = {
     data: {
         collection: vi.fn(() => ({
-            find: vi.fn().mockResolvedValue([{ id: "doc-1", title: "Test Doc" }]),
-            findById: vi.fn().mockResolvedValue({ id: "doc-1", title: "Test Doc" }),
-            create: vi.fn().mockResolvedValue({ id: "doc-2", title: "New Doc" }),
-            update: vi.fn().mockResolvedValue({ id: "doc-1", title: "Updated Doc" }),
+            find: vi.fn().mockResolvedValue([{ id: "doc-1",
+title: "Test Doc" }]),
+            findById: vi.fn().mockResolvedValue({ id: "doc-1",
+title: "Test Doc" }),
+            create: vi.fn().mockResolvedValue({ id: "doc-2",
+title: "New Doc" }),
+            update: vi.fn().mockResolvedValue({ id: "doc-1",
+title: "Updated Doc" }),
             delete: vi.fn().mockResolvedValue(undefined)
         }))
     },
     admin: {
         listUsers: vi.fn().mockResolvedValue([{ email: "user@rebase.pro" }]),
         createUser: vi.fn().mockResolvedValue({ email: "new@rebase.pro" }),
-        updateUser: vi.fn().mockResolvedValue({ userId: "1", email: "updated@rebase.pro" }),
+        updateUser: vi.fn().mockResolvedValue({ userId: "1",
+email: "updated@rebase.pro" }),
         deleteUser: vi.fn().mockResolvedValue(true),
         listRoles: vi.fn().mockResolvedValue(["admin", "user"])
     }
@@ -56,7 +61,7 @@ describe("MCP Server", () => {
     it("handles list tools request", async () => {
         const handler = (server as any)._requestHandlers.get("tools/list");
         expect(handler).toBeDefined();
-        
+
         const result = await handler({
             method: "tools/list"
         });
@@ -72,7 +77,8 @@ describe("MCP Server", () => {
             method: "tools/call",
             params: {
                 name: "get_document",
-                arguments: { collection: "posts", id: "1" }
+                arguments: { collection: "posts",
+id: "1" }
             }
         });
         expect(getResult.content[0].text).toContain("doc-1");
@@ -82,7 +88,8 @@ describe("MCP Server", () => {
             method: "tools/call",
             params: {
                 name: "create_document",
-                arguments: { collection: "posts", data: { title: "New Doc" } }
+                arguments: { collection: "posts",
+data: { title: "New Doc" } }
             }
         });
         expect(createResult.content[0].text).toContain("doc-2");

@@ -502,7 +502,9 @@ values: { title: "UUID" } } as any
 
         it("calls adapter.prepareUserCreation and saves user with returned values", async () => {
             const mockPrepare = jest.fn().mockResolvedValue({
-                values: { email: "custom@example.com", name: "Custom Name", passwordHash: "custom-hash" },
+                values: { email: "custom@example.com",
+name: "Custom Name",
+passwordHash: "custom-hash" },
                 clearPassword: "custom-temp-password",
                 hookHandledEmail: true,
                 invitationSent: true
@@ -512,12 +514,12 @@ values: { title: "UUID" } } as any
                 id: "test-adapter",
                 verifyRequest: jest.fn(),
                 getCapabilities: jest.fn(),
-                prepareUserCreation: mockPrepare,
+                prepareUserCreation: mockPrepare
             };
 
             const app = new Hono();
             app.onError(errorHandler);
-            
+
             const authCollections = [
                 {
                     slug: "users",
@@ -534,13 +536,16 @@ values: { title: "UUID" } } as any
             mockDriver.saveEntity.mockResolvedValue({
                 id: "custom-id",
                 path: "users",
-                values: { email: "custom@example.com", name: "Custom Name", passwordHash: "custom-hash" }
+                values: { email: "custom@example.com",
+name: "Custom Name",
+passwordHash: "custom-hash" }
             } as any);
 
             const res = await app.request("/api/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: "original@example.com", name: "Original Name" })
+                body: JSON.stringify({ email: "original@example.com",
+name: "Original Name" })
             });
 
             expect(res.status).toBe(201);
@@ -550,13 +555,16 @@ values: { title: "UUID" } } as any
             expect(body.temporaryPassword).toBe("custom-temp-password");
 
             expect(mockPrepare).toHaveBeenCalledWith(
-                expect.objectContaining({ email: "original@example.com", name: "Original Name" }),
+                expect.objectContaining({ email: "original@example.com",
+name: "Original Name" }),
                 undefined // auth: true → collectionAuthConfig is undefined
             );
             expect(mockDriver.saveEntity).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "users",
-                    values: { email: "custom@example.com", name: "Custom Name", passwordHash: "custom-hash" },
+                    values: { email: "custom@example.com",
+name: "Custom Name",
+passwordHash: "custom-hash" },
                     status: "new"
                 })
             );

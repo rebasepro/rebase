@@ -40,7 +40,7 @@ const productLocalesCollection: PostgresCollection = {
         description: {
             name: "Description",
             type: "string",
-            ui: { markdown: true },
+            ui: { markdown: true }
         }
     }
 };

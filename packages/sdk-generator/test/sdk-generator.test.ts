@@ -12,9 +12,15 @@ const authorsCollection = {
     slug: "authors",
     table: "authors",
     properties: {
-        id: { name: "ID", type: "number", isId: "increment", validation: { required: true } },
-        name: { name: "Name", type: "string", validation: { required: true } },
-        email: { name: "Email", type: "string" }
+        id: { name: "ID",
+type: "number",
+isId: "increment",
+validation: { required: true } },
+        name: { name: "Name",
+type: "string",
+validation: { required: true } },
+        email: { name: "Email",
+type: "string" }
     }
 } as unknown as EntityCollection;
 
@@ -122,8 +128,10 @@ describe("propertyToTypeScriptType mapping", () => {
                     status: {
                         type: "string",
                         enum: [
-                            { id: "draft", label: "Draft" },
-                            { id: "published", label: "Published" }
+                            { id: "draft",
+label: "Draft" },
+                            { id: "published",
+label: "Published" }
                         ]
                     }
                 }
@@ -175,8 +183,10 @@ describe("propertyToTypeScriptType mapping", () => {
                     level: {
                         type: "number",
                         enum: [
-                            { id: 10, label: "Low" },
-                            { id: 20, label: "High" }
+                            { id: 10,
+label: "Low" },
+                            { id: 20,
+label: "High" }
                         ]
                     }
                 }
@@ -290,7 +300,8 @@ describe("generateTypedefs schemas configurations", () => {
             const col = {
                 slug: "books",
                 properties: {
-                    title: { type: "string", validation: { required: true } }
+                    title: { type: "string",
+validation: { required: true } }
                 }
             } as unknown as EntityCollection;
 
@@ -303,7 +314,9 @@ describe("generateTypedefs schemas configurations", () => {
             const col = {
                 slug: "books",
                 properties: {
-                    id: { type: "number", isId: "increment", validation: { required: true } }
+                    id: { type: "number",
+isId: "increment",
+validation: { required: true } }
                 }
             } as unknown as EntityCollection;
 
@@ -316,7 +329,9 @@ describe("generateTypedefs schemas configurations", () => {
             const col = {
                 slug: "books",
                 properties: {
-                    id: { type: "string", isId: "uuid", validation: { required: true } }
+                    id: { type: "string",
+isId: "uuid",
+validation: { required: true } }
                 }
             } as unknown as EntityCollection;
 
@@ -329,7 +344,9 @@ describe("generateTypedefs schemas configurations", () => {
             const col = {
                 slug: "books",
                 properties: {
-                    id: { type: "string", isId: "manual", validation: { required: true } }
+                    id: { type: "string",
+isId: "manual",
+validation: { required: true } }
                 }
             } as unknown as EntityCollection;
 
@@ -342,7 +359,9 @@ describe("generateTypedefs schemas configurations", () => {
             const col = {
                 slug: "books",
                 properties: {
-                    id: { type: "string", isId: true, validation: { required: true } }
+                    id: { type: "string",
+isId: true,
+validation: { required: true } }
                 }
             } as unknown as EntityCollection;
 
@@ -357,8 +376,11 @@ describe("generateTypedefs schemas configurations", () => {
             const col = {
                 slug: "books",
                 properties: {
-                    id: { type: "number", isId: "increment", validation: { required: true } },
-                    title: { type: "string", validation: { required: true } }
+                    id: { type: "number",
+isId: "increment",
+validation: { required: true } },
+                    title: { type: "string",
+validation: { required: true } }
                 }
             } as unknown as EntityCollection;
 
@@ -376,7 +398,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "authors",
             driver: "postgres",
             properties: {
-                id: { type: "number", isId: "increment" }
+                id: { type: "number",
+isId: "increment" }
             }
         } as unknown as EntityCollection;
 
@@ -384,7 +407,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "posts",
             driver: "postgres",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 author: {
                     type: "relation",
                     target: () => authorsCol,
@@ -408,7 +432,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "posts",
             driver: "postgres",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 author: {
                     type: "relation",
                     target: () => ({ name: "no-properties" }),
@@ -431,7 +456,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "authors",
             driver: "postgres",
             properties: {
-                id: { type: "string", isId: "uuid" }
+                id: { type: "string",
+isId: "uuid" }
             }
         } as unknown as EntityCollection;
 
@@ -439,7 +465,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "posts",
             driver: "postgres",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 author: {
                     type: "relation",
                     relationName: "author_rel",
@@ -470,7 +497,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "tags",
             driver: "postgres",
             properties: {
-                id: { type: "number", isId: "increment" }
+                id: { type: "number",
+isId: "increment" }
             }
         } as unknown as EntityCollection;
 
@@ -478,7 +506,8 @@ describe("Collection relations and FK resolutions", () => {
             slug: "posts",
             driver: "postgres",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 tags: {
                     type: "relation",
                     target: () => tagsCol,

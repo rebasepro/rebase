@@ -41,7 +41,8 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
     const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
     // Custom overlay positioning — bypasses position:fixed containment issues
-    const grabOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const grabOffsetRef = useRef<{ x: number; y: number }>({ x: 0,
+y: 0 });
     const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -261,11 +262,11 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
                     const activeTop = active.rect.current.translated?.top ?? 0;
                     const activeHeight = active.rect.current.translated?.height ?? 0;
                     const activeCenter = activeTop + activeHeight / 2;
-                    
+
                     const overTop = over?.rect.top ?? 0;
                     const overHeight = over?.rect.height ?? 0;
                     const overCenter = overTop + overHeight / 2;
-                    
+
                     const isBelowOverItem = activeCenter > overCenter;
 
                     const modifier = isBelowOverItem ? 1 : 0;
@@ -332,7 +333,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             if (currentColumn && currentColumn === overColumn) {
                 // Use dnd-kit's sortable indexes if available to avoid race conditions with mutating handleDragOver
                 const activeIndex = finalItemMapState[currentColumn].findIndex(i => i.id === activeId);
-                
+
                 let overIndex = finalItemMapState[overColumn].findIndex(i => i.id === overId);
                 const overType = over.data.current?.type;
                 if (overIndex === -1 && (overType === "COLUMN" || overType === "ITEM-LIST")) {
@@ -343,7 +344,7 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
                         // when dragging over the column background.
                         overIndex = activeIndex;
                     }
-                } else if (overIndex === -1 && typeof over.data.current?.sortable?.index === 'number') {
+                } else if (overIndex === -1 && typeof over.data.current?.sortable?.index === "number") {
                     overIndex = over.data.current.sortable.index;
                 }
 
@@ -375,11 +376,11 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
 
     const customCollisionDetection: CollisionDetection = (args) => {
         const pointerCollisions = pointerWithin(args);
-        
+
         if (pointerCollisions.length > 0) {
             return pointerCollisions;
         }
-        
+
         return rectIntersection(args);
     };
 
@@ -394,7 +395,8 @@ export function Board<M extends Record<string, unknown>, COLUMN extends string>(
             {/* Hidden DragOverlay — keeps dnd-kit's internal collision detection
                and drag tracking working (it needs dragOverlay.rect to be set) */}
             <DragOverlay dropAnimation={null} style={{ opacity: 0 }}>
-                {(activeItem || activeColumn) ? <div style={{ width: 1, height: 1 }}/> : null}
+                {(activeItem || activeColumn) ? <div style={{ width: 1,
+height: 1 }}/> : null}
             </DragOverlay>
 
             {/* Visual overlay — rendered at document.body via portal to bypass

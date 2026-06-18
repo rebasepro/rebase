@@ -63,7 +63,8 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#2d7ff9",
         property: {
             type: "string",
-            ui: { multiline: true, Field: TextFieldBinding }
+            ui: { multiline: true,
+Field: TextFieldBinding }
         }
     },
     markdown: {
@@ -74,7 +75,8 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#2d7ff9",
         property: {
             type: "string",
-            ui: { markdown: true, Field: MarkdownEditorFieldBinding }
+            ui: { markdown: true,
+Field: MarkdownEditorFieldBinding }
         }
     },
     url: {
@@ -85,7 +87,8 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#154fb3",
         property: {
             type: "string",
-            ui: { url: true, Field: TextFieldBinding }
+            ui: { url: true,
+Field: TextFieldBinding }
         }
     },
     email: {

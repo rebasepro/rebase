@@ -5,7 +5,8 @@ import * as path from "path";
 async function run() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    viewport: { width: 1280, height: 800 }
+    viewport: { width: 1280,
+height: 800 }
   });
   const page = await context.newPage();
 
@@ -27,7 +28,7 @@ async function run() {
 
     // Toggle to Sign Up mode
     console.log("Switching to Sign Up mode...");
-    await page.click('text=Create one');
+    await page.click("text=Create one");
     await page.waitForTimeout(500);
 
     // 2. Fill login details (email/password)
@@ -41,13 +42,13 @@ async function run() {
     console.log("Submitting login form...");
     await page.click('button[type="submit"]');
     // Wait for registration to complete and redirect to the dashboard
-    await page.waitForURL('**/org/*/projects', { timeout: 15000 });
+    await page.waitForURL("**/org/*/projects", { timeout: 15000 });
     await page.screenshot({ path: path.join(screenshotDir, "3-dashboard-projects.png") });
 
     // 4. Navigate to Create Project
     console.log("Clicking 'New Project'...");
     await page.click('button:has-text("Create Project")');
-    await page.waitForURL('**/org/*/projects/new', { timeout: 10000 });
+    await page.waitForURL("**/org/*/projects/new", { timeout: 10000 });
     await page.screenshot({ path: path.join(screenshotDir, "4-create-project-step1.png") });
 
     // 5. Fill Step 1
@@ -108,7 +109,7 @@ async function run() {
     await page.screenshot({ path: path.join(screenshotDir, "9e-projects-page.png") });
 
     console.log("Opening project details page...");
-    await page.click('text=My E2E Project');
+    await page.click("text=My E2E Project");
     await page.waitForTimeout(3000);
     await page.screenshot({ path: path.join(screenshotDir, "9f-project-detail-logs.png") });
 
@@ -117,7 +118,7 @@ async function run() {
     await page.click('button:has-text("Database")');
     await page.waitForTimeout(2000);
     await page.screenshot({ path: path.join(screenshotDir, "10-project-detail-database.png") });
-    
+
     console.log("Triggering database connection test...");
     await page.click('button:has-text("Test Connection")');
     await page.waitForTimeout(3000); // Wait for mock test db function

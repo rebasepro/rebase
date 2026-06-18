@@ -44,7 +44,7 @@ describe("CronScheduler", () => {
     describe("validateCronExpression", () => {
         it.each([
             "0 * * * *", "*/5 * * * *", "0 0 1 * *", "30 2 * * 1",
-            "0 0 * * 0", "0,15,30,45 * * * *", "0 0 1-15 * *",
+            "0 0 * * 0", "0,15,30,45 * * * *", "0 0 1-15 * *"
         ])("accepts valid expression: %s", (expr) => {
             expect(validateCronExpression(expr)).toEqual({ valid: true });
         });
@@ -106,7 +106,9 @@ describe("CronScheduler", () => {
         });
 
         it("preserves definition metadata", () => {
-            scheduler.registerJobs([makeJob("meta", { name: "My Job", description: "Desc", schedule: "30 2 * * 1" })]);
+            scheduler.registerJobs([makeJob("meta", { name: "My Job",
+description: "Desc",
+schedule: "30 2 * * 1" })]);
             const job = scheduler.getJob("meta")!;
             expect(job.name).toBe("My Job");
             expect(job.description).toBe("Desc");
@@ -262,7 +264,8 @@ describe("CronScheduler", () => {
             // Try second trigger while first is running
             const second = await scheduler.triggerJob("slow");
 
-            expect(second!.result).toEqual({ skipped: true, reason: "already_executing" });
+            expect(second!.result).toEqual({ skipped: true,
+reason: "already_executing" });
             expect(second!.logs).toContain("Skipped: job is already running");
 
             // Let the first one finish
@@ -480,7 +483,7 @@ describe("CronScheduler", () => {
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog,
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map())
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("persisted")]);
@@ -494,7 +497,7 @@ describe("CronScheduler", () => {
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockRejectedValue(new Error("DB down")),
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map())
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("resilient")]);
@@ -505,12 +508,14 @@ describe("CronScheduler", () => {
 
         it("seeds counters from store on start", async () => {
             const stats = new Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>();
-            stats.set("seeded", { totalRuns: 42, totalFailures: 3, lastRunAt: "2026-01-01T00:00:00Z" });
+            stats.set("seeded", { totalRuns: 42,
+totalFailures: 3,
+lastRunAt: "2026-01-01T00:00:00Z" });
             const mockStore = {
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(stats),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(stats)
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("seeded")]);
@@ -527,11 +532,18 @@ describe("CronScheduler", () => {
 
     describe("status shape", () => {
         it("returns all expected fields", () => {
-            scheduler.registerJobs([makeJob("shape", { name: "Shape Test", description: "Desc", schedule: "15 3 * * *" })]);
+            scheduler.registerJobs([makeJob("shape", { name: "Shape Test",
+description: "Desc",
+schedule: "15 3 * * *" })]);
             expect(scheduler.getJob("shape")).toMatchObject({
-                id: "shape", name: "Shape Test", description: "Desc",
-                schedule: "15 3 * * *", enabled: true, state: "idle",
-                totalRuns: 0, totalFailures: 0
+                id: "shape",
+name: "Shape Test",
+description: "Desc",
+                schedule: "15 3 * * *",
+enabled: true,
+state: "idle",
+                totalRuns: 0,
+totalFailures: 0
             });
         });
 

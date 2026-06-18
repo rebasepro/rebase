@@ -205,7 +205,8 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 
     const formActionTopProps: PluginFormActionProps = useMemo(() => ({
         entityId,
-        parentCollectionSlugs, parentEntityIds,
+        parentCollectionSlugs,
+parentEntityIds,
         path: path,
         status,
         collection: collection!,

@@ -207,7 +207,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                         const checkName = resolvedTable ?? tableName;
                         const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
                         if (!dbTables.has(fullCheckName)) {
-                            missing.push({ slug: col.slug, table: checkName });
+                            missing.push({ slug: col.slug,
+table: checkName });
                         }
                     }
                     if (missing.length > 0) {

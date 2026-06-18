@@ -82,7 +82,6 @@ export function MapFieldBinding({
         </div>
 
 
-
     </>
         ;
 
@@ -92,7 +91,8 @@ export function MapFieldBinding({
             {!minimalistView && <ExpandablePanel initiallyExpanded={expanded}
                 onExpandedChange={(expanded: boolean) => {
                     onPropertyChange?.({
-                        ui: { ...property.ui, expanded }
+                        ui: { ...property.ui,
+expanded }
                     });
                 }}
                 className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}

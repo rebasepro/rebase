@@ -1,5 +1,6 @@
 import { TextEncoder, TextDecoder } from "util";
-Object.assign(global, { TextEncoder, TextDecoder });
+Object.assign(global, { TextEncoder,
+TextDecoder });
 
 // Mock window.matchMedia
 if (typeof window !== "undefined") {

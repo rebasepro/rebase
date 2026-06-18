@@ -7,7 +7,8 @@ function makeValuesResult(count: number): ValuesCountEntry {
     for (const v of values) {
         valuesCount.set(v, 1);
     }
-    return { values, valuesCount };
+    return { values,
+valuesCount };
 }
 
 describe("buildValidation", () => {

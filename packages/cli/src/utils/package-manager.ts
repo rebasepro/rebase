@@ -72,7 +72,7 @@ export function getPMCommands(pm: PackageManager): PMCommands {
             view: (pkg, field) => ["npm", "view", pkg, field],
             runAll: (script) => ["npm", "run", script, "--workspaces", "--if-present"],
             runWorkspace: (workspace, script) => ["npm", "run", script, "-w", workspace],
-            workspaceProtocol: "*",
+            workspaceProtocol: "*"
         };
     }
 
@@ -84,6 +84,6 @@ export function getPMCommands(pm: PackageManager): PMCommands {
         view: (pkg, field) => ["pnpm", "view", pkg, field],
         runAll: (script) => ["pnpm", "-r", "run", script],
         runWorkspace: (workspace, script) => ["pnpm", "--filter", workspace, script],
-        workspaceProtocol: "workspace:*",
+        workspaceProtocol: "workspace:*"
     };
 }

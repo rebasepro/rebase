@@ -827,10 +827,10 @@ user: mockUser })
                     const value = pair.substring(key.length + 1);
 
                     const isDelete = parts.some(p => p.trim().startsWith("max-age=-1"));
-                    
+
                     const cookies = this._cookie ? this._cookie.split(";").map(c => c.trim()) : [];
                     const filtered = cookies.filter(c => !c.startsWith(key + "="));
-                    
+
                     if (!isDelete) {
                         filtered.push(`${key}=${value}`);
                     }

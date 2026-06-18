@@ -43,8 +43,12 @@ const databasesCollection: EntityCollection = {
             name: "Type",
             type: "string",
             enum: [
-                { id: "managed", label: "SaaS Managed", color: "green" },
-                { id: "byodb", label: "Bring Your Own DB", color: "blue" }
+                { id: "managed",
+label: "SaaS Managed",
+color: "green" },
+                { id: "byodb",
+label: "Bring Your Own DB",
+color: "blue" }
             ]
         } as unknown as Property,
         connectionString: {
@@ -79,9 +83,15 @@ const databasesCollection: EntityCollection = {
             name: "Connection Status",
             type: "string",
             enum: [
-                { id: "connected", label: "Connected", color: "green" },
-                { id: "failed", label: "Failed", color: "red" },
-                { id: "untested", label: "Untested", color: "gray" }
+                { id: "connected",
+label: "Connected",
+color: "green" },
+                { id: "failed",
+label: "Failed",
+color: "red" },
+                { id: "untested",
+label: "Untested",
+color: "gray" }
             ]
         } as unknown as Property,
         pitrEnabled: {

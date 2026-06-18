@@ -112,7 +112,8 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
 
         const effectiveDefault = resolveDefaultSelectedView(
             collection.defaultSelectedView,
-            { status: "existing", entityId }
+            { status: "existing",
+entityId }
         );
         if (effectiveDefault && effectiveDefault !== "edit") {
             hasCorrectedDefaultView.current = true;

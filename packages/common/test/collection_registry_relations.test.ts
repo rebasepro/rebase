@@ -4,7 +4,7 @@ import {
     RelationProperty,
     MapProperty,
     ArrayProperty,
-    Relation,
+    Relation
 } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { resolveRelationProperty } from "../src/util/resolutions";
@@ -17,9 +17,10 @@ function makeTagsCollection(): PostgresCollection {
         slug: "tags",
         table: "tags",
         properties: {
-            id: { type: "number", isId: "increment" },
-            name: { type: "string" },
-        },
+            id: { type: "number",
+isId: "increment" },
+            name: { type: "string" }
+        }
     };
 }
 
@@ -29,9 +30,10 @@ function makeAuthorsCollection(): PostgresCollection {
         slug: "authors",
         table: "authors",
         properties: {
-            id: { type: "number", isId: "increment" },
-            display_name: { type: "string" },
-        },
+            id: { type: "number",
+isId: "increment" },
+            display_name: { type: "string" }
+        }
     };
 }
 
@@ -49,23 +51,24 @@ function makePostsWithInlineRelations(
         slug: "posts",
         table: "posts",
         properties: {
-            id: { type: "number", isId: "increment" },
+            id: { type: "number",
+isId: "increment" },
             title: { type: "string" },
             author: {
                 name: "Author",
                 type: "relation",
                 target: () => authorsCol,
                 cardinality: "one",
-                direction: "owning",
+                direction: "owning"
             } as RelationProperty,
             tags: {
                 name: "Tags",
                 type: "relation",
                 target: () => tagsCol,
                 cardinality: "many",
-                direction: "owning",
-            } as RelationProperty,
-        },
+                direction: "owning"
+            } as RelationProperty
+        }
     };
 }
 
@@ -82,35 +85,36 @@ function makePostsWithExplicitRelations(
         slug: "posts-legacy",
         table: "posts_legacy",
         properties: {
-            id: { type: "number", isId: "increment" },
+            id: { type: "number",
+isId: "increment" },
             title: { type: "string" },
             author: {
                 name: "Author",
                 type: "relation",
                 relationName: "author_rel",
-                collectionPath: "authors",
+                collectionPath: "authors"
             } as RelationProperty,
             tags: {
                 name: "Tags",
                 type: "relation",
                 relationName: "tags_rel",
-                collectionPath: "tags",
-            } as RelationProperty,
+                collectionPath: "tags"
+            } as RelationProperty
         },
         relations: [
             {
                 relationName: "author_rel",
                 target: () => authorsCol,
                 cardinality: "one",
-                direction: "owning",
+                direction: "owning"
             },
             {
                 relationName: "tags_rel",
                 target: () => tagsCol,
                 cardinality: "many",
-                direction: "owning",
-            },
-        ],
+                direction: "owning"
+            }
+        ]
     };
 }
 
@@ -220,11 +224,11 @@ describe("Layer 2 – normalizeProperty stamps relation metadata", () => {
                             type: "relation",
                             target: () => tags,
                             cardinality: "one",
-                            direction: "owning",
-                        } as RelationProperty,
-                    },
-                },
-            },
+                            direction: "owning"
+                        } as RelationProperty
+                    }
+                }
+            }
         };
 
         const registry = new CollectionRegistry();
@@ -365,7 +369,7 @@ describe("Layer 4 – collection.relations[] populated from inline config", () =
         // Simulate a scenario where property.relation was stripped (e.g. by serialization)
         const strippedProp: RelationProperty = {
             ...stored.properties.tags as RelationProperty,
-            relation: undefined,
+            relation: undefined
         };
         // The property should still have a relationName that matches
         // (the normalization process sets relationName from the key)
@@ -416,9 +420,9 @@ describe("Layer 5 – idempotent re-registration", () => {
                 ...posts.properties,
                 tags: {
                     ...(posts.properties.tags as RelationProperty),
-                    cardinality: "one",
-                },
-            },
+                    cardinality: "one"
+                }
+            }
         };
 
         const changed = registry.registerMultiple([tags, authors, modifiedPosts]);
@@ -442,11 +446,12 @@ describe("Layer 6 – circular dependency resilience", () => {
             slug: "tags",
             table: "tags",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
             },
             // tags has an inverse relation pointing back to posts
-            relations: [],
+            relations: []
         };
 
         const posts: PostgresCollection = {
@@ -454,15 +459,16 @@ describe("Layer 6 – circular dependency resilience", () => {
             slug: "posts",
             table: "posts",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 tags: {
                     name: "Tags",
                     type: "relation",
                     target: () => tags,
                     cardinality: "many",
-                    direction: "owning",
-                } as RelationProperty,
-            },
+                    direction: "owning"
+                } as RelationProperty
+            }
         };
 
         // Now add the inverse relation on tags pointing back to posts
@@ -472,8 +478,8 @@ describe("Layer 6 – circular dependency resilience", () => {
                 target: () => posts,
                 cardinality: "many",
                 direction: "inverse",
-                inverseRelationName: "tags",
-            },
+                inverseRelationName: "tags"
+            }
         ];
 
         const registry = new CollectionRegistry([posts, tags]);
@@ -498,15 +504,16 @@ describe("Layer 6 – circular dependency resilience", () => {
             slug: "posts",
             table: "posts",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 author: {
                     name: "Author",
                     type: "relation",
                     target: "authors", // String slug instead of function returning reference
                     cardinality: "one",
-                    direction: "owning",
-                } as RelationProperty,
-            },
+                    direction: "owning"
+                } as RelationProperty
+            }
         };
 
         const authors: PostgresCollection = {
@@ -514,9 +521,10 @@ describe("Layer 6 – circular dependency resilience", () => {
             slug: "authors",
             table: "authors",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
-            },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
+            }
         };
 
         const registry = new CollectionRegistry([posts, authors]);
@@ -548,9 +556,10 @@ describe("Layer 7 – mixed inline + explicit relations", () => {
             slug: "categories",
             table: "categories",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
-            },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
+            }
         };
 
         const posts: PostgresCollection = {
@@ -558,7 +567,8 @@ describe("Layer 7 – mixed inline + explicit relations", () => {
             slug: "posts",
             table: "posts",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 title: { type: "string" },
                 // Inline relation — no separate relations[] entry needed
                 tags: {
@@ -566,14 +576,14 @@ describe("Layer 7 – mixed inline + explicit relations", () => {
                     type: "relation",
                     target: () => tags,
                     cardinality: "many",
-                    direction: "owning",
+                    direction: "owning"
                 } as RelationProperty,
                 // Legacy relation — uses explicit relations[]
                 author: {
                     name: "Author",
                     type: "relation",
                     relationName: "author_link",
-                    collectionPath: "authors",
+                    collectionPath: "authors"
                 } as RelationProperty,
                 // Another inline relation
                 category: {
@@ -581,17 +591,17 @@ describe("Layer 7 – mixed inline + explicit relations", () => {
                     type: "relation",
                     target: () => categories,
                     cardinality: "one",
-                    direction: "owning",
-                } as RelationProperty,
+                    direction: "owning"
+                } as RelationProperty
             },
             relations: [
                 {
                     relationName: "author_link",
                     target: () => authors,
                     cardinality: "one",
-                    direction: "owning",
-                },
-            ],
+                    direction: "owning"
+                }
+            ]
         };
 
         const registry = new CollectionRegistry([tags, authors, categories, posts]);
@@ -651,7 +661,8 @@ describe("Layer 8 – property.relation is truthy for table binding selection", 
             slug: "posts",
             table: "posts",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 tags: {
                     name: "Tags",
                     type: "relation",
@@ -661,10 +672,10 @@ describe("Layer 8 – property.relation is truthy for table binding selection", 
                     through: {
                         table: "posts_tags",
                         sourceColumn: "post_id",
-                        targetColumn: "tag_id",
-                    },
-                } as RelationProperty,
-            },
+                        targetColumn: "tag_id"
+                    }
+                } as RelationProperty
+            }
         };
 
         const registry = new CollectionRegistry([tags, posts]);
@@ -680,7 +691,7 @@ describe("Layer 8 – property.relation is truthy for table binding selection", 
         expect(relation.through).toEqual({
             table: "posts_tags",
             sourceColumn: "post_id",
-            targetColumn: "tag_id",
+            targetColumn: "tag_id"
         });
     });
 });
@@ -696,9 +707,10 @@ describe("Layer 9 – nested relation config (property.relation.target)", () => 
             slug: "customers",
             table: "customers",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
-            },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
+            }
         };
 
         const orders: PostgresCollection = {
@@ -706,7 +718,8 @@ describe("Layer 9 – nested relation config (property.relation.target)", () => 
             slug: "orders",
             table: "orders",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 // This mimics the pattern in orders.ts where the developer puts
                 // target inside property.relation rather than directly on the property
                 customer: {
@@ -717,10 +730,10 @@ describe("Layer 9 – nested relation config (property.relation.target)", () => 
                         target: () => customers,
                         cardinality: "one",
                         direction: "owning",
-                        localKey: "customer_id",
-                    },
-                } as RelationProperty,
-            },
+                        localKey: "customer_id"
+                    }
+                } as RelationProperty
+            }
         };
 
         const registry = new CollectionRegistry();
@@ -748,8 +761,9 @@ describe("Layer 9 – nested relation config (property.relation.target)", () => 
             slug: "customers",
             table: "customers",
             properties: {
-                id: { type: "number", isId: "increment" },
-            },
+                id: { type: "number",
+isId: "increment" }
+            }
         };
 
         const orders: PostgresCollection = {
@@ -757,7 +771,8 @@ describe("Layer 9 – nested relation config (property.relation.target)", () => 
             slug: "orders",
             table: "orders",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 customer: {
                     name: "Customer",
                     type: "relation",
@@ -770,10 +785,10 @@ describe("Layer 9 – nested relation config (property.relation.target)", () => 
                         relationName: "customer",
                         target: () => customers,
                         cardinality: "many",
-                        direction: "inverse",
-                    },
-                } as RelationProperty,
-            },
+                        direction: "inverse"
+                    }
+                } as RelationProperty
+            }
         };
 
         const registry = new CollectionRegistry();
@@ -799,9 +814,10 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "products",
             table: "products",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
-            },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
+            }
         };
 
         const orderItems: PostgresCollection = {
@@ -809,7 +825,8 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "order_items",
             table: "order_items",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 quantity: { type: "number" },
                 // Inline relation to orders — will be extracted as "one"
                 order: {
@@ -819,8 +836,8 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
                         relationName: "order",
                         target: () => orders,
                         cardinality: "one",
-                        direction: "owning",
-                    },
+                        direction: "owning"
+                    }
                 } as RelationProperty,
                 // Inline relation to products
                 product: {
@@ -828,9 +845,9 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
                     type: "relation",
                     target: () => products,
                     cardinality: "one",
-                    direction: "owning",
-                } as RelationProperty,
-            },
+                    direction: "owning"
+                } as RelationProperty
+            }
         };
 
         const orders: PostgresCollection = {
@@ -838,8 +855,9 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "orders",
             table: "orders",
             properties: {
-                id: { type: "number", isId: "increment" },
-                total: { type: "number" },
+                id: { type: "number",
+isId: "increment" },
+                total: { type: "number" }
             },
             relations: [
                 {
@@ -847,9 +865,9 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
                     target: () => orderItems,
                     cardinality: "many",
                     direction: "inverse",
-                    inverseRelationName: "order",
-                },
-            ],
+                    inverseRelationName: "order"
+                }
+            ]
         };
 
         const customers: PostgresCollection = {
@@ -857,8 +875,9 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "customers",
             table: "customers",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
             },
             relations: [
                 {
@@ -866,9 +885,9 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
                     target: () => orders,
                     cardinality: "many",
                     direction: "inverse",
-                    inverseRelationName: "customer",
-                },
-            ],
+                    inverseRelationName: "customer"
+                }
+            ]
         };
 
         // This should NOT crash — the old code would fail because
@@ -894,9 +913,10 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "products",
             table: "products",
             properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string" },
-            },
+                id: { type: "number",
+isId: "increment" },
+                name: { type: "string" }
+            }
         };
 
         const orderItems: PostgresCollection = {
@@ -904,15 +924,16 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "order_items",
             table: "order_items",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 product: {
                     name: "Product",
                     type: "relation",
                     target: () => products,
                     cardinality: "one",
-                    direction: "owning",
-                } as RelationProperty,
-            },
+                    direction: "owning"
+                } as RelationProperty
+            }
         };
 
         const orders: PostgresCollection = {
@@ -920,16 +941,17 @@ describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
             slug: "orders",
             table: "orders",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" }
             },
             relations: [
                 {
                     relationName: "order_items",
                     target: () => orderItems,
                     cardinality: "many",
-                    direction: "inverse",
-                },
-            ],
+                    direction: "inverse"
+                }
+            ]
         };
 
         const registry = new CollectionRegistry();
@@ -1018,7 +1040,8 @@ describe("Regression – normalizeCollection sanitizes relations (derived fields
             slug: "posts",
             table: "posts",
             properties: {
-                id: { type: "number", isId: "increment" },
+                id: { type: "number",
+isId: "increment" },
                 title: { type: "string" },
                 tags: {
                     name: "Tags",
@@ -1029,10 +1052,10 @@ describe("Regression – normalizeCollection sanitizes relations (derived fields
                     through: {
                         table: "custom_junction",
                         sourceColumn: "src",
-                        targetColumn: "tgt",
-                    },
-                } as RelationProperty,
-            },
+                        targetColumn: "tgt"
+                    }
+                } as RelationProperty
+            }
         };
 
         const registry = new CollectionRegistry();

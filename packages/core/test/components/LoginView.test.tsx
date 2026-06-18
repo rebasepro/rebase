@@ -5,7 +5,8 @@ import "@testing-library/jest-dom";
 
 // Polyfill TextEncoder/TextDecoder for JSDOM
 import { TextEncoder, TextDecoder } from "util";
-Object.assign(global, { TextEncoder, TextDecoder });
+Object.assign(global, { TextEncoder,
+TextDecoder });
 
 // Mock window.matchMedia
 if (typeof window !== "undefined") {
@@ -78,7 +79,7 @@ describe("LoginView Component", () => {
 
     it("renders login view with email and password fields after clicking Sign in with email", async () => {
         render(<LoginView authController={mockAuthController} />);
-        
+
         // Click Sign in with email first to reveal the inputs
         const signInWithEmailButton = screen.getByRole("button", { name: /Sign in with email/i });
         fireEvent.click(signInWithEmailButton);
@@ -93,7 +94,7 @@ describe("LoginView Component", () => {
 
     it("calls emailPasswordLogin when form is submitted", async () => {
         render(<LoginView authController={mockAuthController} />);
-        
+
         // Click Sign in with email to reveal inputs
         const signInWithEmailButton = screen.getByRole("button", { name: /Sign in with email/i });
         fireEvent.click(signInWithEmailButton);
@@ -114,7 +115,7 @@ describe("LoginView Component", () => {
 
     it("switches to registration mode and calls register on submit", async () => {
         render(<LoginView authController={mockAuthController} />);
-        
+
         // Click Create one button/link
         const signUpLink = screen.getByRole("button", { name: /Create one/i });
         fireEvent.click(signUpLink);

@@ -19,7 +19,7 @@ import type {
     AuthUserListResult,
     AuthUserData,
     AuthCreateUserData,
-    BootstrappedAuth,
+    BootstrappedAuth
 } from "@rebasepro/types";
 
 import type { Hono } from "hono";
@@ -80,7 +80,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         oauthProviders = [],
         serviceKey,
         authHooks,
-        collectionAuthConfig,
+        collectionAuthConfig
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -109,7 +109,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                     email: "service@rebase.internal",
                     roles: ["admin"],
                     isAdmin: true,
-                    rawToken: token,
+                    rawToken: token
                 };
             }
 
@@ -135,7 +135,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 displayName: payload.displayName ?? null,
                 roles,
                 isAdmin,
-                rawToken: token,
+                rawToken: token
             };
         },
 
@@ -147,7 +147,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                     email: "service@rebase.internal",
                     roles: ["admin"],
                     isAdmin: true,
-                    rawToken: token,
+                    rawToken: token
                 };
             }
 
@@ -172,12 +172,11 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 displayName: payload.displayName ?? null,
                 roles,
                 isAdmin,
-                rawToken: token,
+                rawToken: token
             };
         },
 
         userManagement: createUserManagementFromRepo(authRepository, resolvedOps),
-
 
 
         createAuthRoutes(): Hono<HonoEnv> | undefined {
@@ -188,7 +187,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowRegistration,
                 defaultRole,
                 oauthProviders,
-                authHooks,
+                authHooks
             });
         },
 
@@ -199,7 +198,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 serviceKey,
                 authHooks,
-                collectionAuthConfig,
+                collectionAuthConfig
             });
         },
 
@@ -210,7 +209,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailService,
                 emailConfig,
                 resolvedHooks: resolvedOps,
-                collectionAuthConfig: parsedCollectionAuth ?? collectionAuthConfig,
+                collectionAuthConfig: parsedCollectionAuth ?? collectionAuthConfig
             });
         },
 
@@ -220,7 +219,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailService,
                 emailConfig,
                 resolvedHooks: resolvedOps,
-                collectionAuthConfig,
+                collectionAuthConfig
             });
         },
 
@@ -246,9 +245,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 profileUpdate: true,
                 emailVerification: !!emailService?.isConfigured(),
                 enabledProviders,
-                needsSetup,
+                needsSetup
             };
-        },
+        }
     };
 
     return adapter;
@@ -265,13 +264,13 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 search: options?.search,
                 orderBy: options?.orderBy,
                 orderDir: options?.orderDir,
-                roleId: options?.roleId,
+                roleId: options?.roleId
             });
             return {
                 users: result.users.map(toAuthUserData),
                 total: result.total,
                 limit: result.limit,
-                offset: result.offset,
+                offset: result.offset
             };
         },
 
@@ -287,7 +286,7 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 passwordHash,
                 displayName: data.displayName,
                 photoUrl: data.photoUrl,
-                metadata: data.metadata,
+                metadata: data.metadata
             };
             if (resolvedOps.beforeUserCreate) {
                 createData = await resolvedOps.beforeUserCreate(createData);
@@ -338,7 +337,7 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
 
         async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
             await repo.setUserRoles(userId, roleIds);
-        },
+        }
     };
 }
 
@@ -351,6 +350,6 @@ function toAuthUserData(user: { id: string; email: string; displayName?: string 
         emailVerified: user.emailVerified,
         metadata: user.metadata,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        updatedAt: user.updatedAt
     };
 }

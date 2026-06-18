@@ -159,7 +159,7 @@ export function apiKeyKeyGenerator(c: Parameters<MiddlewareHandler<HonoEnv>>[0])
  */
 export function createApiKeyRateLimiter(
     defaultLimit = 1000,
-    windowMs = 15 * 60 * 1000,
+    windowMs = 15 * 60 * 1000
 ): MiddlewareHandler<HonoEnv> {
     // We maintain a single shared store keyed by API key ID.
     // The actual limit is resolved per-request from the key's metadata.

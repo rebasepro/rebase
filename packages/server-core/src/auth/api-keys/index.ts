@@ -14,7 +14,7 @@ export type {
     ApiKeyPermission,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
-    UpdateApiKeyRequest,
+    UpdateApiKeyRequest
 } from "./api-key-types";
 
 // Store
@@ -28,7 +28,7 @@ export type { ApiKeyAuthOptions } from "./api-key-middleware";
 // Permission guard
 export {
     httpMethodToOperation,
-    isOperationAllowed,
+    isOperationAllowed
 } from "./api-key-permission-guard";
 export type { ApiKeyOperation } from "./api-key-permission-guard";
 

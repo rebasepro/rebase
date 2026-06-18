@@ -11,7 +11,7 @@ export const iconSize = {
     smallest: 16,
     small: 20,
     medium: 24,
-    large: 28,
+    large: 28
 } as const satisfies Record<IconSize, number>;
 
 export type IconProps = {

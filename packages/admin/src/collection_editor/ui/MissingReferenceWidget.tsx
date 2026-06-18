@@ -22,7 +22,8 @@ export function MissingReferenceWidget({ path: pathProp }: {
                 collectionEditor.createCollection({
                     initialValues: { path,
 name: prettifyIdentifier(path) },
-                    parentCollectionSlugs, parentEntityIds,
+                    parentCollectionSlugs,
+parentEntityIds,
                     redirect: false,
                     sourceClick: "missing_reference"
                 });

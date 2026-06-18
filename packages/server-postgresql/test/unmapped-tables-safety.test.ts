@@ -49,7 +49,9 @@ function buildPrevSnapshot(tables: Record<string, any>, enums: Record<string, an
         roles: {},
         policies: {},
         views: {},
-        _meta: { schemas: {}, tables: {}, columns: {} }
+        _meta: { schemas: {},
+tables: {},
+columns: {} }
     };
 }
 
@@ -82,7 +84,9 @@ function snapshotColumn(name: string, type: string, opts: {
 }
 
 function snapshotEnum(name: string, schema: string, values: string[]) {
-    return { name, schema, values };
+    return { name,
+schema,
+values };
 }
 
 // ── Drizzle schema objects (the "managed" schema) ───────────────────────
@@ -106,7 +110,8 @@ describe("Unmapped tables safety", () => {
     describe("tablesFilter scoping", () => {
 
         it("should extract only managed table names from the tables export", () => {
-            const tables = { managedUsers, managedPosts };
+            const tables = { managedUsers,
+managedPosts };
             const tableNames = Object.values(tables).map(t => getTableName(t as Table));
 
             expect(tableNames).toEqual(["users", "posts"]);
@@ -115,7 +120,8 @@ describe("Unmapped tables safety", () => {
         });
 
         it("should produce a tablesFilter that excludes unmapped tables", () => {
-            const tables = { managedUsers, managedPosts };
+            const tables = { managedUsers,
+managedPosts };
             const tablesFilter = Object.values(tables).map(t => getTableName(t as Table));
 
             const unmappedTables = [
@@ -209,7 +215,8 @@ describe("Unmapped tables safety", () => {
                 })
             });
 
-            const curJson = generateDrizzleJson({ managedUsers, managedPosts });
+            const curJson = generateDrizzleJson({ managedUsers,
+managedPosts });
             const statements = await generateMigration(prevOnlyManaged as any, curJson as any);
 
             // No changes needed — managed schema is identical
@@ -276,7 +283,8 @@ describe("Unmapped tables safety", () => {
                 name: "Posts",
                 properties: {
                     title: { type: "string" },
-                    tags: { type: "relation", relationName: "tags" }
+                    tags: { type: "relation",
+relationName: "tags" }
                 },
                 relations: [{
                     relationName: "tags",

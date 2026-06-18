@@ -38,10 +38,12 @@ describe("parseOpenApiSpec", () => {
         const spec = makeSpec({
             paths: {
                 "/api/data/users": {
-                    get: { tags: ["Users"], summary: "List users" }
+                    get: { tags: ["Users"],
+summary: "List users" }
                 },
                 "/api/data/posts": {
-                    get: { tags: ["Posts"], summary: "List posts" }
+                    get: { tags: ["Posts"],
+summary: "List posts" }
                 }
             }
         });
@@ -67,7 +69,8 @@ describe("parseOpenApiSpec", () => {
         const spec = makeSpec({
             paths: {
                 "/api/data/users": {
-                    get: { tags: ["Users"], summary: "List" }
+                    get: { tags: ["Users"],
+summary: "List" }
                 }
             }
         });
@@ -79,7 +82,8 @@ describe("parseOpenApiSpec", () => {
         const spec = makeSpec({
             paths: {
                 "/api/data": {
-                    get: { tags: ["Root"], summary: "Root" }
+                    get: { tags: ["Root"],
+summary: "Root" }
                 }
             }
         });
@@ -91,12 +95,16 @@ describe("parseOpenApiSpec", () => {
         const spec = makeSpec({
             paths: {
                 "/api/data/users": {
-                    delete: { tags: ["Users"], summary: "Delete" },
-                    get: { tags: ["Users"], summary: "List" },
-                    post: { tags: ["Users"], summary: "Create" }
+                    delete: { tags: ["Users"],
+summary: "Delete" },
+                    get: { tags: ["Users"],
+summary: "List" },
+                    post: { tags: ["Users"],
+summary: "Create" }
                 },
                 "/api/data/users/{id}": {
-                    get: { tags: ["Users"], summary: "Get one" }
+                    get: { tags: ["Users"],
+summary: "Get one" }
                 }
             }
         });
@@ -111,15 +119,19 @@ describe("parseOpenApiSpec", () => {
     it("respects tag order from spec.tags", () => {
         const spec = makeSpec({
             tags: [
-                { name: "Posts", description: "Blog posts" },
-                { name: "Users", description: "User management" }
+                { name: "Posts",
+description: "Blog posts" },
+                { name: "Users",
+description: "User management" }
             ],
             paths: {
                 "/api/data/users": {
-                    get: { tags: ["Users"], summary: "List users" }
+                    get: { tags: ["Users"],
+summary: "List users" }
                 },
                 "/api/data/posts": {
-                    get: { tags: ["Posts"], summary: "List posts" }
+                    get: { tags: ["Posts"],
+summary: "List posts" }
                 }
             }
         });
@@ -131,11 +143,13 @@ describe("parseOpenApiSpec", () => {
     it("includes tag descriptions from spec.tags", () => {
         const spec = makeSpec({
             tags: [
-                { name: "Users", description: "User management endpoints" }
+                { name: "Users",
+description: "User management endpoints" }
             ],
             paths: {
                 "/api/data/users": {
-                    get: { tags: ["Users"], summary: "List" }
+                    get: { tags: ["Users"],
+summary: "List" }
                 }
             }
         });
@@ -144,7 +158,9 @@ describe("parseOpenApiSpec", () => {
     });
 
     it("extracts parameters and requestBody", () => {
-        const params = [{ name: "id", in: "path", required: true }];
+        const params = [{ name: "id",
+in: "path",
+required: true }];
         const requestBody = { content: { "application/json": { schema: {} } } };
         const spec = makeSpec({
             paths: {
@@ -166,8 +182,10 @@ describe("parseOpenApiSpec", () => {
         const spec = makeSpec({
             paths: {
                 "/api/data/users": {
-                    get: { tags: ["Users"], summary: "List" },
-                    post: { tags: ["Users"], summary: "Create" }
+                    get: { tags: ["Users"],
+summary: "List" },
+                    post: { tags: ["Users"],
+summary: "Create" }
                 }
             }
         });
@@ -181,8 +199,10 @@ describe("parseOpenApiSpec", () => {
         const spec = makeSpec({
             paths: {
                 "/api/data/users": {
-                    get: { tags: ["Users"], summary: "List" },
-                    options: { tags: ["Users"], summary: "Options" },
+                    get: { tags: ["Users"],
+summary: "List" },
+                    options: { tags: ["Users"],
+summary: "Options" },
                     parameters: [{ name: "test" }] as unknown as Record<string, unknown>
                 } as unknown as Record<string, never>
             }
@@ -245,7 +265,8 @@ describe("resolveRef", () => {
         const spec = makeSpec({
             components: {
                 schemas: {
-                    Author: { type: "object", properties: { name: { type: "string" } } }
+                    Author: { type: "object",
+properties: { name: { type: "string" } } }
                 }
             }
         });

@@ -70,7 +70,6 @@ function buildAuthResponse(
 }
 
 
-
 /**
  * Get password reset token expiry (1 hour from now)
  */
@@ -187,7 +186,9 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         if (ops.customizeAccessToken) {
             const user = await authRepo.getUserById(userId);
             if (user) {
-                const defaultClaims: Record<string, unknown> = { userId, roles: roleIds, aal: "aal1" };
+                const defaultClaims: Record<string, unknown> = { userId,
+roles: roleIds,
+aal: "aal1" };
                 customClaims = await ops.customizeAccessToken(defaultClaims, user);
             }
         }
@@ -203,7 +204,9 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             ipAddress
         );
 
-        return { roleIds, accessToken, refreshToken };
+        return { roleIds,
+accessToken,
+refreshToken };
     }
 
     /**
@@ -678,7 +681,9 @@ message: "Email verified successfully" });
         if (ops.customizeAccessToken) {
             const user = await authRepo.getUserById(storedToken.userId);
             if (user) {
-                const defaultClaims: Record<string, unknown> = { userId: storedToken.userId, roles: roleIds, aal: "aal1" };
+                const defaultClaims: Record<string, unknown> = { userId: storedToken.userId,
+roles: roleIds,
+aal: "aal1" };
                 customClaims = await ops.customizeAccessToken(defaultClaims, user);
             }
         }
@@ -1094,7 +1099,8 @@ message: "Session revoked successfully" });
         // Mark factor as verified
         await authRepo.verifyMfaFactor(factorId);
 
-        return c.json({ success: true, message: "MFA factor verified and enrolled" });
+        return c.json({ success: true,
+message: "MFA factor verified and enrolled" });
     });
 
     /**
@@ -1259,7 +1265,8 @@ message: "Session revoked successfully" });
             await authRepo.deleteAllRecoveryCodes(userCtx.userId);
         }
 
-        return c.json({ success: true, message: "MFA factor removed" });
+        return c.json({ success: true,
+message: "MFA factor removed" });
     });
 
     return router;

@@ -6,7 +6,6 @@ import type { EntityCollectionsBuilder, AppViewsBuilder, EffectiveRoleController
 import { CollectionRegistry } from "@rebasepro/common";
 
 
-
 import { useResolvedCollections } from "./useResolvedCollections";
 import { useResolvedViews } from "./useResolvedViews";
 import { useTopLevelNavigation } from "./useTopLevelNavigation";

@@ -354,7 +354,7 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
     if (getDataSourceCapabilities(collection.driver).supportsRelations) {
         const resolvedRelations = resolveCollectionRelations(collection);
         const manyRelations = Object.values(resolvedRelations).filter((r: Relation) => r.cardinality === "many");
-        
+
         return manyRelations.map((r: Relation) => {
             const target = r.target();
             if (!target) return undefined;
@@ -377,7 +377,8 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
                 baseOverrides.singularName = customName;
             }
 
-            const targetWithOverrides = { ...target, ...baseOverrides };
+            const targetWithOverrides = { ...target,
+...baseOverrides };
             return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
         }).filter((c: EntityCollection<Record<string, unknown>> | undefined): c is EntityCollection<Record<string, unknown>> => Boolean(c));
     }

@@ -27,7 +27,6 @@ export interface ConfigControllerProviderProps {
     collectionInference?: CollectionInference;
 
 
-
     extraView?: {
         View: React.ComponentType<{
             path: string
@@ -119,7 +118,6 @@ export const ConfigControllerProvider = React.memo(
         }>();
 
 
-
         const editCollection = useCallback(({
             id,
             path,
@@ -145,7 +143,8 @@ export const ConfigControllerProvider = React.memo(
             setCurrentDialog({
                 editedCollectionId: id,
                 path,
-                parentCollectionSlugs, parentEntityIds,
+                parentCollectionSlugs,
+parentEntityIds,
                 isNewCollection: false,
                 parentCollection,
                 redirect: false,
@@ -191,7 +190,8 @@ export const ConfigControllerProvider = React.memo(
                 namespace,
                 currentPropertiesOrder,
                 editedCollectionId,
-                parentCollectionSlugs, parentEntityIds,
+                parentCollectionSlugs,
+parentEntityIds,
 
                 existingEntities,
                 collection
@@ -217,7 +217,8 @@ export const ConfigControllerProvider = React.memo(
             sourceClick?: string
         }) => {
             console.debug("Create collection", {
-                parentCollectionSlugs, parentEntityIds,
+                parentCollectionSlugs,
+parentEntityIds,
                 parentCollection,
                 initialValues,
                 copyFrom,
@@ -225,7 +226,8 @@ export const ConfigControllerProvider = React.memo(
                 sourceClick
             });
             onAnalyticsEvent?.(copyFrom ? "duplicate_collection" : "create_collection", {
-                parentCollectionSlugs, parentEntityIds,
+                parentCollectionSlugs,
+parentEntityIds,
                 parentCollection,
                 initialValues,
                 redirect,
@@ -233,7 +235,8 @@ export const ConfigControllerProvider = React.memo(
             });
             setCurrentDialog({
                 isNewCollection: true,
-                parentCollectionSlugs, parentEntityIds,
+                parentCollectionSlugs,
+parentEntityIds,
                 parentCollection,
                 initialValues,
                 copyFrom,

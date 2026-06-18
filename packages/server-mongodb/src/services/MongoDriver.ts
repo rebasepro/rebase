@@ -79,10 +79,13 @@ export class MongoDriver implements DataDriver {
         collection: EntityCollection<M> | undefined,
         path: string
     ) {
-        if (!collection && !path) return { collection: undefined, callbacks: undefined, propertyCallbacks: undefined };
+        if (!collection && !path) return { collection: undefined,
+callbacks: undefined,
+propertyCallbacks: undefined };
         const registryCollection = this.registry?.getCollectionByPath(path);
         const resolvedCollection = registryCollection
-            ? ({ ...collection, ...registryCollection } as EntityCollection<M>)
+            ? ({ ...collection,
+...registryCollection } as EntityCollection<M>)
             : (collection as EntityCollection<M>);
 
         const callbacks = resolvedCollection?.callbacks;
@@ -688,7 +691,8 @@ export class AuthenticatedMongoDriver implements DataDriver {
 
     listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
         const unsubscribe = this.delegate.listenCollection(props);
-        const authContext = { userId: this.user.uid, roles: this.user.roles ?? [] };
+        const authContext = { userId: this.user.uid,
+roles: this.user.roles ?? [] };
         const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
         const lastEntry = Array.from(subscriptions.entries()).pop();
         const lastSub = lastEntry?.[1];
@@ -712,7 +716,8 @@ export class AuthenticatedMongoDriver implements DataDriver {
 
     listenEntity<M extends Record<string, any>>(props: ListenEntityProps<M>): () => void {
         const unsubscribe = this.delegate.listenEntity(props);
-        const authContext = { userId: this.user.uid, roles: this.user.roles ?? [] };
+        const authContext = { userId: this.user.uid,
+roles: this.user.roles ?? [] };
         const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
         const lastEntry = Array.from(subscriptions.entries()).pop();
         const lastSub = lastEntry?.[1];
@@ -726,12 +731,16 @@ export class AuthenticatedMongoDriver implements DataDriver {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
         if (props.status === "existing" && props.entityId) {
-            const existing = await this.delegate.fetchEntity({ path: props.path, entityId: props.entityId, collection: resolvedCollection });
+            const existing = await this.delegate.fetchEntity({ path: props.path,
+entityId: props.entityId,
+collection: resolvedCollection });
             if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "update")) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
-            const tempEntity = { id: props.entityId || "new", path: props.path, values: props.values } as Entity;
+            const tempEntity = { id: props.entityId || "new",
+path: props.path,
+values: props.values } as Entity;
             if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, tempEntity, "insert")) {
                 throw ApiError.forbidden("Forbidden");
             }
@@ -753,7 +762,9 @@ export class AuthenticatedMongoDriver implements DataDriver {
     async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.entity.path);
 
-        const existing = await this.delegate.fetchEntity({ path: props.entity.path, entityId: props.entity.id, collection: resolvedCollection });
+        const existing = await this.delegate.fetchEntity({ path: props.entity.path,
+entityId: props.entity.id,
+collection: resolvedCollection });
         if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "delete")) {
             throw ApiError.forbidden("Forbidden");
         }

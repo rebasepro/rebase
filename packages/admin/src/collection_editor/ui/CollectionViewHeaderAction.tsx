@@ -36,7 +36,8 @@ export function CollectionViewHeaderAction({
                         propertyKey,
                         property,
                         editedCollectionId: collection.slug,
-                        parentCollectionSlugs, parentEntityIds,
+                        parentCollectionSlugs,
+parentEntityIds,
                         collection,
                         existingEntities: tableController.data ?? []
                     });

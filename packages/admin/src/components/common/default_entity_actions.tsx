@@ -178,18 +178,18 @@ export function ResetPasswordActionDialog({
     const handleConfirm = async () => {
         setLoading(true);
         try {
-            const baseUrl = client?.baseUrl || '';
+            const baseUrl = client?.baseUrl || "";
             const token = await getAuthToken?.();
             const response = await fetch(`${baseUrl}/api/admin/users/${user.uid}/reset-password`, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
                 }
             });
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
-                throw new Error(error.message || 'Failed to reset password');
+                throw new Error(error.message || "Failed to reset password");
             }
             const data = await response.json();
             setCreationResult({
@@ -198,13 +198,13 @@ export function ResetPasswordActionDialog({
                 temporaryPassword: data.temporaryPassword
             });
             snackbarController.open({
-                type: 'success',
-                message: t('reset_password_success') || 'Password reset successfully'
+                type: "success",
+                message: t("reset_password_success") || "Password reset successfully"
             });
         } catch (error: unknown) {
             snackbarController.open({
-                type: 'error',
-                message: error instanceof Error ? error.message : (t('error_resetting_password') || 'Error resetting password')
+                type: "error",
+                message: error instanceof Error ? error.message : (t("error_resetting_password") || "Error resetting password")
             });
             onClose();
         } finally {
@@ -245,7 +245,7 @@ export const resetPasswordAction: EntityAction = {
     isEnabled: ({ entity }) => Boolean(entity),
     onClick({
         entity,
-        context,
+        context
     }): Promise<void> {
         if (!entity) {
             throw new Error("INTERNAL: resetPasswordAction: Entity is undefined");

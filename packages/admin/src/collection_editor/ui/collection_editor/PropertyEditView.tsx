@@ -51,7 +51,7 @@ import { isValidRegExp, mergeDeep } from "@rebasepro/utils";
 
 export type PropertyWithId = Property & {
     id?: string;
-    conditions?: import('@rebasepro/types').PropertyConditions;
+    conditions?: import("@rebasepro/types").PropertyConditions;
 };
 
 export type OnPropertyChangedParams = {

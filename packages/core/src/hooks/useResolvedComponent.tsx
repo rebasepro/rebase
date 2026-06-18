@@ -13,7 +13,7 @@ import { isLazyComponentRef } from "@rebasepro/types";
  * to the `React.lazy()` wrapper it produced. Strings are keyed by a separate
  * plain Map since they can't be WeakMap keys.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const lazyCache = new WeakMap<object | ((...args: any[]) => any), React.ComponentType<any>>();
 
 /**

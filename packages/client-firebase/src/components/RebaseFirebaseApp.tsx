@@ -184,7 +184,7 @@ export function RebaseFirebaseApp({
         authController,
         dataSourceDelegate: firestoreDelegate
     });
-    
+
 
     const navigationStateController = useBuildNavigationStateController({
         collections,

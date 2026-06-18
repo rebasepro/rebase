@@ -11,7 +11,8 @@ describe("createResetPasswordRoute & onAdminResetPassword", () => {
     let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
     beforeAll(() => {
-        configureJwt({ secret: TEST_SECRET, accessExpiresIn: "1h" });
+        configureJwt({ secret: TEST_SECRET,
+accessExpiresIn: "1h" });
     });
 
     beforeEach(() => {
@@ -103,7 +104,7 @@ describe("createResetPasswordRoute & onAdminResetPassword", () => {
             "user-123",
             expect.objectContaining({
                 authRepo: mockAuthRepo,
-                emailService: mockEmailService,
+                emailService: mockEmailService
             })
         );
         expect(mockAuthRepo.createPasswordResetToken).not.toHaveBeenCalled();

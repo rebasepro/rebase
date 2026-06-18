@@ -61,16 +61,14 @@ export default [
 
         settings: {
             react: {
-                version: "detect"
+                version: "19.2.7"
             }
         },
 
         rules: {
             "no-undef": "off",
             "no-useless-escape": "off",
-            "react/jsx-tag-spacing": ["warn", {
-                "beforeSelfClosing": "never"
-            }],
+            "react/jsx-tag-spacing": "off",
             "space-before-function-paren": 0,
             "react/prop-types": 0,
             "react/jsx-handler-names": 0,
@@ -133,13 +131,23 @@ export default [
         }
     },
     {
-        files: ["**/__tests__/**/*.ts", "**/__tests__/**/*.tsx", "**/*.test.ts", "**/*.test.tsx"],
+        files: ["**/__tests__/**/*.ts", "**/__tests__/**/*.tsx", "**/*.test.ts", "**/*.test.tsx", "**/*-test.ts", "**/*-test2.ts"],
         rules: {
             "prefer-const": "off",
             "no-unused-vars": "off",
             "@typescript-eslint/no-unused-vars": "off",
             "@typescript-eslint/no-unsafe-function-type": "off",
-            "@typescript-eslint/no-require-imports": "off"
+            "@typescript-eslint/no-require-imports": "off",
+            "no-unassigned-vars": "off"
+        }
+    },
+    {
+        files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
+        rules: {
+            "no-useless-assignment": "off",
+            "preserve-caught-error": "off",
+            "no-var": "off",
+            "@typescript-eslint/no-unsafe-function-type": "off"
         }
     },
     {

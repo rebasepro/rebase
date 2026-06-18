@@ -7,7 +7,8 @@ function makeValuesResult(values: unknown[]): ValuesCountEntry {
     for (const v of values) {
         valuesCount.set(v, (valuesCount.get(v) || 0) + 1);
     }
-    return { values, valuesCount };
+    return { values,
+valuesCount };
 }
 
 describe("buildStringProperty", () => {

@@ -170,7 +170,10 @@ view: null! }],
         const { result } = renderHook(() => useTopLevelNavigation({
             collections: [],
             views: [],
-            adminViews: [{ name: "Custom Admin", slug: "custom", view: null!, group: "Settings" }],
+            adminViews: [{ name: "Custom Admin",
+slug: "custom",
+view: null!,
+group: "Settings" }],
             urlController: mockCmsUrlController,
             collectionRegistryController: mockCollectionRegistryController
         }));

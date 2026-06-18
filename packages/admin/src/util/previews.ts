@@ -42,7 +42,7 @@ export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(col
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }
-    
+
     const hasExplicitOrder = !!(collection.propertiesOrder as string[] | undefined);
     const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
 

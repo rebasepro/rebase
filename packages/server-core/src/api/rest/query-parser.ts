@@ -31,17 +31,21 @@ export function parseLogicalString(str: string): FilterCondition | LogicalCondit
     str = str.trim();
     if (str.startsWith("or(") && str.endsWith(")")) {
         const inner = str.slice(3, -1);
-        return { type: "or", conditions: parseLogicalList(inner) };
+        return { type: "or",
+conditions: parseLogicalList(inner) };
     }
     if (str.startsWith("and(") && str.endsWith(")")) {
         const inner = str.slice(4, -1);
-        return { type: "and", conditions: parseLogicalList(inner) };
+        return { type: "and",
+conditions: parseLogicalList(inner) };
     }
-    
+
     // It's a leaf condition: field.op.val
     const firstDot = str.indexOf(".");
     if (firstDot === -1) {
-        return { column: str, operator: "==", value: true };
+        return { column: str,
+operator: "==",
+value: true };
     }
     const field = str.substring(0, firstDot);
     const rest = str.substring(firstDot + 1);
@@ -55,7 +59,7 @@ export function parseLogicalString(str: string): FilterCondition | LogicalCondit
         op = "eq";
         valStr = rest;
     }
-    
+
     const rebaseOp = (mapOperator(op) || "==") as FilterCondition["operator"];
     let parsedVal: unknown = valStr;
     if (valStr === "true") parsedVal = true;
@@ -73,20 +77,22 @@ export function parseLogicalString(str: string): FilterCondition | LogicalCondit
             return trimmed;
         });
     }
-    
-    return { column: field, operator: rebaseOp, value: parsedVal };
+
+    return { column: field,
+operator: rebaseOp,
+value: parsedVal };
 }
 
 function parseLogicalList(str: string): (FilterCondition | LogicalCondition)[] {
     const list: (FilterCondition | LogicalCondition)[] = [];
     let depth = 0;
     let current = "";
-    
+
     for (let i = 0; i < str.length; i++) {
         const char = str[i];
         if (char === "(") depth++;
         if (char === ")") depth--;
-        
+
         if (char === "," && depth === 0) {
             list.push(parseLogicalString(current));
             current = "";
@@ -109,10 +115,10 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
     // Pagination
     const limitVal = getLastValue(query.limit);
     if (limitVal) options.limit = parseInt(String(limitVal));
-    
+
     const offsetVal = getLastValue(query.offset);
     if (offsetVal) options.offset = parseInt(String(offsetVal));
-    
+
     const pageVal = getLastValue(query.page);
     if (pageVal) {
         const page = parseInt(String(pageVal));
@@ -275,7 +281,7 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
         const vectorSearch: VectorSearchParams = {
             property: String(vectorSearchVal),
             vector: queryVector,
-            distance: distanceParam,
+            distance: distanceParam
         };
 
         const thresholdVal = getLastValue(query.vector_threshold);

@@ -59,7 +59,7 @@ export function getEntityTitlePropertyKey<M extends Record<string, any>>(collect
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }
-    
+
     const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
     let firstStringCandidate: string | undefined;
 

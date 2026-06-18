@@ -3,7 +3,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
-import { ErrorBoundary , iconSize } from "@rebasepro/ui";
+import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { ArrowLeftIcon, Badge, Button, cls, FilterIcon, IconButton, Tooltip } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
@@ -61,7 +61,8 @@ export function EntityCollectionViewStartActions<M extends Record<string, unknow
     const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
-        parentCollectionSlugs, parentEntityIds,
+        parentCollectionSlugs,
+parentEntityIds,
         collection,
         selectionController,
         context,

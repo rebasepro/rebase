@@ -626,7 +626,7 @@ export class EntityFetchService {
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
                     console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 console.warn(`[EntityFetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select:`, e);
             }
@@ -750,7 +750,7 @@ export class EntityFetchService {
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
                     console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 console.warn(`[EntityFetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select:`, e);
             }
@@ -764,7 +764,8 @@ export class EntityFetchService {
         }
 
         let query = vectorMeta
-            ? this.db.select({ table_row: table, _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
+            ? this.db.select({ table_row: table,
+_distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : this.db.select().from(table).$dynamic();
         const allConditions: SQL[] = [];
 
@@ -1251,7 +1252,7 @@ export class EntityFetchService {
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
                     console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 console.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back:`, e);
             }
@@ -1365,7 +1366,7 @@ export class EntityFetchService {
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
                     console.error(`[EntityFetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
-                    console.error(`Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.`);
+                    console.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 console.warn(`[fetchEntityForRest] db.query.findFirst failed for ${collectionPath}, falling back:`, e);
             }
@@ -1450,7 +1451,8 @@ export class EntityFetchService {
         }
 
         let query = vectorMeta
-            ? this.db.select({ table_row: table, _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
+            ? this.db.select({ table_row: table,
+_distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : this.db.select().from(table).$dynamic();
         const allConditions: SQL[] = [];
 

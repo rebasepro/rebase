@@ -4,15 +4,15 @@ import { fileURLToPath } from "url";
 import * as LucideIcons from "lucide-react";
 
 export async function generateIconKeys() {
-    const keys = Object.keys(LucideIcons).filter(k => 
-        k !== "createLucideIcon" && 
-        k !== "default" && 
-        k !== "icons" && 
-        k !== "LucideIcon" && 
-        k !== "Icon" && 
+    const keys = Object.keys(LucideIcons).filter(k =>
+        k !== "createLucideIcon" &&
+        k !== "default" &&
+        k !== "icons" &&
+        k !== "LucideIcon" &&
+        k !== "Icon" &&
         k !== "LucideProvider" &&
         k !== "useLucideContext" &&
-        !k.endsWith("Node") && 
+        !k.endsWith("Node") &&
         !k.endsWith("Props") &&
         !k.endsWith("Icon") &&
         // Filter out Lucide-prefixed duplicates (e.g. "LucideArrowDown" duplicates "ArrowDown")

@@ -7,9 +7,12 @@ describe("usePostgresClientDriver hook", () => {
 
     beforeEach(() => {
         mockWsClient = {
-            fetchCollection: jest.fn().mockResolvedValue([{ id: "1", name: "Entity 1" }]),
-            fetchEntity: jest.fn().mockResolvedValue({ id: "1", name: "Entity 1" }),
-            saveEntity: jest.fn().mockResolvedValue({ id: "1", name: "Saved Entity" }),
+            fetchCollection: jest.fn().mockResolvedValue([{ id: "1",
+name: "Entity 1" }]),
+            fetchEntity: jest.fn().mockResolvedValue({ id: "1",
+name: "Entity 1" }),
+            saveEntity: jest.fn().mockResolvedValue({ id: "1",
+name: "Saved Entity" }),
             deleteEntity: jest.fn().mockResolvedValue(undefined),
             checkUniqueField: jest.fn().mockResolvedValue(true),
             countEntities: jest.fn().mockResolvedValue(42),
@@ -35,7 +38,7 @@ describe("usePostgresClientDriver hook", () => {
 
     it("returns active database driver object", () => {
         const { result } = renderHook(() => usePostgresClientDriver({ wsClient: mockWsClient }));
-        
+
         expect(result.current.key).toBe("postgres");
         expect(result.current.name).toBe("PostgreSQL");
         expect(result.current.client).toBe(mockWsClient);
@@ -48,15 +51,20 @@ describe("usePostgresClientDriver hook", () => {
         // fetchCollection
         const list = await driver.fetchCollection({ path: "posts" });
         expect(mockWsClient.fetchCollection).toHaveBeenCalledWith({ path: "posts" });
-        expect(list).toEqual([{ id: "1", name: "Entity 1" }]);
+        expect(list).toEqual([{ id: "1",
+name: "Entity 1" }]);
 
         // fetchEntity
-        const item = await driver.fetchEntity({ path: "posts", entityId: "1" });
-        expect(mockWsClient.fetchEntity).toHaveBeenCalledWith({ path: "posts", entityId: "1" });
-        expect(item).toEqual({ id: "1", name: "Entity 1" });
+        const item = await driver.fetchEntity({ path: "posts",
+entityId: "1" });
+        expect(mockWsClient.fetchEntity).toHaveBeenCalledWith({ path: "posts",
+entityId: "1" });
+        expect(item).toEqual({ id: "1",
+name: "Entity 1" });
 
         // saveEntity
-        const saved = await driver.saveEntity({ path: "posts", values: { name: "Test" } });
+        const saved = await driver.saveEntity({ path: "posts",
+values: { name: "Test" } });
         expect(mockWsClient.saveEntity).toHaveBeenCalledWith({
             path: "posts",
             values: { name: "Test" },
@@ -64,11 +72,14 @@ describe("usePostgresClientDriver hook", () => {
             previousValues: undefined,
             status: undefined
         });
-        expect(saved).toEqual({ id: "1", name: "Saved Entity" });
+        expect(saved).toEqual({ id: "1",
+name: "Saved Entity" });
 
         // deleteEntity
-        await driver.deleteEntity({ entity: { id: "1", name: "Test" } });
-        expect(mockWsClient.deleteEntity).toHaveBeenCalledWith({ entity: { id: "1", name: "Test" } });
+        await driver.deleteEntity({ entity: { id: "1",
+name: "Test" } });
+        expect(mockWsClient.deleteEntity).toHaveBeenCalledWith({ entity: { id: "1",
+name: "Test" } });
     });
 
     it("correctly routes admin database branching operations", async () => {

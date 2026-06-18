@@ -126,7 +126,8 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
                 }
             );
 
-            return { code: transformed, map: null };
+            return { code: transformed,
+map: null };
         }
     };
 }

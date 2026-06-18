@@ -237,7 +237,8 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
             .forEach(plugin => {
                 plugin.hooks!.onKanbanColumnsReorder!({
                     fullPath,
-                    parentCollectionSlugs, parentEntityIds,
+                    parentCollectionSlugs,
+parentEntityIds,
                     collection,
                     kanbanColumnProperty: columnProperty,
                     newColumnsOrder: newColumns
@@ -487,7 +488,8 @@ export function EntityCollectionBoardView<M extends Record<string, unknown> = Re
     const addKanbanColumnSlots = useSlot("kanban.add-column", {
         collection,
         fullPath,
-        parentCollectionSlugs, parentEntityIds,
+        parentCollectionSlugs,
+parentEntityIds,
         columnProperty
     });
 

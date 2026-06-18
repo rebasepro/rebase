@@ -122,7 +122,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             await ensureHistoryCollectionExists(db);
 
             const { MongoHistoryService } = await import("./services/MongoHistoryService");
-            
+
             const retention = typeof historyConfig === "object" && historyConfig !== null ? historyConfig.retention : undefined;
             const historyService = new MongoHistoryService(db, retention ? { ttlDays: retention } : undefined);
 
@@ -147,7 +147,8 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
                 },
                 async fetchCollectionStats(collectionName: string) {
                     const stats = await db.command({ collStats: collectionName }) as { count: number; size: number };
-                    return { count: stats.count, sizeBytes: stats.size };
+                    return { count: stats.count,
+sizeBytes: stats.size };
                 },
                 async fetchUnmappedTables(mappedPaths?: string[]) {
                     const allCollections = await db.listCollections().toArray();
@@ -158,7 +159,10 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
                 },
                 async fetchTableMetadata(collectionName: string) {
                     const sample = await db.collection(collectionName).findOne();
-                    if (!sample) return { columns: [], foreignKeys: [], junctions: [], policies: [] };
+                    if (!sample) return { columns: [],
+foreignKeys: [],
+junctions: [],
+policies: [] };
                     const columns = Object.entries(sample).map(([key, value]) => ({
                         column_name: key,
                         data_type: typeof value,
@@ -167,7 +171,10 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
                         column_default: null,
                         character_maximum_length: null
                     }));
-                    return { columns, foreignKeys: [], junctions: [], policies: [] };
+                    return { columns,
+foreignKeys: [],
+junctions: [],
+policies: [] };
                 }
             };
 

@@ -48,7 +48,8 @@ interface ErrorBoundaryState {
 export class ErrorBoundary extends React.Component<PropsWithChildren<ErrorBoundaryProps>, ErrorBoundaryState> {
     constructor(props: PropsWithChildren<ErrorBoundaryProps>) {
         super(props);
-        this.state = { error: null, showDetails: false };
+        this.state = { error: null,
+showDetails: false };
     }
 
     static getDerivedStateFromError(error: Error) {
@@ -60,7 +61,8 @@ export class ErrorBoundary extends React.Component<PropsWithChildren<ErrorBounda
     }
 
     private handleReset = () => {
-        this.setState({ error: null, showDetails: false });
+        this.setState({ error: null,
+showDetails: false });
         this.props.onReset?.();
     };
 

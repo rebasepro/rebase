@@ -4,7 +4,7 @@ import { relations } from "drizzle-orm";
 /**
  * Factory function to dynamically create the auth tables bound to the specified schema names.
  */
-export function createAuthSchema(usersSchemaName: string = "rebase") {
+export function createAuthSchema(usersSchemaName = "rebase") {
     const usersSchema = usersSchemaName === "public" ? null : pgSchema(usersSchemaName);
 
     const tableCreator = (usersSchema ? usersSchema.table.bind(usersSchema) : pgTable) as typeof pgTable;
@@ -28,7 +28,6 @@ export function createAuthSchema(usersSchemaName: string = "rebase") {
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
-
 
 
     /**

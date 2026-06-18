@@ -669,14 +669,16 @@ export const StorageView = () => {
         // Validate folder name
         const name = newFolderName.trim();
         if (name.includes("/") || name.includes("\\")) {
-            snackbarController.open({ type: "error", message: "Folder name cannot contain slashes" });
+            snackbarController.open({ type: "error",
+message: "Folder name cannot contain slashes" });
             return;
         }
 
         // Check if folder already exists
         const existingFolder = folders.find(f => f.name === name);
         if (existingFolder) {
-            snackbarController.open({ type: "error", message: `Folder "${name}" already exists` });
+            snackbarController.open({ type: "error",
+message: `Folder "${name}" already exists` });
             return;
         }
 
@@ -698,12 +700,14 @@ export const StorageView = () => {
                 throw new Error(err.error || "Failed to create folder");
             }
 
-            snackbarController.open({ type: "success", message: `Folder "${name}" created` });
+            snackbarController.open({ type: "success",
+message: `Folder "${name}" created` });
             setNewFolderDialogOpen(false);
             setNewFolderName("");
             await fetchContents(currentPath);
         } catch (e) {
-            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         } finally {
             setCreatingFolder(false);
         }
@@ -715,7 +719,8 @@ export const StorageView = () => {
         try {
             for (const file of droppedFiles) {
                 const key = currentPath ? `${currentPath}/${file.name}` : file.name;
-                await storageSourceRef.current.putObject({ file, key });
+                await storageSourceRef.current.putObject({ file,
+key });
             }
             snackbarController.open({
                 type: "success",
@@ -768,7 +773,8 @@ export const StorageView = () => {
             } else {
                 await storageSourceRef.current.deleteObject(file.fullPath);
             }
-            snackbarController.open({ type: "success", message: `"${file.name}" deleted` });
+            snackbarController.open({ type: "success",
+message: `"${file.name}" deleted` });
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
             setSelectedPaths(prev => {
@@ -778,7 +784,8 @@ export const StorageView = () => {
             });
             fetchContents(currentPath);
         } catch (e) {
-            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         }
     }, [currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
 
@@ -794,13 +801,15 @@ export const StorageView = () => {
                     await storageSourceRef.current.deleteObject(item.fullPath);
                 }
             }
-            snackbarController.open({ type: "success", message: `${items.length} item${items.length !== 1 ? "s" : ""} deleted` });
+            snackbarController.open({ type: "success",
+message: `${items.length} item${items.length !== 1 ? "s" : ""} deleted` });
             setSelectedPaths(new Set());
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
             await fetchContents(currentPath);
         } catch (e) {
-            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         } finally {
             setDeleting(false);
             setDeleteDialogOpen(false);
@@ -814,7 +823,8 @@ export const StorageView = () => {
         setDeleting(true);
         try {
             await deleteFolderRecursive(deleteDialogTarget.fullPath);
-            snackbarController.open({ type: "success", message: `Folder "${deleteDialogTarget.name}" deleted` });
+            snackbarController.open({ type: "success",
+message: `Folder "${deleteDialogTarget.name}" deleted` });
             setSelectedPaths(prev => {
                 const next = new Set(prev);
                 next.delete(deleteDialogTarget.fullPath);
@@ -822,7 +832,8 @@ export const StorageView = () => {
             });
             await fetchContents(currentPath);
         } catch (e) {
-            snackbarController.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
+            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
         } finally {
             setDeleting(false);
             setDeleteDialogOpen(false);

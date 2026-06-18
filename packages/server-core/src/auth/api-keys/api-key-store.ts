@@ -17,7 +17,7 @@ import type {
     ApiKeyMasked,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
-    UpdateApiKeyRequest,
+    UpdateApiKeyRequest
 } from "./api-key-types";
 
 const TABLE = "rebase.api_keys";
@@ -64,7 +64,7 @@ function toMasked(row: ApiKey): ApiKeyMasked {
         updated_at: row.updated_at,
         last_used_at: row.last_used_at,
         expires_at: row.expires_at,
-        revoked_at: row.revoked_at,
+        revoked_at: row.revoked_at
     };
 }
 
@@ -90,7 +90,7 @@ function rowToApiKey(row: Record<string, unknown>): ApiKey {
         updated_at: new Date(row.updated_at as string).toISOString(),
         last_used_at: row.last_used_at ? new Date(row.last_used_at as string).toISOString() : null,
         expires_at: row.expires_at ? new Date(row.expires_at as string).toISOString() : null,
-        revoked_at: row.revoked_at ? new Date(row.revoked_at as string).toISOString() : null,
+        revoked_at: row.revoked_at ? new Date(row.revoked_at as string).toISOString() : null
     };
 }
 
@@ -212,7 +212,7 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             const apiKey = rowToApiKey(rows[0]);
             return {
                 ...toMasked(apiKey),
-                key: plaintext,
+                key: plaintext
             };
         },
 
@@ -312,6 +312,6 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 // Non-blocking — don't fail requests because of a usage timestamp update
                 logger.error("[api-key-store] Failed to update last_used_at", { error: err });
             }
-        },
+        }
     };
 }

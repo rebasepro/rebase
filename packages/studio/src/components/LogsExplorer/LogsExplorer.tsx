@@ -160,7 +160,8 @@ export function LogsExplorer() {
                         Auto-scroll
                     </Label>
                 </div>
-                <span style={{ fontSize: 12, color: "#6c7086" }}>
+                <span style={{ fontSize: 12,
+color: "#6c7086" }}>
                     {logs.length} entries
                 </span>
             </div>
@@ -185,7 +186,8 @@ export function LogsExplorer() {
                             borderBottom: "1px solid #181825"
                         }}
                     >
-                        <span style={{ color: "#6c7086", flexShrink: 0 }}>
+                        <span style={{ color: "#6c7086",
+flexShrink: 0 }}>
                             {new Date(log.timestamp).toLocaleTimeString()}
                         </span>
                         <span style={{
@@ -204,7 +206,8 @@ export function LogsExplorer() {
                         }}>
                             [{log.source}]
                         </span>
-                        <span style={{ color: "#cdd6f4", flex: 1 }}>
+                        <span style={{ color: "#cdd6f4",
+flex: 1 }}>
                             {log.message}
                         </span>
                     </div>

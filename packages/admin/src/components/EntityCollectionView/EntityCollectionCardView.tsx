@@ -109,9 +109,17 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
 
     // Keep mutable refs for values used in the scroll listener callback
     // to avoid re-attaching the listener every time pagination state changes.
-    const paginationStateRef = useRef({ paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize });
+    const paginationStateRef = useRef({ paginationEnabled,
+noMoreToLoad,
+dataLoading,
+itemCount,
+pageSize });
     useEffect(() => {
-        paginationStateRef.current = { paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize };
+        paginationStateRef.current = { paginationEnabled,
+noMoreToLoad,
+dataLoading,
+itemCount,
+pageSize };
     }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize]);
 
     // Reset loading flag when new data arrives (separate effect, like list view)

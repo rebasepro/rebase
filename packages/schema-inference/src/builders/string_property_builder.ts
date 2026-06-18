@@ -46,7 +46,8 @@ export function buildStringProperty({
             .filter((value) => typeof value === "string" && value.length === 28 && !value.includes(" "))
             .length > totalDocsCount / 3 * 2;
         if (probablyUserIds)
-            config.ui = { ...config.ui, readOnly: true };
+            config.ui = { ...config.ui,
+readOnly: true };
 
         if (!probablyAnEmail &&
             !probablyAURL &&

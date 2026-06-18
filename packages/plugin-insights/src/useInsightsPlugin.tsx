@@ -57,7 +57,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                         insights={homeInsights}
                     />
                 ),
-                order: 10,
+                order: 10
             });
         }
 
@@ -84,7 +84,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                             />
                         );
                     },
-                    order: 10,
+                    order: 10
                 });
 
                 // 2. Auto-extract scorecards for home page card
@@ -100,7 +100,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                             />
                         );
                     },
-                    order: 10,
+                    order: 10
                 });
             }
         }
@@ -112,9 +112,9 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                 {
                     scope: "root" as const,
                     Component: InsightsProvider as React.ComponentType<React.PropsWithChildren<Record<string, unknown>>>,
-                    props: { cacheTTL },
-                },
-            ],
+                    props: { cacheTTL }
+                }
+            ]
         };
     }, [insights, cacheTTL]);
 }

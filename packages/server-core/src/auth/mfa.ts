@@ -133,7 +133,8 @@ export function generateTotpSecret(issuer: string, accountName: string): {
     const encodedAccount = encodeURIComponent(accountName);
     const uri = `otpauth://totp/${encodedIssuer}:${encodedAccount}?secret=${secret}&issuer=${encodedIssuer}&algorithm=SHA1&digits=6&period=30`;
 
-    return { secret, uri };
+    return { secret,
+uri };
 }
 
 // ─── Recovery Codes ──────────────────────────────────────────────────────────

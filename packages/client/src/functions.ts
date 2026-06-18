@@ -58,7 +58,7 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
         async invoke<T = unknown>(
             name: string,
             payload?: unknown,
-            options?: FunctionInvokeOptions,
+            options?: FunctionInvokeOptions
         ): Promise<T> {
             const method = options?.method ?? "POST";
             const subPath = options?.path ? `/${options.path.replace(/^\//, "")}` : "";
@@ -75,6 +75,6 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
             }
 
             return transport.request<T>(routePath, init);
-        },
+        }
     };
 }

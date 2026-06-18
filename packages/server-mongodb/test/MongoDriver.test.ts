@@ -388,7 +388,7 @@ email: "test@example.com" },
             const saveArgs = beforeSaveSpy.mock.calls[0][0];
             expect(saveArgs.context.storageSource).toBe(mockStorage);
             expect(saveArgs.values.name).toBe("John");
-            
+
             // Verifies updatedValues includes returned value from beforeSave callback
             expect(saved.values.beforeSaved).toBe(true);
 

@@ -79,7 +79,8 @@ export function useCollapsedGroups(
             const currentlyCollapsed = name in prev
                 ? prev[name]
                 : (defaults?.[name] ?? false);
-            return { ...prev, [name]: !currentlyCollapsed };
+            return { ...prev,
+[name]: !currentlyCollapsed };
         });
     }, [defaults]);
 

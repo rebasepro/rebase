@@ -57,7 +57,7 @@ export class TusHandler {
 
     constructor(
         storageBaseDir: string,
-        private storageController?: StorageController,
+        private storageController?: StorageController
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -126,8 +126,8 @@ export class TusHandler {
                 "Tus-Resumable": "1.0.0",
                 "Tus-Version": "1.0.0",
                 "Tus-Extension": "creation,termination",
-                "Tus-Max-Size": String(MAX_UPLOAD_SIZE),
-            },
+                "Tus-Max-Size": String(MAX_UPLOAD_SIZE)
+            }
         });
     }
 
@@ -164,7 +164,7 @@ export class TusHandler {
             filePath,
             bucket: metadata.bucket || undefined,
             key: metadata.key || metadata.filename || undefined,
-            completed: false,
+            completed: false
         };
         this.uploads.set(id, upload);
 
@@ -177,8 +177,8 @@ export class TusHandler {
             headers: {
                 Location: location,
                 "Tus-Resumable": "1.0.0",
-                "Upload-Offset": "0",
-            },
+                "Upload-Offset": "0"
+            }
         });
     }
 
@@ -195,8 +195,8 @@ export class TusHandler {
                 "Tus-Resumable": "1.0.0",
                 "Upload-Offset": String(upload.offset),
                 "Upload-Length": String(upload.size),
-                "Cache-Control": "no-store",
-            },
+                "Cache-Control": "no-store"
+            }
         });
     }
 
@@ -252,8 +252,8 @@ export class TusHandler {
             status: 204,
             headers: {
                 "Tus-Resumable": "1.0.0",
-                "Upload-Offset": String(upload.offset),
-            },
+                "Upload-Offset": String(upload.offset)
+            }
         });
     }
 
@@ -269,7 +269,7 @@ export class TusHandler {
 
         return new Response(null, {
             status: 204,
-            headers: { "Tus-Resumable": "1.0.0" },
+            headers: { "Tus-Resumable": "1.0.0" }
         });
     }
 
@@ -300,7 +300,7 @@ export class TusHandler {
             await this.storageController.putObject({
                 file,
                 key: fileName,
-                bucket: upload.bucket,
+                bucket: upload.bucket
             });
 
             // Clean up temp file

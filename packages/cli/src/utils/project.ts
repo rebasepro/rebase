@@ -66,7 +66,8 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
 
     try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+        const deps = { ...pkg.dependencies,
+...pkg.devDependencies };
 
         // Collect all @rebasepro/server-* driver plugins (exclude server-core)
         const candidates = Object.keys(deps).filter(

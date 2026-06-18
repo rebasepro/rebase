@@ -399,7 +399,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             initializeHistory: dbAdapter.initializeHistory,
             initializeWebsockets: dbAdapter.initializeWebsockets,
             getAdmin: dbAdapter.getAdmin,
-            mountRoutes: dbAdapter.mountRoutes,
+            mountRoutes: dbAdapter.mountRoutes
         };
         bootstrappers = [wrappedBootstrapper];
     }
@@ -468,7 +468,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // Populate authConfigResult for backward compatibility
             // (the return type still exposes `auth?: BootstrappedAuth`)
             authConfigResult = {
-                userService: authAdapter.userManagement ?? {},
+                userService: authAdapter.userManagement ?? {}
             };
         } else {
             // ── RebaseAuthConfig — wrap in built-in adapter ──
@@ -527,7 +527,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         oauthProviders,
                         serviceKey,
                         authHooks: safeAuthConfig.hooks,
-                        collectionAuthConfig,
+                        collectionAuthConfig
                     });
                 }
 
@@ -694,7 +694,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 oauthProviders,
                 serviceKey,
                 authHooks: safeAuthConfig.hooks,
-                collectionAuthConfig,
+                collectionAuthConfig
             });
         }
 
@@ -727,7 +727,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Mount API key admin routes
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
-            serviceKey,
+            serviceKey
         });
         config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
         logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
@@ -808,14 +808,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 adapter: authAdapter,
                 driver: defaultDriver,
                 requireAuth: dataRequireAuth,
-                apiKeyStore,
+                apiKeyStore
             }));
         } else {
             dataRouter.use("/*", createAuthMiddleware({
                 driver: defaultDriver,
                 requireAuth: dataRequireAuth,
                 serviceKey,
-                apiKeyStore,
+                apiKeyStore
             }));
         }
 
@@ -967,14 +967,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     adapter: authAdapter,
                     driver: defaultDriver,
                     requireAuth: functionsRequireAuth,
-                    apiKeyStore,
+                    apiKeyStore
                 }));
             } else {
                 functionsRouter.use("/*", createAuthMiddleware({
                     driver: defaultDriver,
                     requireAuth: functionsRequireAuth,
                     serviceKey,
-                    apiKeyStore,
+                    apiKeyStore
                 }));
             }
 

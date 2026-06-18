@@ -43,7 +43,8 @@ interface StoredAuthData {
  */
 function saveAuthToStorage(tokens: AuthTokens, user: UserInfo): void {
     try {
-        const data: StoredAuthData = { tokens, user };
+        const data: StoredAuthData = { tokens,
+user };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) { /* ignore */ }
 }
@@ -298,7 +299,7 @@ export function useRebaseAuthController(
             }
             if (client.ws) {
                 client.ws.setAuthTokenGetter(async () => {
-                    return await getAuthToken();
+                    try { return await getAuthToken(); } catch { return null; }
                 });
             }
         }
@@ -313,7 +314,8 @@ export function useRebaseAuthController(
         if (defineRolesFor) {
             const customRoles = await defineRolesFor(convertedUser);
             if (customRoles) {
-                convertedUser = { ...convertedUser, roles: customRoles };
+                convertedUser = { ...convertedUser,
+roles: customRoles };
             }
         }
 

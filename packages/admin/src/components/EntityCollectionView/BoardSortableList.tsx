@@ -94,8 +94,8 @@ export function BoardSortableList<M extends Record<string, unknown>>({
             className={containerClassName}
             style={{ minHeight: 80 }}
         >
-            <SortableContext 
-                items={items.map(i => i.id)} 
+            <SortableContext
+                items={items.map(i => i.id)}
                 strategy={verticalListSortingStrategy}
             >
                 {items.length === 0 && !loading ? (

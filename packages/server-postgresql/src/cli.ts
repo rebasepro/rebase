@@ -486,7 +486,7 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
             const stdout = stripAnsi(result.stdout || "").trim();
             const stderr = stripAnsi(result.stderr || "").trim();
 
-            const hasTtyError = stdout.includes("Interactive prompts require a TTY terminal") || 
+            const hasTtyError = stdout.includes("Interactive prompts require a TTY terminal") ||
                                stderr.includes("Interactive prompts require a TTY terminal");
 
             if (result.exitCode !== 0 || hasTtyError) {

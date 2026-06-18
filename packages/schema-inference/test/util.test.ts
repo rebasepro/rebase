@@ -49,8 +49,10 @@ describe("extractEnumFromValues", () => {
 describe("resolveEnumValues", () => {
     it("returns array input as-is", () => {
         const input = [
-            { id: "a", label: "A" },
-            { id: "b", label: "B" }
+            { id: "a",
+label: "A" },
+            { id: "b",
+label: "B" }
         ];
         expect(resolveEnumValues(input)).toEqual(input);
     });
@@ -63,15 +65,21 @@ describe("resolveEnumValues", () => {
         const result = resolveEnumValues(input);
         expect(result).toHaveLength(2);
         expect(result).toEqual(expect.arrayContaining([
-            { id: "active", label: "Active" },
-            { id: "inactive", label: "Inactive" }
+            { id: "active",
+label: "Active" },
+            { id: "inactive",
+label: "Inactive" }
         ]));
     });
 
     it("converts object with EnumValueConfig values to array", () => {
         const input = {
-            active: { id: "active", label: "Active", color: "green" },
-            inactive: { id: "inactive", label: "Inactive", color: "red" }
+            active: { id: "active",
+label: "Active",
+color: "green" },
+            inactive: { id: "inactive",
+label: "Inactive",
+color: "red" }
         };
         const result = resolveEnumValues(input);
         expect(result).toHaveLength(2);

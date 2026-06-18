@@ -55,7 +55,7 @@ export interface ApiKeyAuthOptions {
 export async function validateApiKey(
     c: Context<HonoEnv>,
     token: string,
-    options: ApiKeyAuthOptions,
+    options: ApiKeyAuthOptions
 ): Promise<Response | true> {
     const { store, driver } = options;
 
@@ -64,27 +64,31 @@ export async function validateApiKey(
 
     if (!apiKey) {
         return c.json({
-            error: { message: "Invalid API key", code: "UNAUTHORIZED" },
+            error: { message: "Invalid API key",
+code: "UNAUTHORIZED" }
         }, 401);
     }
 
     // Check revocation
     if (apiKey.revoked_at) {
         return c.json({
-            error: { message: "API key has been revoked", code: "UNAUTHORIZED" },
+            error: { message: "API key has been revoked",
+code: "UNAUTHORIZED" }
         }, 401);
     }
 
     // Check expiration
     if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
         return c.json({
-            error: { message: "API key has expired", code: "UNAUTHORIZED" },
+            error: { message: "API key has expired",
+code: "UNAUTHORIZED" }
         }, 401);
     }
 
     // Set user identity — API keys represent service accounts
     const userId = `api-key:${apiKey.id}`;
-    c.set("user", { userId, roles: [] });
+    c.set("user", { userId,
+roles: [] });
 
     // Expose masked key metadata for downstream permission checks
     const masked: ApiKeyMasked = {
@@ -98,7 +102,7 @@ export async function validateApiKey(
         updated_at: apiKey.updated_at,
         last_used_at: apiKey.last_used_at,
         expires_at: apiKey.expires_at,
-        revoked_at: apiKey.revoked_at,
+        revoked_at: apiKey.revoked_at
     };
     // Store apiKey in the context for permission checking in api-generator
     c.set("apiKey", masked);
@@ -107,13 +111,14 @@ export async function validateApiKey(
     try {
         const scopedDriver = await scopeDataDriver(driver, {
             uid: userId,
-            roles: ["service"],
+            roles: ["service"]
         });
         c.set("driver", scopedDriver);
     } catch (error) {
         console.error("[AUTH] RLS scoping failed for API key:", error);
         return c.json({
-            error: { message: "Internal authentication error", code: "INTERNAL_ERROR" },
+            error: { message: "Internal authentication error",
+code: "INTERNAL_ERROR" }
         }, 500);
     }
 

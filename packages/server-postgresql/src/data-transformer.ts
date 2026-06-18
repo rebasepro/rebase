@@ -90,7 +90,9 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
     collection?: EntityCollection,
     registry?: PostgresCollectionRegistry
 ): SerializedEntityData {
-    if (!entity || !properties) return { scalarData: entity ?? {}, inverseRelationUpdates: [], joinPathRelationUpdates: [] };
+    if (!entity || !properties) return { scalarData: entity ?? {},
+inverseRelationUpdates: [],
+joinPathRelationUpdates: [] };
 
     const result: Record<string, unknown> = {};
 
@@ -126,7 +128,6 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
             result[key] = effectiveValue;
             continue;
         }
-
 
 
         // Handle relation properties specially
@@ -350,7 +351,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                     } else {
                                         // One-to-many: return array of relation objects
                                         const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                        result[propKey] = relatedEntities.map((entity: Record<string, unknown>) => 
+                                        result[propKey] = relatedEntities.map((entity: Record<string, unknown>) =>
                                             createRelationRef(buildCompositeId(entity, targetPks), targetCollection.slug)
                                         );
                                     }
@@ -519,13 +520,13 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 
         case "string": {
             if (typeof value === "string") return value;
-            
+
             // Handle Buffer objects (e.g. from PostgreSQL bytea columns)
             const buf = tryResolveBuffer(value);
             if (buf) {
                 return bufferToStringOrBase64(buf);
             }
-            
+
             if (typeof value === "object" && value !== null) {
                 try {
                     return JSON.stringify(value);

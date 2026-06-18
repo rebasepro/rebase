@@ -125,5 +125,5 @@ export {
     VoteIcon,
     Wand2Icon,
     XCircleIcon,
-    XIcon,
+    XIcon
 } from "lucide-react";

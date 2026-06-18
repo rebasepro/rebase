@@ -61,7 +61,7 @@ describe("WebSocket Server SQL error handling", () => {
     it("should handle EXECUTE_SQL errors cleanly and return ERROR message without throwing", async () => {
         expect(mockWssInstance).toBeDefined();
         expect(mockWssInstance.on).toHaveBeenCalledWith("connection", expect.any(Function));
-        
+
         const connectionCallback = mockWssInstance.on.mock.calls.find(
             (call: any[]) => call[0] === "connection"
         )[1];

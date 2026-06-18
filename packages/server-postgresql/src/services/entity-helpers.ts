@@ -75,7 +75,9 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
             const meta = getColumnMeta(col);
             const type = col.dataType === "number" || meta.columnType === "PgSerial" || meta.columnType === "PgInteger" ? "number" : "string";
             const isUUID = meta.columnType === "PgUUID";
-            keys.push({ fieldName: key, type, isUUID });
+            keys.push({ fieldName: key,
+type,
+isUUID });
         }
     }
 
@@ -86,7 +88,9 @@ export function getPrimaryKeys(collection: EntityCollection, registry: PostgresC
         const idMeta = getColumnMeta(idCol);
         const type = idCol.dataType === "number" || idMeta.columnType === "PgSerial" || idMeta.columnType === "PgInteger" ? "number" : "string";
         const isUUID = idMeta.columnType === "PgUUID";
-        keys.push({ fieldName: "id", type, isUUID });
+        keys.push({ fieldName: "id",
+type,
+isUUID });
     }
 
     return keys;

@@ -3,8 +3,12 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { EntityCollection } from "@rebasepro/types";
 
-const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 1, path: "posts", values: { title: "Refetched Title" } }]);
-const mockFetchEntity = jest.fn().mockResolvedValue({ id: 1, path: "posts", values: { title: "Refetched Entity Title" } });
+const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 1,
+path: "posts",
+values: { title: "Refetched Title" } }]);
+const mockFetchEntity = jest.fn().mockResolvedValue({ id: 1,
+path: "posts",
+values: { title: "Refetched Entity Title" } });
 
 jest.mock("../src/services/entityService", () => ({
     EntityService: jest.fn().mockImplementation(() => ({

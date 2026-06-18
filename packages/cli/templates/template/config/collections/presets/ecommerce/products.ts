@@ -37,9 +37,15 @@ const productsCollection: EntityCollection = {
             name: "Status",
             type: "string",
             enum: [
-                { id: "draft", label: "Draft", color: "gray" },
-                { id: "active", label: "Active", color: "green" },
-                { id: "archived", label: "Archived", color: "orange" }
+                { id: "draft",
+label: "Draft",
+color: "gray" },
+                { id: "active",
+label: "Active",
+color: "green" },
+                { id: "archived",
+label: "Archived",
+color: "orange" }
             ]
         },
         category: {

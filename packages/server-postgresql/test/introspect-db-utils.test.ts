@@ -2,7 +2,7 @@ import {
     singularize, humanize, toCollectionVarName, getIconForTable,
     mapPgType, buildEnumMap, buildTablesMap, identifyJoinTables,
     generateIndexContent, mergeIndexContent, safeHostFromUrl,
-    EnumValue, TableRow, TableColumn, PrimaryKeyRow, ForeignKeyRow,
+    EnumValue, TableRow, TableColumn, PrimaryKeyRow, ForeignKeyRow
 } from "../src/schema/introspect-db-logic";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -148,7 +148,7 @@ describe("getIconForTable", () => {
         ["notifications", "Mail"], ["messages", "Mail"], ["emails", "Mail"],
         ["audit_log", "Activity"], ["events", "Activity"],
         ["subscriptions", "CreditCard"], ["plans", "CreditCard"], ["billing", "CreditCard"],
-        ["comments", "MessageCircle"], ["reviews", "MessageCircle"], ["feedback", "MessageCircle"],
+        ["comments", "MessageCircle"], ["reviews", "MessageCircle"], ["feedback", "MessageCircle"]
     ];
 
     it.each(cases)("returns %s -> %s", (table, icon) => {
@@ -219,10 +219,18 @@ describe("mapPgType", () => {
 describe("buildEnumMap", () => {
     it("groups enum values by name in order", () => {
         const vals: EnumValue[] = [
-            { enum_name: "status", enum_value: "active", sort_order: 1 },
-            { enum_name: "status", enum_value: "inactive", sort_order: 2 },
-            { enum_name: "role", enum_value: "admin", sort_order: 1 },
-            { enum_name: "role", enum_value: "user", sort_order: 2 },
+            { enum_name: "status",
+enum_value: "active",
+sort_order: 1 },
+            { enum_name: "status",
+enum_value: "inactive",
+sort_order: 2 },
+            { enum_name: "role",
+enum_value: "admin",
+sort_order: 1 },
+            { enum_name: "role",
+enum_value: "user",
+sort_order: 2 }
         ];
         const map = buildEnumMap(vals);
         expect(map.get("status")).toEqual(["active", "inactive"]);
@@ -232,7 +240,9 @@ describe("buildEnumMap", () => {
         expect(buildEnumMap([]).size).toBe(0);
     });
     it("handles single-value enums", () => {
-        const map = buildEnumMap([{ enum_name: "flag", enum_value: "yes", sort_order: 1 }]);
+        const map = buildEnumMap([{ enum_name: "flag",
+enum_value: "yes",
+sort_order: 1 }]);
         expect(map.get("flag")).toEqual(["yes"]);
     });
 });
@@ -244,16 +254,36 @@ describe("buildTablesMap", () => {
     it("groups columns, pks and fks by table", () => {
         const tables: TableRow[] = [{ table_name: "users" }, { table_name: "posts" }];
         const cols: TableColumn[] = [
-            { table_name: "users", column_name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: "NO", column_default: null },
-            { table_name: "posts", column_name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: "NO", column_default: null },
-            { table_name: "posts", column_name: "user_id", data_type: "uuid", udt_name: "uuid", is_nullable: "NO", column_default: null },
+            { table_name: "users",
+column_name: "id",
+data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO",
+column_default: null },
+            { table_name: "posts",
+column_name: "id",
+data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO",
+column_default: null },
+            { table_name: "posts",
+column_name: "user_id",
+data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO",
+column_default: null }
         ];
         const pks: PrimaryKeyRow[] = [
-            { table_name: "users", column_name: "id" },
-            { table_name: "posts", column_name: "id" },
+            { table_name: "users",
+column_name: "id" },
+            { table_name: "posts",
+column_name: "id" }
         ];
         const fks: ForeignKeyRow[] = [
-            { table_name: "posts", column_name: "user_id", foreign_table_name: "users", foreign_column_name: "id" },
+            { table_name: "posts",
+column_name: "user_id",
+foreign_table_name: "users",
+foreign_column_name: "id" }
         ];
         const map = buildTablesMap(tables, cols, pks, fks);
         expect(map.size).toBe(2);
@@ -268,8 +298,12 @@ describe("buildTablesMap", () => {
 // ═══════════════════════════════════════════════════════════════════════
 describe("identifyJoinTables", () => {
     const mkCol = (table: string, col: string): TableColumn => ({
-        table_name: table, column_name: col, data_type: "uuid",
-        udt_name: "uuid", is_nullable: "NO", column_default: null,
+        table_name: table,
+column_name: col,
+data_type: "uuid",
+        udt_name: "uuid",
+is_nullable: "NO",
+column_default: null
     });
 
     it("detects a pure junction table with exactly 2 FKs", () => {
@@ -279,10 +313,16 @@ describe("identifyJoinTables", () => {
                 columns: [mkCol("posts_to_tags", "post_id"), mkCol("posts_to_tags", "tag_id")],
                 pks: [],
                 fks: [
-                    { table_name: "posts_to_tags", column_name: "post_id", foreign_table_name: "posts", foreign_column_name: "id" },
-                    { table_name: "posts_to_tags", column_name: "tag_id", foreign_table_name: "tags", foreign_column_name: "id" },
-                ],
-            }],
+                    { table_name: "posts_to_tags",
+column_name: "post_id",
+foreign_table_name: "posts",
+foreign_column_name: "id" },
+                    { table_name: "posts_to_tags",
+column_name: "tag_id",
+foreign_table_name: "tags",
+foreign_column_name: "id" }
+                ]
+            }]
         ]);
         expect(identifyJoinTables(tablesMap)).toEqual(new Set(["posts_to_tags"]));
     });
@@ -295,14 +335,20 @@ describe("identifyJoinTables", () => {
                     mkCol("posts_tags", "id"),
                     mkCol("posts_tags", "post_id"),
                     mkCol("posts_tags", "tag_id"),
-                    mkCol("posts_tags", "created_at"),
+                    mkCol("posts_tags", "created_at")
                 ],
                 pks: ["id"],
                 fks: [
-                    { table_name: "posts_tags", column_name: "post_id", foreign_table_name: "posts", foreign_column_name: "id" },
-                    { table_name: "posts_tags", column_name: "tag_id", foreign_table_name: "tags", foreign_column_name: "id" },
-                ],
-            }],
+                    { table_name: "posts_tags",
+column_name: "post_id",
+foreign_table_name: "posts",
+foreign_column_name: "id" },
+                    { table_name: "posts_tags",
+column_name: "tag_id",
+foreign_table_name: "tags",
+foreign_column_name: "id" }
+                ]
+            }]
         ]);
         expect(identifyJoinTables(tablesMap).has("posts_tags")).toBe(true);
     });
@@ -314,14 +360,20 @@ describe("identifyJoinTables", () => {
                 columns: [
                     mkCol("enrollments", "student_id"),
                     mkCol("enrollments", "course_id"),
-                    mkCol("enrollments", "grade"), // extra column
+                    mkCol("enrollments", "grade") // extra column
                 ],
                 pks: [],
                 fks: [
-                    { table_name: "enrollments", column_name: "student_id", foreign_table_name: "students", foreign_column_name: "id" },
-                    { table_name: "enrollments", column_name: "course_id", foreign_table_name: "courses", foreign_column_name: "id" },
-                ],
-            }],
+                    { table_name: "enrollments",
+column_name: "student_id",
+foreign_table_name: "students",
+foreign_column_name: "id" },
+                    { table_name: "enrollments",
+column_name: "course_id",
+foreign_table_name: "courses",
+foreign_column_name: "id" }
+                ]
+            }]
         ]);
         expect(identifyJoinTables(tablesMap).size).toBe(0);
     });
@@ -333,9 +385,12 @@ describe("identifyJoinTables", () => {
                 columns: [mkCol("posts", "id"), mkCol("posts", "user_id")],
                 pks: ["id"],
                 fks: [
-                    { table_name: "posts", column_name: "user_id", foreign_table_name: "users", foreign_column_name: "id" },
-                ],
-            }],
+                    { table_name: "posts",
+column_name: "user_id",
+foreign_table_name: "users",
+foreign_column_name: "id" }
+                ]
+            }]
         ]);
         expect(identifyJoinTables(tablesMap).size).toBe(0);
     });
@@ -356,9 +411,9 @@ describe("generateIndexContent", () => {
     it("generates import statements and collections array", () => {
         const result = generateIndexContent(["users"]);
         expect(result).toContain('import usersCollection from "./users";');
-        expect(result).toContain('export const collections = [');
-        expect(result).toContain('    usersCollection,');
-        expect(result).toContain('];');
+        expect(result).toContain("export const collections = [");
+        expect(result).toContain("    usersCollection,");
+        expect(result).toContain("];");
     });
 });
 
@@ -371,8 +426,8 @@ describe("mergeIndexContent", () => {
         const result = mergeIndexContent(existing, ["users", "posts"]);
         expect(result.match(/import usersCollection from ".\/users";/g)!.length).toBe(1);
         expect(result).toContain('import postsCollection from "./posts";');
-        expect(result).toContain('usersCollection,');
-        expect(result).toContain('postsCollection,');
+        expect(result).toContain("usersCollection,");
+        expect(result).toContain("postsCollection,");
     });
 
     it("returns existing content trimmed + newline when no new files", () => {

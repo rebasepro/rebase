@@ -7,7 +7,6 @@ import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/a
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 
 
-
 /**
  * Lightweight REST API generator that leverages existing Rebase DataDriver.
  * Supports `include` query parameter for eager-loading relations via Drizzle.
@@ -36,7 +35,8 @@ export class RestApiGenerator {
     private buildHookContext(c: { get: (key: string) => unknown }, method: BackendHookContext["method"]): BackendHookContext {
         const user = c.get("user") as { userId: string; roles?: string[] } | undefined;
         return {
-            requestUser: user ? { userId: user.userId, roles: user.roles ?? [] } : undefined,
+            requestUser: user ? { userId: user.userId,
+roles: user.roles ?? [] } : undefined,
             method
         };
     }
@@ -64,7 +64,7 @@ export class RestApiGenerator {
      */
     private enforceApiKeyPermission(
         c: { get: (key: string) => unknown; req: { method: string } },
-        collectionSlug: string,
+        collectionSlug: string
     ): void {
         const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
         if (!apiKey) return; // Not an API key request — skip
@@ -73,7 +73,7 @@ export class RestApiGenerator {
         if (!isOperationAllowed(apiKey.permissions, collectionSlug, operation)) {
             throw ApiError.forbidden(
                 `API key does not have "${operation}" permission for collection "${collectionSlug}"`,
-                "API_KEY_FORBIDDEN",
+                "API_KEY_FORBIDDEN"
             );
         }
     }
@@ -240,10 +240,12 @@ export class RestApiGenerator {
                     });
 
                     const result = prepared.hookHandledEmail
-                        ? { temporaryPassword: prepared.clearPassword, invitationSent: prepared.invitationSent }
+                        ? { temporaryPassword: prepared.clearPassword,
+invitationSent: prepared.invitationSent }
                         : this.authAdapter.finalizeUserCreation
                             ? await this.authAdapter.finalizeUserCreation(
-                                { id: entity.id as string, values: entity.values as Record<string, unknown> },
+                                { id: entity.id as string,
+values: entity.values as Record<string, unknown> },
                                 prepared.clearPassword
                             )
                             : { invitationSent: false };
@@ -441,13 +443,13 @@ entityId };
                 const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                
+
                 const total = driver.countEntities ? await driver.countEntities({
                     path: parsed.collectionPath,
                     filter: queryOptions.where as FetchCollectionProps["filter"],
                     searchString
                 }) : 0;
-                
+
                 return c.json({ count: total });
             } else if (parsed.entityId) {
                 // GET /parent/:parentId/child/:id — single entity

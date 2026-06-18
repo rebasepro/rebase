@@ -7,7 +7,8 @@ function makeRefValues(paths: string[]): ValuesCountEntry {
     for (const v of paths) {
         valuesCount.set(v, (valuesCount.get(v) || 0) + 1);
     }
-    return { values: paths, valuesCount };
+    return { values: paths,
+valuesCount };
 }
 
 describe("buildReferenceProperty", () => {

@@ -539,5 +539,5 @@ export const collectionsDictionary = {
   roles: "roles",
   tags: "tags",
   tickets: "tickets",
-  users: "users",
+  users: "users"
 } as const;

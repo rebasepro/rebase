@@ -1,22 +1,33 @@
 import {
     generateCollectionFile, buildTablesMap, buildEnumMap,
     identifyJoinTables, TableRow, TableColumn, PrimaryKeyRow,
-    ForeignKeyRow, EnumValue, TableMeta,
+    ForeignKeyRow, EnumValue, TableMeta
 } from "../src/schema/introspect-db-logic";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
 const mkCol = (table: string, col: string, opts: Partial<TableColumn> = {}): TableColumn => ({
-    table_name: table, column_name: col, data_type: "character varying",
-    udt_name: "varchar", is_nullable: "YES", column_default: null, ...opts,
+    table_name: table,
+column_name: col,
+data_type: "character varying",
+    udt_name: "varchar",
+is_nullable: "YES",
+column_default: null,
+...opts
 });
 
 const mkFk = (table: string, col: string, fTable: string, fCol = "id"): ForeignKeyRow => ({
-    table_name: table, column_name: col, foreign_table_name: fTable, foreign_column_name: fCol,
+    table_name: table,
+column_name: col,
+foreign_table_name: fTable,
+foreign_column_name: fCol
 });
 
 function makeSimpleTable(name: string, columns: TableColumn[], pks: string[] = ["id"], fks: ForeignKeyRow[] = []): TableMeta {
-    return { name, columns, pks, fks };
+    return { name,
+columns,
+pks,
+fks };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -26,8 +37,10 @@ describe("generateCollectionFile", () => {
     describe("basic property generation", () => {
         it("generates a simple collection with slug, name, singularName and table", () => {
             const meta = makeSimpleTable("products", [
-                mkCol("products", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("products", "name", { is_nullable: "NO" }),
+                mkCol("products", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("products", "name", { is_nullable: "NO" })
             ]);
             const result = generateCollectionFile("products", meta, [], new Set(), new Map([["products", meta]]), new Map());
             expect(result).toContain('slug: "products"');
@@ -38,14 +51,20 @@ describe("generateCollectionFile", () => {
 
         it("generates correct property types from columns", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "count", { data_type: "integer", udt_name: "int4" }),
-                mkCol("items", "active", { data_type: "boolean", udt_name: "bool" }),
-                mkCol("items", "created_at", { data_type: "timestamp", udt_name: "timestamp" }),
-                mkCol("items", "metadata", { data_type: "jsonb", udt_name: "jsonb" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "count", { data_type: "integer",
+udt_name: "int4" }),
+                mkCol("items", "active", { data_type: "boolean",
+udt_name: "bool" }),
+                mkCol("items", "created_at", { data_type: "timestamp",
+udt_name: "timestamp" }),
+                mkCol("items", "metadata", { data_type: "jsonb",
+udt_name: "jsonb" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(result).toContain('type: "string"');   // id
+            expect(result).toContain('type: "string"'); // id
             expect(result).toContain('type: "number"');
             expect(result).toContain('type: "boolean"');
             expect(result).toContain('type: "date"');
@@ -55,9 +74,11 @@ describe("generateCollectionFile", () => {
         it("skips FK columns from properties (they become relations)", () => {
             const fks = [mkFk("posts", "author_id", "users")];
             const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("posts", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
                 mkCol("posts", "title", { is_nullable: "NO" }),
-                mkCol("posts", "author_id", { is_nullable: "NO" }),
+                mkCol("posts", "author_id", { is_nullable: "NO" })
             ], ["id"], fks);
             const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
             // author_id should NOT appear as a regular property
@@ -71,9 +92,11 @@ describe("generateCollectionFile", () => {
         it("includes relation property key, not FK column name", () => {
             const fks = [mkFk("posts", "author_id", "users")];
             const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("posts", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
                 mkCol("posts", "title"),
-                mkCol("posts", "author_id"),
+                mkCol("posts", "author_id")
             ], ["id"], fks);
             const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
             // propertiesOrder should contain "author" (the relation key), not "author_id" (the FK column)
@@ -89,7 +112,9 @@ describe("generateCollectionFile", () => {
     describe("ID detection", () => {
         it("marks uuid PK as isId uuid", () => {
             const meta = makeSimpleTable("users", [
-                mkCol("users", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("users", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const result = generateCollectionFile("users", meta, [], new Set(), new Map([["users", meta]]), new Map());
             expect(result).toContain('isId: "uuid"');
@@ -97,7 +122,10 @@ describe("generateCollectionFile", () => {
 
         it("marks integer PK as isId increment", () => {
             const meta = makeSimpleTable("counters", [
-                mkCol("counters", "id", { data_type: "integer", udt_name: "int4", is_nullable: "NO", column_default: "nextval" }),
+                mkCol("counters", "id", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO",
+column_default: "nextval" })
             ]);
             const result = generateCollectionFile("counters", meta, [], new Set(), new Map([["counters", meta]]), new Map());
             expect(result).toContain('isId: "increment"');
@@ -105,9 +133,14 @@ describe("generateCollectionFile", () => {
 
         it("flags composite primary keys with a comment", () => {
             const meta = makeSimpleTable("scores", [
-                mkCol("scores", "user_id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("scores", "game_id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("scores", "score", { data_type: "integer", udt_name: "int4" }),
+                mkCol("scores", "user_id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("scores", "game_id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("scores", "score", { data_type: "integer",
+udt_name: "int4" })
             ], ["user_id", "game_id"]);
             const result = generateCollectionFile("scores", meta, [], new Set(), new Map([["scores", meta]]), new Map());
             expect(result).toContain("composite primary key");
@@ -118,8 +151,10 @@ describe("generateCollectionFile", () => {
     describe("validation.required", () => {
         it("adds required when is_nullable is NO, not a PK, and no default", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "name", { is_nullable: "NO" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "name", { is_nullable: "NO" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
             // name should have required
@@ -128,8 +163,10 @@ describe("generateCollectionFile", () => {
 
         it("does NOT add required for nullable columns", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "bio", { is_nullable: "YES" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "bio", { is_nullable: "YES" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
             const bioSection = result.split("bio:")[1].split("},")[0];
@@ -138,8 +175,11 @@ describe("generateCollectionFile", () => {
 
         it("does NOT add required for columns with defaults", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "role", { is_nullable: "NO", column_default: "'user'" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "role", { is_nullable: "NO",
+column_default: "'user'" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
             const roleSection = result.split("role:")[1].split("},")[0];
@@ -151,11 +191,14 @@ describe("generateCollectionFile", () => {
         it("generates enum for USER-DEFINED columns with matching enum", () => {
             const enumMap = new Map([["order_status", ["pending", "shipped", "delivered"]]]);
             const meta = makeSimpleTable("orders", [
-                mkCol("orders", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("orders", "status", { data_type: "USER-DEFINED", udt_name: "order_status" }),
+                mkCol("orders", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("orders", "status", { data_type: "USER-DEFINED",
+udt_name: "order_status" })
             ]);
             const result = generateCollectionFile("orders", meta, [], new Set(), new Map([["orders", meta]]), enumMap);
-            expect(result).toContain('enum:');
+            expect(result).toContain("enum:");
             expect(result).toContain('{ id: "pending", label: "Pending" }');
             expect(result).toContain('{ id: "shipped", label: "Shipped" }');
             expect(result).toContain('{ id: "delivered", label: "Delivered" }');
@@ -164,8 +207,11 @@ describe("generateCollectionFile", () => {
 
         it("does NOT add enum for USER-DEFINED without matching enum", () => {
             const meta = makeSimpleTable("things", [
-                mkCol("things", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("things", "geom", { data_type: "USER-DEFINED", udt_name: "geometry" }),
+                mkCol("things", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("things", "geom", { data_type: "USER-DEFINED",
+udt_name: "geometry" })
             ]);
             const result = generateCollectionFile("things", meta, [], new Set(), new Map([["things", meta]]), new Map());
             expect(result).not.toContain("enum");
@@ -174,8 +220,11 @@ describe("generateCollectionFile", () => {
         it("humanizes enum value labels with underscores", () => {
             const enumMap = new Map([["my_enum", ["in_progress", "on_hold"]]]);
             const meta = makeSimpleTable("tasks", [
-                mkCol("tasks", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("tasks", "state", { data_type: "USER-DEFINED", udt_name: "my_enum" }),
+                mkCol("tasks", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("tasks", "state", { data_type: "USER-DEFINED",
+udt_name: "my_enum" })
             ]);
             const result = generateCollectionFile("tasks", meta, [], new Set(), new Map([["tasks", meta]]), enumMap);
             expect(result).toContain('label: "In Progress"');
@@ -186,8 +235,11 @@ describe("generateCollectionFile", () => {
     describe("date auto-value heuristics", () => {
         it("sets autoValue on_create for created_at", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "created_at", { data_type: "timestamp", udt_name: "timestamp" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "created_at", { data_type: "timestamp",
+udt_name: "timestamp" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
             expect(result).toContain('autoValue: "on_create"');
@@ -196,8 +248,11 @@ describe("generateCollectionFile", () => {
 
         it("sets autoValue on_update for updated_at", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "updated_at", { data_type: "timestamp", udt_name: "timestamp" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "updated_at", { data_type: "timestamp",
+udt_name: "timestamp" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
             expect(result).toContain('autoValue: "on_update"');
@@ -205,8 +260,12 @@ describe("generateCollectionFile", () => {
 
         it("sets autoValue on_create for columns with now() default", () => {
             const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("items", "published_at", { data_type: "timestamp", udt_name: "timestamp", column_default: "now()" }),
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "published_at", { data_type: "timestamp",
+udt_name: "timestamp",
+column_default: "now()" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
             expect(result).toContain('autoValue: "on_create"');
@@ -217,8 +276,10 @@ describe("generateCollectionFile", () => {
         it("adds storage config for image-like column names", () => {
             for (const name of ["profile_image", "avatar", "photo_url", "logo", "cover_image"]) {
                 const meta = makeSimpleTable("t", [
-                    mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                    mkCol("t", name),
+                    mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                    mkCol("t", name)
                 ]);
                 const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
                 expect(result).toContain("storagePath:");
@@ -228,8 +289,10 @@ describe("generateCollectionFile", () => {
         it("adds multiline for description/summary/excerpt", () => {
             for (const name of ["description", "summary", "excerpt"]) {
                 const meta = makeSimpleTable("t", [
-                    mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                    mkCol("t", name),
+                    mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                    mkCol("t", name)
                 ]);
                 const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
                 expect(result).toContain("multiline: true");
@@ -239,8 +302,10 @@ describe("generateCollectionFile", () => {
         it("adds markdown for content/body", () => {
             for (const name of ["content", "body"]) {
                 const meta = makeSimpleTable("t", [
-                    mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                    mkCol("t", name),
+                    mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                    mkCol("t", name)
                 ]);
                 const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
                 expect(result).toContain("markdown: true");
@@ -249,8 +314,11 @@ describe("generateCollectionFile", () => {
 
         it("adds multiline for text data_type columns", () => {
             const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("t", "notes", { data_type: "text", udt_name: "text" }),
+                mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("t", "notes", { data_type: "text",
+udt_name: "text" })
             ]);
             const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
             expect(result).toContain("multiline: true");
@@ -259,8 +327,11 @@ describe("generateCollectionFile", () => {
         it("does NOT apply string heuristics to enum columns", () => {
             const enumMap = new Map([["img_type", ["png", "jpg"]]]);
             const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("t", "image_type", { data_type: "USER-DEFINED", udt_name: "img_type" }),
+                mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("t", "image_type", { data_type: "USER-DEFINED",
+udt_name: "img_type" })
             ]);
             const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), enumMap);
             expect(result).not.toContain("storagePath");
@@ -272,12 +343,14 @@ describe("generateCollectionFile", () => {
         it("generates a one-to-one owning relation with correct import", () => {
             const fks = [mkFk("posts", "author_id", "users")];
             const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("posts", "author_id"),
+                mkCol("posts", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("posts", "author_id")
             ], ["id"], fks);
             const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
             expect(result).toContain('import usersCollection from "./users"');
-            expect(result).toContain('author: {');
+            expect(result).toContain("author: {");
             expect(result).toContain('cardinality: "one"');
             expect(result).toContain('direction: "owning"');
             expect(result).toContain('localKey: "author_id"');
@@ -288,26 +361,30 @@ describe("generateCollectionFile", () => {
         it("generates a one-to-many inverse relation in the relations array", () => {
             const allFks: ForeignKeyRow[] = [mkFk("comments", "post_id", "posts")];
             const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("posts", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const result = generateCollectionFile("posts", meta, allFks, new Set(), new Map([["posts", meta]]), new Map());
             expect(result).toContain('import commentsCollection from "./comments"');
             // Should be in the relations array, not as an inline property
-            expect(result).toContain('relations: [');
+            expect(result).toContain("relations: [");
             expect(result).toContain('relationName: "comments"');
             expect(result).toContain('cardinality: "many"');
             expect(result).toContain('direction: "inverse"');
             expect(result).toContain('inverseRelationName: "post"');
             expect(result).toContain('foreignKeyOnTarget: "post_id"');
             // Should NOT appear as an inline property with type: "relation"
-            const propsSection = result.split('properties:')[1].split('relations:')[0];
+            const propsSection = result.split("properties:")[1].split("relations:")[0];
             expect(propsSection).not.toContain('"relation"');
         });
 
         it("does NOT include inverse relations in propertiesOrder", () => {
             const allFks: ForeignKeyRow[] = [mkFk("comments", "post_id", "posts")];
             const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("posts", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const result = generateCollectionFile("posts", meta, allFks, new Set(), new Map([["posts", meta]]), new Map());
             const orderMatch = result.match(/propertiesOrder:\s*(\[[\s\S]*?\])/);
@@ -321,21 +398,24 @@ describe("generateCollectionFile", () => {
         it("generates owning M2M with through config in relations array", () => {
             const jtFks: ForeignKeyRow[] = [
                 mkFk("articles_tags", "article_id", "articles"),
-                mkFk("articles_tags", "tag_id", "tags"),
+                mkFk("articles_tags", "tag_id", "tags")
             ];
             const jtMeta: TableMeta = {
-                name: "articles_tags", pks: [],
+                name: "articles_tags",
+pks: [],
                 columns: [mkCol("articles_tags", "article_id"), mkCol("articles_tags", "tag_id")],
-                fks: jtFks,
+                fks: jtFks
             };
             const articlesMeta = makeSimpleTable("articles", [
-                mkCol("articles", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("articles", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const tablesMap = new Map([["articles", articlesMeta], ["articles_tags", jtMeta]]);
             const joinTables = new Set(["articles_tags"]);
 
             const result = generateCollectionFile("articles", articlesMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain('relations: [');
+            expect(result).toContain("relations: [");
             expect(result).toContain('relationName: "tags"');
             expect(result).toContain('direction: "owning"');
             expect(result).toContain('table: "articles_tags"');
@@ -346,21 +426,24 @@ describe("generateCollectionFile", () => {
         it("generates inverse M2M in relations array", () => {
             const jtFks: ForeignKeyRow[] = [
                 mkFk("articles_tags", "article_id", "articles"),
-                mkFk("articles_tags", "tag_id", "tags"),
+                mkFk("articles_tags", "tag_id", "tags")
             ];
             const jtMeta: TableMeta = {
-                name: "articles_tags", pks: [],
+                name: "articles_tags",
+pks: [],
                 columns: [mkCol("articles_tags", "article_id"), mkCol("articles_tags", "tag_id")],
-                fks: jtFks,
+                fks: jtFks
             };
             const tagsMeta = makeSimpleTable("tags", [
-                mkCol("tags", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("tags", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const tablesMap = new Map([["tags", tagsMeta], ["articles_tags", jtMeta]]);
             const joinTables = new Set(["articles_tags"]);
 
             const result = generateCollectionFile("tags", tagsMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain('relations: [');
+            expect(result).toContain("relations: [");
             expect(result).toContain('direction: "inverse"');
         });
     });
@@ -369,21 +452,24 @@ describe("generateCollectionFile", () => {
         it("generates self-ref M2M with _via_ relation name in relations array", () => {
             const jtFks: ForeignKeyRow[] = [
                 mkFk("user_friends", "user_id", "users"),
-                mkFk("user_friends", "friend_id", "users"),
+                mkFk("user_friends", "friend_id", "users")
             ];
             const jtMeta: TableMeta = {
-                name: "user_friends", pks: [],
+                name: "user_friends",
+pks: [],
                 columns: [mkCol("user_friends", "user_id"), mkCol("user_friends", "friend_id")],
-                fks: jtFks,
+                fks: jtFks
             };
             const usersMeta = makeSimpleTable("users", [
-                mkCol("users", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("users", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const tablesMap = new Map([["users", usersMeta], ["user_friends", jtMeta]]);
             const joinTables = new Set(["user_friends"]);
 
             const result = generateCollectionFile("users", usersMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain('relations: [');
+            expect(result).toContain("relations: [");
             expect(result).toContain('relationName: "users_via_friend"');
             expect(result).toContain('table: "user_friends"');
             expect(result).toContain('sourceColumn: "user_id"');
@@ -396,7 +482,9 @@ describe("generateCollectionFile", () => {
     describe("icon mapping", () => {
         it("assigns correct icons based on table name", () => {
             const make = (name: string) => {
-                const meta = makeSimpleTable(name, [mkCol(name, "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" })]);
+                const meta = makeSimpleTable(name, [mkCol(name, "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })]);
                 return generateCollectionFile(name, meta, [], new Set(), new Map([[name, meta]]), new Map());
             };
             expect(make("users")).toContain('icon: "Users"');
@@ -411,7 +499,9 @@ describe("generateCollectionFile", () => {
     describe("humanized names", () => {
         it("uses Title Case for collection name from snake_case table", () => {
             const meta = makeSimpleTable("user_profiles", [
-                mkCol("user_profiles", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("user_profiles", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })
             ]);
             const result = generateCollectionFile("user_profiles", meta, [], new Set(), new Map([["user_profiles", meta]]), new Map());
             expect(result).toContain('name: "User Profiles"');
@@ -420,8 +510,10 @@ describe("generateCollectionFile", () => {
 
         it("humanizes property names", () => {
             const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                mkCol("t", "first_name"),
+                mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("t", "first_name")
             ]);
             const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
             expect(result).toContain('name: "First Name"');
@@ -430,7 +522,9 @@ describe("generateCollectionFile", () => {
 
     describe("import generation", () => {
         it("always imports PostgresCollection", () => {
-            const meta = makeSimpleTable("t", [mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" })]);
+            const meta = makeSimpleTable("t", [mkCol("t", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })]);
             const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
             expect(result).toContain('import { PostgresCollection } from "@rebasepro/types"');
         });
@@ -438,9 +532,11 @@ describe("generateCollectionFile", () => {
         it("does not duplicate imports for multiple relations to same table", () => {
             const fks = [mkFk("posts", "author_id", "users"), mkFk("posts", "reviewer_id", "users")];
             const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                mkCol("posts", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
                 mkCol("posts", "author_id"),
-                mkCol("posts", "reviewer_id"),
+                mkCol("posts", "reviewer_id")
             ], ["id"], fks);
             const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
             const importMatches = result.match(/import usersCollection/g);
@@ -450,7 +546,9 @@ describe("generateCollectionFile", () => {
 
     describe("export default", () => {
         it("exports the collection variable as default", () => {
-            const meta = makeSimpleTable("orders", [mkCol("orders", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" })]);
+            const meta = makeSimpleTable("orders", [mkCol("orders", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" })]);
             const result = generateCollectionFile("orders", meta, [], new Set(), new Map([["orders", meta]]), new Map());
             expect(result).toContain("export default ordersCollection;");
         });

@@ -35,7 +35,7 @@ describe("StudioHomePage Component", () => {
         expect(screen.getByRole("region", { name: "API" })).toBeInTheDocument();
         expect(screen.getByRole("region", { name: "Storage" })).toBeInTheDocument();
         expect(screen.getByRole("region", { name: "Access Control" })).toBeInTheDocument();
-        
+
         // Assert tool names/descriptions are present
         expect(screen.getByText("Define and manage your data model and collection schemas")).toBeInTheDocument();
         expect(screen.getByText("Interactive ERD showing tables, columns, and relationships")).toBeInTheDocument();

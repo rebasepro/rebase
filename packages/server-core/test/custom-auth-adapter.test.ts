@@ -7,20 +7,20 @@ const TEST_USER: AuthenticatedUser = {
     displayName: "Test User",
     roles: ["editor"],
     isAdmin: false,
-    rawToken: "tok_abc",
+    rawToken: "tok_abc"
 };
 
 const ADMIN_USER: AuthenticatedUser = {
     uid: "admin-1",
     email: "admin@example.com",
     roles: ["admin"],
-    isAdmin: true,
+    isAdmin: true
 };
 
 describe("createCustomAuthAdapter", () => {
     it("sets the adapter id to 'custom'", () => {
         const adapter = createCustomAuthAdapter({
-            verifyRequest: async () => null,
+            verifyRequest: async () => null
         });
         expect(adapter.id).toBe("custom");
     });
@@ -29,7 +29,7 @@ describe("createCustomAuthAdapter", () => {
         const verifyRequest = jest.fn(async () => TEST_USER);
         const adapter = createCustomAuthAdapter({ verifyRequest });
         const req = new Request("http://localhost/api", {
-            headers: { Authorization: "Bearer test-token" },
+            headers: { Authorization: "Bearer test-token" }
         });
         const result = await adapter.verifyRequest(req);
         expect(verifyRequest).toHaveBeenCalledWith(req);
@@ -38,7 +38,7 @@ describe("createCustomAuthAdapter", () => {
 
     it("returns null from verifyRequest when the user function returns null", async () => {
         const adapter = createCustomAuthAdapter({
-            verifyRequest: async () => null,
+            verifyRequest: async () => null
         });
         const result = await adapter.verifyRequest(new Request("http://localhost/"));
         expect(result).toBeNull();
@@ -68,7 +68,7 @@ describe("createCustomAuthAdapter", () => {
 
     it("returns null from fallback verifyToken for invalid token", async () => {
         const adapter = createCustomAuthAdapter({
-            verifyRequest: async () => null,
+            verifyRequest: async () => null
         });
         const result = await adapter.verifyToken!("bad-token");
         expect(result).toBeNull();
@@ -84,7 +84,7 @@ describe("createCustomAuthAdapter", () => {
         const verifyRequest = jest.fn(async () => null);
         const adapter = createCustomAuthAdapter({
             verifyRequest,
-            verifyToken: customVerifyToken,
+            verifyToken: customVerifyToken
         });
 
         const result = await adapter.verifyToken!("direct-token");
@@ -97,7 +97,7 @@ describe("createCustomAuthAdapter", () => {
     it("returns null from user-provided verifyToken for unknown token", async () => {
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
-            verifyToken: async () => null,
+            verifyToken: async () => null
         });
         const result = await adapter.verifyToken!("unknown");
         expect(result).toBeNull();
@@ -107,7 +107,7 @@ describe("createCustomAuthAdapter", () => {
 
     it("returns default capabilities when none are overridden", async () => {
         const adapter = createCustomAuthAdapter({
-            verifyRequest: async () => null,
+            verifyRequest: async () => null
         });
         const caps = await adapter.getCapabilities!();
         expect(caps).toEqual({
@@ -118,14 +118,15 @@ describe("createCustomAuthAdapter", () => {
             sessionManagement: false,
             profileUpdate: false,
             emailVerification: false,
-            enabledProviders: [],
+            enabledProviders: []
         });
     });
 
     it("merges user-provided capabilities with defaults", async () => {
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
-            capabilities: { emailPasswordLogin: true, registration: true },
+            capabilities: { emailPasswordLogin: true,
+registration: true }
         });
         const caps = await adapter.getCapabilities!();
         expect(caps.emailPasswordLogin).toBe(true);
@@ -138,7 +139,7 @@ describe("createCustomAuthAdapter", () => {
     it("passes through serviceKey", () => {
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
-            serviceKey: "sk_live_123",
+            serviceKey: "sk_live_123"
         });
         expect(adapter.serviceKey).toBe("sk_live_123");
     });
@@ -149,12 +150,12 @@ describe("createCustomAuthAdapter", () => {
             listUsers: jest.fn(),
             createUser: jest.fn(),
             updateUser: jest.fn(),
-            deleteUser: jest.fn(),
+            deleteUser: jest.fn()
         };
 
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
-            userManagement: userMgmt as unknown as CustomAuthAdapterOptions["userManagement"],
+            userManagement: userMgmt as unknown as CustomAuthAdapterOptions["userManagement"]
         });
 
         expect(adapter.userManagement).toBe(userMgmt);
@@ -162,7 +163,7 @@ describe("createCustomAuthAdapter", () => {
 
     it("omits userManagement when not provided", () => {
         const adapter = createCustomAuthAdapter({
-            verifyRequest: async () => null,
+            verifyRequest: async () => null
         });
         expect(adapter.userManagement).toBeUndefined();
     });

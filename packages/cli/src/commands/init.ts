@@ -35,9 +35,15 @@ const cliRoot = findParentDir(__dirname, "cli");
 export type TemplatePreset = "blog" | "ecommerce" | "blank";
 
 const PRESET_CHOICES: Array<{ name: string; value: TemplatePreset; short: string }> = [
-    { name: "Blog         — Posts, Authors, Tags (with markdown editor)", value: "blog", short: "Blog" },
-    { name: "E-commerce   — Products, Categories, Orders", value: "ecommerce", short: "E-commerce" },
-    { name: "Blank        — Empty project, just authentication", value: "blank", short: "Blank" }
+    { name: "Blog         — Posts, Authors, Tags (with markdown editor)",
+value: "blog",
+short: "Blog" },
+    { name: "E-commerce   — Products, Categories, Orders",
+value: "ecommerce",
+short: "E-commerce" },
+    { name: "Blank        — Empty project, just authentication",
+value: "blank",
+short: "Blank" }
 ];
 
 export interface InitOptions {
@@ -391,7 +397,8 @@ async function applyPreset(targetDirectory: string, preset: TemplatePreset): Pro
 
 function cleanupPresets(presetsDir: string): void {
     if (fs.existsSync(presetsDir)) {
-        fs.rmSync(presetsDir, { recursive: true, force: true });
+        fs.rmSync(presetsDir, { recursive: true,
+force: true });
     }
 }
 
@@ -454,13 +461,13 @@ async function replacePlaceholders(options: InitOptions) {
     // First, find all unique @rebasepro packages across all files to process in parallel
     const allPackages = new Set<string>();
     const fileContents = new Map<string, string>();
-    
+
     for (const file of filesToProcess) {
         const fullPath = path.resolve(options.targetDirectory, file);
         if (!fs.existsSync(fullPath)) continue;
         const content = fs.readFileSync(fullPath, "utf-8");
         fileContents.set(fullPath, content);
-        
+
         const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
         for (const match of matches) {
             allPackages.add(match[1]);
@@ -468,7 +475,7 @@ async function replacePlaceholders(options: InitOptions) {
     }
 
     console.log(chalk.gray("  Resolving package versions..."));
-    
+
     // Resolve all versions in parallel
     await Promise.all(Array.from(allPackages).map(getPackageVersion));
 
@@ -483,7 +490,7 @@ async function replacePlaceholders(options: InitOptions) {
             const resolvedVersion = versionCache.get(pkgName) || "latest";
             content = content.replace(new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"), `"${pkgName}": "${resolvedVersion}"`);
         }
-        
+
         fs.writeFileSync(fullPath, content, "utf-8");
     }
 }

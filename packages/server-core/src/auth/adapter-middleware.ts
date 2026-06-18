@@ -48,7 +48,8 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
             const authHeader = c.req.header("authorization") || "";
             const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
             if (token.startsWith("rk_")) {
-                const result = await validateApiKey(c, token, { store: apiKeyStore, driver });
+                const result = await validateApiKey(c, token, { store: apiKeyStore,
+driver });
                 if (result === true) return next();
                 return result;
             }
@@ -60,7 +61,8 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
             authenticatedUser = await adapter.verifyRequest(c.req.raw);
         } catch (error) {
             // adapter.verifyRequest() threw — reject the request (fail closed)
-            return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+            return c.json({ error: { message: "Unauthorized",
+code: "UNAUTHORIZED" } }, 401);
         }
 
         if (authenticatedUser) {
@@ -68,30 +70,34 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
             c.set("user", {
                 userId: authenticatedUser.uid,
                 email: authenticatedUser.email,
-                roles: authenticatedUser.roles,
+                roles: authenticatedUser.roles
             });
             try {
                 c.set("driver", await scopeDataDriver(driver, {
                     uid: authenticatedUser.uid,
-                    roles: authenticatedUser.roles,
+                    roles: authenticatedUser.roles
                 }));
             } catch (error) {
                 console.error("[AUTH-ADAPTER] RLS scoping failed for authenticated user:", error);
-                return c.json({ error: { message: "Internal authentication error", code: "INTERNAL_ERROR" } }, 500);
+                return c.json({ error: { message: "Internal authentication error",
+code: "INTERNAL_ERROR" } }, 500);
             }
         } else {
             // Not authenticated — scope as anon for RLS evaluation
             try {
-                c.set("driver", await scopeDataDriver(driver, { uid: "anon", roles: ["anon"] }));
+                c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+roles: ["anon"] }));
             } catch (error) {
                 console.error("[AUTH-ADAPTER] Failed to create anon-scoped driver:", error);
-                return c.json({ error: { message: "Server configuration error", code: "INTERNAL_ERROR" } }, 500);
+                return c.json({ error: { message: "Server configuration error",
+code: "INTERNAL_ERROR" } }, 500);
             }
         }
 
         // Enforce auth if required
         if (enforceAuth && !c.get("user")) {
-            return c.json({ error: { message: "Unauthorized: Authentication required", code: "UNAUTHORIZED" } }, 401);
+            return c.json({ error: { message: "Unauthorized: Authentication required",
+code: "UNAUTHORIZED" } }, 401);
         }
 
         return next();

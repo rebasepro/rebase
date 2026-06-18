@@ -711,9 +711,9 @@ export class DrizzleConditionBuilder {
                 const fieldColumn = table[key as keyof typeof table] as AnyPgColumn;
                 if (fieldColumn) {
                     // Verify that the underlying database column supports string pattern-matching
-                    const supportsILike = 
-                        fieldColumn instanceof PgVarchar || 
-                        fieldColumn instanceof PgText || 
+                    const supportsILike =
+                        fieldColumn instanceof PgVarchar ||
+                        fieldColumn instanceof PgText ||
                         fieldColumn instanceof PgChar ||
                         (fieldColumn && typeof fieldColumn === "object" && !("columnType" in fieldColumn));
                     if (supportsILike) {
@@ -1108,7 +1108,7 @@ export class DrizzleConditionBuilder {
             filter: vectorSearch.threshold != null
                 ? sql`(${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)}) < ${vectorSearch.threshold}`
                 : undefined,
-            distanceSelect: sql`(${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)})`,
+            distanceSelect: sql`(${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)})`
         };
     }
 }

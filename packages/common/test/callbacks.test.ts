@@ -4,8 +4,10 @@ import type { Properties, Property } from "@rebasepro/types";
 describe("buildPropertyCallbacks", () => {
     it("returns undefined when no properties have callbacks", () => {
         const properties: Properties = {
-            title: { name: "title", type: "string" },
-            count: { name: "count", type: "number" }
+            title: { name: "title",
+type: "string" },
+            count: { name: "count",
+type: "number" }
         };
         expect(buildPropertyCallbacks(properties)).toBeUndefined();
     });
@@ -81,7 +83,9 @@ describe("buildPropertyCallbacks", () => {
 
         const callbacks = buildPropertyCallbacks(properties);
         const result = await callbacks?.afterRead?.({
-            entity: { id: "1", path: "test/1", values: { title: "hello" } }
+            entity: { id: "1",
+path: "test/1",
+values: { title: "hello" } }
         } as never);
 
         expect(result?.values?.title).toBe("HELLO");
@@ -116,7 +120,8 @@ describe("buildPropertyCallbacks", () => {
                     afterRead: ({ value }) => (value as string).toUpperCase()
                 }
             } as Property,
-            description: { name: "description", type: "string" }
+            description: { name: "description",
+type: "string" }
         };
 
         const callbacks = buildPropertyCallbacks(properties);
@@ -124,7 +129,8 @@ describe("buildPropertyCallbacks", () => {
             entity: {
                 id: "1",
                 path: "test/1",
-                values: { title: "hello", description: "unchanged" }
+                values: { title: "hello",
+description: "unchanged" }
             }
         } as never);
 

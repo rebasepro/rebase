@@ -5,7 +5,7 @@ export type {
     ScorecardConfig,
     InsightDataResult,
     InsightDefinition,
-    InsightsPluginConfig,
+    InsightsPluginConfig
 } from "./types";
 
 // ── Plugin ────────────────────────────────────────────────────────────

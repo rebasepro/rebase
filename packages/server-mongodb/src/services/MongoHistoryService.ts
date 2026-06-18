@@ -100,7 +100,8 @@ export class MongoHistoryService {
         private db: Db,
         retention?: Partial<HistoryRetentionConfig>
     ) {
-        this.retention = { ...DEFAULT_RETENTION, ...retention };
+        this.retention = { ...DEFAULT_RETENTION,
+...retention };
     }
 
     async recordHistory(params: RecordHistoryParams): Promise<void> {
@@ -149,11 +150,13 @@ export class MongoHistoryService {
         const collection = this.db.collection("__rebase_history");
 
         // 1. Enforce maxEntries
-        const count = await collection.countDocuments({ entity_id: entityId, table_name: tableName });
+        const count = await collection.countDocuments({ entity_id: entityId,
+table_name: tableName });
         if (count > this.retention.maxEntries) {
             const toDelete = count - this.retention.maxEntries;
             const oldestEntries = await collection
-                .find({ entity_id: entityId, table_name: tableName })
+                .find({ entity_id: entityId,
+table_name: tableName })
                 .sort({ updated_at: 1 })
                 .limit(toDelete)
                 .toArray();

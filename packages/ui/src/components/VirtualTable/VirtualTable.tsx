@@ -647,7 +647,8 @@ function MemoizedList({
     const TypedList = List as React.ComponentType<ReactWindowV2ListProps>;
     return <TypedList
         ref={outerRef}
-        style={{ width, height }}
+        style={{ width,
+height }}
         overscanCount={4}
         rowCount={itemCount}
         onScroll={onScroll}

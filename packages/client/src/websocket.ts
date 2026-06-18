@@ -329,11 +329,11 @@ export class RebaseWebSocketClient {
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
         console.debug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
-        
+
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
         }
-        
+
         this.reconnectTimeout = setTimeout(() => {
             this.reconnectTimeout = null;
             this.initWebSocket();

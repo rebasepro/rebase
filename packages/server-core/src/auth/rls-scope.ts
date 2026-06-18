@@ -47,7 +47,7 @@ function isRLSScopedDriver(driver: DataDriver): driver is RLSScopedDriver {
  */
 export async function scopeDataDriver(
     driver: DataDriver,
-    user: { uid: string; roles?: string[] },
+    user: { uid: string; roles?: string[] }
 ): Promise<DataDriver> {
     if (isRLSScopedDriver(driver)) {
         // Fail closed — do NOT catch and swallow errors here.

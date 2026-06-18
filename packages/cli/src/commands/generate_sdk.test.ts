@@ -7,8 +7,10 @@ import * as sdkGen from "@rebasepro/sdk-generator";
 
 vi.mock("@rebasepro/sdk-generator", () => ({
     generateSDK: vi.fn(() => [
-        { path: "database.types.ts", content: "export type Database = {};" },
-        { path: "index.ts", content: "export const a = 1;" }
+        { path: "database.types.ts",
+content: "export type Database = {};" },
+        { path: "index.ts",
+content: "export const a = 1;" }
     ])
 }));
 
@@ -24,7 +26,8 @@ describe("generateSdkCommand", () => {
     });
 
     afterEach(() => {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
+        fs.rmSync(tmpDir, { recursive: true,
+force: true });
         consoleLogSpy.mockRestore();
         processExitSpy.mockRestore();
     });

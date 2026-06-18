@@ -28,7 +28,7 @@ app.get("/home", async (c) => {
         totalRevenue: Number(stats.total_revenue),
         totalOrders: Number(stats.total_orders),
         avgOrderValue: Number(stats.avg_order_value),
-        refundedOrders: Number(stats.refunded_orders),
+        refundedOrders: Number(stats.refunded_orders)
     });
 });
 
@@ -56,12 +56,12 @@ app.get("/collection/:slug", async (c) => {
             return c.json({
                 confirmed: Number(stats.confirmed),
                 shipped: Number(stats.shipped),
-                revenue: Number(stats.revenue),
+                revenue: Number(stats.revenue)
             });
         }
 
         case "products": {
-            const [stats] = await rebase.sql(`SELECT COUNT(*) AS total FROM products`);
+            const [stats] = await rebase.sql("SELECT COUNT(*) AS total FROM products");
             return c.json({ total: Number(stats.total) });
         }
 

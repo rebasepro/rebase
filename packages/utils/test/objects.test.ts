@@ -156,7 +156,8 @@ c: 3 });
 
     describe("removeInPath", () => {
         it("should delete a nested property without mutating original", () => {
-            const obj = { a: { b: 1, c: 2 } };
+            const obj = { a: { b: 1,
+c: 2 } };
             const result = removeInPath(obj, "a.b") as any;
             expect(result.a.b).toBeUndefined();
             expect(result.a.c).toBe(2);

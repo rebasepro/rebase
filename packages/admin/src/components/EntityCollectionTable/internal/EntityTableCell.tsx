@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import useMeasure from "react-use-measure";
 
-import { cls, Tooltip , iconSize } from "@rebasepro/ui";
+import { cls, Tooltip, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MinusCircleIcon } from "@rebasepro/ui";
 import { getRowHeight, TableSize } from "@rebasepro/core";
 import { ErrorTooltip } from "@rebasepro/core";

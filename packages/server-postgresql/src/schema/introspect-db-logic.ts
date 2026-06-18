@@ -63,7 +63,7 @@ const IRREGULAR_SINGULARS: Record<string, string> = {
     data: "datum",
     media: "medium",
     criteria: "criterion",
-    phenomena: "phenomenon",
+    phenomena: "phenomenon"
 };
 
 /** Words ending in 's' that are already singular. */
@@ -73,7 +73,7 @@ const UNCOUNTABLE = new Set([
     "synopsis", "parenthesis", "hypothesis", "emphasis",
     "news", "series", "species", "means", "athletics",
     "economics", "electronics", "mathematics", "physics",
-    "politics", "statistics",
+    "politics", "statistics"
 ]);
 
 export function singularize(word: string): string {
@@ -165,10 +165,10 @@ export function mapPgType(dataType: string): string {
 
     // Numeric types
     if (
-        dt.includes("int") ||        // integer, smallint, bigint
+        dt.includes("int") || // integer, smallint, bigint
         dt.includes("numeric") ||
         dt.includes("decimal") ||
-        dt.includes("serial") ||     // serial, bigserial
+        dt.includes("serial") || // serial, bigserial
         dt === "real" ||
         dt === "float4" ||
         dt === "float8" ||
@@ -281,7 +281,7 @@ export interface PropertyOrderingContext {
 const IDENTITY_EXACT: Record<string, number> = {
     id: 0,
     uuid: 1,
-    _id: 2,
+    _id: 2
 };
 
 // — Tier 1: Title / Name — the "display column" (10–19) ———————————————
@@ -293,7 +293,7 @@ const TITLE_EXACT: Record<string, number> = {
     displayname: 13,
     headline: 14,
     subject: 15,
-    heading: 16,
+    heading: 16
 };
 
 // — Tier 2: Human identity fields (20–29) —————————————————————————————
@@ -313,7 +313,7 @@ const HUMAN_IDENTITY_EXACT: Record<string, number> = {
     email_address: 26,
     phone: 27,
     phone_number: 27,
-    mobile: 27,
+    mobile: 27
 };
 
 // — Tier 3: Core descriptors (30–39) ——————————————————————————————————
@@ -333,7 +333,7 @@ const DESCRIPTOR_EXACT: Record<string, number> = {
     priority: 39,
     order: 39,
     sort_order: 39,
-    position: 39,
+    position: 39
 };
 
 // — Tier 12: System timestamps (120–129) ——————————————————————————————
@@ -348,7 +348,7 @@ const SYSTEM_TIMESTAMP_EXACT: Record<string, number> = {
     last_modified: 122,
     deleted_at: 123,
     deletedat: 123,
-    archived_at: 124,
+    archived_at: 124
 };
 
 // — Pattern-based rules for partial matches ———————————————————————————
@@ -370,7 +370,7 @@ const JSON_MAP_NAMES = new Set(["metadata", "meta", "config", "configuration", "
  */
 export function computePropertyPriority(
     columnName: string,
-    ctx: PropertyOrderingContext,
+    ctx: PropertyOrderingContext
 ): number {
     // Normalize camelCase/PascalCase to snake_case, then lowercase
     const col = columnName.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -521,7 +521,7 @@ export function generateCollectionFile(
     joinTables: Set<string>,
     tablesMap: Map<string, TableMeta>,
     enumMap: Map<string, string[]>,
-    sampleData?: Record<string, unknown>[],
+    sampleData?: Record<string, unknown>[]
 ): string {
     const collectionName = humanize(tableName);
     const singular = singularize(collectionName);
@@ -529,8 +529,8 @@ export function generateCollectionFile(
 
     const imports = new Set<string>(['import { PostgresCollection } from "@rebasepro/types";']);
 
-    let propsOutput = ``;
-    let relationsOutput = ``;
+    let propsOutput = "";
+    let relationsOutput = "";
     const orderEntries: PropertyOrderEntry[] = [];
     const propertyBlocks = new Map<string, string>();
     let columnIndex = 0;
@@ -559,7 +559,7 @@ export function generateCollectionFile(
         // ── Data Inference Engine ────────────────────────────────────────────
         let finalPropType = propType;
         let inferenceExtra = "";
-        
+
         if (!isEnumColumn && sampleData && sampleData.length > 0) {
             const values = sampleData.map(r => r[col.column_name]);
             const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name));
@@ -578,11 +578,11 @@ export function generateCollectionFile(
         // Date auto-value heuristics
         if (finalPropType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
-                extra += `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
+                extra += "\n            autoValue: \"on_create\",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
-                extra += `\n            autoValue: "on_update",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },`;
+                extra += "\n            autoValue: \"on_update\",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
-                extra += `\n            autoValue: "on_create",\n            ui: {\n                readOnly: true\n            },`;
+                extra += "\n            autoValue: \"on_create\",\n            ui: {\n                readOnly: true\n            },";
             }
         }
 
@@ -602,7 +602,7 @@ export function generateCollectionFile(
             }
             extra += `\n            of: { name: "${humanize(col.column_name)} Item", type: "${innerType}" },`;
         } else if (finalPropType === "map" && !inferenceExtra.includes("keyValue: true") && !inferenceExtra.includes("properties: {")) {
-            extra += `\n            keyValue: true,`;
+            extra += "\n            keyValue: true,";
         }
 
         // String sub-type heuristics (Fallback if not handled by inference or enum)
@@ -613,16 +613,16 @@ export function generateCollectionFile(
             if (isMedia) {
                 extra += `\n            storage: {\n                storagePath: "${tableName}/${col.column_name}"\n            },`;
             } else if (isUrl) {
-                extra += `\n            ui: {\n                url: true\n            },`;
+                extra += "\n            ui: {\n                url: true\n            },";
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
-                extra += `\n            multiline: true,`;
+                extra += "\n            multiline: true,";
             } else if (colNameLower === "content" || colNameLower === "body") {
-                extra += `\n            multiline: true,\n            markdown: true,`;
+                extra += "\n            multiline: true,\n            markdown: true,";
             } else if (col.data_type === "text") {
-                extra += `\n            multiline: true,`;
+                extra += "\n            multiline: true,";
             }
         }
-        
+
         // Append inference results
         if (inferenceExtra) {
             extra += inferenceExtra;
@@ -634,11 +634,11 @@ export function generateCollectionFile(
             if (isCompositePk) {
                 extra += `\n            // Part of composite primary key (${meta.pks.join(", ")})`;
             } else if (finalPropType === "number" && !inferenceExtra.includes("isId:")) {
-                extra += `\n            isId: "increment",`;
+                extra += "\n            isId: \"increment\",";
             } else if (col.data_type.toLowerCase() === "uuid" && !inferenceExtra.includes("isId:")) {
-                extra += `\n            isId: "uuid",`;
+                extra += "\n            isId: \"uuid\",";
             } else if (!inferenceExtra.includes("isId:")) {
-                extra += `\n            isId: "uuid", // Verify if this is a UUID or CUID`;
+                extra += "\n            isId: \"uuid\", // Verify if this is a UUID or CUID";
             }
         }
 
@@ -651,7 +651,7 @@ export function generateCollectionFile(
             if (extra.includes("validation: {")) {
                 extra = extra.replace("validation: {", "validation: {\n                required: true,");
             } else {
-                extra += `\n            validation: {\n                required: true\n            },`;
+                extra += "\n            validation: {\n                required: true\n            },";
             }
         }
 
@@ -665,8 +665,8 @@ export function generateCollectionFile(
                 isEnum: isEnumColumn,
                 isStorage: extra.includes("storage: {") || inferenceExtra.includes("storage: {"),
                 pgDataType: col.data_type,
-                originalIndex: currentIndex,
-            },
+                originalIndex: currentIndex
+            }
         });
 
         propertyBlocks.set(col.column_name, `
@@ -696,8 +696,8 @@ export function generateCollectionFile(
                     isEnum: false,
                     isStorage: false,
                     pgDataType: "",
-                    originalIndex: columnIndex++,
-                },
+                    originalIndex: columnIndex++
+                }
             });
 
             const targetCollectionCamel = toCollectionVarName(targetTableName);
@@ -794,7 +794,7 @@ export function generateCollectionFile(
             if (direction === "owning" && thisFk) {
                 throughCode = `\n            through: {\n                table: "${jt}",\n                sourceColumn: "${thisFk.column_name}",\n                targetColumn: "${otherFk.column_name}"\n            },`;
             } else if (direction === "inverse") {
-                throughCode = `\n            // Make sure the target collection configures the 'through' property.`;
+                throughCode = "\n            // Make sure the target collection configures the 'through' property.";
             }
 
             relationsOutput += `
@@ -860,10 +860,10 @@ export function mergeIndexContent(existingContent: string, newFileNames: string[
         [...existingContent.matchAll(/import\s+([a-zA-Z0-9_]+)\s+from\s+"\.\/([^"]+)"/g)].map((m) => m[2])
     );
     const sorted = [...newFileNames].sort();
-    
+
     let newImports = "";
     let newElements = "";
-    
+
     for (const f of sorted) {
         if (!existingImports.has(f)) {
             const varName = toCollectionVarName(f);
@@ -871,9 +871,9 @@ export function mergeIndexContent(existingContent: string, newFileNames: string[
             newElements += `    ${varName},\n`;
         }
     }
-    
+
     if (!newImports) return existingContent;
-    
+
     // Simple injection logic:
     // Add new imports below the last import or at the top
     const importRegex = /import\s+.*?;/g;
@@ -882,7 +882,7 @@ export function mergeIndexContent(existingContent: string, newFileNames: string[
     while ((match = importRegex.exec(existingContent)) !== null) {
         lastImportMatch = match;
     }
-    
+
     let contentWithImports = existingContent;
     if (lastImportMatch) {
         const pos = lastImportMatch.index + lastImportMatch[0].length;
@@ -890,7 +890,7 @@ export function mergeIndexContent(existingContent: string, newFileNames: string[
     } else {
         contentWithImports = newImports + "\n" + existingContent;
     }
-    
+
     // Inject into the `collections = [...]` array
     const arrayRegex = /export\s+const\s+collections\s*=\s*\[([\s\S]*?)\];/;
     return contentWithImports.replace(arrayRegex, (fullMatch, arrayContent) => {

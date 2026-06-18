@@ -15,7 +15,7 @@ export class InsightsCache {
     private cache = new Map<string, CacheEntry>();
     private inflight = new Map<string, Promise<InsightDataResult>>();
 
-    constructor(private ttl: number = 60_000) {}
+    constructor(private ttl = 60_000) {}
 
     get(key: string): InsightDataResult | null {
         const entry = this.cache.get(key);
@@ -28,7 +28,8 @@ export class InsightsCache {
     }
 
     set(key: string, data: InsightDataResult): void {
-        this.cache.set(key, { data, timestamp: Date.now() });
+        this.cache.set(key, { data,
+timestamp: Date.now() });
         this.inflight.delete(key);
     }
 

@@ -287,7 +287,7 @@ export function buildCollectionFromTableMetadata(
                 securityRules.push({
                     name: policy.policy_name,
                     operations,
-                    roles: policy.roles ?? [],
+                    roles: policy.roles ?? []
                 });
             }
         }

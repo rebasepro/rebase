@@ -340,7 +340,8 @@ code: DEFAULT_CODE };
                 baseUrl: apiUrl,
                 token: undefined
             });
-            return { client, isScoped: true };
+            return { client,
+isScoped: true };
         }
 
         // If not running as another user safely reuse the application's global client.
@@ -348,7 +349,8 @@ code: DEFAULT_CODE };
             if (!rebaseClient) {
                 throw new Error("Application client is not initialized.");
             }
-            return { client: rebaseClient, isScoped: false };
+            return { client: rebaseClient,
+isScoped: false };
         }
 
         // Get the current auth token

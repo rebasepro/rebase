@@ -41,8 +41,8 @@ export function VectorFieldBinding({
     };
 
     // Extract array value from the custom { __type: "Vector", value: number[] } wrapper
-    const arrayValue = isVectorObject(value) 
-        ? value.value 
+    const arrayValue = isVectorObject(value)
+        ? value.value
         : (Array.isArray(value) ? value : []);
 
     const [textValue, setTextValue] = useState(() => arrayValue.join(", "));
@@ -108,7 +108,7 @@ export function VectorFieldBinding({
                             <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-2.5">
                                     {/* Status Dot */}
-                                    <div className={`w-2.5 h-2.5 rounded-full ${isPopulated ? 'bg-emerald-500 animate-pulse' : 'bg-surface-300 dark:bg-surface-600'}`} />
+                                    <div className={`w-2.5 h-2.5 rounded-full ${isPopulated ? "bg-emerald-500 animate-pulse" : "bg-surface-300 dark:bg-surface-600"}`} />
                                     <span className="text-sm font-semibold text-text-primary dark:text-text-primary-dark">
                                         {isPopulated ? `${arrayValue.length} Dimensions` : "Empty Vector"}
                                     </span>

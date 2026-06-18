@@ -68,7 +68,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         if (!validatePermissions(permissions)) {
             throw ApiError.badRequest(
                 "Permissions must be an array of { collection: string, operations: ('read' | 'write' | 'delete')[] }",
-                "INVALID_INPUT",
+                "INVALID_INPUT"
             );
         }
 
@@ -97,7 +97,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
             name: name.trim(),
             permissions: permissions as ApiKeyPermission[],
             rate_limit: (rate_limit as number | null) ?? null,
-            expires_at: (expires_at as string | null) ?? null,
+            expires_at: (expires_at as string | null) ?? null
         };
 
         const keyWithSecret = await store.createApiKey(request, createdBy);
@@ -134,7 +134,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
             if (!validatePermissions(permissions)) {
                 throw ApiError.badRequest(
                     "Permissions must be an array of { collection: string, operations: ('read' | 'write' | 'delete')[] }",
-                    "INVALID_INPUT",
+                    "INVALID_INPUT"
                 );
             }
         }

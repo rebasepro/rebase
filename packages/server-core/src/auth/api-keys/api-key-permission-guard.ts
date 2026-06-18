@@ -52,7 +52,7 @@ export function httpMethodToOperation(method: string): ApiKeyOperation {
 export function isOperationAllowed(
     permissions: ApiKeyPermission[],
     collection: string,
-    operation: ApiKeyOperation,
+    operation: ApiKeyOperation
 ): boolean {
     for (const perm of permissions) {
         const collectionMatch = perm.collection === "*" || perm.collection === collection;

@@ -51,7 +51,8 @@ describe("httpMethodToOperation", () => {
 describe("isOperationAllowed", () => {
     it("allows operation with exact collection match", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "users", operations: ["read", "write"] }
+            { collection: "users",
+operations: ["read", "write"] }
         ];
         expect(isOperationAllowed(permissions, "users", "read")).toBe(true);
         expect(isOperationAllowed(permissions, "users", "write")).toBe(true);
@@ -59,7 +60,8 @@ describe("isOperationAllowed", () => {
 
     it("denies operation not in the operations list", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "users", operations: ["read"] }
+            { collection: "users",
+operations: ["read"] }
         ];
         expect(isOperationAllowed(permissions, "users", "write")).toBe(false);
         expect(isOperationAllowed(permissions, "users", "delete")).toBe(false);
@@ -67,14 +69,16 @@ describe("isOperationAllowed", () => {
 
     it("denies operation for non-matching collection", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "users", operations: ["read", "write", "delete"] }
+            { collection: "users",
+operations: ["read", "write", "delete"] }
         ];
         expect(isOperationAllowed(permissions, "posts", "read")).toBe(false);
     });
 
     it("allows wildcard collection '*' to match any collection", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "*", operations: ["read"] }
+            { collection: "*",
+operations: ["read"] }
         ];
         expect(isOperationAllowed(permissions, "users", "read")).toBe(true);
         expect(isOperationAllowed(permissions, "posts", "read")).toBe(true);
@@ -83,7 +87,8 @@ describe("isOperationAllowed", () => {
 
     it("wildcard collection still checks operations", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "*", operations: ["read"] }
+            { collection: "*",
+operations: ["read"] }
         ];
         expect(isOperationAllowed(permissions, "users", "write")).toBe(false);
         expect(isOperationAllowed(permissions, "users", "delete")).toBe(false);
@@ -95,9 +100,12 @@ describe("isOperationAllowed", () => {
 
     it("checks all permission entries and grants if any match", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "users", operations: ["read"] },
-            { collection: "posts", operations: ["write"] },
-            { collection: "comments", operations: ["read", "write", "delete"] }
+            { collection: "users",
+operations: ["read"] },
+            { collection: "posts",
+operations: ["write"] },
+            { collection: "comments",
+operations: ["read", "write", "delete"] }
         ];
         expect(isOperationAllowed(permissions, "users", "read")).toBe(true);
         expect(isOperationAllowed(permissions, "posts", "write")).toBe(true);
@@ -108,8 +116,10 @@ describe("isOperationAllowed", () => {
 
     it("handles overlapping permissions correctly", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "users", operations: ["read"] },
-            { collection: "users", operations: ["write"] }
+            { collection: "users",
+operations: ["read"] },
+            { collection: "users",
+operations: ["write"] }
         ];
         expect(isOperationAllowed(permissions, "users", "read")).toBe(true);
         expect(isOperationAllowed(permissions, "users", "write")).toBe(true);
@@ -118,8 +128,10 @@ describe("isOperationAllowed", () => {
 
     it("handles mixed wildcard and specific permissions", () => {
         const permissions: ApiKeyPermission[] = [
-            { collection: "*", operations: ["read"] },
-            { collection: "users", operations: ["write", "delete"] }
+            { collection: "*",
+operations: ["read"] },
+            { collection: "users",
+operations: ["write", "delete"] }
         ];
         // Wildcard read for everything
         expect(isOperationAllowed(permissions, "posts", "read")).toBe(true);

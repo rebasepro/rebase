@@ -63,9 +63,9 @@ describe("RebaseWebSocketClient", () => {
         MockWebSocket.instances = [];
         createdClients = [];
         jest.useFakeTimers();
-        jest.spyOn(console, 'log').mockImplementation(() => {});
-        jest.spyOn(console, 'error').mockImplementation(() => {});
-        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        jest.spyOn(console, "log").mockImplementation(() => {});
+        jest.spyOn(console, "error").mockImplementation(() => {});
+        jest.spyOn(console, "warn").mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -2182,7 +2182,8 @@ path: "posts" }]
                 .mockResolvedValueOnce("old-token")
                 .mockResolvedValueOnce("new-token");
 
-            const client = createClient({ getAuthToken, onUnauthorized });
+            const client = createClient({ getAuthToken,
+onUnauthorized });
             jest.runAllTimers();
             await Promise.resolve();
 
@@ -2208,7 +2209,8 @@ path: "posts" }]
             ws.onmessage!({ data: JSON.stringify({
                 type: "ERROR",
                 requestId: dataMsg.requestId,
-                payload: { error: { message: "Unauthorized token", code: "UNAUTHORIZED" } }
+                payload: { error: { message: "Unauthorized token",
+code: "UNAUTHORIZED" } }
             }) });
 
             // Allow async handlers to run (onUnauthorized and handleAuthFailure)
@@ -2252,7 +2254,8 @@ path: "posts" }]
                 .mockResolvedValueOnce("old-token")
                 .mockResolvedValueOnce("new-token");
 
-            const client = createClient({ getAuthToken, onUnauthorized });
+            const client = createClient({ getAuthToken,
+onUnauthorized });
             jest.runAllTimers();
             await Promise.resolve();
 
@@ -2281,7 +2284,8 @@ path: "posts" }]
             ws.onmessage!({ data: JSON.stringify({
                 type: "ERROR",
                 subscriptionId: subMsg.payload.subscriptionId,
-                payload: { error: { message: "unauthorized", code: "UNAUTHORIZED" } }
+                payload: { error: { message: "unauthorized",
+code: "UNAUTHORIZED" } }
             }) });
 
             await flushMicrotasks();

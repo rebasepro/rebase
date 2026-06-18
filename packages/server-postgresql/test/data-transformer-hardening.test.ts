@@ -30,13 +30,16 @@ function makeCollection(
 // ─────────────────────────────────────────────────────────────
 describe("serializeDataToServer typed return", () => {
     const properties: Properties = {
-        title: { type: "string", name: "Title" } as Property,
-        count: { type: "number", name: "Count" } as Property
+        title: { type: "string",
+name: "Title" } as Property,
+        count: { type: "number",
+name: "Count" } as Property
     };
 
     it("returns a SerializedEntityData object with scalarData, not raw values", () => {
         const result = serializeDataToServer(
-            { title: "Hello", count: 5 },
+            { title: "Hello",
+count: 5 },
             properties
         );
         expect(result).toHaveProperty("scalarData");
@@ -65,7 +68,8 @@ describe("serializeDataToServer typed return", () => {
 
     it("passes scalar values through correctly", () => {
         const result = serializeDataToServer(
-            { title: "Hello World", count: 42 },
+            { title: "Hello World",
+count: 42 },
             properties
         );
         expect(result.scalarData.title).toBe("Hello World");
@@ -86,7 +90,8 @@ describe("serializeDataToServer typed return", () => {
 // ─────────────────────────────────────────────────────────────
 describe("parsePropertyFromServer relation factory", () => {
     const targetCollection = makeCollection("authors", {
-        name: { type: "string", name: "Name" } as Property
+        name: { type: "string",
+name: "Name" } as Property
     });
 
     const collection = makeCollection("posts", {
@@ -125,14 +130,18 @@ describe("parsePropertyFromServer relation factory", () => {
 // ─────────────────────────────────────────────────────────────
 describe("normalizeDbValues", () => {
     const collection = makeCollection("items", {
-        title: { type: "string", name: "Title" } as Property,
-        price: { type: "number", name: "Price" } as Property,
-        created_at: { type: "date", name: "Created" } as Property
+        title: { type: "string",
+name: "Title" } as Property,
+        price: { type: "number",
+name: "Price" } as Property,
+        created_at: { type: "date",
+name: "Created" } as Property
     });
 
     it("coerces string numbers to actual numbers", () => {
         const result = normalizeDbValues(
-            { title: "Widget", price: "19.99" } as any,
+            { title: "Widget",
+price: "19.99" } as any,
             collection
         );
         expect(result.price).toBe(19.99);
@@ -141,7 +150,8 @@ describe("normalizeDbValues", () => {
     it("converts Date objects to { __type: 'date', value: ISO } format", () => {
         const date = new Date("2024-01-15T10:30:00Z");
         const result = normalizeDbValues(
-            { title: "Widget", created_at: date } as any,
+            { title: "Widget",
+created_at: date } as any,
             collection
         );
         expect(result.created_at).toEqual({
@@ -152,7 +162,8 @@ describe("normalizeDbValues", () => {
 
     it("strips unknown database columns not in properties", () => {
         const result = normalizeDbValues(
-            { title: "Widget", internal_counter: 999 } as any,
+            { title: "Widget",
+internal_counter: 999 } as any,
             collection
         );
         expect(result).not.toHaveProperty("internal_counter");
@@ -184,11 +195,13 @@ describe("normalizeDbValues", () => {
                     relationName: "customer"
                 }
             } as unknown as Property,
-            total: { type: "number", name: "Total" } as Property
+            total: { type: "number",
+name: "Total" } as Property
         });
 
         const result = normalizeDbValues(
-            { customer: "some-id", total: 42 } as any,
+            { customer: "some-id",
+total: 42 } as any,
             collectionWithRelation
         );
         // Relation properties should be skipped
@@ -257,9 +270,9 @@ describe("getColumnMeta type guard", () => {
 
     it("returns undefined for wrong-typed properties instead of passing them through", () => {
         const badCol = {
-            columnType: 42,       // should be string
-            dataType: true,       // should be string
-            primary: "yes"        // should be boolean
+            columnType: 42, // should be string
+            dataType: true, // should be string
+            primary: "yes" // should be boolean
         };
         const meta = getColumnMeta(badCol as any);
         expect(meta.columnType).toBeUndefined();
@@ -274,7 +287,8 @@ describe("getColumnMeta type guard", () => {
 describe("normalizeDbValues FK column preservation", () => {
     it("preserves internal FK columns as primitives when not defined as properties", () => {
         const targetCollection = makeCollection("categories", {
-            name: { type: "string", name: "Name" } as Property
+            name: { type: "string",
+name: "Name" } as Property
         });
 
         const categoryRelation = {
@@ -286,7 +300,8 @@ describe("normalizeDbValues FK column preservation", () => {
         };
 
         const collection = makeCollection("products", {
-            title: { type: "string", name: "Title" } as Property,
+            title: { type: "string",
+name: "Title" } as Property,
             category: {
                 type: "relation",
                 name: "Category",
@@ -295,7 +310,9 @@ describe("normalizeDbValues FK column preservation", () => {
         }, [categoryRelation] as any);
 
         const result = normalizeDbValues(
-            { title: "Widget", category_id: "cat-123", category: "ignored" } as any,
+            { title: "Widget",
+category_id: "cat-123",
+category: "ignored" } as any,
             collection
         );
 
@@ -309,7 +326,8 @@ describe("normalizeDbValues FK column preservation", () => {
 
     it("preserves numeric FK columns as numbers", () => {
         const targetCollection = makeCollection("authors", {
-            name: { type: "string", name: "Name" } as Property
+            name: { type: "string",
+name: "Name" } as Property
         });
 
         const authorRelation = {
@@ -321,7 +339,8 @@ describe("normalizeDbValues FK column preservation", () => {
         };
 
         const collection = makeCollection("books", {
-            title: { type: "string", name: "Title" } as Property,
+            title: { type: "string",
+name: "Title" } as Property,
             author: {
                 type: "relation",
                 name: "Author",
@@ -330,7 +349,8 @@ describe("normalizeDbValues FK column preservation", () => {
         }, [authorRelation] as any);
 
         const result = normalizeDbValues(
-            { title: "Book", author_id: 42 } as any,
+            { title: "Book",
+author_id: 42 } as any,
             collection
         );
         expect(result.author_id).toBe(42);
@@ -338,7 +358,8 @@ describe("normalizeDbValues FK column preservation", () => {
 
     it("converts null FK columns to null", () => {
         const targetCollection = makeCollection("authors", {
-            name: { type: "string", name: "Name" } as Property
+            name: { type: "string",
+name: "Name" } as Property
         });
 
         const authorRelation = {
@@ -350,7 +371,8 @@ describe("normalizeDbValues FK column preservation", () => {
         };
 
         const collection = makeCollection("books", {
-            title: { type: "string", name: "Title" } as Property,
+            title: { type: "string",
+name: "Title" } as Property,
             author: {
                 type: "relation",
                 name: "Author",
@@ -359,7 +381,8 @@ describe("normalizeDbValues FK column preservation", () => {
         }, [authorRelation] as any);
 
         const result = normalizeDbValues(
-            { title: "Book", author_id: null } as any,
+            { title: "Book",
+author_id: null } as any,
             collection
         );
         expect(result.author_id).toBeNull();
@@ -372,13 +395,18 @@ describe("normalizeDbValues FK column preservation", () => {
 describe("structural dunder guard", () => {
     it("scalarData never contains any __ prefixed keys", () => {
         const properties: Properties = {
-            title: { type: "string", name: "Title" } as Property,
-            count: { type: "number", name: "Count" } as Property,
-            active: { type: "boolean", name: "Active" } as Property
+            title: { type: "string",
+name: "Title" } as Property,
+            count: { type: "number",
+name: "Count" } as Property,
+            active: { type: "boolean",
+name: "Active" } as Property
         };
 
         const result = serializeDataToServer(
-            { title: "Test", count: 10, active: true },
+            { title: "Test",
+count: 10,
+active: true },
             properties
         );
 
@@ -388,11 +416,13 @@ describe("structural dunder guard", () => {
 
     it("scalarData never contains any __ prefixed keys even with relation properties", () => {
         const targetCollection = makeCollection("tags", {
-            label: { type: "string", name: "Label" } as Property
+            label: { type: "string",
+name: "Label" } as Property
         });
 
         const properties: Properties = {
-            title: { type: "string", name: "Title" } as Property,
+            title: { type: "string",
+name: "Title" } as Property,
             tag: {
                 type: "relation",
                 name: "Tag",
@@ -407,7 +437,10 @@ describe("structural dunder guard", () => {
         };
 
         const result = serializeDataToServer(
-            { title: "Test", tag: { id: "t1", path: "tags", __type: "relation" } },
+            { title: "Test",
+tag: { id: "t1",
+path: "tags",
+__type: "relation" } },
             properties
         );
 
@@ -467,7 +500,8 @@ describe("parsePropertyFromServer binary parsing", () => {
 
     it("parses Buffer object (JSON serialization) into a base64 data URL string", () => {
         const property = targetCollection.properties.data as Property;
-        const bufferObj = { type: "Buffer", data: Array.from(Buffer.from("hello")) };
+        const bufferObj = { type: "Buffer",
+data: Array.from(Buffer.from("hello")) };
         const result = parsePropertyFromServer(bufferObj, property, targetCollection, "data");
         expect(result).toBe("data:application/octet-stream;base64,aGVsbG8=");
     });

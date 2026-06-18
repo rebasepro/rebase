@@ -27,7 +27,9 @@ function execa(command: string, args: string[], options: any = {}) {
     const promise = new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
         cp.on("close", (code: number | null) => {
             if (code === 0 || code === null) {
-                resolve({ stdout: stdoutData, stderr: stderrData, exitCode: code || 0 });
+                resolve({ stdout: stdoutData,
+stderr: stderrData,
+exitCode: code || 0 });
             } else {
                 reject(new Error(`Command failed with exit code ${code}: ${command} ${args.join(" ")}\n${stderrData}`));
             }
@@ -141,7 +143,8 @@ function packLocalPackages(projectPath: string): Record<string, string> {
         const tgzFile = `rebasepro-${pkg}-${tempVersion}.tgz`;
         try {
             // Run pnpm pack
-            execSync("pnpm pack", { cwd: pkgDir, stdio: "pipe" });
+            execSync("pnpm pack", { cwd: pkgDir,
+stdio: "pipe" });
         } finally {
             // Restore original package.json
             fs.writeFileSync(pkgPath, origPkgJson, "utf-8");
@@ -178,7 +181,7 @@ function rewritePackagesToTarballs(projectPath: string, packageTarballs: Record<
     for (const pkgPath of pkgPaths) {
         if (!fs.existsSync(pkgPath)) continue;
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        
+
         const isRoot = pkgPath === path.join(projectPath, "package.json");
 
         const updateDeps = (deps: Record<string, string> | undefined) => {
@@ -210,7 +213,7 @@ function rewritePackagesToTarballs(projectPath: string, packageTarballs: Record<
             if (!pkg.pnpm) {
                 pkg.pnpm = {};
             }
-            
+
             // Build relative path overrides for @rebasepro/* packages
             const rootOverrides: Record<string, string> = {};
             for (const tarballFile of fs.readdirSync(tarballsDir)) {
@@ -268,7 +271,7 @@ function configureServiceKey(projectPath: string, key: string) {
         content += `\nREBASE_SERVICE_KEY=${key}\n`;
     }
     fs.writeFileSync(envPath, content, "utf-8");
-    console.log(`🔑 Configured REBASE_SERVICE_KEY in .env file`);
+    console.log("🔑 Configured REBASE_SERVICE_KEY in .env file");
 }
 
 function configureAllowLocalhostInEnv(projectPath: string) {
@@ -276,12 +279,12 @@ function configureAllowLocalhostInEnv(projectPath: string) {
     if (!fs.existsSync(envPath)) return;
     let content = fs.readFileSync(envPath, "utf-8");
     if (content.includes("ALLOW_LOCALHOST_IN_PRODUCTION=")) {
-        content = content.replace(/#?\s*ALLOW_LOCALHOST_IN_PRODUCTION=.*/g, `ALLOW_LOCALHOST_IN_PRODUCTION=true`);
+        content = content.replace(/#?\s*ALLOW_LOCALHOST_IN_PRODUCTION=.*/g, "ALLOW_LOCALHOST_IN_PRODUCTION=true");
     } else {
-        content += `\nALLOW_LOCALHOST_IN_PRODUCTION=true\n`;
+        content += "\nALLOW_LOCALHOST_IN_PRODUCTION=true\n";
     }
     fs.writeFileSync(envPath, content, "utf-8");
-    console.log(`🔓 Configured ALLOW_LOCALHOST_IN_PRODUCTION=true in .env file`);
+    console.log("🔓 Configured ALLOW_LOCALHOST_IN_PRODUCTION=true in .env file");
 }
 
 function modifyDockerComposePort(projectPath: string) {
@@ -303,7 +306,7 @@ function modifyDockerComposePort(projectPath: string) {
 function createBooksCollection(projectPath: string) {
     console.log("📚 Creating new 'books' collection...");
     const collectionsDir = path.join(projectPath, "config", "collections");
-    
+
     const booksContent = `import { EntityCollection } from "@rebasepro/types";
 
 const booksCollection: EntityCollection = {
@@ -347,7 +350,7 @@ export default booksCollection;
 
     const indexPath = path.join(collectionsDir, "index.ts");
     let indexContent = fs.readFileSync(indexPath, "utf-8");
-    indexContent = `import booksCollection from "./books.js";\n` + indexContent;
+    indexContent = "import booksCollection from \"./books.js\";\n" + indexContent;
     indexContent = indexContent.replace(
         "export const collections = [",
         "export const collections = [booksCollection, "
@@ -467,7 +470,8 @@ async function run() {
     // Clean up old directory if it exists
     if (fs.existsSync(projectPath)) {
         console.log(`Cleaning up old project directory: ${projectPath}...`);
-        fs.rmSync(projectPath, { recursive: true, force: true });
+        fs.rmSync(projectPath, { recursive: true,
+force: true });
     }
 
     console.log("Starting temporary Postgres database container...");
@@ -553,7 +557,7 @@ async function run() {
         }
 
         const schemaContent = fs.readFileSync(schemaFilePath, "utf-8");
-        
+
         // Assert that postsRelations is generated
         if (!schemaContent.includes("postsRelations")) {
             throw new Error("E2E Failure: Generated schema does not contain 'postsRelations'!");
@@ -652,7 +656,8 @@ async function run() {
         console.log("\n🌐 Step 8: Dev Server is ready. Starting browser automation...");
         const browser = await chromium.launch({ headless: true });
         const context = await browser.newContext({
-            viewport: { width: 1280, height: 800 }
+            viewport: { width: 1280,
+height: 800 }
         });
         const page = await context.newPage();
 
@@ -669,7 +674,8 @@ async function run() {
 
             // Verify welcome screen
             const welcomeText = page.locator("text=Welcome!");
-            await welcomeText.waitFor({ state: "visible", timeout: 90000 });
+            await welcomeText.waitFor({ state: "visible",
+timeout: 90000 });
             await page.screenshot({ path: path.join(screenshotDir, "1-bootstrap-welcome.png") });
 
             // Fill registration form
@@ -682,7 +688,7 @@ async function run() {
             // Click Create Account
             console.log("Submitting Admin Bootstrap registration form...");
             await page.click('button[type="submit"]');
-            
+
             // Wait for dashboard redirect
             console.log("Waiting for dashboard redirect...");
             await page.waitForTimeout(6000);
@@ -691,11 +697,13 @@ async function run() {
             // Verify cards
             console.log("Verifying admin dashboard cards...");
             const rolesCard = page.locator("text=Roles").last();
-            await rolesCard.waitFor({ state: "visible", timeout: 15000 });
+            await rolesCard.waitFor({ state: "visible",
+timeout: 15000 });
             console.log("Confirmed: 'Roles' card is visible on dashboard.");
 
             const booksCard = page.locator("text=Books").last();
-            await booksCard.waitFor({ state: "visible", timeout: 15000 });
+            await booksCard.waitFor({ state: "visible",
+timeout: 15000 });
             console.log("Confirmed: 'Books' card is visible on dashboard.");
 
             // Navigate to Books collection
@@ -706,8 +714,9 @@ async function run() {
 
             // Add a new book
             console.log("Adding a new book entry...");
-            const addButton = page.locator('button', { hasText: /Add/i }).first();
-            await addButton.waitFor({ state: "visible", timeout: 10000 });
+            const addButton = page.locator("button", { hasText: /Add/i }).first();
+            await addButton.waitFor({ state: "visible",
+timeout: 10000 });
             await addButton.click();
             await page.waitForTimeout(2000);
             await page.screenshot({ path: path.join(screenshotDir, "6-add-book-drawer.png") });
@@ -721,19 +730,21 @@ async function run() {
             // Click Create/Save button
             console.log("Saving the new book entry...");
             const createButton = page.locator('button[type="submit"]', { hasText: /Create/i }).filter({ visible: true }).first();
-            await createButton.waitFor({ state: "visible", timeout: 10000 });
+            await createButton.waitFor({ state: "visible",
+timeout: 10000 });
             await createButton.click();
 
             // Wait for entry to show in table
             console.log("Verifying book row in table...");
-            const tableRow = page.locator('text=The Great Gatsby');
-            await tableRow.waitFor({ state: "visible", timeout: 10000 });
+            const tableRow = page.locator("text=The Great Gatsby");
+            await tableRow.waitFor({ state: "visible",
+timeout: 10000 });
             await page.screenshot({ path: path.join(screenshotDir, "8-book-added-successfully.png") });
             console.log("Confirmed: Book added successfully and visible in table.");
 
             // 8. Hit the API using service key authentication
             console.log("\n⚡ Step 8: Hitting the Local REST API directly...");
-            const apiResponse = await fetch(`http://localhost:3099/api/data/books`, {
+            const apiResponse = await fetch("http://localhost:3099/api/data/books", {
                 headers: {
                     "Authorization": `Bearer ${serviceKey}`
                 }
@@ -830,21 +841,25 @@ async function run() {
         } finally {
             console.log("--- Docker Container Logs (backend) ---");
             try {
-                execSync("docker compose logs backend", { cwd: projectPath, stdio: "inherit" });
+                execSync("docker compose logs backend", { cwd: projectPath,
+stdio: "inherit" });
             } catch (err: any) {
                 console.warn("Failed to get backend logs:", err.message);
             }
             console.log("--- Docker Container Logs (db) ---");
             try {
-                execSync("docker compose logs db", { cwd: projectPath, stdio: "inherit" });
+                execSync("docker compose logs db", { cwd: projectPath,
+stdio: "inherit" });
             } catch (err: any) {
                 console.warn("Failed to get db logs:", err.message);
             }
             try {
                 console.log("--- Docker DB Tables in 'public' schema ---");
-                execSync("docker compose exec db psql -U rebase -d rebase -c '\\dt'", { cwd: projectPath, stdio: "inherit" });
+                execSync("docker compose exec db psql -U rebase -d rebase -c '\\dt'", { cwd: projectPath,
+stdio: "inherit" });
                 console.log("--- Docker DB Tables in 'rebase' schema ---");
-                execSync("docker compose exec db psql -U rebase -d rebase -c '\\dt rebase.*'", { cwd: projectPath, stdio: "inherit" });
+                execSync("docker compose exec db psql -U rebase -d rebase -c '\\dt rebase.*'", { cwd: projectPath,
+stdio: "inherit" });
             } catch (err: any) {
                 console.warn("Failed to query DB tables:", err.message);
             }

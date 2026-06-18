@@ -78,7 +78,6 @@ type ListColumnDef = {
 };
 
 
-
 /**
  * Get row padding/spacing classes based on size
  */
@@ -501,7 +500,8 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
         const customEntityActions = (collection.entityActions ?? [])
             .map(action => resolveEntityAction(action, customizationController.entityActions))
             .filter(Boolean) as EntityAction<M>[];
-        const allActions = getActionsForEntity({ entity, customEntityActions });
+        const allActions = getActionsForEntity({ entity,
+customEntityActions });
         return allActions.filter(a => a.showActionsInListView);
     }, [getActionsForEntity, collection.entityActions, customizationController.entityActions]);
 
@@ -519,9 +519,15 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
 
     // Keep mutable refs for values used in the scroll handler to avoid
     // re-attaching the listener every time pagination state changes.
-    const paginationStateRef = useRef({ paginationEnabled, noMoreToLoad, itemCount, pageSize });
+    const paginationStateRef = useRef({ paginationEnabled,
+noMoreToLoad,
+itemCount,
+pageSize });
     useEffect(() => {
-        paginationStateRef.current = { paginationEnabled, noMoreToLoad, itemCount, pageSize };
+        paginationStateRef.current = { paginationEnabled,
+noMoreToLoad,
+itemCount,
+pageSize };
     }, [paginationEnabled, noMoreToLoad, itemCount, pageSize]);
 
     useEffect(() => {
@@ -614,9 +620,13 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             ) : (
                 /* Spacer with total height — no internal scroll.
                    The nearest scrollable ancestor provides the scrollbar. */
-                <div style={{ height: totalHeight + footerHeight, position: "relative" }}>
+                <div style={{ height: totalHeight + footerHeight,
+position: "relative" }}>
                     {/* Windowed rows */}
-                    <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
+                    <div style={{ position: "absolute",
+top: offsetY,
+left: 0,
+right: 0 }}>
                         {visibleData.map((entity, i) => {
                             const actualIndex = startIndex + i;
                             const isLast = actualIndex === data.length - 1;
@@ -659,7 +669,10 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     {dataLoading && (
                         <div
                             className="flex items-center justify-center py-3"
-                            style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
+                            style={{ position: "absolute",
+top: totalHeight,
+left: 0,
+right: 0 }}
                         >
                             <CircularProgress size="small"/>
                         </div>
@@ -667,7 +680,10 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
                     {!dataLoading && noMoreToLoad && data.length > 0 && (
                         <div
                             className="flex items-center justify-center py-2 dark:bg-surface-900"
-                            style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
+                            style={{ position: "absolute",
+top: totalHeight,
+left: 0,
+right: 0 }}
                         >
                             <Typography variant="caption" color="secondary">
                                 All {data.length} entries loaded

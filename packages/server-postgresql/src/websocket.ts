@@ -33,7 +33,6 @@ interface ClientSession {
 }
 
 
-
 /** Maximum messages per client per window */
 const WS_RATE_LIMIT = 2000;
 /** Rate limit window in milliseconds (60 seconds) */
@@ -170,14 +169,14 @@ code } }
                             const adapterUser = authAdapter.verifyToken
                                 ? await authAdapter.verifyToken(token)
                                 : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
-                                    headers: { Authorization: `Bearer ${token}` },
+                                    headers: { Authorization: `Bearer ${token}` }
                                 }));
 
                             if (adapterUser) {
                                 verifiedUser = {
                                     userId: adapterUser.uid,
                                     roles: adapterUser.roles,
-                                    isAdmin: adapterUser.isAdmin,
+                                    isAdmin: adapterUser.isAdmin
                                 };
                             }
                         } catch {
@@ -190,7 +189,7 @@ code } }
                             verifiedUser = {
                                 userId: jwtPayload.userId,
                                 roles: jwtPayload.roles ?? [],
-                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
+                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin")
                             };
                         }
                     }
@@ -205,7 +204,8 @@ code } }
                         ws.send(JSON.stringify({
                             type: "AUTH_SUCCESS",
                             requestId,
-                            payload: { userId: verifiedUser.userId, roles: verifiedUser.roles }
+                            payload: { userId: verifiedUser.userId,
+roles: verifiedUser.roles }
                         }));
                         wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${verifiedUser.userId}`);
                     } else {
@@ -576,8 +576,10 @@ colors: true }));
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user
-                            ? { userId: session.user.userId, roles: session.user.roles ?? [] }
-                            : { userId: "anon", roles: ["anon"] };
+                            ? { userId: session.user.userId,
+roles: session.user.roles ?? [] }
+                            : { userId: "anon",
+roles: ["anon"] };
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {
                             type,

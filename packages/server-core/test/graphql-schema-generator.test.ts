@@ -31,7 +31,7 @@ describe("GraphQLSchemaGenerator", () => {
             checkUniqueField: jest.fn(),
             countEntities: jest.fn(),
             withAuth: jest.fn(),
-            admin: {} as any,
+            admin: {} as any
         } as unknown as jest.Mocked<DataDriver>;
 
         collections = [
@@ -41,22 +41,31 @@ describe("GraphQLSchemaGenerator", () => {
                 singularName: "Post",
                 description: "Blog posts",
                 properties: {
-                    title: { name: "Title", type: "string", validation: { required: true } },
-                    body: { name: "Body", type: "string" },
-                    views: { name: "Views", type: "number" },
-                    published: { name: "Published", type: "boolean" },
-                    createdAt: { name: "Created At", type: "date" },
-                },
+                    title: { name: "Title",
+type: "string",
+validation: { required: true } },
+                    body: { name: "Body",
+type: "string" },
+                    views: { name: "Views",
+type: "number" },
+                    published: { name: "Published",
+type: "boolean" },
+                    createdAt: { name: "Created At",
+type: "date" }
+                }
             } as unknown as EntityCollection,
             {
                 slug: "authors",
                 name: "Authors",
                 singularName: "Author",
                 properties: {
-                    name: { name: "Name", type: "string", validation: { required: true } },
-                    bio: { name: "Bio", type: "string" },
-                },
-            } as unknown as EntityCollection,
+                    name: { name: "Name",
+type: "string",
+validation: { required: true } },
+                    bio: { name: "Bio",
+type: "string" }
+                }
+            } as unknown as EntityCollection
         ];
     });
 
@@ -157,10 +166,12 @@ describe("GraphQLSchemaGenerator", () => {
                     name: "Comments",
                     singularName: "Comment",
                     properties: {
-                        text: { name: "Text", type: "string" },
-                        author: { name: "Author", type: "relation" },
-                    },
-                } as unknown as EntityCollection,
+                        text: { name: "Text",
+type: "string" },
+                        author: { name: "Author",
+type: "relation" }
+                    }
+                } as unknown as EntityCollection
             ];
             const generator = new GraphQLSchemaGenerator(withRelation, mockDriver);
             const schema = generator.generateSchema();
@@ -189,10 +200,12 @@ describe("GraphQLSchemaGenerator", () => {
                     name: "Comments",
                     singularName: "Comment",
                     properties: {
-                        text: { name: "Text", type: "string" },
-                        post: { name: "Post", type: "relation" },
-                    },
-                } as unknown as EntityCollection,
+                        text: { name: "Text",
+type: "string" },
+                        post: { name: "Post",
+type: "relation" }
+                    }
+                } as unknown as EntityCollection
             ];
             const generator = new GraphQLSchemaGenerator(withRelation, mockDriver);
             const schema = generator.generateSchema();
@@ -228,20 +241,21 @@ describe("GraphQLSchemaGenerator", () => {
             const mockEntity = {
                 id: "1",
                 path: "posts",
-                values: { title: "Hello World", body: "Content" },
+                values: { title: "Hello World",
+body: "Content" }
             };
             mockDriver.fetchEntity.mockResolvedValue(mockEntity as any);
 
             const result = await graphql({
                 schema,
-                source: `query { post(id: "1") { id title body } }`,
+                source: "query { post(id: \"1\") { id title body } }"
             });
 
             expect(result.errors).toBeUndefined();
             expect(mockDriver.fetchEntity).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "posts",
-                    entityId: "1",
+                    entityId: "1"
                 })
             );
         });
@@ -254,7 +268,7 @@ describe("GraphQLSchemaGenerator", () => {
 
             const result = await graphql({
                 schema,
-                source: `query { posts(limit: 10, offset: 5) { id title } }`,
+                source: "query { posts(limit: 10, offset: 5) { id title } }"
             });
 
             expect(result.errors).toBeUndefined();
@@ -262,7 +276,7 @@ describe("GraphQLSchemaGenerator", () => {
                 expect.objectContaining({
                     path: "posts",
                     limit: 10,
-                    startAfter: "5",
+                    startAfter: "5"
                 })
             );
         });
@@ -275,13 +289,13 @@ describe("GraphQLSchemaGenerator", () => {
 
             const result = await graphql({
                 schema,
-                source: `query { posts(where: "{\\"published\\": true}") { id } }`,
+                source: "query { posts(where: \"{\\\"published\\\": true}\") { id } }"
             });
 
             expect(result.errors).toBeUndefined();
             expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    filter: { published: true },
+                    filter: { published: true }
                 })
             );
         });
@@ -292,7 +306,7 @@ describe("GraphQLSchemaGenerator", () => {
 
             const result = await graphql({
                 schema,
-                source: `query { posts(where: "not-json") { id } }`,
+                source: "query { posts(where: \"not-json\") { id } }"
             });
 
             expect(result.errors).toBeDefined();
@@ -305,7 +319,7 @@ describe("GraphQLSchemaGenerator", () => {
 
             const result = await graphql({
                 schema,
-                source: `query { posts(where: "[1,2,3]") { id } }`,
+                source: "query { posts(where: \"[1,2,3]\") { id } }"
             });
 
             expect(result.errors).toBeDefined();
@@ -337,13 +351,13 @@ describe("GraphQLSchemaGenerator", () => {
             const mockEntity = {
                 id: "1",
                 path: "posts",
-                values: { title: "New Post" },
+                values: { title: "New Post" }
             };
             mockDriver.saveEntity.mockResolvedValue(mockEntity as any);
 
             const result = await graphql({
                 schema,
-                source: `mutation { createPost(input: { title: "New Post" }) { id } }`,
+                source: "mutation { createPost(input: { title: \"New Post\" }) { id } }"
             });
 
             expect(result.errors).toBeUndefined();
@@ -351,7 +365,7 @@ describe("GraphQLSchemaGenerator", () => {
                 expect.objectContaining({
                     path: "posts",
                     values: { title: "New Post" },
-                    status: "new",
+                    status: "new"
                 })
             );
         });
@@ -363,13 +377,13 @@ describe("GraphQLSchemaGenerator", () => {
             const mockEntity = {
                 id: "1",
                 path: "posts",
-                values: { title: "Updated" },
+                values: { title: "Updated" }
             };
             mockDriver.saveEntity.mockResolvedValue(mockEntity as any);
 
             const result = await graphql({
                 schema,
-                source: `mutation { updatePost(id: "1", input: { title: "Updated" }) { id } }`,
+                source: "mutation { updatePost(id: \"1\", input: { title: \"Updated\" }) { id } }"
             });
 
             expect(result.errors).toBeUndefined();
@@ -378,7 +392,7 @@ describe("GraphQLSchemaGenerator", () => {
                     path: "posts",
                     entityId: "1",
                     values: { title: "Updated" },
-                    status: "existing",
+                    status: "existing"
                 })
             );
         });
@@ -387,20 +401,22 @@ describe("GraphQLSchemaGenerator", () => {
             const generator = new GraphQLSchemaGenerator(collections, mockDriver);
             const schema = generator.generateSchema();
 
-            const mockEntity = { id: "1", path: "posts", values: {} };
+            const mockEntity = { id: "1",
+path: "posts",
+values: {} };
             mockDriver.fetchEntity.mockResolvedValue(mockEntity as any);
             mockDriver.deleteEntity.mockResolvedValue(undefined);
 
             const result = await graphql({
                 schema,
-                source: `mutation { deletePost(id: "1") }`,
+                source: "mutation { deletePost(id: \"1\") }"
             });
 
             expect(result.errors).toBeUndefined();
             expect(result.data?.deletePost).toBe(true);
             expect(mockDriver.deleteEntity).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    entity: mockEntity,
+                    entity: mockEntity
                 })
             );
         });
@@ -413,7 +429,7 @@ describe("GraphQLSchemaGenerator", () => {
 
             const result = await graphql({
                 schema,
-                source: `mutation { deletePost(id: "nonexistent") }`,
+                source: "mutation { deletePost(id: \"nonexistent\") }"
             });
 
             expect(result.errors).toBeUndefined();
@@ -424,13 +440,15 @@ describe("GraphQLSchemaGenerator", () => {
             const generator = new GraphQLSchemaGenerator(collections, mockDriver);
             const schema = generator.generateSchema();
 
-            const mockEntity = { id: "1", path: "posts", values: {} };
+            const mockEntity = { id: "1",
+path: "posts",
+values: {} };
             mockDriver.fetchEntity.mockResolvedValue(mockEntity as any);
             mockDriver.deleteEntity.mockRejectedValue(new Error("DB error"));
 
             const result = await graphql({
                 schema,
-                source: `mutation { deletePost(id: "1") }`,
+                source: "mutation { deletePost(id: \"1\") }"
             });
 
             expect(result.errors).toBeUndefined();
@@ -454,9 +472,10 @@ describe("GraphQLSchemaGenerator", () => {
                     name: "Tags",
                     singularName: "Tag",
                     properties: {
-                        labels: { name: "Labels", type: "array" },
-                    },
-                } as unknown as EntityCollection,
+                        labels: { name: "Labels",
+type: "array" }
+                    }
+                } as unknown as EntityCollection
             ];
             const generator = new GraphQLSchemaGenerator(arrayCollection, mockDriver);
             const schema = generator.generateSchema();
@@ -472,9 +491,10 @@ describe("GraphQLSchemaGenerator", () => {
                     name: "Embeddings",
                     singularName: "Embedding",
                     properties: {
-                        embedding: { name: "Embedding", type: "vector" },
-                    },
-                } as unknown as EntityCollection,
+                        embedding: { name: "Embedding",
+type: "vector" }
+                    }
+                } as unknown as EntityCollection
             ];
             const generator = new GraphQLSchemaGenerator(vectorCollection, mockDriver);
             const schema = generator.generateSchema();
@@ -490,9 +510,10 @@ describe("GraphQLSchemaGenerator", () => {
                     name: "Files",
                     singularName: "File",
                     properties: {
-                        data: { name: "Data", type: "binary" },
-                    },
-                } as unknown as EntityCollection,
+                        data: { name: "Data",
+type: "binary" }
+                    }
+                } as unknown as EntityCollection
             ];
             const generator = new GraphQLSchemaGenerator(binaryCollection, mockDriver);
             const schema = generator.generateSchema();
@@ -508,9 +529,10 @@ describe("GraphQLSchemaGenerator", () => {
                     name: "Items",
                     singularName: "Item",
                     properties: {
-                        name: { name: "Name", type: "string" },
-                    },
-                } as unknown as EntityCollection,
+                        name: { name: "Name",
+type: "string" }
+                    }
+                } as unknown as EntityCollection
             ];
             const generator = new GraphQLSchemaGenerator(dupeCollections, mockDriver);
             // Calling generateSchema should not throw even if types are created internally multiple times

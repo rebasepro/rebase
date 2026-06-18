@@ -29,32 +29,39 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
 const mockPostsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     title: { name: "title" },
     _def: { tableName: "posts" }
 };
 
 const mockTagsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "tags" }
 };
 
 const mockPostsTagsTable = {
-    post_id: { name: "post_id", dataType: "number" },
-    tag_id: { name: "tag_id", dataType: "number" },
+    post_id: { name: "post_id",
+dataType: "number" },
+    tag_id: { name: "tag_id",
+dataType: "number" },
     _def: { tableName: "posts_tags" }
 };
 
 const mockAuthorsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "authors" }
 };
 
 const mockAuthorPostsTable = {
-    author_id: { name: "author_id", dataType: "number" },
-    post_id: { name: "post_id", dataType: "number" },
+    author_id: { name: "author_id",
+dataType: "number" },
+    post_id: { name: "post_id",
+dataType: "number" },
     _def: { tableName: "author_posts" }
 };
 
@@ -78,7 +85,8 @@ const postsCollection: EntityCollection = {
     properties: {
         id: { type: "number" },
         title: { type: "string" },
-        tags: { type: "relation", relationName: "tags" }
+        tags: { type: "relation",
+relationName: "tags" }
     },
     relations: [
         {
@@ -115,7 +123,8 @@ const tagsWithInversePosts: EntityCollection = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation", relationName: "posts" }
+        posts: { type: "relation",
+relationName: "posts" }
     },
     relations: [
         {
@@ -141,7 +150,8 @@ const authorsWithJoinPath: EntityCollection = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation", relationName: "posts" }
+        posts: { type: "relation",
+relationName: "posts" }
     },
     relations: [
         {
@@ -150,8 +160,12 @@ const authorsWithJoinPath: EntityCollection = {
             cardinality: "many",
             direction: "owning",
             joinPath: [
-                { table: "author_posts", on: { from: "id", to: "author_id" } },
-                { table: "posts", on: { from: "post_id", to: "id" } }
+                { table: "author_posts",
+on: { from: "id",
+to: "author_id" } },
+                { table: "posts",
+on: { from: "post_id",
+to: "id" } }
             ]
         }
     ],
@@ -179,7 +193,7 @@ function generateJunctionRows(
                 rows.push({
                     [junctionTableName]: {
                         [sourceCol]: postId,
-                        [targetCol]: tagId,
+                        [targetCol]: tagId
                     },
                     [targetTableName]: { ...targetRow }
                 });
@@ -198,7 +212,7 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
         let queryRecorder = {
             selectCount: 0,
             innerJoinCount: 0,
-            fromTable: undefined as string | undefined,
+            fromTable: undefined as string | undefined
         };
 
         function makeChainable(): Record<string, unknown> {
@@ -230,7 +244,7 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
 
         return {
             db: makeChainable() as unknown as jest.Mocked<NodePgDatabase>,
-            recorder: queryRecorder,
+            recorder: queryRecorder
         };
     }
 
@@ -268,19 +282,37 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
 
     describe("Owning M2M with `through` (posts → tags)", () => {
         const mockTags = [
-            { id: 1, name: "TypeScript" },
-            { id: 2, name: "React" },
-            { id: 3, name: "Node.js" },
+            { id: 1,
+name: "TypeScript" },
+            { id: 2,
+name: "React" },
+            { id: 3,
+name: "Node.js" }
         ];
 
         it("should return tags for each post via junction table", async () => {
             // Post 1 → tags 1,2; Post 2 → tags 2,3; Post 3 → tag 1
             const junctionRows = [
-                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
-                { posts_tags: { post_id: 1, tag_id: 2 }, tags: { id: 2, name: "React" } },
-                { posts_tags: { post_id: 2, tag_id: 2 }, tags: { id: 2, name: "React" } },
-                { posts_tags: { post_id: 2, tag_id: 3 }, tags: { id: 3, name: "Node.js" } },
-                { posts_tags: { post_id: 3, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+                { posts_tags: { post_id: 1,
+tag_id: 1 },
+tags: { id: 1,
+name: "TypeScript" } },
+                { posts_tags: { post_id: 1,
+tag_id: 2 },
+tags: { id: 2,
+name: "React" } },
+                { posts_tags: { post_id: 2,
+tag_id: 2 },
+tags: { id: 2,
+name: "React" } },
+                { posts_tags: { post_id: 2,
+tag_id: 3 },
+tags: { id: 3,
+name: "Node.js" } },
+                { posts_tags: { post_id: 3,
+tag_id: 1 },
+tags: { id: 1,
+name: "TypeScript" } }
             ];
 
             const { db } = createMockDb(() => junctionRows);
@@ -310,7 +342,10 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
 
         it("should set correct entity id and path on each relation result", async () => {
             const junctionRows = [
-                { posts_tags: { post_id: 1, tag_id: 42 }, tags: { id: 42, name: "GraphQL" } },
+                { posts_tags: { post_id: 1,
+tag_id: 42 },
+tags: { id: 42,
+name: "GraphQL" } }
             ];
 
             const { db } = createMockDb(() => junctionRows);
@@ -329,7 +364,10 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
 
         it("should use exactly 1 SQL query (junction JOIN target)", async () => {
             const junctionRows = [
-                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+                { posts_tags: { post_id: 1,
+tag_id: 1 },
+tags: { id: 1,
+name: "TypeScript" } }
             ];
 
             const { db, recorder } = createMockDb(() => junctionRows);
@@ -373,9 +411,15 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
 
         it("should handle posts where some have tags and some don't", async () => {
             const junctionRows = [
-                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
+                { posts_tags: { post_id: 1,
+tag_id: 1 },
+tags: { id: 1,
+name: "TypeScript" } },
                 // Post 2 has no junction rows
-                { posts_tags: { post_id: 3, tag_id: 2 }, tags: { id: 2, name: "React" } },
+                { posts_tags: { post_id: 3,
+tag_id: 2 },
+tags: { id: 2,
+name: "React" } }
             ];
 
             const { db } = createMockDb(() => junctionRows);
@@ -400,9 +444,18 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
             // Result rows contain junction + target data.
             // The parentId (tag) is in the junction's targetColumn.
             const joinedRows = [
-                { posts_tags: { post_id: 10, tag_id: 1 }, posts: { id: 10, title: "Post A" } },
-                { posts_tags: { post_id: 20, tag_id: 1 }, posts: { id: 20, title: "Post B" } },
-                { posts_tags: { post_id: 30, tag_id: 2 }, posts: { id: 30, title: "Post C" } },
+                { posts_tags: { post_id: 10,
+tag_id: 1 },
+posts: { id: 10,
+title: "Post A" } },
+                { posts_tags: { post_id: 20,
+tag_id: 1 },
+posts: { id: 20,
+title: "Post B" } },
+                { posts_tags: { post_id: 30,
+tag_id: 2 },
+posts: { id: 30,
+title: "Post C" } }
             ];
 
             const { db } = createMockDb(() => joinedRows);
@@ -443,9 +496,18 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
         it("should return posts for each author via joinPath", async () => {
             // joinPath results are namespaced differently — parent data under parent table name
             const joinedRows = [
-                { authors: { id: 1, name: "Alice" }, posts: { id: 10, title: "Post X" } },
-                { authors: { id: 1, name: "Alice" }, posts: { id: 20, title: "Post Y" } },
-                { authors: { id: 2, name: "Bob" }, posts: { id: 30, title: "Post Z" } },
+                { authors: { id: 1,
+name: "Alice" },
+posts: { id: 10,
+title: "Post X" } },
+                { authors: { id: 1,
+name: "Alice" },
+posts: { id: 20,
+title: "Post Y" } },
+                { authors: { id: 2,
+name: "Bob" },
+posts: { id: 30,
+title: "Post Z" } }
             ];
 
             const { db } = createMockDb(() => joinedRows);
@@ -508,8 +570,14 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
         it("owning M2M: should map results when junction returns string IDs but parent IDs are numbers", async () => {
             // Junction data returns post_id as STRING, but we passed numeric parent IDs
             const junctionRows = [
-                { posts_tags: { post_id: "1", tag_id: "5" }, tags: { id: 5, name: "Rust" } },
-                { posts_tags: { post_id: "2", tag_id: "5" }, tags: { id: 5, name: "Rust" } },
+                { posts_tags: { post_id: "1",
+tag_id: "5" },
+tags: { id: 5,
+name: "Rust" } },
+                { posts_tags: { post_id: "2",
+tag_id: "5" },
+tags: { id: 5,
+name: "Rust" } }
             ];
 
             const { db } = createMockDb(() => junctionRows);
@@ -530,8 +598,14 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
         it("inverse M2M: should map results when junction returns string IDs but parent IDs are numbers", async () => {
             // Junction data returns tag_id (the parentId for inverse) as STRING
             const joinedRows = [
-                { posts_tags: { post_id: 10, tag_id: "1" }, posts: { id: 10, title: "Post A" } },
-                { posts_tags: { post_id: 20, tag_id: "2" }, posts: { id: 20, title: "Post B" } },
+                { posts_tags: { post_id: 10,
+tag_id: "1" },
+posts: { id: 10,
+title: "Post A" } },
+                { posts_tags: { post_id: 20,
+tag_id: "2" },
+posts: { id: 20,
+title: "Post B" } }
             ];
 
             const { db } = createMockDb(() => joinedRows);
@@ -553,8 +627,14 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
         it("owning M2M: should handle mixed string and number IDs in same batch", async () => {
             // Some junction rows return numbers, others return strings
             const junctionRows = [
-                { posts_tags: { post_id: 1, tag_id: 1 }, tags: { id: 1, name: "TypeScript" } },
-                { posts_tags: { post_id: "2", tag_id: "2" }, tags: { id: 2, name: "React" } },
+                { posts_tags: { post_id: 1,
+tag_id: 1 },
+tags: { id: 1,
+name: "TypeScript" } },
+                { posts_tags: { post_id: "2",
+tag_id: "2" },
+tags: { id: 2,
+name: "React" } }
             ];
 
             const { db } = createMockDb(() => junctionRows);

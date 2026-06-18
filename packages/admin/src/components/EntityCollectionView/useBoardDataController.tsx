@@ -276,7 +276,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             if (isCleaningUpRef.current) return;
 
             const pendingMap = pendingItemsRef.current;
-            
+
             // Apply pending updates to incoming entities
             const mergedEntities = entities.map(e => {
                 const pending = pendingMap[String(e.id)];
@@ -284,7 +284,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                     // Check if DB entity has caught up to the expected column and order
                     const expectedCol = pending.expectedValues[currentColumnProperty];
                     const expectedOrder = currentOrderProperty ? pending.expectedValues[currentOrderProperty] : undefined;
-                    
+
                     let caughtUp = true;
                     if (e.values?.[currentColumnProperty] !== expectedCol) {
                         caughtUp = false;
@@ -292,15 +292,17 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                     if (currentOrderProperty && e.values?.[currentOrderProperty] !== expectedOrder) {
                         caughtUp = false;
                     }
-                    
+
                     if (caughtUp) {
                         // DB has caught up, clear pending state
                         delete pendingMap[String(e.id)];
                         return e; // Use the real DB entity
                     }
-                    
+
                     // DB hasn't caught up, overlay expected values
-                    return { ...e, values: { ...e.values, ...pending.expectedValues } };
+                    return { ...e,
+values: { ...e.values,
+...pending.expectedValues } };
                 }
                 return e;
             });
@@ -326,14 +328,14 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 processed = [...processed].sort((a, b) => {
                     const valA = a.values?.[currentOrderProperty] as string | undefined | null;
                     const valB = b.values?.[currentOrderProperty] as string | undefined | null;
-                    
+
                     const isAEmpty = valA === undefined || valA === null || valA === "";
                     const isBEmpty = valB === undefined || valB === null || valB === "";
-                    
+
                     if (isAEmpty && isBEmpty) return 0;
                     if (isAEmpty) return 1;
                     if (isBEmpty) return -1;
-                    
+
                     return valA < valB ? -1 : valA > valB ? 1 : 0;
                 });
             }
@@ -618,7 +620,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                     ...itemToMove.values,
                     ...(newValues || {})
                 };
-                
+
                 const updatedEntity = {
                     ...itemToMove,
                     values: newValuesMerged
@@ -631,7 +633,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 };
 
                 const targetEntities = sourceColumn === targetColumn ? sourceEntities : [...(updated[targetColumn]?.entities || [])];
-                
+
                 if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetEntities.length) {
                     targetEntities.splice(newIndex, 0, updatedEntity);
                 } else {
@@ -641,15 +643,15 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                         targetEntities.sort((a, b) => {
                             const valA = a.values?.[orderProp] as string | undefined | null;
                             const valB = b.values?.[orderProp] as string | undefined | null;
-                            
+
                             // Handle nulls/empty strings to match Postgres NULLS LAST (ASC) behavior
                             const isAEmpty = valA === undefined || valA === null || valA === "";
                             const isBEmpty = valB === undefined || valB === null || valB === "";
-                            
+
                             if (isAEmpty && isBEmpty) return 0;
                             if (isAEmpty) return 1; // A is null, B is not -> A goes after B
                             if (isBEmpty) return -1; // B is null, A is not -> A goes before B
-                            
+
                             return valA < valB ? -1 : valA > valB ? 1 : 0;
                         });
                     }
@@ -658,8 +660,8 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                 updated[sourceColumn] = {
                     ...updated[sourceColumn],
                     entities: sourceColumn === targetColumn ? targetEntities : sourceEntities,
-                    totalCount: sourceColumn === targetColumn 
-                        ? updated[sourceColumn].totalCount 
+                    totalCount: sourceColumn === targetColumn
+                        ? updated[sourceColumn].totalCount
                         : Math.max(0, (updated[sourceColumn].totalCount ?? 0) - 1)
                 };
 

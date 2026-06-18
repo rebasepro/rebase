@@ -3,7 +3,7 @@ import React from "react";
 
 import { Link, useNavigate } from "react-router-dom";
 import { RebaseLogo, LanguageToggle } from "@rebasepro/core";
-import { ErrorBoundary , iconSize } from "@rebasepro/ui";
+import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import {
     Avatar,
     cls,
@@ -136,7 +136,6 @@ export const DefaultAppBar = function DefaultAppBar({
     } else {
         avatarComponent = null;
     }
-
 
 
     return (

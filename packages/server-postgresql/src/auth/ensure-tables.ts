@@ -4,7 +4,6 @@ import { logger } from "@rebasepro/server-core";
 import type { EntityCollection } from "@rebasepro/types";
 
 
-
 /**
  * Auto-create auth tables if they don't exist.
  *
@@ -71,7 +70,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
         }
 
 
-
         // ── Create schemas (idempotent) ──────────────────────────────────
         if (usersSchema !== "public") {
             await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.raw(usersSchema)}`);
@@ -105,7 +103,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
             CREATE INDEX IF NOT EXISTS idx_user_identities_user 
             ON ${sql.raw(userIdentitiesTable)}(user_id)
         `);
-
 
 
         // Create refresh tokens table (includes user_agent, ip_address, and unique constraint)

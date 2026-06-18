@@ -63,7 +63,7 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
                     : undefined,
                 emailConfigured: isEmailConfigured,
                 appName: emailConfig?.appName || "Rebase",
-                resetPasswordUrl: emailConfig?.resetPasswordUrl || "",
+                resetPasswordUrl: emailConfig?.resetPasswordUrl || ""
             });
             temporaryPassword = hookResult.temporaryPassword;
             invitationSent = hookResult.invitationSent ?? false;
@@ -73,7 +73,7 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
             const hookResult = await ops.onAdminResetPassword(existing.id, {
                 authRepo,
                 emailService,
-                emailConfig,
+                emailConfig
             });
             temporaryPassword = hookResult.temporaryPassword;
             invitationSent = hookResult.invitationSent ?? false;
@@ -96,8 +96,10 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
                     const appName = emailConfig?.appName || "Rebase";
                     const templateFn = emailConfig?.templates?.passwordReset;
                     const emailContent = templateFn
-                        ? templateFn(setPasswordUrl, { email: existing.email, displayName: existing.displayName })
-                        : getPasswordResetTemplate(setPasswordUrl, { email: existing.email, displayName: existing.displayName }, appName);
+                        ? templateFn(setPasswordUrl, { email: existing.email,
+displayName: existing.displayName })
+                        : getPasswordResetTemplate(setPasswordUrl, { email: existing.email,
+displayName: existing.displayName }, appName);
 
                     await emailService!.send({
                         to: existing.email,

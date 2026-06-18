@@ -19,7 +19,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tmpDir, { recursive: true,
+force: true });
     // Restore env
     delete process.env.npm_config_user_agent;
 });

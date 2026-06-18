@@ -66,7 +66,7 @@ refreshExpiresIn: "30d" });
 
         it("throws when secret is not configured", () => {
             // Force empty secret
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
+
             Object.defineProperty(require("../src/auth/jwt"), "jwtConfig", { value: { secret: "" },
 writable: true });
             // This won't work since jwtConfig is module-scoped, but generateAccessToken has its own check

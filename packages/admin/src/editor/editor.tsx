@@ -154,7 +154,7 @@ onJsonContentChange };
   // the reverted value.
   const versionRef = useRef(version);
   useEffect(() => {
-    if (versionRef.current === version) return;   // skip initial render
+    if (versionRef.current === version) return; // skip initial render
     versionRef.current = version;
     if (!view) return;
     try {

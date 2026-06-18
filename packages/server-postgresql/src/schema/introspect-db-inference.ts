@@ -45,15 +45,15 @@ export function inferPropertyFromData(
             const max = Math.max(...numValues);
             // Example heuristic: percentages
             if (min >= 0 && max <= 100 && (colNameLower.includes("percent") || colNameLower.includes("rate") || colNameLower.includes("score"))) {
-                extraLines.push(`            validation: {\n                min: 0,\n                max: 100\n            }`);
+                extraLines.push("            validation: {\n                min: 0,\n                max: 100\n            }");
             } else if (min >= 0 && (colNameLower.includes("count") || colNameLower.includes("total") || colNameLower.includes("amount"))) {
-                extraLines.push(`            validation: {\n                min: 0\n            }`);
+                extraLines.push("            validation: {\n                min: 0\n            }");
             }
         }
 
         // Currency
         if (colNameLower.includes("price") || colNameLower.includes("cost") || colNameLower.includes("amount") || colNameLower.includes("fee") || pgDataType === "money") {
-            extraLines.push(`            ui: {\n                currency: true\n            }`);
+            extraLines.push("            ui: {\n                currency: true\n            }");
         }
     }
 
@@ -94,7 +94,7 @@ export function inferPropertyFromData(
             extraLines.push(`            of: { name: "${humanize(columnName)} Item", type: "${innerType}" }`);
         } else {
             result.propType = "map";
-            
+
             // Infer inner schema
             if (allObjects && validValues.length > 0) {
                 const schema: Record<string, string> = {};
@@ -115,7 +115,7 @@ export function inferPropertyFromData(
                         }
                     }
                 }
-                
+
                 const keys = Object.keys(schema).filter(k => schema[k] !== "mixed");
                 if (keys.length > 0) {
                     const props = keys.map(k => {
@@ -123,10 +123,10 @@ export function inferPropertyFromData(
                     }).join(",");
                     extraLines.push(`            properties: {${props}\n            }`);
                 } else {
-                    extraLines.push(`            keyValue: true`);
+                    extraLines.push("            keyValue: true");
                 }
             } else {
-                extraLines.push(`            keyValue: true`);
+                extraLines.push("            keyValue: true");
             }
         }
     }
@@ -134,7 +134,7 @@ export function inferPropertyFromData(
     // ── String Analysis ──────────────────────────────────────────────────
     if (currentPropType === "string") {
         // Date/Time Strings
-        if (validValues.every(v => typeof v === 'string' && ISO_8601_REGEX.test(v))) {
+        if (validValues.every(v => typeof v === "string" && ISO_8601_REGEX.test(v))) {
             result.propType = "date";
             return result;
         }
@@ -148,7 +148,7 @@ export function inferPropertyFromData(
                 maxEnumLength = v.length;
             }
         }
-        
+
         // Ensure no empty string, max length makes sense, and fewer unique values than total values (unless small total)
         if (uniqueValues.size > 0 && uniqueValues.size <= 5 && maxEnumLength <= 50 && validValues.length > uniqueValues.size && !uniqueValues.has("")) {
             const isLikelyId = isPk || colNameLower.endsWith("_id");
@@ -161,18 +161,18 @@ export function inferPropertyFromData(
         }
 
         // UUID / CUID Detection
-        const allUuid = validValues.every(v => typeof v === 'string' && UUID_REGEX.test(v));
-        const allCuid = validValues.every(v => typeof v === 'string' && CUID_REGEX.test(v));
+        const allUuid = validValues.every(v => typeof v === "string" && UUID_REGEX.test(v));
+        const allCuid = validValues.every(v => typeof v === "string" && CUID_REGEX.test(v));
         if (allUuid) {
-            if (isPk) extraLines.push(`            isId: "uuid"`);
+            if (isPk) extraLines.push("            isId: \"uuid\"");
         } else if (allCuid) {
-            if (isPk) extraLines.push(`            isId: "cuid"`);
+            if (isPk) extraLines.push("            isId: \"cuid\"");
         }
 
         // Color Codes
-        const allColors = validValues.every(v => typeof v === 'string' && COLOR_HEX_REGEX.test(v));
+        const allColors = validValues.every(v => typeof v === "string" && COLOR_HEX_REGEX.test(v));
         if (allColors) {
-            extraLines.push(`            ui: {\n                color: true\n            }`);
+            extraLines.push("            ui: {\n                color: true\n            }");
         }
 
         // Text Lengths, Multiline & Markdown
@@ -190,9 +190,9 @@ export function inferPropertyFromData(
         }
 
         if (hasMarkdown) {
-            extraLines.push(`            multiline: true,\n            markdown: true`);
+            extraLines.push("            multiline: true,\n            markdown: true");
         } else if (hasNewlines || maxLength > 100) {
-            extraLines.push(`            multiline: true`);
+            extraLines.push("            multiline: true");
         }
 
         if (maxLength > 0 && maxLength < 10000) { // arbitrary cap to avoid huge limits
@@ -208,26 +208,26 @@ export function inferPropertyFromData(
         const isUrl = colNameLower.endsWith("_url") || colNameLower.endsWith("_uri") || colNameLower.endsWith("_link");
         const isMedia = colNameLower.includes("image") || colNameLower.includes("avatar") || colNameLower.includes("photo") || colNameLower.includes("logo") || colNameLower.includes("cover");
 
-        const allAbsoluteUrls = validValues.every(v => typeof v === 'string' && (v.startsWith("http://") || v.startsWith("https://")));
+        const allAbsoluteUrls = validValues.every(v => typeof v === "string" && (v.startsWith("http://") || v.startsWith("https://")));
         if (allAbsoluteUrls) {
-            const isImage = validValues.some(v => typeof v === 'string' && v.match(/\.(jpeg|jpg|gif|png|webp|svg)/i));
+            const isImage = validValues.some(v => typeof v === "string" && v.match(/\.(jpeg|jpg|gif|png|webp|svg)/i));
             if (isImage || isMedia) {
-                extraLines.push(`            ui: {\n                url: "image"\n            }`);
+                extraLines.push("            ui: {\n                url: \"image\"\n            }");
             } else {
-                extraLines.push(`            ui: {\n                url: true\n            }`);
+                extraLines.push("            ui: {\n                url: true\n            }");
             }
         } else {
-            const hasFileExtension = validValues.some(v => typeof v === 'string' && v.match(/\.[a-zA-Z0-9]+$/));
+            const hasFileExtension = validValues.some(v => typeof v === "string" && v.match(/\.[a-zA-Z0-9]+$/));
             if (hasFileExtension) {
                 const firstVal = validValues[0] as string;
-                const lastSlash = firstVal.lastIndexOf('/');
+                const lastSlash = firstVal.lastIndexOf("/");
                 const inferredStoragePath = lastSlash > 0 ? firstVal.substring(0, lastSlash) : "files";
                 extraLines.push(`            storage: {\n                storagePath: "${inferredStoragePath}"\n            }`);
             } else if (isUrl) {
                 if (isMedia) {
-                    extraLines.push(`            ui: {\n                url: "image"\n            }`);
+                    extraLines.push("            ui: {\n                url: \"image\"\n            }");
                 } else {
-                    extraLines.push(`            ui: {\n                url: true\n            }`);
+                    extraLines.push("            ui: {\n                url: true\n            }");
                 }
             }
         }

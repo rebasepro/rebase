@@ -20,7 +20,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("transforms a Field string into a LazyComponentRef", () => {
         const transform = createTransform();
-        const input = `Field: "../../components/MyField"`;
+        const input = "Field: \"../../components/MyField\"";
         const result = transform(input);
         expect(result).not.toBeNull();
         expect(result!.code).toContain("__rebaseLazy: true");
@@ -29,7 +29,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("transforms a Preview string", () => {
         const transform = createTransform();
-        const input = `Preview: "../frontend/SubscriptionBadge"`;
+        const input = "Preview: \"../frontend/SubscriptionBadge\"";
         const result = transform(input);
         expect(result).not.toBeNull();
         expect(result!.code).toContain("__rebaseLazy: true");
@@ -38,7 +38,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("transforms a Builder string", () => {
         const transform = createTransform();
-        const input = `Builder: "./views/CustomBuilder"`;
+        const input = "Builder: \"./views/CustomBuilder\"";
         const result = transform(input);
         expect(result).not.toBeNull();
         expect(result!.code).toContain("__rebaseLazy: true");
@@ -47,7 +47,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("handles single-quoted paths", () => {
         const transform = createTransform();
-        const input = `Field: './components/MyField'`;
+        const input = "Field: './components/MyField'";
         const result = transform(input);
         expect(result).not.toBeNull();
         expect(result!.code).toContain("__rebaseLazy: true");
@@ -93,28 +93,28 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("does not transform non-relative strings (no ./ or ../ prefix)", () => {
         const transform = createTransform();
-        const input = `Field: "components/MyField"`;
+        const input = "Field: \"components/MyField\"";
         const result = transform(input);
         expect(result).toBeNull();
     });
 
     it("does not transform keys not in the LAZY_COMPONENT_KEYS list", () => {
         const transform = createTransform();
-        const input = `Icon: "../../components/MyIcon"`;
+        const input = "Icon: \"../../components/MyIcon\"";
         const result = transform(input);
         expect(result).toBeNull();
     });
 
     it("does not transform numeric values", () => {
         const transform = createTransform();
-        const input = `Field: 42`;
+        const input = "Field: 42";
         const result = transform(input);
         expect(result).toBeNull();
     });
 
     it("does not transform object/function values", () => {
         const transform = createTransform();
-        const input = `Field: () => import("../../components/MyField")`;
+        const input = "Field: () => import(\"../../components/MyField\")";
         const result = transform(input);
         expect(result).toBeNull();
     });
@@ -123,21 +123,21 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("ignores files outside the collections directory", () => {
         const transform = createTransform("/project/config/collections");
-        const code = `Field: "../../components/MyField"`;
+        const code = "Field: \"../../components/MyField\"";
         const result = transform(code, "/project/src/other/file.ts");
         expect(result).toBeNull();
     });
 
     it("ignores non-TS/TSX files inside the collections directory", () => {
         const transform = createTransform("/project/config/collections");
-        const code = `Field: "../../components/MyField"`;
+        const code = "Field: \"../../components/MyField\"";
         const result = transform(code, "/project/config/collections/readme.md");
         expect(result).toBeNull();
     });
 
     it("processes .tsx files inside the collections directory", () => {
         const transform = createTransform("/project/config/collections");
-        const code = `Field: "../../components/MyField"`;
+        const code = "Field: \"../../components/MyField\"";
         const result = transform(code, "/project/config/collections/products.tsx");
         expect(result).not.toBeNull();
         expect(result!.code).toContain("__rebaseLazy: true");
@@ -161,7 +161,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
         // Only Field should be transformed
         expect(output).toContain('"Products"');
         expect(output).toContain('"products"');
-        expect(output).toContain('"../string"');  // `type` key is not in LAZY_COMPONENT_KEYS
+        expect(output).toContain('"../string"'); // `type` key is not in LAZY_COMPONENT_KEYS
         expect((output.match(/__rebaseLazy/g) || []).length).toBe(1);
     });
 
@@ -169,12 +169,12 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
 
     it("produces valid JavaScript syntax in the output", () => {
         const transform = createTransform();
-        const input = `Field: "../../components/MyField"`;
+        const input = "Field: \"../../components/MyField\"";
         const result = transform(input);
         const output = result!.code;
         // Should be a valid object literal fragment
         expect(output).toBe(
-            `Field: { __rebaseLazy: true, load: () => import("../../components/MyField") }`
+            "Field: { __rebaseLazy: true, load: () => import(\"../../components/MyField\") }"
         );
     });
 });

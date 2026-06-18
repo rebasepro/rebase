@@ -65,7 +65,7 @@ function linkLocalPackages(projectPath: string) {
     for (const pkgPath of pkgPaths) {
         if (!fs.existsSync(pkgPath)) continue;
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        
+
         const updateDeps = (deps: Record<string, string> | undefined) => {
             if (!deps) return;
             for (const [name, version] of Object.entries(deps)) {
@@ -153,7 +153,8 @@ describe("Rebase CLI E2E Integration Suite", () => {
         // Clean up scaffolded directory
         if (tempDir && fs.existsSync(tempDir)) {
             try {
-                fs.rmSync(tempDir, { recursive: true, force: true });
+                fs.rmSync(tempDir, { recursive: true,
+force: true });
             } catch (e) {
                 console.error(`Failed to clean up temporary folder: ${tempDir}`, e);
             }
@@ -333,14 +334,18 @@ describe("Rebase CLI E2E Integration Suite", () => {
         console.log("10. Verifying that the password hash was updated in the database...");
         const selectRes = await dbClient.query("SELECT password_hash FROM rebase.users WHERE id = $1", [mockUserId]);
         const updatedHash = selectRes.rows[0].password_hash;
-        
+
         expect(updatedHash).toBeDefined();
         expect(updatedHash).not.toBe(initialPasswordHash);
         expect(updatedHash.length).toBeGreaterThan(20); // Password hashes are typically much longer
 
         console.log("11. Testing CLI help and version commands...");
-        const helpRes = await execa("node", [cliBin, "--help"], { cwd: scaffoldedDir, stdio: "inherit", env: cleanEnv });
-        const versionRes = await execa("node", [cliBin, "--version"], { cwd: scaffoldedDir, stdio: "inherit", env: cleanEnv });
+        const helpRes = await execa("node", [cliBin, "--help"], { cwd: scaffoldedDir,
+stdio: "inherit",
+env: cleanEnv });
+        const versionRes = await execa("node", [cliBin, "--version"], { cwd: scaffoldedDir,
+stdio: "inherit",
+env: cleanEnv });
 
         console.log("12. Testing generate-sdk command...");
         await execa("node", [

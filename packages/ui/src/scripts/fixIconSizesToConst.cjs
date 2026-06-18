@@ -16,7 +16,7 @@ const SIZE_MAP = {
     16: "iconSize.smallest",
     20: "iconSize.small",
     24: "iconSize.medium",
-    28: "iconSize.large",
+    28: "iconSize.large"
 };
 
 // Regex to match lucide icon components with raw numeric sizes
@@ -71,7 +71,7 @@ for (const filePath of files) {
     if (!content.includes("iconSize")) {
         // This shouldn't happen since we just added it, but safety check
     }
-    
+
     if (content.includes("iconSize") && !content.match(/import\s.*iconSize/)) {
         // Try to add to existing @rebasepro/ui import
         const uiImportRe = /import\s*\{([^}]+)\}\s*from\s*["']@rebasepro\/ui["']/;

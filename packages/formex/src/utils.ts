@@ -3,7 +3,7 @@ export const isEmptyArray = (value?: unknown) =>
     Array.isArray(value) && value.length === 0;
 
 /** @private is the given object a Function? */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+
 export const isFunction = (obj: unknown): obj is Function =>
     typeof obj === "function";
 

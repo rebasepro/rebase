@@ -25,26 +25,32 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
 const mockPostsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     title: { name: "title" },
-    author_id: { name: "author_id", dataType: "number" },
+    author_id: { name: "author_id",
+dataType: "number" },
     _def: { tableName: "posts" }
 };
 
 const mockTagsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "tags" }
 };
 
 const mockPostsTagsTable = {
-    post_id: { name: "post_id", dataType: "number" },
-    tag_id: { name: "tag_id", dataType: "number" },
+    post_id: { name: "post_id",
+dataType: "number" },
+    tag_id: { name: "tag_id",
+dataType: "number" },
     _def: { tableName: "posts_tags" }
 };
 
 const mockAuthorsTable = {
-    id: { name: "id", dataType: "number" },
+    id: { name: "id",
+dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "authors" }
 };
@@ -69,7 +75,8 @@ const postsCollection: EntityCollection = {
     properties: {
         id: { type: "number" },
         title: { type: "string" },
-        tags: { type: "relation", relationName: "tags" }
+        tags: { type: "relation",
+relationName: "tags" }
     },
     relations: [
         {
@@ -94,7 +101,8 @@ const authorsCollection: EntityCollection = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation", relationName: "posts" }
+        posts: { type: "relation",
+relationName: "posts" }
     },
     relations: [
         {
@@ -116,7 +124,8 @@ const tagsWithInversePosts: EntityCollection = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation", relationName: "posts" }
+        posts: { type: "relation",
+relationName: "posts" }
     },
     relations: [
         {
@@ -142,7 +151,7 @@ function createMockDb(resolveResults: () => unknown[]) {
         innerJoinCount: 0,
         fromTable: undefined as string | undefined,
         deleteCalls: [] as unknown[],
-        insertCalls: [] as unknown[],
+        insertCalls: [] as unknown[]
     };
 
     function makeChainable(): Record<string, unknown> {
@@ -184,7 +193,7 @@ function createMockDb(resolveResults: () => unknown[]) {
 
     return {
         db: makeChainable() as unknown as jest.Mocked<NodePgDatabase>,
-        recorder,
+        recorder
     };
 }
 
@@ -226,8 +235,12 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
     it("should match results when Drizzle returns string IDs but parsedParentIds are numbers (FK inverse)", async () => {
         // Simulate Drizzle returning author_id as a string even though it's a numeric column
         const resultRows = [
-            { id: 10, title: "Post A", author_id: "1" },
-            { id: 20, title: "Post B", author_id: "2" },
+            { id: 10,
+title: "Post A",
+author_id: "1" },
+            { id: 20,
+title: "Post B",
+author_id: "2" }
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -250,7 +263,9 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
     it("should match results when Drizzle returns number IDs but parsedParentIds contain strings", async () => {
         // Simulate the reverse: Drizzle returns numbers, but parsed IDs might be strings
         const resultRows = [
-            { id: 10, title: "Post A", author_id: 1 },
+            { id: 10,
+title: "Post A",
+author_id: 1 }
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -267,8 +282,12 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
 
     it("should handle mixed string and number IDs across result rows", async () => {
         const resultRows = [
-            { id: 10, title: "Post A", author_id: 1 },       // number
-            { id: 20, title: "Post B", author_id: "2" },      // string
+            { id: 10,
+title: "Post A",
+author_id: 1 }, // number
+            { id: 20,
+title: "Post B",
+author_id: "2" } // string
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -285,7 +304,9 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
 
     it("should not match results for IDs not in the parent set", async () => {
         const resultRows = [
-            { id: 10, title: "Post A", author_id: "999" },
+            { id: 10,
+title: "Post A",
+author_id: "999" }
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -340,7 +361,9 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
 
         // Drizzle returns author_id as string
         const resultRows = [
-            { id: 10, title: "Post A", author_id: "1" },
+            { id: 10,
+title: "Post A",
+author_id: "1" }
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -624,8 +647,12 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             cardinality: "many",
             direction: "owning",
             joinPath: [
-                { table: "user_roles", on: { from: "id", to: "user_id" } },
-                { table: "permissions", on: { from: "permission_id", to: "id" } }
+                { table: "user_roles",
+on: { from: "id",
+to: "user_id" } },
+                { table: "permissions",
+on: { from: "permission_id",
+to: "id" } }
             ]
         };
 
@@ -645,15 +672,18 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
 
     // Mock collections simulating tasks → clients owning relation
     const mockClientsTable = {
-        id: { name: "id", dataType: "string" },
+        id: { name: "id",
+dataType: "string" },
         name: { name: "name" },
         email: { name: "email" },
         _def: { tableName: "clients" }
     };
 
     const mockTasksTable = {
-        id: { name: "id", dataType: "string" },
-        clientId: { name: "client_id", dataType: "string" },
+        id: { name: "id",
+dataType: "string" },
+        clientId: { name: "client_id",
+dataType: "string" },
         title: { name: "title" },
         _def: { tableName: "tasks" }
     };
@@ -663,7 +693,8 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
         name: "Clients",
         table: "clients",
         properties: {
-            id: { type: "string", isId: "uuid" },
+            id: { type: "string",
+isId: "uuid" },
             name: { type: "string" },
             email: { type: "string" }
         }
@@ -674,8 +705,10 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
         name: "Tasks",
         table: "tasks",
         properties: {
-            id: { type: "string", isId: "uuid" },
-            clientId: { type: "string", columnName: "client_id" },
+            id: { type: "string",
+isId: "uuid" },
+            clientId: { type: "string",
+columnName: "client_id" },
             title: { type: "string" },
             client: {
                 type: "relation",
@@ -748,9 +781,12 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
 
         const db = createSequencedMockDb([
             // Query 1: FK lookup from tasks table
-            () => [{ parentId: taskUuid, fkValue: clientUuid }],
+            () => [{ parentId: taskUuid,
+fkValue: clientUuid }],
             // Query 2: Target entity from clients table
-            () => [{ id: clientUuid, name: "Francesco", email: "f@test.com" }]
+            () => [{ id: clientUuid,
+name: "Francesco",
+email: "f@test.com" }]
         ]);
 
         const service = new RelationService(db, registry);
@@ -779,11 +815,15 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
         const db = createSequencedMockDb([
             // Both tasks have the same clientId
             () => [
-                { parentId: task1, fkValue: clientUuid },
-                { parentId: task2, fkValue: clientUuid }
+                { parentId: task1,
+fkValue: clientUuid },
+                { parentId: task2,
+fkValue: clientUuid }
             ],
             // Only one client row
-            () => [{ id: clientUuid, name: "Francesco", email: "f@test.com" }]
+            () => [{ id: clientUuid,
+name: "Francesco",
+email: "f@test.com" }]
         ]);
 
         const service = new RelationService(db, registry);
@@ -803,7 +843,8 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
 
         const db = createSequencedMockDb([
             // FK is null
-            () => [{ parentId: task1, fkValue: null }],
+            () => [{ parentId: task1,
+fkValue: null }]
         ]);
 
         const service = new RelationService(db, registry);
@@ -897,7 +938,9 @@ describe("Relation data JSON round-trip", () => {
     });
 
     it("should handle entity with no relation data (stub)", () => {
-        const stubRef = { id: "client-uuid", path: "clients", __type: "relation" as const };
+        const stubRef = { id: "client-uuid",
+path: "clients",
+__type: "relation" as const };
 
         const json = JSON.stringify({ values: { client: stubRef } });
         const parsed = JSON.parse(json, rebaseReviver);
@@ -914,7 +957,8 @@ describe("Relation data JSON round-trip", () => {
         const clientEntity = {
             id: "client-uuid",
             path: "clients",
-            values: { name: "Acme Corp", email: "acme@corp.com" }
+            values: { name: "Acme Corp",
+email: "acme@corp.com" }
         };
 
         const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
@@ -927,12 +971,16 @@ describe("Relation data JSON round-trip", () => {
                 {
                     id: "task-1",
                     path: "tasks",
-                    values: { title: "Task A", client: ref, status: "pending" }
+                    values: { title: "Task A",
+client: ref,
+status: "pending" }
                 },
                 {
                     id: "task-2",
                     path: "tasks",
-                    values: { title: "Task B", client: ref, status: "completed" }
+                    values: { title: "Task B",
+client: ref,
+status: "completed" }
                 }
             ]
         };

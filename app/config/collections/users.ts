@@ -26,7 +26,8 @@ const usersCollection: EntityCollection = {
         email: {
             name: "Email",
             type: "string",
-            validation: { required: true, unique: true }
+            validation: { required: true,
+unique: true }
         },
         displayName: {
             name: "Name",
@@ -58,33 +59,38 @@ const usersCollection: EntityCollection = {
             name: "Password Hash",
             type: "string",
             columnName: "password_hash",
-            ui: { hideFromCollection: true, disabled: { hidden: true } }
+            ui: { hideFromCollection: true,
+disabled: { hidden: true } }
         },
         emailVerified: {
             name: "Email Verified",
             type: "boolean",
             columnName: "email_verified",
             defaultValue: false,
-            ui: { hideFromCollection: true, disabled: { hidden: true } }
+            ui: { hideFromCollection: true,
+disabled: { hidden: true } }
         },
         emailVerificationToken: {
             name: "Email Verification Token",
             type: "string",
             columnName: "email_verification_token",
-            ui: { hideFromCollection: true, disabled: { hidden: true } }
+            ui: { hideFromCollection: true,
+disabled: { hidden: true } }
         },
         emailVerificationSentAt: {
             name: "Email Verification Sent At",
             type: "date",
             columnName: "email_verification_sent_at",
-            ui: { hideFromCollection: true, disabled: { hidden: true } }
+            ui: { hideFromCollection: true,
+disabled: { hidden: true } }
         },
         metadata: {
             name: "Metadata",
             type: "map",
             keyValue: true,
             defaultValue: {},
-            ui: { hideFromCollection: true, disabled: { hidden: true } }
+            ui: { hideFromCollection: true,
+disabled: { hidden: true } }
         },
         createdAt: {
             name: "Created At",
@@ -97,7 +103,8 @@ const usersCollection: EntityCollection = {
             type: "date",
             columnName: "updated_at",
             autoValue: "on_update",
-            ui: { hideFromCollection: true, disabled: { hidden: true } }
+            ui: { hideFromCollection: true,
+disabled: { hidden: true } }
         }
     },
     listProperties: ["displayName", "email", "roles", "createdAt"],

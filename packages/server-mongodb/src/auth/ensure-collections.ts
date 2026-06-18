@@ -9,7 +9,10 @@ const DEFAULT_ROLES = [
         id: "admin",
         name: "Admin",
         isAdmin: true,
-        defaultPermissions: { read: true, create: true, edit: true, delete: true },
+        defaultPermissions: { read: true,
+create: true,
+edit: true,
+delete: true },
         createdAt: new Date()
     },
     {
@@ -17,7 +20,10 @@ const DEFAULT_ROLES = [
         id: "editor",
         name: "Editor",
         isAdmin: false,
-        defaultPermissions: { read: true, create: true, edit: true, delete: true },
+        defaultPermissions: { read: true,
+create: true,
+edit: true,
+delete: true },
         createdAt: new Date()
     },
     {
@@ -25,7 +31,10 @@ const DEFAULT_ROLES = [
         id: "viewer",
         name: "Viewer",
         isAdmin: false,
-        defaultPermissions: { read: true, create: false, edit: false, delete: false },
+        defaultPermissions: { read: true,
+create: false,
+edit: false,
+delete: false },
         createdAt: new Date()
     }
 ];
@@ -40,18 +49,22 @@ export async function ensureAuthCollectionsExist(db: Db): Promise<void> {
 
         // User Identities
         const identities = db.collection("rebase_user_identities");
-        await identities.createIndex({ provider: 1, provider_id: 1 }, { unique: true });
+        await identities.createIndex({ provider: 1,
+provider_id: 1 }, { unique: true });
         await identities.createIndex({ user_id: 1 });
 
         // User Roles (junction collection)
         const userRoles = db.collection("rebase_user_roles");
-        await userRoles.createIndex({ user_id: 1, role_id: 1 }, { unique: true });
+        await userRoles.createIndex({ user_id: 1,
+role_id: 1 }, { unique: true });
         await userRoles.createIndex({ user_id: 1 });
 
         // Refresh Tokens
         const refreshTokens = db.collection("rebase_refresh_tokens");
         await refreshTokens.createIndex({ token_hash: 1 }, { unique: true });
-        await refreshTokens.createIndex({ user_id: 1, user_agent: 1, ip_address: 1 }, { unique: true });
+        await refreshTokens.createIndex({ user_id: 1,
+user_agent: 1,
+ip_address: 1 }, { unique: true });
         await refreshTokens.createIndex({ user_id: 1 });
 
         // Password Reset Tokens

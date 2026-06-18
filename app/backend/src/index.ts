@@ -66,7 +66,9 @@ async function startServer() {
         app,
         database: createPostgresAdapter({
             connection: postgresResources.db,
-            schema: { tables, enums, relations },
+            schema: { tables,
+enums,
+relations },
             adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL,
             connectionString: postgresResources.connectionString
         }),
@@ -93,14 +95,15 @@ async function startServer() {
                         port: env.SMTP_PORT,
                         secure: env.SMTP_SECURE,
                         auth: env.SMTP_USER
-                            ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
+                            ? { user: env.SMTP_USER,
+pass: env.SMTP_PASS! }
                             : undefined,
-                        name: env.SMTP_NAME,
+                        name: env.SMTP_NAME
                     },
                     appName: env.APP_NAME,
-                    resetPasswordUrl: env.FRONTEND_URL,
+                    resetPasswordUrl: env.FRONTEND_URL
                 }
-                : undefined,
+                : undefined
         },
         storage: env.STORAGE_TYPE === "s3"
             ? {
@@ -130,7 +133,8 @@ async function startServer() {
                         const [local, domain] = email.split("@");
                         if (local && domain) {
                             const masked = local[0] + "***";
-                            entity = { ...entity, email: `${masked}@${domain}` };
+                            entity = { ...entity,
+email: `${masked}@${domain}` };
                         }
                     }
                     return entity;

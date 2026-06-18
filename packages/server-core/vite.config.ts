@@ -24,7 +24,7 @@ const CONSUMER_EXTERNALS = [
     "fsevents",
     "ws",
     "ts-morph",
-    "sharp",
+    "sharp"
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;

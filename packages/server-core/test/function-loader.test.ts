@@ -62,7 +62,8 @@ describe("Function Loader & Routes", () => {
     afterAll(() => {
         // Clean up temp directory
         if (tempDir && fs.existsSync(tempDir)) {
-            fs.rmSync(tempDir, { recursive: true, force: true });
+            fs.rmSync(tempDir, { recursive: true,
+force: true });
         }
     });
 
@@ -101,12 +102,14 @@ describe("Function Loader & Routes", () => {
             // 1. Verify GET / lists loaded functions
             const listRes = await routes.request("/");
             expect(listRes.status).toBe(200);
-            
+
             const listData = await listRes.json();
             expect(listData).toEqual({
                 functions: [
-                    { name: "valid-app", endpoint: "/functions/valid-app" },
-                    { name: "valid-factory", endpoint: "/functions/valid-factory" }
+                    { name: "valid-app",
+endpoint: "/functions/valid-app" },
+                    { name: "valid-factory",
+endpoint: "/functions/valid-factory" }
                 ]
             });
 

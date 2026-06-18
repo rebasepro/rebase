@@ -12,8 +12,10 @@ const usersCollection: EntityCollection = {
     openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
     securityRules: [
-        { operation: "select", roles: ["admin"] },
-        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+        { operation: "select",
+roles: ["admin"] },
+        { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
     ],
     sort: ["createdAt", "desc"],
     properties: {

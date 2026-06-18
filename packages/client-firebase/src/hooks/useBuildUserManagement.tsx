@@ -87,7 +87,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
     const [usersWithRoleIds, setUsersWithRoleIds] = React.useState<UserWithRoleIds<USER>[]>([]);
 
     const users = usersWithRoleIds.map(u => ({
-        ...u,
+        ...u
     }) as USER);
 
     const [rolesError, setRolesError] = React.useState<Error | undefined>();
@@ -252,7 +252,6 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         };
         await dataSourceDelegate.deleteEntity({ entity })
     }, [rolesPath, dataSourceDelegate?.initialised]);
-
 
 
     const defineRolesFor: ((user: User) => string[] | undefined) = useCallback((user) => {

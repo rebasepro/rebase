@@ -120,7 +120,9 @@ export function createDirectDatabaseConnection(
 
     const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
 
-    return { db, pool, connectionString };
+    return { db,
+pool,
+connectionString };
 }
 
 /**
@@ -157,5 +159,7 @@ export function createReadReplicaConnection(
 
     const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
 
-    return { db, pool, connectionString };
+    return { db,
+pool,
+connectionString };
 }

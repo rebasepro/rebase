@@ -297,7 +297,8 @@ describe("template presets", () => {
         for (const file of presetFiles) {
             fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
         }
-        fs.rmSync(presetsDir, { recursive: true, force: true });
+        fs.rmSync(presetsDir, { recursive: true,
+force: true });
 
         expect(fs.existsSync(path.join(collectionsDir, "users.ts"))).toBe(true);
         expect(fs.existsSync(path.join(collectionsDir, "index.ts"))).toBe(true);
@@ -326,7 +327,8 @@ describe("template presets", () => {
         for (const file of presetFiles) {
             fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
         }
-        fs.rmSync(presetsDir, { recursive: true, force: true });
+        fs.rmSync(presetsDir, { recursive: true,
+force: true });
 
         expect(fs.existsSync(path.join(collectionsDir, "users.ts"))).toBe(true);
         expect(fs.existsSync(path.join(collectionsDir, "products.ts"))).toBe(true);

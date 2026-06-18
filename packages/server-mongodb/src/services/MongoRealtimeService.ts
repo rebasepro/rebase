@@ -141,7 +141,8 @@ export class MongoRealtimeService implements RealtimeProvider {
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
 
             if (config.authContext && this.driver) {
-                const mockUser = { uid: config.authContext.userId, roles: config.authContext.roles } as User;
+                const mockUser = { uid: config.authContext.userId,
+roles: config.authContext.roles } as User;
                 const authenticatedDriver = await this.driver.withAuth(mockUser);
                 entities = await authenticatedDriver.fetchCollection({
                     path: config.path,
@@ -264,7 +265,8 @@ export class MongoRealtimeService implements RealtimeProvider {
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
 
             if (config.authContext && this.driver) {
-                const mockUser = { uid: config.authContext.userId, roles: config.authContext.roles } as User;
+                const mockUser = { uid: config.authContext.userId,
+roles: config.authContext.roles } as User;
                 const authenticatedDriver = await this.driver.withAuth(mockUser);
                 entity = await authenticatedDriver.fetchEntity({
                     path: config.path,
@@ -379,7 +381,8 @@ export class MongoRealtimeService implements RealtimeProvider {
         const ws = this.clients.get(clientId);
         if (!ws) return;
 
-        const authContext = _authContext ? { userId: _authContext.userId, roles: (_authContext.roles ?? []).map(String) } : undefined;
+        const authContext = _authContext ? { userId: _authContext.userId,
+roles: (_authContext.roles ?? []).map(String) } : undefined;
 
         switch (message.type) {
             case "subscribe_collection": {

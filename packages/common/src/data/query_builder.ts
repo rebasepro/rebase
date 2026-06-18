@@ -1,15 +1,19 @@
 import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, FilterOperator, LogicalCondition, WhereValue, FilterCondition } from "@rebasepro/types";
 
 export function or(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
-    return { type: "or", conditions };
+    return { type: "or",
+conditions };
 }
 
 export function and(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
-    return { type: "and", conditions };
+    return { type: "and",
+conditions };
 }
 
 export function cond(column: string, operator: FilterOperator, value: unknown): FilterCondition {
-    return { column, operator, value };
+    return { column,
+operator,
+value };
 }
 
 export class QueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements QueryBuilderInterface<M> {

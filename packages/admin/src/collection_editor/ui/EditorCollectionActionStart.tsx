@@ -40,7 +40,8 @@ export function EditorCollectionActionStart({
                     onClick={() => configController
                         ?.saveCollection({
                             id: collection.slug,
-                            parentCollectionSlugs, parentEntityIds,
+                            parentCollectionSlugs,
+parentEntityIds,
                             collectionData: mergeDeep(collection as EntityCollection,
                                 {
                                     defaultFilter: tableController.filterValues ?? null,

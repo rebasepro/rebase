@@ -263,7 +263,9 @@ export interface RelationRefWithData extends RelationRef {
  * Replaces inline `{ id, path, __type: "relation" }` object literals.
  */
 export function createRelationRef(id: string | number, path: string): RelationRef {
-    return { id, path, __type: "relation" };
+    return { id,
+path,
+__type: "relation" };
 }
 
 /**
@@ -271,5 +273,8 @@ export function createRelationRef(id: string | number, path: string): RelationRe
  * Used when entity data has been pre-fetched (e.g., via batch loading or JOINs).
  */
 export function createRelationRefWithData(id: string | number, path: string, data: Entity): RelationRefWithData {
-    return { id, path, __type: "relation", data };
+    return { id,
+path,
+__type: "relation",
+data };
 }

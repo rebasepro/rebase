@@ -162,7 +162,8 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[], meta: res.meta }), onError);
+            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
+meta: res.meta }), onError);
         } else {
             accessor.find({
                 where: whereParams,
@@ -173,7 +174,8 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 searchString,
                 include: includeParams
             })
-                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[], meta: res.meta }))
+                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
+meta: res.meta }))
                 .catch(onError);
             return () => {
             };

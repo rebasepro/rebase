@@ -258,7 +258,7 @@ export class CollectionRegistry {
                         joinPath: relProp.joinPath ?? relProp.relation?.joinPath,
                         onUpdate: relProp.onUpdate ?? relProp.relation?.onUpdate,
                         onDelete: relProp.onDelete ?? relProp.relation?.onDelete,
-                        overrides: relProp.overrides ?? relProp.relation?.overrides,
+                        overrides: relProp.overrides ?? relProp.relation?.overrides
                     });
                 }
             } else if (property.type === "map" && property.properties) {

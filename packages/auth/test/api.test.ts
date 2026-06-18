@@ -23,8 +23,13 @@ describe("auth API client", () => {
     describe("API responses and network handling", () => {
         it("should successfully register a user", async () => {
             const mockResponse = {
-                user: { uid: "123", email: "test@rebase.pro", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-                tokens: { accessToken: "access_token_123", refreshToken: "refresh_token_123", accessTokenExpiresAt: 1234567890 }
+                user: { uid: "123",
+email: "test@rebase.pro",
+createdAt: new Date().toISOString(),
+updatedAt: new Date().toISOString() },
+                tokens: { accessToken: "access_token_123",
+refreshToken: "refresh_token_123",
+accessTokenExpiresAt: 1234567890 }
             };
 
             (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -38,15 +43,22 @@ describe("auth API client", () => {
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: "test@rebase.pro", password: "password123", displayName: "Test User" })
+                body: JSON.stringify({ email: "test@rebase.pro",
+password: "password123",
+displayName: "Test User" })
             });
             expect(result).toEqual(mockResponse);
         });
 
         it("should successfully login a user", async () => {
             const mockResponse = {
-                user: { uid: "123", email: "test@rebase.pro", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-                tokens: { accessToken: "access_token_123", refreshToken: "refresh_token_123", accessTokenExpiresAt: 1234567890 }
+                user: { uid: "123",
+email: "test@rebase.pro",
+createdAt: new Date().toISOString(),
+updatedAt: new Date().toISOString() },
+                tokens: { accessToken: "access_token_123",
+refreshToken: "refresh_token_123",
+accessTokenExpiresAt: 1234567890 }
             };
 
             (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -60,15 +72,21 @@ describe("auth API client", () => {
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: "test@rebase.pro", password: "password123" })
+                body: JSON.stringify({ email: "test@rebase.pro",
+password: "password123" })
             });
             expect(result).toEqual(mockResponse);
         });
 
         it("should successfully login with Google", async () => {
             const mockResponse = {
-                user: { uid: "123", email: "google@rebase.pro", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-                tokens: { accessToken: "access_token_123", refreshToken: "refresh_token_123", accessTokenExpiresAt: 1234567890 }
+                user: { uid: "123",
+email: "google@rebase.pro",
+createdAt: new Date().toISOString(),
+updatedAt: new Date().toISOString() },
+                tokens: { accessToken: "access_token_123",
+refreshToken: "refresh_token_123",
+accessTokenExpiresAt: 1234567890 }
             };
 
             (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -90,7 +108,9 @@ describe("auth API client", () => {
 
         it("should successfully refresh access tokens", async () => {
             const mockResponse = {
-                tokens: { accessToken: "new_access_token", refreshToken: "new_refresh_token", accessTokenExpiresAt: 1234567890 }
+                tokens: { accessToken: "new_access_token",
+refreshToken: "new_refresh_token",
+accessTokenExpiresAt: 1234567890 }
             };
 
             (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -183,7 +203,8 @@ describe("auth API client", () => {
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/linkedin", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: "code123", redirectUri: "http://redirect" })
+                body: JSON.stringify({ code: "code123",
+redirectUri: "http://redirect" })
             });
         });
 
@@ -250,7 +271,8 @@ describe("auth API client", () => {
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/reset-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: "reset_token", password: "new_password" })
+                body: JSON.stringify({ token: "reset_token",
+password: "new_password" })
             });
         });
 
@@ -269,7 +291,8 @@ describe("auth API client", () => {
                     "Content-Type": "application/json",
                     "Authorization": "Bearer tok"
                 },
-                body: JSON.stringify({ oldPassword: "old", newPassword: "new" })
+                body: JSON.stringify({ oldPassword: "old",
+newPassword: "new" })
             });
         });
 
@@ -321,7 +344,8 @@ describe("auth API client", () => {
                     "Content-Type": "application/json",
                     "Authorization": "Bearer tok"
                 },
-                body: JSON.stringify({ displayName: "New Name", photoURL: "http://photo" })
+                body: JSON.stringify({ displayName: "New Name",
+photoURL: "http://photo" })
             });
         });
 

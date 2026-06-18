@@ -42,7 +42,8 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
     });
     const [customHeaders, setCustomHeaders] = useState<Array<{ key: string; value: string }>>(() => {
         try { const v = localStorage.getItem(`${storageKey}_headers`); if (v) return JSON.parse(v); } catch { /* ignore */ }
-        return [{ key: "rebase-branch", value: "" }];
+        return [{ key: "rebase-branch",
+value: "" }];
     });
     const [body, setBody] = useState(() => {
         try { const v = localStorage.getItem(`${storageKey}_body`); if (v) return JSON.parse(v); } catch { /* ignore */ }
@@ -130,7 +131,7 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
 
         try {
             const headers: Record<string, string> = { "Content-Type": "application/json" };
-            
+
             for (const h of customHeaders) {
                 if (h.key.trim()) headers[h.key.trim()] = h.value;
             }
@@ -151,7 +152,7 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
 
             const elapsed = Math.round(performance.now() - start);
             let text: string;
-            
+
             const rawText = await res.text();
             try {
                 const json = JSON.parse(rawText);
@@ -207,7 +208,8 @@ time: elapsed });
                         title="Query Parameters"
                         params={queryParamDefs}
                         values={queryParams}
-                        onChange={(k, v) => setQueryParams((prev) => ({ ...prev, [k]: v }))}
+                        onChange={(k, v) => setQueryParams((prev) => ({ ...prev,
+[k]: v }))}
                     />
                 )}
 
@@ -217,10 +219,12 @@ time: elapsed });
                     values={customHeaders}
                     onChange={(i, k, v) => {
                         const next = [...customHeaders];
-                        next[i] = { key: k, value: v };
+                        next[i] = { key: k,
+value: v };
                         setCustomHeaders(next);
                     }}
-                    onAdd={() => setCustomHeaders((prev) => [...prev, { key: "", value: "" }])}
+                    onAdd={() => setCustomHeaders((prev) => [...prev, { key: "",
+value: "" }])}
                     onRemove={(i) => {
                         const next = [...customHeaders];
                         next.splice(i, 1);

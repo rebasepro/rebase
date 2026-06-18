@@ -54,11 +54,11 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
             const token = await getAuthToken?.();
             const params = new URLSearchParams({
                 limit: String(pageSize),
-                offset: String(offset),
+                offset: String(offset)
             });
             if (searchStr) params.set("search", searchStr);
             const response = await fetch(`${client.baseUrl}/api/users?${params}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             if (!response.ok) throw new Error("Failed to fetch users");
             const data = await response.json();
@@ -71,10 +71,12 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
                     photoURL: (r.photoURL as string) ?? (r.photo_url as string) ?? null,
                     providerId: "custom",
                     isAnonymous: false,
-                    roles: (r.roles as string[]) ?? [],
+                    roles: (r.roles as string[]) ?? []
                 };
                 userCacheRef.current.set(user.uid, user);
-                return { uid: user.uid, label: user.displayName ?? user.email ?? user.uid, user };
+                return { uid: user.uid,
+label: user.displayName ?? user.email ?? user.uid,
+user };
             });
             setItems(prev => append ? [...prev, ...newItems] : newItems);
             setHasMore(newItems.length >= pageSize);
@@ -105,7 +107,12 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
         return userCacheRef.current.get(uid) ?? null;
     }, []);
 
-    return { items, isLoading, hasMore, search, loadMore, getUser };
+    return { items,
+isLoading,
+hasMore,
+search,
+loadMore,
+getUser };
 }
 
 export interface UserSelectorProps {

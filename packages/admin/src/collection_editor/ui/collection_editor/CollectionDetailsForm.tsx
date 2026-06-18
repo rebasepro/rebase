@@ -111,7 +111,6 @@ export function CollectionDetailsForm({
     const collectionIcon = <IconForView collectionOrView={values}/>;
 
 
-
     const isSubcollection = !!parentCollection;
 
     const showErrors = submitCount > 0;
@@ -175,7 +174,6 @@ export function CollectionDetailsForm({
                         </FieldCaption>
 
                     </div>
-
 
 
                     <LayoutModeSwitch
@@ -296,7 +294,8 @@ export function CollectionDetailsForm({
                                         property={{
                                             type: "string",
                                             name: dialogPropertyName,
-                                            ui: { disabled: true, hideFromCollection: true }
+                                            ui: { disabled: true,
+hideFromCollection: true }
                                         }}
                                         propertyKey={dialogPropertyKey}
                                         existingProperty={false}

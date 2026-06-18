@@ -63,8 +63,10 @@ async function startServer() {
     // Default security rules for collections that don't define their own.
     // Authenticated users can read all rows; only admins can write.
     const defaultSecurityRules: SecurityRule[] = [
-        { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+        { operation: "select",
+access: "public" },
+        { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
     ];
 
     const backend = await initializeRebaseBackend({
@@ -99,14 +101,15 @@ relations },
                         port: env.SMTP_PORT,
                         secure: env.SMTP_SECURE,
                         auth: env.SMTP_USER
-                            ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
+                            ? { user: env.SMTP_USER,
+pass: env.SMTP_PASS! }
                             : undefined,
-                        name: env.SMTP_NAME,
+                        name: env.SMTP_NAME
                     },
                     appName: env.APP_NAME,
-                    resetPasswordUrl: env.FRONTEND_URL,
+                    resetPasswordUrl: env.FRONTEND_URL
                 }
-                : undefined,
+                : undefined
         },
         storage: env.STORAGE_TYPE === "s3"
             ? {

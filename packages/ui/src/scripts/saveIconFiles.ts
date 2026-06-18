@@ -22,7 +22,7 @@ export function saveIconFiles(iconKeys: string[]) {
 
         // Ensure key works as component name
         let componentName = `${key}Icon`;
-        
+
         // Handle names that might start with numbers like "10k" -> "_10k"
         if (/^[0-9]/.test(componentName)) {
             componentName = `_${componentName}`;

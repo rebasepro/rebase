@@ -174,13 +174,15 @@ color: "red" }
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true, hideFromCollection: true }
+            ui: { readOnly: true,
+hideFromCollection: true }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true, hideFromCollection: true }
+            ui: { readOnly: true,
+hideFromCollection: true }
         }
     },
     propertiesOrder: [
@@ -215,15 +217,15 @@ color: "red" }
                 {
                     table: "order_items",
                     on: {
-                        from: "id",          // products.id
-                        to: "product_id"     // order_items.product_id
+                        from: "id", // products.id
+                        to: "product_id" // order_items.product_id
                     }
                 },
                 {
                     table: "orders",
                     on: {
-                        from: "order_id",    // order_items.order_id
-                        to: "id"             // orders.id
+                        from: "order_id", // order_items.order_id
+                        to: "id" // orders.id
                     }
                 }
             ]

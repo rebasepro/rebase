@@ -71,8 +71,11 @@ export function RelationPropertyField({
 
     const updateThrough = useCallback(
         (patch: Record<string, unknown>) => {
-            const currentThrough = values.through ?? { table: "", sourceColumn: "", targetColumn: "" };
-            setFieldValue("through", { ...currentThrough, ...patch });
+            const currentThrough = values.through ?? { table: "",
+sourceColumn: "",
+targetColumn: "" };
+            setFieldValue("through", { ...currentThrough,
+...patch });
         },
         [values.through, setFieldValue]
     );

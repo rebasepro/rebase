@@ -32,8 +32,14 @@ function createMockDriver(): jest.Mocked<DataDriver> {
 }
 
 const mockCollections: EntityCollection[] = [
-    { slug: "products", name: "Products", singularName: "Product", properties: {} } as any,
-    { slug: "orders", name: "Orders", singularName: "Order", properties: {} } as any
+    { slug: "products",
+name: "Products",
+singularName: "Product",
+properties: {} } as any,
+    { slug: "orders",
+name: "Orders",
+singularName: "Order",
+properties: {} } as any
 ];
 
 function createApp(mockDriver: jest.Mocked<DataDriver>, hooks?: DataHooks) {
@@ -62,7 +68,8 @@ describe("DataHooks — REST API", () => {
                 afterRead(slug, entity) {
                     // Mask price for non-premium entities
                     if (slug === "products") {
-                        return { ...entity, price: "***" };
+                        return { ...entity,
+price: "***" };
                     }
                     return entity;
                 }
@@ -70,8 +77,14 @@ describe("DataHooks — REST API", () => {
             const app = createApp(mockDriver, hooks);
 
             mockDriver.fetchCollection.mockResolvedValue([
-                { id: "p1", path: "products", values: { name: "Widget", price: 99 } } as any,
-                { id: "p2", path: "products", values: { name: "Gadget", price: 199 } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Widget",
+price: 99 } } as any,
+                { id: "p2",
+path: "products",
+values: { name: "Gadget",
+price: 199 } } as any
             ]);
             mockDriver.countEntities!.mockResolvedValue(2);
 
@@ -97,9 +110,18 @@ describe("DataHooks — REST API", () => {
             const app = createApp(mockDriver, hooks);
 
             mockDriver.fetchCollection.mockResolvedValue([
-                { id: "p1", path: "products", values: { name: "Published", status: "active" } } as any,
-                { id: "p2", path: "products", values: { name: "Draft", status: "draft" } } as any,
-                { id: "p3", path: "products", values: { name: "Also Published", status: "active" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Published",
+status: "active" } } as any,
+                { id: "p2",
+path: "products",
+values: { name: "Draft",
+status: "draft" } } as any,
+                { id: "p3",
+path: "products",
+values: { name: "Also Published",
+status: "active" } } as any
             ]);
             mockDriver.countEntities!.mockResolvedValue(3);
 
@@ -112,13 +134,16 @@ describe("DataHooks — REST API", () => {
         it("transforms single entity GET response", async () => {
             const hooks: DataHooks = {
                 afterRead(slug, entity) {
-                    return { ...entity, _readAt: "2024-01-01" };
+                    return { ...entity,
+_readAt: "2024-01-01" };
                 }
             };
             const app = createApp(mockDriver, hooks);
 
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "p1", path: "products", values: { name: "Widget" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Widget" } } as any
             );
 
             const res = await app.request("/api/products/p1");
@@ -139,7 +164,9 @@ describe("DataHooks — REST API", () => {
             const app = createApp(mockDriver, hooks);
 
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "hidden", path: "products", values: { name: "Secret" } } as any
+                { id: "hidden",
+path: "products",
+values: { name: "Secret" } } as any
             );
 
             const res = await app.request("/api/products/hidden");
@@ -150,7 +177,8 @@ describe("DataHooks — REST API", () => {
             const hooks: DataHooks = {
                 afterRead(slug, entity) {
                     if (slug === "products") {
-                        return { ...entity, hooked: true };
+                        return { ...entity,
+hooked: true };
                     }
                     return entity;
                 }
@@ -159,7 +187,9 @@ describe("DataHooks — REST API", () => {
 
             // Products should be hooked
             mockDriver.fetchEntity.mockResolvedValueOnce(
-                { id: "p1", path: "products", values: { name: "Widget" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Widget" } } as any
             );
             const prodRes = await app.request("/api/products/p1");
             const prodBody = await prodRes.json() as any;
@@ -167,7 +197,9 @@ describe("DataHooks — REST API", () => {
 
             // Orders should NOT be hooked
             mockDriver.fetchEntity.mockResolvedValueOnce(
-                { id: "o1", path: "orders", values: { total: 42 } } as any
+                { id: "o1",
+path: "orders",
+values: { total: 42 } } as any
             );
             const orderRes = await app.request("/api/orders/o1");
             const orderBody = await orderRes.json() as any;
@@ -180,13 +212,17 @@ describe("DataHooks — REST API", () => {
         it("transforms values before POST (create)", async () => {
             const hooks: DataHooks = {
                 beforeSave(slug, values, entityId) {
-                    return { ...values, slug: values.name?.toString().toLowerCase().replace(/\s+/g, "-") };
+                    return { ...values,
+slug: values.name?.toString().toLowerCase().replace(/\s+/g, "-") };
                 }
             };
             const app = createApp(mockDriver, hooks);
 
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "new-1", path: "products", values: { name: "Cool Widget", slug: "cool-widget" } } as any
+                { id: "new-1",
+path: "products",
+values: { name: "Cool Widget",
+slug: "cool-widget" } } as any
             );
 
             const res = await app.request("/api/products", {
@@ -207,14 +243,20 @@ describe("DataHooks — REST API", () => {
             const hooks: DataHooks = {
                 beforeSave(slug, values, entityId) {
                     // Add an updatedBy field
-                    return { ...values, updatedBy: "hook" };
+                    return { ...values,
+updatedBy: "hook" };
                 }
             };
             const app = createApp(mockDriver, hooks);
 
-            mockDriver.fetchEntity.mockResolvedValue({ id: "p1", path: "products", values: {} } as any);
+            mockDriver.fetchEntity.mockResolvedValue({ id: "p1",
+path: "products",
+values: {} } as any);
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "p1", path: "products", values: { name: "Updated", updatedBy: "hook" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Updated",
+updatedBy: "hook" } } as any
             );
 
             const res = await app.request("/api/products/p1", {
@@ -238,7 +280,9 @@ describe("DataHooks — REST API", () => {
 
             // POST
             mockDriver.saveEntity.mockResolvedValueOnce(
-                { id: "new-1", path: "products", values: { name: "A" } } as any
+                { id: "new-1",
+path: "products",
+values: { name: "A" } } as any
             );
             await app.request("/api/products", {
                 method: "POST",
@@ -248,9 +292,13 @@ describe("DataHooks — REST API", () => {
             expect(beforeSaveSpy.mock.calls[0][2]).toBeUndefined(); // entityId
 
             // PUT
-            mockDriver.fetchEntity.mockResolvedValueOnce({ id: "p1", path: "products", values: {} } as any);
+            mockDriver.fetchEntity.mockResolvedValueOnce({ id: "p1",
+path: "products",
+values: {} } as any);
             mockDriver.saveEntity.mockResolvedValueOnce(
-                { id: "p1", path: "products", values: { name: "B" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "B" } } as any
             );
             await app.request("/api/products/p1", {
                 method: "PUT",
@@ -289,7 +337,9 @@ describe("DataHooks — REST API", () => {
             const app = createApp(mockDriver, hooks);
 
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "new-1", path: "products", values: { name: "Widget" } } as any
+                { id: "new-1",
+path: "products",
+values: { name: "Widget" } } as any
             );
 
             const res = await app.request("/api/products", {
@@ -303,7 +353,8 @@ describe("DataHooks — REST API", () => {
             expect(afterSaveSpy).toHaveBeenCalledTimes(1);
             expect(afterSaveSpy).toHaveBeenCalledWith(
                 "products",
-                expect.objectContaining({ id: "new-1", name: "Widget" }),
+                expect.objectContaining({ id: "new-1",
+name: "Widget" }),
                 expect.objectContaining({ method: "POST" })
             );
         });
@@ -313,9 +364,13 @@ describe("DataHooks — REST API", () => {
             const hooks: DataHooks = { afterSave: afterSaveSpy };
             const app = createApp(mockDriver, hooks);
 
-            mockDriver.fetchEntity.mockResolvedValue({ id: "p1", path: "products", values: {} } as any);
+            mockDriver.fetchEntity.mockResolvedValue({ id: "p1",
+path: "products",
+values: {} } as any);
             mockDriver.saveEntity.mockResolvedValue(
-                { id: "p1", path: "products", values: { name: "Updated" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Updated" } } as any
             );
 
             await app.request("/api/products/p1", {
@@ -346,7 +401,9 @@ describe("DataHooks — REST API", () => {
             const app = createApp(mockDriver, hooks);
 
             mockDriver.fetchEntity.mockResolvedValue(
-                { id: "protected", path: "products", values: {} } as any
+                { id: "protected",
+path: "products",
+values: {} } as any
             );
 
             const res = await app.request("/api/products/protected", { method: "DELETE" });
@@ -359,7 +416,9 @@ describe("DataHooks — REST API", () => {
             const hooks: DataHooks = { beforeDelete: beforeDeleteSpy };
             const app = createApp(mockDriver, hooks);
 
-            const existingEntity = { id: "p1", path: "products", values: {} } as any;
+            const existingEntity = { id: "p1",
+path: "products",
+values: {} } as any;
             mockDriver.fetchEntity.mockResolvedValue(existingEntity);
             mockDriver.deleteEntity.mockResolvedValue();
 
@@ -376,7 +435,9 @@ describe("DataHooks — REST API", () => {
             const hooks: DataHooks = { afterDelete: afterDeleteSpy };
             const app = createApp(mockDriver, hooks);
 
-            mockDriver.fetchEntity.mockResolvedValue({ id: "p1", path: "products", values: {} } as any);
+            mockDriver.fetchEntity.mockResolvedValue({ id: "p1",
+path: "products",
+values: {} } as any);
             mockDriver.deleteEntity.mockResolvedValue();
 
             await app.request("/api/products/p1", { method: "DELETE" });
@@ -393,7 +454,9 @@ describe("DataHooks — REST API", () => {
         it("returns data unchanged when no hooks are provided", async () => {
             const app = createApp(mockDriver); // no hooks
             mockDriver.fetchCollection.mockResolvedValue([
-                { id: "p1", path: "products", values: { name: "Widget" } } as any
+                { id: "p1",
+path: "products",
+values: { name: "Widget" } } as any
             ]);
             mockDriver.countEntities!.mockResolvedValue(1);
 

@@ -86,7 +86,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     ], [directSlots, plugins]);
 
 
-
     // Auth fallback logic
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);
     const authController = authControllerProp ?? clientAuthController;

@@ -18,13 +18,15 @@ export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlug
             totalOrders: number;
             avgOrderValue: number;
             refundedOrders: number;
-        }>("insights", undefined, { method: "GET", path: "home" }),
+        }>("insights", undefined, { method: "GET",
+path: "home" }),
         [rebaseClient]
     );
 
     const fetchCollectionInsights = React.useCallback(
         (slug: string) => rebaseClient.functions.invoke<Record<string, number>>(
-            "insights", undefined, { method: "GET", path: `collection/${slug}` }
+            "insights", undefined, { method: "GET",
+path: `collection/${slug}` }
         ),
         [rebaseClient]
     );
@@ -39,57 +41,86 @@ export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlug
                     title: "Total Revenue",
                     data: async () => {
                         const stats = await fetchHomeInsights();
-                        return { rows: [{ value: stats.totalRevenue, comp: 0.15 }] };
+                        return { rows: [{ value: stats.totalRevenue,
+comp: 0.15 }] };
                     },
                     scorecard: {
-                        value: { field: "value", format: { style: "currency", currency: "USD", notation: "compact", decimals: 1 } },
-                        comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" },
+                        value: { field: "value",
+format: { style: "currency",
+currency: "USD",
+notation: "compact",
+decimals: 1 } },
+                        comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "increase_is_good" },
                         icon: "DollarSign",
-                        dateRange: "vs Previous 30 Days",
-                    },
+                        dateRange: "vs Previous 30 Days"
+                    }
                 },
                 {
                     id: "total-orders",
                     title: "Orders",
                     data: async () => {
                         const stats = await fetchHomeInsights();
-                        return { rows: [{ value: stats.totalOrders, comp: 0.124 }] };
+                        return { rows: [{ value: stats.totalOrders,
+comp: 0.124 }] };
                     },
                     scorecard: {
-                        value: { field: "value", format: { style: "decimal" } },
-                        comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" },
+                        value: { field: "value",
+format: { style: "decimal" } },
+                        comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "increase_is_good" },
                         icon: "ShoppingCart",
-                        dateRange: "vs Previous 30 Days",
-                    },
+                        dateRange: "vs Previous 30 Days"
+                    }
                 },
                 {
                     id: "avg-order-value",
                     title: "Avg. Order Value",
                     data: async () => {
                         const stats = await fetchHomeInsights();
-                        return { rows: [{ value: stats.avgOrderValue, comp: -0.052 }] };
+                        return { rows: [{ value: stats.avgOrderValue,
+comp: -0.052 }] };
                     },
                     scorecard: {
-                        value: { field: "value", format: { style: "currency", currency: "USD", decimals: 2 } },
-                        comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" },
+                        value: { field: "value",
+format: { style: "currency",
+currency: "USD",
+decimals: 2 } },
+                        comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "increase_is_good" },
                         icon: "TrendingUp",
-                        dateRange: "vs Previous 30 Days",
-                    },
+                        dateRange: "vs Previous 30 Days"
+                    }
                 },
                 {
                     id: "refunded-orders",
                     title: "Refunded Orders",
                     data: async () => {
                         const stats = await fetchHomeInsights();
-                        return { rows: [{ value: stats.refundedOrders, comp: 0.021 }] };
+                        return { rows: [{ value: stats.refundedOrders,
+comp: 0.021 }] };
                     },
                     scorecard: {
-                        value: { field: "value", format: { style: "decimal" } },
-                        comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "decrease_is_good" },
+                        value: { field: "value",
+format: { style: "decimal" } },
+                        comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "decrease_is_good" },
                         icon: "PackageX",
-                        dateRange: "vs Previous 30 Days",
-                    },
-                },
+                        dateRange: "vs Previous 30 Days"
+                    }
+                }
             ],
             collections: {
                 orders: [
@@ -98,28 +129,40 @@ export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlug
                         title: "Confirmed",
                         data: async () => {
                             const stats = await fetchCollectionInsights("orders");
-                            return { rows: [{ value: stats.confirmed, comp: 0.18 }] };
+                            return { rows: [{ value: stats.confirmed,
+comp: 0.18 }] };
                         },
                         scorecard: {
-                            value: { field: "value", format: { style: "decimal" } },
-                            comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" as const },
+                            value: { field: "value",
+format: { style: "decimal" } },
+                            comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "increase_is_good" as const },
                             icon: "CheckCircle",
-                            dateRange: "vs Previous Week",
-                        },
+                            dateRange: "vs Previous Week"
+                        }
                     },
                     {
                         id: "orders-shipped-count",
                         title: "Shipped",
                         data: async () => {
                             const stats = await fetchCollectionInsights("orders");
-                            return { rows: [{ value: stats.shipped, comp: 0.074 }] };
+                            return { rows: [{ value: stats.shipped,
+comp: 0.074 }] };
                         },
                         scorecard: {
-                            value: { field: "value", format: { style: "decimal" } },
-                            comparison: { field: "comp", format: { style: "percent", showSign: true, decimals: 1 }, intent: "increase_is_good" as const },
+                            value: { field: "value",
+format: { style: "decimal" } },
+                            comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "increase_is_good" as const },
                             icon: "Truck",
-                            dateRange: "vs Previous Week",
-                        },
+                            dateRange: "vs Previous Week"
+                        }
                     },
                     {
                         id: "orders-revenue",
@@ -129,9 +172,13 @@ export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlug
                             return { rows: [{ value: stats.revenue }] };
                         },
                         scorecard: {
-                            value: { field: "value", format: { style: "currency", currency: "USD", notation: "compact", decimals: 1 } },
-                        },
-                    },
+                            value: { field: "value",
+format: { style: "currency",
+currency: "USD",
+notation: "compact",
+decimals: 1 } }
+                        }
+                    }
                 ],
                 products: [
                     {
@@ -142,9 +189,10 @@ export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlug
                             return { rows: [{ value: stats.total }] };
                         },
                         scorecard: {
-                            value: { field: "value", format: { style: "decimal" } },
-                        },
-                    },
+                            value: { field: "value",
+format: { style: "decimal" } }
+                        }
+                    }
                 ],
                 tickets: [
                     {
@@ -155,12 +203,13 @@ export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlug
                             return { rows: [{ value: stats.openCount }] };
                         },
                         scorecard: {
-                            value: { field: "value", format: { style: "decimal" } },
-                        },
-                    },
-                ],
-            },
-        },
+                            value: { field: "value",
+format: { style: "decimal" } }
+                        }
+                    }
+                ]
+            }
+        }
     }), [fetchHomeInsights, fetchCollectionInsights]);
 
     return useInsightsPlugin(insightsConfig);

@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { jest } from "@jest/globals";
 import { createCollectionClient } from "./collection";
 import type { Transport } from "./transport";
 
@@ -12,7 +12,7 @@ function createMockTransport(): Transport {
         apiPath: "/api",
         fetchFn: globalThis.fetch,
         getHeaders: () => ({}),
-        resolveToken: jest.fn<any>().mockResolvedValue(null),
+        resolveToken: jest.fn<any>().mockResolvedValue(null)
     };
 }
 
@@ -74,7 +74,8 @@ describe("createCollectionClient", () => {
 
             const client = createCollectionClient(transport, "users");
             // Even if the caller passes limit/offset in params, they should be stripped
-            await client.count({ limit: 50, offset: 10 });
+            await client.count({ limit: 50,
+offset: 10 });
 
             const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;
             expect(calledUrl).not.toContain("limit=");
@@ -111,7 +112,7 @@ describe("createCollectionClient", () => {
             await client.count({
                 where: {
                     status: "eq.active",
-                    total: [">=", 100],
+                    total: [">=", 100]
                 }
             });
 
@@ -124,8 +125,12 @@ describe("createCollectionClient", () => {
     describe("find()", () => {
         it("should call the list endpoint and return entities", async () => {
             (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({
-                data: [{ id: "1", name: "Product A" }],
-                meta: { total: 1, limit: 20, offset: 0, hasMore: false }
+                data: [{ id: "1",
+name: "Product A" }],
+                meta: { total: 1,
+limit: 20,
+offset: 0,
+hasMore: false }
             });
 
             const client = createCollectionClient(transport, "products");

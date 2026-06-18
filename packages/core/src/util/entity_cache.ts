@@ -155,7 +155,6 @@ export function getEntityFromMemoryCache(path: string): object | undefined {
 }
 
 
-
 /**
  * Retrieves an entity from the in-memory cache or `sessionStorage`.
  * If the entity is not in the cache but exists in `sessionStorage`, it loads it into the cache.
@@ -209,7 +208,6 @@ export function removeEntityFromCache(path: string): void {
         }
     }
 }
-
 
 
 export function flattenKeys(obj: Record<string, unknown> | unknown[], prefix = "", result: string[] = []): string[] {

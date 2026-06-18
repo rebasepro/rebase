@@ -25,9 +25,12 @@ describe("WebhookDispatcher", () => {
         it("filters out disabled webhooks", () => {
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([
-                makeWebhook({ id: "wh_1", enabled: true }),
-                makeWebhook({ id: "wh_2", enabled: false }),
-                makeWebhook({ id: "wh_3", enabled: true })
+                makeWebhook({ id: "wh_1",
+enabled: true }),
+                makeWebhook({ id: "wh_2",
+enabled: false }),
+                makeWebhook({ id: "wh_3",
+enabled: true })
             ]);
 
             // Disabled webhook should not trigger
@@ -46,14 +49,16 @@ describe("WebhookDispatcher", () => {
             dispatcher.setWebhooks([makeWebhook({ table: "posts" })]);
 
             const results = await dispatcher.onEntityChange(
-                "users", "INSERT", "id_1", { id: "id_1", name: "Test" }
+                "users", "INSERT", "id_1", { id: "id_1",
+name: "Test" }
             );
             expect(results).toEqual([]);
         });
 
         it("matches webhooks by table AND event", async () => {
             const dispatcher = new WebhookDispatcher();
-            dispatcher.setWebhooks([makeWebhook({ table: "users", events: ["INSERT"] })]);
+            dispatcher.setWebhooks([makeWebhook({ table: "users",
+events: ["INSERT"] })]);
 
             mockFetch.mockResolvedValue({
                 status: 200,
@@ -140,7 +145,8 @@ describe("WebhookDispatcher", () => {
                 text: () => Promise.resolve("OK")
             });
 
-            const entity = { id: "id_1", name: "Test User" };
+            const entity = { id: "id_1",
+name: "Test User" };
             await dispatcher.onEntityChange("users", "INSERT", "id_1", entity);
 
             const [, options] = mockFetch.mock.calls[0];
@@ -161,8 +167,10 @@ describe("WebhookDispatcher", () => {
                 text: () => Promise.resolve("OK")
             });
 
-            const entity = { id: "id_1", name: "Updated" };
-            const previous = { id: "id_1", name: "Original" };
+            const entity = { id: "id_1",
+name: "Updated" };
+            const previous = { id: "id_1",
+name: "Original" };
             await dispatcher.onEntityChange("users", "UPDATE", "id_1", entity, previous);
 
             const [, options] = mockFetch.mock.calls[0];
@@ -208,7 +216,8 @@ describe("WebhookDispatcher", () => {
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([
                 makeWebhook({
-                    headers: { "X-Custom": "my-value", "Authorization": "Bearer token" }
+                    headers: { "X-Custom": "my-value",
+"Authorization": "Bearer token" }
                 })
             ]);
 
@@ -228,8 +237,10 @@ describe("WebhookDispatcher", () => {
         it("dispatches to multiple matching webhooks", async () => {
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([
-                makeWebhook({ id: "wh_1", url: "https://a.com/hook" }),
-                makeWebhook({ id: "wh_2", url: "https://b.com/hook" })
+                makeWebhook({ id: "wh_1",
+url: "https://a.com/hook" }),
+                makeWebhook({ id: "wh_2",
+url: "https://b.com/hook" })
             ]);
 
             mockFetch.mockResolvedValue({

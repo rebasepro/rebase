@@ -113,8 +113,8 @@ describe("env configuration and localhost validation", () => {
 
         const extension = {
             extend: z.object({
-                EXTERNAL_SERVICE_URL: z.string().url(),
-            }),
+                EXTERNAL_SERVICE_URL: z.string().url()
+            })
         };
 
         expect(() => loadEnv(extension)).toThrow(/https:\/\/localhost:8080\/api/);
@@ -129,8 +129,8 @@ describe("env configuration and localhost validation", () => {
 
         const extension = {
             extend: z.object({
-                DB_HOST: z.string(),
-            }),
+                DB_HOST: z.string()
+            })
         };
 
         expect(() => loadEnv(extension)).toThrow(/localhost/);

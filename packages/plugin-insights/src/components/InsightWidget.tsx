@@ -40,7 +40,7 @@ export function InsightWidget({
     path,
     parentCollectionSlugs, parentEntityIds,
     compact = false,
-    embedded = false,
+    embedded = false
 }: {
     definition: InsightDefinition;
     collectionSlug?: string;
@@ -50,7 +50,9 @@ export function InsightWidget({
     /** When true, inner views skip their own borders since the parent card provides them. */
     embedded?: boolean;
 }) {
-    const { data, loading, error } = useInsightsData(definition, { path, collectionSlug, parentCollectionSlugs });
+    const { data, loading, error } = useInsightsData(definition, { path,
+collectionSlug,
+parentCollectionSlugs });
 
     // For non-compact, non-embedded standard scorecards, use a fixed height
     // derived from the config to prevent layout shift between skeleton → loaded.

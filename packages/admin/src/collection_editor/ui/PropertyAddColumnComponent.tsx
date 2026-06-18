@@ -34,7 +34,8 @@ export function PropertyAddColumnComponent({
                 onClick={canEditCollection ? () => {
                     collectionEditorController.editProperty({
                         editedCollectionId: collection.slug,
-                        parentCollectionSlugs, parentEntityIds,
+                        parentCollectionSlugs,
+parentEntityIds,
                         currentPropertiesOrder: getDefaultPropertiesOrder(collection),
                         collection,
                         existingEntities: tableController.data

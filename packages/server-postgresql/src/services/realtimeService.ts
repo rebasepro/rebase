@@ -607,11 +607,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             });
 
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing
-            const activeAuth = authContext || { userId: "anon", roles: ["anon"] };
+            const activeAuth = authContext || { userId: "anon",
+roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
                 await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${activeAuth.userId}, true)`);
                 await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
-                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId, roles: activeAuth.roles })}, true)`);
+                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
+roles: activeAuth.roles })}, true)`);
                 const txEntityService = new EntityService(tx, this.registry);
                 let fetchedEntities;
                 if (collectionRequest.searchString) {
@@ -649,7 +651,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
                 if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
                     const contextForCallback = {
-                        user: { uid: activeAuth.userId, roles: activeAuth.roles },
+                        user: { uid: activeAuth.userId,
+roles: activeAuth.roles },
                         driver: this.driver,
                         data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                     } as unknown as RebaseCallContext;
@@ -774,11 +777,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             });
 
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing
-            const activeAuth = authContext || { userId: "anon", roles: ["anon"] };
+            const activeAuth = authContext || { userId: "anon",
+roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
                 await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${activeAuth.userId}, true)`);
                 await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
-                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId, roles: activeAuth.roles })}, true)`);
+                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
+roles: activeAuth.roles })}, true)`);
                 const txEntityService = new EntityService(tx, this.registry);
                 let processedEntity = await txEntityService.fetchEntity(notifyPath, entityId, collection?.databaseId);
 
@@ -792,7 +797,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
                     if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
                         const contextForCallback = {
-                            user: { uid: activeAuth.userId, roles: activeAuth.roles },
+                            user: { uid: activeAuth.userId,
+roles: activeAuth.roles },
                             driver: this.driver,
                             data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                         } as unknown as RebaseCallContext;
@@ -953,7 +959,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         }
 
         const channelPresence = this.presence.get(channel)!;
-        channelPresence.set(clientId, { state, lastSeen: Date.now() });
+        channelPresence.set(clientId, { state,
+lastSeen: Date.now() });
 
         // Broadcast join / state update to channel
         this.broadcastPresenceDiff(channel, { [clientId]: state }, {});

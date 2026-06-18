@@ -1,6 +1,6 @@
 import {
     computePropertyPriority, sortPropertiesOrder,
-    PropertyOrderingContext, PropertyOrderEntry,
+    PropertyOrderingContext, PropertyOrderEntry
 } from "../src/schema/introspect-db-logic";
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -13,12 +13,13 @@ function mkCtx(overrides: Partial<PropertyOrderingContext> = {}): PropertyOrderi
         isStorage: false,
         pgDataType: "character varying",
         originalIndex: 0,
-        ...overrides,
+        ...overrides
     };
 }
 
 function mkEntry(key: string, overrides: Partial<PropertyOrderingContext> = {}): PropertyOrderEntry {
-    return { key, ctx: mkCtx(overrides) };
+    return { key,
+ctx: mkCtx(overrides) };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -52,7 +53,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx());
                 expect(score).toBeGreaterThanOrEqual(10);
                 expect(score).toBeLessThan(20);
-            },
+            }
         );
 
         it("ranks 'product_name' as partial match in tier 1b (17-19)", () => {
@@ -75,7 +76,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx());
                 expect(score).toBeGreaterThanOrEqual(20);
                 expect(score).toBeLessThan(30);
-            },
+            }
         );
 
         it("ranks first_name before last_name", () => {
@@ -92,7 +93,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx());
                 expect(score).toBeGreaterThanOrEqual(30);
                 expect(score).toBeLessThan(40);
-            },
+            }
         );
     });
 
@@ -110,7 +111,8 @@ describe("computePropertyPriority", () => {
         });
 
         it("ranks short string (varchar) in tier 4", () => {
-            const score = computePropertyPriority("color", mkCtx({ propType: "string", pgDataType: "character varying" }));
+            const score = computePropertyPriority("color", mkCtx({ propType: "string",
+pgDataType: "character varying" }));
             expect(score).toBeGreaterThanOrEqual(40);
             expect(score).toBeLessThan(50);
         });
@@ -145,7 +147,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx());
                 expect(score).toBeGreaterThanOrEqual(70);
                 expect(score).toBeLessThan(80);
-            },
+            }
         );
     });
 
@@ -156,7 +158,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx());
                 expect(score).toBeGreaterThanOrEqual(80);
                 expect(score).toBeLessThan(90);
-            },
+            }
         );
     });
 
@@ -173,7 +175,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx());
                 expect(score).toBeGreaterThanOrEqual(90);
                 expect(score).toBeLessThan(100);
-            },
+            }
         );
 
         it("ranks URL-suffix fields in tier 9", () => {
@@ -212,7 +214,7 @@ describe("computePropertyPriority", () => {
                 const score = computePropertyPriority(col, mkCtx({ propType: "date" }));
                 expect(score).toBeGreaterThanOrEqual(120);
                 expect(score).toBeLessThan(130);
-            },
+            }
         );
 
         it("ranks created_at before updated_at", () => {
@@ -249,10 +251,12 @@ describe("computePropertyPriority", () => {
 describe("sortPropertiesOrder", () => {
     it("places 'id' before 'name' before generic fields", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("created_at", { propType: "date", originalIndex: 3 }),
+            mkEntry("created_at", { propType: "date",
+originalIndex: 3 }),
             mkEntry("name", { originalIndex: 1 }),
-            mkEntry("id", { isPk: true, originalIndex: 0 }),
-            mkEntry("status", { originalIndex: 2 }),
+            mkEntry("id", { isPk: true,
+originalIndex: 0 }),
+            mkEntry("status", { originalIndex: 2 })
         ];
         const result = sortPropertiesOrder(entries);
         expect(result).toEqual(["id", "name", "status", "created_at"]);
@@ -260,95 +264,132 @@ describe("sortPropertiesOrder", () => {
 
     it("sorts a realistic user table correctly", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("id", { isPk: true, propType: "string", pgDataType: "uuid", originalIndex: 0 }),
-            mkEntry("created_at", { propType: "date", originalIndex: 1 }),
-            mkEntry("updated_at", { propType: "date", originalIndex: 2 }),
+            mkEntry("id", { isPk: true,
+propType: "string",
+pgDataType: "uuid",
+originalIndex: 0 }),
+            mkEntry("created_at", { propType: "date",
+originalIndex: 1 }),
+            mkEntry("updated_at", { propType: "date",
+originalIndex: 2 }),
             mkEntry("email", { originalIndex: 3 }),
             mkEntry("first_name", { originalIndex: 4 }),
             mkEntry("last_name", { originalIndex: 5 }),
-            mkEntry("avatar", { isStorage: true, originalIndex: 6 }),
-            mkEntry("role", { isEnum: true, originalIndex: 7 }),
-            mkEntry("active", { propType: "boolean", originalIndex: 8 }),
-            mkEntry("bio", { pgDataType: "text", originalIndex: 9 }),
-            mkEntry("metadata", { propType: "map", pgDataType: "jsonb", originalIndex: 10 }),
+            mkEntry("avatar", { isStorage: true,
+originalIndex: 6 }),
+            mkEntry("role", { isEnum: true,
+originalIndex: 7 }),
+            mkEntry("active", { propType: "boolean",
+originalIndex: 8 }),
+            mkEntry("bio", { pgDataType: "text",
+originalIndex: 9 }),
+            mkEntry("metadata", { propType: "map",
+pgDataType: "jsonb",
+originalIndex: 10 })
         ];
         const result = sortPropertiesOrder(entries);
         expect(result).toEqual([
-            "id",           // tier 0: PK
-            "first_name",   // tier 2: human identity
-            "last_name",    // tier 2: human identity
-            "email",        // tier 2: human identity
-            "role",         // tier 4: enum
-            "active",       // tier 4: boolean
-            "bio",          // tier 7: long text
-            "avatar",       // tier 9: storage
-            "metadata",     // tier 10: map
-            "created_at",   // tier 12: system timestamp
-            "updated_at",   // tier 12: system timestamp
+            "id", // tier 0: PK
+            "first_name", // tier 2: human identity
+            "last_name", // tier 2: human identity
+            "email", // tier 2: human identity
+            "role", // tier 4: enum
+            "active", // tier 4: boolean
+            "bio", // tier 7: long text
+            "avatar", // tier 9: storage
+            "metadata", // tier 10: map
+            "created_at", // tier 12: system timestamp
+            "updated_at" // tier 12: system timestamp
         ]);
     });
 
     it("sorts a realistic product table correctly", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("id", { isPk: true, propType: "number", pgDataType: "integer", originalIndex: 0 }),
-            mkEntry("created_at", { propType: "date", originalIndex: 1 }),
+            mkEntry("id", { isPk: true,
+propType: "number",
+pgDataType: "integer",
+originalIndex: 0 }),
+            mkEntry("created_at", { propType: "date",
+originalIndex: 1 }),
             mkEntry("sku", { originalIndex: 2 }),
             mkEntry("name", { originalIndex: 3 }),
-            mkEntry("description", { pgDataType: "text", originalIndex: 4 }),
-            mkEntry("price", { propType: "number", originalIndex: 5 }),
-            mkEntry("category", { propType: "relation", originalIndex: 6 }),
-            mkEntry("cover_image", { isStorage: true, originalIndex: 7 }),
-            mkEntry("active", { propType: "boolean", originalIndex: 8 }),
+            mkEntry("description", { pgDataType: "text",
+originalIndex: 4 }),
+            mkEntry("price", { propType: "number",
+originalIndex: 5 }),
+            mkEntry("category", { propType: "relation",
+originalIndex: 6 }),
+            mkEntry("cover_image", { isStorage: true,
+originalIndex: 7 }),
+            mkEntry("active", { propType: "boolean",
+originalIndex: 8 })
         ];
         const result = sortPropertiesOrder(entries);
         expect(result).toEqual([
-            "id",             // tier 0: PK
-            "name",           // tier 1: title/name
-            "sku",            // tier 3: descriptor
-            "category",       // tier 3: descriptor (name match overrides relation tier)
-            "active",         // tier 4: boolean
-            "price",          // tier 5: number
-            "description",    // tier 7: long text
-            "cover_image",    // tier 9: storage
-            "created_at",     // tier 12: system timestamp
+            "id", // tier 0: PK
+            "name", // tier 1: title/name
+            "sku", // tier 3: descriptor
+            "category", // tier 3: descriptor (name match overrides relation tier)
+            "active", // tier 4: boolean
+            "price", // tier 5: number
+            "description", // tier 7: long text
+            "cover_image", // tier 9: storage
+            "created_at" // tier 12: system timestamp
         ]);
     });
 
     it("sorts a blog post table correctly", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("id", { isPk: true, propType: "string", pgDataType: "uuid", originalIndex: 0 }),
-            mkEntry("updated_at", { propType: "date", originalIndex: 1 }),
-            mkEntry("created_at", { propType: "date", originalIndex: 2 }),
-            mkEntry("content", { pgDataType: "text", originalIndex: 3 }),
+            mkEntry("id", { isPk: true,
+propType: "string",
+pgDataType: "uuid",
+originalIndex: 0 }),
+            mkEntry("updated_at", { propType: "date",
+originalIndex: 1 }),
+            mkEntry("created_at", { propType: "date",
+originalIndex: 2 }),
+            mkEntry("content", { pgDataType: "text",
+originalIndex: 3 }),
             mkEntry("title", { originalIndex: 4 }),
             mkEntry("slug", { originalIndex: 5 }),
-            mkEntry("status", { isEnum: true, originalIndex: 6 }),
-            mkEntry("author", { propType: "relation", originalIndex: 7 }),
-            mkEntry("published_at", { propType: "date", originalIndex: 8 }),
-            mkEntry("cover_image", { isStorage: true, originalIndex: 9 }),
-            mkEntry("excerpt", { pgDataType: "text", originalIndex: 10 }),
+            mkEntry("status", { isEnum: true,
+originalIndex: 6 }),
+            mkEntry("author", { propType: "relation",
+originalIndex: 7 }),
+            mkEntry("published_at", { propType: "date",
+originalIndex: 8 }),
+            mkEntry("cover_image", { isStorage: true,
+originalIndex: 9 }),
+            mkEntry("excerpt", { pgDataType: "text",
+originalIndex: 10 })
         ];
         const result = sortPropertiesOrder(entries);
         expect(result).toEqual([
-            "id",             // tier 0: PK
-            "title",          // tier 1: title
-            "slug",           // tier 3: descriptor
-            "status",         // tier 4: enum
-            "published_at",   // tier 5: user-facing date
-            "author",         // tier 6: relation
-            "excerpt",        // tier 7: long text
-            "content",        // tier 8: rich content
-            "cover_image",    // tier 9: storage
-            "created_at",     // tier 12: system timestamp
-            "updated_at",     // tier 12: system timestamp
+            "id", // tier 0: PK
+            "title", // tier 1: title
+            "slug", // tier 3: descriptor
+            "status", // tier 4: enum
+            "published_at", // tier 5: user-facing date
+            "author", // tier 6: relation
+            "excerpt", // tier 7: long text
+            "content", // tier 8: rich content
+            "cover_image", // tier 9: storage
+            "created_at", // tier 12: system timestamp
+            "updated_at" // tier 12: system timestamp
         ]);
     });
 
     it("preserves original order for properties in the same tier", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("color", { propType: "string", pgDataType: "character varying", originalIndex: 0 }),
-            mkEntry("size", { propType: "string", pgDataType: "character varying", originalIndex: 1 }),
-            mkEntry("weight", { propType: "string", pgDataType: "character varying", originalIndex: 2 }),
+            mkEntry("color", { propType: "string",
+pgDataType: "character varying",
+originalIndex: 0 }),
+            mkEntry("size", { propType: "string",
+pgDataType: "character varying",
+originalIndex: 1 }),
+            mkEntry("weight", { propType: "string",
+pgDataType: "character varying",
+originalIndex: 2 })
         ];
         const result = sortPropertiesOrder(entries);
         // All three are tier 4 (short strings), should preserve original order
@@ -357,9 +398,12 @@ describe("sortPropertiesOrder", () => {
 
     it("handles tables with only system columns", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("id", { isPk: true, originalIndex: 0 }),
-            mkEntry("created_at", { propType: "date", originalIndex: 1 }),
-            mkEntry("updated_at", { propType: "date", originalIndex: 2 }),
+            mkEntry("id", { isPk: true,
+originalIndex: 0 }),
+            mkEntry("created_at", { propType: "date",
+originalIndex: 1 }),
+            mkEntry("updated_at", { propType: "date",
+originalIndex: 2 })
         ];
         const result = sortPropertiesOrder(entries);
         expect(result).toEqual(["id", "created_at", "updated_at"]);
@@ -367,10 +411,12 @@ describe("sortPropertiesOrder", () => {
 
     it("handles partial name matches (product_name, page_title)", () => {
         const entries: PropertyOrderEntry[] = [
-            mkEntry("id", { isPk: true, originalIndex: 0 }),
+            mkEntry("id", { isPk: true,
+originalIndex: 0 }),
             mkEntry("product_name", { originalIndex: 1 }),
             mkEntry("category", { originalIndex: 2 }),
-            mkEntry("price", { propType: "number", originalIndex: 3 }),
+            mkEntry("price", { propType: "number",
+originalIndex: 3 })
         ];
         const result = sortPropertiesOrder(entries);
         // product_name should come after id but before category and price
@@ -382,8 +428,9 @@ describe("sortPropertiesOrder", () => {
         const entries: PropertyOrderEntry[] = [
             mkEntry("name", { originalIndex: 0 }),
             mkEntry("website_url", { originalIndex: 1 }),
-            mkEntry("avatar", { isStorage: true, originalIndex: 2 }),
-            mkEntry("thumbnail", { originalIndex: 3 }),
+            mkEntry("avatar", { isStorage: true,
+originalIndex: 2 }),
+            mkEntry("thumbnail", { originalIndex: 3 })
         ];
         const result = sortPropertiesOrder(entries);
         expect(result[0]).toBe("name");

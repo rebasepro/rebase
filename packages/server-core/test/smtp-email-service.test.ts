@@ -4,10 +4,10 @@ import nodemailer from "nodemailer";
 jest.mock("nodemailer", () => {
     const mockTransporter = {
         verify: jest.fn().mockResolvedValue(true),
-        sendMail: jest.fn().mockResolvedValue(true),
+        sendMail: jest.fn().mockResolvedValue(true)
     };
     return {
-        createTransport: jest.fn().mockReturnValue(mockTransporter),
+        createTransport: jest.fn().mockReturnValue(mockTransporter)
     };
 });
 
@@ -28,15 +28,15 @@ describe("SMTPEmailService", () => {
             smtp: {
                 host: "smtp.example.com",
                 port: 587,
-                name: "explicit-hostname",
-            },
+                name: "explicit-hostname"
+            }
         });
 
         expect(mockCreateTransport).toHaveBeenCalledWith(
             expect.objectContaining({
                 name: "explicit-hostname",
                 host: "smtp.example.com",
-                port: 587,
+                port: 587
             })
         );
     });
@@ -50,13 +50,13 @@ describe("SMTPEmailService", () => {
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
-                    port: 587,
-                },
+                    port: 587
+                }
             });
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    name: "frontend-url.com",
+                    name: "frontend-url.com"
                 })
             );
         } finally {
@@ -73,14 +73,14 @@ describe("SMTPEmailService", () => {
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
-                    port: 587,
+                    port: 587
                 },
-                resetPasswordUrl: "http://reset-password-url.org",
+                resetPasswordUrl: "http://reset-password-url.org"
             });
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    name: "reset-password-url.org",
+                    name: "reset-password-url.org"
                 })
             );
         } finally {
@@ -97,14 +97,14 @@ describe("SMTPEmailService", () => {
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
-                    port: 587,
+                    port: 587
                 },
-                verifyEmailUrl: "verify-email-url.net/auth",
+                verifyEmailUrl: "verify-email-url.net/auth"
             });
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    name: "verify-email-url.net",
+                    name: "verify-email-url.net"
                 })
             );
         } finally {
@@ -121,13 +121,13 @@ describe("SMTPEmailService", () => {
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
-                    port: 587,
-                },
+                    port: 587
+                }
             });
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    name: undefined,
+                    name: undefined
                 })
             );
         } finally {
@@ -142,8 +142,8 @@ describe("SMTPEmailService", () => {
             from: "test@example.com",
             smtp: {
                 host: "smtp.example.com",
-                port: 587,
-            },
+                port: 587
+            }
         });
 
         const verified = await service.verifyConnection();
@@ -158,8 +158,8 @@ describe("SMTPEmailService", () => {
             from: "test@example.com",
             smtp: {
                 host: "smtp.example.com",
-                port: 587,
-            },
+                port: 587
+            }
         });
 
         const verified = await service.verifyConnection();
