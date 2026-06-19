@@ -5,11 +5,12 @@ import {
     RebaseRoutes,
     UserSettingsView,
     UIReferenceView,
-    NotFoundPage
+    NotFoundPage,
+    useComponentOverride
 } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 
-import { ContentHomePage } from "./HomePage/ContentHomePage";
+import { ContentHomePage as DefaultHomePage } from "./HomePage/ContentHomePage";
 
 import { RebaseRoute } from "../routes/RebaseRoute";
 import { CustomViewRoute } from "../routes/CustomViewRoute";
@@ -65,7 +66,8 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
     const registry = useRebaseRegistry();
     const navigationStateController = useNavigationStateController();
 
-    const cmsHomePage = registry.cmsConfig?.homePage ?? <Suspense fallback={<CircularProgressCenter/>}><ContentHomePage/></Suspense>;
+    const ResolvedHomePage = useComponentOverride("HomePage", DefaultHomePage);
+    const cmsHomePage = registry.cmsConfig?.homePage ?? <Suspense fallback={<CircularProgressCenter/>}><ResolvedHomePage/></Suspense>;
     const studioHomePage = registry.studioConfig?.homePage;
 
     const combinedViews = useMemo(() => [

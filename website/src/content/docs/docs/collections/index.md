@@ -83,6 +83,7 @@ export const productsCollection: EntityCollection = {
 | `properties` | `Properties` | **Required.** Map of property key → property definition. Each key becomes a database column. |
 | `relations` | `Relation[]` | SQL relations — foreign keys, junction tables. See [Relations](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Row Level Security policies. See [Security Rules](/docs/collections/security-rules). |
+| `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 ### UI Configuration
 
@@ -130,8 +131,23 @@ export const productsCollection: EntityCollection = {
 | `exportable` | `boolean \| ExportConfig` | Enable data export |
 | `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
 | `overrides` | `EntityOverrides` | Overrides for the entity view |
+| `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
 | `driver` | `string` | Database driver to use (default: `"(default)"`) |
 | `databaseId` | `string` | Database/schema ID within the driver |
+
+## Entity Previews & Title Resolution
+
+### Title Property Selection
+By default, the property used as the entity's display title (previews, headers) is resolved automatically:
+1. If `titleProperty` is explicitly specified on the collection, it is used.
+2. If `propertiesOrder` is explicitly defined, the first non-ID property that is either a `relation` or `string` type is chosen as the title.
+3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+
+### Relation Previews in Tables
+When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
+
+### resolveTitleToString Utility
+Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
 
 ## Collection Builder
 

@@ -193,6 +193,64 @@ Pass `tools={undefined} homePage={undefined}` explicitly:
 | `<RebaseStudio>` | `@rebasepro/studio` | Studio config (tools, home page) | No — registers into registry |
 | `<RebaseShell>` | `@rebasepro/admin` | App shell (drawer, navigation, routes, layout) | Yes — the actual UI |
 
+## Global Component Overrides (Swizzling)
+
+Rebase allows you to override default UI components globally by passing a `components` prop to the `<Rebase>` provider. This implements Docusaurus-style component swizzling, supporting both **Eject** and **Wrap** patterns.
+
+```tsx
+import { Rebase } from "@rebasepro/core";
+import { MyAppBar } from "./MyAppBar";
+
+<Rebase
+    client={rebaseClient}
+    components={{
+        // Eject Mode: Replace the built-in AppBar entirely
+        "Shell.AppBar": { Component: MyAppBar },
+
+        // Wrap Mode: Wrap the default LoginView, adding custom branding
+        "Auth.LoginView": {
+            Component: ({ OriginalComponent, ...props }) => (
+                <div className="custom-login-wrapper">
+                    <div className="branding">Welcome to My Enterprise App</div>
+                    <OriginalComponent {...props} />
+                </div>
+            ),
+            wrap: true
+        }
+    }}
+>
+    {/* ... */}
+</Rebase>
+```
+
+### Overridable Component Scopes
+
+#### App-scoped Components (`AppComponentName`)
+These components can only be overridden at the root `<Rebase>` provider, as they represent global shell or utility structures.
+
+- `"Shell.AppBar"` — The header bar at the top of the page.
+- `"Shell.Drawer"` — The collapsible main sidebar drawer.
+- `"Shell.DrawerNavigationItem"` — Sidebar navigation link.
+- `"Shell.DrawerNavigationGroup"` — Sidebar navigation group header.
+- `"HomePage"` — The landing dashboard of the CMS (when in content mode).
+- `"HomePage.CollectionCard"` — Individual collection link card on the home page.
+- `"Auth.LoginView"` — The login screen overlay.
+
+#### Collection-scoped Components (`CollectionComponentName`)
+These components can be overridden globally on `<Rebase>` (which acts as a fallback for all collections) or overridden on individual collections inside their definitions.
+
+- `"Collection.View"` — The container view for the collection.
+- `"Collection.Table"` — The default tabular data view.
+- `"Collection.Card"` — Individual card wrapper.
+- `"Collection.EmptyState"` — View shown when a collection is empty.
+- `"Collection.Actions"` — Toolbar actions header.
+- `"Entity.Form"` — The detail form view.
+- `"Entity.FormActions"` — Form action button bar.
+- `"Entity.DetailView"` — Read-only detail view.
+- `"Entity.SidePanel"` — Side panel wrapper.
+- `"Entity.Preview"` — Reference / relation preview chip.
+- `"Entity.MissingReference"` — Placeholder view when a relation references a deleted/non-existent entity.
+
 ## RebaseCMS Configuration
 
 `<RebaseCMS>` accepts the full `RebaseCMSConfig`:

@@ -185,7 +185,18 @@ hideFromCollection: true }
                 status: ["==", "archived"]
             }
         }
-    ]
+    ],
+    callbacks: {
+        beforeSave: ({ values }) => {
+            if (typeof values.title === "string" && !values.slug) {
+                values.slug = values.title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/(^-|-$)/g, "");
+            }
+            return values;
+        }
+    }
 };
 
 postsCollection.securityRules = [

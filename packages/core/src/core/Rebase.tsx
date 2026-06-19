@@ -1,6 +1,7 @@
 "use client";
 import type { RebaseProps } from "./RebaseProps";
 import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/types";
+import type { ComponentOverrideMap } from "@rebasepro/types";
 
 import React, { useMemo } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
@@ -19,6 +20,7 @@ import { ModeControllerProvider, AdminModeControllerProvider, SnackbarProvider }
 import { RebaseI18nProvider } from "../i18n/RebaseI18nProvider";
 import { RebaseRegistryProvider } from "../hooks/useRebaseRegistry";
 import { SchemaDriftProvider } from "../components/SchemaDriftBanner";
+import { GlobalComponentOverrideProvider } from "../contexts/ComponentOverrideContext";
 import { useBuildModeController } from "../hooks/useBuildModeController";
 import { useBuildAdminModeController } from "../hooks/useBuildAdminModeController";
 import { RebaseClientInstanceContext } from "../contexts/RebaseClientInstanceContext";
@@ -61,12 +63,12 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         propertyConfigs,
         entityViews,
         entityActions,
-        components,
         apiKey,
 
         effectiveRoleController,
         apiUrl,
-        translations
+        translations,
+        components: componentsProp
     } = props;
 
     const plugins = pluginsProp;
@@ -153,8 +155,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         entityViews: entityViews ?? [],
         entityActions: entityActions ?? [],
         propertyConfigs: propertyConfigs ?? {},
-        components
-    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, entityActions, propertyConfigs, components]);
+        components: componentsProp
+    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, entityActions, propertyConfigs, componentsProp]);
 
     const analyticsController = useMemo(() => ({
         onAnalyticsEvent
@@ -178,6 +180,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
 
     const content = (
         <RebaseI18nProvider locale={locale} translations={translations}>
+        <GlobalComponentOverrideProvider overrides={componentsProp}>
         <SnackbarProvider>
         <ModeControllerProvider value={modeController}>
         <AdminModeControllerProvider value={adminModeController}>
@@ -217,6 +220,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         </AdminModeControllerProvider>
         </ModeControllerProvider>
         </SnackbarProvider>
+        </GlobalComponentOverrideProvider>
         </RebaseI18nProvider>
     );
 
@@ -256,13 +260,13 @@ function RebaseInternal({
         && !authController.authLoading
         && (Boolean(authController.user) || authController.loginSkipped);
 
-    if (authReady && plugins && plugins.length > 0) {
+    if (plugins && plugins.length > 0) {
         return (
             <PluginProviderStack
                 plugins={plugins}
                 scope="root"
                 scopeProps={{ context }}>
-                <PluginLifecycleManager plugins={plugins} context={context}/>
+                {authReady && <PluginLifecycleManager plugins={plugins} context={context}/>}
                 {childrenResult}
             </PluginProviderStack>
         );

@@ -11,6 +11,7 @@ import type { Relation } from "./relations";
 import type { EntityCustomView, FormViewConfig } from "./entity_views";
 import type { EntityAction } from "./entity_actions";
 import type { ComponentRef } from "./component_ref";
+import type { CollectionComponentOverrideMap } from "./component_overrides";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -423,6 +424,31 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * When defined, the backend enforces access control policies.
      */
     securityRules?: SecurityRule[];
+
+    /**
+     * Collection-scoped component overrides. These take precedence over
+     * global overrides set on `<Rebase>`, but only within this collection's
+     * views (entity form, detail view, table, empty state, etc.).
+     *
+     * Only collection-scoped components (like `Entity.Form`, `Collection.EmptyState`,
+     * `Collection.Card`, etc.) can be overridden here. App-level components
+     * (like `Shell.AppBar`, `HomePage`) can only be overridden at the `<Rebase>` level.
+     *
+     * @example
+     * ```tsx
+     * const productsCollection: PostgresCollection = {
+     *     name: "Products",
+     *     slug: "products",
+     *     table: "products",
+     *     components: {
+     *         "Entity.Form": { Component: ProductCustomForm },
+     *         "Collection.Card": { Component: ProductCard },
+     *     },
+     *     properties: { ... }
+     * };
+     * ```
+     */
+    components?: CollectionComponentOverrideMap;
 }
 
 // ── Driver-specific collection types ──────────────────────────────────

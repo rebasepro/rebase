@@ -1,0 +1,120 @@
+---
+title: Component Overrides (Swizzling)
+sidebar_label: Component Overrides
+description: Override default UI components with custom implementations at the application or collection level.
+---
+
+## Overview
+
+Rebase allows you to override default UI components with your own custom implementations. This implements a Docusaurus-style component swizzling model that supports two customization patterns:
+- **Eject mode** (default): Your component fully replaces the built-in one.
+- **Wrap mode** (`wrap: true`): Your component wraps the original. The built-in component is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
+
+Component overrides can be applied **globally** at the application level (on the `<Rebase>` provider) or **locally** at the collection level (inside individual collection definitions).
+
+---
+
+## Global Component Overrides
+
+To override components globally across your entire application, pass a `components` object to the root `<Rebase>` provider.
+
+```tsx
+import { Rebase } from "@rebasepro/core";
+import { MyAppBar } from "./components/MyAppBar";
+
+function App() {
+    return (
+        <Rebase
+            client={rebaseClient}
+            components={{
+                // Eject Mode: Replace the default AppBar entirely
+                "Shell.AppBar": { Component: MyAppBar },
+
+                // Wrap Mode: Wrap the login view to insert branding
+                "Auth.LoginView": {
+                    Component: ({ OriginalComponent, ...props }) => (
+                        <div className="login-branding-container">
+                            <header className="branding-header">My Custom Brand</header>
+                            <OriginalComponent {...props} />
+                        </div>
+                    ),
+                    wrap: true
+                }
+            }}
+        >
+            {/* ... */}
+        </Rebase>
+    );
+}
+```
+
+---
+
+## Collection-Level Component Overrides
+
+To override components only for a specific collection, add a `components` object to its definition. This is useful for customizing empty states, cards, or detail views for particular models.
+
+```typescript
+import { PostgresCollection } from "@rebasepro/types";
+import { ProductCustomForm } from "./components/ProductCustomForm";
+
+const productsCollection: PostgresCollection = {
+    name: "Products",
+    slug: "products",
+    table: "products",
+    components: {
+        // Eject Mode: Replace the default entity form view
+        "Entity.Form": { Component: ProductCustomForm },
+
+        // Wrap Mode: Wrap the empty state to add quick links
+        "Collection.EmptyState": {
+            Component: ({ OriginalComponent, ...props }) => (
+                <div className="empty-state-wrapper">
+                    <OriginalComponent {...props} />
+                    <button onClick={() => importDemoProducts()}>
+                        Load Demo Products
+                    </button>
+                </div>
+            ),
+            wrap: true
+        }
+    },
+    properties: { /* ... */ }
+};
+```
+
+---
+
+## Overridable Components Scopes
+
+### App-Scoped Components (`AppComponentName`)
+
+These components can only be overridden at the root `<Rebase>` provider level since they represent shell-level structure.
+
+| Component Key | Description |
+|---|---|
+| `"Shell.AppBar"` | The header bar at the top of the page |
+| `"Shell.Drawer"` | The collapsible main sidebar navigation drawer |
+| `"Shell.DrawerNavigationItem"` | Individual links inside the sidebar |
+| `"Shell.DrawerNavigationGroup"` | Collapsible navigation group headers in the sidebar |
+| `"HomePage"` | The default content-mode home landing page |
+| `"HomePage.CollectionCard"` | Individual collection cards on the home page |
+| `"Auth.LoginView"` | The overlay shown when requesting authentication |
+
+### Collection-Scoped Components (`CollectionComponentName`)
+
+These components can be overridden globally (acting as defaults for all collections) or on individual collections.
+
+| Component Key | Original Props | Description |
+|---|---|---|
+| `"Collection.View"` | `CollectionViewProps` | The entire collection landing page |
+| `"Collection.Table"` | `CollectionTableProps` | The default spreadsheet tabular view |
+| `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
+| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | View shown when a collection is empty |
+| `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
+| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
+| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
+| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
+| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
+| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
+| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is missing |

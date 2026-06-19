@@ -14,7 +14,7 @@ export interface Database {
       twitter?: string;
       github?: string;
       website?: string;
-      userid?: string;
+      userId?: string;
     };
     Insert: {
       id?: string;
@@ -25,7 +25,7 @@ export interface Database {
       twitter?: string;
       github?: string;
       website?: string;
-      userid?: string;
+      userId?: string;
     };
     Update: {
       id?: string;
@@ -36,7 +36,7 @@ export interface Database {
       twitter?: string;
       github?: string;
       website?: string;
-      userid?: string;
+      userId?: string;
     };
   };
   customers: {
@@ -160,22 +160,22 @@ export interface Database {
   orderItems: {
     Row: {
       id?: string;
-      productName: string;
+      productName?: string;
       sku?: string;
       quantity: number;
-      unitPrice: number;
+      unitPrice?: number;
       lineTotal?: number;
       orderId?: string;
       productId?: string;
-      order?: { id: string | number; path: string; __type: "relation"; data?: any };
-      product?: { id: string | number; path: string; __type: "relation"; data?: any };
+      order?: { id: string | number; path: string; __type: "relation"; data?: unknown };
+      product?: { id: string | number; path: string; __type: "relation"; data?: unknown };
     };
     Insert: {
       id?: string;
-      productName: string;
+      productName?: string;
       sku?: string;
       quantity: number;
-      unitPrice: number;
+      unitPrice?: number;
       lineTotal?: number;
       orderId?: string | number;
       productId?: string | number;
@@ -201,7 +201,7 @@ export interface Database {
       taxAmount?: number;
       shippingCost?: number;
       discountAmount?: number;
-      total: number;
+      total?: number;
       currency?: "USD" | "EUR" | "GBP" | "CAD" | "AUD";
       shippingAddress?: string;
       trackingNumber?: string;
@@ -212,7 +212,7 @@ export interface Database {
       createdAt?: string;
       updatedAt?: string;
       customerId?: string;
-      customer?: { id: string | number; path: string; __type: "relation"; data?: any };
+      customer?: { id: string | number; path: string; __type: "relation"; data?: unknown };
     };
     Insert: {
       id?: string;
@@ -223,7 +223,7 @@ export interface Database {
       taxAmount?: number;
       shippingCost?: number;
       discountAmount?: number;
-      total: number;
+      total?: number;
       currency?: "USD" | "EUR" | "GBP" | "CAD" | "AUD";
       shippingAddress?: string;
       trackingNumber?: string;
@@ -264,14 +264,14 @@ export interface Database {
       slug: string;
       heroImage?: string;
       excerpt?: string;
-      content?: Array<any>;
+      content?: Array<unknown>;
       status: "draft" | "needs_review" | "published" | "archived";
       publishDate?: string;
       createdAt?: string;
       updatedAt?: string;
       authorId?: string;
-      author?: { id: string | number; path: string; __type: "relation"; data?: any };
-      tags?: Array<{ id: string | number; path: string; __type: "relation"; data?: any }>;
+      author?: { id: string | number; path: string; __type: "relation"; data?: unknown };
+      tags?: Array<{ id: string | number; path: string; __type: "relation"; data?: unknown }>;
     };
     Insert: {
       id?: string;
@@ -279,7 +279,7 @@ export interface Database {
       slug: string;
       heroImage?: string;
       excerpt?: string;
-      content?: Array<any>;
+      content?: Array<unknown>;
       status: "draft" | "needs_review" | "published" | "archived";
       publishDate?: string;
       createdAt?: string;
@@ -292,7 +292,7 @@ export interface Database {
       slug?: string;
       heroImage?: string;
       excerpt?: string;
-      content?: Array<any>;
+      content?: Array<unknown>;
       status?: "draft" | "needs_review" | "published" | "archived";
       publishDate?: string;
       createdAt?: string;
@@ -307,7 +307,7 @@ export interface Database {
       name?: string;
       description?: string;
       productId?: string;
-      product?: { id: string | number; path: string; __type: "relation"; data?: any };
+      product?: { id: string | number; path: string; __type: "relation"; data?: unknown };
     };
     Insert: {
       id?: string;
@@ -392,32 +392,6 @@ export interface Database {
       updatedAt?: string;
     };
   };
-  roles: {
-    Row: {
-      id: string;
-      name: string;
-      isadmin?: boolean;
-      defaultpermissions?: { read: boolean; create: boolean; edit: boolean; delete: boolean; };
-      collectionpermissions?: Record<string, any>;
-      config?: { createcollections: boolean; editcollections: string; deletecollections: string; };
-    };
-    Insert: {
-      id: string;
-      name: string;
-      isadmin?: boolean;
-      defaultpermissions?: { read: boolean; create: boolean; edit: boolean; delete: boolean; };
-      collectionpermissions?: Record<string, any>;
-      config?: { createcollections: boolean; editcollections: string; deletecollections: string; };
-    };
-    Update: {
-      id?: string;
-      name?: string;
-      isadmin?: boolean;
-      defaultpermissions?: { read: boolean; create: boolean; edit: boolean; delete: boolean; };
-      collectionpermissions?: Record<string, any>;
-      config?: { createcollections: boolean; editcollections: string; deletecollections: string; };
-    };
-  };
   tags: {
     Row: {
       id: string;
@@ -447,7 +421,7 @@ export interface Database {
       updatedAt?: string;
       order?: string;
       customerId?: string;
-      customer?: { id: string | number; path: string; __type: "relation"; data?: any };
+      customer?: { id: string | number; path: string; __type: "relation"; data?: unknown };
     };
     Insert: {
       id?: string;
@@ -484,42 +458,44 @@ export interface Database {
     Row: {
       id?: string;
       email: string;
-      displayname: string;
-      photourl?: string;
-      passwordhash?: string;
-      emailverified?: boolean;
-      emailverificationtoken?: string;
-      emailverificationsentat?: string;
-      metadata?: Record<string, any>;
-      createdat?: string;
-      updatedat?: string;
-      roles?: Array<{ id: string | number; path: string; __type: "relation"; data?: any }>;
+      displayName: string;
+      photoURL?: string;
+      roles?: Array<"admin" | "editor" | "viewer">;
+      passwordHash?: string;
+      emailVerified?: boolean;
+      emailVerificationToken?: string;
+      emailVerificationSentAt?: string;
+      metadata?: Record<string, unknown>;
+      createdAt?: string;
+      updatedAt?: string;
     };
     Insert: {
       id?: string;
       email: string;
-      displayname: string;
-      photourl?: string;
-      passwordhash?: string;
-      emailverified?: boolean;
-      emailverificationtoken?: string;
-      emailverificationsentat?: string;
-      metadata?: Record<string, any>;
-      createdat?: string;
-      updatedat?: string;
+      displayName: string;
+      photoURL?: string;
+      roles?: Array<"admin" | "editor" | "viewer">;
+      passwordHash?: string;
+      emailVerified?: boolean;
+      emailVerificationToken?: string;
+      emailVerificationSentAt?: string;
+      metadata?: Record<string, unknown>;
+      createdAt?: string;
+      updatedAt?: string;
     };
     Update: {
       id?: string;
       email?: string;
-      displayname?: string;
-      photourl?: string;
-      passwordhash?: string;
-      emailverified?: boolean;
-      emailverificationtoken?: string;
-      emailverificationsentat?: string;
-      metadata?: Record<string, any>;
-      createdat?: string;
-      updatedat?: string;
+      displayName?: string;
+      photoURL?: string;
+      roles?: Array<"admin" | "editor" | "viewer">;
+      passwordHash?: string;
+      emailVerified?: boolean;
+      emailVerificationToken?: string;
+      emailVerificationSentAt?: string;
+      metadata?: Record<string, unknown>;
+      createdAt?: string;
+      updatedAt?: string;
     };
   };
 }
@@ -536,8 +512,7 @@ export const collectionsDictionary = {
   posts: "posts",
   productLocales: "product_locales",
   products: "products",
-  roles: "roles",
   tags: "tags",
   tickets: "tickets",
-  users: "users"
+  users: "users",
 } as const;

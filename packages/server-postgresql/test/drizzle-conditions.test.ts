@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq } from "drizzle-orm";
-import { integer, pgTable, primaryKey, serial, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { EntityCollection, Relation } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
+import { getColumnMeta } from "../src/services/entity-helpers";
 
 // Mock tables for testing
 const mockAuthorsTable = pgTable("authors", {
@@ -900,37 +901,89 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
         id: serial("id").primaryKey(),
         name: varchar("name").notNull(),
         email: varchar("email").notNull(),
-        age: integer("age")
+        age: integer("age"),
+        tags: text("tags").array()
     });
 
     describe("buildSingleFilterCondition - array-contains", () => {
-        it("should generate a non-null condition for a single value", () => {
+        const { PgDialect } = require("drizzle-orm/pg-core");
+        const pgDialect = new PgDialect();
+
+        it("should generate a native array condition for native array columns", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.tags,
+                "array-contains",
+                "featured"
+            );
+            expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."tags" @> ARRAY[$1]');
+            expect(query.params).toEqual(["featured"]);
+        });
+
+        it("should generate a JSONB condition for non-native array columns", () => {
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.name,
                 "array-contains",
                 "featured"
             );
             expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."name" @> $1');
+            expect(query.params).toEqual(['["featured"]']);
         });
     });
 
     describe("buildSingleFilterCondition - array-contains-any", () => {
-        it("should generate a non-null condition for an array of values", () => {
+        const { PgDialect } = require("drizzle-orm/pg-core");
+        const pgDialect = new PgDialect();
+
+        it("should generate a native array overlap condition for native array columns", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.tags,
+                "array-contains-any",
+                ["featured", "popular", "trending"]
+            );
+            expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."tags" && ARRAY[$1, $2, $3]');
+            expect(query.params).toEqual(["featured", "popular", "trending"]);
+        });
+
+        it("should generate a JSONB overlap (?|) condition for non-native array columns", () => {
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.name,
                 "array-contains-any",
                 ["featured", "popular", "trending"]
             );
             expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."name" ?| array[$1, $2, $3]');
+            expect(query.params).toEqual(["featured", "popular", "trending"]);
         });
 
-        it("should fallback to array-contains for a single (non-array) value", () => {
+        it("should fallback to native array-contains for native array columns with single value", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.tags,
+                "array-contains-any",
+                "featured"
+            );
+            expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."tags" @> ARRAY[$1]');
+            expect(query.params).toEqual(["featured"]);
+        });
+
+        it("should fallback to JSONB array-contains for non-native array columns with single value", () => {
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.name,
                 "array-contains-any",
                 "featured"
             );
             expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."name" @> $1');
+            expect(query.params).toEqual(['["featured"]']);
         });
     });
 

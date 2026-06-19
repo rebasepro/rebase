@@ -182,6 +182,9 @@ export default productsCollection;
 | `childCollections` | `() => EntityCollection[]` | — | Nested child collections (populated automatically) |
 | `overrides` | `EntityOverrides` | — | Override data source or storage source |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
+| `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
+| `components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
+
 
 ## Common Property Options (BaseProperty)
 
@@ -1095,6 +1098,110 @@ if (!entity) {
 }
 ```
 This narrows the type of `entity` for the remainder of the component, allowing safe property access (e.g. `entity.id`, `entity.values.field`).
+
+## Entity Preview & Title Resolution
+
+### Title Property Selection
+By default, the property used as the entity's display title (previews, headers) is resolved as follows:
+1. If `titleProperty` is explicitly specified on the collection, it is used.
+2. If `propertiesOrder` is explicitly defined on the collection, the first non-ID property that is either a `relation` or `string` type is chosen as the title key.
+3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+
+### Relation Previews in Tables
+When `propertiesOrder` is explicitly set, relation properties are *not* automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
+
+### resolveTitleToString Utility
+Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, renderable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data, falling back to stringified IDs or JSON representations.
+
+## Collection-Scoped Component Overrides
+
+You can override built-in UI components for a specific collection by adding a `components` map to its definition. This is a collection-level implementation of Docusaurus-style swizzling.
+
+Only collection-scoped components can be overridden here. App-level components (such as `Shell.AppBar` or `HomePage`) must be overridden globally at the `<Rebase>` root.
+
+```typescript
+import { PostgresCollection } from "@rebasepro/types";
+
+const productsCollection: PostgresCollection = {
+    name: "Products",
+    slug: "products",
+    table: "products",
+    components: {
+        // Eject Mode: Replace the empty state view entirely
+        "Collection.EmptyState": { Component: ProductCustomEmptyState },
+        
+        // Wrap Mode: Wrap the built-in form, augmenting it
+        "Entity.Form": {
+            Component: ({ OriginalComponent, ...props }) => (
+                <div>
+                    <div className="bg-amber-100 p-2 text-amber-800 text-sm">Editing Product</div>
+                    <OriginalComponent {...props} />
+                </div>
+            ),
+            wrap: true
+        }
+    },
+    properties: { ... }
+};
+```
+
+### Collection-Scoped Overridable Components
+
+| Component Key | Original Props | Description |
+|---|---|---|
+| `"Collection.View"` | `CollectionViewProps` | The entire collection landing page |
+| `"Collection.Table"` | `CollectionTableProps` | The default table view |
+| `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
+| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Displayed when a collection has no items |
+| `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
+| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
+| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
+| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
+| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
+| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
+| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is deleted or missing |
+
+## Authentication Collection Configuration (auth)
+
+You can mark a collection as an authentication collection by setting the `auth` property to `true` (shorthand for `{ enabled: true }`) or providing an `AuthCollectionConfig` object.
+
+This is the collection used for user credentials, password hashing, and user management. Rebase auto-injects required auth actions (like resetting passwords) and routes them through this config.
+
+```typescript
+import { PostgresCollection } from "@rebasepro/types";
+
+const customUsersCollection: PostgresCollection = {
+    name: "Members",
+    slug: "members",
+    table: "members",
+    auth: {
+        enabled: true,
+        // Override default user creation flow
+        onCreateUser: async (values, ctx) => {
+            const hash = await ctx.hashPassword("welcome123");
+            return {
+                values: { ...values, passwordHash: hash, emailVerified: true },
+                temporaryPassword: "welcome123"
+            };
+        },
+        // Override default password reset flow
+        onResetPassword: async (userId, ctx) => {
+            if (ctx.emailConfigured) {
+                const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+                const hash = await ctx.hashPassword(tempPassword);
+                // Custom email sending or persistence
+                return { temporaryPassword: tempPassword, invitationSent: false };
+            }
+            return { invitationSent: false };
+        },
+        // Override/disable default user management actions
+        actions: {
+            resetPassword: true // Or false to disable, or a custom EntityAction to replace the UI
+        }
+    },
+    properties: { ... }
+};
+```
 
 ## Vector Properties
 

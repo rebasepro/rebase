@@ -73,6 +73,8 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
+When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
+
 ## Quick Example
 
 ```typescript

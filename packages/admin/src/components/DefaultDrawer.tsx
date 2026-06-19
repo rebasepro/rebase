@@ -1,7 +1,7 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React, { useMemo } from "react";
 
-import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, useComponentOverride } from "@rebasepro/core";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 
@@ -161,6 +161,7 @@ function CMSNavigationContent() {
     const largeLayout = useLargeLayout();
     const adminModeController = useAdminModeController();
     const registry = useRebaseRegistry();
+    const ResolvedDrawerNavigationGroup = useComponentOverride("Shell.DrawerNavigationGroup", DrawerNavigationGroup);
 
     const allNavigationEntries = navigationState.topLevelNavigation?.navigationEntries ?? [];
 
@@ -223,7 +224,7 @@ context });
             {groupsToRender.map((group) => {
                 const entriesInGroup = filteredEntries.filter(e => e.group === group);
                 return (
-                    <DrawerNavigationGroup
+                    <ResolvedDrawerNavigationGroup
                         key={`drawer_group_${group}`}
                         group={group}
                         entries={entriesInGroup}

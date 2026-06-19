@@ -270,6 +270,14 @@ In multi-instance deployments (e.g., behind a load balancer), Rebase uses Postgr
 
 This is **automatic** and requires no additional configuration. The dedicated `LISTEN` connection auto-reconnects with a 3-second delay if it drops.
 
+## Pending Request Timeout
+
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ENTITY`, creating/updating `SAVE_ENTITY`, deletes `DELETE_ENTITY`, counts `COUNT_ENTITIES`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
+
+If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
+
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_entity`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+
 ## Next Steps
 
 - [Client SDK](/docs/client-sdk) — Full SDK reference including typed collection accessors.

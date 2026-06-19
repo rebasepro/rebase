@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { Entity, EntityRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useEntityFetch, ErrorView } from "@rebasepro/core";
+import { useCustomizationController, useEntityFetch, ErrorView, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
 import { EntityPreview, EntityPreviewContainer } from "../../components";
 import { useCollectionRegistryController } from "../../index";
@@ -42,7 +42,9 @@ export const RelationPreview = function RelationPreview(props: RelationPreviewPr
     return <RelationPreviewInternal {...props}/>;
 };
 
-function RelationPreviewInternal({
+const DefaultMissingReference: React.FC<{ path: string }> = () => null;
+
+function RelationPreviewInternalInner({
     disabled,
     relation,
     previewProperties,
@@ -51,17 +53,14 @@ function RelationPreviewInternal({
     onClick,
     includeEntityLink = true,
     includeId = true,
-    textOnly
-}: RelationPreviewProps) {
+    textOnly,
+    collection
+}: RelationPreviewProps & { collection?: EntityCollection }) {
+    const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
 
-    const customizationController = useCustomizationController();
-
-    const collectionRegistryController = useCollectionRegistryController();
-
-    const collection = collectionRegistryController.getCollection(relation.path);
     if (!collection) {
-        if (customizationController.components?.missingReference) {
-            return <customizationController.components.missingReference path={relation.path}/>;
+        if (ResolvedMissingReference !== DefaultMissingReference) {
+            return <ResolvedMissingReference path={relation.path}/>;
         } else {
             if (textOnly) {
                 return <span>{relation.path}</span>;
@@ -85,6 +84,27 @@ function RelationPreviewInternal({
         hover={hover}/>
 }
 
+function RelationPreviewInternal(props: RelationPreviewProps) {
+    const collectionRegistryController = useCollectionRegistryController();
+    const collection = collectionRegistryController.getCollection(props.relation.path);
+
+    const content = (
+        <RelationPreviewInternalInner
+            {...props}
+            collection={collection}
+        />
+    );
+
+    if (collection?.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={collection.components}>
+                {content}
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return content;
+}
+
 function RelationPreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
     relation,
     collection,
@@ -101,6 +121,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
 }) {
 
     const passedEntity = relation.data;
+    const ResolvedEntityPreview = useComponentOverride("Entity.Preview", EntityPreview);
     const customizationController = useCustomizationController();
 
     const {
@@ -175,7 +196,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         return <span className="truncate">{displayValue}</span>;
     }
 
-    return <EntityPreview size={size}
+    return <ResolvedEntityPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}
         entity={usedEntity}

@@ -243,7 +243,7 @@ code: "AUTH_FAILED" } }
             const fetchPromise = client.fetchCollection({ path: "users" });
             expect((client as any).messageQueue.length).toBe(1);
 
-            jest.runAllTimers();
+            jest.runOnlyPendingTimers();
             await Promise.resolve();
 
             const ws = getWs();

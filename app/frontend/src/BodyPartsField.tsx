@@ -10,7 +10,7 @@ import bodyBackImg from "./assets/body_back.png";
  * Hotspot zone: a percentage-based rectangle placed over the body image.
  * `view` controls whether the zone appears on the "front" or "back" illustration.
  */
-interface HotspotZone {
+export interface HotspotZone {
     top: number;
     left: number;
     width: number;
@@ -23,7 +23,7 @@ interface HotspotZone {
  * Coordinates are percentages relative to each image container.
  * Keyed by the enum ID from the collection definition.
  */
-const HOTSPOT_ZONES: Record<string, HotspotZone[]> = {
+export const HOTSPOT_ZONES: Record<string, HotspotZone[]> = {
     // Head: y=4-18%, x=45-55% (centered head/neck region)
     head_neck: [
         { top: 4,

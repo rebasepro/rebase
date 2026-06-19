@@ -110,10 +110,21 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                         <div
                             className={`flex items-center justify-${column.headerAlign} flex-row`}>
 
-                            {column.icon}
+                            {column.icon && (
+                                <div className="flex-shrink-0 flex items-center justify-center mr-1">
+                                    {React.isValidElement(column.icon) ? (
+                                        React.cloneElement(column.icon as React.ReactElement<any>, {
+                                            size: 14,
+                                            className: cls((column.icon as React.ReactElement<any>).props?.className, "flex-shrink-0")
+                                        })
+                                    ) : (
+                                        column.icon
+                                    )}
+                                </div>
+                            )}
 
                             <div
-                                className="truncate -webkit-box w-full mx-1 overflow-hidden"
+                                className="truncate -webkit-box w-full mr-1 overflow-hidden"
                                 style={{
                                     WebkitBoxOrient: "vertical",
                                     WebkitLineClamp: 2,
@@ -130,27 +141,29 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                             <AdditionalHeaderWidget onHover={onHover || openFilter}/>}
 
                         {column.sortable && (sort || hovered || openFilter) &&
-                            <Badge color="secondary"
-                                invisible={!sort}>
-                                <IconButton
-                                    size={"small"}
-                                    className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
-                                    onClick={() => {
-                                        onColumnSort(column.key as Extract<keyof M, string>);
-                                    }}
-                                >
-                                    {!sort &&
-                                        <ArrowUpIcon/>}
-                                    {sort === "asc" &&
-                                        <ArrowUpIcon/>}
-                                    {sort === "desc" &&
-                                        <ArrowUpIcon className={"rotate-180"}/>}
-                                </IconButton>
-                            </Badge>
+                            <div className="flex-shrink-0">
+                                <Badge color="secondary"
+                                    invisible={!sort}>
+                                    <IconButton
+                                        size={"small"}
+                                        className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
+                                        onClick={() => {
+                                            onColumnSort(column.key as Extract<keyof M, string>);
+                                        }}
+                                    >
+                                        {!sort &&
+                                            <ArrowUpIcon size={14} className="flex-shrink-0" />}
+                                        {sort === "asc" &&
+                                            <ArrowUpIcon size={14} className="flex-shrink-0" />}
+                                        {sort === "desc" &&
+                                            <ArrowUpIcon size={14} className="flex-shrink-0 rotate-180" />}
+                                    </IconButton>
+                                </Badge>
+                            </div>
                         }
                     </>
 
-                    {column.filter && createFilterField && <div>
+                    {column.filter && createFilterField && <div className="flex-shrink-0">
                         <Badge color="secondary"
                             invisible={!filter}>
 
@@ -164,7 +177,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                                         className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
                                         size={"small"}
                                         onClick={handleSettingsClick}>
-                                        <FilterIcon size={iconSize.small}/>
+                                        <FilterIcon size={14} className="flex-shrink-0"/>
                                     </IconButton>}
                             >
                                 <FilterForm column={column}

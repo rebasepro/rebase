@@ -4,7 +4,7 @@ import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 ;
 import { IconForView } from "@rebasepro/core";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation, useComponentOverride } from "@rebasepro/core";
 
 export interface DrawerNavigationGroupProps {
     /**
@@ -66,6 +66,7 @@ export function DrawerNavigationGroup({
     hideHeader
 }: DrawerNavigationGroupProps) {
     const { t } = useTranslation();
+    const ResolvedDrawerNavigationItem = useComponentOverride("Shell.DrawerNavigationItem", DrawerNavigationItem);
     return (
         <div
             className={"my-2 mx-2 flex flex-col"}
@@ -112,7 +113,7 @@ export function DrawerNavigationGroup({
                 )}
             >
                 {entries.map((entry) => (
-                    <DrawerNavigationItem
+                    <ResolvedDrawerNavigationItem
                         key={entry.id}
                         icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={"small"}/>}
                         tooltipsOpen={!collapsed && tooltipsOpen}

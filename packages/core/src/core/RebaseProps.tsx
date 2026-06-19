@@ -1,5 +1,5 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
 
 /** DeepPartial helper — allows partial overrides at any nesting level */
 type DeepPartial<T> = T extends object
@@ -137,17 +137,6 @@ export type RebaseProps<USER extends User> = {
      */
     entityActions?: EntityAction[];
 
-    components?: {
-
-        /**
-         * Component to render when a reference is missing
-         */
-        missingReference?: React.ComponentType<{
-            path: string,
-        }>;
-
-    };
-
     /**
      * Controller to simulate different roles when dev mode is active.
      */
@@ -159,6 +148,29 @@ export type RebaseProps<USER extends User> = {
     translations?: {
         [locale: string]: DeepPartial<RebaseTranslations>;
     };
+
+    /**
+     * Override built-in UI components with custom implementations.
+     *
+     * Keys are component names from {@link OverridableComponentName}.
+     * Values specify the replacement component and an optional `wrap`
+     * flag for the wrapping pattern.
+     *
+     * @example
+     * ```tsx
+     * <Rebase
+     *     client={client}
+     *     components={{
+     *         "Shell.AppBar": { Component: MyCustomAppBar },
+     *         "Entity.FormActions": {
+     *             Component: MyFormActions,
+     *             wrap: true
+     *         }
+     *     }}
+     * >
+     * ```
+     */
+    components?: ComponentOverrideMap;
 
 };
 

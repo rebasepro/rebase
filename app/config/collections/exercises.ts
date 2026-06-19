@@ -246,11 +246,11 @@ hideFromCollection: true }
     },
     propertiesOrder: [
         "name",
+        "body_parts",
         "images",
         "status",
         "difficulty",
         "category",
-        "body_parts",
         "equipment",
         "is_compound",
         "default_reps",

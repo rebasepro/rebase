@@ -100,6 +100,54 @@ await initializeRebaseBackend({
 });
 ```
 
+### Collection-Level Auth Configuration
+
+Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
+
+```typescript
+import { PostgresCollection } from "@rebasepro/types";
+
+const membersCollection: PostgresCollection = {
+  name: "Members",
+  slug: "members",
+  table: "members",
+  auth: {
+    enabled: true,
+    
+    // Customize what happens when an admin creates a user via the REST API
+    onCreateUser: async (values, ctx) => {
+      const hash = await ctx.hashPassword("welcome123");
+      return {
+        values: { ...values, passwordHash: hash, emailVerified: true },
+        temporaryPassword: "welcome123"
+      };
+    },
+
+    // Customize what happens when an admin resets a user's password in the admin panel
+    onResetPassword: async (userId, ctx) => {
+      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      return {
+        temporaryPassword: tempPassword,
+        invitationSent: false
+      };
+    },
+
+    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
+    actions: {
+      resetPassword: true // Or false to disable, or a custom EntityAction
+    }
+  },
+  properties: { ... }
+};
+```
+
+When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
+- `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
+- `sendEmail?: (options) => Promise<void>` — Send an email (only available when email service is configured).
+- `emailConfigured: boolean` — Whether email service is configured.
+- `appName: string` — The app name from email config.
+- `resetPasswordUrl: string` — The password reset link base URL.
+
 ### First-User Bootstrap
 
 > **IMPORTANT FOR AGENTS:** The very first user registered (via `POST /auth/register` or OAuth) is automatically promoted to `"admin"`. This prevents the chicken-and-egg problem. All subsequent users receive the `defaultRole`.

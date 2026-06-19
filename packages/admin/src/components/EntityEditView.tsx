@@ -3,7 +3,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef } from "@rebasepro/core";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
@@ -146,15 +146,26 @@ export function EntityEditView<M extends Record<string, unknown>>({
         </CenteredView>;
     }
 
-    return <EntityEditViewInner<M> {...props}
-        entityId={entityId}
-        entity={entity}
-        initialDirtyValues={initialDirtyValues as Partial<M>}
-        dataLoading={dataLoading}
-        status={status}
-        setStatus={setStatus}
-        canEdit={canEdit}
-    />;
+    const content = (
+        <EntityEditViewInner<M> {...props}
+            entityId={entityId}
+            entity={entity}
+            initialDirtyValues={initialDirtyValues as Partial<M>}
+            dataLoading={dataLoading}
+            status={status}
+            setStatus={setStatus}
+            canEdit={canEdit}
+        />
+    );
+
+    if (props.collection.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={props.collection.components}>
+                {content}
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return content;
 }
 
 export function EntityEditViewInner<M extends Record<string, unknown>>({
@@ -184,6 +195,10 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
     setStatus: (status: EntityStatus) => void,
     canEdit?: boolean,
 }) {
+
+    const ResolvedFormActions = useComponentOverride("Entity.FormActions", EntityEditViewFormActions);
+    const ResolvedEntityForm = useComponentOverride("Entity.Form", EntityForm) as typeof EntityForm;
+    const ResolvedCollectionView = useComponentOverride("Collection.View", EntityCollectionView);
 
     const context = useRebaseContext();
     const urlController = useUrlController();
@@ -394,7 +409,7 @@ parentEntityIds,
 
                 {!globalLoading &&
                     (usedEntity && newFullPath
-                        ? <EntityCollectionView
+                        ? <ResolvedCollectionView
                             path={newFullPath}
                             parentCollectionSlugs={[...parentCollectionSlugs, collection.slug]}
                             parentEntityIds={[...parentEntityIds, String(usedEntity?.id)]}
@@ -480,7 +495,7 @@ parentEntityIds,
             </ErrorBoundary>
         </div>
     ) : (
-        <EntityForm<M>
+        <ResolvedEntityForm<M>
             collection={collection}
             path={path}
             entityId={entityId ?? usedEntity?.id}
@@ -491,7 +506,7 @@ parentEntityIds,
             forceActionsAtTheBottom={actionsAtTheBottom}
             initialStatus={status}
             className={cls((!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : "", formProps?.className)}
-            EntityFormActionsComponent={EntityEditViewFormActions}
+            EntityFormActionsComponent={ResolvedFormActions as React.FC<typeof ResolvedFormActions extends React.ComponentType<infer P> ? P : never>}
             disabled={!canEdit}
             navigateBack={navigateBack}
             {...formProps}
@@ -520,7 +535,7 @@ parentEntityIds,
     );
 
     const subcollectionTabs = subcollections && subcollections.map((subcollection) => {
-        const icon = getIcon(subcollection.icon, undefined, undefined, "small");
+        const icon = getIcon(subcollection.icon, undefined, undefined, "smallest");
         return (
             <Tab
                 className="text-sm min-w-[90px]"
@@ -536,7 +551,7 @@ parentEntityIds,
 
     const customViewTabsStart = resolvedEntityViews.filter(view => view.position === "start")
         .map((view) => {
-            const icon = getIcon(view.icon, undefined, undefined, "small");
+            const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
                     className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
@@ -553,7 +568,7 @@ parentEntityIds,
         });
     const customViewTabsEnd = resolvedEntityViews.filter(view => !view.position || view.position === "end")
         .map((view) => {
-            const icon = getIcon(view.icon, undefined, undefined, "small");
+            const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
                     className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
@@ -616,21 +631,24 @@ parentEntityIds,
                         disabled={!hasAdditionalViews}
                         value={JSON_TAB_VALUE}
                         className={"text-sm"}>
-                        <CodeIcon size={iconSize.small} />
+                        <CodeIcon size={iconSize.smallest} />
                     </Tab>}
 
                     {includeHistoryView && <Tab
                         disabled={!hasAdditionalViews}
                         value={HISTORY_TAB_VALUE}
                         className={"text-sm"}>
-                        <HistoryIcon size={iconSize.small} />
+                        <HistoryIcon size={iconSize.smallest} />
                     </Tab>}
 
                     <Tab
                         disabled={!hasAdditionalViews}
                         value={MAIN_TAB_VALUE}
                         className={"text-sm min-w-[90px]"}>
-                        {collection.singularName ?? collection.name}
+                        <span className="flex items-center gap-1.5">
+                            {getIcon(collection.icon, undefined, undefined, "smallest")}
+                            {collection.singularName ?? collection.name}
+                        </span>
                     </Tab>
 
                     {customViewTabsStart}

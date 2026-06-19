@@ -7,8 +7,7 @@ import { ReferencePreview } from "../../../preview";
 import { CollectionSize, Entity, EntityReference, FilterValues } from "@rebasepro/types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
-import { useCustomizationController } from "@rebasepro/core";
-import { ErrorView } from "@rebasepro/core";
+import { useComponentOverride, ErrorView, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreview";
 import { getReferenceFrom } from "@rebasepro/common";
@@ -29,20 +28,42 @@ type TableReferenceFieldProps = {
     includeEntityLink?: boolean;
 };
 
-export function TableReferenceField(props: TableReferenceFieldProps) {
-    const customizationController = useCustomizationController();
+const DefaultMissingReference: React.FC<{ path: string }> = () => null;
 
-    const collectionRegistryController = useCollectionRegistryController();
-    const { path } = props;
-    const collection = collectionRegistryController.getCollection(path);
+function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collection: EntityCollection | undefined }) {
+    const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
+    const { path, collection } = props;
+
     if (!collection) {
-        if (customizationController.components?.missingReference) {
-            return <customizationController.components.missingReference path={path}/>;
+        if (ResolvedMissingReference !== DefaultMissingReference) {
+            return <ResolvedMissingReference path={path}/>;
         } else {
             return <ErrorView error={`Collection not found: ${path}`}/>;
         }
     }
     return <TableReferenceFieldInternal {...props} collection={collection}/>;
+}
+
+export function TableReferenceField(props: TableReferenceFieldProps) {
+    const collectionRegistryController = useCollectionRegistryController();
+    const { path } = props;
+    const collection = collectionRegistryController.getCollection(path);
+
+    const content = (
+        <TableReferenceFieldResolver
+            {...props}
+            collection={collection}
+        />
+    );
+
+    if (collection?.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={collection.components}>
+                {content}
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return content;
 }
 
 export const TableReferenceFieldInternal = React.memo(

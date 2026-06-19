@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import { EntityCollectionView } from "./EntityCollectionView/EntityCollectionView";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { Typography } from "@rebasepro/ui";
+import { useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 
 /**
  * Props for the {@link CollectionPanel} component.
@@ -94,17 +95,44 @@ export type CollectionPanelProps = {
  *
  * @group Components
  */
-export function CollectionPanel({
+function CollectionPanelInner({
+    mergedCollection,
     path,
     title,
-    viewMode,
-    sort,
-    limit,
-    updateUrl = false,
-    openEntityMode,
-    className,
-    collectionOverrides
-}: CollectionPanelProps) {
+    updateUrl,
+    className
+}: CollectionPanelProps & { mergedCollection: EntityCollection }) {
+    const ResolvedCollectionView = useComponentOverride("Collection.View", EntityCollectionView);
+
+    return (
+        <div className={className}>
+            {title !== false && (
+                <Typography
+                    variant="subtitle2"
+                    className="font-bold mb-2 text-surface-700 dark:text-surface-300"
+                >
+                    {title ?? mergedCollection.name}
+                </Typography>
+            )}
+            <ResolvedCollectionView
+                {...mergedCollection}
+                path={path}
+                updateUrl={updateUrl}
+            />
+        </div>
+    );
+}
+
+export function CollectionPanel(props: CollectionPanelProps) {
+    const {
+        path,
+        viewMode,
+        sort,
+        limit,
+        openEntityMode,
+        className,
+        collectionOverrides
+    } = props;
     const collectionRegistry = useCollectionRegistryController();
     const registeredCollection = collectionRegistry.getCollection(path);
 
@@ -135,21 +163,19 @@ export function CollectionPanel({
         );
     }
 
-    return (
-        <div className={className}>
-            {title !== false && (
-                <Typography
-                    variant="subtitle2"
-                    className="font-bold mb-2 text-surface-700 dark:text-surface-300"
-                >
-                    {title ?? mergedCollection.name}
-                </Typography>
-            )}
-            <EntityCollectionView
-                {...mergedCollection}
-                path={path}
-                updateUrl={updateUrl}
-            />
-        </div>
+    const content = (
+        <CollectionPanelInner
+            {...props}
+            mergedCollection={mergedCollection}
+        />
     );
+
+    if (mergedCollection.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={mergedCollection.components}>
+                {content}
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return content;
 }

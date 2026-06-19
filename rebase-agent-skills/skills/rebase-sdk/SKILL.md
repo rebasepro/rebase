@@ -74,6 +74,12 @@ const rebase = createRebaseClient<Database>({
 });
 ```
 
+### Typed SDK Return Type
+
+The `createRebaseClient<DB>()` factory returns a reconciled client type of `CreateRebaseClientResult<DB>` (which extends the base `RebaseClient` from `@rebasepro/types`). 
+
+Passing your generated `Database` type maps camelCase collection names (e.g. `posts`) to their database schemas (`Row`, `Insert`, and `Update` types), providing autocomplete and type safety across the entire `data` layer.
+
 ### Configuration Options
 
 | Option | Type | Default | Description |

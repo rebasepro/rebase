@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { Entity, EntityReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useEntityFetch } from "@rebasepro/core";
+import { useCustomizationController, useEntityFetch, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
@@ -46,7 +46,9 @@ export const ReferencePreview = function ReferencePreview(props: ReferencePrevie
     </ErrorBoundary>;
 };
 
-function ReferencePreviewInternal({
+const DefaultMissingReference: React.FC<{ path: string }> = () => null;
+
+function ReferencePreviewInternalInner({
     disabled,
     reference,
     previewProperties,
@@ -55,17 +57,14 @@ function ReferencePreviewInternal({
     onClick,
     includeEntityLink = true,
     includeId = true,
-    textOnly
-}: ReferencePreviewProps) {
+    textOnly,
+    collection
+}: ReferencePreviewProps & { collection?: EntityCollection }) {
+    const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
 
-    const customizationController = useCustomizationController();
-
-    const collectionRegistryController = useCollectionRegistryController();
-
-    const collection = collectionRegistryController.getCollection(reference.path);
     if (!collection) {
-        if (customizationController.components?.missingReference) {
-            return <customizationController.components.missingReference path={reference.path}/>;
+        if (ResolvedMissingReference !== DefaultMissingReference) {
+            return <ResolvedMissingReference path={reference.path}/>;
         } else {
             if (textOnly) {
                 return <span>{reference.path}</span>;
@@ -92,6 +91,27 @@ function ReferencePreviewInternal({
         hover={hover}/>
 }
 
+function ReferencePreviewInternal(props: ReferencePreviewProps) {
+    const collectionRegistryController = useCollectionRegistryController();
+    const collection = collectionRegistryController.getCollection(props.reference.path);
+
+    const content = (
+        <ReferencePreviewInternalInner
+            {...props}
+            collection={collection}
+        />
+    );
+
+    if (collection?.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={collection.components}>
+                {content}
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return content;
+}
+
 function ReferencePreviewExisting<M extends Record<string, unknown> = Record<string, unknown>>({
     reference,
     collection,
@@ -107,6 +127,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     collection: EntityCollection<M>
 }) {
 
+    const ResolvedEntityPreview = useComponentOverride("Entity.Preview", EntityPreview);
     const customizationController = useCustomizationController();
 
     const {
@@ -181,7 +202,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         return <span className="truncate">{displayValue}</span>;
     }
 
-    return <EntityPreview size={size}
+    return <ResolvedEntityPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}
         entity={usedEntity}

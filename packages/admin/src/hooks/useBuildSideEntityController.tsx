@@ -11,10 +11,32 @@ import {
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/core";
-import { useCustomizationController, useLargeLayout } from "@rebasepro/core";
+import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EntityEditView";
 import React from "react";
 import { EntitySidePanel } from "../components/EntitySidePanel";
+
+/**
+ * Thin wrapper that resolves the Entity.SidePanel component override.
+ * Because the JSX is created inside `propsToSidePanel` (a plain function,
+ * not a React component), we need this wrapper so the hook is called at the
+ * top level of a React component per the Rules of Hooks.
+ */
+function ResolvedEntitySidePanelInner(props: EntitySidePanelProps) {
+    const Resolved = useComponentOverride("Entity.SidePanel", EntitySidePanel);
+    return <Resolved {...props}/>;
+}
+
+function ResolvedEntitySidePanel(props: EntitySidePanelProps) {
+    if (props.collection?.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={props.collection.components}>
+                <ResolvedEntitySidePanelInner {...props}/>
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return <ResolvedEntitySidePanelInner {...props}/>;
+}
 
 const NEW_URL_HASH = "new_side";
 const SIDE_URL_HASH = "side";
@@ -317,7 +339,7 @@ const propsToSidePanel = (props: EntitySidePanelProps,
     const entityViewWidth = getEntityViewWidth(props, smallLayout, customizationController);
     return {
         key: `${props.path}/${props.entityId}`,
-        component: <EntitySidePanel {...resolvedPanelProps}/>,
+        component: <ResolvedEntitySidePanel {...resolvedPanelProps}/>,
         urlPath: urlPath,
         parentUrlPath: parentUrlPath,
         width: entityViewWidth,

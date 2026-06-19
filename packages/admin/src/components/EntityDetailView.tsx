@@ -3,7 +3,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, Property } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef } from "@rebasepro/core";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
@@ -104,12 +104,23 @@ export function EntityDetailView<M extends Record<string, unknown>>({
         </CenteredView>;
     }
 
-    return <EntityDetailViewInner<M>
-        {...props}
-        entityId={entityId}
-        entity={entity}
-        dataLoading={dataLoading}
-    />;
+    const content = (
+        <EntityDetailViewInner<M>
+            {...props}
+            entityId={entityId}
+            entity={entity}
+            dataLoading={dataLoading}
+        />
+    );
+
+    if (props.collection.components) {
+        return (
+            <CollectionComponentOverrideProvider overrides={props.collection.components}>
+                {content}
+            </CollectionComponentOverrideProvider>
+        );
+    }
+    return content;
 }
 
 function EntityDetailViewInner<M extends Record<string, unknown>>({
@@ -129,6 +140,7 @@ function EntityDetailViewInner<M extends Record<string, unknown>>({
     entity?: Entity<M>,
     dataLoading: boolean,
 }) {
+    const ResolvedCollectionView = useComponentOverride("Collection.View", EntityCollectionView);
     const { t } = useTranslation();
     const context = useRebaseContext();
     const urlController = useUrlController();
@@ -327,7 +339,7 @@ entityId }
                 {globalLoading && <CircularProgressCenter />}
                 {!globalLoading &&
                     (usedEntity && newFullPath
-                        ? <EntityCollectionView
+                        ? <ResolvedCollectionView
                             path={newFullPath}
                             parentCollectionSlugs={[...parentCollectionSlugs, collection.slug]}
                             parentEntityIds={[...parentEntityIds, String(usedEntity?.id)]}
@@ -385,7 +397,7 @@ entityId }
 
     // Tabs
     const subcollectionTabs = subcollections && subcollections.map((subcollection) => {
-        const icon = getIcon(subcollection.icon, undefined, undefined, "small");
+        const icon = getIcon(subcollection.icon, undefined, undefined, "smallest");
         return (
             <Tab
                 className="text-sm min-w-[90px]"
@@ -401,7 +413,7 @@ entityId }
 
     const customViewTabsStart = resolvedEntityViews.filter(view => view.position === "start")
         .map((view) => {
-            const icon = getIcon(view.icon, undefined, undefined, "small");
+            const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
                     className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
@@ -418,7 +430,7 @@ entityId }
         });
     const customViewTabsEnd = resolvedEntityViews.filter(view => !view.position || view.position === "end")
         .map((view) => {
-            const icon = getIcon(view.icon, undefined, undefined, "small");
+            const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
                     className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
@@ -549,21 +561,24 @@ entityId }
                         disabled={!hasAdditionalViews}
                         value={JSON_TAB_VALUE}
                         className={"text-sm"}>
-                        <CodeIcon size={iconSize.small} />
+                        <CodeIcon size={iconSize.smallest} />
                     </Tab>}
 
                     {includeHistoryView && <Tab
                         disabled={!hasAdditionalViews}
                         value={HISTORY_TAB_VALUE}
                         className={"text-sm"}>
-                        <HistoryIcon size={iconSize.small} />
+                        <HistoryIcon size={iconSize.smallest} />
                     </Tab>}
 
                     <Tab
                         disabled={!hasAdditionalViews}
                         value={MAIN_TAB_VALUE}
                         className={"text-sm min-w-[90px]"}>
-                        {collection.singularName ?? collection.name}
+                        <span className="flex items-center gap-1.5">
+                            {getIcon(collection.icon, undefined, undefined, "smallest")}
+                            {collection.singularName ?? collection.name}
+                        </span>
                     </Tab>
 
                     {customViewTabsStart}

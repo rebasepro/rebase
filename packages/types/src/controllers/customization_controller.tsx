@@ -1,4 +1,4 @@
-import React from "react";
+
 import type { EntityLinkBuilder } from "../types/entity_link_builder";
 import type { Locale } from "../types/locales";
 import type { EntityAction } from "../types/entity_actions";
@@ -6,6 +6,7 @@ import type { EntityCustomView } from "../types/entity_views";
 import type { RebasePlugin } from "../types/plugins";
 import type { PropertyConfig } from "../types/property_config";
 import type { SlotContribution } from "../types/slots";
+import type { ComponentOverrideMap } from "../types/component_overrides";
 
 export type CustomizationController = {
 
@@ -59,14 +60,13 @@ export type CustomizationController = {
      */
     propertyConfigs: Record<string, PropertyConfig>;
 
-    components?: {
-
-        /**
-         * Component to render when a reference is missing
-         */
-        missingReference?: React.ComponentType<{
-            path: string,
-        }>;
-
-    };
+    /**
+     * Global component overrides. Keys are component names from
+     * {@link OverridableComponentName}. Values replace the default
+     * implementation everywhere in the app.
+     *
+     * Collection-scoped overrides (set on individual collections)
+     * take precedence over global overrides.
+     */
+    components?: ComponentOverrideMap;
 }

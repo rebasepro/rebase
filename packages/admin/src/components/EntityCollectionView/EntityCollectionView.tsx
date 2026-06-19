@@ -32,7 +32,9 @@ import {
     usePermissions,
     useTranslation,
     useSlot,
-    IconForView
+    IconForView,
+    useComponentOverride,
+    CollectionComponentOverrideProvider
 } from "@rebasepro/core";
 import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { EntityCollectionViewActions } from "./EntityCollectionViewActions";
@@ -142,8 +144,8 @@ export type EntityCollectionViewProps<M extends Record<string, unknown>> = {
 
  * @group Components
  */
-export const EntityCollectionView = React.memo(
-    function EntityCollectionView<M extends Record<string, unknown>>({
+const EntityCollectionViewInner = React.memo(
+    function EntityCollectionViewInner<M extends Record<string, unknown>>({
         path: pathProp,
 
         parentCollectionSlugs, parentEntityIds,
@@ -820,13 +822,18 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
                         plugin.hooks!.onColumnsReorder!({
                             fullPath: path,
                             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
+                            parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                             collection,
                             newPropertiesOrder
                         });
                     });
             }
-        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionSlugs]);
+
+            // Save to user configuration persistence (local storage)
+            if (userConfigPersistence) {
+                onCollectionModifiedForUser(path, { propertiesOrder: newPropertiesOrder } as PartialEntityCollection<M>);
+            }
+        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionSlugs, parentEntityIds, userConfigPersistence, onCollectionModifiedForUser]);
 
         // Popover open state managed at parent level to prevent closing when view changes
         const [viewModePopoverOpen, setViewModePopoverOpen] = useState(false);
@@ -859,27 +866,20 @@ parentEntityIds,
             ? pluginErrorViews[0]
             : null;
 
-        // Shared empty state — plugin slot takes priority, then default
+        // Shared empty state — plugin slot takes priority, then override, then default
         const isSearching = !!tableController.searchString;
         const isFilteredOrSorted = tableController.filterValues !== undefined || tableController.sortBy !== undefined || isSearching;
+        const ResolvedEmptyState = useComponentOverride("Collection.EmptyState", DefaultCollectionEmptyState);
+        const ResolvedCollectionActions = useComponentOverride("Collection.Actions", EntityCollectionViewActions);
+        const ResolvedCollectionTable = useComponentOverride("Collection.Table", EntityCollectionTable) as typeof EntityCollectionTable;
         const emptyComponent = pluginEmptyStates.length > 0
             ? <>{pluginEmptyStates}</>
-            : canCreateEntities && !isFilteredOrSorted
-                ? <div className="flex flex-col items-center justify-center">
-                    <Typography variant={"subtitle2"}>{t("so_empty")}</Typography>
-                    <Button
-                        onClick={onNewClick}
-                        className="mt-4"
-                    >
-                        <PlusIcon/>
-                        {t("create_your_first_entry")}
-                    </Button>
-                </div>
-                : <Typography variant={"label"}>
-                    {isSearching
-                        ? t("no_results_search", { search: tableController.searchString ?? "" })
-                        : t("no_results_filter_sort")}
-                </Typography>;
+            : <ResolvedEmptyState
+                canCreate={canCreateEntities && !isFilteredOrSorted}
+                onNewClick={onNewClick}
+                isSearching={isSearching}
+                searchString={tableController.searchString ?? ""}
+            />;
 
         const toolbarNode = (
             <CollectionTableToolbar
@@ -900,7 +900,7 @@ parentEntityIds,
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
                 actions={
-                    <EntityCollectionViewActions
+                    <ResolvedCollectionActions
                         parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentEntityIds={parentEntityIds ?? EMPTY_ARRAY}
                         collection={collection}
                         tableController={tableController}
@@ -915,7 +915,7 @@ parentEntityIds,
                         compact={isCompact}
                     >
                         {pluginToolbarWidgets}
-                    </EntityCollectionViewActions>
+                    </ResolvedCollectionActions>
                 }
             />
         ); const innerView = viewMode === "kanban" ? (
@@ -963,7 +963,7 @@ parentEntityIds,
                 openEntityMode={openEntityMode}
             />
         ) : (
-            <EntityCollectionTable
+            <ResolvedCollectionTable
                 key={`collection_table_${path}`}
                 hideToolbar={true}
                 additionalFields={additionalFields}
@@ -998,11 +998,19 @@ parentEntityIds,
             />
         );
 
-        return (
+        const mainContent = (
             <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col dark:bg-surface-800", className)}
                 ref={containerRef}>
 
                 {countFetcher}
+
+                {tableController.dataLoadingError && tableController.data.length > 0 && (
+                    <div className="flex items-center gap-4 px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 flex-shrink-0">
+                        <Typography variant="body2" className="text-red-700 dark:text-red-300 flex-1">
+                            <strong>Warning:</strong> {tableController.dataLoadingError.message || "Failed to update data."}
+                        </Typography>
+                    </div>
+                )}
 
 
                 {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
@@ -1162,6 +1170,8 @@ parentEntityIds,
 
             </div>
         );
+
+        return mainContent;
     }, (a, b) => {
         return equal(a.path, b.path) &&
             equal(a.parentCollectionSlugs, b.parentCollectionSlugs) && equal(a.parentEntityIds, b.parentEntityIds) &&
@@ -1184,7 +1194,67 @@ parentEntityIds,
             equal(a.fixedFilter, b.fixedFilter) &&
             equal(a.selectedEntityId, b.selectedEntityId) &&
             equal(a.selectedTab, b.selectedTab);
-    }) as React.FunctionComponent<EntityCollectionViewProps<any>>
+    }) as React.FunctionComponent<EntityCollectionViewProps<any>>;
+
+export const EntityCollectionView = React.memo(
+    function EntityCollectionView<M extends Record<string, unknown>>(props: EntityCollectionViewProps<M>) {
+        const collectionRegistry = useCollectionRegistryController();
+        const path = props.path ?? props.slug;
+        const collection = collectionRegistry.getCollection(path) ?? props;
+
+        const content = <EntityCollectionViewInner {...props} />;
+
+        if (collection?.components) {
+            return (
+                <CollectionComponentOverrideProvider overrides={collection.components}>
+                    {content}
+                </CollectionComponentOverrideProvider>
+            );
+        }
+        return content;
+    }
+) as React.FunctionComponent<EntityCollectionViewProps<any>>;
+
+/**
+ * Default empty state shown when a collection has no entities.
+ * Used as the fallback for the `"Collection.EmptyState"` component override.
+ *
+ * @internal
+ */
+function DefaultCollectionEmptyState({
+    canCreate,
+    onNewClick,
+    isSearching,
+    searchString
+}: {
+    canCreate: boolean;
+    onNewClick: () => void;
+    isSearching: boolean;
+    searchString: string;
+}) {
+    const { t } = useTranslation();
+    if (canCreate) {
+        return (
+            <div className="flex flex-col items-center justify-center">
+                <Typography variant={"subtitle2"}>{t("so_empty")}</Typography>
+                <Button
+                    onClick={onNewClick}
+                    className="mt-4"
+                >
+                    <PlusIcon/>
+                    {t("create_your_first_entry")}
+                </Button>
+            </div>
+        );
+    }
+    return (
+        <Typography variant={"label"}>
+            {isSearching
+                ? t("no_results_search", { search: searchString })
+                : t("no_results_filter_sort")}
+        </Typography>
+    );
+}
 
 /**
  * Inflight count request deduplication map.

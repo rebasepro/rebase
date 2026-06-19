@@ -755,7 +755,19 @@ export class RebaseWebSocketClient {
         const requestId = (message.requestId as string) || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         message.requestId = requestId;
 
-        if (!this.pendingRequests.has(requestId)) {
+        const expectsResponse = ![
+            "subscribe_collection",
+            "subscribe_entity",
+            "unsubscribe",
+            "join_channel",
+            "leave_channel",
+            "broadcast",
+            "presence_track",
+            "presence_untrack",
+            "presence_state"
+        ].includes(message.type as string);
+
+        if (expectsResponse && !this.pendingRequests.has(requestId)) {
             const timeoutHandle = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
@@ -778,8 +790,13 @@ export class RebaseWebSocketClient {
 
         try {
             this.ws!.send(JSON.stringify(message));
+            if (!expectsResponse) {
+                resolve(undefined);
+            }
         } catch (error) {
-            this.pendingRequests.delete(requestId);
+            if (expectsResponse) {
+                this.pendingRequests.delete(requestId);
+            }
             reject(new ApiError("Failed to send message", error instanceof Error ? error.message : "Unknown error"));
         }
     }

@@ -88,6 +88,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Frontend Setup", slug: "docs/frontend" },
+                        { label: "Component Overrides (Swizzling)", slug: "docs/frontend/component-overrides" },
                         { label: "Authentication & Login", slug: "docs/frontend/authentication" },
                         { label: "Storage & File Uploads", slug: "docs/frontend/storage" },
                         { label: "View Modes", slug: "docs/frontend/view-modes" },

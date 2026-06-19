@@ -184,27 +184,34 @@ export function mergeDeep<T extends object, U extends object>(
                 (output as Record<string, unknown>)[key] = new Date(sourceValue.getTime());
             } else if (Array.isArray(sourceValue)) {
                 if (Array.isArray(outputValue)) {
-                    const newArray = [];
-                    const maxLength = Math.max(outputValue.length, sourceValue.length);
-                    for (let i = 0; i < maxLength; i++) {
-                        const sourceItem = sourceValue[i];
-                        const targetItem = outputValue[i];
+                    // If the array contains primitives or class instances (non-plain objects),
+                    // overwrite the array entirely instead of doing element-wise merging.
+                    const hasPlainObjects = sourceValue.some(isPlainObject) || outputValue.some(isPlainObject);
+                    if (!hasPlainObjects) {
+                        (output as Record<string, unknown>)[key] = [...sourceValue];
+                    } else {
+                        const newArray = [];
+                        const maxLength = Math.max(outputValue.length, sourceValue.length);
+                        for (let i = 0; i < maxLength; i++) {
+                            const sourceItem = sourceValue[i];
+                            const targetItem = outputValue[i];
 
-                        if (i >= sourceValue.length) { // source is shorter
-                            newArray[i] = targetItem;
-                        } else if (i >= outputValue.length) { // target is shorter
-                            newArray[i] = sourceItem;
-                        } else if (sourceItem === null) {
-                            newArray[i] = targetItem;
-                        } else if (isPlainObject(sourceItem) && isPlainObject(targetItem)) {
-                            // Only recursively merge plain objects, preserve class instances
-                            newArray[i] = mergeDeep(targetItem, sourceItem, ignoreUndefined);
-                        } else {
-                            // For class instances and primitives, use source directly
-                            newArray[i] = sourceItem;
+                            if (i >= sourceValue.length) { // source is shorter
+                                newArray[i] = targetItem;
+                            } else if (i >= outputValue.length) { // target is shorter
+                                newArray[i] = sourceItem;
+                            } else if (sourceItem === null) {
+                                newArray[i] = targetItem;
+                            } else if (isPlainObject(sourceItem) && isPlainObject(targetItem)) {
+                                // Only recursively merge plain objects, preserve class instances
+                                newArray[i] = mergeDeep(targetItem, sourceItem, ignoreUndefined);
+                            } else {
+                                // For class instances and primitives, use source directly
+                                newArray[i] = sourceItem;
+                            }
                         }
+                        (output as Record<string, unknown>)[key] = newArray;
                     }
-                    (output as Record<string, unknown>)[key] = newArray;
                 } else {
                     // If output's value (from target) is not an array,
                     // overwrite with a shallow copy of the source array.

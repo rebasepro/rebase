@@ -9,7 +9,7 @@ import { EntityEditView } from "./EntityEditView";
 import { EntityDetailView } from "./EntityDetailView";
 import { useSideDialogContext } from "./SideDialogs";
 import { useNavigate } from "react-router-dom";
-import { saveEntityToMemoryCache } from "@rebasepro/core";
+import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/core";
 import { useCollectionRegistryController, useSideEntityController } from "../index";
 import { useUrlController } from "../index";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
@@ -31,6 +31,8 @@ export function EntitySidePanel(props: EntitySidePanelProps) {
         selectedTab,
         formProps
     } = props;
+
+    const ResolvedDetailView = useComponentOverride("Entity.DetailView", EntityDetailView);
 
     const {
         blocked,
@@ -145,7 +147,7 @@ entityId }
         <>
             <ErrorBoundary>
                 {isDetailMode
-                    ? <EntityDetailView
+                    ? <ResolvedDetailView
                         path={path}
                         layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
                         collection={collection as EntityCollection}

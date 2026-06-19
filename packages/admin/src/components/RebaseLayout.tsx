@@ -2,6 +2,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import {
     useAdminModeController,
+    useComponentOverride,
     useRebaseRegistry
 } from "@rebasepro/core";
 
@@ -52,14 +53,16 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     } = props;
 
     const adminModeController = useAdminModeController();
+    const ResolvedAppBar = useComponentOverride("Shell.AppBar", AppBar);
+    const ResolvedDrawer = useComponentOverride("Shell.Drawer", Drawer);
 
-    const ActiveAppBar = appBar ?? <AppBar
+    const ActiveAppBar = appBar ?? <ResolvedAppBar
         includeLanguageToggle={false}
         includeModeToggle={false}
         includeUserMenu={false}
     />;
     const ActiveDrawer = drawer ?? (
-        <Drawer
+        <ResolvedDrawer
             title={title}
             logoDestination={adminModeController.mode === "studio" ? "/s" : "/"}
         />

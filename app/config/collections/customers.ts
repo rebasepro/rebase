@@ -57,16 +57,19 @@ const customersCollection: PostgresCollection = {
         is_vip: {
             name: "VIP",
             type: "boolean",
-            description: "Whether this customer has VIP status"
+            ui: { readOnly: true },
+            description: "Whether this customer has VIP status (spent >= $1000)"
         },
         lifetime_value: {
             name: "Lifetime Value",
             type: "number",
+            ui: { readOnly: true },
             description: "Total amount spent across all orders"
         },
         total_orders: {
             name: "Total Orders",
             type: "number",
+            ui: { readOnly: true },
             description: "Number of orders placed"
         },
         shipping_address: {

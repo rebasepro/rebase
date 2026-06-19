@@ -129,6 +129,12 @@ z: 3 },
             expect(mergeDeep(target, source)).toEqual({ arr: [9, 8, 7] });
         });
 
+        it("should overwrite target primitive array with source primitive array completely", () => {
+            const target = { arr: ["a", "b", "c"] };
+            const source = { arr: ["c", "b"] };
+            expect(mergeDeep(target, source)).toEqual({ arr: ["c", "b"] });
+        });
+
         it("should ignore undefined values if ignoreUndefined flag is true", () => {
             const target = { a: 1,
 b: 2 };

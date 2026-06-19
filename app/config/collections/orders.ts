@@ -2,6 +2,14 @@ import { PostgresCollection } from "@rebasepro/types";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 
+// Helper function to extract ID from relation value (which can be primitive ID or expanded object)
+const getRelationId = (val: any): string | number | undefined => {
+    if (!val) return undefined;
+    if (typeof val === "object" && "id" in val) return val.id;
+    if (typeof val === "string" || typeof val === "number") return val;
+    return undefined;
+};
+
 const ordersCollection: PostgresCollection = {
     name: "Orders",
     singularName: "Order",
@@ -11,10 +19,7 @@ const ordersCollection: PostgresCollection = {
     group: "E-Commerce",
     history: true,
     defaultEntityAction: "view",
-    enabledViews: [
-        "table",
-        "kanban"
-    ],
+    enabledViews: ["table", "kanban"],
     kanban: {
         columnProperty: "status"
     },
@@ -51,41 +56,13 @@ const ordersCollection: PostgresCollection = {
             },
             defaultValue: "pending",
             enum: [
-                {
-                    id: "pending",
-                    label: "Pending",
-                    color: "orange"
-                },
-                {
-                    id: "confirmed",
-                    label: "Confirmed",
-                    color: "blue"
-                },
-                {
-                    id: "processing",
-                    label: "Processing",
-                    color: "cyan"
-                },
-                {
-                    id: "shipped",
-                    label: "Shipped",
-                    color: "purple"
-                },
-                {
-                    id: "delivered",
-                    label: "Delivered",
-                    color: "green"
-                },
-                {
-                    id: "cancelled",
-                    label: "Cancelled",
-                    color: "red"
-                },
-                {
-                    id: "refunded",
-                    label: "Refunded",
-                    color: "gray"
-                }
+                { id: "pending", label: "Pending", color: "orange" },
+                { id: "confirmed", label: "Confirmed", color: "blue" },
+                { id: "processing", label: "Processing", color: "cyan" },
+                { id: "shipped", label: "Shipped", color: "purple" },
+                { id: "delivered", label: "Delivered", color: "green" },
+                { id: "cancelled", label: "Cancelled", color: "red" },
+                { id: "refunded", label: "Refunded", color: "gray" }
             ]
         },
         payment_status: {
@@ -96,55 +73,40 @@ const ordersCollection: PostgresCollection = {
             },
             defaultValue: "unpaid",
             enum: [
-                {
-                    id: "unpaid",
-                    label: "Unpaid",
-                    color: "red"
-                },
-                {
-                    id: "paid",
-                    label: "Paid",
-                    color: "green"
-                },
-                {
-                    id: "partially_refunded",
-                    label: "Partially Refunded",
-                    color: "orange"
-                },
-                {
-                    id: "refunded",
-                    label: "Refunded",
-                    color: "gray"
-                }
+                { id: "unpaid", label: "Unpaid", color: "red" },
+                { id: "paid", label: "Paid", color: "green" },
+                { id: "partially_refunded", label: "Partially Refunded", color: "orange" },
+                { id: "refunded", label: "Refunded", color: "gray" }
             ]
         },
         subtotal: {
             name: "Subtotal",
             type: "number",
+            ui: { readOnly: true },
             description: "Sum of all line items before tax and shipping"
         },
         tax_amount: {
             name: "Tax",
             type: "number",
+            defaultValue: 0,
             description: "Tax amount"
         },
         shipping_cost: {
             name: "Shipping",
             type: "number",
+            defaultValue: 0,
             description: "Shipping cost"
         },
         discount_amount: {
             name: "Discount",
             type: "number",
+            defaultValue: 0,
             description: "Total discount applied"
         },
         total: {
             name: "Total",
             type: "number",
-            validation: {
-                required: true,
-                min: 0
-            },
+            ui: { readOnly: true },
             description: "Final order total (subtotal + tax + shipping - discount)"
         },
         currency: {
@@ -215,15 +177,13 @@ const ordersCollection: PostgresCollection = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: { readOnly: true, hideFromCollection: true }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: { readOnly: true, hideFromCollection: true }
         }
     },
     propertiesOrder: [
@@ -254,17 +214,41 @@ hideFromCollection: true }
             target: () => orderItemsCollection,
             cardinality: "many",
             direction: "inverse",
-            inverseRelationName: "order"
+            inverseRelationName: "order",
+            overrides: {
+                hideFromNavigation: false
+            }
         }
     ],
+    callbacks: {
+        beforeSave: ({ values }) => {
+            // Ensure total is kept in sync if tax, shipping or discount changes
+            const subtotal = Number(values.subtotal ?? 0);
+            const tax = Number(values.tax_amount ?? 0);
+            const shipping = Number(values.shipping_cost ?? 0);
+            const discount = Number(values.discount_amount ?? 0);
+            values.total = subtotal + tax + shipping - discount;
+            return values;
+        },
+        afterSave: async ({ values, previousValues, context }) => {
+            const customerId = getRelationId(values.customer) ?? getRelationId(previousValues?.customer);
+            if (customerId) {
+                await updateCustomerMetrics(customerId, context);
+            }
+        },
+        afterDelete: async ({ entity, context }) => {
+            const customerId = getRelationId(entity.values.customer);
+            if (customerId) {
+                await updateCustomerMetrics(customerId, context);
+            }
+        }
+    },
     securityRules: [
         {
             name: "test_policy",
             mode: "permissive",
             operation: "all",
-            pgRoles: [
-                "authenticated"
-            ],
+            pgRoles: ["authenticated"],
             using: "true"
         }
     ],
@@ -298,14 +282,29 @@ hideFromCollection: true }
     ]
 };
 
-ordersCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
+// Helper function to update customer lifetime value and total orders count
+async function updateCustomerMetrics(customerId: string | number, context: any) {
+    const { data: customerOrders } = await context.data.collection("orders").find({
+        where: {
+            customer: ["==", customerId],
+            status: ["!=", "cancelled"] // Ignore cancelled orders
+        }
+    });
+
+    const totalOrders = customerOrders.length;
+    const lifetimeValue = customerOrders.reduce((sum: number, order: any) => {
+        // Sum only paid or delivered orders
+        if (order.values.payment_status === "paid" || order.values.status === "delivered") {
+            return sum + Number(order.values.total ?? 0);
+        }
+        return sum;
+    }, 0);
+
+    await context.data.collection("customers").update(customerId, {
+        total_orders: totalOrders,
+        lifetime_value: lifetimeValue,
+        is_vip: lifetimeValue >= 1000 // VIP threshold
+    });
+}
 
 export default ordersCollection;

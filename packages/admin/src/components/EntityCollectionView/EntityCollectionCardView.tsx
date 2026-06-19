@@ -7,6 +7,7 @@ import {
     CircularProgress,
     Typography
 } from "@rebasepro/ui";
+import { useComponentOverride } from "@rebasepro/core";
 
 export type EntityCollectionCardViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: EntityCollection<M>;
@@ -90,6 +91,7 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
     size = "m"
 }: EntityCollectionCardViewProps<M>) {
 
+    const ResolvedEntityCard = useComponentOverride("Collection.Card", EntityCard) as typeof EntityCard;
     const containerRef = useRef<HTMLDivElement>(null);
     const hasRestoredScroll = useRef(false);
 
@@ -243,7 +245,7 @@ pageSize };
             className="w-full p-4"
         >
             {/* Error state */}
-            {dataLoadingError ? (
+            {dataLoadingError && data.length === 0 ? (
                 <div className="h-full flex items-center justify-center p-8">
                     <Typography className="text-red-500">
                         Error loading data: {dataLoadingError.message}
@@ -270,7 +272,7 @@ pageSize };
                             gridColumnsClass
                         )}>
                             {data.map((entity) => (
-                                <EntityCard
+                                <ResolvedEntityCard
                                     key={`${entity.path}_${entity.id}`}
                                     entity={entity}
                                     collection={collection}

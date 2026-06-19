@@ -10,3 +10,4 @@ export * from "./UserConfigurationPersistenceContext";
 export * from "./DialogsProvider";
 export * from "./RebaseClientInstanceContext";
 export * from "./CustomizationControllerContext";
+export * from "./ComponentOverrideContext";

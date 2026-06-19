@@ -98,13 +98,6 @@ const authorsCollection: EntityCollection = {
         "website",
         "userId"
     ],
-    callbacks: {
-        beforeSave: ({ values }) => {
-            return values;
-        },
-        afterSave: ({ values }) => {
-        }
-    },
 
     defaultFilter: undefined,
     sort: [

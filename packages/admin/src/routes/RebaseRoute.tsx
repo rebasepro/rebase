@@ -5,7 +5,7 @@ import { EntityDetailView } from "../components/EntityDetailView";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EntityCollectionView } from "../components";
-import { NotFoundPage, useUserConfigurationPersistence } from "@rebasepro/core";
+import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride } from "@rebasepro/core";
 import { UnsavedChangesDialog } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/common";
@@ -20,6 +20,7 @@ export function RebaseRoute() {
     const urlController = useUrlController();
     const breadcrumbs = useBreadcrumbsController();
     const userConfigPersistence = useUserConfigurationPersistence();
+    const ResolvedCollectionView = useComponentOverride("Collection.View", EntityCollectionView);
 
     const hash = location.hash;
     const isSidePanel = hash.includes("#side");
@@ -91,7 +92,7 @@ export function RebaseRoute() {
             }
             return null;
         }
-        return <EntityCollectionView
+        return <ResolvedCollectionView
             key={`collection_view_${collection.slug}`}
             {...collection}
             parentCollectionSlugs={[]} parentEntityIds={[]}
@@ -114,7 +115,7 @@ export function RebaseRoute() {
                 }
                 return null;
             }
-            return <EntityCollectionView
+            return <ResolvedCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
                 parentCollectionSlugs={[]} parentEntityIds={[]}
@@ -185,7 +186,7 @@ export function RebaseRoute() {
                     }
                 }
             }
-            return <EntityCollectionView
+            return <ResolvedCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
                 parentCollectionSlugs={[]} parentEntityIds={[]}

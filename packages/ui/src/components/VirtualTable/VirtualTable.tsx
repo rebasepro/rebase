@@ -4,7 +4,7 @@ import React, { createContext, forwardRef, RefObject, useCallback, useEffect, us
 
 import { deepEqual as equal } from "fast-equals"
 
-import { List } from "react-window";
+import { FixedSizeList as List } from "react-window";
 import useMeasure from "react-use-measure";
 
 import { CircularProgress } from "../CircularProgress";
@@ -319,7 +319,7 @@ export const VirtualTable = React.memo<VirtualTableProps<Record<string, unknown>
         }, [checkFilterCombination, currentSort, onFilterUpdate, sortByProperty]);
 
         const empty = !loading && (data?.length ?? 0) === 0;
-        const customView = error
+        const customView = (error && (data?.length ?? 0) === 0)
             ? <CenteredView maxWidth={"2xl"}
                 className="flex flex-col gap-2">
 
@@ -480,123 +480,6 @@ const SortableCellWrapper = ({
     );
 };
 
-function RowRenderer({
-    index,
-    style,
-    includeAddColumn,
-    ...rest
-}: {
-    ariaAttributes: any;
-    index: number;
-    style: React.CSSProperties;
-    includeAddColumn?: boolean;
-}) {
-    return <VirtualListContext.Consumer>
-        {({
-            onRowClick,
-            data,
-            columns,
-            rowHeight = 54,
-            headerHeight = 48,
-            cellRenderer,
-            hoverRow,
-            rowClassName,
-            endAdornment,
-            draggingColumnId,
-            onColumnsOrderChange,
-            extraData
-        }) => {
-
-            if (endAdornment && index === (data ?? []).length) {
-                return <div style={{
-                    ...style,
-                    height: "auto",
-                    position: "sticky",
-                    bottom: 0,
-                    zIndex: 1
-                }}>
-                    {endAdornment}
-                </div>;
-            }
-
-            const rowData = (data ? data[index] : undefined) as Record<string, unknown>;
-            return (
-                <VirtualTableRow
-                    key={`row_${index}`}
-                    rowData={rowData}
-                    rowIndex={index}
-                    onRowClick={onRowClick}
-                    columns={columns}
-                    hoverRow={hoverRow}
-                    rowClassName={rowClassName}
-                    style={{
-                        ...style,
-                        top: `calc(${style.top}px + ${headerHeight ?? 48}px)`
-                    }}
-                    rowHeight={rowHeight}>
-
-                    {columns.map((column: VirtualTableColumn, columnIndex: number) => {
-                        const cellData = rowData && rowData[column.key];
-                        const isDragging = draggingColumnId === column.key;
-                        const isDraggable = !column.frozen && !!onColumnsOrderChange;
-
-                        return onColumnsOrderChange ? (
-                            <SortableCellWrapper
-                                key={`cell_wrapper_${column.key}`}
-                                columnKey={column.key}
-                                width={column.width}
-                                isDragging={isDragging}
-                                isDraggable={isDraggable}
-                                frozen={column.frozen}
-                            >
-                                <VirtualTableCell
-                                    dataKey={column.key}
-                                    // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
-                                    cellRenderer={cellRenderer}
-                                    column={column}
-                                    columns={columns}
-                                    rowData={rowData}
-                                    cellData={cellData}
-                                    rowIndex={index}
-                                    columnIndex={columnIndex}
-                                    extraData={extraData}/>
-                            </SortableCellWrapper>
-                        ) : (
-                            <div
-                                key={`cell_wrapper_${column.key}`}
-                                className={cls(
-                                    "flex-shrink-0 relative",
-                                    column.frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
-                                )}
-                                style={{
-                                    minWidth: column.width,
-                                    maxWidth: column.width,
-                                    width: column.width
-                                }}
-                            >
-                                <VirtualTableCell
-                                    dataKey={column.key}
-                                    // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
-                                    cellRenderer={cellRenderer}
-                                    column={column}
-                                    columns={columns}
-                                    rowData={rowData}
-                                    cellData={cellData}
-                                    rowIndex={index}
-                                    columnIndex={columnIndex}
-                                    extraData={extraData}/>
-                            </div>
-                        );
-                    })}
-
-                    {includeAddColumn && <div className={"w-20"}/>}
-
-                </VirtualTableRow>
-            );
-        }}
-    </VirtualListContext.Consumer>;
-}
-
 function MemoizedList({
     outerRef,
     width,
@@ -618,44 +501,128 @@ function MemoizedList({
     itemSize: number;
     includeAddColumn?: boolean;
 }) {
-    /**
-     * react-window v2 exposes row-based props (`rowComponent`, `rowCount`,
-     * `rowHeight`, `rowProps`) that are not reflected in the published
-     * type definitions. Define the actual shape we use so we can cast
-     * `List` to a concrete `ComponentType` instead of `any`.
-     */
-    interface ReactWindowV2ListProps {
-        ref: RefObject<HTMLDivElement | null>;
-        style: React.CSSProperties;
-        overscanCount: number;
-        rowCount: number;
-        onScroll?: (params: {
-            scrollDirection: "forward" | "backward";
-            scrollOffset: number;
-            scrollUpdateWasRequested: boolean;
-        }) => void;
-        rowHeight: number;
-        rowComponent: React.ComponentType<{
-            index: number;
-            style: React.CSSProperties;
-            includeAddColumn?: boolean;
-            ariaAttributes: unknown;
-        }>;
-        rowProps: Record<string, unknown>;
-    }
 
-    const TypedList = List as React.ComponentType<ReactWindowV2ListProps>;
-    return <TypedList
-        ref={outerRef}
-        style={{ width,
-height }}
+    const Row = useCallback(({
+        index,
+        style
+    }: { index: number; style: React.CSSProperties }) => {
+        return <VirtualListContext.Consumer>
+            {({
+                onRowClick,
+                data,
+                columns,
+                rowHeight = 54,
+                headerHeight = 48,
+                cellRenderer,
+                hoverRow,
+                rowClassName,
+                endAdornment,
+                draggingColumnId,
+                onColumnsOrderChange,
+                extraData
+            }) => {
+
+                if (endAdornment && index === (data ?? []).length) {
+                    return <div style={{
+                        ...style,
+                        height: "auto",
+                        position: "sticky",
+                        bottom: 0,
+                        zIndex: 1
+                    }}>
+                        {endAdornment}
+                    </div>;
+                }
+
+                const rowData = (data ? data[index] : undefined) as Record<string, unknown>;
+                return (
+                    <VirtualTableRow
+                        key={`row_${index}`}
+                        rowData={rowData}
+                        rowIndex={index}
+                        onRowClick={onRowClick}
+                        columns={columns}
+                        hoverRow={hoverRow}
+                        rowClassName={rowClassName}
+                        style={{
+                            ...style,
+                            top: `calc(${style.top}px + ${headerHeight ?? 48}px)`
+                        }}
+                        rowHeight={rowHeight}>
+
+                        {columns.map((column: VirtualTableColumn, columnIndex: number) => {
+                            const cellData = rowData && rowData[column.key];
+                            const isDragging = draggingColumnId === column.key;
+                            const isDraggable = !column.frozen && !!onColumnsOrderChange;
+
+                            return onColumnsOrderChange ? (
+                                <SortableCellWrapper
+                                    key={`cell_wrapper_${column.key}`}
+                                    columnKey={column.key}
+                                    width={column.width}
+                                    isDragging={isDragging}
+                                    isDraggable={isDraggable}
+                                    frozen={column.frozen}
+                                >
+                                    <VirtualTableCell
+                                        dataKey={column.key}
+                                        // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
+                                        cellRenderer={cellRenderer}
+                                        column={column}
+                                        columns={columns}
+                                        rowData={rowData}
+                                        cellData={cellData}
+                                        rowIndex={index}
+                                        columnIndex={columnIndex}
+                                        extraData={extraData}/>
+                                </SortableCellWrapper>
+                            ) : (
+                                <div
+                                    key={`cell_wrapper_${column.key}`}
+                                    className={cls(
+                                        "flex-shrink-0 relative",
+                                        column.frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
+                                    )}
+                                    style={{
+                                        minWidth: column.width,
+                                        maxWidth: column.width,
+                                        width: column.width
+                                    }}
+                                >
+                                    <VirtualTableCell
+                                        dataKey={column.key}
+                                        // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
+                                        cellRenderer={cellRenderer}
+                                        column={column}
+                                        columns={columns}
+                                        rowData={rowData}
+                                        cellData={cellData}
+                                        rowIndex={index}
+                                        columnIndex={columnIndex}
+                                        extraData={extraData}/>
+                                </div>
+                            );
+                        })}
+
+                        {includeAddColumn && <div className={"w-20"}/>}
+
+                    </VirtualTableRow>
+                );
+            }}
+        </VirtualListContext.Consumer>;
+    }, []);
+
+    return <List
+        outerRef={outerRef}
+        innerElementType={innerElementType}
+        width={width}
+        height={height}
         overscanCount={4}
-        rowCount={itemCount}
+        itemCount={itemCount}
         onScroll={onScroll}
-        rowHeight={itemSize}
-        rowComponent={RowRenderer}
-        rowProps={{ includeAddColumn }}
-    />;
+        itemSize={itemSize}>
+        {Row}
+    </List>;
 }
 
 const SafeLinkRenderer: React.FC<{

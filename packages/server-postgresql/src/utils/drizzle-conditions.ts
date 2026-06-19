@@ -5,6 +5,7 @@ import { getColumnName, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { logger } from "@rebasepro/server-core";
+import { getColumnMeta } from "../services/entity-helpers";
 
 /** Drizzle dynamic query builder — accepts innerJoin + where chaining */
 
@@ -130,18 +131,32 @@ export class DrizzleConditionBuilder {
                     return inArray(column, value);
                 }
                 return null;
-            case "array-contains":
+            case "array-contains": {
+                const meta = getColumnMeta(column);
+                if (meta.dataType === "array" || meta.columnType === "PgArray") {
+                    return sql`${column} @> ARRAY[${value}]`;
+                }
                 // For JSONB arrays: checks if the column contains the given value
                 return sql`${column} @> ${JSON.stringify([value])}`;
-            case "array-contains-any":
-                // For JSONB arrays: checks if the column contains any of the given values
+            }
+            case "array-contains-any": {
+                const meta = getColumnMeta(column);
+                const isNativeArray = meta.dataType === "array" || meta.columnType === "PgArray";
                 if (Array.isArray(value) && value.length > 0) {
-                    // Use the ?| operator for JSONB overlap with text array
-                    const textValues = value.map(v => String(v));
-                    return sql`${column} ?| array[${sql.join(textValues.map(v => sql`${v}`), sql`, `)}]`;
+                    if (isNativeArray) {
+                        return sql`${column} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`;
+                    } else {
+                        // Use the ?| operator for JSONB overlap with text array
+                        const textValues = value.map(v => String(v));
+                        return sql`${column} ?| array[${sql.join(textValues.map(v => sql`${v}`), sql`, `)}]`;
+                    }
                 }
                 // Single value fallback: treat as array-contains
+                if (isNativeArray) {
+                    return sql`${column} @> ARRAY[${value}]`;
+                }
                 return sql`${column} @> ${JSON.stringify([value])}`;
+            }
             case "not-in":
                 if (Array.isArray(value) && value.length > 0) {
                     return sql`${column} NOT IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`;

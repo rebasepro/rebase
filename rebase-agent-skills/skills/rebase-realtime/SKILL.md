@@ -719,6 +719,16 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
+### Pending Request Timeout
+
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as `FETCH_COLLECTION`, `FETCH_ENTITY`, `SAVE_ENTITY`, `DELETE_ENTITY`, `COUNT_ENTITIES`, and `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds (`requestTimeoutMs = 30000`).
+
+If the server does not respond within this window, the client automatically deletes the pending request record and rejects the request's promise with an `ApiError`:
+- Message: `"Request timed out"`
+- Code: `undefined`
+
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_entity`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+
 ### Production Error Sanitization
 
 In production (`NODE_ENV=production`):

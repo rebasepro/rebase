@@ -606,6 +606,7 @@ export const productsCollection: EntityCollection = {
 | `properties` | `Properties` | **Required.** Map of property key → property definition. Each key becomes a database column. |
 | `relations` | `Relation[]` | SQL relations — foreign keys, junction tables. See [Relations](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Row Level Security policies. See [Security Rules](/docs/collections/security-rules). |
+| `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 #### UI Configuration
 
@@ -653,8 +654,23 @@ export const productsCollection: EntityCollection = {
 | `exportable` | `boolean \| ExportConfig` | Enable data export |
 | `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
 | `overrides` | `EntityOverrides` | Overrides for the entity view |
+| `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
 | `driver` | `string` | Database driver to use (default: `"(default)"`) |
 | `databaseId` | `string` | Database/schema ID within the driver |
+
+### Entity Previews & Title Resolution
+
+#### Title Property Selection
+By default, the property used as the entity's display title (previews, headers) is resolved automatically:
+1. If `titleProperty` is explicitly specified on the collection, it is used.
+2. If `propertiesOrder` is explicitly defined, the first non-ID property that is either a `relation` or `string` type is chosen as the title.
+3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+
+#### Relation Previews in Tables
+When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
+
+#### resolveTitleToString Utility
+Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
 
 ### Collection Builder
 
@@ -2755,6 +2771,53 @@ When no users exist in the database, the first person to register automatically 
 
 This ensures you can always bootstrap a fresh deployment without needing to seed the database manually.
 
+### Collection-Level Auth Configuration
+
+Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
+
+```typescript
+
+const membersCollection: PostgresCollection = {
+  name: "Members",
+  slug: "members",
+  table: "members",
+  auth: {
+    enabled: true,
+    
+    // Customize what happens when an admin creates a user via the REST API
+    onCreateUser: async (values, ctx) => {
+      const hash = await ctx.hashPassword("welcome123");
+      return {
+        values: { ...values, passwordHash: hash, emailVerified: true },
+        temporaryPassword: "welcome123"
+      };
+    },
+
+    // Customize what happens when an admin resets a user's password in the admin panel
+    onResetPassword: async (userId, ctx) => {
+      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      return {
+        temporaryPassword: tempPassword,
+        invitationSent: false
+      };
+    },
+
+    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
+    actions: {
+      resetPassword: true // Or false to disable, or a custom EntityAction
+    }
+  },
+  properties: { ... }
+};
+```
+
+When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
+- `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
+- `sendEmail?: (options) => Promise<void>` — Send an email (only available when email service is configured).
+- `emailConfigured: boolean` — Whether email service is configured.
+- `appName: string` — The app name from email config.
+- `resetPasswordUrl: string` — The password reset link base URL.
+
 ### Service Key Authentication
 
 For server-to-server communication (e.g., cron jobs, external services), configure a static service key:
@@ -3165,6 +3228,14 @@ In multi-instance deployments (e.g., behind a load balancer), Rebase uses Postgr
 - Each instance has a unique ID to prevent processing its own notifications.
 
 This is **automatic** and requires no additional configuration. The dedicated `LISTEN` connection auto-reconnects with a 3-second delay if it drops.
+
+### Pending Request Timeout
+
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ENTITY`, creating/updating `SAVE_ENTITY`, deletes `DELETE_ENTITY`, counts `COUNT_ENTITIES`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
+
+If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
+
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_entity`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
 
 ### Next Steps
 
@@ -4439,6 +4510,119 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 - **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
 - **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
 - **[Plugins](/docs/plugins)** — Extend the framework
+
+## Component Overrides (Swizzling)
+
+### Overview
+
+Rebase allows you to override default UI components with your own custom implementations. This implements a Docusaurus-style component swizzling model that supports two customization patterns:
+- **Eject mode** (default): Your component fully replaces the built-in one.
+- **Wrap mode** (`wrap: true`): Your component wraps the original. The built-in component is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
+
+Component overrides can be applied **globally** at the application level (on the `<Rebase>` provider) or **locally** at the collection level (inside individual collection definitions).
+
+---
+
+### Global Component Overrides
+
+To override components globally across your entire application, pass a `components` object to the root `<Rebase>` provider.
+
+```tsx
+
+function App() {
+    return (
+        <Rebase
+            client={rebaseClient}
+            components={{
+                // Eject Mode: Replace the default AppBar entirely
+                "Shell.AppBar": { Component: MyAppBar },
+
+                // Wrap Mode: Wrap the login view to insert branding
+                "Auth.LoginView": {
+                    Component: ({ OriginalComponent, ...props }) => (
+                        <div className="login-branding-container">
+                            <header className="branding-header">My Custom Brand</header>
+                            <OriginalComponent {...props} />
+                        </div>
+                    ),
+                    wrap: true
+                }
+            }}
+        >
+            {/* ... */}
+        </Rebase>
+    );
+}
+```
+
+---
+
+### Collection-Level Component Overrides
+
+To override components only for a specific collection, add a `components` object to its definition. This is useful for customizing empty states, cards, or detail views for particular models.
+
+```typescript
+
+const productsCollection: PostgresCollection = {
+    name: "Products",
+    slug: "products",
+    table: "products",
+    components: {
+        // Eject Mode: Replace the default entity form view
+        "Entity.Form": { Component: ProductCustomForm },
+
+        // Wrap Mode: Wrap the empty state to add quick links
+        "Collection.EmptyState": {
+            Component: ({ OriginalComponent, ...props }) => (
+                <div className="empty-state-wrapper">
+                    <OriginalComponent {...props} />
+                    <button onClick={() => importDemoProducts()}>
+                        Load Demo Products
+                    </button>
+                </div>
+            ),
+            wrap: true
+        }
+    },
+    properties: { /* ... */ }
+};
+```
+
+---
+
+### Overridable Components Scopes
+
+#### App-Scoped Components (`AppComponentName`)
+
+These components can only be overridden at the root `<Rebase>` provider level since they represent shell-level structure.
+
+| Component Key | Description |
+|---|---|
+| `"Shell.AppBar"` | The header bar at the top of the page |
+| `"Shell.Drawer"` | The collapsible main sidebar navigation drawer |
+| `"Shell.DrawerNavigationItem"` | Individual links inside the sidebar |
+| `"Shell.DrawerNavigationGroup"` | Collapsible navigation group headers in the sidebar |
+| `"HomePage"` | The default content-mode home landing page |
+| `"HomePage.CollectionCard"` | Individual collection cards on the home page |
+| `"Auth.LoginView"` | The overlay shown when requesting authentication |
+
+#### Collection-Scoped Components (`CollectionComponentName`)
+
+These components can be overridden globally (acting as defaults for all collections) or on individual collections.
+
+| Component Key | Original Props | Description |
+|---|---|---|
+| `"Collection.View"` | `CollectionViewProps` | The entire collection landing page |
+| `"Collection.Table"` | `CollectionTableProps` | The default spreadsheet tabular view |
+| `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
+| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | View shown when a collection is empty |
+| `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
+| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
+| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
+| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
+| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
+| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
+| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is missing |
 
 ## Authentication & Login
 
@@ -6121,6 +6305,8 @@ const client = createRebaseClient<Database>({
 // Full autocomplete on collection names and field types
 const { data } = await client.data.products.find();
 ```
+
+When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
 
 ### Quick Example
 

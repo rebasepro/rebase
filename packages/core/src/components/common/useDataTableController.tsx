@@ -235,7 +235,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const onError = (error: Error) => {
             console.error("ERROR", error);
             setDataLoading(false);
-            setRawData([]);
+            setRawData((prev) => prev && prev.length > 0 ? prev : []);
             setDataLoadingError(error);
         };
 
