@@ -14,14 +14,7 @@ import {
 } from "@rebasepro/types";
 import { rebaseReviver } from "./reviver";
 
-/**
- * Rehydrate all serialised types inside an Entity's `values`.
- * (Now obsolete as JSON.parse with rebaseReviver handles this globally,
- * kept as pass-through for API compatibility)
- */
-function rehydrateEntity<M extends Record<string, unknown>>(entity: Entity<M>): Entity<M> {
-    return entity;
-}
+
 
 /**
  * Extract error message and code from a WebSocket message payload.
@@ -128,6 +121,7 @@ export class RebaseWebSocketClient {
     private maxReconnectAttempts = 5;
     private isConnected = false;
     private messageQueue: Record<string, unknown>[] = [];
+    private requestTimeoutMs = 30000;
     private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
     private isAuthenticated = false;
@@ -232,6 +226,13 @@ export class RebaseWebSocketClient {
     private initWebSocket() {
         if (!this.WebSocketConstructor) return;
         if (this.ws?.readyState === this.WebSocketConstructor.OPEN) return;
+
+        // Guard against race condition: if a previous socket is still connecting, tear it down
+        if (this.ws) {
+            this.ws.onclose = null;
+            this.ws.close();
+            this.ws = null;
+        }
 
         try {
             this.ws = new this.WebSocketConstructor(this.websocketUrl);
@@ -378,6 +379,56 @@ export class RebaseWebSocketClient {
         }
     }
 
+    /**
+     * Shared logic for re-subscribing a collection or entity subscription
+     * after an auth error is resolved by refreshing credentials.
+     */
+    private resubscribeAfterAuthRefresh(
+        message: WebSocketMessage,
+        subscription: {
+            backendSubscriptionId: string;
+            callbacks: Map<string, { onUpdate: (...args: never[]) => void; onError?: (error: Error) => void }>;
+            props: FetchCollectionProps | FetchEntityProps;
+        },
+        subscriptionKey: string,
+        idPrefix: "collection" | "entity",
+        backendKeyMap: Map<string, string>,
+        messageType: "subscribe_collection" | "subscribe_entity"
+    ): void {
+        this.handleAuthFailure().then(refreshed => {
+            if (refreshed) {
+                const oldBackendId = subscription.backendSubscriptionId;
+                const newBackendId = `${idPrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+                subscription.backendSubscriptionId = newBackendId;
+                backendKeyMap.delete(oldBackendId);
+                backendKeyMap.set(newBackendId, subscriptionKey);
+
+                this.sendMessage({
+                    type: messageType,
+                    payload: {
+                        ...subscription.props,
+                        subscriptionId: newBackendId
+                    }
+                }).catch(error => {
+                    console.error(`[WS] Failed to re-subscribe ${idPrefix} after auth refresh:`, subscriptionKey, error);
+                    subscription.callbacks.forEach(callback => {
+                        if (callback.onError) callback.onError(error);
+                    });
+                });
+            } else {
+                const { errorMessage, errorCode } = extractMessageError(message);
+                const error = new ApiError(errorMessage, errorMessage, errorCode);
+                subscription.callbacks.forEach(callback => {
+                    if (callback.onError) callback.onError(error);
+                });
+            }
+        }).catch(err => {
+            subscription.callbacks.forEach(callback => {
+                if (callback.onError) callback.onError(err);
+            });
+        });
+    }
+
     private handleWebSocketMessage(message: WebSocketMessage) {
         const {
             type,
@@ -419,7 +470,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const incomingEntities = (message.entities || []).map((e: Entity) => rehydrateEntity(e));
+                    const incomingEntities = (message.entities || []) as Entity[];
 
                     // Structural merge: preserve cached entity references for entities
                     // whose values haven't changed. This prevents downstream React components
@@ -455,7 +506,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub && collectionSub.isInitialDataReceived && collectionSub.latestData) {
-                    const patchEntity = message.entity ? rehydrateEntity(message.entity) : message.entity;
+                    const patchEntity = message.entity ?? null;
                     const patchEntityId = (message as unknown as { entityId: string }).entityId;
                     let updated: Entity[];
 
@@ -500,7 +551,7 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const entitySub = this.entitySubscriptions.get(subscriptionKey);
                 if (entitySub) {
-                    const entity = message.entity ? rehydrateEntity(message.entity) : null;
+                    const entity = message.entity ?? null;
                     // Cache the latest data with optimizations
                     entitySub.latestData = entity;
                     entitySub.lastUpdated = Date.now();
@@ -529,38 +580,14 @@ export class RebaseWebSocketClient {
                 const collectionSub = this.collectionSubscriptions.get(collectionKey);
                 if (collectionSub) {
                     if (this.isAuthError(message)) {
-                        this.handleAuthFailure().then(refreshed => {
-                            if (refreshed) {
-                                const oldBackendId = collectionSub.backendSubscriptionId;
-                                const newBackendId = `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                                collectionSub.backendSubscriptionId = newBackendId;
-                                this.backendToCollectionKey.delete(oldBackendId);
-                                this.backendToCollectionKey.set(newBackendId, collectionKey);
-
-                                this.sendMessage({
-                                    type: "subscribe_collection",
-                                    payload: {
-                                        ...collectionSub.props,
-                                        subscriptionId: newBackendId
-                                    }
-                                }).catch(error => {
-                                    console.error("[WS] Failed to re-subscribe collection after auth refresh:", collectionKey, error);
-                                    collectionSub.callbacks.forEach(callback => {
-                                        if (callback.onError) callback.onError(error);
-                                    });
-                                });
-                            } else {
-                                const { errorMessage, errorCode } = extractMessageError(message);
-                                const error = new ApiError(errorMessage, errorMessage, errorCode);
-                                collectionSub.callbacks.forEach(callback => {
-                                    if (callback.onError) callback.onError(error);
-                                });
-                            }
-                        }).catch(err => {
-                            collectionSub.callbacks.forEach(callback => {
-                                if (callback.onError) callback.onError(err);
-                            });
-                        });
+                        this.resubscribeAfterAuthRefresh(
+                            message,
+                            collectionSub,
+                            collectionKey,
+                            "collection",
+                            this.backendToCollectionKey,
+                            "subscribe_collection"
+                        );
                         return;
                     }
 
@@ -580,38 +607,14 @@ export class RebaseWebSocketClient {
                 const entitySub = this.entitySubscriptions.get(entityKey);
                 if (entitySub) {
                     if (this.isAuthError(message)) {
-                        this.handleAuthFailure().then(refreshed => {
-                            if (refreshed) {
-                                const oldBackendId = entitySub.backendSubscriptionId;
-                                const newBackendId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                                entitySub.backendSubscriptionId = newBackendId;
-                                this.backendToEntityKey.delete(oldBackendId);
-                                this.backendToEntityKey.set(newBackendId, entityKey);
-
-                                this.sendMessage({
-                                    type: "subscribe_entity",
-                                    payload: {
-                                        ...entitySub.props,
-                                        subscriptionId: newBackendId
-                                    }
-                                }).catch(error => {
-                                    console.error("[WS] Failed to re-subscribe entity after auth refresh:", entityKey, error);
-                                    entitySub.callbacks.forEach(callback => {
-                                        if (callback.onError) callback.onError(error);
-                                    });
-                                });
-                            } else {
-                                const { errorMessage, errorCode } = extractMessageError(message);
-                                const error = new ApiError(errorMessage, errorMessage, errorCode);
-                                entitySub.callbacks.forEach(callback => {
-                                    if (callback.onError) callback.onError(error);
-                                });
-                            }
-                        }).catch(err => {
-                            entitySub.callbacks.forEach(callback => {
-                                if (callback.onError) callback.onError(err);
-                            });
-                        });
+                        this.resubscribeAfterAuthRefresh(
+                            message,
+                            entitySub,
+                            entityKey,
+                            "entity",
+                            this.backendToEntityKey,
+                            "subscribe_entity"
+                        );
                         return;
                     }
 
@@ -753,9 +756,22 @@ export class RebaseWebSocketClient {
         message.requestId = requestId;
 
         if (!this.pendingRequests.has(requestId)) {
+            const timeoutHandle = setTimeout(() => {
+                if (this.pendingRequests.has(requestId)) {
+                    this.pendingRequests.delete(requestId);
+                    reject(new ApiError("Request timed out", "Request timed out"));
+                }
+            }, this.requestTimeoutMs);
+
             this.pendingRequests.set(requestId, {
-                resolve,
-                reject,
+                resolve: (value: unknown) => {
+                    clearTimeout(timeoutHandle);
+                    resolve(value);
+                },
+                reject: (error: Error) => {
+                    clearTimeout(timeoutHandle);
+                    reject(error);
+                },
                 message: message as Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void }
             });
         }
@@ -774,7 +790,7 @@ export class RebaseWebSocketClient {
             type: "FETCH_COLLECTION",
             payload: props
         }) as { entities?: Entity<M>[] };
-        return (response.entities || []).map(e => rehydrateEntity(e));
+        return response.entities || [];
     }
 
     async fetchEntity<M extends Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
@@ -782,7 +798,7 @@ export class RebaseWebSocketClient {
             type: "FETCH_ENTITY",
             payload: props
         }) as { entity?: Entity<M> };
-        return response.entity ? rehydrateEntity(response.entity) : undefined;
+        return response.entity ?? undefined;
     }
 
     async saveEntity<M extends Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
@@ -790,7 +806,7 @@ export class RebaseWebSocketClient {
             type: "SAVE_ENTITY",
             payload: props
         }) as { entity: Entity<M> };
-        return rehydrateEntity(response.entity);
+        return response.entity;
     }
 
     async deleteEntity<M extends Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void> {

@@ -16,6 +16,28 @@ import { PostgresCollectionRegistry } from "../collections/PostgresCollectionReg
 import { logger } from "@rebasepro/server-core";
 
 /**
+ * Typed wrapper for Drizzle dynamic query innerJoin.
+ * Drizzle's `$dynamic()` queries lose the `innerJoin` method from
+ * their static type, but it exists at runtime. This helper bridges
+ * the gap with a single confined cast.
+ */
+function applyDynamicJoin<T>(query: T, joinTable: PgTable, condition: SQL): T {
+    return (query as unknown as { innerJoin(t: PgTable, c: SQL): T }).innerJoin(joinTable, condition) as T;
+}
+
+/**
+ * Typed wrapper for DrizzleConditionBuilder.buildRelationQuery on dynamic queries.
+ * The method returns a widened generic that doesn't reassign cleanly;
+ * this helper confines the cast.
+ */
+function applyDynamicRelationQuery<T>(
+    query: T,
+    ...args: Parameters<typeof DrizzleConditionBuilder.buildRelationQuery>
+): T {
+    return DrizzleConditionBuilder.buildRelationQuery(...args) as unknown as T;
+}
+
+/**
  * Service for handling all relation-related operations.
  * Handles fetching, updating, and managing entity relations.
  */
@@ -109,8 +131,7 @@ export class RelationService {
                     throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
                 }
 
-                // @ts-expect-error Drizzle mutates base query generic on innerJoin
-                query = query.innerJoin(joinTable, eq(fromCol, toCol));
+                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
                 currentTable = joinTable;
             }
 
@@ -168,8 +189,8 @@ export class RelationService {
         }
 
         // Use unified relation query builder
-        // @ts-expect-error buildRelationQuery uses dynamic queries
-        query = DrizzleConditionBuilder.buildRelationQuery(
+        query = applyDynamicRelationQuery(
+            query,
             query,
             relation,
             parsedParentId,
@@ -317,8 +338,7 @@ export class RelationService {
                     throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
                 }
 
-                // @ts-expect-error Drizzle mutates base query generic on innerJoin
-                query = query.innerJoin(joinTable, eq(fromCol, toCol));
+                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
                 currentTable = joinTable;
             }
 
@@ -420,8 +440,8 @@ export class RelationService {
         let query = this.db.select().from(targetTable).$dynamic();
 
         // Build the relation query with ALL parent IDs
-        // @ts-expect-error buildRelationQuery uses dynamic queries
-        query = DrizzleConditionBuilder.buildRelationQuery(
+        query = applyDynamicRelationQuery(
+            query,
             query,
             relation,
             parsedParentIds, // Pass array instead of single ID
@@ -514,8 +534,7 @@ export class RelationService {
                 const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
                 if (!fromCol || !toCol) throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
 
-                // @ts-expect-error Drizzle mutates base query generic on innerJoin
-                query = query.innerJoin(joinTable, eq(fromCol, toCol));
+                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
                 currentTable = joinTable;
             }
 
@@ -598,8 +617,8 @@ export class RelationService {
         // Handle FK-based relations (one-to-many inverse)
         let query = this.db.select().from(targetTable).$dynamic();
 
-        // @ts-expect-error buildRelationQuery uses dynamic queries
-        query = DrizzleConditionBuilder.buildRelationQuery(
+        query = applyDynamicRelationQuery(
+            query,
             query,
             relation,
             parsedParentIds,

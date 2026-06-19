@@ -113,6 +113,16 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
 
+    private buildCallContext(): RebaseCallContext {
+        return {
+            user: this.user,
+            driver: this,
+            data: this.data,
+            client: this.client,
+            storageSource: this.client?.storage
+        } as unknown as RebaseCallContext;
+    }
+
     private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {
         if (!collection && !path) return { collection: undefined,
 callbacks: undefined,
@@ -164,13 +174,7 @@ propertyCallbacks: undefined };
         const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
-            const contextForCallback = {
-                user: this.user,
-                driver: this,
-                data: this.data,
-                client: this.client,
-                storageSource: this.client?.storage
-            } as unknown as RebaseCallContext; // Backend context
+            const contextForCallback = this.buildCallContext();
             return Promise.all(entities.map(async (entity) => {
                 let fetched = entity;
                 if (callbacks?.afterRead) {
@@ -275,13 +279,7 @@ propertyCallbacks: undefined };
         const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         if (entity && (callbacks?.afterRead || propertyCallbacks?.afterRead)) {
-            const contextForCallback = {
-                user: this.user,
-                driver: this,
-                data: this.data,
-                client: this.client,
-                storageSource: this.client?.storage
-            } as unknown as RebaseCallContext; // Backend context
+            const contextForCallback = this.buildCallContext();
             if (callbacks?.afterRead) {
                 entity = await callbacks.afterRead({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -359,13 +357,7 @@ propertyCallbacks: undefined };
         const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         let updatedValues = values;
-        const contextForCallback = {
-            user: this.user,
-            driver: this,
-            data: this.data,
-            client: this.client,
-            storageSource: this.client?.storage
-        } as unknown as RebaseCallContext;
+        const contextForCallback = this.buildCallContext();
 
         // Fetch previous values for callbacks AND history recording
         let previousValuesForHistory: Partial<Entity<M>["values"]> | undefined;
@@ -535,13 +527,7 @@ propertyCallbacks: undefined };
         // Resolve from backend registry to restore callbacks lost during WebSocket serialization
         const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, entity.path);
 
-        const contextForCallback = {
-            user: this.user,
-            driver: this,
-            data: this.data,
-            client: this.client,
-            storageSource: this.client?.storage
-        } as unknown as RebaseCallContext;
+        const contextForCallback = this.buildCallContext();
 
         if (callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
             let preventDefault = false;

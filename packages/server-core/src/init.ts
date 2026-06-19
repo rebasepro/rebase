@@ -466,23 +466,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 logger.info("Bootstrapping authentication via driver protocol");
                 authConfigResult = await defaultBootstrapper.initializeAuth(config.auth, defaultDriverResult);
 
-                // Build the built-in auth adapter from bootstrapper results
-                if (authConfigResult) {
-                    const oauthProviders: OAuthProvider<unknown>[] = [...(safeAuthConfig.providers || [])];
-                    // OAuth providers are resolved later in route mounting,
-                    // but we need them here for the adapter
-                    authAdapter = createBuiltinAuthAdapter({
-                        authRepository: authConfigResult.authRepository as import("./auth/interfaces").AuthRepository ?? authConfigResult.userService as import("./auth/interfaces").AuthRepository,
-                        emailService: authConfigResult.emailService as import("./email").EmailService,
-                        emailConfig: safeAuthConfig.email,
-                        allowRegistration: safeAuthConfig.allowRegistration ?? false,
-                        defaultRole: safeAuthConfig.defaultRole,
-                        oauthProviders,
-                        serviceKey,
-                        authHooks: safeAuthConfig.hooks,
-                        collectionAuthConfig
-                    });
-                }
+                // The built-in auth adapter is created after OAuth providers
+                // are resolved (below) so it only needs to be constructed once.
 
                 logger.info("Authentication initialized");
             } else {
@@ -520,7 +505,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // basePath already resolved above
 
     // 4. Mount API Routes
-    if (config.auth && authAdapter) {
+    if (config.auth) {
         // ── Auth Capabilities Endpoint ───────────────────────────────────
         // Exposes adapter capabilities so the frontend knows what's available
         // (login form vs external redirect, OAuth providers, etc.)
@@ -534,67 +519,34 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const oauthProviders: OAuthProvider<any>[] = [...(safeAuthConfig.providers || [])];
 
-            if (safeAuthConfig.google?.clientId) {
-                const { createGoogleProvider } = await import("./auth");
-                oauthProviders.push(createGoogleProvider(safeAuthConfig.google));
-            }
+            // Resolve configured OAuth providers via data-driven registration.
+            // Each entry maps a config key to its factory function name and required fields.
+            const OAUTH_PROVIDERS: Array<{
+                key: keyof RebaseAuthConfig;
+                factory: string;
+                requiredFields: string[];
+            }> = [
+                { key: "google", factory: "createGoogleProvider", requiredFields: ["clientId"] },
+                { key: "linkedin", factory: "createLinkedinProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "github", factory: "createGitHubProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "microsoft", factory: "createMicrosoftProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "apple", factory: "createAppleProvider", requiredFields: ["clientId", "teamId", "keyId", "privateKey"] },
+                { key: "facebook", factory: "createFacebookProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "twitter", factory: "createTwitterProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "discord", factory: "createDiscordProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "gitlab", factory: "createGitLabProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "bitbucket", factory: "createBitbucketProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "slack", factory: "createSlackProvider", requiredFields: ["clientId", "clientSecret"] },
+                { key: "spotify", factory: "createSpotifyProvider", requiredFields: ["clientId", "clientSecret"] }
+            ];
 
-            if (safeAuthConfig.linkedin?.clientId && safeAuthConfig.linkedin?.clientSecret) {
-                const { createLinkedinProvider } = await import("./auth");
-                oauthProviders.push(createLinkedinProvider(safeAuthConfig.linkedin as {
-                    clientId: string;
-                    clientSecret: string
-                }));
-            }
-
-            if (safeAuthConfig.github?.clientId && safeAuthConfig.github?.clientSecret) {
-                const { createGitHubProvider } = await import("./auth");
-                oauthProviders.push(createGitHubProvider(safeAuthConfig.github));
-            }
-
-            if (safeAuthConfig.microsoft?.clientId && safeAuthConfig.microsoft?.clientSecret) {
-                const { createMicrosoftProvider } = await import("./auth");
-                oauthProviders.push(createMicrosoftProvider(safeAuthConfig.microsoft));
-            }
-
-            if (safeAuthConfig.apple?.clientId && safeAuthConfig.apple?.teamId && safeAuthConfig.apple?.keyId && safeAuthConfig.apple?.privateKey) {
-                const { createAppleProvider } = await import("./auth");
-                oauthProviders.push(createAppleProvider(safeAuthConfig.apple));
-            }
-
-            if (safeAuthConfig.facebook?.clientId && safeAuthConfig.facebook?.clientSecret) {
-                const { createFacebookProvider } = await import("./auth");
-                oauthProviders.push(createFacebookProvider(safeAuthConfig.facebook));
-            }
-
-            if (safeAuthConfig.twitter?.clientId && safeAuthConfig.twitter?.clientSecret) {
-                const { createTwitterProvider } = await import("./auth");
-                oauthProviders.push(createTwitterProvider(safeAuthConfig.twitter));
-            }
-
-            if (safeAuthConfig.discord?.clientId && safeAuthConfig.discord?.clientSecret) {
-                const { createDiscordProvider } = await import("./auth");
-                oauthProviders.push(createDiscordProvider(safeAuthConfig.discord));
-            }
-
-            if (safeAuthConfig.gitlab?.clientId && safeAuthConfig.gitlab?.clientSecret) {
-                const { createGitLabProvider } = await import("./auth");
-                oauthProviders.push(createGitLabProvider(safeAuthConfig.gitlab));
-            }
-
-            if (safeAuthConfig.bitbucket?.clientId && safeAuthConfig.bitbucket?.clientSecret) {
-                const { createBitbucketProvider } = await import("./auth");
-                oauthProviders.push(createBitbucketProvider(safeAuthConfig.bitbucket));
-            }
-
-            if (safeAuthConfig.slack?.clientId && safeAuthConfig.slack?.clientSecret) {
-                const { createSlackProvider } = await import("./auth");
-                oauthProviders.push(createSlackProvider(safeAuthConfig.slack));
-            }
-
-            if (safeAuthConfig.spotify?.clientId && safeAuthConfig.spotify?.clientSecret) {
-                const { createSpotifyProvider } = await import("./auth");
-                oauthProviders.push(createSpotifyProvider(safeAuthConfig.spotify));
+            for (const { key, factory, requiredFields } of OAUTH_PROVIDERS) {
+                const providerConfig = safeAuthConfig[key] as Record<string, unknown> | undefined;
+                if (providerConfig && requiredFields.every(f => Boolean(providerConfig[f]))) {
+                    const authModule = await import("./auth");
+                    const createFn = (authModule as unknown as Record<string, (cfg: unknown) => OAuthProvider<unknown>>)[factory];
+                    oauthProviders.push(createFn(providerConfig));
+                }
             }
 
             // Re-create the built-in adapter with all resolved OAuth providers
@@ -614,7 +566,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         // ── Mount auth & admin routes via the adapter ────────────────────
-        if (authAdapter.createAuthRoutes) {
+        if (authAdapter && authAdapter.createAuthRoutes) {
             const authRoutes = authAdapter.createAuthRoutes();
             if (authRoutes) {
                 config.app.route(`${basePath}/auth`, authRoutes);
@@ -622,7 +574,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         }
 
-        if (authAdapter.createAdminRoutes) {
+        if (authAdapter && authAdapter.createAdminRoutes) {
             const adminRoutes = authAdapter.createAdminRoutes();
             if (adminRoutes) {
                 config.app.route(`${basePath}/admin`, adminRoutes);

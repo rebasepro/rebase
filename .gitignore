@@ -87,3 +87,11 @@ test-results/
 
 # Backend scratch files
 app/backend/scratch/
+
+# CI/debug output files
+/build_errors.log
+/build_results.log
+/eslint_results.log
+/full_test_results.log
+/test_results.log
+/tsc_results.log

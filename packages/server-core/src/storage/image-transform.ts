@@ -168,10 +168,13 @@ export class TransformCache {
     private cache = new Map<string, CacheEntry>();
     private readonly maxEntries: number;
     private readonly maxAgeMs: number;
+    private readonly maxTotalBytes: number;
+    private totalBytes = 0;
 
-    constructor(maxEntries = 500, maxAgeMs = 3_600_000) {
+    constructor(maxEntries = 500, maxAgeMs = 3_600_000, maxTotalBytes = 256 * 1024 * 1024) {
         this.maxEntries = maxEntries;
         this.maxAgeMs = maxAgeMs;
+        this.maxTotalBytes = maxTotalBytes;
     }
 
     /** Build a deterministic cache key from file key + transform options. */
@@ -183,6 +186,7 @@ export class TransformCache {
         const entry = this.cache.get(cacheKey);
         if (!entry) return null;
         if (Date.now() - entry.timestamp > this.maxAgeMs) {
+            this.totalBytes -= entry.data.length;
             this.cache.delete(cacheKey);
             return null;
         }
@@ -194,11 +198,19 @@ contentType: entry.contentType };
     }
 
     set(cacheKey: string, data: Buffer, contentType: string): void {
-        // Evict oldest if at capacity
-        if (this.cache.size >= this.maxEntries) {
+        // Evict oldest entries while over capacity (entry count or total bytes)
+        while (
+            (this.cache.size >= this.maxEntries || this.totalBytes + data.length > this.maxTotalBytes)
+            && this.cache.size > 0
+        ) {
             const oldest = this.cache.keys().next().value;
-            if (oldest !== undefined) this.cache.delete(oldest);
+            if (oldest !== undefined) {
+                const evicted = this.cache.get(oldest);
+                if (evicted) this.totalBytes -= evicted.data.length;
+                this.cache.delete(oldest);
+            }
         }
+        this.totalBytes += data.length;
         this.cache.set(cacheKey, { data,
 contentType,
 timestamp: Date.now() });

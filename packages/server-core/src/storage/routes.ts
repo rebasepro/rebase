@@ -3,7 +3,8 @@
  */
 
 import { Hono } from "hono";
-import * as fs from "fs";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
 import { StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import { requireAuth as jwtRequireAuth, optionalAuth } from "../auth/middleware";
@@ -46,6 +47,23 @@ export function extractWildcardPath(c: { req: { path: string; routePath: string 
     if (idx < 0) return "";
     // +1 to skip the '/' after the prefix
     return fullPath.substring(idx + prefix.length + 1);
+}
+
+/**
+ * Sanitize a user-supplied storage key to prevent path traversal and other attacks.
+ * Removes null bytes, ../ sequences, leading slashes, and limits length.
+ */
+function sanitizeStorageKey(key: string): string {
+    let sanitized = key;
+    // Remove null bytes
+    sanitized = sanitized.replace(/\0/g, "");
+    // Remove ../ sequences (and ..\ on Windows)
+    sanitized = sanitized.replace(/\.\.\/|\.\.\\/g, "");
+    // Remove leading slashes
+    sanitized = sanitized.replace(/^\/+/, "");
+    // Limit length
+    sanitized = sanitized.slice(0, 1024);
+    return sanitized;
 }
 
 /**
@@ -99,7 +117,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const key = typeof body["key"] === "string" ? body["key"] : "";
         const bucket = typeof body["bucket"] === "string" ? body["bucket"] : undefined;
 
-        const finalKey = key || uploadedFile.name || "unnamed";
+        const finalKey = sanitizeStorageKey(key || uploadedFile.name || "unnamed");
 
         // Extract custom metadata from request body
         const metadata: Record<string, unknown> = {};
@@ -145,23 +163,24 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             const absolutePath = localController.getAbsolutePath(resolvedPath, bucket);
 
             // Check if file exists
-            if (!fs.existsSync(absolutePath)) {
+            try {
+                await fsp.access(absolutePath);
+            } catch {
                 throw ApiError.notFound("File not found");
             }
 
             // Get content type from metadata or infer from extension
             let contentType = "application/octet-stream";
             const metadataPath = `${absolutePath}.metadata.json`;
-            if (fs.existsSync(metadataPath)) {
-                try {
-                    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf-8"));
-                    contentType = metadata.contentType || contentType;
-                } catch {
-                    // Ignore metadata errors
-                }
+            try {
+                const metadataRaw = await fsp.readFile(metadataPath, "utf-8");
+                const metadata = JSON.parse(metadataRaw);
+                contentType = metadata.contentType || contentType;
+            } catch {
+                // Ignore metadata errors (file may not exist)
             }
 
-            const fileContent = fs.readFileSync(absolutePath);
+            const fileContent = await fsp.readFile(absolutePath);
 
             // Apply image transforms if requested and the file is a transformable image
             if (transformOpts && isTransformableImage(contentType)) {

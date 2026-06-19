@@ -10,7 +10,7 @@
  * 3. Built-in default — framework fallback
  */
 
-import { randomBytes, createHash } from "crypto";
+import { randomBytes, createHash, randomInt } from "node:crypto";
 import type { AuthRepository } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
@@ -32,7 +32,7 @@ export function generateSecurePassword(): string {
     const digits = "23456789";
     const all = upper + lower + digits;
 
-    const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+    const pick = (chars: string) => chars[randomInt(chars.length)];
     const parts = [pick(upper), pick(lower), pick(digits)];
 
     for (let i = parts.length; i < 16; i++) {
@@ -41,7 +41,7 @@ export function generateSecurePassword(): string {
 
     // Shuffle
     for (let i = parts.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = randomInt(i + 1);
         [parts[i], parts[j]] = [parts[j], parts[i]];
     }
     return parts.join("");

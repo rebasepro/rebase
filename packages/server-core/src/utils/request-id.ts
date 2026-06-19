@@ -24,10 +24,12 @@ import type { HonoEnv } from "../api/types";
 
 export const REQUEST_ID_HEADER = "X-Request-ID";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function requestId(): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
         const incoming = c.req.header(REQUEST_ID_HEADER);
-        const id = incoming && incoming.length > 0 ? incoming : randomUUID();
+        const id = incoming && UUID_RE.test(incoming) ? incoming : randomUUID();
 
         c.set("requestId", id);
 

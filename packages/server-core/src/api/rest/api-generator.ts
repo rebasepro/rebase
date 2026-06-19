@@ -80,6 +80,16 @@ roles: user.roles ?? [] } : undefined,
     }
 
     /**
+     * Get the request-scoped driver. Throws if none is set — never falls
+     * back to the unscoped `this.driver` to avoid bypassing RLS/auth.
+     */
+    private getScopedDriver(c: { get: (key: string) => unknown }): DataDriver {
+        const driver = c.get("driver") as DataDriver | undefined;
+        if (!driver) throw ApiError.internal("Scoped driver not available");
+        return driver;
+    }
+
+    /**
      * Get the typed RestFetchService from a driver if it exposes one (for include support).
      */
     private getFetchService(driver: DataDriver): RestFetchService | undefined {
@@ -99,7 +109,7 @@ roles: user.roles ?? [] } : undefined,
             const queryDict = c.req.queries();
             const queryOptions = parseQueryOptions(queryDict);
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
             return c.json({ count: total });
@@ -112,7 +122,7 @@ roles: user.roles ?? [] } : undefined,
             const queryOptions = parseQueryOptions(queryDict);
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
             const fetchService = this.getFetchService(driver);
             const hookCtx = this.buildHookContext(c, "GET");
 
@@ -172,7 +182,7 @@ roles: user.roles ?? [] } : undefined,
             const id = c.req.param("id");
             const queryDict = c.req.queries();
             const queryOptions = parseQueryOptions(queryDict);
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
             const fetchService = this.getFetchService(driver);
             const hookCtx = this.buildHookContext(c, "GET");
 
@@ -216,7 +226,7 @@ roles: user.roles ?? [] } : undefined,
         this.router.post(basePath, async (c) => {
             try {
                 this.enforceApiKeyPermission(c, collection.slug);
-                const driver = c.get("driver") || this.driver;
+                const driver = this.getScopedDriver(c);
                 const path = collection.slug;
                 const hookCtx = this.buildHookContext(c, "POST");
 
@@ -295,7 +305,7 @@ values: entity.values as Record<string, unknown> },
             try {
                 this.enforceApiKeyPermission(c, collection.slug);
                 const id = c.req.param("id");
-                const driver = c.get("driver") || this.driver;
+                const driver = this.getScopedDriver(c);
                 const hookCtx = this.buildHookContext(c, "PUT");
 
                 const existingEntity = await driver.fetchEntity({
@@ -343,7 +353,7 @@ values: entity.values as Record<string, unknown> },
         this.router.delete(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
             const hookCtx = this.buildHookContext(c, "DELETE");
 
             const existingEntity = await driver.fetchEntity({
@@ -433,7 +443,7 @@ entityId };
             const parsed = parseSubPath(rawPath);
             if (!parsed) return next();
 
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
@@ -508,7 +518,7 @@ entityId };
             const parsed = parseSubPath(rawPath);
             if (!parsed || parsed.entityId) return next();
 
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
             const hookCtx = this.buildHookContext(c, "POST");
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
@@ -543,7 +553,7 @@ entityId };
             const parsed = parseSubPath(rawPath);
             if (!parsed || !parsed.entityId) return next();
 
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
             const hookCtx = this.buildHookContext(c, "PUT");
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
@@ -580,7 +590,7 @@ entityId };
             const parsed = parseSubPath(rawPath);
             if (!parsed || !parsed.entityId) return next();
 
-            const driver = c.get("driver") || this.driver;
+            const driver = this.getScopedDriver(c);
             const hookCtx = this.buildHookContext(c, "DELETE");
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));

@@ -158,7 +158,7 @@ function rowToLogEntry(row: Record<string, unknown>): CronJobLogEntry {
         success: row.success as boolean,
         error: (row.error as string) ?? undefined,
         result: row.result ?? undefined,
-        logs: Array.isArray(row.logs) ? row.logs : (row.logs ? JSON.parse(row.logs as string) : []),
+        logs: Array.isArray(row.logs) ? row.logs : (row.logs ? (() => { try { return JSON.parse(row.logs as string); } catch { return []; } })() : []),
         manual: row.manual as boolean
     };
 }

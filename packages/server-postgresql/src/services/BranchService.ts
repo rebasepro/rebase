@@ -19,6 +19,16 @@ const BRANCH_DB_PREFIX = "rb_";
 const BRANCHES_TABLE = "rebase.branches";
 
 /**
+ * Validate that a user-provided identifier only contains safe characters.
+ * Throws if the value contains characters outside [a-zA-Z0-9_-].
+ */
+function validateIdentifier(value: string, label: string): void {
+    if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+        throw new Error(`Invalid ${label}: only letters, digits, underscores, and hyphens are allowed.`);
+    }
+}
+
+/**
  * Sanitize a user-provided branch name to a safe PostgreSQL identifier.
  * Only allows alphanumeric characters and underscores.
  */
@@ -70,6 +80,11 @@ export class BranchService {
      * @param options.source  Source database to clone; defaults to the main database.
      */
     async createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
+        validateIdentifier(name, "branch name");
+        if (options?.source) {
+            validateIdentifier(options.source, "source database name");
+        }
+
         const dbName = toBranchDbName(name);
         const sanitizedName = sanitizeBranchName(name);
         const sourceDb = options?.source || this.poolManager.defaultDatabaseName;

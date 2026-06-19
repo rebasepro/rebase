@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import * as path from "path";
 import * as fs from "fs";
+import fsp from "node:fs/promises";
 import { logger } from "./utils/logger.js";
 
 /**
@@ -59,6 +60,9 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // Build list of paths to exclude from SPA handling
     const allExcludePaths = [apiBasePath, ...excludePaths];
 
+    // Cache the index.html content to avoid re-reading from disk on every navigation request.
+    let cachedHtml: string | null = null;
+
     // SPA fallback - serve index.html for all non-excluded routes
     app.get("*", async (c, next) => {
         // Skip excluded paths (API, health checks, etc.)
@@ -68,13 +72,16 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
 
         const indexPath = path.join(frontendPath, indexFile);
 
-        if (!fs.existsSync(indexPath)) {
-            logger.warn(`⚠️ Index file not found: ${indexPath}`);
-            return next();
+        if (!cachedHtml) {
+            try {
+                cachedHtml = await fsp.readFile(indexPath, "utf-8");
+            } catch {
+                logger.warn(`⚠️ Index file not found: ${indexPath}`);
+                return next();
+            }
         }
 
-        const html = fs.readFileSync(indexPath, "utf-8");
-        return c.html(html);
+        return c.html(cachedHtml);
     });
 
     logger.info(`✅ SPA serving enabled from: ${frontendPath}`);

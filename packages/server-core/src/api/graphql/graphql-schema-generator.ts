@@ -185,7 +185,8 @@ export class GraphQLSchemaGenerator {
                 },
                 resolve: async (_, args, context: unknown) => {
                     const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver || this.driver;
+                    const ds = ctx?.driver;
+                    if (!ds) throw new Error("Scoped driver not available");
                     const entity = await ds.fetchEntity({
                         path: collection.slug,
                         entityId: args.id,
@@ -208,7 +209,8 @@ defaultValue: 0 },
                 },
                 resolve: async (_, args, context: unknown) => {
                     const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver || this.driver;
+                    const ds = ctx?.driver;
+                    if (!ds) throw new Error("Scoped driver not available");
                     let filter: FetchCollectionProps["filter"] | undefined;
                     if (args.where) {
                         try {
@@ -260,7 +262,8 @@ defaultValue: 0 },
                 },
                 resolve: async (_, args, context: unknown) => {
                     const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver || this.driver;
+                    const ds = ctx?.driver;
+                    if (!ds) throw new Error("Scoped driver not available");
                     const path = collection.slug;
                     const entity = await ds.saveEntity({
                         path,
@@ -281,7 +284,8 @@ defaultValue: 0 },
                 },
                 resolve: async (_, args, context: unknown) => {
                     const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver || this.driver;
+                    const ds = ctx?.driver;
+                    if (!ds) throw new Error("Scoped driver not available");
                     const entity = await ds.saveEntity({
                         path: collection.slug,
                         entityId: args.id,
@@ -302,7 +306,8 @@ defaultValue: 0 },
                 resolve: async (_, args, context: unknown) => {
                     try {
                         const ctx = context as { driver?: DataDriver } | undefined;
-                        const ds = ctx?.driver || this.driver;
+                        const ds = ctx?.driver;
+                        if (!ds) throw new Error("Scoped driver not available");
                         const existingEntity = await ds.fetchEntity({
                             path: collection.slug,
                             entityId: args.id,

@@ -15,6 +15,7 @@ import { logger } from "../../utils/logger";
 import type {
     ApiKey,
     ApiKeyMasked,
+    ApiKeyPermission,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
     UpdateApiKeyRequest
@@ -72,9 +73,14 @@ function toMasked(row: ApiKey): ApiKeyMasked {
  * Parse a raw DB row into the typed `ApiKey` shape.
  */
 function rowToApiKey(row: Record<string, unknown>): ApiKey {
-    const permissions = typeof row.permissions === "string"
-        ? JSON.parse(row.permissions)
-        : (row.permissions ?? []);
+    let permissions = (row.permissions ?? []) as ApiKeyPermission[];
+    if (typeof row.permissions === "string") {
+        try {
+            permissions = JSON.parse(row.permissions) as ApiKeyPermission[];
+        } catch {
+            permissions = [];
+        }
+    }
 
     return {
         id: row.id as string,
