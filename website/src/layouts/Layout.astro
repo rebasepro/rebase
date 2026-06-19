@@ -1,7 +1,8 @@
 ---
 import { ClientRouter } from "astro:transitions";
-import "@fontsource/rubik";
+import "@fontsource-variable/rubik";
 import "../styles/global.css";
+import rubikLatinUrl from "@fontsource-variable/rubik/files/rubik-latin-wght-normal.woff2?url";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import CookieBanner from "../components/CookieBanner.astro";
@@ -70,6 +71,9 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 
     <title>{title}</title>
     <link rel="shortcut icon" href="/favicon.svg" type="image/x-icon">
+    <link rel="preload" as="font" type="font/woff2" href={rubikLatinUrl} crossorigin>
+    <link rel="stylesheet" href="/styles/fonts-mono.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="/styles/fonts-mono.css"></noscript>
     <link rel="canonical" href={canonical}>
     <meta name="description" content={description}>
     <meta name="keywords"
@@ -217,72 +221,4 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 <script src="../page-effects.ts"/>
 </body>
 
-<style is:global>
-    /* Fallback scrollbar hiding */
-    .no-scrollbar::-webkit-scrollbar {
-        display: none;
-    }
-
-    .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-    }
-
-    video, iframe, img.feature-img {
-        max-width: 100%;
-        height: auto;
-    }
-
-    .btn-glow {
-        transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .btn-glow:hover {
-        filter: brightness(1.1);
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
-    }
-
-    .btn-glow.bg-primary:hover {
-        background-color: var(--color-primary) !important;
-        color: #ffffff !important;
-    }
-
-    .btn-glow.text-primary:hover:not(.bg-primary) {
-        color: var(--color-primary) !important;
-        background-color: rgb(30 41 59 / 0.75) !important;
-        filter: none;
-        box-shadow: none !important;
-    }
-
-    .btn-glow:active {
-        transform: scale(0.98);
-    }
-
-    iframe {
-        aspect-ratio: 16 / 9;
-    }
-
-    .gradient-text {
-        background: linear-gradient(135deg, #0070f4, #359aff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    .hero-gradient {
-        background: radial-gradient(ellipse at center, rgba(0, 112, 244, 0.1) 0%, transparent 70%);
-    }
-
-
-
-    :focus-visible {
-        outline: none;
-        box-shadow: 0 0 0 2px transparent, 0 0 0 4px rgba(0, 112, 244, 0.75), 0 0 0 6px transparent;
-    }
-
-    /* Manifesto Banner Dismissal */
-    html.banner-dismissed-instant #manifesto-banner {
-        display: none !important;
-    }
-</style>
 </html>

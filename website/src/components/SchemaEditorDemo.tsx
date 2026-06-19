@@ -1,9 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { icons as lucideIcons } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+    Ban, CheckSquare, ChevronDown, Clock, Code, FolderUp,
+    FunctionSquare, Globe, GripVertical, Link2, List, ListChecks,
+    ListTodo, Plus, Quote, RefreshCw, Repeat, ToggleRight,
+    Trash2, Type, Upload
+} from "lucide-react";
+
+/** Only the icons actually used in this demo */
+const iconMap: Record<string, LucideIcon> = {
+    Ban, CheckSquare, ChevronDown, Clock, Code, FolderUp,
+    FunctionSquare, Globe, GripVertical, Link2, List, ListChecks,
+    ListTodo, Plus, Quote, RefreshCw, Repeat, ToggleRight,
+    Trash2, Type, Upload
+};
 
 /** Tiny local wrapper for data-driven icon rendering in the demo */
 function Icon({ iconKey, size = 20, className = "" }: { iconKey: string; size?: number; className?: string }) {
-    const Comp = (lucideIcons as any)[iconKey];
+    const Comp = iconMap[iconKey];
     if (!Comp) return null;
     return <Comp size={size} className={className} />;
 }

@@ -19,7 +19,7 @@
     "@astrojs/react": "^5.0.7",
     "@astrojs/sitemap": "^3.7.3",
     "@astrojs/starlight": "^0.40.0",
-    "@firecms/neat": "1.0.0",
+    "@firecms/neat": "1.0.1",
     "@fontsource-variable/rubik": "^5.2.8",
     "@fontsource/rubik": "^5.2.8",
     "@google/generative-ai": "0.24.1",

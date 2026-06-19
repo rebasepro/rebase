@@ -1999,8 +1999,8 @@ importers:
         specifier: ^0.40.0
         version: 0.40.0(astro@6.4.6(@types/node@25.9.3)(jiti@2.7.0)(lightningcss@1.32.0)(rollup@4.62.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(typescript@6.0.3)
       '@firecms/neat':
-        specifier: 1.0.0
-        version: 1.0.0
+        specifier: 1.0.1
+        version: 1.0.1
       '@fontsource-variable/rubik':
         specifier: ^5.2.8
         version: 5.2.8
@@ -3488,8 +3488,8 @@ packages:
   '@firebase/webchannel-wrapper@1.0.6':
     resolution: {integrity: sha512-Vr/Mqu79dMwGRAyGbJ4uN4+BtXB3/mRTdzetD1daWNeG8QaWuzhhbG77GltO5c0yYmYls8i250iX73624GJd7Q==}
 
-  '@firecms/neat@1.0.0':
-    resolution: {integrity: sha512-XfPV/Eqshca+Er9ktT6qHx3gjjiBtlIAy8Q4om9/xtZ2J/i5O1EhADBU896rQDmoCZe90Pc9EhWJI7JkzBgZAg==}
+  '@firecms/neat@1.0.1':
+    resolution: {integrity: sha512-9eKpzGh3odIXdKbRAzkD1q8+zwrJ3TKuh7vKh5twbbOQ6oKdjT0uhypeBeI4VRIv2GaLGGPKamKxd2kb4mkfTQ==}
 
   '@floating-ui/core@1.7.5':
     resolution: {integrity: sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ==}
@@ -14289,7 +14289,7 @@ snapshots:
 
   '@firebase/webchannel-wrapper@1.0.6': {}
 
-  '@firecms/neat@1.0.0': {}
+  '@firecms/neat@1.0.1': {}
 
   '@floating-ui/core@1.7.5':
     dependencies:

@@ -28,3 +28,4 @@ minimumReleaseAgeExclude:
   - '@firecms/neat@0.9.3-canary.20260615000629'
   - '@firecms/neat@0.9.3-canary.20260615103956'
   - '@firecms/neat@1.0.0'
+  - '@firecms/neat@1.0.1'
