@@ -1,14 +1,10 @@
-// import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { EntityService } from "./services/entityService";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { DrizzleClient } from "./interfaces";
-import { User, RebaseClient } from "@rebasepro/types";
-import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, updateDateAutoValues } from "@rebasepro/common";
-import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import {
+    DatabaseAdmin,
     DataDriver,
     DeleteEntityProps,
     Entity,
@@ -18,19 +14,20 @@ import {
     ListenCollectionProps,
     ListenEntityProps,
     RebaseCallContext,
-    SaveEntityProps,
+    RebaseClient,
     RebaseData,
-    TableMetadata,
+    RestFetchService,
+    SaveEntityProps,
     TableColumnInfo,
     TableForeignKeyInfo,
     TableJunctionInfo,
+    TableMetadata,
     TablePolicyInfo,
-    SQLAdmin,
-    SchemaAdmin,
-    DatabaseAdmin,
-    RestFetchService
+    User
 } from "@rebasepro/types";
-import { buildRebaseData } from "@rebasepro/common";
+import { sql as drizzleSql } from "drizzle-orm";
+import { buildPropertyCallbacks, buildRebaseData, updateDateAutoValues } from "@rebasepro/common";
+import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server-core";
@@ -112,7 +109,6 @@ export class PostgresBackendDriver implements DataDriver {
         return this.entityService.getFetchService();
     }
 
-
     private buildCallContext(): RebaseCallContext {
         return {
             user: this.user,
@@ -124,13 +120,17 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {
-        if (!collection && !path) return { collection: undefined,
-callbacks: undefined,
-propertyCallbacks: undefined };
+        if (!collection && !path) return {
+            collection: undefined,
+            callbacks: undefined,
+            propertyCallbacks: undefined
+        };
         const registryCollection = this.registry?.getCollectionByPath(path);
         const resolvedCollection = registryCollection
-            ? { ...collection,
-...registryCollection } as EntityCollection<M>
+            ? {
+                ...collection,
+                ...registryCollection
+            } as EntityCollection<M>
             : collection as EntityCollection<M>;
 
         const callbacks = resolvedCollection?.callbacks;
@@ -147,17 +147,17 @@ propertyCallbacks: undefined };
     }
 
     async fetchCollection<M extends Record<string, unknown>>({
-        path,
-        collection,
-        filter,
-        limit,
-        offset,
-        startAfter,
-        orderBy,
-        searchString,
-        order,
-        vectorSearch
-    }: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+                                                                 path,
+                                                                 collection,
+                                                                 filter,
+                                                                 limit,
+                                                                 offset,
+                                                                 startAfter,
+                                                                 orderBy,
+                                                                 searchString,
+                                                                 order,
+                                                                 vectorSearch
+                                                             }: FetchCollectionProps<M>): Promise<Entity<M>[]> {
 
         const entities = await this.entityService.fetchCollection<M>(path, {
             filter,
@@ -171,7 +171,11 @@ propertyCallbacks: undefined };
             vectorSearch
         });
 
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const {
+            collection: resolvedCollection,
+            callbacks,
+            propertyCallbacks
+        } = this.resolveCollectionCallbacks(collection, path);
 
         if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = this.buildCallContext();
@@ -201,18 +205,18 @@ propertyCallbacks: undefined };
     }
 
     listenCollection<M extends Record<string, unknown>>({
-        path,
-        collection,
-        filter,
-        limit,
-        offset,
-        startAfter,
-        orderBy,
-        searchString,
-        order,
-        onUpdate,
-        onError
-    }: ListenCollectionProps<M>): () => void {
+                                                            path,
+                                                            collection,
+                                                            filter,
+                                                            limit,
+                                                            offset,
+                                                            startAfter,
+                                                            orderBy,
+                                                            searchString,
+                                                            order,
+                                                            onUpdate,
+                                                            onError
+                                                        }: ListenCollectionProps<M>): () => void {
 
         const subscriptionId = this.generateSubscriptionId();
 
@@ -265,18 +269,22 @@ propertyCallbacks: undefined };
     }
 
     async fetchEntity<M extends Record<string, unknown>>({
-        path,
-        entityId,
-        databaseId,
-        collection
-    }: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
+                                                             path,
+                                                             entityId,
+                                                             databaseId,
+                                                             collection
+                                                         }: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
         let entity = await this.entityService.fetchEntity<M>(
             path,
             entityId,
             databaseId || collection?.databaseId
         );
 
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const {
+            collection: resolvedCollection,
+            callbacks,
+            propertyCallbacks
+        } = this.resolveCollectionCallbacks(collection, path);
 
         if (entity && (callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = this.buildCallContext();
@@ -302,12 +310,12 @@ propertyCallbacks: undefined };
     }
 
     listenEntity<M extends Record<string, unknown>>({
-        path,
-        entityId,
-        collection,
-        onUpdate,
-        onError
-    }: ListenEntityProps<M>): () => void {
+                                                        path,
+                                                        entityId,
+                                                        collection,
+                                                        onUpdate,
+                                                        onError
+                                                    }: ListenEntityProps<M>): () => void {
 
         const subscriptionId = this.generateSubscriptionId();
         const callbackWrapper = (entity: Entity<M> | null) => {
@@ -347,14 +355,18 @@ propertyCallbacks: undefined };
     }
 
     async saveEntity<M extends Record<string, unknown>>({
-        path,
-        entityId,
-        values,
-        collection,
-        status
-    }: SaveEntityProps<M>): Promise<Entity<M>> {
+                                                            path,
+                                                            entityId,
+                                                            values,
+                                                            collection,
+                                                            status
+                                                        }: SaveEntityProps<M>): Promise<Entity<M>> {
 
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const {
+            collection: resolvedCollection,
+            callbacks,
+            propertyCallbacks
+        } = this.resolveCollectionCallbacks(collection, path);
 
         let updatedValues = values;
         const contextForCallback = this.buildCallContext();
@@ -520,12 +532,16 @@ propertyCallbacks: undefined };
     }
 
     async deleteEntity<M extends Record<string, unknown>>({
-        entity,
-        collection
-    }: DeleteEntityProps<M>): Promise<void> {
+                                                              entity,
+                                                              collection
+                                                          }: DeleteEntityProps<M>): Promise<void> {
 
         // Resolve from backend registry to restore callbacks lost during WebSocket serialization
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, entity.path);
+        const {
+            collection: resolvedCollection,
+            callbacks,
+            propertyCallbacks
+        } = this.resolveCollectionCallbacks(collection, entity.path);
 
         const contextForCallback = this.buildCallContext();
 
@@ -639,17 +655,18 @@ propertyCallbacks: undefined };
         );
     }
 
-
     async countEntities<M extends Record<string, unknown>>({
-        path,
-        collection,
-        filter,
-        searchString
-    }: FetchCollectionProps<M>): Promise<number> {
+                                                               path,
+                                                               collection,
+                                                               filter,
+                                                               searchString
+                                                           }: FetchCollectionProps<M>): Promise<number> {
         return this.entityService.countEntities(
             path,
-            { filter,
-searchString }
+            {
+                filter,
+                searchString
+            }
         );
     }
 
@@ -665,7 +682,10 @@ searchString }
         return this.poolManager.getDrizzle(databaseName);
     }
 
-    async executeSql(sqlText: string, options?: { database?: string, role?: string }): Promise<Record<string, unknown>[]> {
+    async executeSql(sqlText: string, options?: {
+        database?: string,
+        role?: string
+    }): Promise<Record<string, unknown>[]> {
         if (!options?.database && !options?.role) {
             return this.entityService.executeSql(sqlText);
         }
@@ -690,7 +710,7 @@ searchString }
             }
 
             if (needsRoleSwitch && options?.role) {
-                const safeRole = options.role.replace(/"/g, '""');
+                const safeRole = options.role.replace(/"/g, "\"\"");
                 return await targetDb.transaction(async (tx) => {
                     await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
                     const result = await tx.execute(drizzleSql.raw(sqlText));
@@ -813,7 +833,6 @@ searchString }
         const mappedSet = new Set(mappedPaths.map(p => p.toLowerCase()));
         return filteredTables.filter((name: string) => !mappedSet.has(name.toLowerCase()));
     }
-
 
     /**
      * Fetch metadata for a given table from information_schema (columns, policies, constraints).
@@ -958,18 +977,22 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             fetchCollectionForRest: async (collectionPath, options, include) => {
                 return this.withTransaction(async (delegate) => {
                     return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
-                });
+                }, { accessMode: "read only" });
             },
             fetchEntityForRest: async (collectionPath, entityId, include, databaseId) => {
                 return this.withTransaction(async (delegate) => {
                     return delegate.restFetchService.fetchEntityForRest(collectionPath, entityId, include, databaseId);
-                });
+                }, { accessMode: "read only" });
             }
         };
     }
 
     private async withTransaction<T>(
-        operation: (delegate: PostgresBackendDriver) => Promise<T>
+        operation: (delegate: PostgresBackendDriver) => Promise<T>,
+        options?: {
+            accessMode?: "read only" | "read write";
+            isolationLevel?: "read uncommitted" | "read committed" | "repeatable read" | "serializable"
+        }
     ): Promise<T> {
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
@@ -993,8 +1016,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 SELECT 
                     set_config('app.user_id', ${userId}, true),
                     set_config('app.user_roles', ${rolesString}, true),
-                    set_config('app.jwt', ${JSON.stringify({ sub: userId,
-roles: userRoles })}, true)
+                    set_config('app.jwt', ${JSON.stringify({
+                sub: userId,
+                roles: userRoles
+            })}, true)
             `);
 
             const txEntityService = new EntityService(tx, this.delegate.registry);
@@ -1006,7 +1031,7 @@ roles: userRoles })}, true)
             txDelegate.client = this.delegate.client;
 
             return await operation(txDelegate);
-        });
+        }, options);
 
         for (const notification of pendingNotifications) {
             try {
@@ -1025,7 +1050,7 @@ roles: userRoles })}, true)
     }
 
     async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
-        return this.withTransaction((delegate) => delegate.fetchCollection(props));
+        return this.withTransaction((delegate) => delegate.fetchCollection(props), { accessMode: "read only" });
     }
 
     /**
@@ -1033,8 +1058,10 @@ roles: userRoles })}, true)
      * registered realtime subscription so RLS-aware polling can apply.
      */
     private injectAuthContext(unsubscribe: () => void): () => void {
-        const authContext = { userId: this.user?.uid || "anonymous",
-roles: this.user?.roles ?? [] };
+        const authContext = {
+            userId: this.user?.uid || "anonymous",
+            roles: this.user?.roles ?? []
+        };
         const entries = Array.from(this.delegate.realtimeService.subscriptions.entries());
         const lastEntry = entries[entries.length - 1];
         const lastSub = lastEntry?.[1] as Record<string, unknown> | undefined;
@@ -1049,7 +1076,7 @@ roles: this.user?.roles ?? [] };
     }
 
     async fetchEntity<M extends Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
-        return this.withTransaction((delegate) => delegate.fetchEntity(props));
+        return this.withTransaction((delegate) => delegate.fetchEntity(props), { accessMode: "read only" });
     }
 
     listenEntity<M extends Record<string, unknown>>(props: ListenEntityProps<M>): () => void {
@@ -1075,11 +1102,11 @@ roles: this.user?.roles ?? [] };
         entityId?: string,
         collection?: EntityCollection
     ): Promise<boolean> {
-        return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, entityId, collection));
+        return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, entityId, collection), { accessMode: "read only" });
     }
 
     async countEntities<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
-        return this.withTransaction((delegate) => delegate.countEntities(props));
+        return this.withTransaction((delegate) => delegate.countEntities(props), { accessMode: "read only" });
     }
 
 }
