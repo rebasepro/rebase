@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { server, ALL_TOOLS } from "../src/index";
+import { server, ALL_TOOLS, detectPackageManager, getExecCommand, getRunCommand } from "../src/index";
+import type { PackageManager } from "../src/index";
+import { resolve } from "node:path";
 
 // Mock the child_process spawn for CLI tools
 const mockSpawn = {
@@ -13,6 +15,9 @@ vi.mock("node:child_process", () => ({
 
 // Mock the Rebase Client SDK
 const mockClient = {
+    auth: {
+        getUser: vi.fn().mockResolvedValue({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] })
+    },
     data: {
         collection: vi.fn(() => ({
             find: vi.fn().mockResolvedValue([{ id: "doc-1",
@@ -33,6 +38,21 @@ title: "Updated Doc" }),
 email: "updated@rebase.pro" }),
         deleteUser: vi.fn().mockResolvedValue(true),
         listRoles: vi.fn().mockResolvedValue(["admin", "user"])
+    },
+    cron: {
+        listJobs: vi.fn().mockResolvedValue({ jobs: [{ jobId: "cleanup", enabled: true }] }),
+        getJob: vi.fn().mockResolvedValue({ job: { jobId: "cleanup", enabled: true } }),
+        triggerJob: vi.fn().mockResolvedValue({ log: { status: "success" }, job: { jobId: "cleanup" } }),
+        getJobLogs: vi.fn().mockResolvedValue({ logs: [{ message: "Job finished" }] }),
+        toggleJob: vi.fn().mockResolvedValue({ job: { jobId: "cleanup", enabled: false } })
+    },
+    storage: {
+        listObjects: vi.fn().mockResolvedValue({ objects: [{ key: "file.png" }] }),
+        deleteObject: vi.fn().mockResolvedValue(undefined),
+        getSignedUrl: vi.fn().mockResolvedValue({ url: "http://tempurl" })
+    },
+    functions: {
+        invoke: vi.fn().mockResolvedValue({ result: "success" })
     }
 };
 
@@ -108,5 +128,124 @@ data: { title: "New Doc" } }
             }
         });
         expect(usersResult.content[0].text).toContain("user@rebase.pro");
+    });
+
+    it("routes call tool requests to storage, cron, and custom functions", async () => {
+        const handler = (server as any)._requestHandlers.get("tools/call");
+        expect(handler).toBeDefined();
+
+        // 1. storage_list_objects
+        const storageResult = await handler({
+            method: "tools/call",
+            params: {
+                name: "storage_list_objects",
+                arguments: { prefix: "img/" }
+            }
+        });
+        expect(storageResult.content[0].text).toContain("file.png");
+
+        // 2. cron_list_jobs
+        const cronResult = await handler({
+            method: "tools/call",
+            params: {
+                name: "cron_list_jobs",
+                arguments: {}
+            }
+        });
+        expect(cronResult.content[0].text).toContain("cleanup");
+
+        // 3. invoke_function
+        const funcResult = await handler({
+            method: "tools/call",
+            params: {
+                name: "invoke_function",
+                arguments: { name: "test-func", payload: { val: 1 } }
+            }
+        });
+        expect(funcResult.content[0].text).toContain("success");
+    });
+
+    it("verifies admin role for database branching operations", async () => {
+        const handler = (server as any)._requestHandlers.get("tools/call");
+        expect(handler).toBeDefined();
+
+        // Make user a non-admin
+        mockClient.auth.getUser.mockResolvedValueOnce({ uid: "user-id", email: "user@rebase.pro", roles: ["user"] });
+
+        await expect(handler({
+            method: "tools/call",
+            params: {
+                name: "rebase_db_branch_list",
+                arguments: {}
+            }
+        })).rejects.toThrow("Admin authorization failed: Access denied: User does not have the 'admin' role.");
+
+        // As an admin, it should execute the CLI command
+        mockClient.auth.getUser.mockResolvedValueOnce({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] });
+        
+        // Mock stdout capture for spawn
+        mockSpawn.on.mockImplementation((event: string, callback: any) => {
+            if (event === "close") {
+                setTimeout(() => callback(0), 10);
+            }
+            return mockSpawn;
+        });
+
+        const result = await handler({
+            method: "tools/call",
+            params: {
+                name: "rebase_db_branch_list",
+                arguments: {}
+            }
+        });
+        expect(result.content[0].text).toBeDefined();
+    });
+});
+
+describe("detectPackageManager", () => {
+    it("detects pnpm from pnpm-lock.yaml", () => {
+        // The test project itself uses pnpm (has pnpm-workspace.yaml)
+        const result = detectPackageManager(resolve(__dirname, "../../.."));
+        expect(result).toBe("pnpm");
+    });
+
+    it("returns pnpm as default when no lock file is found", () => {
+        // Use /tmp which shouldn't have any lock files
+        const result = detectPackageManager("/tmp/nonexistent-project-" + Date.now());
+        expect(result).toBe("pnpm");
+    });
+});
+
+describe("getExecCommand", () => {
+    it("returns pnpm exec for pnpm", () => {
+        const result = getExecCommand("pnpm");
+        expect(result).toEqual({ command: "pnpm", args: ["exec"] });
+    });
+
+    it("returns yarn exec for yarn", () => {
+        const result = getExecCommand("yarn");
+        expect(result).toEqual({ command: "yarn", args: ["exec"] });
+    });
+
+    it("returns npx with no args prefix for npm", () => {
+        const result = getExecCommand("npm");
+        expect(result).toEqual({ command: "npx", args: [] });
+    });
+});
+
+describe("getRunCommand", () => {
+    it("returns pnpm run for pnpm", () => {
+        const result = getRunCommand("pnpm");
+        expect(result).toEqual({ command: "pnpm", args: ["run"] });
+    });
+
+    it("returns yarn run for yarn", () => {
+        const result = getRunCommand("yarn");
+        expect(result).toEqual({ command: "yarn", args: ["run"] });
+    });
+
+    it("returns npm run for npm", () => {
+        const result = getRunCommand("npm");
+        expect(result).toEqual({ command: "npm", args: ["run"] });
     });
 });

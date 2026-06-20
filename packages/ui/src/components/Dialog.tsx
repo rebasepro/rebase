@@ -94,7 +94,7 @@ export const Dialog = ({
                 <div className={cls("fixed inset-0 z-50", containerClassName)}>
 
                     <DialogPrimitive.Overlay
-                        className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 bg-black dark:bg-opacity-60 dark:bg-black/60 bg-opacity-50 bg-black/50 backdrop-blur-sm",
+                        className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 bg-black/50 dark:bg-black/60 backdrop-blur-sm",
                             displayed && open ? "opacity-100" : "opacity-0",
                             "z-50 fixed top-0 left-0 w-full h-full flex justify-center items-center"
                         )}
@@ -114,7 +114,7 @@ export const Dialog = ({
                         onPointerDownOutside={onPointerDownOutside}
                         onInteractOutside={onInteractOutside}
                         aria-describedby={ariaDescribedby}
-                        className={cls("h-full outline-none flex justify-center items-center z-60 opacity-100 transition-all duration-200 ease-in-out")}
+                        className={cls("relative h-full outline-none flex justify-center items-center z-60 opacity-100 transition-all duration-200 ease-in-out")}
                     >
                         <div
                             className={cls(paperMixin,

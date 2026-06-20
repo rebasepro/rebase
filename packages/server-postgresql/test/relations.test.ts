@@ -1113,3 +1113,250 @@ relationName: "recipient" }
         expect(namesInMessages[0]).not.toBe(namesInMessages[1]);
     });
 });
+
+describe("columnName vs property key deduplication regression", () => {
+    const extractRelationNames = (schema: string): string[] => {
+        const matches = schema.match(/relationName:\s*"([^"]+)"/g) ?? [];
+        return matches.map(m => m.replace(/relationName:\s*"/, "").replace(/"$/, ""));
+    };
+
+    it("should not emit a synthetic duplicate when property uses columnName different from property key", async () => {
+        // Scenario: engagements.clientId has columnName: "client_id"
+        // The explicit owning relation uses localKey: "clientId" (property key).
+        // The inverse relation on clients uses foreignKeyOnTarget: "client_id" (raw column).
+        // Without the fix, the synthetic loop would emit a broken second relation
+        // using engagements.client_id (which doesn't exist as a Drizzle property).
+        const clientsCollection: EntityCollection = {
+            slug: "clients",
+            table: "clients",
+            name: "Clients",
+            properties: {
+                id: { type: "string" },
+                name: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "engagements",
+                    target: () => engagementsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "client_id"
+                }
+            ]
+        };
+
+        const engagementsCollection: EntityCollection = {
+            slug: "engagements",
+            table: "engagements",
+            name: "Engagements",
+            properties: {
+                id: { type: "string" },
+                clientId: {
+                    type: "relation",
+                    columnName: "client_id",
+                    target: () => clientsCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "clientId",
+                    relationName: "client"
+                } as any,
+                title: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "client",
+                    target: () => clientsCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "clientId"
+                }
+            ]
+        };
+
+        const result = await generateSchema([clientsCollection, engagementsCollection]);
+
+        // engagements should have exactly ONE one() entry for clientId
+        const engagementsRelBlock = result.match(/export const engagementsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const oneEntries = (engagementsRelBlock.match(/:\s*one\(/g) ?? []).length;
+        expect(oneEntries).toBe(1);
+
+        // The one() entry must reference engagements.clientId (property key), NOT engagements.client_id
+        expect(engagementsRelBlock).toContain("engagements.clientId");
+        expect(engagementsRelBlock).not.toContain("engagements.client_id");
+
+        // No _synth_ entry should appear
+        expect(engagementsRelBlock).not.toContain("_synth_");
+    });
+
+    it("should produce matching relation names on both sides when columnName differs from property key", async () => {
+        const clientsCollection: EntityCollection = {
+            slug: "clients",
+            table: "clients",
+            name: "Clients",
+            properties: {
+                id: { type: "string" },
+                name: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "engagements",
+                    target: () => engagementsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "client_id"
+                }
+            ]
+        };
+
+        const engagementsCollection: EntityCollection = {
+            slug: "engagements",
+            table: "engagements",
+            name: "Engagements",
+            properties: {
+                id: { type: "string" },
+                clientId: {
+                    type: "relation",
+                    columnName: "client_id",
+                    target: () => clientsCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "clientId",
+                    relationName: "client"
+                } as any,
+                title: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "client",
+                    target: () => clientsCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "clientId"
+                }
+            ]
+        };
+
+        const result = await generateSchema([clientsCollection, engagementsCollection]);
+
+        // Extract relation names from both sides
+        const engagementsRelBlock = result.match(/export const engagementsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const clientsRelBlock = result.match(/export const clientsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+
+        const engagementsRelNames = extractRelationNames(engagementsRelBlock);
+        const clientsRelNames = extractRelationNames(clientsRelBlock);
+
+        // Both sides must share the same relation name
+        expect(engagementsRelNames.length).toBeGreaterThanOrEqual(1);
+        expect(clientsRelNames.length).toBeGreaterThanOrEqual(1);
+
+        // The owning side's relation name should appear in the inverse side too
+        const sharedName = engagementsRelNames[0];
+        expect(clientsRelNames).toContain(sharedName);
+    });
+
+    it("should correctly handle inverse one-to-one with columnName on target", async () => {
+        // One-to-one: user has a profile, profile has userId with columnName: "user_id"
+        const usersCollection: EntityCollection = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            properties: {
+                id: { type: "string" },
+                name: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "profile",
+                    target: () => profilesCollection,
+                    cardinality: "one",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "user_id"
+                }
+            ]
+        };
+
+        const profilesCollection: EntityCollection = {
+            slug: "profiles",
+            table: "profiles",
+            name: "Profiles",
+            properties: {
+                id: { type: "string" },
+                userId: {
+                    type: "relation",
+                    columnName: "user_id",
+                    target: () => usersCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "userId",
+                    relationName: "user"
+                } as any,
+                bio: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "user",
+                    target: () => usersCollection,
+                    cardinality: "one",
+                    direction: "owning",
+                    localKey: "userId"
+                }
+            ]
+        };
+
+        const result = await generateSchema([usersCollection, profilesCollection]);
+
+        // profiles should have exactly ONE one() entry
+        const profilesRelBlock = result.match(/export const profilesRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        const oneEntries = (profilesRelBlock.match(/:\s*one\(/g) ?? []).length;
+        expect(oneEntries).toBe(1);
+
+        // Must reference profiles.userId (property key), NOT profiles.user_id
+        expect(profilesRelBlock).toContain("profiles.userId");
+        expect(profilesRelBlock).not.toContain("profiles.user_id");
+
+        // No _synth_ entry
+        expect(profilesRelBlock).not.toContain("_synth_");
+    });
+
+    it("should still emit synthetic relations when no explicit owning relation exists", async () => {
+        // When a collection has a FK column but no explicit owning relation defined,
+        // the synthetic loop should still create the missing relation.
+        const categoriesCollection: EntityCollection = {
+            slug: "categories",
+            table: "categories",
+            name: "Categories",
+            properties: {
+                id: { type: "string" },
+                name: { type: "string" }
+            },
+            relations: [
+                {
+                    relationName: "products",
+                    target: () => productsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "category_id"
+                }
+            ]
+        };
+
+        const productsCollection: EntityCollection = {
+            slug: "products",
+            table: "products",
+            name: "Products",
+            properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                category_id: { type: "string" }
+                // NOTE: no type: "relation" and no explicit relations[]
+            }
+        };
+
+        const result = await generateSchema([categoriesCollection, productsCollection]);
+
+        // products should get a synthetic one() for category_id
+        const productsRelBlock = result.match(/export const productsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
+        expect(productsRelBlock).toContain("one(categories");
+        expect(productsRelBlock).toContain("products.category_id");
+    });
+});

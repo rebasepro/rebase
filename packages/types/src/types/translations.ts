@@ -130,6 +130,9 @@ export interface RebaseTranslations {
 
     // ─── Error states ─────────────────────────────────────────────
     error: string;
+    error_loading_data?: string;
+    error_check_server_logs?: string;
+    error_technical_details?: string;
     error_uploading_file: string;
     error_deleting: string;
     error_before_delete: string;

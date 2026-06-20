@@ -16,8 +16,9 @@
   "scripts": {
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "prebuild": "rm -rf skills && cp -r ../../rebase-agent-skills/skills skills",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.json",
-    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+    "clean": "rm -rf dist skills && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "keywords": [
     "cli",
@@ -53,7 +54,8 @@
   "files": [
     "bin/",
     "dist/",
-    "templates/"
+    "templates/",
+    "skills/"
   ],
   "exports": {
     ".": {

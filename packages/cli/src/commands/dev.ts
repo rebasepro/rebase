@@ -239,8 +239,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     if (!frontendOnly && backendDir) {
         const tsxBin = resolveTsx(projectRoot);
         if (!tsxBin) {
-            const pmName = detectPackageManager(projectRoot);
-            const addCmd = pmName === "npm" ? "npm install -D tsx" : "pnpm add -D tsx";
+            const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
+            const addCmd = [...pmCmdsLocal.install, "-D", "tsx"].join(" ");
             console.error(chalk.red("  ✗ Could not find tsx binary for backend."));
             console.error(chalk.gray(`    Install it with: ${addCmd}`));
             process.exit(1);
@@ -276,7 +276,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         env
                     });
                 }
-                await execa("npx", ["rebase", "generate-sdk"], {
+                const sdkCmd = getPMCommands(detectPackageManager(projectRoot)).exec("rebase", ["generate-sdk"]);
+                await execa(sdkCmd[0], sdkCmd.slice(1), {
                     cwd: projectRoot,
                     stdio: "inherit",
                     env
@@ -306,7 +307,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                                     env
                                 });
                             }
-                            await execa("npx", ["rebase", "generate-sdk"], {
+                            const sdkCmd = getPMCommands(detectPackageManager(projectRoot)).exec("rebase", ["generate-sdk"]);
+                            await execa(sdkCmd[0], sdkCmd.slice(1), {
                                 cwd: projectRoot,
                                 stdio: "inherit",
                                 env
@@ -337,14 +339,14 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         console.log([
                             "",
                             chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
-                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(filename!.padEnd(29)) + chalk.yellow("│"),
+                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(filename!.padEnd(31)) + chalk.yellow("│"),
                             chalk.yellow("  │                                                              │"),
                             chalk.yellow("  │  Your schema may be out of sync. Run:                        │"),
-                            chalk.yellow("  │    ") + chalk.cyan("pnpm schema:generate") + chalk.yellow("   regenerate Drizzle schema        │"),
-                            chalk.yellow("  │    ") + chalk.cyan("pnpm db:push         ") + chalk.yellow("   sync schema to database          │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase doctor        ") + chalk.yellow("   check for drift                  │"),
+                            chalk.yellow("  │    ") + chalk.cyan("rebase schema generate") + chalk.yellow("   regenerate Drizzle schema        │"),
+                            chalk.yellow("  │    ") + chalk.cyan("rebase db push        ") + chalk.yellow("   sync schema to database          │"),
+                            chalk.yellow("  │    ") + chalk.cyan("rebase doctor         ") + chalk.yellow("   check for drift                  │"),
                             chalk.yellow("  │                                                              │"),
-                            chalk.yellow("  │  TIP: Use ") + chalk.bold("rebase dev --generate") + chalk.yellow(" for auto-regeneration    │"),
+                            chalk.yellow("  │  TIP: Use ") + chalk.bold("rebase dev --generate") + chalk.yellow(" for auto-regeneration        │"),
                             chalk.yellow("  └──────────────────────────────────────────────────────────────┘"),
                             ""
                         ].join("\n"));

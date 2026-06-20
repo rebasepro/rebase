@@ -350,6 +350,12 @@ async function createProject(options: InitOptions) {
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
     console.log(chalk.gray("GitHub: https://github.com/rebasepro/rebase"));
     console.log("");
+    console.log(chalk.bold("🤖 AI Agent Skills"));
+    console.log("");
+    console.log(chalk.gray("  Install Rebase agent skills for your AI coding assistant:"));
+    console.log("");
+    console.log(`  ${chalk.cyan("rebase skills install")}  ${chalk.gray("or")}  ${chalk.cyan(pmCommands.run("skills:install").join(" "))}`);
+    console.log("");
 }
 
 /**

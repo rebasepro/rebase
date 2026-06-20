@@ -170,6 +170,9 @@ export const en: RebaseTranslations = {
 
     // ─── Error states ─────────────────────────────────────────────
     error: "Error",
+    error_loading_data: "Could not load data",
+    error_check_server_logs: "Check server logs for details.",
+    error_technical_details: "Technical details",
     error_uploading_file: "Error uploading file",
     error_deleting: "Error deleting",
     error_before_delete: "Error before delete",

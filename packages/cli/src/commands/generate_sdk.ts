@@ -12,6 +12,7 @@ import path from "path";
 import chalk from "chalk";
 import { EntityCollection } from "@rebasepro/types";
 import { generateSDK, GeneratedFile } from "@rebasepro/sdk-generator";
+import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 
 interface GenerateSDKArgs {
     collectionsDir: string;
@@ -38,8 +39,9 @@ async function loadCollections(collectionsDir: string): Promise<EntityCollection
         const jitiModule = await import("jiti");
         jiti = (jitiModule.default || jitiModule) as typeof jiti;
     } catch {
+        const installCmd = [...getPMCommands(detectPackageManager()).install, "-D", "jiti"].join(" ");
         throw new Error(
-            "Could not load 'jiti'. Install it with: pnpm add -D jiti\n" +
+            `Could not load 'jiti'. Install it with: ${installCmd}\n` +
             "jiti is required to dynamically import TypeScript collection definitions."
         );
     }

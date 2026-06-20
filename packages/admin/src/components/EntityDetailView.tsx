@@ -192,16 +192,32 @@ entityId }
     const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView || includeHistoryView;
 
     const {
-        resolvedEntityViews,
-        selectedEntityView
-    } = resolvedSelectedEntityView(customViews, customizationController, selectedTab, canEdit);
+        resolvedEntityViews
+    } = resolvedSelectedEntityView(customViews, customizationController, undefined, canEdit);
 
-    const mainViewVisible = selectedTab === MAIN_TAB_VALUE;
+    const validTabValues = useMemo(() => {
+        const set = new Set<string>([
+            MAIN_TAB_VALUE,
+            ...(includeJsonView ? [JSON_TAB_VALUE] : []),
+            ...(includeHistoryView ? [HISTORY_TAB_VALUE] : []),
+            ...resolvedEntityViews.map(v => v.key),
+            ...subcollections.map(s => s.slug)
+        ]);
+        return set;
+    }, [includeJsonView, includeHistoryView, resolvedEntityViews, subcollections]);
+
+    const activeTab = validTabValues.has(selectedTab) ? selectedTab : MAIN_TAB_VALUE;
+
+    const {
+        selectedEntityView
+    } = resolvedSelectedEntityView(customViews, customizationController, activeTab, canEdit);
+
+    const mainViewVisible = activeTab === MAIN_TAB_VALUE;
 
     // Track which custom view tabs have been visited
     const mountedTabsRef = useRef<Set<string>>(new Set());
-    if (selectedTab) {
-        mountedTabsRef.current.add(selectedTab);
+    if (activeTab) {
+        mountedTabsRef.current.add(activeTab);
     }
 
     // Read-only form context for custom entity views
@@ -220,6 +236,9 @@ entityId }
             },
             save: () => {
                 throw new Error("Cannot save in read-only detail view");
+            },
+            submit: () => {
+                throw new Error("Cannot submit in read-only detail view");
             },
             collection,
             path,
@@ -268,7 +287,7 @@ entityId }
             if (!Builder) return null;
             if (!entityId) return null;
 
-            const isActive = selectedTab === customView.key;
+            const isActive = activeTab === customView.key;
             const hasBeenMounted = mountedTabsRef.current.has(customView.key);
             if (!isActive && !hasBeenMounted) return null;
 
@@ -298,9 +317,9 @@ entityId }
 
     // JSON view
     const jsonTabMounted = mountedTabsRef.current.has(JSON_TAB_VALUE);
-    const jsonView = (selectedTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
+    const jsonView = (activeTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
         className={cls("relative flex-1 h-full overflow-auto w-full",
-            { "hidden": selectedTab !== JSON_TAB_VALUE })}
+            { "hidden": activeTab !== JSON_TAB_VALUE })}
         key={"json_view"}
         role="tabpanel">
         <ErrorBoundary>
@@ -309,7 +328,7 @@ entityId }
     </div> : null;
 
     // History view
-    const historyView = includeHistoryView && selectedTab === HISTORY_TAB_VALUE ? <div
+    const historyView = includeHistoryView && activeTab === HISTORY_TAB_VALUE ? <div
         className={"relative flex-1 h-full overflow-auto w-full"}
         key={"history_view"}
         role="tabpanel">
@@ -330,7 +349,7 @@ entityId }
         const subcollectionId = subcollection.slug;
         const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(subcollection.slug)}` : undefined;
 
-        if (selectedTab !== subcollectionId) return null;
+        if (activeTab !== subcollectionId) return null;
         return (
             <div
                 className={"relative flex-1 h-full overflow-auto w-full"}
@@ -552,7 +571,7 @@ entityId }
             {hasAdditionalViews && <div className={"flex-1 flex justify-end min-w-0 shrink-0"}>
                 <Tabs
                     className={"!w-fit max-w-full"}
-                    value={selectedTab}
+                    value={activeTab}
                     onValueChange={(value) => {
                         onSideTabClick(value);
                     }}>

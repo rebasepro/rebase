@@ -1,4 +1,4 @@
-import type { EntityCollection, UrlController, SideEntityController } from "@rebasepro/types";
+import type { EntityCollection, UrlController, SideEntityController, NavigateOptions } from "@rebasepro/types";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
 export {
@@ -26,7 +26,8 @@ export function navigateToEntity({
     defaultValues,
     sideEntityController,
     onClose,
-    navigation
+    navigation,
+    replace
 }:
 
     {
@@ -47,7 +48,8 @@ export function navigateToEntity({
         path: string;
         sideEntityController: SideEntityController;
         onClose?: () => void;
-        navigation: UrlController
+        navigation: UrlController;
+        replace?: boolean;
     }) {
 
     if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
@@ -83,7 +85,15 @@ export function navigateToEntity({
         // Use React Router location.state to carry defaultValues — the correct SPA
         // approach. No URL size limits, no encoding, nothing in the address bar.
         // EntityFullScreenRoute reads location.state.defaultValues on mount.
-        navigation.navigate(to, defaultValues ? { state: { defaultValues } } : undefined);
+        const navigateOptions: NavigateOptions = {};
+        if (replace !== undefined) {
+            navigateOptions.replace = replace;
+        }
+        if (defaultValues) {
+            navigateOptions.state = { defaultValues };
+        }
+        const hasOptions = Object.keys(navigateOptions).length > 0;
+        navigation.navigate(to, hasOptions ? navigateOptions : undefined);
     }
 
 }

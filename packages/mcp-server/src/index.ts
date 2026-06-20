@@ -11,6 +11,55 @@ import { config as loadDotenv } from "dotenv";
 import { resolve, join } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
+// ── Package Manager Detection ───────────────────────────────────────────────
+
+export type PackageManager = "pnpm" | "yarn" | "npm";
+
+/**
+ * Detect the project's package manager by checking for lock files.
+ * Falls back to pnpm (Rebase's default) if no lock file is found.
+ */
+export function detectPackageManager(projectDir: string): PackageManager {
+    const candidates: [string, PackageManager][] = [
+        ["pnpm-lock.yaml", "pnpm"],
+        ["pnpm-workspace.yaml", "pnpm"],
+        ["yarn.lock", "yarn"],
+        ["package-lock.json", "npm"]
+    ];
+    for (const [lockFile, pm] of candidates) {
+        if (existsSync(resolve(projectDir, lockFile))) return pm;
+    }
+    // Also check in app/ subdirectory for scaffolded projects
+    for (const [lockFile, pm] of candidates) {
+        if (existsSync(resolve(projectDir, "app", lockFile))) return pm;
+    }
+    return "pnpm"; // Rebase default
+}
+
+/** Return the exec command and its arguments prefix for running a package binary. */
+export function getExecCommand(pm: PackageManager): { command: string; args: string[] } {
+    switch (pm) {
+        case "pnpm":
+            return { command: "pnpm", args: ["exec"] };
+        case "yarn":
+            return { command: "yarn", args: ["exec"] };
+        case "npm":
+            return { command: "npx", args: [] };
+    }
+}
+
+/** Return the run command for executing package.json scripts. */
+export function getRunCommand(pm: PackageManager): { command: string; args: string[] } {
+    switch (pm) {
+        case "pnpm":
+            return { command: "pnpm", args: ["run"] };
+        case "yarn":
+            return { command: "yarn", args: ["run"] };
+        case "npm":
+            return { command: "npm", args: ["run"] };
+    }
+}
+
 // We dynamically load @rebasepro/client to avoid transitive type issues.
 // The client SDK ships compiled .d.ts that reference @rebasepro/types (which
 // drags in React peer-deps).  By importing at runtime only we keep the MCP
@@ -42,6 +91,9 @@ const API_TOKEN = process.env.REBASE_API_TOKEN || process.env.REBASE_TOKEN || ""
 // ── Rebase Client (lazy) ────────────────────────────────────────────────────
 
 type RebaseClient = {
+    auth: {
+        getUser: () => Promise<{ uid: string; email: string | null; roles?: string[] }>;
+    };
     data: {
         collection: (slug: string) => {
             find: (opts: Record<string, unknown>) => Promise<unknown>;
@@ -49,7 +101,7 @@ type RebaseClient = {
             create: (data: unknown) => Promise<unknown>;
             update: (id: string, data: unknown) => Promise<unknown>;
             delete: (id: string) => Promise<void>;
-        }
+        };
     };
     admin: {
         listUsers: () => Promise<unknown>;
@@ -57,6 +109,21 @@ type RebaseClient = {
         updateUser: (id: string, opts: Record<string, unknown>) => Promise<unknown>;
         deleteUser: (id: string) => Promise<unknown>;
         listRoles: () => Promise<unknown>;
+    };
+    cron: {
+        listJobs: () => Promise<{ jobs: unknown[] }>;
+        getJob: (jobId: string) => Promise<{ job: unknown }>;
+        triggerJob: (jobId: string) => Promise<{ log: unknown; job: unknown }>;
+        getJobLogs: (jobId: string, options?: { limit?: number }) => Promise<{ logs: unknown[] }>;
+        toggleJob: (jobId: string, enabled: boolean) => Promise<{ job: unknown }>;
+    };
+    storage: {
+        listObjects: (prefix: string, options?: { bucket?: string; maxResults?: number; pageToken?: string }) => Promise<unknown>;
+        deleteObject: (key: string, bucket?: string) => Promise<void>;
+        getSignedUrl: (keyOrUrl: string, bucket?: string) => Promise<unknown>;
+    };
+    functions: {
+        invoke: (name: string, payload?: unknown, options?: { method?: string; path?: string }) => Promise<unknown>;
     };
 };
 
@@ -71,6 +138,18 @@ async function getClient(): Promise<RebaseClient> {
         }) as RebaseClient;
     }
     return _client;
+}
+
+async function ensureAdmin(): Promise<void> {
+    const client = await getClient();
+    try {
+        const user = await client.auth.getUser();
+        if (!user.roles?.includes("admin")) {
+            throw new Error("Access denied: User does not have the 'admin' role.");
+        }
+    } catch (err: any) {
+        throw new Error(`Admin authorization failed: ${err.message}`);
+    }
 }
 
 // ── MCP Server ──────────────────────────────────────────────────────────────
@@ -136,6 +215,68 @@ properties: {} },
         inputSchema: { type: "object",
 properties: {} },
         cmd: ["generate-sdk"]
+    },
+    {
+        name: "rebase_doctor",
+        description: "Detect schema drift between collection definitions, generated Drizzle schema, and the live PostgreSQL database.",
+        inputSchema: { type: "object", properties: {} },
+        cmd: ["doctor"]
+    },
+    {
+        name: "rebase_auth_reset_password",
+        description: "Reset a user's password in the Rebase project.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                email: { type: "string", description: "Email of the user to reset" },
+                password: { type: "string", description: "New password to set (defaults to 'NewPassword123!')" }
+            },
+            required: ["email"]
+        },
+        cmd: ["auth", "reset-password"]
+    },
+    {
+        name: "rebase_db_branch_create",
+        description: "Create a new database branch (Admins only).",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Name of the new database branch" },
+                from: { type: "string", description: "Parent branch to clone from (optional)" }
+            },
+            required: ["name"]
+        },
+        cmd: ["db", "branch", "create"]
+    },
+    {
+        name: "rebase_db_branch_list",
+        description: "List all database branches (Admins only).",
+        inputSchema: { type: "object", properties: {} },
+        cmd: ["db", "branch", "list"]
+    },
+    {
+        name: "rebase_db_branch_delete",
+        description: "Delete an existing database branch (Admins only).",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Name of the branch to delete" }
+            },
+            required: ["name"]
+        },
+        cmd: ["db", "branch", "delete"]
+    },
+    {
+        name: "rebase_db_branch_info",
+        description: "Show information and status for a database branch (Admins only).",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Name of the branch to inspect" }
+            },
+            required: ["name"]
+        },
+        cmd: ["db", "branch", "info"]
     }
 ];
 
@@ -313,11 +454,125 @@ properties: {} }
     }
 ];
 
+const STORAGE_TOOLS: ToolDef[] = [
+    {
+        name: "storage_list_objects",
+        description: "List files/objects stored in Rebase storage.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                prefix: { type: "string", description: "Filter objects by prefix (e.g. 'images/')" },
+                bucket: { type: "string", description: "Filter by storage bucket name" },
+                maxResults: { type: "number", description: "Maximum number of results to return (default 50)" },
+                pageToken: { type: "string", description: "Pagination token" }
+            }
+        }
+    },
+    {
+        name: "storage_delete_object",
+        description: "Delete an object/file from Rebase storage.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                key: { type: "string", description: "Key/path of the file to delete (e.g., 'images/profile.png')" },
+                bucket: { type: "string", description: "Storage bucket name" }
+            },
+            required: ["key"]
+        }
+    },
+    {
+        name: "storage_get_metadata",
+        description: "Get metadata and a temporary signed download URL for a file in Rebase storage.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                key: { type: "string", description: "Key/path/url of the file to download" },
+                bucket: { type: "string", description: "Storage bucket name" }
+            },
+            required: ["key"]
+        }
+    }
+];
+
+const CRON_TOOLS: ToolDef[] = [
+    {
+        name: "cron_list_jobs",
+        description: "List all scheduled cron jobs and their configuration status.",
+        inputSchema: { type: "object", properties: {} }
+    },
+    {
+        name: "cron_get_job",
+        description: "Get status and details of a specific scheduled cron job.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                jobId: { type: "string", description: "Unique identifier of the cron job" }
+            },
+            required: ["jobId"]
+        }
+    },
+    {
+        name: "cron_trigger_job",
+        description: "Manually trigger a cron job run immediately.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                jobId: { type: "string", description: "Unique identifier of the cron job to run" }
+            },
+            required: ["jobId"]
+        }
+    },
+    {
+        name: "cron_get_job_logs",
+        description: "Read execution logs for a specific cron job.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                jobId: { type: "string", description: "Unique identifier of the cron job" },
+                limit: { type: "number", description: "Number of log lines to return (default 50)" }
+            },
+            required: ["jobId"]
+        }
+    },
+    {
+        name: "cron_toggle_job",
+        description: "Enable or disable a scheduled cron job.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                jobId: { type: "string", description: "Unique identifier of the cron job" },
+                enabled: { type: "boolean", description: "Set to true to enable, false to disable" }
+            },
+            required: ["jobId", "enabled"]
+        }
+    }
+];
+
+const FUNCTION_TOOLS: ToolDef[] = [
+    {
+        name: "invoke_function",
+        description: "Invoke a custom backend Hono function (located in api/functions/:name).",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Function name (filename without extension, e.g. 'send-welcome-email')" },
+                payload: { type: "object", description: "Optional JSON payload body for POST/PUT/PATCH requests", additionalProperties: true },
+                method: { type: "string", enum: ["GET", "POST", "PUT", "PATCH", "DELETE"], description: "HTTP Method (defaults to POST)" },
+                path: { type: "string", description: "Optional sub-path to append after the function name (e.g. 'status/123')" }
+            },
+            required: ["name"]
+        }
+    }
+];
+
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...DATA_TOOLS,
     ...ADMIN_TOOLS,
-    ...DEV_TOOLS
+    ...DEV_TOOLS,
+    ...STORAGE_TOOLS,
+    ...CRON_TOOLS,
+    ...FUNCTION_TOOLS
 ];
 
 // ── Tool Handlers ───────────────────────────────────────────────────────────
@@ -326,10 +581,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: ALL_TOOLS
 }));
 
-/** Spawn `npx rebase <args>` and capture output. */
+/** Spawn the rebase CLI using the project's detected package manager. */
 function runRebaseCmd(commandArgs: string[]): Promise<string> {
+    const pm = detectPackageManager(PROJECT_DIR);
+    const { command, args: execArgs } = getExecCommand(pm);
     return new Promise((resolve) => {
-        const child = spawn("npx", ["rebase", ...commandArgs], {
+        const child = spawn(command, [...execArgs, "rebase", ...commandArgs], {
             cwd: PROJECT_DIR,
             shell: true,
             env: { ...process.env }
@@ -372,7 +629,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // ── CLI tools ───────────────────────────────────────────────────────
     const cliTool = CLI_TOOLS.find((t) => t.name === name);
     if (cliTool) {
-        const result = await runRebaseCmd(cliTool.cmd);
+        if (name.startsWith("rebase_db_branch_")) {
+            await ensureAdmin();
+        }
+
+        let cmdArgs = [...cliTool.cmd];
+        if (name === "rebase_auth_reset_password") {
+            const argsObj = args as { email: string; password?: string };
+            cmdArgs.push("--email", argsObj.email);
+            if (argsObj.password) {
+                cmdArgs.push("--password", argsObj.password);
+            }
+        } else if (name === "rebase_db_branch_create") {
+            const argsObj = args as { name: string; from?: string };
+            cmdArgs.push(argsObj.name);
+            if (argsObj.from) {
+                cmdArgs.push("--from", argsObj.from);
+            }
+        } else if (name === "rebase_db_branch_delete" || name === "rebase_db_branch_info") {
+            const argsObj = args as { name: string };
+            cmdArgs.push(argsObj.name);
+        }
+
+        const result = await runRebaseCmd(cmdArgs);
         return textResult(result);
     }
 
@@ -458,13 +737,75 @@ roles });
             return jsonResult(result);
         }
 
+        // ── Storage Tools ──────────────────────────────────────────────────
+        case "storage_list_objects": {
+            const argsObj = args as { prefix?: string; bucket?: string; maxResults?: number; pageToken?: string };
+            const { prefix = "", bucket, maxResults, pageToken } = argsObj;
+            const result = await client.storage.listObjects(prefix, { bucket, maxResults, pageToken });
+            return jsonResult(result);
+        }
+
+        case "storage_delete_object": {
+            const argsObj = args as { key: string; bucket?: string };
+            const { key, bucket } = argsObj;
+            await client.storage.deleteObject(key, bucket);
+            return textResult(`Deleted object "${key}" successfully.`);
+        }
+
+        case "storage_get_metadata": {
+            const argsObj = args as { key: string; bucket?: string };
+            const { key, bucket } = argsObj;
+            const result = await client.storage.getSignedUrl(key, bucket);
+            return jsonResult(result);
+        }
+
+        // ── Cron Tools ─────────────────────────────────────────────────────
+        case "cron_list_jobs": {
+            const result = await client.cron.listJobs();
+            return jsonResult(result);
+        }
+
+        case "cron_get_job": {
+            const argsObj = args as { jobId: string };
+            const result = await client.cron.getJob(argsObj.jobId);
+            return jsonResult(result);
+        }
+
+        case "cron_trigger_job": {
+            const argsObj = args as { jobId: string };
+            const result = await client.cron.triggerJob(argsObj.jobId);
+            return jsonResult(result);
+        }
+
+        case "cron_get_job_logs": {
+            const argsObj = args as { jobId: string; limit?: number };
+            const result = await client.cron.getJobLogs(argsObj.jobId, { limit: argsObj.limit });
+            return jsonResult(result);
+        }
+
+        case "cron_toggle_job": {
+            const argsObj = args as { jobId: string; enabled: boolean };
+            const result = await client.cron.toggleJob(argsObj.jobId, argsObj.enabled);
+            return jsonResult(result);
+        }
+
+        // ── Function Tools ─────────────────────────────────────────────────
+        case "invoke_function": {
+            const argsObj = args as { name: string; payload?: unknown; method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; path?: string };
+            const { name: funcName, payload, method, path: funcPath } = argsObj;
+            const result = await client.functions.invoke(funcName, payload, { method, path: funcPath });
+            return jsonResult(result);
+        }
+
         // ── Dev server management ──────────────────────────────────────────
         case "rebase_dev_start": {
             if (devProcess && !devProcess.killed) {
                 return textResult("Dev server is already running (PID " + devProcess.pid + ")");
             }
             devLogs.length = 0;
-            devProcess = spawn("pnpm", ["run", "dev"], {
+            const pm = detectPackageManager(PROJECT_DIR);
+            const { command: runCmd, args: runArgs } = getRunCommand(pm);
+            devProcess = spawn(runCmd, [...runArgs, "dev"], {
                 cwd: resolve(PROJECT_DIR, "app"),
                 shell: true,
                 env: { ...process.env }

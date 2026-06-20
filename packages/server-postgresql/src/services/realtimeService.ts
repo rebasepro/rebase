@@ -11,6 +11,7 @@ import { RealtimeProvider, CollectionSubscriptionConfig, EntitySubscriptionConfi
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks } from "@rebasepro/common";
 import { logger } from "@rebasepro/server-core";
+import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -361,7 +362,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             this.sendCollectionUpdate(clientId, subscriptionId, entities);
 
         } catch (error) {
-            this.sendError(clientId, `Failed to subscribe to collection: ${error}`, subscriptionId);
+            const sanitized = sanitizeErrorForClient(error, request.path);
+            this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
         }
     }
 
@@ -398,7 +400,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             this.sendEntityUpdate(clientId, subscriptionId, entity || null);
 
         } catch (error) {
-            this.sendError(clientId, `Failed to subscribe to entity: ${request.path} ${request.entityId} ${error}`, subscriptionId);
+            const sanitized = sanitizeErrorForClient(error, request.path);
+            this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
         }
     }
 
@@ -503,8 +506,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     this.debouncedCollectionRefetch(subscriptionId, notifyPath, subscription);
                 }
             } catch (error) {
-                logger.error(`❌ [RealtimeService] Error processing WebSocket subscription ${subscriptionId}`, { error: error });
-                this.sendError(subscription.clientId, `Failed to process update for subscription ${subscriptionId}`, subscriptionId);
+                const sanitized = sanitizeErrorForClient(error, notifyPath);
+                this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
             }
         }
 
@@ -552,8 +555,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 const entities = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
                 this.sendCollectionUpdate(subscription.clientId, subscriptionId, entities);
             } catch (error) {
-                logger.error(`❌ [RealtimeService] Error in debounced refetch for ${subscriptionId}`, { error: error });
-                this.sendError(subscription.clientId, `Failed to process update for subscription ${subscriptionId}`, subscriptionId);
+                const sanitized = sanitizeErrorForClient(error, notifyPath);
+                this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
@@ -729,8 +732,8 @@ roles: activeAuth.roles },
                 const entity = await this.fetchEntityWithAuth(notifyPath, entityId, subscription.authContext);
                 this.sendEntityUpdate(subscription.clientId, subscriptionId, entity || null);
             } catch (error) {
-                logger.error(`❌ [RealtimeService] Error in debounced entity refetch for ${subscriptionId}`, { error: error });
-                this.sendError(subscription.clientId, `Failed to process entity update for subscription ${subscriptionId}`, subscriptionId);
+                const sanitized = sanitizeErrorForClient(error, notifyPath);
+                this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
             }
         }, RealtimeService.REFETCH_DEBOUNCE_MS));
     }
@@ -862,17 +865,19 @@ roles: activeAuth.roles },
         this.sendMessage(clientId, message);
     }
 
-    private sendError(clientId: string, error: string, subscriptionId?: string) {
-        logger.error("Error handling collection subscription", { error: error });
+    private sendError(clientId: string, error: string, subscriptionId?: string, code?: string) {
         const message = {
             type: "error" as const,
             subscriptionId,
+            payload: {
+                error: code ? { message: error, code } : error
+            },
             error
         };
         this.sendMessage(clientId, message);
     }
 
-    private sendMessage(clientId: string, message: CollectionUpdateMessage | EntityUpdateMessage | CollectionEntityPatchMessage | { type: string; subscriptionId?: string; error?: string }) {
+    private sendMessage(clientId: string, message: CollectionUpdateMessage | EntityUpdateMessage | CollectionEntityPatchMessage | { type: string; subscriptionId?: string; error?: string; payload?: unknown }) {
         const client = this.clients.get(clientId);
         if (client && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(message));

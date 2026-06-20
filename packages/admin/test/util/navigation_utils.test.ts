@@ -347,4 +347,17 @@ describe("navigateToEntity", () => {
 
         expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining("#copy"), undefined);
     });
+
+    it("passes replace option when replace parameter is set", () => {
+        navigateToEntity({
+            openEntityMode: "full_screen",
+            entityId: "abc",
+            path: "products",
+            sideEntityController: mockSideEntityController,
+            navigation: mockNavigation,
+            replace: true
+        });
+
+        expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc", { replace: true });
+    });
 });

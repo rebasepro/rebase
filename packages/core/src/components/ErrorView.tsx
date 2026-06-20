@@ -28,19 +28,29 @@ export function ErrorView({
     tooltip,
     onRetry
 }: ErrorViewProps): React.ReactElement {
-    const component = error instanceof Error ? error.message : error;
-    console.warn("ErrorView", JSON.stringify(error))
+    const message = error instanceof Error ? error.message : error;
+    // Extract error code from ApiError instances (e.g. PG error codes like "42P01")
+    const errorCode = error instanceof Error && "code" in error
+        ? (error as Error & { code?: string }).code
+        : undefined;
 
     const body = (
         <div
             className="flex flex-col m-2">
-            <div className="flex items-start">
-                <AlertTriangleIcon className="mx-2 mt-0.5"/>
-                <div className="pl-2">
+            <div className="flex items-center gap-2">
+                <AlertTriangleIcon className="shrink-0"/>
+                <div>
                     {title && <Typography
                         variant={"body2"}
                         className="font-medium text-text-primary">{title}</Typography>}
-                    <Typography variant={"body2"} className="text-text-secondary">{component}</Typography>
+                    <Typography variant={"body2"} className="text-text-secondary">{message}</Typography>
+                    {errorCode && (
+                        <span
+                            className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-mono rounded bg-surface-200 dark:bg-surface-700 text-text-secondary"
+                        >
+                            {errorCode}
+                        </span>
+                    )}
                     {onRetry && (
                         <div className="mt-3">
                             <Button

@@ -1,7 +1,7 @@
 import React from "react";
 import type { PropertyPreviewProps } from "@rebasepro/admin";
-import type { ArrayProperty, StringProperty, EnumValueConfig } from "@rebasepro/types";
-import { Chip, cls, Tooltip } from "@rebasepro/ui";
+import type { ArrayProperty, EnumValueConfig, StringProperty } from "@rebasepro/types";
+import { cls, Tooltip } from "@rebasepro/ui";
 import { resolveEnumValues } from "@rebasepro/common";
 
 import { HOTSPOT_ZONES } from "./BodyPartsField";
@@ -43,12 +43,11 @@ const BODY_PART_COLORS: Record<string, string> = {
  * regions when medium or large.
  */
 export default function BodyPartsPreview({
-    propertyKey,
-    value,
-    property,
-    size
-}: PropertyPreviewProps<ArrayProperty>) {
-    if (!value || !Array.isArray(value) || value.length === 0) return null;
+                                             propertyKey,
+                                             value,
+                                             property,
+                                             size
+                                         }: PropertyPreviewProps<ArrayProperty>) {
 
     const ofProperty = property.of as StringProperty;
     const enumValues: EnumValueConfig[] = ofProperty.enum
@@ -63,6 +62,8 @@ export default function BodyPartsPreview({
     const [hoveredPart, setHoveredPart] = React.useState<string | null>(null);
 
     const isSmall = size === "small";
+
+    if (!value || !Array.isArray(value) || value.length === 0) return null;
 
     if (isSmall) {
         return (
@@ -103,7 +104,7 @@ export default function BodyPartsPreview({
     const isCompact = size === "medium";
 
     const renderBodyView = (view: "front" | "back", imgSrc: string) => (
-        <div 
+        <div
             className={cls("relative", isCompact ? "h-24 w-fit" : "w-full")}
             style={isCompact ? undefined : { maxWidth: 240 }}
         >
@@ -157,7 +158,7 @@ export default function BodyPartsPreview({
     );
 
     return (
-        <div 
+        <div
             className={cls(
                 "flex rounded-xl border bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-800 w-fit",
                 isCompact ? "gap-2 p-1" : "gap-6 p-3"

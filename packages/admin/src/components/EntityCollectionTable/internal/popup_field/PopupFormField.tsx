@@ -279,6 +279,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         path,
         setFieldValue,
         save: saveValue,
+        submit: handleSubmit,
         formex,
         status: "existing",
         openEntityMode: "side_panel",

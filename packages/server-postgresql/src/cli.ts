@@ -406,7 +406,9 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
     const drizzleKitBin = resolveLocalBin("drizzle-kit");
     if (!drizzleKitBin) {
         logger.error(chalk.red("✗ Could not find drizzle-kit binary."));
-        logger.error(chalk.gray("  Install it with: pnpm add -D drizzle-kit"));
+        const isNpm = (process.env.npm_config_user_agent ?? "").startsWith("npm/") || fs.existsSync(path.join(process.cwd(), "package-lock.json"));
+        const installCmd = isNpm ? "npm install -D drizzle-kit" : "pnpm add -D drizzle-kit";
+        logger.error(chalk.gray(`  Install it with: ${installCmd}`));
         process.exit(1);
     }
 

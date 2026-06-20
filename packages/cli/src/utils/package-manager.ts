@@ -25,6 +25,8 @@ export interface PMCommands {
     runAll: (script: string) => string[];
     /** Run a script in a specific workspace — e.g. `pnpm --filter "*-backend" start` / `npm run start -w backend`. */
     runWorkspace: (workspace: string, script: string) => string[];
+    /** Execute a one-off package — e.g. `pnpm dlx skills ...` / `npx -y skills ...`. */
+    dlx: (pkg: string, args: string[]) => string[];
     /** The workspace dependency protocol: `"workspace:*"` for pnpm, `"*"` for npm. */
     workspaceProtocol: string;
 }
@@ -72,6 +74,7 @@ export function getPMCommands(pm: PackageManager): PMCommands {
             view: (pkg, field) => ["npm", "view", pkg, field],
             runAll: (script) => ["npm", "run", script, "--workspaces", "--if-present"],
             runWorkspace: (workspace, script) => ["npm", "run", script, "-w", workspace],
+            dlx: (pkg, args) => ["npx", "-y", pkg, ...args],
             workspaceProtocol: "*"
         };
     }
@@ -84,6 +87,7 @@ export function getPMCommands(pm: PackageManager): PMCommands {
         view: (pkg, field) => ["pnpm", "view", pkg, field],
         runAll: (script) => ["pnpm", "-r", "run", script],
         runWorkspace: (workspace, script) => ["pnpm", "--filter", workspace, script],
+        dlx: (pkg, args) => ["pnpm", "dlx", pkg, ...args],
         workspaceProtocol: "workspace:*"
     };
 }

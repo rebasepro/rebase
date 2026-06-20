@@ -219,18 +219,7 @@ export function LoginView({
         }
     }, [authController]);
 
-    function buildErrorView() {
-        if (!authController.authProviderError) return null;
-        if (authController.user != null) return null;
-        const errorMsg = authController.authProviderError instanceof Error
-            ? authController.authProviderError.message
-            : String(authController.authProviderError);
-        return (
-            <div className="w-full">
-                <ErrorView error={errorMsg}/>
-            </div>
-        );
-    }
+
 
     let logoComponent;
     if (logo) {
@@ -296,12 +285,11 @@ export function LoginView({
                     </div>
                 )}
 
-                {mode !== "forgot" && buildErrorView()}
-
                 <div className={cls(
                     "w-full transition-opacity duration-150",
                     viewVisible ? "opacity-100" : "opacity-0"
                 )}>
+
                     {/* Bootstrap mode: show setup form directly */}
                     {isBootstrapMode && !authController.user && (
                         <LoginForm
@@ -671,6 +659,17 @@ function LoginForm({
                     </IconButton>
                 </div>
             )}
+
+            {(() => {
+                const err = authController.authProviderError;
+                if (!err || authController.user) return null;
+                const msg: string = err instanceof Error ? err.message : String(err);
+                return (
+                    <div className="w-full mb-2">
+                        <ErrorView error={msg}/>
+                    </div>
+                );
+            })()}
 
             <Typography variant="h6" className="mb-0.5">
                 {title}

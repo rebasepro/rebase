@@ -42,6 +42,31 @@ type: "string",
 isUuid: isUuid ?? false };
 };
 
+/**
+ * Given a raw DB column name (e.g. "client_id"), find the Drizzle property key
+ * on the collection that maps to that column. A property matches if:
+ *   (a) it has an explicit `columnName` equal to the given column, OR
+ *   (b) its snake_case form equals the given column.
+ *
+ * Returns the property key (the Drizzle object key) if found, or the original
+ * column name as a fallback.
+ */
+const resolvePropertyKeyForColumn = (collection: EntityCollection, column: string): string => {
+    if (!collection.properties) return column;
+    for (const [propKey, prop] of Object.entries(collection.properties)) {
+        const p = prop as Property;
+        // Explicit columnName match
+        if ("columnName" in p && typeof (p as unknown as Record<string, unknown>).columnName === "string") {
+            if ((p as unknown as Record<string, unknown>).columnName === column) return propKey;
+        }
+        // Convention match: snake_case(propKey) === column
+        if (toSnakeCase(propKey) === column) return propKey;
+        // Exact match (propKey is already the column name)
+        if (propKey === column) return propKey;
+    }
+    return column;
+};
+
 const isNumericId = (collection: EntityCollection): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
 };
@@ -467,15 +492,22 @@ const computeSharedRelationName = (
 
     // --- owning one (belongs-to) ---
     if (rel.direction === "owning" && rel.cardinality === "one" && rel.localKey) {
-        return `${getTableName(sourceCollection)}_${rel.localKey}`;
+        // Normalise the localKey to the actual Drizzle property name so that
+        // the owning side produces the same relation name as the inverse side
+        // (which resolves foreignKeyOnTarget via the same helper).
+        const normalisedKey = resolvePropertyKeyForColumn(sourceCollection, rel.localKey);
+        return `${getTableName(sourceCollection)}_${normalisedKey}`;
     }
 
     // --- inverse many (one-to-many has-many) ---
     if (rel.direction === "inverse" && rel.cardinality === "many" && rel.foreignKeyOnTarget) {
-        // The owning table is the *target*, the FK column is foreignKeyOnTarget
+        // The owning table is the *target*, the FK column is foreignKeyOnTarget.
+        // Resolve to the Drizzle property key on the target so it matches the
+        // owning side's normalised localKey.
         try {
             const targetCollection = rel.target();
-            return `${getTableName(targetCollection)}_${rel.foreignKeyOnTarget}`;
+            const normalisedFK = resolvePropertyKeyForColumn(targetCollection, rel.foreignKeyOnTarget);
+            return `${getTableName(targetCollection)}_${normalisedFK}`;
         } catch {
             return fallback;
         }
@@ -484,10 +516,11 @@ const computeSharedRelationName = (
     // --- inverse one (one-to-one inverse) ---
     if (rel.direction === "inverse" && rel.cardinality === "one") {
         if (rel.foreignKeyOnTarget) {
-            // FK lives on the target table
+            // FK lives on the target table — resolve to Drizzle property key
             try {
                 const targetCollection = rel.target();
-                return `${getTableName(targetCollection)}_${rel.foreignKeyOnTarget}`;
+                const normalisedFK = resolvePropertyKeyForColumn(targetCollection, rel.foreignKeyOnTarget);
+                return `${getTableName(targetCollection)}_${normalisedFK}`;
             } catch {
                 return fallback;
             }
@@ -840,8 +873,13 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
 
                                 if (!emittedRelationNames.has(deduplicationKey)) {
                                     const otherTableVar = getTableVarName(getTableName(otherCollection));
-                                    const synthKey = `_synth_${otherTableVar}_${otherRel.foreignKeyOnTarget}`;
-                                    tableRelations.push(`    "${synthKey}": one(${otherTableVar}, {\n        fields: [${tableVarName}.${otherRel.foreignKeyOnTarget}],\n        references: [${otherTableVar}.${getPrimaryKeyName(otherCollection)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                                    // Resolve foreignKeyOnTarget to the Drizzle property key
+                                    // on THIS collection (the owning table). The raw FK column
+                                    // name (e.g. "client_id") may differ from the property key
+                                    // (e.g. "clientId") when `columnName` is set.
+                                    const drizzleFieldKey = resolvePropertyKeyForColumn(collection, otherRel.foreignKeyOnTarget);
+                                    const synthKey = `_synth_${otherTableVar}_${drizzleFieldKey}`;
+                                    tableRelations.push(`    "${synthKey}": one(${otherTableVar}, {\n        fields: [${tableVarName}.${drizzleFieldKey}],\n        references: [${otherTableVar}.${getPrimaryKeyName(otherCollection)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
                                     emittedRelationNames.add(deduplicationKey);
                                 }
                             }

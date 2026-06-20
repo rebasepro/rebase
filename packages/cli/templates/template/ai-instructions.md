@@ -1,9 +1,12 @@
 # Rebase AI Coding Rules
 
-For the most up-to-date, comprehensive guidelines, architecture details, SDK APIs, and troubleshooting guides, please refer to the official Rebase LLM documentation:
-👉 https://rebase.pro/llms.txt
+Rebase provides agent skills for AI coding assistants (Cursor, Claude Code, Windsurf, Gemini CLI, Antigravity, and more) with detailed guidelines, architecture, SDK APIs, and troubleshooting guides.
 
-If you are running in an agentic environment (like Antigravity or a Gemini CLI extension), the assistant will automatically load the active Rebase agent skills.
+To install skills for your environment, run:
+
+```
+rebase skills install
+```
 
 ## Core Tenets (Quick Reference)
 

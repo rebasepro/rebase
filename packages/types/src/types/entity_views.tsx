@@ -21,9 +21,18 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     setFieldValue: (key: string, value: unknown, shouldValidate?: boolean) => void;
 
     /**
-     * Save the entity.
+     * Quietly persist the entity to the database without any UI feedback
+     * (no validation, no snackbar, no form reset).
+     * Use this for programmatic/background saves from custom views.
      */
     save: (values: M) => void;
+
+    /**
+     * Submit the form — validates, saves, resets the form, and shows
+     * a success snackbar. This is what the Save button calls.
+     * Use this from custom views when you want the full "user saved" experience.
+     */
+    submit: () => void;
 
     /**
      * Collection of the entity being modified

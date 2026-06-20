@@ -349,10 +349,11 @@ const EntityCollectionViewInner = React.memo(
                 sideEntityController,
                 openEntityMode,
                 collection,
-                entityId: clickedEntity.id
+                entityId: clickedEntity.id,
+                replace: openEntityMode === "split" && selectedEntityIdProp !== undefined
             });
 
-        }, [unselectNavigatedEntity, sideEntityController]);
+        }, [sideEntityController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController]);
 
         const onNewClick = useCallback(() => {
             const collection = collectionRef.current;

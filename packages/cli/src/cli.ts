@@ -9,6 +9,7 @@ import { buildCommand } from "./commands/build";
 import { startCommand } from "./commands/start";
 import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
+import { skillsCommand } from "./commands/skills";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -52,7 +53,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor"];
+    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor", "skills"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -116,6 +117,10 @@ export async function entry(args: string[]) {
             await doctorCommand(args);
             break;
 
+        case "skills":
+            await skillsCommand(effectiveSubcommand, args);
+            break;
+
         default:
             console.log(chalk.red(`Unknown command: ${command}`));
             console.log("");
@@ -157,6 +162,9 @@ ${chalk.green.bold("Auth")}
 
 ${chalk.green.bold("Diagnostics")}
   ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
+
+${chalk.green.bold("AI Agent Skills")}
+  ${chalk.blue.bold("skills install")}           Install Rebase agent skills for your AI coding assistant
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--version, -v")}   Show version number

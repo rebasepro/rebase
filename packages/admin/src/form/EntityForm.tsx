@@ -249,11 +249,19 @@ export function EntityForm<M extends Record<string, unknown>>({
 
         return save(values)
             ?.then((savedEntity) => {
-                formexController.resetForm({
-                    values: savedEntity?.values || values,
-                    submitCount: 0,
-                    touched: {}
-                });
+                if (savedEntity) {
+                    formexController.resetForm({
+                        values: savedEntity.values || values,
+                        submitCount: 0,
+                        touched: {}
+                    });
+                    if (!autoSave) {
+                        snackbarController.open({
+                            type: "success",
+                            message: `${collection.singularName ?? collection.name}: ${t("saved_correctly")}`
+                        });
+                    }
+                }
             })
             .finally(() => {
                 formexController.setSubmitting(false);
@@ -372,11 +380,6 @@ export function EntityForm<M extends Record<string, unknown>>({
 
         clearDirtyCache();
         onValuesModified?.(false, updatedEntity.values);
-        if (!autoSave)
-            snackbarController.open({
-                type: "success",
-                message: `${collection.singularName ?? collection.name}: ${t("saved_correctly")}`
-            });
         onEntityChange?.(updatedEntity);
         updateStatus("existing");
         setEntityId(updatedEntity.id);
@@ -502,6 +505,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         entityId: entityId as string,
         path,
         save,
+        submit: formex.handleSubmit,
         formex,
         entity,
         savingError,

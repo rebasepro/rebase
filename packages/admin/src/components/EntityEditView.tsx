@@ -270,20 +270,36 @@ parentEntityIds,
     const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView || includeHistoryView;
 
     const {
-        resolvedEntityViews,
+        resolvedEntityViews
+    } = resolvedSelectedEntityView(customViews, customizationController, undefined, canEdit);
+
+    const validTabValues = useMemo(() => {
+        const set = new Set<string>([
+            MAIN_TAB_VALUE,
+            ...(includeJsonView ? [JSON_TAB_VALUE] : []),
+            ...(includeHistoryView ? [HISTORY_TAB_VALUE] : []),
+            ...resolvedEntityViews.map(v => v.key),
+            ...subcollections.map(s => s.slug)
+        ]);
+        return set;
+    }, [includeJsonView, includeHistoryView, resolvedEntityViews, subcollections]);
+
+    const activeTab = validTabValues.has(selectedTab) ? selectedTab : MAIN_TAB_VALUE;
+
+    const {
         selectedEntityView,
         selectedSecondaryForm
-    } = resolvedSelectedEntityView(customViews, customizationController, selectedTab, canEdit);
+    } = resolvedSelectedEntityView(customViews, customizationController, activeTab, canEdit);
 
     const actionsAtTheBottom = layout === "side_panel" || layout === "dialog" || selectedEntityView?.includeActions === "bottom";
 
-    const mainViewVisible = selectedTab === MAIN_TAB_VALUE || Boolean(selectedSecondaryForm);
+    const mainViewVisible = activeTab === MAIN_TAB_VALUE || Boolean(selectedSecondaryForm);
 
     // Track which custom view tabs have been visited so we keep them mounted
     // (preserving their state) but don't eagerly mount tabs never visited.
     const mountedTabsRef = useRef<Set<string>>(new Set());
-    if (selectedTab) {
-        mountedTabsRef.current.add(selectedTab);
+    if (activeTab) {
+        mountedTabsRef.current.add(activeTab);
     }
 
     // Memoize the read-only fallback form context to avoid recreating it every render
@@ -303,6 +319,9 @@ parentEntityIds,
             },
             save: () => {
                 throw new Error("You can't save in read only mode");
+            },
+            submit: () => {
+                throw new Error("You can't submit in read only mode");
             },
             collection,
             path: path,
@@ -333,7 +352,7 @@ parentEntityIds,
             }
 
             // Only mount tabs that have been visited at least once
-            const isActive = selectedTab === customView.key;
+            const isActive = activeTab === customView.key;
             const hasBeenMounted = mountedTabsRef.current.has(customView.key);
             if (!isActive && !hasBeenMounted) {
                 return null;
@@ -366,9 +385,9 @@ parentEntityIds,
 
     // Only mount JSON view when its tab is selected (or was previously selected)
     const jsonTabMounted = mountedTabsRef.current.has(JSON_TAB_VALUE);
-    const jsonView = (selectedTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
+    const jsonView = (activeTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
         className={cls("relative flex-1 h-full overflow-auto w-full",
-            { "hidden": selectedTab !== JSON_TAB_VALUE })}
+            { "hidden": activeTab !== JSON_TAB_VALUE })}
         key={"json_view"}
         role="tabpanel">
         <ErrorBoundary>
@@ -378,7 +397,7 @@ parentEntityIds,
     </div> : null;
 
     // Only mount history view when its tab is actually selected
-    const historyView = includeHistoryView && selectedTab === HISTORY_TAB_VALUE ? <div
+    const historyView = includeHistoryView && activeTab === HISTORY_TAB_VALUE ? <div
         className={"relative flex-1 h-full overflow-auto w-full"}
         key={"history_view"}
         role="tabpanel">
@@ -398,7 +417,7 @@ parentEntityIds,
         const subcollectionId = subcollection.slug;
         const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(subcollection.slug)}` : undefined;
 
-        if (selectedTab !== subcollectionId) return null;
+        if (activeTab !== subcollectionId) return null;
         return (
             <div
                 className={"relative flex-1 h-full overflow-auto w-full"}
@@ -525,7 +544,7 @@ parentEntityIds,
             onSaved={(params) => {
                 const res = {
                     ...params,
-                    selectedTab: MAIN_TAB_VALUE === selectedTab ? undefined : selectedTab
+                    selectedTab: MAIN_TAB_VALUE === activeTab ? undefined : activeTab
                 };
                 onSaved?.(res);
                 formProps?.onSaved?.(res);
@@ -622,7 +641,7 @@ parentEntityIds,
             {hasAdditionalViews && <div className={"flex-1 flex justify-end min-w-0 shrink-0"}>
                 <Tabs
                     className={"!w-fit max-w-full"}
-                    value={selectedTab}
+                    value={activeTab}
                     onValueChange={(value) => {
                         onSideTabClick(value);
                     }}>
