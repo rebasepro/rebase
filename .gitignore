@@ -72,6 +72,7 @@ app/frontend/debug_trace**
 !/LICENSE
 tsc_output.txt
 yarn.lock
+package-lock.json
 app/uploads/
 .rebase-dev-url
 
