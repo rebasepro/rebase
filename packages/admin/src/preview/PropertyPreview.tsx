@@ -231,7 +231,7 @@ path: stringProperty.reference.path })}
             content = (
                 <div className="flex flex-col w-full gap-0.5">
                     {(value as unknown[]).map((item: unknown, index: number) => {
-                        const entityRelation = normalizeToEntityRelation(item);
+                        const entityRelation = normalizeToEntityRelation(item, "relation");
                         if (!entityRelation) return null;
                         return (
                             <div className="w-full"
@@ -252,7 +252,7 @@ path: stringProperty.reference.path })}
             );
         } else {
             // Single-cardinality relation
-            const relationValue = normalizeToEntityRelation(value);
+            const relationValue = normalizeToEntityRelation(value, "relation");
             if (relationValue) {
                 content = <RelationPreview
                     disabled={!property.relation}

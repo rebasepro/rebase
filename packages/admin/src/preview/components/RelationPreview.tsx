@@ -23,6 +23,42 @@ export type RelationPreviewProps = {
 };
 
 /**
+ * Extract a display name from a plain relation-shaped object that isn't
+ * a proper EntityRelation instance. Tries common name fields in the
+ * entity's values, then falls back to the id.
+ */
+function extractDisplayFromPlainObject(obj: unknown): string {
+    if (!obj || typeof obj !== "object") return "—";
+    const record = obj as Record<string, unknown>;
+
+    // Try data.values.{name,title,...} (EntityRelation.data is an Entity with .values)
+    const data = record.data;
+    if (data && typeof data === "object") {
+        const dataRecord = data as Record<string, unknown>;
+        const values = (dataRecord.values && typeof dataRecord.values === "object")
+            ? dataRecord.values as Record<string, unknown>
+            : dataRecord;
+        const nameFields = ["name", "title", "label", "display_name", "displayName", "email", "username"];
+        for (const field of nameFields) {
+            const v = values[field];
+            if (v && typeof v === "string") return v;
+        }
+    }
+
+    // Try direct fields on the object itself (some serialization paths flatten the data)
+    const directFields = ["name", "title", "label", "display_name", "displayName", "email"];
+    for (const field of directFields) {
+        const v = record[field];
+        if (v && typeof v === "string") return v;
+    }
+
+    // Last resort: show the id
+    if ("id" in record && record.id != null) return String(record.id);
+
+    return "—";
+}
+
+/**
  * @group Preview components
  */
 export const RelationPreview = function RelationPreview(props: RelationPreviewProps) {
@@ -30,7 +66,8 @@ export const RelationPreview = function RelationPreview(props: RelationPreviewPr
     if (!(typeof relation === "object" && "isEntityRelation" in relation && relation.isEntityRelation())) {
         console.warn("Relation preview received value of type", typeof relation);
         if (props.textOnly) {
-            return <span>{String(relation)}</span>;
+            const display = extractDisplayFromPlainObject(relation);
+            return <span className="truncate">{display}</span>;
         }
         return <EntityPreviewContainer
             onClick={props.onClick}

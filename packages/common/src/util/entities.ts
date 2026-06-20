@@ -156,9 +156,13 @@ export function getRelationFrom<M extends Record<string, unknown>>(entity: Entit
  * Handles EntityRelation class instances, and plain objects
  * with `__type === "relation"` or an `isEntityRelation()` method.
  *
+ * When `propertyType` is `"relation"`, also accepts plain objects that
+ * have `id` and `path` fields — these are relation-shaped objects from
+ * edge cases in the data pipeline (REST fallback, stale cache, custom data source).
+ *
  * Returns null if the value cannot be coerced.
  */
-export function normalizeToEntityRelation(value: unknown): EntityRelation | null {
+export function normalizeToEntityRelation(value: unknown, propertyType?: string): EntityRelation | null {
     if (value instanceof EntityRelation) return value;
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
@@ -167,7 +171,8 @@ export function normalizeToEntityRelation(value: unknown): EntityRelation | null
         obj.__type === "relation" ||
         obj.__type === "reference" ||
         (typeof obj.isEntityRelation === "function" && (obj.isEntityRelation as () => boolean)()) ||
-        (typeof obj.isEntityReference === "function" && (obj.isEntityReference as () => boolean)());
+        (typeof obj.isEntityReference === "function" && (obj.isEntityReference as () => boolean)()) ||
+        (propertyType === "relation" && typeof obj.id !== "undefined" && typeof obj.path === "string");
 
     if (!isRelationLike) return null;
 

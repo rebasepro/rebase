@@ -340,7 +340,7 @@ value: val };
         const items: RelationChipItem[] = [];
         let totalCount = 0;
 
-        const isMany = prop.relation?.cardinality === "many";
+        const isMany = prop.cardinality === "many" || prop.relation?.cardinality === "many";
 
         if (isMany && Array.isArray(val)) {
             // cardinality:"many" → array of EntityRelation
@@ -358,9 +358,12 @@ id });
             }
         } else if (!isMany && val && typeof val === "object") {
             // cardinality:"one" → single EntityRelation
-            const isRelation = "__type" in val && (val as Record<string, unknown>).__type === "relation";
+            const obj = val as Record<string, unknown>;
+            const isRelation = ("__type" in obj && obj.__type === "relation")
+                || (typeof obj.isEntityRelation === "function"
+                    && (obj.isEntityRelation as () => boolean)());
             if (isRelation) {
-                const relation = val as EntityRelation;
+                const relation = obj as unknown as EntityRelation;
                 const displayName = resolveRelationDisplayName(relation, prop);
                 totalCount = 1;
                 if (displayName) {

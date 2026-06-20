@@ -211,15 +211,18 @@ function compactValueSummary(value: unknown, property: Property): string | null 
     }
 
     if (property.type === "relation") {
-        // Relation data is often populated as { id, data: { ... } }
         if (typeof value === "string" || typeof value === "number") return String(value);
         if (value && typeof value === "object") {
             const obj = value as Record<string, unknown>;
-            // Try to find a display name in relation data
+            // EntityRelation.data is an Entity: { id, path, values: { name, ... } }
             if (obj.data && typeof obj.data === "object") {
                 const data = obj.data as Record<string, unknown>;
-                const name = data.name ?? data.title ?? data.display_name ?? data.displayName ?? data.email;
-                if (name) return String(name);
+                const values = (data.values && typeof data.values === "object")
+                    ? data.values as Record<string, unknown>
+                    : data;
+                const name = values.name ?? values.title ?? values.display_name
+                    ?? values.displayName ?? values.label ?? values.email;
+                if (name && typeof name !== "object") return String(name);
             }
             if ("id" in obj) return String(obj.id);
         }
