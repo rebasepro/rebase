@@ -77,6 +77,7 @@ app/uploads/
 .rebase-dev-url
 
 *.d.ts
+!packages/admin/src/editor/markdown-it-plugins.d.ts
 
 # Temporary test, linting, and scratch outputs
 /e2e-screenshots/
