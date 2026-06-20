@@ -40,6 +40,14 @@ PUT    /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
+#### Routing Mechanics & Segment Parsing
+
+To handle arbitrary nested subcollection depths, Rebase routes incoming requests using Hono's `:rest{.+}` parameter regex. The internal segment parsing engine analyzes paths by counting slash-separated segments:
+- **Odd segment count** (e.g., `authors/42/posts` -> 3 segments) represents a collection list request.
+- **Even segment count** (e.g., `authors/42/posts/7` -> 4 segments) represents an operation on a specific entity ID. The last segment is popped as the target `entityId`.
+
+The engine filters out reserved system namespaces (e.g., `history`) from the path segment analysis to prevent collisions with built-in endpoints.
+
 ## Authentication
 
 All data endpoints require authentication by default. Include a Bearer token in the `Authorization` header:
@@ -175,6 +183,23 @@ Use `searchString` for full-text search across string fields:
 GET /api/data/products?searchString=wireless%20keyboard
 ```
 
+## Vector Search
+
+If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector cosine distance operations compiled directly in the database query.
+
+```bash
+GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
+```
+
+### Vector Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `vector_search` | `string` | The name of the vector property to query against. |
+| `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
+| `vector_distance` | `string` | The distance metric to evaluate. Supported value: `cosine` (compiles to Postgres `embedding <=> query_vector`). |
+| `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
+
 ## Relation Inclusion
 
 Use the `include` parameter to embed related entities:
@@ -210,9 +235,25 @@ Use `fields` to select specific columns:
 GET /api/data/products?fields=id,name,price
 ```
 
+## Lifecycle Hook Pipeline
+
+Every REST mutation operation (`POST`, `PUT`, `DELETE`) runs through a strict, sequential hook execution pipeline:
+
+```
+Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
+```
+
+### Blocking vs. Deferred Hooks
+
+1. **Blocking Hooks (`beforeSave`, `beforeDelete`)**
+   These hooks are executed synchronously in the main request cycle *before* committing the database transaction. They can modify incoming payloads, run custom validations, or abort the request entirely by throwing an error.
+
+2. **Deferred Hooks (`afterSave`, `afterDelete`)**
+   These hooks execute asynchronously after the database transaction has successfully committed. They use deferred promises (fire-and-forget), meaning they run in the background and do not block the client's HTTP response. Ideal for sending webhooks, triggering push notifications, or queuing external tasks.
+
 ## GraphQL API
 
-A GraphQL endpoint is automatically generated at `/api/graphql`:
+A GraphQL endpoint is automatically generated at `/api/graphql`. The schema is compiled dynamically on startup from your collections configuration.
 
 ```graphql
 query {
@@ -227,6 +268,22 @@ query {
     }
 }
 ```
+
+### Type Mapping
+
+TypeScript collection property types map to GraphQL types as follows:
+
+| Property Type | GraphQL Type |
+|---------------|--------------|
+| `string` / `binary` / `date` | `GraphQLString` |
+| `number` | `GraphQLFloat` (or `GraphQLInt` if `integer` validation is set) |
+| `boolean` | `GraphQLBoolean` |
+| `array` | `GraphQLList(GraphQLString)` |
+| `vector` | `GraphQLList(GraphQLFloat)` |
+
+### RLS Integration
+
+GraphQL resolvers access the database using `context.driver` (a Postgres driver scoped dynamically by Hono's authentication middleware). Because resolver calls use the transaction-local session state populated with `app.user_id` and `app.user_roles`, all GraphQL queries and mutations automatically enforce Row-Level Security (RLS) constraints.
 
 In development mode, an interactive GraphiQL IDE is available at `/api/graphiql`.
 

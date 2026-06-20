@@ -58,6 +58,57 @@ After initialization, these routes are mounted:
 | `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
+---
+
+## The Initialization Lifecycle
+
+When you invoke `initializeRebaseBackend()`, the framework triggers a sequential, 5-stage boot sequence:
+
+```
+[Start Boot]
+     │
+     ▼
+1. ENV validation (Zod parsing of jwt, databases, cors)
+     │
+     ▼
+2. Dynamic Collection Loading (Chokidar watches .ts files, AST parsing)
+     │
+     ▼
+3. Database Bootstrapping (Acquires advisory lock, creates schemas/auth/helper SQL functions)
+     │
+     ▼
+4. Service Initialization (Auth, Storage S3/Local client instances, Cron store seeding)
+     │
+     ▼
+5. Route Mounting & Edge Loading (Hono controllers, custom functions, WebSocket binding)
+     │
+     ▼
+[Boot Complete]
+```
+
+---
+
+## Startup Fail-Closed Protection
+
+Rebase enforces a strict **fail-closed security posture** during database connection outages. 
+
+If the database is unreachable during boot (e.g., PostgreSQL is starting or network routes are severed):
+- The server does **not** crash or enter a restart loop. Instead, the bootstrapper transitions the backend into a **degraded status mode**.
+- The HTTP server starts successfully to preserve health check endpoints, but all REST, GraphQL, and WebSocket controllers are immediately locked.
+- Any client attempting to read or write data gets a uniform `503 Service Unavailable` response:
+  ```json
+  {
+    "error": {
+      "message": "Database connection is not ready.",
+      "code": "service-unavailable",
+      "status": 503
+    }
+  }
+  ```
+- The framework attempts to re-establish the connection pool in the background, recovering automatically when the database becomes healthy.
+
+---
+
 ## Configuration Reference
 
 ```typescript

@@ -274,41 +274,74 @@ When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio und
 
 The dashboard auto-refreshes every 15 seconds.
 
-## Persistence
+## Schedule Validation & AST Parsing
 
-When the database driver supports SQL (e.g. PostgreSQL), execution logs are **automatically persisted** to a `rebase.cron_logs` table. This means:
+At backend initialization, Rebase parses all registered cron schedules using a zero-dependency JS-based cron expander:
+- **Syntax Check**: Verifies that the string contains exactly 5 whitespace-separated fields (`minute`, `hour`, `day of month`, `month`, `day of week`).
+- **Range Expansion**: Deconstructs steps (`*/15`), ranges (`9-17`), and comma-separated lists (`0,30`) into explicit arrays of valid integers mapped to their respective bounds (e.g., minutes `0-59`, hours `0-23`, months `1-12`).
+- If any cron expression fails validation, Rebase rejects the definition, logs a startup error, and refuses to register the job to prevent runtime execution failures.
 
-- Execution history **survives server restarts** and deployments
-- `totalRuns` and `totalFailures` counters are **seeded from the database** on startup
-- The `/api/cron/:id/logs` endpoint queries the database, not just in-memory
-- Multiple server instances share the same execution history
+---
 
-The table is auto-created on first startup — no migrations needed.
+## Under the Hood: Clock-Drift Correction
 
-:::tip
-Persistence is non-blocking. If a database write fails, the scheduler continues running and the in-memory log buffer is still available as a fallback.
-:::
+Standard interval-based schedulers (such as `setInterval`) drift over time and cause significant CPU spikes due to OS-level event loop scheduling delays. To guarantee execution accuracy, Rebase implements a **dynamic target-time calculation loop**:
+1. **Candidate Calculation**: Upon completing a job or starting the scheduler, Rebase calculates the exact timestamp of the *next* matching candidate minute.
+2. **Dynamic Sleep**: It calculates the difference in milliseconds (`nextRun.getTime() - now.getTime()`) and schedules a single `setTimeout`.
+3. **Drift Safety Threshold**: A minimum sleep buffer (`MIN_SCHEDULE_INTERVAL_MS`) of **5,000ms** is enforced. If a scheduler tick completes extremely quickly, this threshold prevents near-instant double-firing.
+4. **Shutdown Friendliness**: Timer handles are explicitly detached from the Node.js event loop using `timer.unref()`, ensuring background cron schedulers do not block clean process terminations during deployments.
 
-## Schedule Validation
-
-At server initialization, Rebase parses and validates all registered cron schedules. 
-- Validation verifies that the expression contains exactly 5 whitespace-separated fields.
-- It checks that all ranges, steps, and lists produce values within the standard bounds (e.g., minutes 0–59, hours 0–23).
-- If any cron expression is invalid, Rebase logs a clear error to the terminal at startup and rejects the job so the server doesn't execute malformed schedules.
+---
 
 ## Concurrency Guarding
 
-To ensure stability under heavy workloads, Rebase implements a strict **concurrency guard** per cron job:
-- **No overlapping executions**: If a job's scheduled tick fires (or is manually triggered) while the previous run of the same job is still active, Rebase will skip the execution.
-- **Manual trigger fallback**: When a job is triggered via the API/Studio while already running, the execution is skipped and the API returns a skipped indicator: `result: { skipped: true, reason: "already_executing" }`.
-- **Timer unref**: Timers use `unref()` internally to prevent scheduled jobs from blocking the Node.js event loop during graceful process shutdown.
+To ensure stability when executing resource-heavy operations, Rebase implements a strict **single-concurrency execution lock** per job ID:
+- **Scheduled Overlaps**: If a job's scheduled tick fires while the previous execution is still running, the scheduler skips the tick, logs a warning, and immediately schedules the next candidate run.
+- **Manual Trigger Collisions**: If an operator manually triggers a running job via Rebase Studio or the REST API, the request returns immediately with a skipped payload, protecting the active worker:
+  ```json
+  {
+    "jobId": "expire-users",
+    "success": true,
+    "result": { "skipped": true, "reason": "already_executing" },
+    "logs": ["Skipped: job is already running"]
+  }
+  ```
 
-## Timeouts & Error Handling
+---
 
-- **Automatic Timeout**: If a job execution exceeds its configured `timeoutSeconds` (defaults to `300` seconds / 5 minutes), the run is forcibly aborted and logged as a failure with a timeout error.
-- **Fail-safe isolation**: If a handler throws an error, the scheduler captures the exception stack, updates the job state to `"error"`, and schedules the next run normally. A crash in a single job will never crash the scheduler thread or the main HTTP server.
-- **In-Memory Ring Buffer**: Rebase holds the last `50` execution logs per job in an in-memory ring buffer for instant retrieval, while writing all logs asynchronously to the PostgreSQL database if persistence is enabled.
-- **Robust Persistence**: Database log writes are fully asynchronous and fail-safe; if the database connection drops temporarily, the scheduler continues executing normally and uses the in-memory buffer as a fallback.
+## Timeouts & Error Isolation
+
+- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes). If the handler hangs past this threshold, the promise is rejected, throwing:
+  `Error: Cron job "<id>" timed out after <N>ms`
+- **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
+- **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from the Rebase Studio UI.
+
+---
+
+## Database Persistence Schema
+
+When database adapters supporting SQL (e.g. PostgreSQL) are active, Rebase provisions the `rebase.cron_logs` table:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS rebase;
+
+CREATE TABLE IF NOT EXISTS rebase.cron_logs (
+    id           TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    job_id       TEXT NOT NULL,
+    started_at   TIMESTAMPTZ NOT NULL,
+    finished_at  TIMESTAMPTZ NOT NULL,
+    duration_ms  INTEGER NOT NULL,
+    success      BOOLEAN NOT NULL DEFAULT true,
+    error        TEXT,                                 -- Stack trace or error message
+    result       JSONB,                                -- Return value of handler
+    logs         JSONB,                                -- Ring buffer array of ctx.log outputs
+    manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST
+);
+
+CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
+```
+
+On startup, the scheduler reads stats from this table via aggregate queries (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) to populate `totalRuns` and `totalFailures` history. Log insertions are executed in a non-blocking asynchronous sweep; if a database flush fails, the scheduler logs the error and continues normal execution using the in-memory ring buffer as a fallback.
 
 ## Example: Daily Cleanup Job
 

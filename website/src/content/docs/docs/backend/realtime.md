@@ -141,13 +141,15 @@ The `.listen()` method on the query builder is only available when the `RebaseCl
 
 ## Update Delivery: Instant Patch + Correctness Refetch
 
-Rebase uses a two-phase update strategy for collection subscriptions:
+Rebase uses a two-phase update strategy for collection subscriptions to combine extreme speed with absolute correctness:
 
-1. **Phase 1 — Instant entity patch:** When a single entity changes, the server immediately pushes a lightweight `collection_entity_patch` message. The client merges this into its cached collection data for near-instant cross-tab feedback — no database query needed.
+1. **Phase 1 — Instant entity patch:** When a single entity changes (created, updated, deleted), the server immediately pushes a lightweight `collection_entity_patch` message containing the modified entity values directly to subscribers. The client merges this into its cached collection data for near-instant cross-tab feedback — bypassing the database entirely for sub-millisecond perceived updates.
 
-2. **Phase 2 — Debounced full refetch:** After a short delay (300ms), the server runs a full collection query with your original filters and sort order, then sends the authoritative `collection_update`. This ensures correctness when filters, sort order, or pagination are affected by the change.
+2. **Phase 2 — Debounced RLS refetch:** After a short delay of **300ms** (`REFETCH_DEBOUNCE_MS`), the server performs an authoritative database refetch of the collection matching your original filters and sort order. This is critical because field mutations might alter the entity's visibility (e.g. if its status changed and no longer matches a `where` filter).
+   
+   To maintain strict security boundaries, this refetch query is executed inside a transaction setting the transaction-local variables `app.user_id` and `app.user_roles` mapped from the subscriber's `SubscriptionAuthContext`. This ensures PostgreSQL Row-Level Security (RLS) constraints are evaluated correctly under the client's auth session, and only the records the user is authorized to see are sent in the final `collection_update`.
 
-This approach gives you the best of both worlds: sub-millisecond perceived latency for simple updates, and guaranteed correctness for complex queries.
+This approach guarantees that list filters and access policies remain perfectly consistent while maintaining high UI responsiveness.
 
 ## Broadcast Channels
 
@@ -259,16 +261,32 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 This means each user only receives updates for records they have permission to see.
 
-## Cross-Instance Broadcasting
+## Cross-Instance Broadcasting & LISTEN/NOTIFY Architecture
 
-In multi-instance deployments (e.g., behind a load balancer), Rebase uses PostgreSQL `LISTEN/NOTIFY` to synchronize changes across server instances:
+For multi-instance cluster environments (e.g., running inside Kubernetes or Docker containers behind a load balancer), Rebase relies on PostgreSQL `LISTEN/NOTIFY` to synchronize mutating operations and real-time state across instances.
 
-- A mutation on Instance A triggers a `pg_notify('rebase_entity_changes', ...)` call.
-- Instance B receives the notification via its dedicated `LISTEN` connection.
-- Instance B refetches the affected entity and fans out the update to its local WebSocket subscribers.
-- Each instance has a unique ID to prevent processing its own notifications.
+### Bypassing pgBouncer Pools
 
-This is **automatic** and requires no additional configuration. The dedicated `LISTEN` connection auto-reconnects with a 3-second delay if it drops.
+Because connection poolers like **pgBouncer** do not support the persistent connection model required for long-lived SQL `LISTEN` sessions, the real-time supervisor opens a dedicated, unpooled Postgres client (`PgClient`) directly to the database. This direct connection utilizes the `DATABASE_DIRECT_URL` environment variable if configured, ensuring stability and preventing pool exhaustion or abrupt drops.
+
+### Notification Mechanics & Payload Layout
+
+When an entity is modified on Instance A, it broadcasts a notification on the `rebase_entity_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "p": "posts",
+  "eid": "45",
+  "db": null
+}
+```
+
+*Note: `sid` represents the server's unique random instance ID generated at startup, `p` is the collection slug (path), and `eid` is the target entity ID.*
+
+- **Self-Filtering**: Upon receiving a message, each instance reads the `sid`. If it matches its own instance ID, the server discards the notification to prevent infinite routing loops.
+- **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch and relays the update to its locally connected WebSocket subscribers.
+- **Supervisor Reconnection Loop**: If the database connection drops, a background connection supervisor monitors the state and triggers an auto-reconnect sequence after a fixed **3-second** delay, restoring the `LISTEN` loop without affecting the main Hono application lifecycle.
 
 ## Pending Request Timeout
 

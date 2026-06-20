@@ -45,84 +45,149 @@ See `.env.example` in the scaffolded app for the full list of supported variable
 
 ## Using Rebase with Express
 
-Here is a complete example of how to initialize the Rebase PostgreSQL adapter and Realtime WebSockets inside a standard Express application.
+Here is a complete example of how to initialize the Rebase PostgreSQL adapter and Realtime WebSockets inside a standard Express application, manage read replicas, access Drizzle directly, and implement clean server terminations.
 
-### 1. Install Dependencies
+### 1. Installation
 
-You'll need the Postgres server package along with Express:
+Install the required core packages along with Express:
 
 ```bash
-npm install @rebasepro/server-postgresql @rebasepro/types express
+npm install @rebasepro/server-postgresql @rebasepro/types express pg
 ```
 
-### 2. Initialization Example
+### 2. Initialization and Graceful Shutdown Example
 
 ```typescript
-import express from 'express';
-import { createServer } from 'http';
-import { createPostgresBootstrapper } from '@rebasepro/server-postgresql';
+import express from "express";
+import { createServer } from "http";
+import pg from "pg";
+import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
 
 async function startServer() {
     const app = express();
     
-    // 1. You MUST create the raw Node HTTP server so the WebSocket server can bind to it
+    // 1. WebSocket Upgrade Guard
+    // WebSockets require hijacking the HTTP Upgrade header. You must bind
+    // Rebase to a raw Node.js http.Server instance.
     const server = createServer(app);
 
-    // 2. Initialize the Postgres Bootstrapper directly
-    const bootstrapper = createPostgresBootstrapper({
+    // 2. Configure the connection pool
+    const pool = new pg.Pool({
         connectionString: process.env.DATABASE_URL,
-        // Optional: define any Drizzle schema here if you want typed relations/queries
-        // schema: { tables: { ... } } 
+        max: 20, // Max concurrent database connections
+        idleTimeoutMillis: 30000
     });
 
-    // 3. Initialize the driver (connects to DB, starts logical replication listeners)
-    const { driver, realtimeProvider } = await bootstrapper.initializeDriver({
-        collections: [] // Pass your Rebase collections here if you're using them
+    // 3. Initialize the Postgres Bootstrapper
+    const bootstrapper = createPostgresBootstrapper({
+        connection: pool,
+        connectionString: process.env.DATABASE_URL,
+        adminConnectionString: process.env.ADMIN_CONNECTION_STRING, // Required for branching
+        schema: {
+            tables: {},   // Place your custom Drizzle tables here
+            relations: {} // Place your custom Drizzle relations here
+        }
     });
 
-    // 4. Attach the Rebase WebSockets to your HTTP Server
-    await bootstrapper.initializeWebsockets(
-        server, 
-        realtimeProvider, 
-        driver
-    );
+    // 4. Initialize the Driver and Services
+    // Connects to Postgres, verifies connection, starts cross-instance listeners
+    const { driver, realtimeProvider, internals } = await bootstrapper.initializeDriver({
+        collections: [] // Pass Rebase EntityCollections if using schema-as-code
+    });
 
-    // --- Express Routes ---
+    // Access the underlying schema-aware Drizzle client if needed
+    const db = internals.db; // Drizzle NodePgDatabase instance
+    const readDb = internals.readDb; // Read replica Drizzle instance if DATABASE_READ_URL is set
+
+    // 5. Mount Realtime WebSockets
+    await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
+        requireAuth: true // Enforces authentication token checks
+    });
+
     app.use(express.json());
 
-    app.get('/', (req, res) => {
-        res.send('Express server running with embedded Rebase!');
+    app.get("/api/health", (req, res) => {
+        res.json({ status: "healthy" });
     });
 
-    // You can interact directly with the Rebase driver anywhere in your Express routes
-    app.post('/custom-data', async (req, res) => {
+    // Direct Driver CRUD Operation
+    app.post("/api/products", async (req, res) => {
         try {
-            // Use the raw Rebase Database Driver
             const result = await driver.saveEntity({
-                collection: 'products',
+                path: "products",
                 entity: req.body
             });
-            res.json({ success: true, data: result });
-        } catch (error) {
+            res.status(201).json({ success: true, data: result });
+        } catch (error: any) {
             res.status(500).json({ error: error.message });
         }
     });
 
-    // 5. Start listening using the raw server instance (NOT app.listen)
-    server.listen(3000, () => {
-        console.log('Express and Rebase Realtime running on port 3000');
+    // Raw Drizzle SQL Execution (RLS bypass)
+    app.get("/api/stats", async (req, res) => {
+        try {
+            const countResult = await db.select().from(...); // Perform standard Drizzle operations
+            res.json(countResult);
+        } catch (error: any) {
+            res.status(500).json({ error: error.message });
+        }
     });
+
+    // Start listening (Using the HTTP Server, NOT app.listen)
+    const port = process.env.PORT || 3000;
+    server.listen(port, () => {
+        console.log(`🚀 Server and WebSocket engine running on port ${port}`);
+    });
+
+    // 6. Graceful Shutdown Handler
+    // Terminate listeners and drain connection pools on process termination signals
+    const handleShutdown = async (signal: string) => {
+        console.log(`\nShutdown triggered via ${signal}. Cleaning up resources...`);
+        
+        server.close(async () => {
+            console.log("✔ HTTP Server closed.");
+            try {
+                // Terminate cross-instance pg LISTEN/NOTIFY client
+                if (realtimeProvider && typeof realtimeProvider.stopListening === "function") {
+                    await realtimeProvider.stopListening();
+                    console.log("✔ Realtime listeners stopped.");
+                }
+
+                // Disconnect dynamic branch connection pools
+                if (internals.poolManager) {
+                    await internals.poolManager.destroy();
+                    console.log("✔ Branch connection pools evicted.");
+                }
+
+                // End the main database pool
+                await pool.end();
+                console.log("✔ Database connection pool drained.");
+
+                process.exit(0);
+            } catch (err) {
+                console.error("❌ Error during graceful shutdown:", err);
+                process.exit(1);
+            }
+        });
+    };
+
+    process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+    process.on("SIGINT", () => handleShutdown("SIGINT"));
 }
 
 startServer();
 ```
 
-## Key Concepts
+---
 
-### Native HTTP Server
-Because WebSockets require an HTTP `Upgrade` request, you **must** bind Rebase to the native Node.js `http.Server` instance. If you just call `app.listen(3000)` in Express, you won't have access to the underlying server object needed by `initializeWebsockets()`.
+## Key Backend Concepts
 
-### Bypassing Hono
-By directly invoking `createPostgresBootstrapper()` and manually calling `initializeDriver()` and `initializeWebsockets()`, you are bypassing the Rebase coordinator (`initializeRebaseBackend`) entirely. This means no Hono dependencies are loaded, and the auto-generated REST APIs, Admin UI routes, and Auth endpoints are not mounted. 
+### Read Replica Connections
+If you define the `DATABASE_READ_URL` environment variable, Rebase automatically spawns a secondary connection pool targeting your read replica. The bootstrapper registers this under `internals.readDb`. The core `EntityFetchService` routes all SELECT queries to the replica pool to optimize performance, while mutation queries remain on the primary pool.
 
-This gives you total control over your API surface while still leveraging Rebase's powerful logical-replication WebSocket engine and Drizzle-powered driver.
+### Drizzle Integration
+You do not have to choose between Rebase and Drizzle. The bootstrapper compiles your schemas dynamically. You can access the compiled Drizzle NodePgDatabase client via `internals.db`, allowing you to run raw SQL migrations or invoke type-safe Drizzle builders alongside Rebase's REST services.
+
+### Graceful Connection Draining
+In serverless environments or orchestrators (like Kubernetes), terminating pods can result in broken connections. Always implement signal handlers that invoke `realtimeProvider.stopListening()` (which terminates the dedicated pg LISTEN client) and `pool.end()` to prevent leaking connection slots in your database server.
+

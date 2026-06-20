@@ -6,112 +6,158 @@ description: Create isolated database branches for development, staging, and tes
 
 ## Overview
 
-Database branching lets you create **instant, isolated copies** of your entire database — schema and data — for development, staging, or testing. Each branch is a real PostgreSQL database created from a template, so it's a full-fidelity copy with no downtime.
+Database branching allows you to create **instant, isolated copies** of your entire database (both schema and data) to safely perform development, migration tests, and QA procedures. 
 
-This is similar to git branching, but for your database. Create a branch, experiment with migrations or data, and delete it when you're done. Your production database is never touched.
+By leveraging native PostgreSQL templates, Rebase provisions clone databases at the filesystem level. This means you get a full-fidelity replica containing all tables, indexes, custom types, constraints, and Row-Level Security (RLS) policies without any network transfer overhead or schema setup delays.
 
-## How It Works
-
-Rebase uses PostgreSQL's native `CREATE DATABASE ... TEMPLATE` to create branches. This is:
-
-- **Instant** — PostgreSQL copies the template at the filesystem level
-- **Full-fidelity** — schema, data, indexes, constraints, RLS policies — everything is copied
-- **Isolated** — changes in the branch don't affect the source database
-
-Branch metadata is stored in a `rebase.branches` table in the main database, so the system always knows which branches exist and where they came from.
-
-## API
-
-The branching API is available through the backend's `DatabaseAdmin` interface:
-
-### Create a Branch
-
-```typescript
-// Create a branch from the default database
-await admin.createBranch("feature_auth");
-
-// Create a branch from a specific source database
-await admin.createBranch("staging", { source: "production" });
+```
+                  ┌────────────────────────┐
+                  │ Production DB (rebase) │
+                  └───────────┬────────────┘
+                              │
+               (CREATE DATABASE ... TEMPLATE)
+                              │
+            ┌─────────────────┴─────────────────┐
+            ▼                                   ▼
+┌───────────────────────┐           ┌───────────────────────┐
+│ rb_feature_auth (Dev) │           │ rb_staging (Staging)  │
+└───────────────────────┘           └───────────────────────┘
 ```
 
-This creates a new PostgreSQL database named `rb_feature_auth` (prefixed to avoid collisions) and records it in the metadata table.
+---
 
-### List Branches
+## Under the Hood: PostgreSQL Templating
+
+When a database branch is created, the Rebase `BranchService` executes the following SQL:
+
+```sql
+CREATE DATABASE "rb_feature_auth" TEMPLATE "rebase";
+```
+
+PostgreSQL processes this operation by copying the underlying filesystem directories containing the source database files. This provides:
+- **Sub-Second Clones**: No SQL generation or data loading is performed.
+- **Identical Schemas and Data**: Every row, index, and constraint is duplicated instantly.
+- **Complete Isolation**: Altering the schema or inserting records into the branch has no impact on the source database.
+
+### The Connection Limitation Guard
+
+PostgreSQL requires that **no other active connections** exist on the template (source) database when running a `CREATE DATABASE ... TEMPLATE` command. 
+
+To prevent failures, the Rebase `DatabasePoolManager` executes an active eviction process before cloning or dropping a branch:
+1. **Eviction Loop**: It automatically closes and disconnects all idle pools pointing to the targeted database within the Rebase application context.
+2. **External Connections Block**: If external clients (such as DBeaver, pgAdmin, or external backend processes) maintain active transactions on the source database, PostgreSQL will reject the template operation with a `"being accessed by other users"` error. In this scenario, those connections must be closed manually.
+
+---
+
+## Metadata Schema
+
+Branch configurations are stored in the default database under the `rebase.branches` table, which is provisioned during bootstrapping:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS rebase;
+
+CREATE TABLE IF NOT EXISTS rebase.branches (
+    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
+    parent_db    TEXT NOT NULL,                 -- Source database cloned from
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    metadata     JSONB DEFAULT '{}'
+);
+```
+
+---
+
+## Programmatic API
+
+The branching API is exposed via the backend's `BranchService`. Below is a reference of the core interface:
+
+### Create a Database Branch
+
+Generates a new branch database from the default database or an explicit source template.
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+
+const backend = await initializeRebaseBackend({ /* ... */ });
+const admin = backend.driver.admin;
+
+// Create a branch from the default database
+const newBranch = await admin.createBranch("feature_oauth");
+
+// Create a branch from a specific staging database
+const stagingBranch = await admin.createBranch("pr_review_42", { 
+    source: "rb_staging" 
+});
+```
+
+### List Active Branches
+
+Retrieves list of registered branches along with their physical sizes queried via the PostgreSQL `pg_database_size` system function.
 
 ```typescript
 const branches = await admin.listBranches();
-// [
-//   {
-//     name: "feature_auth",
-//     parentDatabase: "rebase",
-//     createdAt: "2026-04-15T10:30:00Z",
-//     sizeBytes: 52428800
-//   }
-// ]
+/*
+Output:
+[
+  {
+    name: "feature_oauth",
+    parentDatabase: "rebase",
+    createdAt: 2026-06-20T22:00:00.000Z,
+    sizeBytes: 83886080 // 80 MB
+  }
+]
+*/
 ```
 
-### Get Branch Info
+### Get Branch Information
+
+Fetches metadata for a single branch. If the branch exists, the service attempts to query its current physical disk usage:
 
 ```typescript
-const branch = await admin.getBranchInfo("feature_auth");
-// { name: "feature_auth", parentDatabase: "rebase", createdAt: ..., sizeBytes: ... }
+const info = await admin.getBranchInfo("feature_oauth");
 ```
 
 ### Delete a Branch
 
-```typescript
-await admin.deleteBranch("feature_auth");
-```
-
-This drops the PostgreSQL database and removes the metadata. The main database can never be deleted.
-
-## Configuration
-
-Database branching requires the `adminConnectionString` to be configured in your PostgreSQL bootstrapper, since creating and dropping databases needs elevated privileges:
+Drops the target database from the server and cleans up its record in the `rebase.branches` metadata table.
 
 ```typescript
-createPostgresBootstrapper({
-    connection: db,
-    schema: { tables, enums, relations },
-    adminConnectionString: process.env.ADMIN_CONNECTION_STRING || databaseUrl,
-    connectionString
-})
+await admin.deleteBranch("feature_oauth");
 ```
 
-The `DatabasePoolManager` automatically handles connection pooling for branch databases. When you switch to a branch, the pool manager creates a new connection pool targeting that database.
+> [!CAUTION]
+> Safety Guard: The main database (default database name configured in connection strings) is protected. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
 
-## Branch Naming
+---
 
-Branch names are sanitized to only allow alphanumeric characters and underscores. The actual PostgreSQL database name is prefixed with `rb_` to avoid collisions:
+## CLI Integration
 
-| Branch name | Database name |
-|---|---|
-| `feature_auth` | `rb_feature_auth` |
-| `staging` | `rb_staging` |
-| `v2_migration` | `rb_v2_migration` |
+Database branches can be managed directly using the Rebase CLI.
 
-## Use Cases
+```bash
+# Create a new branch named 'dev_sandbox'
+rebase db branch create dev_sandbox
 
-### Preview Environments
+# List all branches and disk utilization
+rebase db branch list
 
-Create a branch for each pull request or preview deployment. The branch gets a full copy of production data, so reviewers can test against real data.
+# Delete a branch
+rebase db branch delete dev_sandbox
+```
 
-### Migration Testing
+When you create or switch to a branch, the CLI updates your local development configuration. The `DatabasePoolManager` dynamically instantiates a new connection pool for the chosen branch database name (e.g. `rb_dev_sandbox`), letting you test migrations or seed data without manual connection string edits.
 
-Before running a migration on production, create a branch and run the migration there first. If something goes wrong, just delete the branch.
+---
 
-### Data Experiments
+## Best Practices and Limitations
 
-Need to test a data transformation? Create a branch, run your script, and verify the results without touching production.
+### Disk Usage
+Because PostgreSQL duplicates the files on disk, each branch consumes space equal to the source database. If you have a 100GB production database, creating 5 branches will consume an additional 500GB of storage. 
+* *Recommendation*: Use subsetted databases or thin dev-templates as your clone sources instead of full production clones.
 
-## Limitations
+### pgBouncer Compatibility
+When deploying behind pgBouncer or connection poolers, ensure the pooler supports administrative database operations. Creating and dropping databases bypasses standard transaction-level pools and requires direct connections to the Postgres server (using elevated user privileges) via the `adminConnectionString` configuration.
 
-- **Active connections** — PostgreSQL requires all connections to the source database to be closed before creating a template. The branch service automatically disconnects idle pools, but other clients (e.g., pgAdmin) must be disconnected manually.
-- **Disk space** — each branch is a full copy of the database. Monitor disk usage when creating many branches.
-- **Cross-database queries** — branches are separate PostgreSQL databases. You cannot JOIN between a branch and the main database.
+### Cross-Database Queries
+Because branches are separate PostgreSQL databases, you cannot perform SQL `JOIN` statements across branch boundaries. All relations must be contained within the scope of the single active branch database.
 
-## Next Steps
-
-- **[Backend Overview](/docs/backend)** — Full backend configuration reference
-- **[CLI](/docs/cli)** — Manage branches from the command line
-- **[Entity History](/docs/backend/history)** — Track changes within a branch

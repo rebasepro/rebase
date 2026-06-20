@@ -110,7 +110,48 @@ Intercept role definitions fetched by the admin panel.
 
 ## Data Boundary Hooks (`data`)
 
-Intersects **ALL** collection entities flowing through the REST API routes. These run **after** the per-collection `EntityCallbacks`.
+These hooks intersect **ALL** collection entities flowing through the REST API routes. 
+
+### Execution Priorities & Boundaries
+
+It is critical to distinguish between **Entity Callbacks** and **Global Backend Hooks**:
+1. **Database Adapter Boundary (Entity Callbacks)**: Callbacks defined on individual collections (e.g., `beforeSave`, `beforeDelete`) execute *inside* the Postgres driver's transactional block, under the subscriber's specific RLS parameters (`app.user_id`, `app.user_roles`). They are designed for database integrity, field defaults, and transaction-bound validations.
+2. **HTTP API Boundary (Global Hooks)**: Global hooks execute at the Hono router boundary *outside* the Postgres transaction scope. 
+
+```
+[Client Request]
+       │
+       ▼
+ [Hono Router]
+       │
+ ┌─────┴───────────────────────────────────────────────────────┐
+ │ 1. Global Hook: data.beforeSave (HTTP Boundary - Blocking)  │
+ └─────┬───────────────────────────────────────────────────────┘
+       │
+ [Database Driver]
+ ┌─────┴───────────────────────────────────────────────────────┐
+ │ 2. Start PostgreSQL Transaction                             │
+ │ 3. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
+ │ 4. Entity Callback: beforeSave (Tx Boundary - Blocking)     │
+ │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
+ │ 6. Entity Callback: afterSave (Tx Boundary - Blocking)      │
+ │ 7. Commit Transaction                                       │
+ └─────┬───────────────────────────────────────────────────────┘
+       │
+ ┌─────┴───────────────────────────────────────────────────────┐
+ │ 8. Global Hook: data.afterSave (HTTP Boundary - Deferred)   │
+ └─────┬───────────────────────────────────────────────────────┘
+       │
+       ▼
+[Client Response]
+```
+
+### Blocking vs. Asynchronous Hook Semantics
+
+- **Blocking Hooks (`beforeSave`, `beforeDelete`)**: Executed sequentially and synchronously prior to running database operations. If any hook throws an error, the pipeline is immediately halted, aborting the transaction and returning a `400 Bad Request` or `403 Forbidden` response to the client.
+- **Asynchronous Hooks (`afterSave`, `afterDelete`)**: Executed after the database transaction has committed. To keep HTTP response times low, these hooks are handled via deferred promises. They execute in the background without holding up the HTTP response to the client.
+
+These run **after** the per-collection `EntityCallbacks`.
 
 | Hook | Signature | Description |
 |------|-----------|-------------|

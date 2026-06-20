@@ -92,9 +92,41 @@ export default function () {
 }
 ```
 
-Both are detected via duck-typing — the loader checks for `.fetch()` and `.routes` properties, so any Hono-compatible instance will work regardless of the installed Hono version.
+---
 
-## Authentication
+## Under the Hood: The Duck-Typing Loader
+
+When compiling codebases with multiple nested directories or in monorepos, you may run into **Hono package duplication**. 
+
+If the Rebase framework depends on one Hono version and your local function directory resolves to another, standard class inheritance checks (`exported instanceof Hono`) will fail because their prototypes exist in separate memory spaces.
+
+To prevent false negatives and reject loading functioning routers, Rebase uses a duck-typed validator (`isHonoLike`):
+- It verifies the exported object is a non-null `object`.
+- It checks that the object exposes a `.fetch` method (required to route requests).
+- It verifies that `.routes` is an `array`.
+
+```typescript
+function isHonoLike(obj: unknown): boolean {
+    if (!obj || typeof obj !== "object") return false;
+    const record = obj as Record<string, unknown>;
+    return typeof record.fetch === "function" && Array.isArray(record.routes);
+}
+```
+
+### ES Module Compiler Escape
+
+To import TypeScript and JavaScript files dynamically on both Windows and Posix systems, the loader converts file paths to standard file URIs via `pathToFileURL(filePath).href`. 
+
+To prevent TypeScript compilation from rewriting native ESM dynamic imports (`import(url)`) into CommonJS `require()` calls (which would throw errors at runtime under ESM runtimes), Rebase executes a runtime compiler escape:
+
+```typescript
+const dynamicImport = new Function("url", "return import(url)");
+const mod = await dynamicImport(fileUrl);
+```
+
+---
+
+## Authentication & Context Propagation
 
 Custom functions are mounted with the **same auth middleware** as the data routes, but with `requireAuth: false`. This means:
 

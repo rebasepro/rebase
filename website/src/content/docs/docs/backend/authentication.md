@@ -104,18 +104,71 @@ All data API endpoints require a valid `Authorization: Bearer <token>` header wh
 
 ## Auto-Created Tables
 
-On first startup, Rebase creates these tables in the `rebase` schema:
+On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
 
-- **`rebase.users`** — User accounts with email, password hash, and a `roles` text[] column
-- **`rebase.refresh_tokens`** — JWT refresh token storage
+- **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
+- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash` and a unique constraint on `(user_id, user_agent, ip_address)` to track active device sessions.
+- **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
+- **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
+- **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
+- **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
+- **`rebase.app_config`** — Key-value store for system configurations.
 
-Roles are stored as a `text[]` array column directly on the users table — there are no separate `roles` or `user_roles` tables.
+## Row-Level Security (RLS) Database Context
+
+Rebase bridges request authentication directly down to PostgreSQL Row-Level Security (RLS). Every database query executed through a user-scoped driver runs inside a database transaction (`db.transaction()`) that configures transaction-local configuration parameters:
+
+*   `app.user_id` — The authenticated user's unique ID (`uid`). Defaults to `'anon'` for unauthenticated requests.
+*   `app.user_roles` — A comma-separated string listing the user's assigned roles.
+*   `app.jwt` — A JSON string containing the full JWT claims payload (`{"sub": "<uid>", "roles": [...]}`).
+
+These parameters are configured locally for the duration of the transaction using Postgres's `set_config` function:
+```sql
+SELECT 
+    set_config('app.user_id', $1, true),
+    set_config('app.user_roles', $2, true),
+    set_config('app.jwt', $3, true);
+```
+
+### PostgreSQL Policy Helper Functions
+
+To make writing Row-Level Security policies simple, Rebase creates helper functions under the `auth` schema during database bootstrapping:
+
+*   **`auth.uid()`** — Returns the authenticated user's ID as `text`, or `NULL` if not set:
+    ```sql
+    CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+        SELECT NULLIF(current_setting('app.user_id', true), '');
+    $$ LANGUAGE sql STABLE;
+    ```
+*   **`auth.roles()`** — Returns the comma-separated roles string:
+    ```sql
+    CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
+        SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
+    $$ LANGUAGE sql STABLE;
+    ```
+*   **`auth.jwt()`** — Returns the full JWT payload as a `jsonb` object:
+    ```sql
+    CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
+        SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
+    $$ LANGUAGE sql STABLE;
+    ```
+
+You can use these helpers directly in your custom security rules or database migrations:
+```sql
+CREATE POLICY owner_access ON posts
+    FOR ALL
+    TO public
+    USING (author_id = auth.uid() OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+```
 
 ## First User Bootstrap
 
 When no users exist in the database, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
 
-This ensures you can always bootstrap a fresh deployment without needing to seed the database manually.
+This ensures you can always bootstrap a fresh deployment without needing to seed the database manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
+```sql
+SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
+```
 
 ## Collection-Level Auth Configuration
 
@@ -176,30 +229,244 @@ auth: {
 }
 ```
 
-Clients authenticate with the `Authorization: Bearer <service-key>` header. The service key bypasses user authentication and grants full access.
+Clients authenticate with the `Authorization: Bearer <service-key>` header. 
+
+### Timing-Attack Protection & Key Requirements
+To prevent timing attacks, Rebase validates the service key using constant-time string comparison (`safeCompare`). The service key **must be at least 32 characters long**; if a key shorter than 32 characters is configured, Rebase will throw a configuration error on startup and fail-closed.
+
 
 ## Custom Auth Adapters
 
-Rebase allows complete replacement of the built-in authentication system via the `AuthAdapter` interface. Use this to integrate with Firebase Auth, Auth0, Clerk, or any external SSO provider:
+Rebase allows complete replacement of the built-in authentication system via a pluggable authentication architecture. This decouples authentication verification from the database and REST/WebSocket layers, enabling seamless integration with external providers such as **Clerk**, **Auth0**, **Firebase Auth**, or custom JWT identity services.
+
+### The AuthAdapter Contract
+
+You can implement the `AuthAdapter` interface directly for complete control. The interface definition is as follows:
 
 ```typescript
-import { AuthAdapter } from "@rebasepro/types";
+import { Hono } from "hono";
+import { 
+  AuthAdapter, 
+  AuthenticatedUser, 
+  AuthAdapterCapabilities,
+  UserManagementAdapter,
+  UserCreationPrepareResult,
+  UserCreationFinalizeResult
+} from "@rebasepro/types";
 
-const myAdapter: AuthAdapter = {
-    middleware: async (c, next) => {
-        // Extract and verify token from the request
-        const token = c.req.header("Authorization")?.replace("Bearer ", "");
-        // Verify with your auth provider...
-        // Set user context for downstream handlers
-        await next();
+export interface AuthAdapter {
+  /** Unique identifier for this auth adapter (e.g., "clerk", "custom") */
+  readonly id: string;
+
+  /**
+   * Verifies an incoming HTTP request and returns the authenticated user payload.
+   * Called by Hono authentication middleware on every REST endpoint.
+   */
+  verifyRequest(request: Request): Promise<AuthenticatedUser | null>;
+
+  /**
+   * Verifies a raw token string (e.g. for WebSocket connection handshake phase 1).
+   * If omitted, a synthetic request is automatically constructed.
+   */
+  verifyToken?(token: string): Promise<AuthenticatedUser | null>;
+
+  /** Optional user management operations (CRUD) for the Admin Dashboard panel */
+  userManagement?: UserManagementAdapter;
+
+  /** Optional: Mount adapter-specific custom public routes (e.g. callback paths) */
+  createAuthRoutes?(): Hono<any, any, any> | undefined;
+
+  /** Optional: Mount adapter-specific admin-only routes */
+  createAdminRoutes?(): Hono<any, any, any> | undefined;
+
+  /** Advertise supported capabilities (to customize Admin Dashboard UI visibility) */
+  getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
+
+  /** Lifecycle hooks called during backend start and graceful shutdown */
+  initialize?(): Promise<void>;
+  destroy?(): Promise<void>;
+
+  /** Custom user lifecycle hooks (e.g., hash passwords before collection writes) */
+  prepareUserCreation?(
+    values: Record<string, unknown>,
+    collectionAuth?: unknown
+  ): Promise<UserCreationPrepareResult>;
+
+  finalizeUserCreation?(
+    entity: { id: string; values: Record<string, unknown> },
+    clearPassword?: string
+  ): Promise<UserCreationFinalizeResult>;
+
+  /** Static service key to bypass checks for server-to-server calls */
+  serviceKey?: string;
+}
+```
+
+### The Authenticated User Payload
+
+Regardless of the external authentication provider chosen, your adapter must resolve successful token verifications to a uniform `AuthenticatedUser` object. The Rebase RLS Scope Injector maps these values directly to PostgreSQL session variables inside transactions:
+
+```typescript
+export interface AuthenticatedUser {
+  uid: string;                    // Maps to pg local 'app.user_id' -> auth.uid()
+  email: string;                  // User email address
+  displayName?: string | null;    // Optional display name
+  photoUrl?: string | null;        // Optional avatar URL
+  roles: string[];                // Maps to pg local 'app.user_roles' -> auth.roles()
+  isAdmin: boolean;               // Grants global superuser privileges if true
+  rawToken?: string;              // The original token string (for downstream forwarding)
+  claims?: Record<string, any>;   // Custom claims/metadata (available in auth.jwt())
+}
+```
+
+---
+
+### Quick Integration via `createCustomAuthAdapter`
+
+For standard scenarios (such as validating JWTs from a third-party service), you can use the `createCustomAuthAdapter` utility. This utility handles capabilities defaults and implements WebSocket token validation out-of-the-box by wrapping your `verifyRequest` implementation.
+
+#### Example: Integrating with Clerk
+
+To connect a Rebase backend with **Clerk**, you can verify Clerk JWT tokens using Clerk's JSON Web Key Set (JWKS):
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createCustomAuthAdapter } from "@rebasepro/server-core";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+// Clerk JWKS URL
+const CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json";
+const JWKS = createRemoteJWKSet(new URL(CLERK_JWKS_URL));
+
+const clerkAuthAdapter = createCustomAuthAdapter({
+    serviceKey: process.env.REBASE_SERVICE_KEY,
+    verifyRequest: async (request) => {
+        const authHeader = request.headers.get("Authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) return null;
+
+        try {
+            // Verify Clerk JWT token against JWKS
+            const { payload } = await jwtVerify(token, JWKS);
+            
+            const roles = (payload.metadata as any)?.roles || [];
+            
+            return {
+                uid: payload.sub!,
+                email: (payload as any).email || "",
+                displayName: (payload as any).name || null,
+                roles: roles,
+                isAdmin: roles.includes("admin"),
+                claims: payload as Record<string, unknown>
+            };
+        } catch (error) {
+            console.error("Clerk token verification failed:", error);
+            return null; // Fail-closed
+        }
+    },
+    capabilities: {
+        hasBuiltInAuthRoutes: false, // Login is managed by Clerk UI
+        emailPasswordLogin: false,
+        registration: false,
+        passwordReset: false,
+        profileUpdate: false,
+        sessionManagement: false
     }
-};
+});
 
-await initializeRebaseBackend({
-    auth: myAdapter,  // Pass adapter directly instead of config object
+const backend = await initializeRebaseBackend({
+    auth: clerkAuthAdapter,
     // ...
 });
 ```
+
+#### Example: Integrating with Firebase Auth
+
+To verify Firebase Auth tokens using Firebase's public certificates:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { createCustomAuthAdapter } from "@rebasepro/server-core";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const FIREBASE_JWKS_URL = "https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com";
+const JWKS = createRemoteJWKSet(new URL(FIREBASE_JWKS_URL));
+const FIREBASE_PROJECT_ID = "my-firebase-project-id";
+
+const firebaseAuthAdapter = createCustomAuthAdapter({
+    serviceKey: process.env.REBASE_SERVICE_KEY,
+    verifyRequest: async (request) => {
+        const authHeader = request.headers.get("Authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) return null;
+
+        try {
+            const { payload } = await jwtVerify(token, JWKS, {
+                issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+                audience: FIREBASE_PROJECT_ID
+            });
+
+            const roles = (payload as any).roles || [];
+
+            return {
+                uid: payload.sub!,
+                email: (payload as any).email || "",
+                displayName: (payload as any).name || null,
+                photoUrl: (payload as any).picture || null,
+                roles: roles,
+                isAdmin: roles.includes("admin"),
+                claims: payload as Record<string, unknown>
+            };
+        } catch (error) {
+            console.error("Firebase token verification failed:", error);
+            return null;
+        }
+    }
+});
+
+const backend = await initializeRebaseBackend({
+    auth: firebaseAuthAdapter,
+    // ...
+});
+```
+
+---
+
+### Mounting Auth Routes and Admin UI Actions
+
+If your custom auth provider requires mounting redirect endpoints (like OAuth callback routes or SAML login loops), implement the `createAuthRoutes` method on your adapter:
+
+```typescript
+const myOauthAdapter: AuthAdapter = {
+    id: "custom-oauth",
+    verifyRequest: async (req) => { /* token validation */ },
+    getCapabilities: () => ({
+        hasBuiltInAuthRoutes: true,
+        emailPasswordLogin: false,
+        registration: false,
+        passwordReset: false,
+        sessionManagement: false,
+        profileUpdate: false,
+        emailVerification: false,
+        enabledProviders: []
+    }),
+    createAuthRoutes: () => {
+        const app = new Hono();
+        
+        // Mounted automatically under /api/auth/callback
+        app.get("/callback", async (c) => {
+            const code = c.req.query("code");
+            // Exchange code for provider tokens and set cookies/redirect
+            return c.redirect("/dashboard");
+        });
+        
+        return app;
+    }
+};
+```
+
+If you wish to allow user CRUD operations directly inside the Rebase Admin Dashboard, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `createUser`, `updateUser`, and `deleteUser`.
+
 
 ## Next Steps
 

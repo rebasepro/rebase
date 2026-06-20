@@ -72,9 +72,60 @@ image: {
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Upload a file |
-| `GET` | `/api/storage/files/:path` | Download/serve a file |
+| `POST` | `/api/storage/upload` | Direct file upload |
+| `GET` | `/api/storage/files/:path` | Retrieve a file |
 | `DELETE` | `/api/storage/files/:path` | Delete a file |
+| `OPTIONS` | `/api/storage/tus` | Query supported TUS protocol capabilities |
+| `POST` | `/api/storage/tus` | Initiate a resumable TUS upload session |
+| `HEAD` | `/api/storage/tus/:id` | Check upload progress (byte offset) |
+| `PATCH` | `/api/storage/tus/:id` | Append data chunk to temporary file |
+| `DELETE` | `/api/storage/tus/:id` | Terminate/abort TUS upload session |
+
+## On-the-Fly Image Transformations
+
+Rebase includes a built-in image processing pipeline powered by **Sharp**. When serving image assets from storage, you can apply dynamic operations using query parameters:
+
+```bash
+# Serve image scaled to 300px width in webp format
+GET /api/storage/files/products/laptop.jpg?width=300&format=webp
+```
+
+### Supported Parameters
+
+- `width`: Resizes the image to the specified width (maintaining aspect ratio).
+- `format`: Converts the image format. Supported formats: `webp`, `jpeg`, `png`, `avif`.
+
+### Performance & LRU Caching
+
+To prevent high CPU utilization and scaling latency under heavy traffic, processed images are stored in a memory-backed **LRU Cache**:
+- **Capacity**: Capped at **500 entries** globally.
+- **TTL (Time to Live)**: Cached variants expire after **1 hour**.
+- Subsequent requests for the same size/format combination hit the LRU cache instantly, preventing redundant file manipulation.
+
+## TUS Resumable Upload Protocol
+
+For uploading large files (up to **5GB**) or handling unstable network conditions, Rebase implements the **TUS v1.0.0** open protocol including the `Creation` and `Termination` extensions.
+
+```
+Client                                                   Rebase Server
+  │                                                           │
+  │─── POST /api/storage/tus (Upload-Length: 50000000) ──────>│ (Generates session ID)
+  │<── 201 Created (Location: /api/storage/tus/uuid-abc) ────│
+  │                                                           │
+  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 0) ───>│ (Appends chunk via open/write)
+  │<── 204 No Content (Upload-Offset: 1500000) ───────────────│
+  │                                                           │
+  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 1.5M) ─>│ (Upload finishes)
+  │<── 204 No Content (Upload-Offset: 50000000) ──────────────│ (Copies to storage, unlinks temp)
+```
+
+### Upload Lifecycle Mechanics
+
+1. **Session Initialisation (`POST`)**: The client sends the total file size in the `Upload-Length` header and base64 metadata via `Upload-Metadata`. The server creates an empty placeholder file under a hidden temporary directory `.tus-uploads/` and returns the upload URL.
+2. **Progress Inquiries (`HEAD`)**: If an upload is interrupted, the client queries the upload URL using a `HEAD` request. The server returns the current byte position in the `Upload-Offset` header.
+3. **Data Appending (`PATCH`)**: The client resumes sending binary data starting at the returned offset with `Content-Type: application/offset+octet-stream`. The server writes incoming chunks directly to the temporary file using Node's low-level `open` and `write` file system APIs at the specified byte offset.
+4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted.
+5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete orphaned, incomplete temporary uploads that have exceeded the **24-hour** retention threshold.
 
 ## Environment Variables
 
