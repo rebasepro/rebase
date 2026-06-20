@@ -46,6 +46,12 @@ describe("RestApiGenerator", () => {
     function createApp() {
         const app = new Hono();
         app.onError(errorHandler);
+        // RestApiGenerator.getScopedDriver reads from c.get("driver") which is
+        // normally set by auth middleware. Replicate that here for tests.
+        app.use("/api/*", async (c, next) => {
+            c.set("driver", mockDriver);
+            await next();
+        });
         const generator = new RestApiGenerator(mockCollections, mockDriver);
         app.route("/api", generator.generateRoutes());
         return app;
@@ -56,9 +62,14 @@ describe("RestApiGenerator", () => {
      * so we can reliably test route matching without nesting interference.
      */
     function createFlatApp() {
-        const generator = new RestApiGenerator(mockCollections, mockDriver);
-        const app = generator.generateRoutes();
+        const app = new Hono();
         app.onError(errorHandler);
+        app.use("/*", async (c, next) => {
+            c.set("driver", mockDriver);
+            await next();
+        });
+        const generator = new RestApiGenerator(mockCollections, mockDriver);
+        app.route("/", generator.generateRoutes());
         return app;
     }
 
@@ -519,6 +530,10 @@ passwordHash: "custom-hash" },
 
             const app = new Hono();
             app.onError(errorHandler);
+            app.use("/api/*", async (c, next) => {
+                c.set("driver", mockDriver);
+                await next();
+            });
 
             const authCollections = [
                 {

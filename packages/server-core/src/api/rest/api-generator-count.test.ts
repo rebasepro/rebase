@@ -1,4 +1,5 @@
 import { jest } from "@jest/globals";
+import { Hono } from "hono";
 import { RestApiGenerator } from "./api-generator";
 import type { DataDriver, Entity, EntityCollection, FetchCollectionProps } from "@rebasepro/types";
 
@@ -27,6 +28,21 @@ function createTestCollection(slug: string): EntityCollection {
     } as unknown as EntityCollection;
 }
 
+/**
+ * Wraps generated routes in a parent Hono app that injects the driver
+ * into context — replicating what auth middleware does in production.
+ */
+function createApp(collections: EntityCollection[], driver: DataDriver): Hono {
+    const parent = new Hono();
+    parent.use("/*", async (c, next) => {
+        c.set("driver", driver);
+        await next();
+    });
+    const generator = new RestApiGenerator(collections, driver);
+    parent.route("/", generator.generateRoutes());
+    return parent;
+}
+
 describe("RestApiGenerator - Count Endpoint", () => {
     let driver: DataDriver;
     let collection: EntityCollection;
@@ -39,8 +55,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
     });
 
     it("GET /products/count should return a count object", async () => {
-        const generator = new RestApiGenerator([collection], driver);
-        const app = generator.generateRoutes();
+        const app = createApp([collection], driver);
 
         const res = await app.request("/products/count");
         expect(res.status).toBe(200);
@@ -50,8 +65,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
     });
 
     it("should pass filters to countEntities driver", async () => {
-        const generator = new RestApiGenerator([collection], driver);
-        const app = generator.generateRoutes();
+        const app = createApp([collection], driver);
 
         const res = await app.request("/products/count?status=eq.active");
         expect(res.status).toBe(200);
@@ -67,8 +81,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
     });
 
     it("should pass searchString to countEntities driver", async () => {
-        const generator = new RestApiGenerator([collection], driver);
-        const app = generator.generateRoutes();
+        const app = createApp([collection], driver);
 
         const res = await app.request("/products/count?searchString=widget");
         expect(res.status).toBe(200);
@@ -83,8 +96,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
     it("should return 0 when countEntities is not available on driver", async () => {
         const driverWithoutCount = createMockDriver({ countEntities: undefined });
-        const generator = new RestApiGenerator([collection], driverWithoutCount);
-        const app = generator.generateRoutes();
+        const app = createApp([collection], driverWithoutCount);
 
         const res = await app.request("/products/count");
         expect(res.status).toBe(200);
@@ -100,8 +112,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
             countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(99),
             fetchEntity: fetchEntity as unknown as DataDriver["fetchEntity"]
         });
-        const generator = new RestApiGenerator([collection], driverCustom);
-        const app = generator.generateRoutes();
+        const app = createApp([collection], driverCustom);
 
         const res = await app.request("/products/count");
         expect(res.status).toBe(200);

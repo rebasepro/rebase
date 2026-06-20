@@ -45,6 +45,12 @@ properties: {} } as any
 function createApp(mockDriver: jest.Mocked<DataDriver>, hooks?: DataHooks) {
     const app = new Hono();
     app.onError(errorHandler);
+    // RestApiGenerator.getScopedDriver reads from c.get("driver") which is
+    // normally set by auth middleware. Replicate that here for tests.
+    app.use("/api/*", async (c, next) => {
+        c.set("driver", mockDriver);
+        await next();
+    });
     const generator = new RestApiGenerator(mockCollections, mockDriver, hooks);
     app.route("/api", generator.generateRoutes());
     return app;

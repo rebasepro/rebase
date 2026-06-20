@@ -248,7 +248,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "query { post(id: \"1\") { id title body } }"
+                source: "query { post(id: \"1\") { id title body } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -268,7 +269,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "query { posts(limit: 10, offset: 5) { id title } }"
+                source: "query { posts(limit: 10, offset: 5) { id title } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -289,7 +291,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "query { posts(where: \"{\\\"published\\\": true}\") { id } }"
+                source: "query { posts(where: \"{\\\"published\\\": true}\") { id } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -306,7 +309,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "query { posts(where: \"not-json\") { id } }"
+                source: "query { posts(where: \"not-json\") { id } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeDefined();
@@ -319,7 +323,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "query { posts(where: \"[1,2,3]\") { id } }"
+                source: "query { posts(where: \"[1,2,3]\") { id } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeDefined();
@@ -357,7 +362,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "mutation { createPost(input: { title: \"New Post\" }) { id } }"
+                source: "mutation { createPost(input: { title: \"New Post\" }) { id } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -383,7 +389,8 @@ body: "Content" }
 
             const result = await graphql({
                 schema,
-                source: "mutation { updatePost(id: \"1\", input: { title: \"Updated\" }) { id } }"
+                source: "mutation { updatePost(id: \"1\", input: { title: \"Updated\" }) { id } }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -409,7 +416,8 @@ values: {} };
 
             const result = await graphql({
                 schema,
-                source: "mutation { deletePost(id: \"1\") }"
+                source: "mutation { deletePost(id: \"1\") }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -429,7 +437,8 @@ values: {} };
 
             const result = await graphql({
                 schema,
-                source: "mutation { deletePost(id: \"nonexistent\") }"
+                source: "mutation { deletePost(id: \"nonexistent\") }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
@@ -448,7 +457,8 @@ values: {} };
 
             const result = await graphql({
                 schema,
-                source: "mutation { deletePost(id: \"1\") }"
+                source: "mutation { deletePost(id: \"1\") }",
+                contextValue: { driver: mockDriver }
             });
 
             expect(result.errors).toBeUndefined();
