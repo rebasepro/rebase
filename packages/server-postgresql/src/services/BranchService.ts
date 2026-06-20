@@ -80,7 +80,6 @@ export class BranchService {
      * @param options.source  Source database to clone; defaults to the main database.
      */
     async createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
-        validateIdentifier(name, "branch name");
         if (options?.source) {
             validateIdentifier(options.source, "source database name");
         }
