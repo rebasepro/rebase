@@ -7,15 +7,8 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { NeatBackground } from '../../components/NeatBackground';
-import { SQLEditorDemo } from '../../components/demos/SQLEditorDemo';
-import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo';
-import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo';
-import { SchemaEditorDemo } from '../../components/SchemaEditorDemo';
-import { RbacMiniDemo } from '../../components/demos/RbacMiniDemo';
-import { KanbanDemo } from '../../components/demos/KanbanDemo';
-import { RichTextEditorDemo } from '../../components/demos/RichTextEditorDemo';
-import { StorageViewDemo } from '../../components/demos/StorageViewDemo';
-import { SpreadsheetDemo } from '../../components/demos/SpreadsheetDemo';
+import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo.tsx';
+import { RbacMiniDemo } from '../../components/demos/RbacMiniDemo.tsx';
 import "../../styles/editor.css";
 
 
@@ -78,83 +71,6 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
       </div>
     </section>
 
-    <!-- Schema Editor -->
-    <section class="bg-black py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-indigo-500/10 text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
-              Schema-as-Code
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Visual Schema Editor</h2>
-            <p class="text-lg text-surface-400 mb-6">Build your data model visually — every change generates clean, version-controlled TypeScript collection files via AST transformation. What you see is what gets committed.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> 20+ built-in field types (text, number, date, enum, map, array, reference…)</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Relation editor with cardinality, direction, and cascade controls</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> RLS security rules defined per collection</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Validation rules with Zod schema generation</li>
-            </ul>
-          </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950" style="height: 500px;">
-            <SchemaEditorDemo client:load />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SQL Editor Mockup -->
-    <section class="bg-black py-16 sm:py-24">
-      <SectionBackgroundAccents topLine={true}/>
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div class="lg:order-last">
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">
-              Built-in SQL View
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">SQL Editor</h2>
-            <p class="text-lg text-surface-400 mb-6">Write and execute SQL directly against your Postgres database from the admin UI. Schema-aware autocomplete, result previews, and query history — all integrated.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Monaco-based editor with syntax highlighting</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Schema browser sidebar with table/column introspection</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Inline result table with sorting and pagination</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Saved snippets and query history</li>
-            </ul>
-          </div>
-
-          <!-- Interactive SQL Editor Demo -->
-          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-            <SQLEditorDemo client:only="react" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- RLS Security Policies Mockup -->
-    <section class="bg-black py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">
-              Row-Level Security
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">RLS Policy Editor</h2>
-            <p class="text-lg text-surface-400 mb-6">Manage Postgres Row-Level Security visually. Define policies per table, sync them between code and database, and see live status at a glance.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Enable/disable RLS per table with one click</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Visual USING and WITH CHECK clause editor (Monaco)</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Sync code-based policies with live database</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> PERMISSIVE / RESTRICTIVE modes, role targeting</li>
-            </ul>
-          </div>
-
-          <!-- Interactive RLS Editor Demo -->
-          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-            <RLSEditorDemo client:only="react" />
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- Collection Code Editor -->
     <section class="bg-black py-16 sm:py-24">
       <SectionBackgroundAccents topLine={true}/>
@@ -193,79 +109,6 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
             <div class="px-4 py-2 border-t border-surface-800/40 bg-surface-900/30">
               <p class="text-[11px] text-surface-500">Every visual change writes back to this file via AST transformation.</p>
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Kanban View -->
-    <section class="bg-black py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div class="lg:order-last">
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">
-              Kanban Boards
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Drag-and-Drop Management</h2>
-            <p class="text-lg text-surface-400 mb-6">Organize records visually by status, priority, or any enum field. Every drag writes directly to Postgres — no sync layer needed.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Group by any enum or status field</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Drag-and-drop to update records instantly</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Inline card preview with key fields</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Switch between Kanban and table views</li>
-            </ul>
-          </div>
-          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height: 400px;">
-            <KanbanDemo client:only="react" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Rich Text Editor -->
-    <section class="bg-black py-16 sm:py-24">
-      <SectionBackgroundAccents topLine={true}/>
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
-              Block Editor
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Notion-Style Rich Text</h2>
-            <p class="text-lg text-surface-400 mb-6">A block-based editor for long-form content. Headings, lists, images, code blocks, callouts — all stored as structured JSON in your database.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Block-based editing with slash commands</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Images, code blocks, callouts, and embeds</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Structured JSON output for API consumption</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Inline formatting: bold, italic, links, and more</li>
-            </ul>
-          </div>
-          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height: 400px;">
-            <RichTextEditorDemo client:only="react" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Storage / File Manager -->
-    <section class="bg-black py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div class="lg:order-last">
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-pink-500/10 text-pink-400 ring-1 ring-inset ring-pink-500/20">
-              File Storage
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Digital Asset Manager</h2>
-            <p class="text-lg text-surface-400 mb-6">Upload, organize, and preview files directly from the admin panel. Assets are auto-linked to your database records with built-in metadata rendering.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Drag-and-drop file upload</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Folder organization and navigation</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Image, video, and document preview</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Auto-linked to collection records</li>
-            </ul>
-          </div>
-          <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-            <StorageViewDemo client:only="react" />
           </div>
         </div>
       </div>
@@ -562,7 +405,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
 </svg>
 
           </a>
-          <a href="/features" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
+          <a href="/product" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
             All Features
             
 <svg

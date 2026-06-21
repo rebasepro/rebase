@@ -8,7 +8,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { NeatBackground } from '../../components/NeatBackground';
 import SpotlightCard from '../../components/SpotlightCard.astro';
-import { Terminal, ShieldCheck, Folder, Network, ClipboardList, History } from "lucide-react";
+import { Terminal, ShieldCheck, Folder, Network, ClipboardList, History, Clock, Zap, Webhook } from "lucide-react";
 import { SchemaEditorDemo } from '../../components/SchemaEditorDemo';
 import UsageExamples from '../../components/UsageExamples.astro';
 import { ContentEditorDemo } from '../../components/demos/ContentEditorDemo';
@@ -150,6 +150,21 @@ import { DataTalkDemo } from '../../components/DataTalkDemo';
                             icon={History}
                             title="Data History & Audit"
                             description="Track who changed what and when. Compare versions and safely revert to previous states."
+                    />
+                    <SpotlightCard
+                            icon={Clock}
+                            title="Cron Jobs"
+                            description="Schedule background tasks — data cleanup, report generation, API syncs — with built-in monitoring and logging."
+                    />
+                    <SpotlightCard
+                            icon={Zap}
+                            title="Custom Functions"
+                            description="Drop a Hono route file in functions/ and it auto-mounts with auth middleware and database access. Zero config."
+                    />
+                    <SpotlightCard
+                            icon={Webhook}
+                            title="Webhooks"
+                            description="Notify external services on data changes with HMAC-signed payloads, automatic retries, and exponential backoff."
                     />
                 </div>
             </div>
