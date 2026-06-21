@@ -87,7 +87,7 @@ const translatePath = useTranslatedPath(lang);
                 <a href="https://demo.rebase.pro"
                    target="_blank" rel="noopener noreferrer"
                    id="hero-try-demo"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
                     {t("hero.cta.demo")}
                     <svg
                             class="lucide lucide-arrow-right"
@@ -108,7 +108,7 @@ const translatePath = useTranslatedPath(lang);
                 <a href="https://github.com/rebasepro/rebase"
                    target="_blank" rel="noopener noreferrer"
                    id="hero-view-github"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
+                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
                     <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                         <path fill-rule="evenodd"
                               d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
@@ -874,9 +874,9 @@ const translatePath = useTranslatedPath(lang);
                             per-collection, per-operation permissions. Built-in rate limiting, automatic expiry, and
                             Studio management.</p>
                         <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">SHA-256 hashed</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Per-key rate limits</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Soft revocation</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">SHA-256 hashed</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Per-key rate limits</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Soft revocation</span>
                         </div>
                     </div>
                 </div>
@@ -941,9 +941,9 @@ const translatePath = useTranslatedPath(lang);
                             Claude, and Windsurf via the Model Context Protocol. Agents can CRUD data, run migrations,
                             and manage schemas.</p>
                         <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data tools</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Schema tools</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Admin tools</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data tools</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Schema tools</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Admin tools</span>
                         </div>
                     </div>
                 </div>
@@ -964,14 +964,14 @@ const translatePath = useTranslatedPath(lang);
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Real-time Subscriptions</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">WebSocket-based live data sync. Agents
-                            write to collections and all connected clients receive updates instantly — perfect for live
-                            dashboards and agent UIs.</p>
+                        <h3 class="text-lg font-semibold text-white mb-2">Realtime Engine</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Full WebSocket engine with live data subscriptions, broadcast channels for messaging, and presence tracking for online status — agents and clients stay in sync instantly.</p>
                         <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">WebSocket</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Collection watch</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Entity watch</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">WebSocket</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data subscriptions</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Broadcast channels</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Presence tracking</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Auto-reconnect</span>
                         </div>
                     </div>
                 </div>
@@ -997,9 +997,9 @@ const translatePath = useTranslatedPath(lang);
                             cron expressions. Sync external APIs, process embedding batches, clean stale data, or
                             trigger LLM pipelines on a timer.</p>
                         <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Cron expressions</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Typed handlers</span>
-                            <span class="px-2 py-1 rounded-md bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Execution logs</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Cron expressions</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Typed handlers</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Execution logs</span>
                         </div>
                     </div>
                 </div>
@@ -1721,7 +1721,7 @@ const translatePath = useTranslatedPath(lang);
                    data-track
                    id="cta-try-rebase"
                    target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
                     {t("cta.button.demo")}
 
                     <svg
@@ -1744,7 +1744,7 @@ const translatePath = useTranslatedPath(lang);
                 <a href={translatePath("/docs")}
                    data-track
                    id="cta-view-docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
+                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
                     {t("cta.button.docs")}
 
                     <svg

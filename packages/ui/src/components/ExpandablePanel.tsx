@@ -82,7 +82,7 @@ export function ExpandablePanel({
             <Collapsible.Root
                 className={cls(
                     !invisible && defaultBorderMixin + " border",
-                    "rounded-md",
+                    "rounded-lg",
                     "w-full",
                     className
                 )}

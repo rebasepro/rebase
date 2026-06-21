@@ -40,7 +40,7 @@ export function NavigationGroup({
                 color="secondary"
                 className={cls(
                     "px-4 py-1 rounded",
-                    "font-semibold text-[11px] uppercase tracking-wider text-surface-400 dark:text-surface-400"
+                    "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
                 )}
             >
                 {currentGroupName}

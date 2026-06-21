@@ -84,10 +84,10 @@ export const en = {
   "features.sdk.badge": "Type-safe",
   "features.sdk.desc":
     "Fully type-safe SDK with IDE auto-complete. Schema changes update your types automatically.",
-  "features.realtime.title": "Real-time everywhere",
+  "features.realtime.title": "Realtime engine",
   "features.realtime.badge": "WebSocket",
   "features.realtime.desc":
-    "Every table, form, and Kanban view stays in sync. Data changes propagate instantly — no refresh.",
+    "Live data subscriptions, broadcast channels, and presence tracking — all over WebSocket. Build chat, dashboards, and collaborative UIs without any extra infrastructure.",
   "faq.title": "Frequently asked questions",
   "faq.q1": "What database does Rebase support?",
   "faq.a1":
@@ -197,7 +197,7 @@ export const en = {
   "roadmap.now.item2": "Isomorphic TypeScript SDK",
   "roadmap.now.item3": "Instant REST & GraphQL APIs",
   "roadmap.now.item4": "Row-Level Security (RLS)",
-  "roadmap.now.item5": "Real-time WebSocket subscriptions",
+  "roadmap.now.item5": "Realtime engine — subscriptions, broadcast channels, presence",
   "roadmap.now.item6": "Table, List, Kanban & Gallery views",
   "roadmap.now.item7": "Auth and roles system",
   "roadmap.now.item8": "Backend crons and functions",
@@ -573,7 +573,7 @@ export const en = {
   // AI & Agents Section
   "ai.badge": "Agent Infrastructure",
   "ai.title": "The backend <span class=\"text-primary subtle-shimmer\">AI agents need.</span>",
-  "ai.subtitle": "Vector search, scoped API keys, custom functions, real-time sync, and cron jobs — everything your AI agents need to read, write, and act on your Postgres data autonomously.",
+  "ai.subtitle": "Vector search, scoped API keys, custom functions, realtime subscriptions with broadcast channels, and cron jobs — everything your AI agents need to read, write, and act on your Postgres data autonomously.",
 
   // Grouped Features Section
   "features.group.baas.title": "Postgres BaaS",

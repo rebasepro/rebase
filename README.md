@@ -116,6 +116,15 @@ A full developer environment built into the admin panel:
 | **Cron Jobs** | Schedule and monitor recurring tasks |
 | **Storage Browser** | Browse and manage files in your S3-compatible storage |
 
+### 🔌 Realtime Engine
+
+A full WebSocket engine built into every Rebase backend:
+
+- **Live data subscriptions** — Subscribe to collection queries or individual entities. Changes propagate instantly with RLS-aware security.
+- **Broadcast channels** — Send typed messages between connected clients. Build chat, notifications, or collaborative features.
+- **Presence tracking** — Track who's online, sync user state across clients (typing indicators, cursor positions, online status).
+- **Auto-reconnect** — Exponential backoff, automatic resubscription, and token refresh on reconnect.
+
 ### ⚡ Extensible API & Edge Functions
 
 Drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` directories. Rebase auto-loads them with database access and JWT authentication middleware injected automatically.

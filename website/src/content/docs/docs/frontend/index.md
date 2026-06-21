@@ -155,7 +155,7 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 ```css
 /* Override design tokens */
 :root {
-    --font-sans: "Inter", sans-serif;
+    --font-sans: "Rubik", sans-serif;
     --font-mono: "JetBrains Mono", monospace;
 }
 ```

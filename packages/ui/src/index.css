@@ -65,51 +65,51 @@
 }
 
 .typography-h1 {
-    @apply text-6xl font-headers font-light tracking-tight;
+    @apply text-4xl font-headers font-semibold tracking-tight;
 }
 
 .typography-h2 {
-    @apply text-5xl font-headers font-light tracking-tight;
+    @apply text-3xl font-headers font-semibold tracking-tight;
 }
 
 .typography-h3 {
-    @apply text-4xl font-headers font-normal tracking-tight;
+    @apply text-2xl font-headers font-semibold tracking-tight;
 }
 
 .typography-h4 {
-    @apply text-3xl font-headers font-normal tracking-tight;
+    @apply text-xl font-headers font-semibold tracking-[-0.01em];
 }
 
 .typography-h5 {
-    @apply text-2xl font-headers font-normal;
+    @apply text-lg font-headers font-semibold tracking-[-0.01em];
 }
 
 .typography-h6 {
-    @apply text-xl font-headers font-normal;
+    @apply text-base font-headers font-semibold tracking-[-0.01em];
 }
 
 .typography-subtitle1 {
-    @apply text-lg font-headers font-medium;
+    @apply text-sm font-headers font-semibold tracking-[-0.01em];
 }
 
 .typography-subtitle2 {
-    @apply text-base font-headers font-medium;
+    @apply text-sm font-headers font-medium;
 }
 
 .typography-body1 {
-    @apply text-base;
-}
-
-.typography-body2 {
     @apply text-sm;
 }
 
-.typography-caption {
+.typography-body2 {
     @apply text-xs;
 }
 
+.typography-caption {
+    @apply text-[11px] leading-[1.4];
+}
+
 .typography-label {
-    @apply text-sm font-medium;
+    @apply text-xs font-medium tracking-wide;
 }
 
 .typography-inherit {
@@ -117,7 +117,7 @@
 }
 
 .typography-button {
-    @apply text-sm font-semibold;
+    @apply text-xs font-semibold tracking-wide capitalize;
 }
 
 :focus-visible {

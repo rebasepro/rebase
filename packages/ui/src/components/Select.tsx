@@ -139,7 +139,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
             {...props}>
             {typeof label === "string" ? <SelectInputLabel error={error}>{label}</SelectInputLabel> : label}
             <div className={cls(
-                "select-none rounded-md text-sm",
+                "select-none rounded-lg text-sm",
                 invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
                 disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
                 "relative flex items-center",
@@ -169,7 +169,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         } : "",
                         "outline-hidden focus:outline-hidden",
                         "outline-none focus:outline-none",
-                        "select-none rounded-md text-sm",
+                        "select-none rounded-lg text-sm",
                         error ? "text-red-500 dark:text-red-600" : "focus:text-text-primary dark:focus:text-text-primary-dark",
                         error ? "border border-red-500 dark:border-red-600" : "",
                         disabled ? "text-surface-accent-600 dark:text-surface-accent-400" : "text-surface-accent-800 dark:text-white",

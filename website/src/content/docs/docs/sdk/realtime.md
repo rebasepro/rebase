@@ -138,12 +138,74 @@ The WebSocket client handles authentication automatically:
 
 No manual token management is needed — the integration between `client.auth` and the WebSocket layer is handled internally.
 
+## Broadcast Channels
+
+Broadcast channels let you send arbitrary messages between connected clients — ideal for chat, notifications, or collaborative features:
+
+```typescript
+// Join a channel
+const channel = client.realtime.channel("chat-room");
+
+// Listen for messages
+channel.on("message", (payload) => {
+    console.log("New message:", payload);
+});
+
+// Send a message to all subscribers
+channel.send("message", {
+    text: "Hello, world!",
+    userId: currentUser.id
+});
+
+// Leave the channel
+channel.unsubscribe();
+```
+
+Channels are lightweight and ephemeral — they exist as long as at least one client is subscribed.
+
+## Presence Tracking
+
+Presence lets you track which users are online and sync shared state across all participants:
+
+```typescript
+const channel = client.realtime.channel("editors");
+
+// Track your presence
+channel.presence.track({
+    userId: currentUser.id,
+    status: "editing",
+    cursor: { x: 100, y: 200 }
+});
+
+// Listen for presence changes
+channel.presence.on("sync", (state) => {
+    console.log("Online users:", Object.keys(state));
+});
+
+channel.presence.on("join", (key, newPresence) => {
+    console.log(`${key} came online:`, newPresence);
+});
+
+channel.presence.on("leave", (key) => {
+    console.log(`${key} went offline`);
+});
+
+// Update your state
+channel.presence.track({
+    userId: currentUser.id,
+    status: "idle"
+});
+```
+
+Presence is built on top of broadcast channels with automatic state diffing — only changes are transmitted.
+
 ## When to Use Realtime
 
 | Use Case | Method |
 |----------|--------|
 | Dashboard with live data | `listen()` with filters |
-| Chat or notifications | `listen()` on messages collection |
+| Chat or messaging | `channel.send()` via broadcast |
+| Typing indicators / online status | `channel.presence.track()` |
 | Detail page with live updates | `listenById()` |
 | Admin panel monitoring | `listen()` with `orderBy` and `limit` |
 

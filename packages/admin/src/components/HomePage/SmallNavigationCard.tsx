@@ -1,4 +1,4 @@
-import { ArrowRightIcon, cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
+import { cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
 
 import { Link } from "react-router-dom";
 
@@ -35,11 +35,7 @@ export function SmallNavigationCard({
                     </Typography>
                 </div>
 
-                <div className={"p-2"}>
-                    <ArrowRightIcon className="text-primary"/>
-                </div>
             </Link>
 
         </>);
 }
-

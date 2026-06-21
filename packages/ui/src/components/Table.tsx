@@ -19,7 +19,7 @@ export const Table = React.memo(({
                           ...rest
                       }: TableProps) => (
     <table
-        className={cls("text-left text-surface-900 dark:text-white rounded-md overflow-x-auto", className)}
+        className={cls("text-left text-surface-900 dark:text-white rounded-lg overflow-x-auto", className)}
         style={style}
         {...rest}
     >
@@ -88,7 +88,7 @@ export const TableRow = React.memo(({
         style={style}
         className={cls(
             "bg-white dark:bg-surface-900",
-            onClick ? "hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800 cursor-pointer" : "",
+            onClick ? "hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer" : "",
             className
         )}
         {...rest}

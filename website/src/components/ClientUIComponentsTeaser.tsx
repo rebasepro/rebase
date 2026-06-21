@@ -33,7 +33,7 @@ export default function ClientUIComponentsTeaser() {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
     const [selectedValue, setSelectedValue] = useState<string>();
     const [multiSelectedValue, setMultiSelectedValue] = useState<string[]>();
-    const cardClasses = "relative p-4 flex flex-col gap-2 break-inside-avoid dark:bg-surface-950 mb-4 rounded-xl";
+    const cardClasses = "relative p-4 flex flex-col gap-2 break-inside-avoid dark:bg-surface-950 mb-4 rounded-lg";
 
     return (
         <div className={"@container max-w-7xl mx-auto not-content my-8"}>
@@ -185,7 +185,7 @@ export default function ClientUIComponentsTeaser() {
             </div>
             <div className="text-center">
                 <a
-                    className={"inline-flex items-center justify-center gap-x-2 rounded-md text-primary px-6 py-3 text-base font-semibold  hover:text-primary-dark transition-all duration-200 ease-in-out btn-glow w-full lg:w-auto mt-8"}
+                    className={"inline-flex items-center justify-center gap-x-2 rounded-lg text-primary px-6 py-3 text-base font-semibold  hover:text-primary-dark transition-all duration-200 ease-in-out btn-glow w-full lg:w-auto mt-8"}
                     href={"/ui"}
                 >
                     See all components

@@ -34,15 +34,15 @@ Rebase ist **kein** gehostetes SaaS. Sie hosten es selbst, Sie besitzen Ihre Dat
           │  HTTP + WebSocket   │
           ▼                     ▼
 ┌──────────────────────────────────────────────────────┐
-│              Rebase Backend (Node.js + Hono)          │
-│  ┌─────────┐ ┌──────┐ ┌─────────┐ ┌───────────────┐ │
-│  │ REST API│ │ Auth │ │ Storage │ │ WebSocket RT  │ │
-│  └────┬────┘ └──┬───┘ └────┬────┘ └──────┬────────┘ │
+│              Rebase Backend (Node.js + Hono)         │
+│  ┌─────────┐ ┌──────┐ ┌─────────┐ ┌───────────────┐  │
+│  │ REST API│ │ Auth │ │ Storage │ │ WebSocket RT  │  │
+│  └────┬────┘ └──┬───┘ └────┬────┘ └──────┬────────┘  │
 └───────┼─────────┼──────────┼─────────────┼───────────┘
         │         │          │             │
         ▼         ▼          ▼             ▼
 ┌──────────────────────────────────────────────────────┐
-│              PostgreSQL (Drizzle ORM)                 │
+│              PostgreSQL (Drizzle ORM)                │
 └──────────────────────────────────────────────────────┘
 ```
 

@@ -24,6 +24,7 @@ import {
     CircularProgress,
     cls,
     defaultBorderMixin,
+    FilterChip,
     FilterIcon,
     FolderIcon,
     IconButton,
@@ -86,27 +87,28 @@ label: "Chips & Alerts" },
     { id: "users",
 label: "Users View" },
     { id: "user-dialog",
-label: "User Dialog" },
-    { id: "roles",
-label: "Roles View" },
-    { id: "role-dialog",
-label: "Role Dialog" }
+label: "User Dialog" }
 ];
 
 export function UIReferenceView() {
     const [activeSection, setActiveSection] = useState("drawer");
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     const scrollTo = (id: string) => {
-        document.getElementById(id)?.scrollIntoView({ behavior: "smooth",
-block: "start" });
+        const el = document.getElementById(id);
+        const container = scrollContainerRef.current;
+        if (el && container) {
+            const offsetTop = el.offsetTop - container.offsetTop;
+            container.scrollTo({ top: offsetTop, behavior: "smooth" });
+        }
         setActiveSection(id);
     };
 
     return (
-        <div className="flex h-full w-full overflow-hidden">
+        <div className="flex w-full">
 
             {/* ── Sidebar nav (same structure as DefaultDrawer) ─────────────── */}
-            <div className={cls("flex flex-col h-full relative grow-0 shrink-0 w-[200px] border-r", defaultBorderMixin)}>
+            <div className={cls("flex flex-col sticky top-0 h-screen grow-0 shrink-0 w-[200px] border-r", defaultBorderMixin)}>
                 {/* DrawerLogo */}
                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
@@ -132,15 +134,15 @@ block: "start" });
                                     <div
                                         onClick={() => scrollTo(s.id)}
                                         className={cls(
-                                            "rounded-lg truncate",
-                                            "hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white",
+                                            "rounded-lg truncate group/nav",
+                                            "hover:bg-primary/5 dark:hover:bg-primary/5 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white",
                                             "flex flex-row items-center",
                                             "pr-4 h-10",
-                                            "font-semibold text-xs cursor-pointer",
-                                            activeSection === s.id ? "bg-surface-accent-200/60 dark:bg-surface-950 dark:bg-opacity-50" : ""
+                                            "font-medium text-xs cursor-pointer",
+                                            activeSection === s.id ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary" : ""
                                         )}
                                     >
-                                        <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
+                                        <div className={cls("shrink-0 flex items-center justify-center w-[56px] h-[40px] text-surface-500 dark:text-text-secondary-dark transition-colors duration-150 group-hover/nav:text-primary", activeSection === s.id && "text-primary dark:text-primary")}>
                                             <SettingsIcon size={iconSize.small}/>
                                         </div>
                                         <div className="text-text-primary dark:text-surface-200 opacity-100 font-inherit truncate space-x-2">
@@ -171,8 +173,8 @@ block: "start" });
                 </div>
             </div>
 
-            {/* ── Main scroll area ───────────────────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto">
+            {/* ── Main content area ───────────────────────────────────────────── */}
+            <div ref={scrollContainerRef} className="flex-1">
 
                 {/* ═══════════════════════════════════════════════
                     SECTION: Drawer
@@ -187,7 +189,7 @@ block: "start" });
                         {/* Collapsed — exact markup from DefaultDrawer + DrawerNavigationItem */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">Collapsed (72px)</Typography>
-                            <div className={cls("flex flex-col h-72 relative w-[72px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
+                            <div className={cls("flex flex-col h-72 relative w-[72px] border rounded-lg overflow-hidden bg-white dark:bg-surface-900", defaultBorderMixin)}>
                                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
                                         <RebaseLogo width="28px" height="28px"/>
@@ -197,7 +199,7 @@ block: "start" });
                                     <div className="my-2 mx-2 flex flex-col">
                                         <div className="overflow-hidden rounded-lg bg-surface-50 dark:bg-surface-950/30">
                                             {[<FolderIcon key="folder" size={iconSize.small}/>, <UserIcon key="user" size={iconSize.small}/>, <TagIcon key="tag" size={iconSize.small}/>].map((icon, i) => (
-                                                <div key={i} className="rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 flex flex-row items-center h-10">
+                                                <div key={i} className="rounded-lg truncate hover:bg-primary/5 dark:hover:bg-primary/5 flex flex-row items-center h-10">
                                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
                                                         {icon}
                                                     </div>
@@ -219,7 +221,7 @@ block: "start" });
                         {/* Expanded — exact markup from DefaultDrawer + DrawerNavigationGroup + DrawerNavigationItem */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">Expanded (280px)</Typography>
-                            <div className={cls("flex flex-col h-72 relative w-[280px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
+                            <div className={cls("flex flex-col h-72 relative w-[280px] border rounded-lg overflow-hidden bg-white dark:bg-surface-900", defaultBorderMixin)}>
                                 {/* DrawerLogo */}
                                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
@@ -249,10 +251,10 @@ icon: <TagIcon size={iconSize.small}/>,
 active: false }
                                             ].map(({ label, icon, active }) => (
                                                 <div key={label} className={cls(
-                                                    "rounded-lg truncate hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-10 font-semibold text-xs cursor-pointer",
-                                                    active ? "bg-surface-accent-200/60 dark:bg-surface-950 dark:bg-opacity-50" : ""
+                                                    "rounded-lg truncate hover:bg-primary/5 dark:hover:bg-primary/5 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-10 font-medium text-xs cursor-pointer",
+                                                    active ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary" : ""
                                                 )}>
-                                                    <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
+                                                    <div className={cls("shrink-0 flex items-center justify-center w-[56px] h-[40px] transition-colors duration-150", active ? "text-primary dark:text-primary" : "text-surface-500 dark:text-text-secondary-dark")}>
                                                         {icon}
                                                     </div>
                                                     <div className="text-text-primary dark:text-surface-200 font-inherit truncate">
@@ -623,15 +625,31 @@ selected: true }, { name: "Tags" }].map(c => (
                             </div>
                         </div>
                         <div>
-                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">IconButton</Typography>
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">IconButton — sizes</Typography>
                             <div className="flex flex-wrap gap-3 items-center">
-                                {(["primary", "secondary", "inherit"] as const).map(c => (
-                                    <IconButton key={c} color={c}><PencilIcon/></IconButton>
+                                {([
+                                    { s: "smallest" as const, icon: <PencilIcon size={14}/> },
+                                    { s: "small" as const, icon: <PencilIcon size={16}/> },
+                                    { s: "medium" as const, icon: <PencilIcon size={20}/> },
+                                    { s: "large" as const, icon: <PencilIcon size={24}/> }
+                                ]).map(({ s, icon }) => (
+                                    <div key={s} className="flex flex-col items-center gap-1">
+                                        <IconButton size={s}>{icon}</IconButton>
+                                        <Typography variant="caption" color="secondary">{s}</Typography>
+                                    </div>
                                 ))}
-                                {(["small", "medium", "large"] as const).map(s => (
-                                    <IconButton key={s} size={s}><Trash2Icon/></IconButton>
-                                ))}
-                                <IconButton disabled><PlusIcon/></IconButton>
+                                <div className="flex flex-col items-center gap-1">
+                                    <IconButton disabled><Trash2Icon size={20}/></IconButton>
+                                    <Typography variant="caption" color="secondary">disabled</Typography>
+                                </div>
+                                <div className="flex flex-col items-center gap-1">
+                                    <IconButton variant="filled"><PlusIcon size={20}/></IconButton>
+                                    <Typography variant="caption" color="secondary">filled</Typography>
+                                </div>
+                                <div className="flex flex-col items-center gap-1">
+                                    <IconButton shape="square"><SettingsIcon size={20}/></IconButton>
+                                    <Typography variant="caption" color="secondary">square</Typography>
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -706,16 +724,36 @@ selected: true }, { name: "Tags" }].map(c => (
                     SECTION: Chips & Alerts
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="chips-alerts" title="Chips & Alerts">
-                    <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Chip — colorScheme × size</Typography>
+                    <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Chip — colorScheme</Typography>
                     <div className="flex flex-wrap gap-2 mb-4">
-                        {(["grayLight", "grayDark", "redLight", "redDark", "blueDark", "blueLight", "greenDark", "greenLight", "yellowLight", "yellowDark", "orangeLight", "purpleDark", "pinkLight"] as const).map(s => (
-                            <Chip key={s} colorScheme={s} size="small">{s}</Chip>
+                        {(["blue", "teal", "red", "green", "yellow", "orange", "purple", "pink", "cyan", "indigo", "violet", "fuchsia", "rose", "emerald", "gray"] as const).map(s => (
+                            <Chip key={s} colorScheme={s}>{s}</Chip>
                         ))}
                     </div>
-                    <div className="flex flex-wrap gap-2 mb-6">
-                        {(["smallest", "small", "medium"] as const).map(sz => (
-                            <Chip key={sz} colorScheme="blueDark" size={sz}>{sz}</Chip>
+                    <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Chip — sizes</Typography>
+                    <div className="flex flex-wrap gap-2 items-center mb-4">
+                        {(["smallest", "small", "medium", "large"] as const).map(sz => (
+                            <Chip key={sz} colorScheme="blue" size={sz}>{sz}</Chip>
                         ))}
+                    </div>
+                    <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Chip — outlined, error, clickable, icon</Typography>
+                    <div className="flex flex-wrap gap-2 items-center mb-4">
+                        <Chip colorScheme="red" outlined>Outlined Red</Chip>
+                        <Chip colorScheme="blue" outlined>Outlined Blue</Chip>
+                        <Chip error>Error</Chip>
+                        <Chip error outlined>Error Outlined</Chip>
+                        <Chip onClick={() => {}}>Clickable</Chip>
+                        <Chip icon={<TagIcon size={12}/>} colorScheme="teal">With Icon</Chip>
+                        <Chip>Default (no scheme)</Chip>
+                        <Chip outlined>Default Outlined</Chip>
+                    </div>
+                    <Typography variant="caption" color="secondary" className="block mb-2 font-mono">FilterChip</Typography>
+                    <div className="flex flex-wrap gap-2 items-center mb-6">
+                        <FilterChip active>Active</FilterChip>
+                        <FilterChip>Inactive</FilterChip>
+                        <FilterChip icon={<FilterIcon size={12}/>} active>With Icon</FilterChip>
+                        <FilterChip size="small">Small</FilterChip>
+                        <FilterChip disabled>Disabled</FilterChip>
                     </div>
                     <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Alert — color variants</Typography>
                     <div className="flex flex-col gap-2">
@@ -851,128 +889,6 @@ roles: [] }
                     </div>
                 </SectionBlock>
 
-                {/* ═══════════════════════════════════════════════
-                    SECTION: Roles View
-                ═══════════════════════════════════════════════ */}
-                <SectionBlock id="roles" title="Roles View — RolesView.tsx">
-                    <Typography variant="body2" color="secondary" className="mb-4">
-                        Layout from <code className="font-mono text-xs">RolesView</code>: same header pattern, table, and <code className="font-mono text-xs">CollectionPermissionsMatrix</code> with <code className="font-mono text-xs">defaultBorderMixin</code>.
-                    </Typography>
-                    <div className="flex items-center mt-12">
-                        <Typography gutterBottom variant="h4" className="grow" component="h4">Roles</Typography>
-                        <Button startIcon={<PlusIcon/>}>Add role</Button>
-                    </div>
-                    <div className="w-full overflow-auto">
-                        <Table className="w-full">
-                            <TableHeader>
-                                <TableCell header className="w-16"></TableCell>
-                                <TableCell header>Role</TableCell>
-                                <TableCell header className="items-center">Is Admin</TableCell>
-                            </TableHeader>
-                            <TableBody>
-                                {[
-                                    { id: "admin",
-name: "Admin",
-isAdmin: true },
-                                    { id: "editor",
-name: "Editor",
-isAdmin: false },
-                                    { id: "viewer",
-name: "Viewer",
-isAdmin: false }
-                                ].map(role => (
-                                    <TableRow key={role.id}>
-                                        <TableCell style={{ width: "64px" }}>
-                                            {!role.isAdmin && (
-                                                <Tooltip asChild title="Delete this role">
-                                                    <IconButton size="small"><Trash2Icon/></IconButton>
-                                                </Tooltip>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip colorScheme={role.isAdmin ? "purpleDark" : "blueDark"} size="small">{role.name}</Chip>
-                                        </TableCell>
-                                        <TableCell className="items-center">
-                                            <Checkbox checked={role.isAdmin ?? false} disabled/>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    {/* CollectionPermissionsMatrix — from RolesView line 365-406 */}
-                    <div className="mt-4">
-                        <Typography variant="label" className="mb-2 block text-surface-500 dark:text-surface-400 uppercase tracking-wide text-xs">
-                            Collection permissions
-                        </Typography>
-                        <div className={`rounded-lg overflow-hidden border w-full ${defaultBorderMixin}`}>
-                            <Table className="w-full">
-                                <TableHeader>
-                                    <TableCell header>Collection</TableCell>
-                                    {["Read", "Create", "Edit", "Delete"].map(op => (
-                                        <TableCell key={op} header align="center" className="w-20">{op}</TableCell>
-                                    ))}
-                                </TableHeader>
-                                <TableBody>
-                                    {[{ name: "Posts",
-slug: "posts" }, { name: "Authors",
-slug: "authors" }].map(col => (
-                                        <TableRow key={col.slug}>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="font-medium">{col.name}</span>
-                                                    <Tooltip title="No security rules defined — all operations unrestricted">
-                                                        <Chip size="smallest" colorScheme="gray">no rules</Chip>
-                                                    </Tooltip>
-                                                </div>
-                                                <span className="text-xs text-surface-400 font-mono">{col.slug}</span>
-                                            </TableCell>
-                                            {["select", "insert", "update", "delete"].map(op => (
-                                                <TableCell key={op} align="center" className="w-20">
-                                                    <span className="text-green-500 dark:text-green-400 font-bold">✓</span>
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
-                </SectionBlock>
-
-                {/* ═══════════════════════════════════════════════
-                    SECTION: Role Dialog
-                ═══════════════════════════════════════════════ */}
-                <SectionBlock id="role-dialog" title="Role Dialog — RoleDetailsForm">
-                    <Typography variant="body2" color="secondary" className="mb-4">
-                        Exact structure of <code className="font-mono text-xs">RoleDetailsForm</code>: <code className="font-mono text-xs">col-span-4</code> grid, Role ID + Name + Is Admin checkbox.
-                    </Typography>
-                    <div className={`rounded-lg border w-full max-w-xl ${defaultBorderMixin}`}>
-                        <div className="px-6 pt-6 pb-2">
-                            <Typography variant="h4">Role</Typography>
-                        </div>
-                        <div className="px-6 py-4">
-                            <div className="grid grid-cols-12 gap-4">
-                                <div className="col-span-12 sm:col-span-4">
-                                    <TextField name="id" required value="editor" onChange={() => {}} label="Role ID" disabled/>
-                                </div>
-                                <div className="col-span-12 sm:col-span-4">
-                                    <TextField name="name" required value="Editor" onChange={() => {}} label="Role Name"/>
-                                </div>
-                                <div className="col-span-12 sm:col-span-4 flex items-start pt-2">
-                                    <label className="flex items-center gap-2 cursor-pointer mt-3">
-                                        <Checkbox checked={false} onCheckedChange={() => {}}/>
-                                        <span className="font-medium">Is Admin</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2 px-6 pb-6">
-                            <Button variant="text">Cancel</Button>
-                            <LoadingButton variant="filled" loading={false}>Update</LoadingButton>
-                        </div>
-                    </div>
-                </SectionBlock>
 
                 {/* Footer */}
                 <div className="px-6 py-8">

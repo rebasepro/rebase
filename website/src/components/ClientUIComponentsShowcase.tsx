@@ -8,6 +8,7 @@ import {
     Card,
     Checkbox,
     Chip,
+    FilterChip,
     CircularProgress,
     Collapse,
     DateTimeField,
@@ -210,16 +211,38 @@ export default function ClientUIComponentsShowcase({
                     <ArrowRight size={14}/>
                 </IconButton>
                 <Typography variant="subtitle2" component="div">Chip</Typography>
-                <div className={"flex flex-row flex-wrap gap-2"}>
-                    <Chip>Basic Chip</Chip>
-                    <Chip colorScheme="red">Red Chip</Chip>
+                <div className={"flex flex-row flex-wrap gap-2 items-center"}>
+                    <Chip size="smallest">Smallest</Chip>
+                    <Chip size="small">Small</Chip>
+                    <Chip size="medium">Medium</Chip>
+                    <Chip size="large">Large</Chip>
+                </div>
+                <div className={"flex flex-row flex-wrap gap-2 items-center"}>
+                    <Chip colorScheme="blue">Blue</Chip>
+                    <Chip colorScheme="teal">Teal</Chip>
+                    <Chip colorScheme="red">Red</Chip>
+                    <Chip colorScheme="purple">Purple</Chip>
+                    <Chip colorScheme="orange">Orange</Chip>
+                    <Chip colorScheme="green">Green</Chip>
+                </div>
+                <div className={"flex flex-row flex-wrap gap-2 items-center"}>
                     <Chip colorScheme="red" outlined>Outlined Red</Chip>
-                    <Chip colorScheme="blue" size="small" outlined>Outlined Blue</Chip>
-                    <Chip icon={<Smile size={16}/>}>Chip with Icon</Chip>
-                    <Chip onClick={() => console.log("Chip clicked")} outlined>Clickable Outlined</Chip>
+                    <Chip colorScheme="blue" outlined>Outlined Blue</Chip>
+                    <Chip icon={<Smile size={14}/>}>With Icon</Chip>
+                    <Chip onClick={() => console.log("Chip clicked")} outlined>Clickable</Chip>
                 </div>
             </Card>
 
+            <Card className={cardClasses}>
+                <Typography variant="subtitle2" component="div">Filter Chip</Typography>
+                <div className={"flex flex-row flex-wrap gap-2 items-center"}>
+                    <FilterChip active>Active</FilterChip>
+                    <FilterChip>Inactive</FilterChip>
+                    <FilterChip icon={<Settings size={12}/>} active>With Icon</FilterChip>
+                    <FilterChip size="small">Small</FilterChip>
+                    <FilterChip disabled>Disabled</FilterChip>
+                </div>
+            </Card>
 
             <Card className={cardClasses}>
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
@@ -401,21 +424,21 @@ export default function ClientUIComponentsShowcase({
                 <Typography variant="subtitle2" component="div">Radio Group</Typography>
                 <RadioGroup className="flex items-center gap-2" defaultValue="black" id="color">
                     <Label
-                        className="border cursor-pointer rounded-md p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
                         htmlFor="color-black"
                     >
                         <RadioGroupItem id="color-black" value="black"/>
                         Black
                     </Label>
                     <Label
-                        className="border cursor-pointer rounded-md p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
                         htmlFor="color-white"
                     >
                         <RadioGroupItem id="color-white" value="white"/>
                         White
                     </Label>
                     <Label
-                        className="border cursor-pointer rounded-md p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
                         htmlFor="color-blue"
                     >
                         <RadioGroupItem id="color-blue" value="blue"/>

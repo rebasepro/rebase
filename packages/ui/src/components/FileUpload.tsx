@@ -70,7 +70,7 @@ export function FileUpload({
         className={cls(
             fieldBackgroundMixin,
             "flex gap-2",
-            "p-4 box-border relative items-center border-2 border-solid border-transparent outline-hidden rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid",
+            "p-4 box-border relative items-center border-2 border-solid border-transparent outline-hidden rounded-lg duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid",
             {
                 "h-44": size === "large",
                 "h-28": size === "medium",

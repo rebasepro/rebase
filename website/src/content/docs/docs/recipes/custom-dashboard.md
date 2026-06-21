@@ -50,13 +50,13 @@ function DashboardView() {
 
     return (
         <div className="p-8">
-            <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.01em] mb-6">Dashboard</h1>
             <div className="grid grid-cols-3 gap-4 mb-8">
                 <StatCard title="Total Orders" value={stats.totalOrders} />
                 <StatCard title="Revenue" value={`$${stats.totalRevenue.toFixed(2)}`} />
                 <StatCard title="Active Products" value={stats.activeProducts} />
             </div>
-            <h2 className="text-lg font-semibold mb-4">Recent Orders</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.01em] mb-4">Recent Orders</h2>
             <ul>
                 {stats.recentOrders.map(order => (
                     <li key={order.id}>
@@ -71,8 +71,8 @@ function DashboardView() {
 function StatCard({ title, value }: { title: string; value: string | number }) {
     return (
         <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-6">
-            <p className="text-sm text-surface-500">{title}</p>
-            <p className="text-3xl font-bold">{value}</p>
+            <p className="text-xs text-surface-500">{title}</p>
+            <p className="text-xl font-semibold">{value}</p>
         </div>
     );
 }

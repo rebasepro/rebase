@@ -1,12 +1,12 @@
 export const focusedDisabled = "focus-visible:ring-0 focus-visible:ring-offset-0";
 export const focusedInvisibleMixin = "focus:bg-opacity-70 focus:bg-surface-accent-100 focus:dark:bg-surface-900 focus:dark:bg-opacity-60 focus:bg-surface-accent-100/70 dark:focus:bg-surface-900/60";
-export const focusedClasses = "z-30 outline-hidden outline-none ring-2 ring-primary ring-opacity-75 ring-primary/75 ring-offset-0 ring-offset-transparent ";
+export const focusedClasses = "z-30 outline-hidden outline-none ring-2 ring-primary ring-opacity-50 ring-primary/50 ring-offset-0 ring-offset-transparent ";
 export const fieldBackgroundMixin = "bg-opacity-50 bg-surface-accent-200 bg-surface-accent-200/50 dark:bg-surface-900 dark:bg-opacity-100 dark:bg-surface-900/100";
 export const fieldBackgroundInvisibleMixin = "bg-opacity-0 bg-surface-accent-100 dark:bg-surface-900 dark:bg-opacity-0 bg-surface-accent-200/0 dark:bg-surface-900/0";
 export const fieldBackgroundDisabledMixin = "dark:bg-surface-900 bg-opacity-50 dark:bg-opacity-90 bg-surface-accent-200/50 dark:bg-surface-900/90";
 export const fieldBackgroundHoverMixin = "hover:bg-opacity-70 dark:hover:bg-surface-700 dark:hover:bg-opacity-40 hover:bg-surface-accent-200/70 hover:dark:bg-surface-700/40";
-export const defaultBorderMixin = "border-surface-200/60 dark:border-surface-700/60 ";
-export const paperMixin = "bg-white rounded-md dark:bg-surface-800 border border-surface-200/60 dark:border-surface-700/60";
-export const cardMixin = "bg-white dark:bg-surface-900 rounded-md border border-surface-200/60 dark:border-surface-700/60 m-1 -p-1";
-export const cardClickableMixin = "hover:bg-surface-accent-100 dark:hover:bg-surface-800 hover:ring-1 hover:ring-primary/50 hover:shadow-sm cursor-pointer hover:bg-primary/10 dark:hover:bg-primary/10 transition-all duration-150";
+export const defaultBorderMixin = "border-surface-200 dark:border-surface-700 ";
+export const paperMixin = "bg-white rounded-lg dark:bg-surface-900 border border-surface-200 dark:border-surface-700";
+export const cardMixin = "bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700";
+export const cardClickableMixin = "hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150";
 export const cardSelectedMixin = "bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75";

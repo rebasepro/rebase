@@ -225,7 +225,7 @@ hour12: false,
             <style>{inputStyles}</style>
             <div
                 className={cls(
-                    "rounded-md relative max-w-full",
+                    "rounded-lg relative max-w-full",
                     !invisible && fieldBackgroundMixin,
                     disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
                     {
@@ -272,7 +272,7 @@ hour12: false,
                     className={cls(
                         "w-full outline-hidden bg-transparent leading-normal text-base px-3",
                         clearable ? "pr-14" : "pr-12",
-                        "rounded-md",
+                        "rounded-lg",
                         {
                             "min-h-[28px]": size === "smallest",
                             "min-h-[32px]": size === "small",

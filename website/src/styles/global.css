@@ -15,6 +15,7 @@
 @source "../**/*.{astro,html,js,jsx,ts,tsx,md,mdx}";
 @source "../pages/**/*.{astro,md,mdx,ts,tsx}";
 @source "../../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
+@source "../../../packages/core/src/**/*.{js,ts,jsx,tsx}";
 
 
 

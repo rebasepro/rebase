@@ -12,9 +12,9 @@ This document is the single source of truth for the visual design language used 
 
 ## 1. Foundational Principle
 
-> **The UI must look like it belongs to the Rebase admin panel, not a standalone landing page.**
+> **Near-zero chrome — the UI disappears so content is the interface.**
 
-Rebase applications render inside the Rebase Shell — an admin panel with a sidebar, top bar, and content area. Custom views must feel like a native part of this panel. They must **not** look like a marketing website, a Dribbble concept, or a standalone SaaS dashboard.
+Rebase applications render inside the Rebase Shell — an admin panel with a sidebar, top bar, and content area. Custom views must feel like a native part of this panel. The design is Attio-inspired: data-dense, quiet, and monochromatic. Every element exists to serve the data, not to decorate. They must **not** look like a marketing website, a Dribbble concept, or a standalone SaaS dashboard.
 
 ---
 
@@ -51,7 +51,7 @@ import {
     // Utilities
     cls, defaultBorderMixin, cardMixin, cardClickableMixin, paperMixin,
     // Icons (all from @rebasepro/ui)
-    ArrowRightIcon, AddIcon, DeleteIcon
+    AddIcon, DeleteIcon
 } from "@rebasepro/ui";
 ```
 
@@ -108,7 +108,7 @@ The surface scale goes from `50` (lightest) to `950` (darkest):
 Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 | Token                     | Value       | Usage                              |
-|---------------------------|-------------|------------------------------------|
+|---------------------------|-------------|-------------------------------------|
 | `surface-accent-50`       | `#f8fafc`   | Lightest accent background         |
 | `surface-accent-100`      | `#f1f5f9`   | Hover backgrounds (light)          |
 | `surface-accent-200`      | `#e2e8f0`   | Field backgrounds (light)          |
@@ -149,22 +149,24 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 ### Variant Scale
 
-| Variant      | CSS Class             | Rendered Element | Specs                                    |
-|--------------|-----------------------|------------------|------------------------------------------|
-| `h1`         | `typography-h1`       | `<h1>`           | 6xl, font-light, tracking-tight          |
-| `h2`         | `typography-h2`       | `<h2>`           | 5xl, font-light, tracking-tight          |
-| `h3`         | `typography-h3`       | `<h3>`           | 4xl, font-normal, tracking-tight         |
-| `h4`         | `typography-h4`       | `<h4>`           | 3xl, font-normal, tracking-tight         |
-| `h5`         | `typography-h5`       | `<h5>`           | 2xl, font-normal                         |
-| `h6`         | `typography-h6`       | `<h6>`           | xl, font-normal                          |
-| `subtitle1`  | `typography-subtitle1`| `<h6>`           | lg, font-medium                          |
-| `subtitle2`  | `typography-subtitle2`| `<h6>`           | base, font-medium                        |
-| `body1`      | `typography-body1`    | `<p>`            | base                                     |
-| `body2`      | `typography-body2`    | `<p>`            | sm                                       |
-| `caption`    | `typography-caption`  | `<p>`            | xs                                       |
-| `label`      | `typography-label`    | `<label>`        | sm, font-medium                          |
-| `inherit`    | `typography-inherit`  | `<p>`            | text-inherit (inherits parent sizing)    |
-| `button`     | `typography-button`   | `<span>`         | sm, font-semibold                        |
+The typography scale is compact and uses semibold weights for headings — designed for high content density.
+
+| Variant      | CSS Class             | Rendered Element | Specs                                                  |
+|--------------|-----------------------|------------------|---------------------------------------------------------|
+| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-semibold, tracking-tight                      |
+| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-semibold, tracking-tight                      |
+| `h3`         | `typography-h3`       | `<h3>`           | 2xl, font-semibold, tracking-tight                      |
+| `h4`         | `typography-h4`       | `<h4>`           | xl, font-semibold, tracking-[-0.01em]                   |
+| `h5`         | `typography-h5`       | `<h5>`           | lg, font-semibold, tracking-[-0.01em]                   |
+| `h6`         | `typography-h6`       | `<h6>`           | base, font-semibold, tracking-[-0.01em]                 |
+| `subtitle1`  | `typography-subtitle1`| `<h6>`           | sm, font-semibold, tracking-[-0.01em]                   |
+| `subtitle2`  | `typography-subtitle2`| `<h6>`           | sm, font-medium                                         |
+| `body1`      | `typography-body1`    | `<p>`            | sm                                                      |
+| `body2`      | `typography-body2`    | `<p>`            | xs                                                      |
+| `caption`    | `typography-caption`  | `<p>`            | [11px], leading-[1.4]                                   |
+| `label`      | `typography-label`    | `<label>`        | xs, font-medium, tracking-wide                          |
+| `inherit`    | `typography-inherit`  | `<p>`            | text-inherit (inherits parent sizing)                   |
+| `button`     | `typography-button`   | `<span>`         | xs, font-semibold, tracking-wide                        |
 
 ### Color Prop
 
@@ -180,7 +182,7 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 ### Typography Usage Examples
 
 ```tsx
-// Page title — use h4 or h5, never h1-h3 (those are too large for admin panels)
+// Page title — use h4 or h5 (the scale is compact; h1-h3 are reserved for hero contexts)
 <Typography variant="h4">Dashboard</Typography>
 
 // Section title
@@ -264,8 +266,8 @@ The `Card` component from `@rebasepro/ui` automatically applies `cardMixin` and,
 
 ```tsx
 // Style mixins applied by Card:
-// cardMixin = "bg-white dark:bg-surface-900 rounded-md border border-surface-200/60 dark:border-surface-700/60 m-1 -p-1"
-// cardClickableMixin = "hover:bg-surface-accent-100 dark:hover:bg-surface-800 hover:ring-1 hover:ring-primary/50 hover:shadow-sm cursor-pointer hover:bg-primary/10 dark:hover:bg-primary/10 transition-all duration-150"
+// cardMixin = "bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+// cardClickableMixin = "hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150"
 ```
 
 ```tsx
@@ -288,12 +290,13 @@ The `Card` component from `@rebasepro/ui` automatically applies `cardMixin` and,
 
 | ❌ Don't                                          | ✅ Do                                         |
 |---------------------------------------------------|-----------------------------------------------|
-| `rounded-2xl`                                     | Let `Card` use `rounded-md`                   |
-| `shadow-lg shadow-blue-500/20`                    | Let `cardClickableMixin` handle hover shadow  |
+| `rounded-2xl`                                     | Let `Card` use `rounded-lg`                   |
+| `shadow-lg shadow-blue-500/20`                    | No shadows — hover uses `bg-surface-50` only  |
 | `hover:-translate-y-1`                            | Don't lift cards on hover                     |
 | `hover:scale-110` on icons                        | Use subtle `transition-colors` at most        |
-| `bg-gradient-to-br from-blue-500 to-indigo-600`  | Use `bg-primary/8 dark:bg-primary/10`         |
+| `bg-gradient-to-br from-blue-500 to-indigo-600`  | Use plain surface colors                      |
 | `glass-card`, `glass-panel`, backdrop-blur        | Use `Card` or `Paper` component               |
+| `hover:shadow-md`, `hover:ring-1`                | Use `hover:bg-surface-50 dark:hover:bg-surface-800` |
 
 ### NavigationCard Reference Pattern
 
@@ -301,30 +304,36 @@ This is the gold standard for how a card should look:
 
 ```tsx
 <Card className={cls(
-    "group h-full p-4 cursor-pointer transition-all duration-150 ease-in-out",
-    "border-surface-200 dark:border-surface-700/40",
-    "hover:shadow-md hover:shadow-black/[0.04]",
-    "hover:border-surface-300 dark:hover:border-primary/20"
+    "group h-full p-4 cursor-pointer transition-colors duration-150 ease-in-out",
+    "hover:bg-surface-50 dark:hover:bg-surface-800"
 )}>
     <div className="flex flex-col h-full">
-        {/* Icon in subtle primary tint */}
-        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8 dark:bg-primary/10 text-primary/70 dark:text-primary/60">
-            {icon}
+        {/* Header: icon + title left, actions right */}
+        <div className="flex items-center w-full justify-between mb-1">
+            <div className="flex items-center gap-3">
+                {/* Icon: plain muted color, no background pill */}
+                <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500">
+                    {icon}
+                </div>
+                <Typography variant="subtitle1" component="h2">{name}</Typography>
+            </div>
         </div>
-        {/* Title */}
-        <Typography variant="subtitle1" component="h2">{name}</Typography>
-        {/* Description */}
-        <Typography variant="caption" color="secondary">
-            <Markdown source={description} size="small" />
-        </Typography>
+        {/* Description indented to align with title */}
+        <div className="grow pl-8">
+            <Typography variant="caption" color="secondary">
+                <Markdown source={description} size="small" />
+            </Typography>
+        </div>
     </div>
 </Card>
 ```
 
 **Key observations from NavigationCard:**
-- Icons use `bg-primary/8 dark:bg-primary/10` — subtle, monochrome primary tint. **Not** vibrant gradients.
-- Hover effects are minimal: slightly stronger border + tiny shadow. **Not** lifting, scaling, or glowing.
-- The card transitions are `duration-150` — fast and subtle.
+- Icons are **plain muted color** (`text-surface-400 dark:text-surface-500`) — no background pill, no gradient, no primary tint.
+- Hover effect is a **single background color change** — `hover:bg-surface-50 dark:hover:bg-surface-800`. No shadows, no border changes, no rings.
+- The card transitions use `transition-colors duration-150` — fast and minimal.
+- No arrow icon or decorative footer — the card is the affordance.
+- Description is offset with `pl-8` to align with the title (past the icon).
 
 ---
 
@@ -336,10 +345,10 @@ Always import and use these mixins rather than hardcoding equivalent classes:
 
 | Mixin                        | Classes                                                                                              |
 |------------------------------|------------------------------------------------------------------------------------------------------|
-| `defaultBorderMixin`         | `border-surface-200/60 dark:border-surface-700/60`                                                   |
-| `paperMixin`                 | `bg-white rounded-md dark:bg-surface-800 border border-surface-200/60 dark:border-surface-700/60`    |
-| `cardMixin`                  | `bg-white dark:bg-surface-900 rounded-md border border-surface-200/60 dark:border-surface-700/60`    |
-| `cardClickableMixin`         | hover:bg, hover:ring-1, hover:shadow-sm, cursor-pointer, transition-all                             |
+| `defaultBorderMixin`         | `border-surface-200 dark:border-surface-700`                                                         |
+| `paperMixin`                 | `bg-white rounded-lg dark:bg-surface-800 border border-surface-200 dark:border-surface-700`          |
+| `cardMixin`                  | `bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700`          |
+| `cardClickableMixin`         | `hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150`        |
 | `cardSelectedMixin`          | `bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75`                                     |
 
 ### Field & Focus Mixins
@@ -374,7 +383,7 @@ The mixin applies a subtle primary-tinted background and a `ring-1` primary bord
 
 ### Valid Button Variants
 
-The `Button` component accepts these variants and colors:
+The `Button` component accepts these variants and colors. Buttons use `rounded-lg`, `transition-colors`, and no active scale effect.
 
 ```tsx
 <Button variant="filled" color="primary">Primary Action</Button>
@@ -389,6 +398,13 @@ The `Button` component accepts these variants and colors:
 | `color`   | `"primary"`, `"secondary"`, `"text"`, `"error"`, `"neutral"` |
 | `size`    | `"small"`, `"medium"`, `"large"`, `"xl"`, `"2xl"` |
 
+### Button Styling Details
+
+- Base shape: `rounded-lg` (not `rounded-md`)
+- Transitions: `transition-colors` (not `transition-all`)
+- Filled hover: `hover:brightness-105` (subtle, not `hover:brightness-110`)
+- No `shadow-sm`, no `hover:shadow-md`, no `active:scale-[0.98]`
+
 ### Button Anti-Patterns
 
 ```tsx
@@ -400,6 +416,9 @@ The `Button` component accepts these variants and colors:
 
 // ❌ NEVER: Custom shadow styling
 <Button className="shadow-lg shadow-violet-500/20 hover:shadow-xl">
+
+// ❌ NEVER: Active scale effect
+<Button className="active:scale-[0.98]">
 
 // ✅ CORRECT: Use proper variant and color
 <Button variant="filled" color="primary">Submit</Button>
@@ -446,7 +465,7 @@ Follow the `NavigationGroup` pattern — section headers are **small, uppercase,
     variant="caption"
     component="h2"
     color="secondary"
-    className="px-4 py-1 rounded font-semibold text-[11px] uppercase tracking-wider text-surface-400 dark:text-surface-400"
+    className="px-4 py-1 rounded font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-500"
 >
     Pipeline Stages
 </Typography>
@@ -470,14 +489,14 @@ For panel-level titles (inside a Card or Paper), use `subtitle1`:
 
 ## 11. Metric / KPI Cards
 
-When displaying numeric KPIs, follow the NavigationCard icon pattern:
+When displaying numeric KPIs, use plain muted icons (matching NavigationCard) — no background pill:
 
 ```tsx
 <Card className="p-4">
-    <div className="flex items-center gap-4">
-        {/* Icon: subtle primary-tinted background */}
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/8 dark:bg-primary/10 text-primary/70 dark:text-primary/60">
-            <UsersIcon className="h-5 w-5" />
+    <div className="flex items-center gap-3">
+        {/* Icon: plain muted color, no background */}
+        <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500">
+            <UsersIcon className="h-4 w-4" />
         </div>
         <div>
             <Typography variant="caption" color="secondary">Active Leads</Typography>
@@ -492,6 +511,9 @@ When displaying numeric KPIs, follow the NavigationCard icon pattern:
 ```tsx
 // ❌ NEVER: Gradient icon backgrounds
 <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20">
+
+// ❌ NEVER: Primary-tinted icon pill (old pattern)
+<div className="w-10 h-10 rounded-lg bg-primary/8 dark:bg-primary/10 text-primary/70">
 
 // ❌ NEVER: Oversized rounded corners
 <div className="rounded-2xl">
@@ -508,9 +530,10 @@ When displaying numeric KPIs, follow the NavigationCard icon pattern:
 ## 12. Icons
 
 - Import icons from `lucide-react` for functional/semantic icons.
-- Import icons from `@rebasepro/ui` for navigation icons (`ArrowRightIcon`, `AddIcon`, `DeleteIcon`, etc.)
-- **Icon containers** use `bg-primary/8 dark:bg-primary/10` — a single, consistent primary tint. **Not** per-card colored gradients.
-- Icon size: typically `h-5 w-5` or `h-4 w-4` inside icon containers.
+- Import icons from `@rebasepro/ui` for navigation icons (`AddIcon`, `DeleteIcon`, etc.)
+- **Icon treatment**: plain muted color (`text-surface-400 dark:text-surface-500`). **No** background pill, **no** primary tint, **no** gradients.
+- Icon size: typically `h-4 w-4` or `h-5 w-5`.
+- No decorative arrow icons on cards — the card itself is the affordance.
 
 ---
 
@@ -588,7 +611,7 @@ Ensure `@fontsource/rubik` and `@fontsource/jetbrains-mono` are imported in the 
 - Standard dark mode backgrounds:
   - Page: `dark:bg-surface-800`
   - Cards: `dark:bg-surface-900`
-  - Borders: `dark:border-surface-700/60`
+  - Borders: `dark:border-surface-700`
 
 ---
 
@@ -626,17 +649,22 @@ Before submitting UI code, verify you have NONE of these:
 | 4 | Template literal class concatenation                  | Use `cls()` from `@rebasepro/ui`                       |
 | 5 | Gradient text on headings                             | Remove gradient, use `Typography` color prop           |
 | 6 | Glassmorphism (`backdrop-blur`, translucent bg)       | Use `Card`, `Paper`, or solid backgrounds              |
-| 7 | `rounded-2xl` on cards/panels                         | Use `Card`/`Paper` which use `rounded-md`              |
-| 8 | Colored gradient icon backgrounds                     | Use `bg-primary/8 dark:bg-primary/10`                  |
-| 9 | `hover:-translate-y-1` or `hover:scale-110`           | Use subtle `hover:shadow-md` at most                   |
-| 10| Custom shadow colors (`shadow-blue-500/20`)           | Use `hover:shadow-md hover:shadow-black/[0.04]`        |
+| 7 | `rounded-2xl` on cards/panels                         | Use `Card`/`Paper` which use `rounded-lg`              |
+| 8 | Colored gradient or primary-tinted icon backgrounds   | Use plain `text-surface-400 dark:text-surface-500`     |
+| 9 | `hover:-translate-y-1` or `hover:scale-110`           | Don't lift or scale on hover                           |
+| 10| Custom shadow colors (`shadow-blue-500/20`)           | No shadows on hover — use `hover:bg-surface-50` only   |
 | 11| `animate-bounce`, `animate-pulse` on alerts           | Use static `Alert` component                           |
 | 12| Custom CSS classes like `glass-card`, `shimmer-shine` | Remove and use standard UI kit patterns                |
 | 13| `font-extrabold` overrides on Typography              | Let the variant handle font weight                     |
 | 14| `text-[10px]`, `tracking-widest` custom overrides     | Use `Typography variant="caption"`                     |
-| 15| Per-card colored themes (blue card, green card, etc.) | Use uniform `Card` + `bg-primary/8` icon tint          |
+| 15| Per-card colored themes (blue card, green card, etc.) | Use uniform `Card` with plain muted icons              |
 | 16| `dark:bg-surface-950` for page background             | Use `dark:bg-surface-800`                              |
 | 17| Arbitrary Tailwind colors (`text-violet-600`, etc.)   | Use design token colors                                |
+| 18| `hover:shadow-md`, `hover:ring-1` on cards            | Use `hover:bg-surface-50 dark:hover:bg-surface-800`   |
+| 19| `active:scale-[0.98]` on buttons                      | Buttons don't scale — use `transition-colors` only     |
+| 20| `border-*/60` opacity on borders                      | Use solid borders via `defaultBorderMixin`             |
+| 21| `bg-primary/8` icon background pills                  | Icons are plain color, no background container         |
+| 22| Decorative arrow icons on cards                       | Cards are the affordance — no `ArrowRightIcon` needed  |
 
 > **IMPORTANT FOR AGENTS:** The internal `EntityCard` component (used for card-view in collection grids) uses `hover:-translate-y-0.5` and `hover:shadow-lg`, and the Studio home page uses per-section colored icons. These are **intentional exceptions** in Rebase's own codebase for specific contexts (rich media cards with thumbnails and the Studio admin landing page). **Do NOT copy these patterns** into custom views, home pages, or dashboard cards — they are reserved for these specific internal components.
 
@@ -648,7 +676,7 @@ When building new views, always reference these existing implementations:
 
 | Component            | Location                                                          | What it demonstrates           |
 |----------------------|-------------------------------------------------------------------|--------------------------------|
-| `NavigationCard`     | `packages/admin/src/components/HomePage/NavigationCard.tsx`       | Card pattern, icon treatment   |
+| `NavigationCard`     | `packages/admin/src/components/HomePage/NavigationCard.tsx`       | Card pattern, plain icon treatment |
 | `SmallNavigationCard`| `packages/admin/src/components/HomePage/SmallNavigationCard.tsx`  | Compact card with mixins       |
 | `ContentHomePage`    | `packages/admin/src/components/HomePage/ContentHomePage.tsx`      | Page layout, Container usage   |
 | `NavigationGroup`    | `packages/admin/src/components/HomePage/NavigationGroup.tsx`      | Section headers, grouping      |
@@ -657,8 +685,8 @@ When building new views, always reference these existing implementations:
 
 ## 21. Summary: The Design Philosophy
 
-1. **Minimal, not flashy.** The admin panel is a work tool. It should be clean, readable, and professional — not eye-catching.
-2. **Consistent, not creative.** Every card, button, and section should look the same across the entire application. Use the UI kit.
-3. **Subtle, not dramatic.** Hover effects are barely noticeable. Transitions are 150ms. Shadows are paper-thin.
-4. **Monochrome accents.** The only accent color is `primary` (blue), applied at very low opacity (`/8`, `/10`). No rainbow gradients.
-5. **Let components do the work.** `Card`, `Paper`, `Typography`, `Alert`, `Button` — these handle all the visual styling. You add content and layout.
+1. **Near-zero chrome.** The UI disappears so content is the interface. No decorative elements, no visual noise — only what serves the data.
+2. **Data-first.** Every element exists to present or interact with data. If it doesn't serve the data, remove it.
+3. **Quiet sophistication.** Hierarchy comes from subtle weight and size differentiation (semibold headings, medium subtitles, regular body) rather than dramatic size jumps or color contrasts.
+4. **Monochromatic hierarchy.** One accent color (`primary` blue) used sparingly at low opacity. Icons are plain muted grays. No rainbow gradients, no per-card color themes.
+5. **Content density.** Smaller type, tighter spacing, more data per viewport. The compressed typography scale (`sm` body text, `xs` captions, `[11px]` fine print) maximizes information density without sacrificing readability.

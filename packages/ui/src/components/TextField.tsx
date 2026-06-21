@@ -131,7 +131,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 style={inputStyle}
                 className={cls(
                     invisible ? focusedInvisibleMixin : "",
-                    "rounded-md resize-none w-full outline-none text-base bg-transparent min-h-[64px] px-3",
+                    "rounded-lg resize-none w-full outline-none text-base bg-transparent min-h-[64px] px-3",
                     label ? "pt-8 pb-2" : "py-2",
                     disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
                     inputClassName
@@ -149,7 +149,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 style={inputStyle}
                 className={cls(
                     "w-full outline-none bg-transparent leading-normal px-3",
-                    "rounded-md",
+                    "rounded-lg",
                     "focused:text-text-primary focused:dark:text-text-primary-dark",
                     invisible ? focusedInvisibleMixin : "",
                     disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
@@ -187,7 +187,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
             <div
                 ref={ref}
                 className={cls(
-                    "rounded-md relative max-w-full",
+                    "rounded-lg relative max-w-full",
                     invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
                     disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
                     error ? "border border-red-500 dark:border-red-600" : "",

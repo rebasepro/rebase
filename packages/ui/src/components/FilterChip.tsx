@@ -58,14 +58,14 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
             className={cls(
                 "inline-flex items-center gap-1 rounded-full",
                 "font-medium whitespace-nowrap select-none shrink-0",
-                "transition-all duration-150",
+                "transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 sizeClasses[size],
                 active
                     ? "bg-primary/12 text-primary dark:bg-primary/20 dark:text-primary shadow-[inset_0_0_0_1.5px_var(--color-primary)]"
                     : cls(
                         "bg-surface-accent-100 text-text-secondary dark:bg-surface-accent-800 dark:text-text-secondary-dark",
-                        !disabled && "cursor-pointer hover:bg-surface-accent-200 dark:hover:bg-surface-accent-700"
+                        !disabled && "cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/5"
                     ),
                 disabled && "opacity-50 cursor-not-allowed",
                 className

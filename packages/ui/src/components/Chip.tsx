@@ -25,10 +25,10 @@ export interface ChipProps {
 }
 
 const sizeClassNames = {
-    smallest: "px-1.5 text-xs",
-    small: "px-2 py-0.5 text-sm",
-    medium: "px-3 py-1 text-sm",
-    large: "px-4 py-1.5 text-sm"
+    smallest: "px-1.5 py-px text-[10px]",
+    small: "px-2 py-0.5 text-xs",
+    medium: "px-2.5 py-0.5 text-xs",
+    large: "px-3 py-1 text-xs"
 }
 
 /**
@@ -41,6 +41,21 @@ function isDarkMode(): boolean {
 }
 
 /**
+ * Helper to generate rgba from hex or standard colors.
+ */
+function getRgba(hex: string, alpha: number): string {
+    if (!hex || !hex.startsWith("#")) return hex;
+    let color = hex.slice(1);
+    if (color.length === 3) {
+        color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
+    }
+    const r = parseInt(color.slice(0, 2), 16);
+    const g = parseInt(color.slice(2, 4), 16);
+    const b = parseInt(color.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
  * @group Preview components
  */
 export function Chip({
@@ -50,28 +65,15 @@ export function Chip({
                          outlined,
                          onClick,
                          icon,
-                         size = "large",
+                         size = "medium",
                          className,
                          style
                      }: ChipProps) {
 
     const usedColorScheme = typeof colorScheme === "string" ? getColorSchemeForKey(colorScheme) : colorScheme;
-
-    // Resolve theme-aware colors
     const dark = isDarkMode();
 
-    // Helper to generate rgba from hex or standard colors
-    const getRgba = (hex: string, alpha: number): string => {
-        if (!hex || !hex.startsWith("#")) return hex;
-        let color = hex.slice(1);
-        if (color.length === 3) {
-            color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
-        }
-        const r = parseInt(color.slice(0, 2), 16);
-        const g = parseInt(color.slice(2, 4), 16);
-        const b = parseInt(color.slice(4, 6), 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
+    const hasScheme = error || usedColorScheme;
 
     let textColor = "";
     let bgColor = "";
@@ -81,44 +83,44 @@ export function Chip({
         textColor = dark ? "#f87171" : "#dc2626";
     } else if (usedColorScheme) {
         textColor = dark && usedColorScheme.darkText ? usedColorScheme.darkText : usedColorScheme.text;
-    } else {
-        textColor = dark ? "#d4d4d4" : "#404040";
     }
 
-    if (outlined) {
-        bgColor = getRgba(textColor, dark ? 0.12 : 0.06);
-        border = `1px solid ${getRgba(textColor, dark ? 0.25 : 0.18)}`;
-    } else {
-        if (error) {
-            bgColor = dark ? "rgba(220, 38, 38, 0.2)" : "rgba(239, 68, 68, 0.15)";
-            border = `1px solid ${dark ? "rgba(220, 38, 38, 0.4)" : "rgba(239, 68, 68, 0.3)"}`;
+    if (hasScheme) {
+        if (outlined) {
+            bgColor = getRgba(textColor, dark ? 0.1 : 0.06);
+            border = `1px solid ${getRgba(textColor, dark ? 0.2 : 0.14)}`;
+        } else if (error) {
+            bgColor = dark ? "rgba(220, 38, 38, 0.15)" : "rgba(239, 68, 68, 0.1)";
+            border = `1px solid ${dark ? "rgba(220, 38, 38, 0.3)" : "rgba(239, 68, 68, 0.2)"}`;
         } else if (usedColorScheme) {
             bgColor = dark && usedColorScheme.darkColor ? usedColorScheme.darkColor : usedColorScheme.color;
-        } else {
-            bgColor = dark ? "#1f1f1f" : "#f4f4f5";
-            border = `1px solid ${dark ? "#2e2e30" : "#e4e4e7"}`;
         }
     }
 
     return (
         <div
-            className={cls("rounded-lg max-w-full w-max h-fit font-regular inline-flex gap-1",
+            className={cls("rounded-lg max-w-full w-max h-fit font-medium inline-flex gap-1",
                 "text-ellipsis",
                 "items-center",
-                onClick ? "cursor-pointer hover:bg-surface-accent-300 dark:hover:bg-surface-accent-700" : "",
+                "transition-colors duration-150",
+                !hasScheme && "bg-surface-100 dark:bg-surface-800 text-text-secondary dark:text-text-secondary-dark border border-surface-200 dark:border-surface-700",
+                !hasScheme && outlined && "bg-transparent dark:bg-transparent",
+                onClick ? "cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/5" : "",
                 sizeClassNames[size],
                 className)}
             onClick={onClick}
             style={{
-                backgroundColor: bgColor,
-                color: textColor,
-                border: border || undefined,
+                ...(hasScheme ? {
+                    backgroundColor: bgColor,
+                    color: textColor,
+                    border: border || undefined,
+                } : {}),
                 overflow: "hidden",
                 ...style
             }}
         >
-            {children}
             {icon}
+            {children}
         </div>
     );
 }

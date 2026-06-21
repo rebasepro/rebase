@@ -22,7 +22,8 @@ const initCode = `<span class="text-blue-400">import</span> { createRebaseClient
 rebase.<span class="text-amber-400">data</span>      <span class="text-surface-500">// → collection queries</span>
 rebase.<span class="text-amber-400">auth</span>      <span class="text-surface-500">// → sign in, sign up, sessions</span>
 rebase.<span class="text-amber-400">admin</span>     <span class="text-surface-500">// → user/role management</span>
-rebase.<span class="text-amber-400">storage</span>   <span class="text-surface-500">// → file upload/download</span>`;
+rebase.<span class="text-amber-400">storage</span>   <span class="text-surface-500">// → file upload/download</span>
+rebase.<span class="text-amber-400">realtime</span>  <span class="text-surface-500">// → broadcast channels, presence</span>`;
 
 const crudCode = `<span class="text-surface-500">// Find all published posts</span>
 <span class="text-blue-400">const</span> { data } = <span class="text-blue-400">await</span> rebase.data.posts.<span class="text-amber-400">find</span>({
@@ -72,6 +73,13 @@ const queryCode = `<span class="text-surface-500">// Chained queries</span>
   .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"eq"</span>, <span class="text-emerald-400">"published"</span>)
   .<span class="text-amber-400">listen</span>(({ data }) =&gt; {
     console.log(<span class="text-emerald-400">"Live update:"</span>, data);
+  });
+
+<span class="text-surface-500">// Broadcast channel</span>
+<span class="text-blue-400">const</span> channel = rebase.realtime
+  .<span class="text-amber-400">channel</span>(<span class="text-emerald-400">"chat-room"</span>)
+  .<span class="text-amber-400">on</span>(<span class="text-emerald-400">"message"</span>, (msg) =&gt; {
+    console.log(<span class="text-emerald-400">"Received:"</span>, msg);
   });`;
 
 const authCode = `<span class="text-surface-500">// Sign in</span>
@@ -249,7 +257,7 @@ const sdkGenCode = `<span class="text-surface-500">$ rebase generate-sdk</span>
         </div>
         <div class="flex items-center justify-center gap-x-6">
           <a href="/backend"
-             class="inline-flex items-center gap-x-2 rounded-md bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-dark transition-all duration-200 ease-in-out btn-glow">
+             class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
             Backend & APIs
             
 <svg

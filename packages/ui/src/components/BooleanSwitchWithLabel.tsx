@@ -69,7 +69,7 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                 !invisible && fieldBackgroundMixin,
                 !invisible && (disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin),
                 disabled ? "cursor-default" : "cursor-pointer",
-                "rounded-md max-w-full justify-between box-border relative inline-flex items-center",
+                "rounded-lg max-w-full justify-between box-border relative inline-flex items-center",
                 !invisible && focus && !disabled ? focusedClasses : "",
                 error ? "text-red-500 dark:text-red-600" : (focus && !disabled ? "text-primary" : (!disabled ? "text-text-primary dark:text-text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark")),
                 {

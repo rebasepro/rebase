@@ -235,7 +235,7 @@ export const MultiSelect = React.forwardRef<
                                     "px-2": size === "small" || size === "smallest",
                                     "px-4": size === "medium" || size === "large"
                                 },
-                                "select-none rounded-md text-sm",
+                                "select-none rounded-lg text-sm",
                                 "focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none",
                                 invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
                                 disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,

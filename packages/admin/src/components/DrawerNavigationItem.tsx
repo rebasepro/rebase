@@ -22,7 +22,7 @@ export function DrawerNavigationItem({
 }) {
 
     const iconWrap = <div
-        className={"shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4"}>
+        className={"shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150"}>
         {icon}
     </div>;
 
@@ -33,12 +33,12 @@ export function DrawerNavigationItem({
                 width: "100%",
                 transition: drawerOpen ? "width 150ms ease-in" : undefined
             }}
-            className={({ isActive }: { isActive: boolean }) => cls("rounded-md truncate",
-                "hover:bg-surface-100 dark:hover:bg-surface-800/60 text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
+            className={({ isActive }: { isActive: boolean }) => cls("rounded-lg truncate group/nav",
+                "hover:bg-primary/5 dark:hover:bg-primary/5 text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
                 "flex flex-row items-center",
                 drawerOpen ? "pr-4 h-[30px]" : "h-[30px]",
                 "font-medium text-[13px]",
-                isActive ? "bg-surface-900/[0.06] dark:bg-surface-800/50 text-surface-900 dark:text-white" : ""
+                isActive ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
             )}
             to={url}
         >

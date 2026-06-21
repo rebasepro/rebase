@@ -31,7 +31,7 @@ export const VirtualTableRow = React.memo<VirtualTableRowProps<Record<string, un
                     "flex min-w-full text-sm border-b border-surface-200/60 dark:border-surface-700/60 dark:bg-surface-800",
                     rowClassName ? rowClassName(rowData) : "",
                     {
-                        "hover:!bg-surface-50/75 dark:hover:!bg-surface-800/75": hoverRow,
+                        "hover:!bg-primary/[0.03] dark:hover:!bg-primary/5": hoverRow,
                         "cursor-pointer ": onRowClick
                     }
                 )}
