@@ -14,6 +14,7 @@ import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo.tsx';
 import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo.tsx';
 import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo.tsx';
 import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo.tsx';
+import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo.tsx';
 import { TerminalInit } from '../../components/demos/TerminalInit.tsx';
 import "../../styles/editor.css";
 
@@ -53,11 +54,10 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
 }`;
 ---
 
-<main class="bg-black text-surface-300 overflow-hidden font-sans">
+<div class="bg-black text-surface-300 overflow-hidden font-sans flex flex-col isolate">
     
     <!-- -- HERO SECTION -- -->
-    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-        <NeatBackground client:only="react" />
+ <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
         <!-- Background accents and subtle grid -->
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6 animate-pulse">
@@ -84,7 +84,7 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     </section>
 
     <!-- -- CLIENT LOGOS SECTION -- -->
-    <section class="relative isolate bg-black py-12 border-b border-surface-800/40">
+ <section class="relative isolate py-12 border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-8 lg:px-12">
             <h2 class="text-center text-xs font-bold leading-8 text-surface-500 uppercase tracking-widest">
                 Trusted by engineering teams at forward-thinking companies
@@ -95,8 +95,13 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
         </div>
     </section>
 
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="a" client:visible/>
+    </div>
+
     <!-- -- CORE DEVELOPER COMPONENTS SHOWCASE -- -->
-    <section id="features" class="bg-black py-20 sm:py-28 relative border-b border-surface-800/40">
+ <section id="schema" class="py-20 sm:py-28 relative z-0 border-b border-surface-800/40">
         <div class="pointer-events-none absolute inset-0 -z-10">
             <div class="absolute top-1/3 left-10 w-[600px] h-[600px] rounded-full bg-blue-500/5 blur-3xl opacity-30"></div>
             <div class="absolute bottom-1/3 right-10 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl opacity-20"></div>
@@ -257,7 +262,7 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     </section>
 
     <!-- -- ISOMORPHIC SDK ARCHITECTURE -- -->
-    <section class="relative isolate bg-black py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+ <section id="sdk-architecture" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
         <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
@@ -347,7 +352,7 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     </section>
 
     <!-- -- UI COMPONENTS TEASER -- -->
-    <section class="relative isolate bg-black py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+ <section id="ui-components" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="max-w-3xl mb-16">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">
@@ -371,7 +376,7 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     </section>
 
     <!-- -- CUSTOM REACT VIEWS SECTION -- -->
-    <section class="bg-black py-20 sm:py-28 relative border-b border-surface-800/40">
+ <section id="custom-views" class="py-20 sm:py-28 relative border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-6">
             <div class="mx-auto max-w-3xl text-center mb-16">
                 <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Build Custom Views</h2>
@@ -457,8 +462,53 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
             </div>
         </div>
     </section>
+
+    <!-- -- REALTIME ENGINE -- -->
+ <section id="realtime" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+        <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-xs font-semibold">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        WebSocket Realtime
+                    </div>
+                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        Live Data. Zero Polling.
+                    </h2>
+                    <p class="text-base text-surface-400">
+                        Subscribe to table changes, broadcast to channels, and track user presence — all through the typed SDK. Changes propagate instantly via WebSocket with automatic reconnection and RLS enforcement.
+                    </p>
+                    <div class="rounded-xl bg-[#09090b] border border-surface-800/40 p-4 font-mono text-[11px] leading-relaxed">
+                        <div class="text-surface-500 mb-1">// Subscribe to live changes</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#9cdcfe]">unsub</span> = <span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">users</span></div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">listen</span>((<span class="text-[#9cdcfe]">event</span>) => {"{"}</div>
+                        <div class="ml-4"><span class="text-surface-500">// INSERT | UPDATE | DELETE</span></div>
+                        <div class="ml-4"><span class="text-[#9cdcfe]">console</span>.<span class="text-[#dcdcaa]">log</span>(<span class="text-[#9cdcfe]">event</span>.<span class="text-[#9cdcfe]">type</span>, <span class="text-[#9cdcfe]">event</span>.<span class="text-[#9cdcfe]">record</span>);</div>
+                        <div class="ml-2">{"}"});</div>
+                        <div class="mt-3 text-surface-500">// Broadcast channels</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#9cdcfe]">channel</span> = <span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">realtime</span></div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">channel</span>(<span class="text-[#ce9178]">"room:lobby"</span>)</div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">on</span>(<span class="text-[#ce9178]">"message"</span>, <span class="text-[#9cdcfe]">handler</span>)</div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">subscribe</span>();</div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        <span>Live data preview</span>
+                        <span class="text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[8px]">Realtime</span>
+                    </div>
+                    <div class="h-[300px]">
+                        <RealtimeMiniDemo client:only="react" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- -- BACKEND & SDK CAPABILITIES -- -->
-    <section class="relative isolate bg-black py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+ <section id="backend" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
         <SectionBackgroundAccents topLine={true}/>
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
@@ -524,11 +574,16 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
         </div>
     </section>
 
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="b" client:visible/>
+    </div>
+
     <!-- -- ALTERNATIVES COMPARISON -- -->
     <AlternativesComparison />
 
     <!-- -- GET STARTED CLI TERMINAL -- -->
-    <section class="bg-black py-20 sm:py-28 relative overflow-hidden bg-radial-at-b from-surface-950/70 via-black to-black">
+ <section class="py-20 sm:py-28 relative z-0 overflow-hidden bg-radial-at-b from-surface-950/70 via-black to-black">
         <div class="pointer-events-none absolute inset-0 -z-10">
             <div class="absolute -bottom-40 right-10 w-[700px] h-[700px] rounded-full bg-primary/5 blur-3xl opacity-50"></div>
         </div>
@@ -555,4 +610,4 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
         </div>
     </section>
 
-</main>
+</div>

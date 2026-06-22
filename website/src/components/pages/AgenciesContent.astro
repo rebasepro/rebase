@@ -17,11 +17,10 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 ---
 
 
-    <main class="flex-grow">
+    <div class="flex-grow flex flex-col isolate">
         <!-- Hero Section -->
-        <section
+ <section
                 class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-            <NeatBackground client:only="react" />
             <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
                 <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
                     {t('agencies.hero.title')}
@@ -30,8 +29,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
                 </p>
             </div>
         </section>
-
-        <section class="relative isolate bg-black py-16">
+ <section class="relative isolate py-16">
             <SectionBackgroundAccents topLine={true}/>
             <div class="mx-auto max-w-7xl px-8 lg:px-12">
                 <div class="mx-auto mt-4 mb-8 animate-on-scroll fade-in">
@@ -40,9 +38,15 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
             </div>
         </section>
 
+        <!-- Neat gradient divider -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+            <NeatBackground variant="a" client:visible/>
+        </div>
+
+
 
         <!-- Agency Advantage Section -->
-        <section class="relative isolate bg-black py-16 sm:py-24">
+ <section class="relative isolate py-16 sm:py-24">
             <SectionBackgroundAccents topLine={true}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="mx-auto max-w-4xl text-center animate-on-scroll fade-in-up">
@@ -65,7 +69,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
         <UsageExamples/>
 
 
-        <section class="relative isolate bg-black py-16 sm:py-24">
+ <section class="relative isolate py-16 sm:py-24">
             <SectionBackgroundAccents topLine={true}/>
             <div class="max-w-7xl mx-auto px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center animate-on-scroll fade-in-up delay-100">
@@ -180,7 +184,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 
 
         <!-- Easy to Customize Section -->
-        <section class="relative isolate bg-black py-16 sm:py-24">
+ <section class="relative isolate py-16 sm:py-24">
             <SectionBackgroundAccents topLine={true}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center animate-on-scroll fade-in-up">
@@ -224,7 +228,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
         </section>
 
         <!-- Features for Agency Success Section -->
-        <section class="relative isolate bg-black py-16 sm:py-24">
+ <section class="relative isolate py-16 sm:py-24">
             <SectionBackgroundAccents topLine={true}/>
             <div class="max-w-7xl mx-auto px-6 lg:px-8">
                 <div class="text-center mb-12">
@@ -405,8 +409,13 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
             </div>
         </section>
 
+        <!-- Neat gradient divider -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+            <NeatBackground variant="b" client:visible/>
+        </div>
 
-        <section class="relative isolate bg-black py-10 sm:py-12">
+
+ <section class="relative isolate py-10 sm:py-12">
             <SectionBackgroundAccents topLine={true}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 gap-8 sm:grid-cols-3 text-center animate-on-scroll scale-in">
@@ -427,7 +436,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
         </section>
 
         <!-- Agency Client Showcase Section -->
-        <section class="relative isolate bg-black py-16 sm:py-24">
+ <section class="relative isolate py-16 sm:py-24">
             <SectionBackgroundAccents topLine={true}/>
             <div class="max-w-7xl mx-auto px-6 lg:px-8">
                 <h2 class="text-3xl md:text-4xl font-medium tracking-tight mb-12 text-center text-white animate-on-scroll fade-in-up">
@@ -673,7 +682,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 
         <!-- Final CTA (keep consistent with site) -->
         <!-- CTA Section -->
-        <section class="relative isolate bg-black py-16 sm:py-24">
+ <section class="relative isolate py-16 sm:py-24">
             <SectionBackgroundAccents topLine={true}/>
             <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
                 <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8 animate-on-scroll fade-in-up">
@@ -724,6 +733,6 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
                 </div>
             </div>
         </section>
-    </main>
+    </div>
 
 

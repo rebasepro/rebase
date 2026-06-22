@@ -143,6 +143,146 @@ ${cleanHtml(tr("about.story.p3"))}
 `;
   }
 
+  if (page === "backend") {
+    return `# Rebase — Backend & APIs
+
+Define your collections in TypeScript and get a production-ready API server.
+
+## Features
+- **Hono & Drizzle Engine**: Built on lightweight Hono server and Drizzle ORM.
+- **REST API**: Full CRUD endpoints with pagination, filtering, sorting, and relations.
+- **GraphQL API**: Automatic GraphQL endpoint mapping your schema structures.
+- **WebSocket Realtime**: Live data subscriptions, broadcast channels, and presence tracking.
+- **Auto-generated Documentation**: Instant OpenAPI/Swagger docs for all routes.
+`;
+  }
+
+  if (page === "ai") {
+    return `# Rebase — AI & Agents
+
+Let AI agents read, write, and act on your Postgres data autonomously.
+
+## Capabilities
+- **Model Context Protocol (MCP) Server**: Exposes your Postgres database and admin tools directly to AI assistants like Cursor and Claude.
+- **AI Data Enhancement Plugin**: Schema-aware prompts, auto-filled fields, suggestions, and translation within the admin UI.
+- **DataTalk**: Ask questions about your data in plain English; DataTalk converts natural language to SQL and displays charts/tables.
+`;
+  }
+
+  if (page === "studio") {
+    return `# Rebase Studio
+
+A visual developer workspace to manage database content, edit schemas, and inspect logs.
+
+## Features
+- **Visual Schema Builder**: Edit tables, columns, relations, and permissions visually.
+- **Spreadsheet Editing**: Edit Postgres records directly in a clean grid layout.
+- **AST Syncing**: Visual editor changes are synchronized directly back to your local TypeScript schema files.
+- **Developer Tools**: Explore SQL, RLS rules, custom cron jobs, and background workers in real time.
+`;
+  }
+
+  if (page === "sdk") {
+    return `# Rebase Client SDK
+
+A type-safe client library to interact with your Rebase backend from client-side or server-side TypeScript.
+
+## Features
+- **Type Safety**: Automatic TypeScript types generated directly from your collection schemas.
+- **CRUD Operations**: Securely fetch and update documents with IDE autocomplete.
+- **Realtime Subscriptions**: Subscribe to table updates or broadcast channels over WebSockets.
+- **Auth & Storage**: Built-in methods to handle login, sign-up, JWT auth, and resumable file uploads.
+`;
+  }
+
+  if (page === "cli") {
+    return `# Rebase CLI & Tooling
+
+A powerful terminal CLI to scaffold, introspect, migrate, and deploy Rebase projects.
+
+## Core Commands
+- \`init\`: Initialize a new Rebase project in the current directory.
+- \`pull\`: Introspect an existing PostgreSQL database schema and generate TypeScript collections.
+- \`db:push\`: Push schema changes to your database.
+- \`dev\`: Spin up the admin panel, API, and WebSocket server locally.
+`;
+  }
+
+  if (page === "security") {
+    return `# Rebase — Security & Auth
+
+Bulletproof, version-controlled access control for your PostgreSQL database.
+
+## Security Architecture
+- **Row-Level Security (RLS)**: Define RLS policies directly in your TypeScript schema — no raw SQL required.
+- **Role-Based Access Control (RBAC)**: Fine-grained permissions per collection, per field, and per user role.
+- **JWT Authentication**: Secure JSON Web Token plumbing out of the box.
+- **Enterprise Integrations**: Supported SAML, SSO, and OAuth providers.
+`;
+  }
+
+  if (page === "ui") {
+    return `# Rebase UI Components
+
+Tailwind-styled, accessible React components to build premium custom layouts.
+
+## UI Toolkit
+- **Spreadsheet Grids**: Performant, editable table views for large datasets.
+- **Form Layouts**: Dynamic, schema-aware inputs, rich text editors, and file dropzones.
+- **Visualizations**: Interactive chart widgets, dashboard metrics, and progress grids.
+`;
+  }
+
+  if (page === "startups") {
+    return `# Rebase for Startups
+
+Ship your product faster with schema-driven development. Eliminate backend boilerplate and focus on your core product.
+
+## Benefits
+- **Zero Boilerplate**: Define your schema once; get admin, API, and SDK instantly.
+- **Database Native**: Connect directly to your existing Postgres — no vendor lock-in.
+- **Scale Securely**: RLS policies and JWT auth version-controlled in Git.
+- **Cost Effective**: Open-source, self-hosted, no per-seat developer pricing.
+`;
+  }
+
+  if (page === "developers") {
+    return `# Rebase — Developers Overview
+
+A developer-first BaaS and admin dashboard framework built on TypeScript and React.
+
+## Key Principles
+- **Schema-as-Code**: Your TypeScript definitions are the single source of truth.
+- **AST Generation**: Code changes flow bi-directionally between visual studio and Git.
+- **Extensible**: Override form fields and add custom dashboard views using standard React components.
+- **Lightweight**: Zero SSR, zero bloated monoliths — runs as a fast React SPA.
+`;
+  }
+
+  if (page === "product") {
+    return `# Rebase Product Ecosystem
+
+Rebase combines an auto-generated admin panel, lightweight backend APIs, and a client SDK into a unified developer platform.
+
+## Key Components
+- **Lightweight API Engine**: Hono-based REST, GraphQL, and WebSocket server.
+- **Visual Studio**: Spreadsheet editor and visual schema manager syncing back to code.
+- **TypeScript Client SDK**: Isomorphic library for type-safe queries, auth, and storage.
+- **React UI Kit**: Reusable widgets and layout components to build custom admin dashboards.
+`;
+  }
+
+  if (page === "contact") {
+    return `# Contact Rebase Team
+
+Get in touch for enterprise support, dedicated hosting plans, or custom database integrations.
+
+- **Email**: hello@rebase.pro
+- **GitHub**: https://github.com/rebasepro/rebase
+- **Discord Community**: Join our developer community on Discord.
+`;
+  }
+
   const pageTitle = page.charAt(0).toUpperCase() + page.slice(1).replace("-", " ");
   return `# Rebase — ${pageTitle}
 

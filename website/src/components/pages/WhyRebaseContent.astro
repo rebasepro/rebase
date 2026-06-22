@@ -10,13 +10,12 @@ import SpotlightCard from '../../components/SpotlightCard.astro';
 import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
 ---
 
-<main class="flex flex-col isolate">
+<div class="flex flex-col isolate">
 
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 1 — HERO
          ═══════════════════════════════════════════════════════════════ -->
-    <section class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
-        <NeatBackground client:idle />
+ <section class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
         <!-- Radial glow for readability -->
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
@@ -92,7 +91,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 2 — SOCIAL PROOF
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-social-proof" class="relative z-0 py-20 sm:py-28">
+ <section id="why-social-proof" class="relative z-0 py-20 sm:py-28">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">Trusted by developers and teams at</p>
             <ClientLogos />
@@ -111,7 +110,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 4 — "SEE IT IN ACTION" — PRODUCT SHOWCASE BENTO GRID
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-showcase" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+ <section id="why-showcase" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">See it in action</h2>
@@ -238,7 +237,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 5 — DATA OWNERSHIP: "YOUR POSTGRES. YOUR RULES."
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-data-ownership" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+ <section id="why-data-ownership" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <SectionBackgroundAccents topLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 items-center">
@@ -334,7 +333,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 7 — REBASE VS THE ALTERNATIVES
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-alternatives" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+ <section id="why-alternatives" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <SectionBackgroundAccents bottomLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
@@ -445,7 +444,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 8 — "CHOOSE YOUR PATH" — PERSONA CARDS
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-personas" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+ <section id="why-personas" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <SectionBackgroundAccents topLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center mb-14 animate-on-scroll fade-in-up">
@@ -535,7 +534,7 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 9 — FINAL CTA
          ═══════════════════════════════════════════════════════════════ -->
-    <section id="why-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+ <section id="why-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
             <div class="animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Get started</h2>
@@ -593,4 +592,4 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
         </div>
     </section>
 
-</main>
+</div>

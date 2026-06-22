@@ -56,12 +56,92 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 <head>
     <meta charset="UTF-8">
 
-    <!-- Immediate check for dismissed manifesto banner to avoid layout shift (CLS) -->
+    <!-- Immediate check for dismissed manifesto banner & active A/B tests to avoid CLS -->
     <script is:inline>
     (function(){
         try {
             if (localStorage.getItem('rb_manifesto_banner_dismissed') === 'true') {
                 document.documentElement.classList.add('banner-dismissed-instant');
+            }
+            
+            // 1. Get existing ab object from cookie
+            var match = document.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
+            var ab = {};
+            if (match) {
+                try { ab = JSON.parse(decodeURIComponent(match[2])); } catch(e) {}
+            }
+
+            // 2. Experiments definition
+            var experiments = [
+                { id: "navigation-structure", variants: ["control", "flat-nav"], weights: [50, 50] },
+                { id: "homepage-section-order", variants: ["control", "demo-first", "social-first", "explain-first", "features-focus", "roadmap-first", "high-velocity"], weights: [16, 14, 14, 14, 14, 14, 14] },
+                { id: "manifesto-banner-text", variants: ["control", "mission", "founders"], weights: [34, 33, 33] }
+            ];
+
+            var updated = false;
+            var H = document.documentElement;
+
+            for (var i = 0; i < experiments.length; i++) {
+                var exp = experiments[i];
+                var variant = ab[exp.id];
+
+                // If not assigned or not a valid variant, assign one
+                if (!variant || exp.variants.indexOf(variant) === -1) {
+                    var r = Math.random() * 100;
+                    var sum = 0;
+                    var assigned = exp.variants[0];
+                    for (var j = 0; j < exp.variants.length; j++) {
+                        sum += exp.weights[j];
+                        if (r <= sum) {
+                            assigned = exp.variants[j];
+                            break;
+                        }
+                    }
+                    ab[exp.id] = assigned;
+                    variant = assigned;
+                    updated = true;
+                }
+
+                // Apply attribute to html element
+                H.setAttribute("data-ab-" + exp.id, variant);
+            }
+
+            // Write back cookie if updated
+            if (updated) {
+                var dm = location.hostname.indexOf("rebase.pro") > -1 ? ";domain=.rebase.pro" : "";
+                document.cookie = "rb_ab=" + encodeURIComponent(JSON.stringify(ab)) +
+                    ";path=/;max-age=7776000;samesite=lax" + dm;
+            }
+
+            // Inject CSS for active non-control content variants and section orders
+            var css = "";
+            for (var id in ab) {
+                var v = ab[id];
+                if (v && v !== "control") {
+                    css += '[data-ab-show="' + id + ':control"]{display:none!important}';
+                    css += '[data-ab-show="' + id + ':' + v + '"]{display:block!important}';
+                }
+            }
+            var sectionOrder = ab["homepage-section-order"];
+            var sectionOrders = {
+                "demo-first": {"s-hero": 1, "s-demo-terminal": 2, "s-demo-carousel": 3, "s-power-features": 4, "s-scroll-sync": 5, "s-mosaic-showcase": 6, "s-collection-power": 7, "s-ai-apps": 8, "s-social-proof": 9, "s-how-it-works": 10, "s-case-study": 11, "s-security": 12, "s-faq": 13, "s-roadmap": 14, "s-final-cta": 15},
+                "social-first": {"s-hero": 1, "s-social-proof": 2, "s-case-study": 3, "s-security": 4, "s-how-it-works": 5, "s-collection-power": 6, "s-ai-apps": 7, "s-mosaic-showcase": 8, "s-demo-terminal": 9, "s-demo-carousel": 10, "s-power-features": 11, "s-scroll-sync": 12, "s-faq": 13, "s-roadmap": 14, "s-final-cta": 15},
+                "explain-first": {"s-hero": 1, "s-how-it-works": 2, "s-collection-power": 3, "s-ai-apps": 4, "s-mosaic-showcase": 5, "s-demo-terminal": 6, "s-demo-carousel": 7, "s-power-features": 8, "s-scroll-sync": 9, "s-case-study": 10, "s-social-proof": 11, "s-security": 12, "s-faq": 13, "s-roadmap": 14, "s-final-cta": 15},
+                "features-focus": {"s-hero": 1, "s-power-features": 2, "s-scroll-sync": 3, "s-mosaic-showcase": 4, "s-collection-power": 5, "s-ai-apps": 6, "s-demo-terminal": 7, "s-demo-carousel": 8, "s-social-proof": 9, "s-how-it-works": 10, "s-case-study": 11, "s-security": 12, "s-faq": 13, "s-roadmap": 14, "s-final-cta": 15},
+                "roadmap-first": {"s-hero": 1, "s-roadmap": 2, "s-security": 3, "s-faq": 4, "s-social-proof": 5, "s-how-it-works": 6, "s-collection-power": 7, "s-ai-apps": 8, "s-case-study": 9, "s-demo-terminal": 10, "s-demo-carousel": 11, "s-power-features": 12, "s-scroll-sync": 13, "s-mosaic-showcase": 14, "s-final-cta": 15},
+                "high-velocity": {"s-hero": 1, "s-demo-terminal": 2, "s-how-it-works": 3, "s-case-study": 4, "s-social-proof": 5, "s-demo-carousel": 6, "s-power-features": 7, "s-scroll-sync": 8, "s-collection-power": 9, "s-ai-apps": 10, "s-mosaic-showcase": 11, "s-security": 12, "s-faq": 13, "s-roadmap": 14, "s-final-cta": 15}
+            };
+            if (sectionOrder && sectionOrders[sectionOrder]) {
+                var so = sectionOrders[sectionOrder];
+                for (var sid in so) {
+                    css += "#" + sid + "{order:" + so[sid] + "}";
+                }
+            }
+            if (css) {
+                var s = document.createElement("style");
+                s.id = "ab-styles-head";
+                s.textContent = css;
+                document.head.appendChild(s);
             }
         } catch(e) {}
     })();

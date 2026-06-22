@@ -19,11 +19,10 @@ import "../../styles/editor.css";
 
 ---
 
-  <main>
+  <div class="flex flex-col isolate">
 
     <!-- Hero -->
-    <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-      <NeatBackground client:only="react" />
+ <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
           <span class="text-sm font-medium">Rich Text · Blocks · Kanban · Inline</span>
@@ -79,10 +78,8 @@ import "../../styles/editor.css";
         </div>
       </div>
     </section>
-
-
     <!-- Full-width interactive Notion editor hero -->
-    <section class="bg-black pb-16 sm:pb-24">
+ <section class="relative z-0 pb-16 sm:pb-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
           <!-- Browser Chrome -->
@@ -109,9 +106,15 @@ import "../../styles/editor.css";
       </div>
     </section>
 
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="a" client:visible/>
+    </div>
+
+
 
     <!-- Editor Features Strip -->
-    <section class="bg-black py-16 sm:py-24">
+ <section class="py-16 sm:py-24">
       <SectionBackgroundAccents topLine={true}/>
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
@@ -278,7 +281,7 @@ import "../../styles/editor.css";
 
 
     <!-- Slash Commands Animated Demo -->
-    <section class="bg-black py-16 sm:py-24">
+ <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div class="lg:order-last">
@@ -302,7 +305,7 @@ import "../../styles/editor.css";
 
 
     <!-- Kanban View -->
-    <section class="bg-black py-16 sm:py-24">
+ <section class="py-16 sm:py-24">
       <SectionBackgroundAccents topLine={true}/>
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -327,7 +330,7 @@ import "../../styles/editor.css";
 
 
     <!-- Inline Spreadsheet Editing -->
-    <section class="bg-black py-16 sm:py-24">
+ <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div class="lg:order-last">
@@ -352,7 +355,7 @@ import "../../styles/editor.css";
 
 
     <!-- Extensibility: Custom Fields -->
-    <section class="bg-black py-16 sm:py-24">
+ <section class="py-16 sm:py-24">
       <SectionBackgroundAccents topLine={true}/>
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -378,7 +381,7 @@ import "../../styles/editor.css";
 
 
     <!-- Full-Width Feature Strip: Data Formats -->
-    <section class="bg-black py-16 sm:py-24">
+ <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
           <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">One editor. Every content type.</h2>
@@ -488,9 +491,13 @@ import "../../styles/editor.css";
       </div>
     </section>
 
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="b" client:visible/>
+    </div>
 
     <!-- CTA -->
-    <section class="bg-black py-24 sm:py-32">
+ <section class="relative z-0 py-24 sm:py-32">
       <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
         <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">See the editor in action.</h2>
         <p class="text-lg text-surface-400 mb-8 max-w-xl mx-auto">Try the live demo or start a project and have a full editing experience running in under 5 minutes.</p>
@@ -540,5 +547,5 @@ import "../../styles/editor.css";
       </div>
     </section>
 
-  </main>
+  </div>
 

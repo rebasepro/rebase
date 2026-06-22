@@ -16,30 +16,14 @@ import { DataTalkDemo } from '../../components/DataTalkDemo';
 import { Terminal, ShieldCheck, Folder, Network, History, Bot, Zap, Database, Layers, Clock, Webhook, Radio, GitBranch, Users, Mail, Globe, KeyRound, Server } from "lucide-react";
 import "../../styles/editor.css";
 
-const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBackend } <span class="text-blue-400">from</span> <span class="text-emerald-400">"@rebasepro/backend"</span>;
-
-<span class="text-blue-400">const</span> backend = <span class="text-blue-400">await</span> <span class="text-amber-400">initializeRebaseBackend</span>({
-  server,
-  app,
-  bootstrappers: [
-    <span class="text-amber-400">createPostgresBootstrapper</span>({
-      connection: db,
-      schema: { tables, enums, relations },
-    })
-  ],
-  auth: { jwtSecret: process.env.<span class="text-amber-400">JWT_SECRET</span> },
-  storage: { type: <span class="text-emerald-400">"local"</span>, basePath: <span class="text-emerald-400">"./uploads"</span> },
-});
-<span class="text-surface-500">// ✅ REST, WebSocket, Auth, Storage — all ready</span>`;
 ---
 
-<main>
+<div class="flex flex-col isolate">
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- HERO                                                       -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="relative isolate overflow-hidden bg-black pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-    <NeatBackground client:only="react" />
+ <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
 
     <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
       <div class="inline-flex items-center py-1.5 px-4 mb-8 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
@@ -71,7 +55,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- 1 · ADMIN PANEL — "Edit like a spreadsheet"                -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="bg-black py-24 sm:py-32">
+ <section class="relative z-0 py-24 sm:py-32">
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
       <div class="mx-auto max-w-3xl text-center mb-12 animate-on-scroll fade-in-up">
         <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20">Rebase Studio</div>
@@ -84,9 +68,14 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
     </div>
   </section>
 
+  <!-- Neat gradient divider -->
+  <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+      <NeatBackground variant="a" client:visible/>
+  </div>
+
 
   <!-- Editing views: Bento Grid (Kanban + Rich Text + Spreadsheet + Storage) -->
-  <section class="bg-black py-24 sm:py-32 relative overflow-hidden">
+ <section class="py-24 sm:py-32 relative overflow-hidden">
     <SectionBackgroundAccents topLine={true}/>
     <!-- Glow backgrounds for bento section -->
     <div class="pointer-events-none absolute inset-0 -z-10 flex justify-center">
@@ -160,7 +149,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- 2 · SCHEMA-AS-CODE                                         -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="bg-black py-24 sm:py-32">
+ <section class="py-24 sm:py-32">
     <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
       <div class="mx-auto max-w-3xl text-center mb-10 animate-on-scroll fade-in-up">
@@ -180,7 +169,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- 3 · SQL EDITOR                                            -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="bg-black py-24 sm:py-32">
+ <section class="py-24 sm:py-32">
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         <div class="lg:order-last">
@@ -204,7 +193,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- 4 · FLEXIBLE & ADAPTABLE                                   -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="bg-black py-24 sm:py-32">
+ <section class="py-24 sm:py-32">
     <SectionBackgroundAccents topLine={true}/>
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
       <div class="mx-auto max-w-3xl text-center mb-14">
@@ -236,7 +225,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- 5 · AI & CONVERSATIONAL DATA                               -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="bg-black py-24 sm:py-32">
+ <section class="py-24 sm:py-32">
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
       <div class="mx-auto max-w-3xl text-center mb-14">
         <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Harness AI for Your Structured Data</h2>
@@ -261,30 +250,47 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- 6 · FEATURE GRID                                           -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="bg-black py-24 sm:py-32">
+ <section class="py-24 sm:py-32">
     <SectionBackgroundAccents topLine={true}/>
     <div class="mx-auto max-w-7xl px-6 lg:px-8">
       <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
-        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Everything Out of the Box</h2>
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Admin & Data Tools</h2>
+        <p class="mt-4 text-lg text-surface-400">Everything you need to manage, query, and secure your data.</p>
       </div>
       <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <SpotlightCard icon={Terminal} title="Built-in SQL Editor" description="Run queries, visualize EXPLAIN plans, edit results inline, and save snippets."/>
         <SpotlightCard icon={ShieldCheck} title="Row-Level Security" description="Create and manage Postgres RLS policies visually. Per-row, per-role access rules."/>
         <SpotlightCard icon={Network} title="Typed Client SDK" description="Fetch data and resolve deep relations with pure TypeScript autocompletion."/>
         <SpotlightCard icon={Globe} title="REST, GraphQL & OpenAPI" description="Auto-generated REST and GraphQL endpoints with OpenAPI 3.0 spec and Swagger UI."/>
-        <SpotlightCard icon={KeyRound} title="Authentication" description="JWT access/refresh tokens, Google OAuth, MFA, RBAC, API keys, and session management."/>
-        <SpotlightCard icon={Mail} title="Email Service" description="SMTP integration with password reset, email verification, and transactional email templates."/>
         <SpotlightCard icon={Bot} title="AI & MCP Server" description="AI autofill, natural language queries, and full MCP integration for AI agents."/>
+        <SpotlightCard icon={Users} title="Users & Roles" description="Manage users, assign roles, and configure RBAC directly from the admin panel."/>
+        <SpotlightCard icon={History} title="Entity History" description="Full audit trail with versioning. See who changed what, when, and revert to any previous state."/>
+        <SpotlightCard icon={Layers} title="Import & Export" description="Bulk import from CSV/JSON with field mapping. Export with a single click."/>
+        <SpotlightCard icon={GitBranch} title="Database Branching" description="Create isolated database copies for development. Branch, experiment, and merge safely."/>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 7 · BACKEND INFRASTRUCTURE                                -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+ <section class="py-24 sm:py-32">
+    <SectionBackgroundAccents topLine={true}/>
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
+        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Backend Infrastructure</h2>
+        <p class="mt-4 text-lg text-surface-400">Production-grade services built into the framework. No third-party assembly required.</p>
+      </div>
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <SpotlightCard icon={KeyRound} title="Authentication" description="JWT access/refresh tokens, Google OAuth, MFA, RBAC, API keys, and session management."/>
         <SpotlightCard icon={Radio} title="Realtime Engine" description="WebSocket subscriptions, broadcast channels, and presence tracking — built in."/>
+        <SpotlightCard icon={Mail} title="Email Service" description="SMTP integration with password reset, email verification, and transactional email templates."/>
         <SpotlightCard icon={Clock} title="Cron Jobs" description="Schedule background tasks with monitoring, logging, and a Studio dashboard."/>
         <SpotlightCard icon={Zap} title="Custom Functions" description="Drop a Hono route in functions/ — auto-mounted with auth and DB access."/>
         <SpotlightCard icon={Webhook} title="Webhooks" description="HMAC-signed outbound webhooks on INSERT, UPDATE, DELETE with automatic retries."/>
-        <SpotlightCard icon={History} title="Entity History" description="Full audit trail with versioning. See who changed what, when, and revert to any previous state."/>
-        <SpotlightCard icon={GitBranch} title="Database Branching" description="Create isolated database copies for development. Branch, experiment, and merge safely."/>
-        <SpotlightCard icon={Users} title="Users & Roles" description="Manage users, assign roles, and configure RBAC directly from the admin panel."/>
-        <SpotlightCard icon={Layers} title="Import & Export" description="Bulk import from CSV/JSON with field mapping. Export with a single click."/>
-        <SpotlightCard icon={Server} title="Self-Host Anywhere" description="Your Postgres, your infrastructure. Deploy with Docker, Railway, Fly.io, or bare metal."/>
         <SpotlightCard icon={Database} title="Drizzle ORM" description="Auto-generated Drizzle schema with zero N+1 queries, field selection, and relational loading."/>
+        <SpotlightCard icon={Server} title="Self-Host Anywhere" description="Your Postgres, your infrastructure. Deploy with Docker, Railway, Fly.io, or bare metal."/>
       </div>
     </div>
   </section>
@@ -293,7 +299,7 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
   <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- FINAL CTA                                                  -->
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <section class="relative isolate bg-black py-28 sm:py-36 overflow-hidden">
+ <section class="relative isolate py-28 sm:py-36 overflow-hidden">
     <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
     <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
       <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4 animate-on-scroll fade-in-up">Ready to see it in action?</h2>
@@ -313,4 +319,4 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
     </div>
   </section>
 
-</main>
+</div>
