@@ -113,15 +113,9 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     title: "Backlog",
     color: "rgb(156, 163, 175)",
     cards: [
-      { id: "871492",
-title: "Dark mode",
-image: "https://picsum.photos/seed/dark-mode/80/80" },
-      { id: "871388",
-title: "Search indexing",
-image: "https://picsum.photos/seed/search-idx/80/80" },
-      { id: "871204",
-title: "API documentation",
-image: "https://picsum.photos/seed/api-docs/80/80" }
+      { id: "871492", title: "Dark mode", image: "/img/kanban/dark_mode.png" },
+      { id: "871388", title: "Search indexing", image: "/img/kanban/search_indexing.png" },
+      { id: "871204", title: "API documentation", image: "/img/kanban/api_docs.png" }
     ]
   },
   {
@@ -129,12 +123,8 @@ image: "https://picsum.photos/seed/api-docs/80/80" }
     title: "In Progress",
     color: "rgb(251, 191, 36)",
     cards: [
-      { id: "871090",
-title: "Auth middleware refactor",
-image: "https://picsum.photos/seed/auth-mid/80/80" },
-      { id: "870984",
-title: "Onboarding flow",
-image: "https://picsum.photos/seed/onboard-f/80/80" }
+      { id: "871090", title: "Auth middleware refactor", image: "/img/kanban/auth.png" },
+      { id: "870984", title: "Onboarding flow", image: "/img/kanban/onboarding.png" }
     ]
   },
   {
@@ -142,9 +132,7 @@ image: "https://picsum.photos/seed/onboard-f/80/80" }
     title: "Review",
     color: "rgb(96, 165, 250)",
     cards: [
-      { id: "870812",
-title: "RLS policies",
-image: "https://picsum.photos/seed/rls-policy/80/80" }
+      { id: "870812", title: "RLS policies", image: "/img/kanban/rls.png" }
     ]
   },
   {
@@ -152,12 +140,8 @@ image: "https://picsum.photos/seed/rls-policy/80/80" }
     title: "Done",
     color: "rgb(74, 222, 128)",
     cards: [
-      { id: "870650",
-title: "CI/CD pipeline",
-image: "https://picsum.photos/seed/cicd-pipe/80/80" },
-      { id: "870511",
-title: "Export to CSV",
-image: "https://picsum.photos/seed/export-csv/80/80" }
+      { id: "870650", title: "CI/CD pipeline", image: "/img/kanban/cicd.png" },
+      { id: "870511", title: "Export to CSV", image: "/img/kanban/export.png" }
     ]
   }
 ];

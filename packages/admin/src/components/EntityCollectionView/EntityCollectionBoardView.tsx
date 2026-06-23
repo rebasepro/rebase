@@ -13,6 +13,7 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
+    DialogTitle,
     getColorSchemeForSeed,
     IconButton,
     iconSize,
@@ -626,6 +627,7 @@ parentEntityIds,
 
             {/* Backfill dialog */}
             <Dialog open={showBackfillDialog} onOpenChange={setShowBackfillDialog}>
+                <DialogTitle hidden>{t("initialize_kanban_order")}</DialogTitle>
                 <DialogContent>
                     <Typography variant="h6" className="mb-4">{t("initialize_kanban_order")}</Typography>
                     <Typography variant="body2">

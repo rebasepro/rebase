@@ -58,6 +58,8 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     
     <!-- -- HERO SECTION -- -->
  <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+     <NeatBackground client:only="react" />
+
         <!-- Background accents and subtle grid -->
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6 animate-pulse">
@@ -583,7 +585,7 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     <AlternativesComparison />
 
     <!-- -- GET STARTED CLI TERMINAL -- -->
- <section class="py-20 sm:py-28 relative z-0 overflow-hidden bg-radial-at-b from-surface-950/70 via-black to-black">
+    <section class="py-20 sm:py-28 relative z-0 overflow-hidden">
         <div class="pointer-events-none absolute inset-0 -z-10">
             <div class="absolute -bottom-40 right-10 w-[700px] h-[700px] rounded-full bg-primary/5 blur-3xl opacity-50"></div>
         </div>

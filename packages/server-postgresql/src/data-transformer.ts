@@ -244,8 +244,12 @@ export function serializePropertyToServer(value: unknown, property: Property): u
                         };
                     });
                 }
+                return value;
             }
-            return value;
+            // Non-array value for an array property — coerce to avoid .map() crashes downstream
+            logger.warn(`Expected array value for array property, got ${typeof value}. Coercing to empty array.`);
+            return [];
+
 
         case "map":
             if (typeof value === "object" && property.properties) {
@@ -585,6 +589,10 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                         };
                     });
                 }
+            } else {
+                // Non-array value from DB for an array property — coerce to avoid .map() crashes
+                logger.warn(`Expected array value from DB for array property, got ${typeof value}. Coercing to array.`);
+                return typeof value === "string" ? [value] : [];
             }
             return value;
 

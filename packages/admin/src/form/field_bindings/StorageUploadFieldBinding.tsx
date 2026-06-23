@@ -481,7 +481,7 @@ export function StorageUpload({
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
             >
-                <SortableContext items={value.map(v => v.id)} strategy={horizontalListSortingStrategy}>
+                <SortableContext items={(value ?? []).map(v => v.id)} strategy={horizontalListSortingStrategy}>
                     <FileDropComponent {...fileDropProps}/>
                 </SortableContext>
             </DndContext>

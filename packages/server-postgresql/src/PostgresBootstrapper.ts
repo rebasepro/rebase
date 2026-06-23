@@ -4,41 +4,31 @@
  * Implements the `BackendBootstrapper` interface for PostgreSQL.
  */
 
-import { getTableName, isTable, Relations, sql, Table } from "drizzle-orm";
+import { getTableName, isTable, Relations, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PgEnum, PgTable, getTableConfig } from "drizzle-orm/pg-core";
+import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import type { RebasePgTable } from "./types";
 import {
+    type AuthAdapter,
     BackendBootstrapper,
-    InitializedDriver,
     BootstrappedAuth,
     DatabaseAdmin,
-    RealtimeProvider,
     type DataDriver,
-    type AuthAdapter,
     EntityCollection,
-    PostgresCollection
+    InitializedDriver,
+    RealtimeProvider
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
-import {
-    createAuthRoutes,
-    requireAuth,
-    requireAdmin,
-    logger
-} from "@rebasepro/server-core";
+import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server-core";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
-import { UserService, PostgresAuthRepository, AuthSchemaTables } from "./auth/services";
+import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
-
-import { createEmailService, type EmailConfig, type EmailService } from "@rebasepro/server-core";
-import { createHistoryRoutes } from "@rebasepro/server-core";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
-import type { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server-core";
+import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
@@ -107,6 +97,13 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             if (pgConfig.schema?.enums) registry.registerEnums(pgConfig.schema.enums as Record<string, PgEnum<[string, ...string[]]>>);
             if (pgConfig.schema?.relations) registry.registerRelations(pgConfig.schema.relations as Record<string, Relations>);
+
+            // Patch Drizzle's PgArray columns to handle NULL values safely.
+            // Drizzle's mapFromDriverValue crashes with "value.map is not a function"
+            // when a native array column (text[], integer[], etc.) contains NULL.
+            if (pgConfig.schema?.tables) {
+                patchPgArrayNullSafety(pgConfig.schema.tables as Record<string, unknown>);
+            }
 
             // Build schema-aware Drizzle connection
             const mergedSchema: Record<string, unknown> = {

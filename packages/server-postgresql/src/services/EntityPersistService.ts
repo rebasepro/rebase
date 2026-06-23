@@ -192,17 +192,17 @@ export class EntityPersistService {
             }
         }
 
-        // Transform relations to IDs, then sanitize
-        const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
-
-        // Extract relation updates from the typed result
-        const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
-        const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
-
-        const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
-
         let savedId: string | number;
         try {
+            // Transform relations to IDs, then sanitize
+            const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
+
+            // Extract relation updates from the typed result
+            const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
+            const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
+
+            const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
+
             savedId = await this.db.transaction(async (tx) => {
                 let currentId: string | number;
 

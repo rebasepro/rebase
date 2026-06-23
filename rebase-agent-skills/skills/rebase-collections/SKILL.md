@@ -236,7 +236,7 @@ title: {
 | `isId` | `boolean \| "manual" \| "uuid" \| "cuid" \| string` | — | Mark as primary key with generation strategy |
 | `enum` | `EnumValues` | — | Dropdown/picklist values |
 | `multiline` | `boolean` | `false` | Multi-line text area |
-| `markdown` | `boolean` | `false` | Markdown editor with preview |
+| `markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/admin/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
 | `url` | `boolean \| PreviewType` | — | Render as link. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
 | `email` | `boolean` | — | Email field rendering |
 | `storage` | `StorageConfig` | — | File upload configuration (see Storage section) |

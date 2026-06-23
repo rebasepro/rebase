@@ -15,6 +15,7 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
+    DialogTitle,
     IconButton,
     PlusIcon,
     TextField,
@@ -159,6 +160,7 @@ export function AddKanbanColumnAction({
             </div>
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTitle hidden>{t("studio_add_kanban_column_title")}</DialogTitle>
                 <DialogContent className="max-w-md">
                     <Typography variant="h6" className="mb-4">
                         {t("studio_add_kanban_column_title")}

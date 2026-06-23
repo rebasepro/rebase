@@ -118,15 +118,19 @@ const postsCollection: PostgresCollection = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         author: {
             name: "Author",

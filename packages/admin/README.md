@@ -88,13 +88,17 @@ Also available as a separate entry point:
 import { ... } from "@rebasepro/admin/collection_editor_ui";
 ```
 
-### Rich Text Editor
+### Rich Text Editor (`RichTextEditor`)
 
-Type exports only from the main entry point (`RebaseEditorProps`, `JSONContent`, `EditorAIController`). The full ProseMirror editor is a heavy import (~300 KB) and available as a separate entry point:
+A full-featured WYSIWYG editor built on ProseMirror with support for **Markdown**, **JSON** (ProseMirror document tree), and **HTML** output formats. Includes slash commands, bubble menus, image uploads, tables, AI completions, and a raw Markdown toggle.
+
+Type exports only from the main entry point (`RichTextEditorProps`, `JSONContent`, `EditorAIController`). The full ProseMirror editor is a heavy import (~300 KB) and available as a separate entry point:
 
 ```ts
-import { RebaseEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/admin/editor";
 ```
+
+> **Note:** The previous name `RebaseEditor` still works but is deprecated.
 
 ### Utilities
 

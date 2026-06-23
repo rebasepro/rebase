@@ -408,7 +408,7 @@ export function LoginView({
                     )}
                 </div>
 
-                {additionalComponent && (
+                {additionalComponent && mode === "buttons" && (
                     <div className="w-full">
                         {additionalComponent}
                     </div>

@@ -23,6 +23,7 @@ export default defineConfig(() => ({
         lib: {
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase UI",
+            formats: ["es"],
             fileName: (format) => `index.${format}.js`
         },
         target: "ESNEXT",

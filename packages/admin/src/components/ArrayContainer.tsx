@@ -402,13 +402,13 @@ export function ArrayContainer<T>({
         const newIds = [...internalIds];
         newIds.splice(index, 1);
         setInternalIds(newIds);
-        onValueChange(value.filter((_, i) => i !== index));
+        onValueChange((value ?? []).filter((_, i) => i !== index));
     };
 
     const copy = (index: number) => {
         if ((value ?? []).length >= max) return;
         const id = getRandomId();
-        const copyingItem = value[index];
+        const copyingItem = (value ?? [])[index];
         const newIds: number[] = [
             ...internalIds.slice(0, index + 1),
             id,
@@ -416,7 +416,7 @@ export function ArrayContainer<T>({
         ];
         if (onInternalIdAdded) onInternalIdAdded(id);
         setInternalIds(newIds);
-        onValueChange([...value.slice(0, index + 1), copyingItem, ...value.slice(index + 1)]);
+        onValueChange([...(value ?? []).slice(0, index + 1), copyingItem, ...(value ?? []).slice(index + 1)]);
     };
 
     const addInIndex = (index: number) => {
@@ -429,7 +429,7 @@ export function ArrayContainer<T>({
         ];
         if (onInternalIdAdded) onInternalIdAdded(id);
         setInternalIds(newIds);
-        onValueChange([...value.slice(0, index), newDefaultEntry, ...value.slice(index)]);
+        onValueChange([...(value ?? []).slice(0, index), newDefaultEntry, ...(value ?? []).slice(index)]);
     };
 
     const onDragEnd = (event: DragEndEvent) => {
@@ -444,7 +444,7 @@ export function ArrayContainer<T>({
         if (oldIndex === -1 || newIndex === -1) return;
         const newIds = arrayMove(internalIds, oldIndex, newIndex);
         setInternalIds(newIds);
-        onValueChange(arrayMove(value, oldIndex, newIndex));
+        onValueChange(arrayMove(value ?? [], oldIndex, newIndex));
     };
 
     return sortable ? (

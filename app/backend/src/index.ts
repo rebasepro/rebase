@@ -126,18 +126,94 @@ pass: env.SMTP_PASS! }
         hooks: {
             data: {
                 afterRead(slug, entity) {
-                    if (slug !== "users") return entity;
-                    // Mask user emails in the demo: "alice@gmail.com" → "a***@gmail.com"
-                    const email = entity.email as string | undefined;
-                    if (email) {
+                    const maskEmail = (email: string): string => {
                         const [local, domain] = email.split("@");
                         if (local && domain) {
                             const masked = local[0] + "***";
-                            entity = { ...entity,
-email: `${masked}@${domain}` };
+                            return `${masked}@${domain}`;
+                        }
+                        return email;
+                    };
+
+                    const maskName = (name: string): string => {
+                        return name
+                            .split(/\s+/)
+                            .map(word => (word && word[0] ? word[0] + "***" : ""))
+                            .join(" ");
+                    };
+
+                    const maskPhone = (phone: string): string => {
+                        if (phone.length <= 5) return "***";
+                        return phone.substring(0, 5) + phone.substring(5).replace(/[0-9]/g, "*");
+                    };
+
+                    const maskHandle = (handle: string): string => {
+                        if (handle.startsWith("@")) {
+                            return handle[1] ? `@${handle[1]}***` : "@***";
+                        }
+                        return handle[0] ? `${handle[0]}***` : "***";
+                    };
+
+                    const updatedEntity = { ...entity };
+
+                    if (slug === "users") {
+                        if (typeof updatedEntity.email === "string") {
+                            updatedEntity.email = maskEmail(updatedEntity.email);
+                        }
+                        if (typeof updatedEntity.displayName === "string") {
+                            updatedEntity.displayName = maskName(updatedEntity.displayName);
+                        }
+                        if (updatedEntity.photoURL) {
+                            updatedEntity.photoURL = "";
+                        }
+                    } else if (slug === "customers") {
+                        if (typeof updatedEntity.email === "string") {
+                            updatedEntity.email = maskEmail(updatedEntity.email);
+                        }
+                        if (typeof updatedEntity.first_name === "string") {
+                            updatedEntity.first_name = maskName(updatedEntity.first_name);
+                        }
+                        if (typeof updatedEntity.last_name === "string") {
+                            updatedEntity.last_name = maskName(updatedEntity.last_name);
+                        }
+                        if (typeof updatedEntity.phone === "string") {
+                            updatedEntity.phone = maskPhone(updatedEntity.phone);
+                        }
+                        if (typeof updatedEntity.shipping_address === "string") {
+                            updatedEntity.shipping_address = "Redacted Address";
+                        }
+                        if (typeof updatedEntity.billing_address === "string") {
+                            updatedEntity.billing_address = "Redacted Address";
+                        }
+                        if (updatedEntity.avatar) {
+                            updatedEntity.avatar = "";
+                        }
+                    } else if (slug === "authors") {
+                        if (typeof updatedEntity.email === "string") {
+                            updatedEntity.email = maskEmail(updatedEntity.email);
+                        }
+                        if (typeof updatedEntity.name === "string") {
+                            updatedEntity.name = maskName(updatedEntity.name);
+                        }
+                        if (typeof updatedEntity.twitter === "string") {
+                            updatedEntity.twitter = maskHandle(updatedEntity.twitter);
+                        }
+                        if (typeof updatedEntity.github === "string") {
+                            updatedEntity.github = maskHandle(updatedEntity.github);
+                        }
+                        if (typeof updatedEntity.website === "string") {
+                            updatedEntity.website = "https://***";
+                        }
+                        if (updatedEntity.picture) {
+                            updatedEntity.picture = "";
+                        }
+                    } else if (slug === "orders") {
+                        if (typeof updatedEntity.shipping_address === "string") {
+                            updatedEntity.shipping_address = "Redacted Address";
                         }
                     }
-                    return entity;
+
+                    return updatedEntity;
                 }
             }
         }

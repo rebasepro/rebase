@@ -13,13 +13,13 @@ import {
     Skeleton,
     XIcon
 } from "@rebasepro/ui";
-import type { RebaseEditorProps } from "../../editor";
+import type { RichTextEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
 
 // Lazy-load ProseMirror editor + markdown parser/serializer (~300KB)
 // Only fetched when a markdown field is actually rendered.
-const RebaseEditor = lazy(() => import("../../editor").then(m => ({ default: m.RebaseEditor })));
+const RichTextEditor = lazy(() => import("../../editor").then(m => ({ default: m.RichTextEditor })));
 const loadMarkdownUtils = () => import("../../editor/markdown");
 let _markdownUtils: Awaited<ReturnType<typeof loadMarkdownUtils>> | null = null;
 const getMarkdownUtils = async () => {
@@ -29,7 +29,7 @@ const getMarkdownUtils = async () => {
 
 interface MarkdownEditorFieldProps {
     highlight?: { from: number, to: number };
-    editorProps?: Partial<RebaseEditorProps>
+    editorProps?: Partial<RichTextEditorProps>
 }
 
 /**
@@ -173,7 +173,7 @@ export function MarkdownEditorFieldBinding({
     }, [entityId, entityValues, path, property, propertyKey, storage]);
 
     const editor = <Suspense fallback={<Skeleton height={200} className="w-full rounded-md"/>}>
-        <RebaseEditor
+        <RichTextEditor
         content={value}
         onMarkdownContentChange={onContentChange}
         version={context.formex.version + fieldVersion}

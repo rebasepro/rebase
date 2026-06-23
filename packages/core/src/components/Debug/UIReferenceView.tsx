@@ -13,7 +13,9 @@
 import React, { useState } from "react";
 import {
     Alert,
+    AlertCircleIcon,
     Avatar,
+    AppWindow,
     BooleanSwitch,
     Button,
     Checkbox,
@@ -21,9 +23,13 @@ import {
     ChevronsLeftIcon,
     ChevronsRightIcon,
     Chip,
+    CircleUserIcon,
     CircularProgress,
     cls,
+    ColumnsIcon,
     defaultBorderMixin,
+    FileIcon,
+    FileTextIcon,
     FilterChip,
     FilterIcon,
     FolderIcon,
@@ -39,6 +45,7 @@ import {
     MoonIcon,
     MultiSelect,
     MultiSelectItem,
+    PanelLeftIcon,
     PencilIcon,
     PlusIcon,
     SearchBar,
@@ -60,34 +67,24 @@ import {
     TextField,
     Tooltip,
     Trash2Icon,
+    TypeIcon,
     Typography,
     UserIcon
 } from "@rebasepro/ui";
 import { RebaseLogo } from "../RebaseLogo";
 
 const SECTIONS = [
-    { id: "drawer",
-label: "Drawer" },
-    { id: "appbar",
-label: "App Bar" },
-    { id: "tabs",
-label: "Tabs" },
-    { id: "editor-sidebar",
-label: "Editor Sidebar" },
-    { id: "empty-states",
-label: "Empty States" },
-    { id: "typography",
-label: "Typography" },
-    { id: "buttons",
-label: "Buttons" },
-    { id: "inputs",
-label: "Form Inputs" },
-    { id: "chips-alerts",
-label: "Chips & Alerts" },
-    { id: "users",
-label: "Users View" },
-    { id: "user-dialog",
-label: "User Dialog" }
+    { id: "drawer", label: "Drawer", icon: PanelLeftIcon },
+    { id: "appbar", label: "App Bar", icon: AppWindow },
+    { id: "tabs", label: "Tabs", icon: ListIcon },
+    { id: "editor-sidebar", label: "Editor Sidebar", icon: ColumnsIcon },
+    { id: "empty-states", label: "Empty States", icon: FileIcon },
+    { id: "typography", label: "Typography", icon: TypeIcon },
+    { id: "buttons", label: "Buttons", icon: PlusIcon },
+    { id: "inputs", label: "Form Inputs", icon: FileTextIcon },
+    { id: "chips-alerts", label: "Chips & Alerts", icon: AlertCircleIcon },
+    { id: "users", label: "Users View", icon: UserIcon },
+    { id: "user-dialog", label: "User Dialog", icon: CircleUserIcon }
 ];
 
 export function UIReferenceView() {
@@ -129,28 +126,31 @@ export function UIReferenceView() {
                         </div>
                         {/* Nav items — from DrawerNavigationItem */}
                         <div className="overflow-hidden bg-surface-50 dark:bg-surface-950/30 rounded-b-lg">
-                            {SECTIONS.map(s => (
-                                <div key={s.id}>
-                                    <div
-                                        onClick={() => scrollTo(s.id)}
-                                        className={cls(
-                                            "rounded-lg truncate group/nav",
-                                            "hover:bg-primary/5 dark:hover:bg-primary/5 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white",
-                                            "flex flex-row items-center",
-                                            "pr-4 h-10",
-                                            "font-medium text-xs cursor-pointer",
-                                            activeSection === s.id ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary" : ""
-                                        )}
-                                    >
-                                        <div className={cls("shrink-0 flex items-center justify-center w-[56px] h-[40px] text-surface-500 dark:text-text-secondary-dark transition-colors duration-150 group-hover/nav:text-primary", activeSection === s.id && "text-primary dark:text-primary")}>
-                                            <SettingsIcon size={iconSize.small}/>
-                                        </div>
-                                        <div className="text-text-primary dark:text-surface-200 opacity-100 font-inherit truncate space-x-2">
-                                            {s.label.toUpperCase()}
+                            {SECTIONS.map(s => {
+                                const IconComponent = s.icon;
+                                return (
+                                    <div key={s.id}>
+                                        <div
+                                            onClick={() => scrollTo(s.id)}
+                                            className={cls(
+                                                "rounded-lg truncate group/nav",
+                                                "hover:bg-primary/5 dark:hover:bg-primary/5 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white",
+                                                "flex flex-row items-center",
+                                                "pr-4 h-10",
+                                                "font-medium text-xs cursor-pointer",
+                                                activeSection === s.id ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary" : ""
+                                            )}
+                                        >
+                                            <div className={cls("shrink-0 flex items-center justify-center w-[56px] h-[40px] text-surface-500 dark:text-text-secondary-dark transition-colors duration-150 group-hover/nav:text-primary", activeSection === s.id && "text-primary dark:text-primary")}>
+                                                <IconComponent size={iconSize.small}/>
+                                            </div>
+                                            <div className="text-text-primary dark:text-surface-200 opacity-100 font-inherit truncate space-x-2">
+                                                {s.label.toUpperCase()}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -888,14 +888,6 @@ roles: [] }
                         </div>
                     </div>
                 </SectionBlock>
-
-
-                {/* Footer */}
-                <div className="px-6 py-8">
-                    <Typography variant="caption" color="secondary">
-                        Hidden debug reference — <code className="font-mono text-xs">/debug/ui</code>. Not linked from sidebar.
-                    </Typography>
-                </div>
             </div>
         </div>
     );

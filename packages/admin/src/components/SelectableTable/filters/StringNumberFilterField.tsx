@@ -1,8 +1,15 @@
-
 import React, { useState } from "react";
 import { EnumValuesChip } from "../../../preview";
-import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { IconButton, MultiSelect, MultiSelectItem, Select, SelectItem, TextField, XIcon } from "@rebasepro/ui";
+import {
+    IconButton,
+    MultiSelect,
+    MultiSelectItem,
+    Select,
+    SelectItem,
+    TextField,
+    VirtualTableWhereFilterOp,
+    XIcon
+} from "@rebasepro/ui";
 import { EnumValueConfig } from "@rebasepro/types";
 import { useTranslation } from "@rebasepro/core";
 
@@ -33,14 +40,14 @@ const operationLabels = {
 const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
 
 export function StringNumberFilterField({
-    name,
-    value,
-    setValue,
-    type,
-    isArray,
-    enumValues,
-    title
-}: StringNumberFilterFieldProps) {
+                                            name,
+                                            value,
+                                            setValue,
+                                            type,
+                                            isArray,
+                                            enumValues,
+                                            title
+                                        }: StringNumberFilterFieldProps) {
     const { t } = useTranslation();
 
     const possibleOperations: (keyof typeof operationLabels)[] = isArray
@@ -110,13 +117,13 @@ export function StringNumberFilterField({
         <div className="flex w-full">
             <div className={"w-[100px]"}>
                 <Select value={operation}
-                    size={"medium"}
-                    fullWidth={true}
-                    position={"item-aligned"}
-                    onValueChange={(value) => {
-                        updateFilter(value as VirtualTableWhereFilterOp | "is-null", internalValue);
-                    }}
-                    renderValue={(op) => operationLabels[op as keyof typeof operationLabels]}>
+                        size={"medium"}
+                        fullWidth={true}
+                        position={"item-aligned"}
+                        onValueChange={(value) => {
+                            updateFilter(value as VirtualTableWhereFilterOp | "is-null", internalValue);
+                        }}
+                        renderValue={(op) => operationLabels[op as keyof typeof operationLabels]}>
                     {possibleOperations.map((op) => (
                         <SelectItem key={op} value={op}>
                             {operationLabels[op]}
@@ -174,7 +181,7 @@ export function StringNumberFilterField({
                         }}>
                         {enumValues.map((enumConfig) => (
                             <SelectItem key={`select_item_${name}_${enumConfig.id}`}
-                                value={String(enumConfig.id)}>
+                                        value={String(enumConfig.id)}>
                                 <EnumValuesChip
                                     enumKey={String(enumConfig.id)}
                                     enumValues={enumValues}
@@ -191,7 +198,7 @@ export function StringNumberFilterField({
                         value={Array.isArray(internalValue) ? internalValue.map(e => String(e)) : []}
                         disabled={isNullOperation}
                         onValueChange={(value) => {
-                            updateFilter(operation, type === "number" ? value.map(v => parseInt(v)) : value)
+                            updateFilter(operation, type === "number" ? (value ?? []).map(v => parseInt(v)) : value)
                         }}
                         multiple={multiple}
                         endAdornment={internalValue && <IconButton
@@ -202,7 +209,7 @@ export function StringNumberFilterField({
                     >
                         {enumValues.map((enumConfig) => (
                             <MultiSelectItem key={`select_value_${name}_${enumConfig.id}`}
-                                value={String(enumConfig.id)}>
+                                             value={String(enumConfig.id)}>
                                 <EnumValuesChip
                                     enumKey={String(enumConfig.id)}
                                     enumValues={enumValues}

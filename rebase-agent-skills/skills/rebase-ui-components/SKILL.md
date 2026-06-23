@@ -1397,6 +1397,83 @@ export function DashboardView() {
 }
 ```
 
+## Rich Text Editor (`RichTextEditor`)
+
+> **IMPORTANT:** `RichTextEditor` lives in `@rebasepro/admin`, NOT in `@rebasepro/ui`. It is a separate heavy entry point (~300 KB) because it bundles ProseMirror.
+
+A full-featured, block-based WYSIWYG editor with slash commands, bubble menus, image uploads, tables, AI autocomplete, drag-and-drop reordering, and a raw Markdown toggle. Outputs **Markdown**, **JSON** (ProseMirror document tree), and **HTML**.
+
+### Import
+
+```ts
+// The component (heavy — code-split / lazy-load when possible)
+import { RichTextEditor } from "@rebasepro/admin/editor";
+
+// Types only (lightweight — from the main entry point)
+import type { RichTextEditorProps, JSONContent, EditorAIController } from "@rebasepro/admin";
+```
+
+> **Note:** The previous export name `RebaseEditor` still works but is deprecated. Always use `RichTextEditor`.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `content` | `JSONContent \| string` | — | Initial content. Pass a markdown string or a ProseMirror JSON document. |
+| `onMarkdownContentChange` | `(md: string) => void` | — | Called with serialized Markdown on edits |
+| `onJsonContentChange` | `(json: JSONContent \| null) => void` | — | Called with ProseMirror JSON on edits |
+| `onHtmlContentChange` | `(html: string) => void` | — | Called with HTML string on edits |
+| `handleImageUpload` | `(file: File) => Promise<string>` | **required** | Upload handler that returns the image URL |
+| `version` | `number` | — | Bump to force-reset editor content (e.g. on form discard) |
+| `textSize` | `"sm" \| "base" \| "lg"` | `"base"` | Prose typography scale |
+| `highlight` | `{ from: number, to: number }` | — | Highlight a character range (used by AI autocomplete) |
+| `aiController` | `EditorAIController` | — | AI autocomplete controller |
+| `disabled` | `boolean` | `false` | Read-only mode |
+| `markdownConfig` | `MarkdownEditorConfig` | — | Markdown parser options (`html`, `transformPastedText`) |
+
+### Usage Example
+
+```tsx
+import { RichTextEditor } from "@rebasepro/admin/editor";
+
+function MyEditor() {
+    const [markdown, setMarkdown] = useState("");
+
+    return (
+        <RichTextEditor
+            content={markdown}
+            onMarkdownContentChange={setMarkdown}
+            handleImageUpload={async (file) => {
+                const url = await uploadToStorage(file);
+                return url;
+            }}
+            textSize="base"
+        />
+    );
+}
+```
+
+### Lazy Loading
+
+Because the editor is ~300 KB, lazy-load it when it's not immediately visible:
+
+```tsx
+import { lazy, Suspense } from "react";
+import { Skeleton } from "@rebasepro/ui";
+
+const RichTextEditor = lazy(() =>
+    import("@rebasepro/admin/editor").then(m => ({ default: m.RichTextEditor }))
+);
+
+function LazyEditor(props) {
+    return (
+        <Suspense fallback={<Skeleton height={200} className="w-full rounded-md" />}>
+            <RichTextEditor {...props} />
+        </Suspense>
+    );
+}
+```
+
 ## Tailwind CSS v4
 
 Rebase uses Tailwind CSS v4 with CSS-first configuration:

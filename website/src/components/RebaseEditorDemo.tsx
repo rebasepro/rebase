@@ -1,4 +1,4 @@
-import { RebaseEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/admin/editor";
 
 const sampleContent = `# Getting Started with Rebase
 
@@ -23,7 +23,7 @@ const rebase = createRebaseClient(config);
 | Data Import/Export | ✓ |
 `;
 
-export function RebaseEditorDemo() {
+export function RichTextEditorDemo() {
     const handleImageUpload = async (file: File): Promise<string> => {
         return URL.createObjectURL(file);
     };
@@ -47,7 +47,7 @@ export function RebaseEditorDemo() {
                 prose-li:text-surface-300
                 [&_.ProseMirror]:min-h-[350px] [&_.ProseMirror]:p-8 [&_.ProseMirror]:focus:outline-none
             ">
-                <RebaseEditor
+                <RichTextEditor
                     content={sampleContent}
                     handleImageUpload={handleImageUpload}
                     textSize="sm"

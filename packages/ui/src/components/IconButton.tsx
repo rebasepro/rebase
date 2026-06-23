@@ -21,7 +21,7 @@ const colorClasses = "text-surface-accent-500 visited:text-surface-accent-500 da
 const sizeClasses = {
     medium: "w-10 !h-10 min-w-10 min-h-10",
     small: "w-8 !h-8 min-w-8 min-h-8",
-    smallest: "w-6 !h-6 min-w-6 min-h-6",
+    smallest: "w-7 !h-7 min-w-7 min-h-7",
     large: "w-12 !h-12 min-w-12 min-h-12"
 }
 const shapeClasses = {

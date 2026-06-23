@@ -149,14 +149,65 @@ path: "authors" }
             of: { type: "string" } as Property
         } as unknown as Property;
 
+        const arrayOfNumbersProp: Property = {
+            type: "array",
+            of: { type: "number" } as Property
+        } as unknown as Property;
+
+        const arrayOfRelationsProp: Property = {
+            type: "array",
+            of: { type: "relation" } as Property
+        } as unknown as Property;
+
         it("should serialize array elements through their sub-property type", () => {
             expect(serializePropertyToServer(["a", "b", "c"], arrayOfStringsProp))
                 .toEqual(["a", "b", "c"]);
         });
 
-        it("should pass through non-array values", () => {
+        it("should coerce non-array values to empty array", () => {
             expect(serializePropertyToServer("not-an-array", arrayOfStringsProp))
-                .toBe("not-an-array");
+                .toEqual([]);
+        });
+
+        // --- Null safety ---
+        it("should return null for null array value", () => {
+            expect(serializePropertyToServer(null, arrayOfStringsProp)).toBeNull();
+        });
+
+        it("should return undefined for undefined array value", () => {
+            expect(serializePropertyToServer(undefined, arrayOfStringsProp)).toBeUndefined();
+        });
+
+        it("should return empty array for empty array value", () => {
+            expect(serializePropertyToServer([], arrayOfStringsProp)).toEqual([]);
+        });
+
+        it("should return null for null value with array-of-numbers property", () => {
+            expect(serializePropertyToServer(null, arrayOfNumbersProp)).toBeNull();
+        });
+
+        it("should handle array with null elements", () => {
+            const result = serializePropertyToServer([null, "a", null, "b"], arrayOfStringsProp);
+            expect(result).toEqual([null, "a", null, "b"]);
+        });
+
+        it("should handle array of relation objects with null entries", () => {
+            const value = [{ id: "1", path: "tags" }, null, { id: "2", path: "tags" }];
+            const result = serializePropertyToServer(value, arrayOfRelationsProp);
+            expect(result).toEqual(["1", null, "2"]);
+        });
+
+        it("should coerce number value to empty array for array property", () => {
+            expect(serializePropertyToServer(42, arrayOfStringsProp)).toEqual([]);
+        });
+
+        it("should coerce boolean value to empty array for array property", () => {
+            expect(serializePropertyToServer(true, arrayOfStringsProp)).toEqual([]);
+        });
+
+        it("should coerce object value to empty array for array property", () => {
+            const obj = { a: 1 };
+            expect(serializePropertyToServer(obj, arrayOfStringsProp)).toEqual([]);
         });
     });
 

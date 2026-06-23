@@ -145,6 +145,10 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * Path: /file/{bucket}/{path} or /file/{path}
      */
     router.get("/file/*", readAuthMiddleware, async (c) => {
+        // Allow cross-origin loading so admin frontends on different
+        // ports (dev) or domains (CDN) can render images via <img>.
+        c.header("Cross-Origin-Resource-Policy", "cross-origin");
+
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
             throw ApiError.notFound("File not found");

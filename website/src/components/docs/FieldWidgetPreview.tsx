@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback } from "react";
-import { RebaseEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/admin/editor";
 import {
     TextField,
     TextareaAutosize,
@@ -211,7 +211,7 @@ function MarkdownPreview() {
                     prose-code:font-normal
                     [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:p-8 [&_.ProseMirror]:focus:outline-none
                 ">
-                    <RebaseEditor
+                    <RichTextEditor
                         content={"## Hello World\n\nThis is a **markdown** editor with *rich text* support.\n\n- Bullet one\n- Bullet two\n\n> A blockquote example"}
                         handleImageUpload={handleImageUpload}
                     />

@@ -434,6 +434,7 @@ function FilePreviewPanel({
 
             {/* Delete Confirmation */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogTitle hidden>Delete File</DialogTitle>
                 <DialogContent>
                     <Typography variant="subtitle1" className="mb-2">
                         Delete File?
@@ -1400,6 +1401,7 @@ message: e instanceof Error ? e.message : String(e) });
                     }
                 }}
             >
+                <DialogTitle hidden>Delete Confirmation</DialogTitle>
                 <DialogContent>
                     <Typography variant="subtitle1" className="font-semibold mb-2">
                         {deleteDialogTarget === "selection"
@@ -1446,10 +1448,8 @@ message: e instanceof Error ? e.message : String(e) });
                     }
                 }}
             >
+                <DialogTitle hidden>New Folder</DialogTitle>
                 <DialogContent>
-                    <Typography variant="subtitle1" className="font-semibold mb-4">
-                        New Folder
-                    </Typography>
                     <TextField
                         autoFocus
                         size="small"

@@ -125,7 +125,8 @@ export const deleteEntityAction: EntityAction = {
         context,
         selectionController,
         onCollectionChange,
-        navigateBack
+        navigateBack,
+        openEntityMode
     }): Promise<void> {
         if (!entity) {
             throw new Error("INTERNAL: deleteEntityAction: Entity is undefined");
@@ -150,7 +151,14 @@ export const deleteEntityAction: EntityAction = {
                         });
                         selectionController?.setSelectedEntities(selectionController.selectedEntities.filter(e => e.id !== entity.id));
                         onCollectionChange?.();
-                        navigateBack?.();
+                        // In full-screen mode, navigateBack would go to the deleted entity's
+                        // detail URL, which no longer exists. Navigate to the parent collection instead.
+                        if (openEntityMode === "full_screen" && context.urlController) {
+                            const collectionUrl = context.urlController.buildUrlCollectionPath(path);
+                            context.urlController.navigate(collectionUrl, { replace: true });
+                        } else {
+                            navigateBack?.();
+                        }
                     }}
                     onClose={closeDialog}/>;
             }

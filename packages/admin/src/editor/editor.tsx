@@ -25,22 +25,26 @@ export interface MarkdownEditorConfig {
   transformPastedText?: boolean;
 }
 
-export type RebaseEditorTextSize = "sm" | "base" | "lg";
+export type RichTextEditorTextSize = "sm" | "base" | "lg";
+/** @deprecated Use `RichTextEditorTextSize` instead. */
+export type RebaseEditorTextSize = RichTextEditorTextSize;
 
-export type RebaseEditorProps = {
+export type RichTextEditorProps = {
   content?: JSONContent | string,
   onMarkdownContentChange?: (content: string) => void,
   onJsonContentChange?: (content: JSONContent | null) => void,
   onHtmlContentChange?: (content: string) => void,
   handleImageUpload: (file: File) => Promise<string>,
   version?: number,
-  textSize?: RebaseEditorTextSize,
+  textSize?: RichTextEditorTextSize,
   highlight?: { from: number, to: number },
   aiController?: EditorAIController,
   customComponents?: CustomEditorComponent[];
   disabled?: boolean;
   markdownConfig?: MarkdownEditorConfig;
 };
+/** @deprecated Use `RichTextEditorProps` instead. */
+export type RebaseEditorProps = RichTextEditorProps;
 
 const proseClasses = {
   "sm": "prose-sm",
@@ -48,7 +52,7 @@ const proseClasses = {
   "lg": "prose-lg"
 }
 
-export const RebaseEditor = ({
+export const RichTextEditor = ({
   content,
   onJsonContentChange,
   onHtmlContentChange,
@@ -60,7 +64,8 @@ export const RebaseEditor = ({
   aiController,
   disabled,
   markdownConfig
-}: RebaseEditorProps) => {
+}: RichTextEditorProps) => {
+
   const { t } = useTranslation();
 
   const [openNode, setOpenNode] = useState(false);
@@ -134,7 +139,7 @@ onJsonContentChange };
         const markdown = serializer.serialize(currentState.doc);
         onMarkdownContentChange(markdown);
       } catch (e) {
-        console.warn("[RebaseEditor] Could not serialize editor state to markdown:", e);
+        console.warn("[RichTextEditor] Could not serialize editor state to markdown:", e);
       }
     }
     if (onJsonContentChange) {
@@ -168,7 +173,7 @@ onJsonContentChange };
         view.dispatch(tr);
       }
     } catch (e) {
-      console.warn("[RebaseEditor] Could not reset editor content:", e);
+      console.warn("[RichTextEditor] Could not reset editor content:", e);
     }
     // Also reset raw-markdown textarea if the user is in source mode
     if (isMarkdownMode) {
@@ -319,7 +324,8 @@ view }), [state, view])}>
     </div>
   );
 };
-
+/** @deprecated Use `RichTextEditor` instead. */
+export const RebaseEditor = RichTextEditor;
 
 const cssStyles = `
 .ProseMirror {

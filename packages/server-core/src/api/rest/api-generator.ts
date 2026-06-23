@@ -294,7 +294,16 @@ values: entity.values as Record<string, unknown> },
                 return c.json(response, 201);
             } catch (error) {
                 if (isRebaseApiError(error) && !error.code) {
-                    error.code = "BAD_REQUEST";
+                    // Only classify as BAD_REQUEST if it's an operational error
+                    // (e.g. validation, DB constraints). Runtime bugs like TypeError,
+                    // RangeError etc. should remain as 500 INTERNAL_ERROR.
+                    const isRuntimeBug = error instanceof TypeError
+                        || error instanceof RangeError
+                        || error instanceof SyntaxError
+                        || error instanceof ReferenceError;
+                    if (!isRuntimeBug) {
+                        error.code = "BAD_REQUEST";
+                    }
                 }
                 throw error;
             }
@@ -343,7 +352,15 @@ values: entity.values as Record<string, unknown> },
                 return c.json(response);
             } catch (error) {
                 if (isRebaseApiError(error) && !error.code) {
-                    error.code = "BAD_REQUEST";
+                    // Only classify as BAD_REQUEST if it's an operational error.
+                    // Runtime bugs (TypeError, RangeError, etc.) stay as 500.
+                    const isRuntimeBug = error instanceof TypeError
+                        || error instanceof RangeError
+                        || error instanceof SyntaxError
+                        || error instanceof ReferenceError;
+                    if (!isRuntimeBug) {
+                        error.code = "BAD_REQUEST";
+                    }
                 }
                 throw error;
             }

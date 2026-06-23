@@ -62,6 +62,91 @@ export interface InitOptions {
     pmCommands: PMCommands;
 }
 
+export interface BuildQuestionsParams {
+    nameArg?: string;
+    templateArg?: TemplatePreset;
+    hasGitFlag: boolean;
+    hasInstallFlag: boolean;
+    pm: PackageManager;
+}
+
+/**
+ * Builds the interactive prompt questions for `rebase init`.
+ * Exported for testability — all prompt `type` values must match
+ * types registered by the installed version of inquirer.
+ */
+export function buildInitQuestions(params: BuildQuestionsParams): Record<string, unknown>[] {
+    const { nameArg, templateArg, hasGitFlag, hasInstallFlag, pm } = params;
+    const questions: Record<string, unknown>[] = [];
+
+    if (!nameArg) {
+        questions.push({
+            type: "input",
+            name: "projectName",
+            message: "Project name:",
+            default: "my-rebase-app",
+            validate: (input: string) => {
+                if (!input.trim()) return "Project name is required";
+                if (!/^[a-z0-9][a-z0-9._-]*$/.test(input)) {
+                    return "Project name must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, dots, or underscores";
+                }
+                return true;
+            }
+        });
+    }
+
+    if (!templateArg) {
+        questions.push({
+            type: "select",
+            name: "preset",
+            message: "Choose a starter template:",
+            choices: PRESET_CHOICES,
+            default: "blog"
+        });
+    }
+
+    if (!hasGitFlag) {
+        questions.push({
+            type: "confirm",
+            name: "git",
+            message: "Initialize a git repository?",
+            default: true
+        });
+    }
+
+    if (!hasInstallFlag) {
+        questions.push({
+            type: "confirm",
+            name: "installDeps",
+            message: `Install dependencies with ${pm}?`,
+            default: true
+        });
+    }
+
+    questions.push({
+        type: "input",
+        name: "databaseUrl",
+        message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
+        default: "",
+        validate: (input: string) => {
+            if (input.trim() && /[\r\n]/.test(input)) {
+                return "Database URL cannot contain newline characters.";
+            }
+            return true;
+        }
+    });
+
+    questions.push({
+        type: "confirm",
+        name: "introspect",
+        message: "Would you like to introspect this database to automatically generate collections?",
+        default: true,
+        when: (answers: Record<string, unknown>) => !!(answers.databaseUrl as string)?.trim()
+    });
+
+    return questions;
+}
+
 export async function createRebaseApp(rawArgs: string[]) {
     console.log(`
 ${chalk.bold("Rebase")} — Create a new project 🚀
@@ -122,72 +207,14 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         };
     }
 
-    const questions: Record<string, unknown>[] = [];
-
-    if (!nameArg) {
-        questions.push({
-            type: "input",
-            name: "projectName",
-            message: "Project name:",
-            default: "my-rebase-app",
-            validate: (input: string) => {
-                if (!input.trim()) return "Project name is required";
-                if (!/^[a-z0-9][a-z0-9._-]*$/.test(input)) {
-                    return "Project name must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, dots, or underscores";
-                }
-                return true;
-            }
-        });
-    }
-
-    if (!templateArg) {
-        questions.push({
-            type: "select",
-            name: "preset",
-            message: "Choose a starter template:",
-            choices: PRESET_CHOICES,
-            default: "blog"
-        });
-    }
-
-    if (!args["--git"]) {
-        questions.push({
-            type: "confirm",
-            name: "git",
-            message: "Initialize a git repository?",
-            default: true
-        });
-    }
-
-    if (!args["--install"]) {
-        questions.push({
-            type: "confirm",
-            name: "installDeps",
-            message: `Install dependencies with ${pm}?`,
-            default: true
-        });
-    }
-
-    questions.push({
-        type: "input",
-        name: "databaseUrl",
-        message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
-        default: "",
-        validate: (input: string) => {
-            if (input.trim() && /[\r\n]/.test(input)) {
-                return "Database URL cannot contain newline characters.";
-            }
-            return true;
-        }
+    const questions = buildInitQuestions({
+        nameArg,
+        templateArg,
+        hasGitFlag: !!args["--git"],
+        hasInstallFlag: !!args["--install"],
+        pm
     });
 
-    questions.push({
-        type: "confirm",
-        name: "introspect",
-        message: "Would you like to introspect this database to automatically generate collections?",
-        default: true,
-        when: (answers: Record<string, unknown>) => !!(answers.databaseUrl as string)?.trim()
-    });
 
     const answers = await inquirer.prompt(questions as unknown as Parameters<typeof inquirer.prompt>[0]);
 

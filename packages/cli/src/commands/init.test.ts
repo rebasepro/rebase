@@ -9,7 +9,9 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { cp } from "fs/promises";
-import { configureEnvFile } from "./init.js";
+import inquirer from "inquirer";
+import { configureEnvFile, buildInitQuestions } from "./init.js";
+
 
 let tmpDir: string;
 
@@ -666,5 +668,110 @@ describe("scaffold security defaults", () => {
             expect(gitignore).toContain(".rebase-dev-url");
             expect(gitignore).toContain(".rebase-dev-port");
         });
+    });
+});
+
+// =============================================================================
+// Interactive prompt configuration
+// =============================================================================
+
+describe("buildInitQuestions", () => {
+    const registeredTypes = new Set(Object.keys(inquirer.prompt.prompts));
+
+    it("should only use prompt types registered by the installed inquirer version", () => {
+        // Call with no flags so every conditional question is included
+        const questions = buildInitQuestions({
+            nameArg: undefined,
+            templateArg: undefined,
+            hasGitFlag: false,
+            hasInstallFlag: false,
+            pm: "pnpm"
+        });
+
+        expect(questions.length).toBeGreaterThan(0);
+
+        for (const q of questions) {
+            expect(
+                registeredTypes.has(q.type as string),
+                `Prompt type "${q.type}" is not registered in inquirer. Available: ${[...registeredTypes].join(", ")}`
+            ).toBe(true);
+        }
+    });
+
+    it("should include all expected question names when no flags are set", () => {
+        const questions = buildInitQuestions({
+            nameArg: undefined,
+            templateArg: undefined,
+            hasGitFlag: false,
+            hasInstallFlag: false,
+            pm: "pnpm"
+        });
+        const names = questions.map((q) => q.name);
+
+        expect(names).toContain("projectName");
+        expect(names).toContain("preset");
+        expect(names).toContain("git");
+        expect(names).toContain("installDeps");
+        expect(names).toContain("databaseUrl");
+        expect(names).toContain("introspect");
+    });
+
+    it("should omit projectName question when nameArg is provided", () => {
+        const questions = buildInitQuestions({
+            nameArg: "my-app",
+            templateArg: undefined,
+            hasGitFlag: false,
+            hasInstallFlag: false,
+            pm: "pnpm"
+        });
+        expect(questions.map((q) => q.name)).not.toContain("projectName");
+    });
+
+    it("should omit preset question when templateArg is provided", () => {
+        const questions = buildInitQuestions({
+            nameArg: undefined,
+            templateArg: "blog",
+            hasGitFlag: false,
+            hasInstallFlag: false,
+            pm: "pnpm"
+        });
+        expect(questions.map((q) => q.name)).not.toContain("preset");
+    });
+
+    it("should omit git question when hasGitFlag is true", () => {
+        const questions = buildInitQuestions({
+            nameArg: undefined,
+            templateArg: undefined,
+            hasGitFlag: true,
+            hasInstallFlag: false,
+            pm: "pnpm"
+        });
+        expect(questions.map((q) => q.name)).not.toContain("git");
+    });
+
+    it("should omit installDeps question when hasInstallFlag is true", () => {
+        const questions = buildInitQuestions({
+            nameArg: undefined,
+            templateArg: undefined,
+            hasGitFlag: false,
+            hasInstallFlag: true,
+            pm: "pnpm"
+        });
+        expect(questions.map((q) => q.name)).not.toContain("installDeps");
+    });
+
+    it("should include package manager name in installDeps message", () => {
+        for (const pm of ["pnpm", "npm"] as const) {
+            const questions = buildInitQuestions({
+                nameArg: undefined,
+                templateArg: undefined,
+                hasGitFlag: false,
+                hasInstallFlag: false,
+                pm
+            });
+            const installQ = questions.find((q) => q.name === "installDeps");
+            expect(installQ).toBeDefined();
+            expect(installQ!.message as string).toContain(pm);
+        }
     });
 });

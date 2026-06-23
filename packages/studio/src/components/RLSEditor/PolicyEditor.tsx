@@ -358,6 +358,7 @@ export const PolicyEditor = ({
             </DialogActions>
 
             <Dialog open={helpOpen} onOpenChange={setHelpOpen} maxWidth="3xl">
+                <DialogTitle hidden>Row-Level Security Help</DialogTitle>
                 <DialogContent className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
                     <div>
                         <Typography variant="h5" className="mb-2">{t("studio_policy_help_title")}</Typography>

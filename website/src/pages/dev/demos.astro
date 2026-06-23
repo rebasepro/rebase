@@ -6,7 +6,7 @@ import { StorageViewDemo } from "../../components/demos/StorageViewDemo";
 import { EntityViewDemo } from "../../components/demos/EntityViewDemo";
 import { JSEditorDemo } from "../../components/demos/JSEditorDemo";
 import { SchemaEditorDemo } from "../../components/SchemaEditorDemo";
-import { RebaseEditorDemo } from "../../components/RebaseEditorDemo";
+import { RichTextEditorDemo } from "../../components/RebaseEditorDemo";
 import "../../styles/editor.css";
 
 const title = "Development Demos — Rebase Component Lab";
@@ -159,7 +159,7 @@ if (import.meta.env.PROD) {
                     <p class="text-surface-400 max-w-2xl">Block-based rich text editor built on the Rebase editor package. This is the existing demo used in the Studio showcase page.</p>
                 </div>
                 <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 shadow-2xl">
-                    <RebaseEditorDemo client:only="react" />
+                    <RichTextEditorDemo client:only="react" />
                 </div>
             </div>
         </section>

@@ -327,9 +327,6 @@ iframe {
     background-clip: text;
 }
 
-.hero-gradient {
-    background: radial-gradient(ellipse at center, rgba(0, 112, 244, 0.1) 0%, transparent 70%);
-}
 
 /* Manifesto Banner Dismissal */
 html.banner-dismissed-instant #manifesto-banner {

@@ -117,7 +117,7 @@
 }
 
 .typography-button {
-    @apply text-xs font-semibold tracking-wide capitalize;
+    @apply text-sm font-semibold tracking-wide;
 }
 
 :focus-visible {

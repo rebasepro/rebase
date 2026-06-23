@@ -1,8 +1,8 @@
 // CMS-specific types take priority over base types when names conflict
 export * from "./types";
-// Editor types only — the full ProseMirror editor is a heavy import (~300 KB)
+// Editor types only — the full ProseMirror editor (RichTextEditor) is a heavy import (~300 KB)
 // and is available as a separate entry point: @rebasepro/admin/editor
-export type { RebaseEditorProps, JSONContent, EditorAIController } from "./editor";
+export type { RichTextEditorProps, RichTextEditorTextSize, RebaseEditorProps, RebaseEditorTextSize, JSONContent, EditorAIController } from "./editor";
 export * from "./form";
 export * from "./preview";
 export * from "./routes";

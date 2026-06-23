@@ -90,7 +90,7 @@ function normalizeWhereValue(value: WhereFieldValue): string {
 
 function serializeLogicalCondition(cond: any): string {
     if ("type" in cond) {
-        const sub = cond.conditions.map(serializeLogicalCondition).join(",");
+        const sub = (cond.conditions ?? []).map(serializeLogicalCondition).join(",");
         return `${cond.type}(${sub})`;
     } else {
         const op = OP_MAP[cond.operator] ?? cond.operator;
@@ -126,7 +126,7 @@ export function buildQueryString(params?: FindParams): string {
 
     if (params.logical) {
         const root = params.logical;
-        const serialized = root.conditions.map(serializeLogicalCondition).join(",");
+        const serialized = (root.conditions ?? []).map(serializeLogicalCondition).join(",");
         parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
     }
 
