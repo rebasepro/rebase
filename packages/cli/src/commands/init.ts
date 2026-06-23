@@ -142,7 +142,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
     if (!templateArg) {
         questions.push({
-            type: "list",
+            type: "select",
             name: "preset",
             message: "Choose a starter template:",
             choices: PRESET_CHOICES,
