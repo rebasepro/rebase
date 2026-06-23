@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/plugin-insights",
   "type": "module",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
@@ -57,7 +57,12 @@
   },
   "jest": {
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", { "diagnostics": false }]
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "diagnostics": false
+        }
+      ]
     },
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
     "moduleFileExtensions": [
