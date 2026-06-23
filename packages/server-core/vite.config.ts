@@ -53,6 +53,11 @@ export default defineConfig(() => ({
         sourcemap: true,
         rollupOptions: {
             external: isExternal,
+            onwarn(warning, warn) {
+                if (warning.code === "MISSING_GLOBAL_NAME") return;
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                warn(warning);
+            },
             output: {
                 banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);',
                 globals: {

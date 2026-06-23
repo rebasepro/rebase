@@ -8,8 +8,6 @@ description: Deployment rules and restrictions for the Rebase backend and all se
 
 This applies to:
 - `rebase deploy` (any variant)
-- `firebase deploy` (any variant)
-- `gcloud functions deploy`
 - `gcloud run deploy`
 - `terraform apply` (any variant that deploys resources)
 - Any command that pushes code, functions, or configuration to a live environment

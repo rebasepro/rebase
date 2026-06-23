@@ -46,7 +46,11 @@ Azure Container Apps provides a serverless container environment with built-in H
 |------|-------|
 | `DATABASE_URL` | Your Azure Postgres connection string |
 | `JWT_SECRET` | A Secure random 32+ character string |
+| `REBASE_SERVICE_KEY` | A Secure random 32+ character string |
 | `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | Your frontend domain (e.g., `https://yourdomain.com`) |
+| `FRONTEND_URL` | Your frontend URL (used for email links and CORS fallback) |
+| `ALLOW_REGISTRATION` | `false` (set to `true` only during initial setup) |
 
 5. Under the **Ingress** tab, explicitly Enable Ingress.
 6. Set the Target Port to **3001**.

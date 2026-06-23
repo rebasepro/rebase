@@ -28,15 +28,18 @@ Ensure you have the `gcloud` CLI installed and authenticated:
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+# Create an Artifact Registry repository (one-time)
+gcloud artifacts repositories create rebase --repository-format=docker --location=europe-west3
 
-# Deploy the newly built image to Cloud Run
+# Build and push using Cloud Build
+gcloud builds submit --tag europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest ./backend
+
+# Deploy the image to Cloud Run
 gcloud run deploy rebase-backend \
-  --image gcr.io/YOUR_PROJECT_ID/rebase-backend \
+  --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \
   --region europe-west3 \
   --port 3001 \
-  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",NODE_ENV="production" \
+  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",REBASE_SERVICE_KEY="YOUR_SERVICE_KEY",NODE_ENV="production",CORS_ORIGINS="https://yourdomain.com",FRONTEND_URL="https://yourdomain.com",ALLOW_REGISTRATION="false" \
   --allow-unauthenticated
 ```
 

@@ -76,34 +76,24 @@ cd frontend && pnpm build
 
 This way you only need to deploy one server that handles both SPA and API.
 
-## Cloud Platforms
+## Platform Deployment Guides
 
-### Railway / Render / Fly.io
+Detailed step-by-step guides for each platform:
 
-1. Push your code to a Git repository
-2. Connect the repo to your cloud platform
-3. Set environment variables (`DATABASE_URL`, `JWT_SECRET`, etc.)
-4. The included `Dockerfile` will be auto-detected
-
-### Google Cloud Run
-
-```bash
-# Build the container
-docker build -t gcr.io/YOUR_PROJECT/rebase-backend ./backend
-
-# Push to Container Registry
-docker push gcr.io/YOUR_PROJECT/rebase-backend
-
-# Deploy
-gcloud run deploy rebase-backend \
-  --image gcr.io/YOUR_PROJECT/rebase-backend \
-  --set-env-vars DATABASE_URL=...,JWT_SECRET=... \
-  --allow-unauthenticated
-```
+| Platform | Type | Guide |
+|----------|------|-------|
+| **AWS** | App Runner / ECS + RDS | [Deploy on AWS →](/docs/deployment/aws) |
+| **Google Cloud** | Cloud Run + Cloud SQL | [Deploy on GCP →](/docs/deployment/gcp) |
+| **Azure** | Container Apps + PostgreSQL | [Deploy on Azure →](/docs/deployment/azure) |
+| **Hetzner Cloud** | VPS + Docker Compose | [Deploy on Hetzner →](/docs/deployment/hetzner) |
+| **Scaleway** | Serverless Containers | [Deploy on Scaleway →](/docs/deployment/scaleway) |
+| **Railway** | PaaS (auto-detect Dockerfile) | [Deploy on Railway →](/docs/deployment/railway) |
+| **Fly.io** | Container runtime | [Deploy on Fly.io →](/docs/deployment/flyio) |
 
 :::caution
-Cloud Run instances are stateless. Use **S3 storage** instead of local filesystem for file uploads, and enable **cross-instance realtime** by providing a `connectionString` in your `PostgresAdapter` configuration so WebSocket updates propagate across replicas.
+Cloud Run and other serverless platforms are stateless. Use **S3 storage** instead of local filesystem for file uploads, and set `--min-instances 1` if you use Rebase realtime features (WebSocket connections are terminated when instances scale down).
 :::
+
 
 ## Changing the Base URL
 

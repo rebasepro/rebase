@@ -30,6 +30,11 @@ export default defineConfig(() => ({
         sourcemap: true,
         rollupOptions: {
             external: isExternal,
+            onwarn(warning, warn) {
+                if (warning.code === "MISSING_GLOBAL_NAME") return;
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                warn(warning);
+            },
             output: {
                 globals: {
                     "json-logic-js": "jsonLogic",

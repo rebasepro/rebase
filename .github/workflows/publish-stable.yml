@@ -64,7 +64,13 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          CURRENT=$(node -e "console.log(require('./lerna.json').version)")
+          LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "❌ No semver tags found. Create an initial tag first: git tag -a v0.0.0 -m 'Initial version'"
+            exit 1
+          fi
+
+          CURRENT="${LATEST_TAG#v}"
           BUMP="${{ inputs.version }}"
 
           if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -81,7 +87,7 @@ jobs:
 
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "📦 Releasing: $CURRENT → $VERSION"
+          echo "📦 Releasing: $CURRENT → $VERSION (from tag $LATEST_TAG)"
 
       # ── Extract release notes from CHANGELOG.md ─────────────
       - name: Extract release notes
@@ -128,14 +134,6 @@ jobs:
             const p=JSON.parse(fs.readFileSync('package.json','utf8'));
             p.version='$VERSION';
             fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
-          "
-
-          # Bump lerna.json
-          node -e "
-            const fs=require('fs');
-            const p=JSON.parse(fs.readFileSync('lerna.json','utf8'));
-            p.version='$VERSION';
-            fs.writeFileSync('lerna.json',JSON.stringify(p,null,2)+'\n');
           "
 
           # Commit and tag

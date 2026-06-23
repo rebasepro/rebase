@@ -1,6 +1,6 @@
 ---
 name: rebase-deployment
-description: Guide for deploying Rebase applications. Use this skill when the user needs to deploy to Rebase Cloud, set up Docker, configure Firebase Hosting, or self-host Rebase.
+description: Guide for deploying Rebase applications. Use this skill when the user needs to deploy to Rebase Cloud, set up Docker, self-host on AWS/GCP/Hetzner, or use a PaaS like Railway or Render.
 ---
 
 # Rebase Deployment
@@ -12,9 +12,13 @@ Rebase supports multiple deployment strategies — from fully managed Rebase Clo
 | Option | Best For | Complexity |
 |--------|----------|------------|
 | **Rebase Cloud** | Fastest setup, managed infrastructure | ⭐ Easy |
-| **Docker** | Full control, self-hosted | ⭐⭐ Medium |
-| **Firebase Hosting** | Static frontend + Cloud Functions backend | ⭐⭐ Medium |
-| **Custom** | Any Node.js hosting (Railway, Render, Fly.io, etc.) | ⭐⭐⭐ Advanced |
+| **Docker (Self-Hosted)** | Full control on any VPS or bare metal | ⭐⭐ Medium |
+| **AWS** | ECS/Fargate or EC2 with RDS PostgreSQL | ⭐⭐⭐ Advanced |
+| **GCP** | Cloud Run with Cloud SQL PostgreSQL | ⭐⭐⭐ Advanced |
+| **Azure** | Container Apps with Azure Database for PostgreSQL | ⭐⭐⭐ Advanced |
+| **Scaleway** | Serverless Containers with Managed PostgreSQL (EU-only) | ⭐⭐⭐ Advanced |
+| **Hetzner** | Cost-effective VPS with Docker Compose | ⭐⭐ Medium |
+| **PaaS** | Railway, Render, Fly.io — Docker-based platforms | ⭐⭐ Medium |
 
 ## Rebase Cloud
 
@@ -483,18 +487,318 @@ if (isProduction) {
 
 ---
 
-## Firebase Hosting (Frontend)
+## AWS (ECS/Fargate + RDS)
 
-Deploy the Studio frontend to Firebase Hosting:
+Deploy the Rebase Docker image to AWS using ECS (Fargate) with a managed PostgreSQL database via RDS.
+
+### Architecture
+
+```
+Internet → ALB (HTTPS) → ECS Fargate (Rebase container) → RDS PostgreSQL
+                                                        → S3 (file storage)
+```
+
+### Key Steps
+
+1. **PostgreSQL** — Create an RDS PostgreSQL 16+ instance (or Aurora Serverless v2). Enable automated backups. Place in a private subnet.
+2. **Docker Image** — Push the Rebase Docker image to ECR:
+   ```bash
+   # Build and tag
+   docker build -t rebase-backend -f app/backend/Dockerfile .
+   docker tag rebase-backend:latest <account-id>.dkr.ecr.<region>.amazonaws.com/rebase-backend:latest
+
+   # Push
+   aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <account-id>.dkr.ecr.<region>.amazonaws.com
+   docker push <account-id>.dkr.ecr.<region>.amazonaws.com/rebase-backend:latest
+   ```
+3. **ECS Task Definition** — Define a Fargate task with the container image, port `3001`, and environment variables (see env var reference above). Use AWS Secrets Manager for `JWT_SECRET`, `REBASE_SERVICE_KEY`, and `DATABASE_URL`.
+4. **ALB** — Create an Application Load Balancer with HTTPS listener (ACM certificate). Target group pointing to the ECS service on port `3001`. Configure the health check path to `/health`.
+5. **File Storage** — Set `STORAGE_TYPE=s3` with an S3 bucket. Grant the ECS task role `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` permissions.
+
+### Key Environment Variables
 
 ```bash
-# Build the frontend
-cd frontend
-pnpm run build
-
-# Deploy to Firebase
-npx firebase-tools@latest deploy --only hosting
+DATABASE_URL=postgresql://rebase:<password>@<rds-endpoint>:5432/rebase
+JWT_SECRET=<your-secret-min-32-chars>
+REBASE_SERVICE_KEY=<your-service-key-min-32-chars>
+CORS_ORIGINS=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+NODE_ENV=production
+STORAGE_TYPE=s3
+S3_BUCKET=your-rebase-uploads
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=<iam-key-or-use-task-role>
+S3_SECRET_ACCESS_KEY=<iam-secret>
 ```
+
+> **TIP:** Use IAM task roles instead of static access keys for S3. Attach the policy to the ECS task execution role and omit `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` — the AWS SDK will use the role credentials automatically.
+
+---
+
+## GCP (Cloud Run + Cloud SQL)
+
+Deploy the Rebase Docker image to Cloud Run with Cloud SQL for PostgreSQL.
+
+### Architecture
+
+```
+Internet → Cloud Run (HTTPS, auto-scaling) → Cloud SQL PostgreSQL
+                                            → GCS or S3-compatible (file storage)
+```
+
+### Key Steps
+
+1. **PostgreSQL** — Create a Cloud SQL for PostgreSQL 16+ instance. Enable private IP or use the Cloud SQL Auth Proxy.
+2. **Docker Image** — Push to Artifact Registry:
+   ```bash
+   # Build and tag
+   docker build -t rebase-backend -f app/backend/Dockerfile .
+   docker tag rebase-backend:latest <region>-docker.pkg.dev/<project-id>/rebase/backend:latest
+
+   # Push
+   gcloud auth configure-docker <region>-docker.pkg.dev
+   docker push <region>-docker.pkg.dev/<project-id>/rebase/backend:latest
+   ```
+3. **Cloud Run Service** — Deploy with the Cloud SQL connection:
+   ```bash
+   gcloud run deploy rebase-backend \
+     --image <region>-docker.pkg.dev/<project-id>/rebase/backend:latest \
+     --region <region> \
+     --port 3001 \
+     --add-cloudsql-instances <project-id>:<region>:<instance-name> \
+     --set-env-vars "NODE_ENV=production,CORS_ORIGINS=https://yourdomain.com,FRONTEND_URL=https://yourdomain.com" \
+     --set-secrets "DATABASE_URL=rebase-db-url:latest,JWT_SECRET=rebase-jwt-secret:latest,REBASE_SERVICE_KEY=rebase-service-key:latest" \
+     --min-instances 1 \
+     --memory 512Mi \
+     --allow-unauthenticated
+   ```
+4. **Custom Domain** — Map a custom domain in Cloud Run settings. Cloud Run provides HTTPS automatically.
+5. **File Storage** — Use `STORAGE_TYPE=s3` with a GCS bucket via the S3-compatible interop endpoint, or use a dedicated S3 provider like Cloudflare R2.
+
+### Cloud SQL Auth Proxy (Connection String)
+
+When using the Cloud SQL connector in Cloud Run, the database is exposed via a Unix socket:
+
+```bash
+DATABASE_URL=postgresql://rebase:<password>@localhost/rebase?host=/cloudsql/<project-id>:<region>:<instance-name>
+```
+
+> **WARNING:** Cloud Run has a **request timeout** (default 300s, max 3600s) and can scale to zero. WebSocket connections will be terminated when instances scale down. If you rely on Rebase realtime features, set `--min-instances 1` and increase the request timeout. For heavy realtime usage, consider GCE (Compute Engine) with Docker Compose instead.
+
+---
+
+## Azure (Container Apps + PostgreSQL Flexible Server)
+
+Deploy the Rebase Docker image to Azure Container Apps with Azure Database for PostgreSQL.
+
+### Architecture
+
+```
+Internet → Azure Container Apps (HTTPS, auto-scaling) → Azure Database for PostgreSQL
+                                                      → Azure Blob Storage (file storage)
+```
+
+### Key Steps
+
+1. **PostgreSQL** — Create an Azure Database for PostgreSQL Flexible Server. Choose a Burstable or General Purpose tier. Place in an EU region (West Europe, North Europe, or France Central).
+2. **Docker Image** — Push to Azure Container Registry (ACR):
+   ```bash
+   # Login to ACR
+   az acr login --name YourRegistryName
+
+   # Build and push
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f app/backend/Dockerfile .
+   docker push yourregistryname.azurecr.io/rebase-backend:latest
+   ```
+3. **Container App** — Create a Container Apps Environment and deploy:
+   - Point to your ACR image
+   - Set the target port to `3001`
+   - Enable Ingress for external traffic
+   - Configure environment variables (see below)
+4. **Networking** — If the PostgreSQL server uses private networking, configure VNet integration in the Container Apps Environment.
+5. **File Storage** — Use `STORAGE_TYPE=s3` with Azure Blob Storage via the S3-compatible API, or use Cloudflare R2.
+
+### Key Environment Variables
+
+```bash
+DATABASE_URL=postgresql://rebase_admin:<password>@<server-name>.postgres.database.azure.com:5432/rebase
+JWT_SECRET=<your-secret-min-32-chars>
+REBASE_SERVICE_KEY=<your-service-key-min-32-chars>
+CORS_ORIGINS=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+NODE_ENV=production
+ALLOW_REGISTRATION=false
+```
+
+> **TIP:** Azure Container Apps provides built-in HTTPS with automatic TLS certificates. Use Managed Identity instead of static credentials for accessing Azure services.
+
+---
+
+## Scaleway (Serverless Containers + Managed PostgreSQL)
+
+Deploy the Rebase Docker image to Scaleway Serverless Containers. Scaleway is a premier European cloud provider with datacenters in Paris, Amsterdam, and Warsaw — ideal for EU data sovereignty.
+
+### Architecture
+
+```
+Internet → Scaleway Serverless Container (HTTPS) → Managed PostgreSQL
+                                                  → Object Storage (S3-compatible)
+```
+
+### Key Steps
+
+1. **PostgreSQL** — Create a Managed Database for PostgreSQL in your preferred EU region (e.g., Paris `fr-par`).
+2. **Docker Image** — Push to Scaleway Container Registry:
+   ```bash
+   # Build and push
+   docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f app/backend/Dockerfile .
+   docker push rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest
+   ```
+3. **Serverless Container** — Deploy from the Scaleway Console or CLI:
+   - Select your image from the Container Registry
+   - Set the port to `3001`
+   - Configure environment variables (see below)
+4. **File Storage** — Use `STORAGE_TYPE=s3` with Scaleway Object Storage (natively S3-compatible):
+   ```bash
+   S3_ENDPOINT=https://s3.fr-par.scw.cloud
+   S3_BUCKET=your-rebase-uploads
+   S3_REGION=fr-par
+   S3_FORCE_PATH_STYLE=true
+   ```
+
+### Key Environment Variables
+
+```bash
+DATABASE_URL=postgresql://user:<password>@<instance-ip>:5432/rebase
+JWT_SECRET=<your-secret-min-32-chars>
+REBASE_SERVICE_KEY=<your-service-key-min-32-chars>
+CORS_ORIGINS=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+NODE_ENV=production
+ALLOW_REGISTRATION=false
+STORAGE_TYPE=s3
+S3_ENDPOINT=https://s3.fr-par.scw.cloud
+S3_BUCKET=your-rebase-uploads
+S3_REGION=fr-par
+S3_FORCE_PATH_STYLE=true
+```
+
+> **TIP:** Scaleway Object Storage is natively S3-compatible — no interop layer needed. Set `S3_FORCE_PATH_STYLE=true` for compatibility.
+
+---
+
+## Hetzner (VPS + Docker Compose)
+
+The most cost-effective production deployment. A single Hetzner VPS running Docker Compose.
+
+### Architecture
+
+```
+Internet → Caddy (HTTPS, auto-TLS) → Rebase container (port 3001)
+                                   → PostgreSQL container
+                                   → Hetzner Volume (persistent storage)
+```
+
+### Setup
+
+1. **Provision a VPS** — A Hetzner CPX21 (3 vCPU, 4 GB RAM, ~€8/mo) handles most workloads. Choose Ubuntu 24.04.
+2. **Install Docker** — SSH in and install Docker + Docker Compose:
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   ```
+3. **Clone your project** and copy your `.env` file to the server.
+4. **Use the existing `docker-compose.yml`** — the template generated by `rebase init` works out of the box. Just update `.env` with production values:
+   ```bash
+   DATABASE_PASSWORD=<strong-random-password>
+   JWT_SECRET=<your-secret-min-32-chars>
+   REBASE_SERVICE_KEY=<your-service-key-min-32-chars>
+   CORS_ORIGINS=https://yourdomain.com
+   FRONTEND_URL=https://yourdomain.com
+   NODE_ENV=production
+   ALLOW_REGISTRATION=false
+   ```
+5. **Reverse Proxy (Caddy)** — Add a Caddy service for automatic HTTPS:
+   ```yaml
+   # Add to docker-compose.yml
+   caddy:
+     image: caddy:2-alpine
+     restart: unless-stopped
+     ports:
+       - "80:80"
+       - "443:443"
+       - "443:443/udp"  # HTTP/3
+     volumes:
+       - ./Caddyfile:/etc/caddy/Caddyfile
+       - caddy_data:/data
+       - caddy_config:/config
+     depends_on:
+       - backend
+
+   # Add to volumes:
+   caddy_data:
+     driver: local
+   caddy_config:
+     driver: local
+   ```
+
+   Create a `Caddyfile`:
+   ```
+   yourdomain.com {
+       reverse_proxy backend:3001
+   }
+   ```
+6. **Start everything:**
+   ```bash
+   docker compose up -d
+   ```
+7. **Persistent Storage** — Attach a Hetzner Volume for the `postgres_data` and `uploads` Docker volumes if you need data to survive server rebuilds.
+
+### Backups
+
+Schedule automated PostgreSQL backups via cron on the host:
+
+```bash
+# /etc/cron.d/rebase-backup
+0 3 * * * root docker compose -f /path/to/docker-compose.yml exec -T db pg_dump -U rebase rebase | gzip > /backups/rebase-$(date +\%Y\%m\%d).sql.gz
+```
+
+> **TIP:** Hetzner also offers managed snapshots (server-level) and the option to attach a Hetzner Volume for data that survives server rebuilds. For production, strongly consider both.
+
+---
+
+## PaaS (Railway, Render, Fly.io)
+
+Docker-based PaaS platforms that deploy directly from your repo or Docker image.
+
+### General Pattern
+
+All PaaS platforms follow the same workflow:
+1. Connect your Git repository or point to a Dockerfile
+2. Provision a managed PostgreSQL add-on
+3. Set environment variables (see env var reference above)
+4. Deploy — the platform builds and runs the Docker image
+
+### Platform-Specific Notes
+
+| Platform | PostgreSQL | Notes |
+|----------|-----------|-------|
+| **Railway** | Built-in add-on | Connects via `DATABASE_URL` injected automatically. Supports persistent volumes for file uploads. |
+| **Render** | Managed PostgreSQL | Use a "Web Service" with Docker runtime. Free tier has cold starts — use paid for production. |
+| **Fly.io** | Fly Postgres (community) | Closest to self-hosted — Fly Postgres is a managed wrapper around standard Postgres. Supports persistent volumes via `fly volumes`. |
+
+### Minimum Environment Variables
+
+```bash
+DATABASE_URL=<provided-by-platform>
+JWT_SECRET=<your-secret-min-32-chars>
+REBASE_SERVICE_KEY=<your-service-key-min-32-chars>
+CORS_ORIGINS=https://your-app.up.railway.app  # or your custom domain
+FRONTEND_URL=https://your-app.up.railway.app
+NODE_ENV=production
+ALLOW_REGISTRATION=false
+```
+
+> **WARNING:** Most PaaS free tiers have ephemeral filesystems — uploaded files will be lost on redeploy. Use `STORAGE_TYPE=s3` with an external object storage provider (Cloudflare R2, AWS S3, MinIO) for production file storage.
 
 ---
 
@@ -550,8 +854,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 **Agents should NEVER deploy or run deployment commands unless explicitly asked by the user in the current conversation.** This includes:
 - `rebase deploy` (any variant)
-- `firebase deploy` (any variant)
-- `gcloud functions deploy`
 - `gcloud run deploy`
 - `terraform apply` (any variant that deploys resources)
 - `docker compose up` in production

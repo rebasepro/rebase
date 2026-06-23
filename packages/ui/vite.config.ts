@@ -31,13 +31,11 @@ export default defineConfig(() => ({
         sourcemap: true,
         rollupOptions: {
             external: isExternal,
-            output: {
-                globals: {
-                    "json-logic-js": "jsonLogic",
-                    "fast-equals": "fastEquals",
-                    "lodash/cloneDeep.js": "cloneDeep"
-                }
-            }
+            onwarn(warning, warn) {
+                if (warning.code === "MISSING_GLOBAL_NAME") return;
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                warn(warning);
+            },
         }
     },
 

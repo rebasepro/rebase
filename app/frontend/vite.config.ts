@@ -23,7 +23,13 @@ export default defineConfig({
         outDir: "./dist",
         target: "es2022",
         sourcemap: true,
+        chunkSizeWarningLimit: Infinity,
         rollupOptions: {
+            onwarn(warning, warn) {
+                if (warning.code === "MISSING_GLOBAL_NAME") return;
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                warn(warning);
+            },
             output: {
                 manualChunks(id) {
                     // Heavy vendor libraries — split into individually cached chunks
@@ -50,6 +56,13 @@ export default defineConfig({
 
                     if (id.includes("packages/ui/")) return "rebase-ui";
                     if (id.includes("packages/core/")) return "rebase-core";
+
+                    // Split admin into sub-chunks to stay under size limits
+                    if (id.includes("packages/admin/src/editor/")) return "rebase-admin-editor";
+                    if (id.includes("packages/admin/src/collection_editor/")) return "rebase-admin-collection-editor";
+                    if (id.includes("packages/admin/src/data_import/")) return "rebase-admin-data-import";
+                    if (id.includes("packages/admin/src/data_export/")) return "rebase-admin-data-export";
+                    if (id.includes("packages/admin/src/form/")) return "rebase-admin-form";
                     if (id.includes("packages/admin/")) return "rebase-admin";
 
                     return undefined;

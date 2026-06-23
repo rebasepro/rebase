@@ -45,6 +45,7 @@ export default defineConfig(() => ({
         lib: {
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase Backend",
+            formats: ["es"],
             fileName: (format) => `index.${format}.js`
         },
         target: "ESNEXT",
@@ -52,13 +53,14 @@ export default defineConfig(() => ({
         sourcemap: true,
         rollupOptions: {
             external: isExternal,
+            onwarn(warning, warn) {
+                if (warning.code === "MISSING_GLOBAL_NAME") return;
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                if (warning.code === "EMPTY_IMPORT_META") return;
+                warn(warning);
+            },
             output: {
-                banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);',
-                globals: {
-                    "json-logic-js": "jsonLogic",
-                    "fast-equals": "fastEquals",
-                    "lodash/cloneDeep.js": "cloneDeep"
-                }
+                banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);'
             }
         }
     },

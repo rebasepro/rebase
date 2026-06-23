@@ -52,7 +52,11 @@ Now deploy the image completely serverless without managing infrastructure.
 |-----|-------|
 | `DATABASE_URL` | The URI from your Managed Postgres step |
 | `JWT_SECRET` | A secure 32+ character random string for signing auth tokens |
+| `REBASE_SERVICE_KEY` | A secure 32+ character random string |
 | `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | Your frontend domain (e.g., `https://yourdomain.com`) |
+| `FRONTEND_URL` | Your frontend URL (used for email links and CORS fallback) |
+| `ALLOW_REGISTRATION` | `false` (set to `true` only during initial setup) |
 
 6. Click **Deploy Container**.
 

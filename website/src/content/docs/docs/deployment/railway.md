@@ -30,7 +30,11 @@ The initial build might fail because it is entirely missing configuration. Let's
 2. Go to the **Variables** tab. 
 3. Click **New Variable** and add:
    - `JWT_SECRET`: Generate a secure 32+ character random string.
+   - `REBASE_SERVICE_KEY`: Generate another secure 32+ character random string.
    - `NODE_ENV`: Set to `production`
+   - `CORS_ORIGINS`: Your frontend domain (e.g., `https://your-app.up.railway.app`)
+   - `FRONTEND_URL`: Same as CORS_ORIGINS
+   - `ALLOW_REGISTRATION`: Set to `false` after creating your admin account
 4. Click **Reference Variable** and select `DATABASE_URL` from the PostgreSQL service you provisioned. Railway will securely inject the internal Postgres URL at runtime.
 
 ## 5. Expose the Domain

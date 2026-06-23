@@ -12,8 +12,8 @@ set -euo pipefail
 #   ./scripts/release.sh patch --dry-run # preview without publishing
 #
 # This script:
-#   1. Bumps versions in all packages + lerna.json
-#   2. Commits, tags, and pushes
+#   1. Reads the current version from the latest git tag
+#   2. Bumps versions in all packages
 #   3. Publishes all packages to npm
 #   4. Creates a GitHub Release using notes from CHANGELOG.md
 #     (falls back to GitHub auto-generated notes if not found)
@@ -96,8 +96,14 @@ ok "All preflight checks passed"
 # ── Calculate version ───────────────────────────────────────
 step "Calculating version"
 
-CURRENT_VERSION=$(node -e "console.log(require('./lerna.json').version)")
-info "Current version: ${BOLD}$CURRENT_VERSION${RESET}"
+LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+if [ -z "$LATEST_TAG" ]; then
+  err "No semver tags found. Create an initial tag first: git tag -a v0.0.0 -m 'Initial version'"
+  exit 1
+fi
+
+CURRENT_VERSION="${LATEST_TAG#v}"
+info "Current version: ${BOLD}$CURRENT_VERSION${RESET} (from tag $LATEST_TAG)"
 
 if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
   NEW_VERSION="$BUMP"
@@ -192,15 +198,6 @@ pnpm --filter './packages/*' -r exec node -e "
   fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
 "
 ok "Bumped all package versions"
-
-# Bump lerna.json
-node -e "
-  const fs = require('fs');
-  const p = JSON.parse(fs.readFileSync('lerna.json', 'utf8'));
-  p.version = '$NEW_VERSION';
-  fs.writeFileSync('lerna.json', JSON.stringify(p, null, 2) + '\n');
-"
-ok "Bumped lerna.json"
 
 # ── Build & Test ────────────────────────────────────────────
 step "Building all packages"

@@ -51,7 +51,11 @@ Add your secrets:
 ```env
 DATABASE_URL=postgresql://rebase:your_secure_db_password@postgres:5432/rebase
 JWT_SECRET=generate_a_very_long_secure_random_string_here
+REBASE_SERVICE_KEY=generate_another_very_long_secure_random_string
 NODE_ENV=production
+CORS_ORIGINS=https://admin.yourdomain.com
+FRONTEND_URL=https://admin.yourdomain.com
+ALLOW_REGISTRATION=false
 ```
 
 *Be sure to update `docker-compose.yml` if you want to pull the Postgres password from an environment variable.*

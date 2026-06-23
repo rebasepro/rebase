@@ -45,7 +45,11 @@ App Runner is the simplest way to run containers on AWS without managing orchest
 |-----|-------|
 | `DATABASE_URL` | Your RDS Connection String |
 | `JWT_SECRET` | A secure randomly generated hash (32+ chars) |
+| `REBASE_SERVICE_KEY` | A secure randomly generated hash (32+ chars) |
 | `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | Your frontend domain (e.g., `https://yourdomain.com`) |
+| `FRONTEND_URL` | Your frontend URL (used for email links and CORS fallback) |
+| `ALLOW_REGISTRATION` | `false` (set to `true` only during initial setup) |
 
 6. (Optional) If your RDS instance is strictly private, configure **Custom VPC** networking in App Runner so the container can securely talk to the database.
 7. Click **Create & deploy**.

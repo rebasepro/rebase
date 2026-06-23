@@ -15,25 +15,19 @@ export default defineConfig(() => ({
         lib: {
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase CLI",
-            fileName: (format) => {
-                if (format === "es")
-                    return `index.${format}.js`;
-                else if (format === "umd")
-                    return "index.cjs";
-                throw new Error("Unexpected format");
-            }
+            formats: ["es"],
+            fileName: () => "index.es.js"
         },
         minify: false,
         target: "ESNEXT",
         sourcemap: true,
         rollupOptions: {
             external: isExternal,
-            output: {
-                globals: {
-                    "json-logic-js": "jsonLogic",
-                    "fast-equals": "fastEquals",
-                    "lodash/cloneDeep.js": "cloneDeep"
-                }
+            onwarn(warning, warn) {
+                if (warning.code === "MISSING_GLOBAL_NAME") return;
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                if (warning.code === "EMPTY_IMPORT_META") return;
+                warn(warning);
             }
         }
     },

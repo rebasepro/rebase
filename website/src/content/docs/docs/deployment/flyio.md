@@ -23,12 +23,18 @@ fly launch
 
 *Do not deploy just yet when prompted.* We need to set a critical environment variable first.
 
-## 2. Setting the JWT Secret
-Before your application spins up in production, you must inject the JWT Secret so Rebase can securely sign authentication tokens operations.
+## 2. Set Production Secrets
+Before your application spins up in production, you must inject the required secrets and configuration.
 
 Run the following command locally:
 ```bash
-fly secrets set JWT_SECRET=your_super_long_randomly_generated_secure_string -a my-rebase-app
+fly secrets set \
+  JWT_SECRET=your_super_long_randomly_generated_secure_string \
+  REBASE_SERVICE_KEY=another_super_long_randomly_generated_secure_string \
+  CORS_ORIGINS=https://my-rebase-app.fly.dev \
+  FRONTEND_URL=https://my-rebase-app.fly.dev \
+  ALLOW_REGISTRATION=false \
+  -a my-rebase-app
 ```
 
 ## 3. Validate Internal Configuration
