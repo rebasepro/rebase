@@ -72,6 +72,7 @@ import {
     UserIcon
 } from "@rebasepro/ui";
 import { RebaseLogo } from "../RebaseLogo";
+import { CrmDashboardDemo } from "./crm-dashboard/CrmDashboardDemo";
 
 const SECTIONS = [
     { id: "drawer", label: "Drawer", icon: PanelLeftIcon },
@@ -84,7 +85,8 @@ const SECTIONS = [
     { id: "inputs", label: "Form Inputs", icon: FileTextIcon },
     { id: "chips-alerts", label: "Chips & Alerts", icon: AlertCircleIcon },
     { id: "users", label: "Users View", icon: UserIcon },
-    { id: "user-dialog", label: "User Dialog", icon: CircleUserIcon }
+    { id: "user-dialog", label: "User Dialog", icon: CircleUserIcon },
+    { id: "crm-dashboard", label: "CRM Dashboard", icon: LayoutGridIcon }
 ];
 
 export function UIReferenceView() {
@@ -886,6 +888,18 @@ roles: [] }
                             <Button variant="text">Cancel</Button>
                             <LoadingButton variant="filled" loading={false}>Update</LoadingButton>
                         </div>
+                    </div>
+                </SectionBlock>
+
+                {/* ═══════════════════════════════════════════════
+                    SECTION: CRM Dashboard
+                ═══════════════════════════════════════════════ */}
+                <SectionBlock id="crm-dashboard" title="CRM Dashboard — CrmDashboardDemo">
+                    <Typography variant="body2" color="secondary" className="mb-4">
+                        A real-world showcase of a complex dashboard home page incorporating Rebase design language.
+                    </Typography>
+                    <div className="w-full">
+                        <CrmDashboardDemo />
                     </div>
                 </SectionBlock>
             </div>

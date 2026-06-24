@@ -63,6 +63,7 @@
     "fast-equals": "6.0.0",
     "fuse.js": "^7.4.2",
     "i18next": "^26.3.1",
+    "lucide-react": "1.18.0",
     "notistack": "^3.0.2",
     "react-i18next": "^17.0.8"
   },

@@ -13,6 +13,7 @@ export * from "./RebaseLogo";
 export * from "./AIIcon";
 export * from "./Debug/UIStyleGuide";
 export * from "./Debug/UIReferenceView";
+export { CrmDashboardDemo } from "./Debug/crm-dashboard/CrmDashboardDemo";
 export * from "./UserSettingsView";
 export * from "./LanguageToggle";
 export * from "./UserSelectPopover";

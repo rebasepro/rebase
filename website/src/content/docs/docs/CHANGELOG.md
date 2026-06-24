@@ -4,7 +4,20 @@ title: Changelog
 ---
 # Changelog
 
+## [0.6.1] - 2026-06-23
+
+### Fixes
+
+- **CLI Init Crash** — Fixed `rebase init` crashing with `UnknownPromptTypeError: Prompt type "list" is not registered` after entering the project name. The `inquirer` v14 dependency renamed the `"list"` prompt type to `"select"`, breaking the interactive flow. The non-interactive (`--yes`) path was unaffected, which is why E2E tests did not catch it.
+
+### Testing
+
+- **Interactive Prompt Validation** — Extracted prompt question building into a testable `buildInitQuestions()` function and added unit tests that validate all prompt `type` values against the installed `inquirer` version's registered types. This prevents prompt-type regressions from shipping silently when `inquirer` is upgraded.
+
+---
+
 ## [0.6.0] - 2026-06-18
+
 
 ### Features & Improvements
 
