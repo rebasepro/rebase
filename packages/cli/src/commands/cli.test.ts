@@ -90,12 +90,6 @@ describe("CLI routing", () => {
         expect(dbCommand).toHaveBeenCalledWith("push", args);
     });
 
-    it("routes 'db studio' to dbCommand", async () => {
-        const args = ["node", "rebase", "db", "studio"];
-        await entry(args);
-        expect(dbCommand).toHaveBeenCalledWith("studio", args);
-    });
-
     it("routes 'auth reset-password' to authCommand", async () => {
         const args = ["node", "rebase", "auth", "reset-password"];
         await entry(args);

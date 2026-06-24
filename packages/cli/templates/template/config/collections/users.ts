@@ -38,10 +38,7 @@ roles: ["admin"] }
         displayName: {
             name: "Name",
             type: "string",
-            columnName: "display_name",
-            validation: {
-                required: true
-            }
+            columnName: "display_name"
         },
         photoURL: {
             name: "Photo URL",

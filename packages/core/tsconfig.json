@@ -48,6 +48,9 @@
       ],
       "@rebasepro/formex": [
         "../formex/src"
+      ],
+      "@rebasepro/utils": [
+        "../utils/src"
       ]
     }
   },

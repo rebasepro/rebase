@@ -143,8 +143,7 @@ export async function loadCollections(collectionsPath: string): Promise<EntityCo
                 const filePath = path.join(resolvedPath, file);
                 try {
                     const fileUrl = pathToFileURL(filePath).href;
-                    const dynamicImport = new Function("url", "return import(url)");
-                    const mod = await dynamicImport(fileUrl);
+                    const mod = await import(fileUrl);
                     if (mod?.default) {
                         collections.push(mod.default);
                     }
@@ -156,8 +155,7 @@ export async function loadCollections(collectionsPath: string): Promise<EntityCo
         }
     } else {
         const fileUrl = pathToFileURL(resolvedPath).href + `?t=${Date.now()}`;
-        const dynamicImport = new Function("url", "return import(url)");
-        const imported = await dynamicImport(fileUrl);
+        const imported = await import(fileUrl);
         const loaded = imported.backendCollections || imported.collections;
         if (Array.isArray(loaded)) {
             collections.push(...loaded);

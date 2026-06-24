@@ -34,6 +34,7 @@
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "jest": {
@@ -41,6 +42,7 @@
       "^.+\\.tsx?$": "ts-jest"
     },
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "testPathIgnorePatterns": ["/node_modules/", "test/e2e/"],
     "moduleFileExtensions": [
       "ts",
       "tsx",
@@ -85,16 +87,17 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
+    "@ariga/atlas": "^1.2.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.2",
-    "drizzle-kit": "^0.31.10",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
   },
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {

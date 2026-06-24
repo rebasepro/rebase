@@ -23,7 +23,6 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase db push` | Apply schema directly to database (dev) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
-| `rebase db studio` | Open Drizzle Studio |
 | `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
 | `rebase auth reset-password` | Reset a user's password |
 | `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |

@@ -80,7 +80,6 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("push")}       Apply schema directly to database (development)
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations
-  ${chalk.blue.bold("studio")}     Open Studio viewer
   ${chalk.blue.bold("branch")}     Database branching (create, list, delete, info)
 
 ${chalk.green.bold("Examples")}

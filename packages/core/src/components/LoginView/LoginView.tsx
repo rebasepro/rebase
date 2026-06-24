@@ -297,7 +297,6 @@ export function LoginView({
                             registrationMode={true}
                             onClose={() => {}}
                             onForgotPassword={() => {}}
-                            noUserComponent={noUserComponent}
                             disableSignupScreen={false}
                             bootstrapMode={true}
                             defaultEmail={defaultEmail}
@@ -408,7 +407,7 @@ export function LoginView({
                     )}
                 </div>
 
-                {additionalComponent && mode === "buttons" && (
+                {additionalComponent && !isBootstrapMode && mode === "buttons" && (
                     <div className="w-full">
                         {additionalComponent}
                     </div>
@@ -678,7 +677,7 @@ function LoginForm({
                 {subtitle}
             </Typography>
 
-            {registrationMode && noUserComponent && (
+            {registrationMode && !bootstrapMode && noUserComponent && (
                 <div className="w-full mb-2">
                     {noUserComponent}
                 </div>

@@ -97,7 +97,6 @@ describe("template structure", () => {
     it("contains backend entry point and schema", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "index.ts"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "schema.generated.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "drizzle.config.ts"))).toBe(true);
     });
 
     it("contains frontend entry point", () => {

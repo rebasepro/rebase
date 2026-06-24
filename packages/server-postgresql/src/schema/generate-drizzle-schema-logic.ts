@@ -98,7 +98,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 columnDefinition = `uuid("${colName}")`;
             } else if (stringProp.columnType === "uuid") {
                 columnDefinition = `uuid("${colName}")`;
-            } else if (stringProp.columnType === "text") {
+            } else if (stringProp.columnType === "text" || stringProp.ui?.markdown || stringProp.ui?.multiline) {
                 columnDefinition = `text("${colName}")`;
             } else if (stringProp.columnType === "char") {
                 columnDefinition = `char("${colName}")`;

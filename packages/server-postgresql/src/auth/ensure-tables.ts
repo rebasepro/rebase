@@ -82,7 +82,37 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
         const passwordResetTokensTableName = `"${authSchema}"."password_reset_tokens"`;
         const appConfigTableName = `"${authSchema}"."app_config"`;
 
-        // ── Create tables (idempotent) ──────────────────────────────────
+        // ── Create users table (idempotent) ─────────────────────────────
+        // The users table MUST be created before any dependent auth tables
+        // (user_identities, refresh_tokens, etc.) because they all hold
+        // foreign keys referencing users(id).  When a developer runs
+        // `pnpm dev` for the first time without `db:migrate`, this ensures
+        // the server can self-bootstrap.
+        const idDefault = userIdType === "UUID"
+            ? "DEFAULT gen_random_uuid()"
+            : userIdType === "INTEGER"
+                ? "GENERATED ALWAYS AS IDENTITY"
+                : "DEFAULT gen_random_uuid()::text";
+
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ${sql.raw(usersTableName)} (
+                id ${sql.raw(userIdType)} PRIMARY KEY ${sql.raw(idDefault)},
+                email VARCHAR(255) UNIQUE NOT NULL,
+                display_name VARCHAR(255),
+                photo_url VARCHAR(500),
+                roles TEXT[] DEFAULT '{}' NOT NULL,
+                password_hash VARCHAR(255),
+                email_verified BOOLEAN DEFAULT FALSE NOT NULL,
+                email_verification_token VARCHAR(255),
+                email_verification_sent_at TIMESTAMP WITH TIME ZONE,
+                is_anonymous BOOLEAN DEFAULT FALSE NOT NULL,
+                metadata JSONB DEFAULT '{}' NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+            )
+        `);
+
+        // ── Create dependent auth tables (idempotent) ───────────────────
 
         // Create user_identities table
         await db.execute(sql`

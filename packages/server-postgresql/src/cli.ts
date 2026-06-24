@@ -3,32 +3,19 @@ import chalk from "chalk";
 import { execa } from "execa";
 import path from "path";
 import fs from "fs";
-import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { logger } from "@rebasepro/server-core";
+import {
+    resolveLocalBin,
+    getTableIncludes,
+    getDevDatabaseUrl,
+    ensureDevDatabaseExists,
+    getTableExcludes
+} from "./cli-helpers";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
-function resolveLocalBin(binName: string): string | null {
-    let cwd = process.cwd();
-    // Try to find node_modules/.bin upwards
-    while (true) {
-        const candidate = path.join(cwd, "node_modules", ".bin", binName);
-        if (fs.existsSync(candidate)) return candidate;
-        const parent = path.dirname(cwd);
-        if (parent === cwd) break;
-        cwd = parent;
-    }
-    // Fall back to globally installed binary via which/where
-    try {
-        const cmd = process.platform === "win32" ? `where ${binName}` : `which ${binName}`;
-        const globalPath = execSync(cmd, { encoding: "utf-8" }).trim().split("\n")[0].trim();
-        if (globalPath && fs.existsSync(globalPath)) return globalPath;
-    } catch {
-        // not found globally
-    }
-    return null;
-}
+
 
 export async function runPluginCommand(args: string[]) {
     const domain = args[0]; // "db" or "schema"
@@ -47,7 +34,7 @@ export async function runPluginCommand(args: string[]) {
 }
 
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
-    const VALID_ACTIONS = ["push", "generate", "migrate", "studio", "branch"];
+    const VALID_ACTIONS = ["push", "generate", "migrate", "branch"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
         logger.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);
@@ -58,55 +45,127 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         return;
     }
 
+    const argsList = arg(
+        {
+            "--collections": String,
+            "-c": "--collections"
+        },
+        {
+            argv: rawArgs.slice(2),
+            permissive: true
+        }
+    );
+    const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+
     if (subcommand === "generate") {
         logger.info("");
         logger.info(chalk.bold("  📦 Rebase DB Generate"));
-        logger.info(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
+        logger.info(chalk.gray("  Step 1/2: Generating Drizzle schema & Postgres DDL from collections..."));
         logger.info("");
         await schemaCommand("generate", rawArgs);
+        await generatePostgresDdlCommand(rawArgs);
         logger.info("");
-        logger.info(chalk.gray("  Step 2/2: Generating SQL migration files..."));
+        logger.info(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
         logger.info("");
-        await runDrizzleKit("generate", rawArgs);
-        await fixMigrationStatementOrder();
+        const migrationName = argsList._[0] || "migration";
+        await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", "file://drizzle/schema.sql"], collectionsPath);
+        
+        // Post-process the newest migration file
+        try {
+            const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
+            if (fs.existsSync(migrationsDir)) {
+                const files = fs.readdirSync(migrationsDir);
+                const sqlFiles = files
+                    .filter(f => f.endsWith(".sql"))
+                    .sort();
+                if (sqlFiles.length > 0) {
+                    const newestMigrationFile = path.join(migrationsDir, sqlFiles[sqlFiles.length - 1]);
+
+                    // Make CREATE SCHEMA idempotent so it doesn't conflict with
+                    // --revisions-schema (Atlas pre-creates the rebase schema
+                    // for its revision table before running migrations).
+                    let migrationContent = fs.readFileSync(newestMigrationFile, "utf-8");
+                    migrationContent = migrationContent.replace(
+                        /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
+                        "CREATE SCHEMA IF NOT EXISTS $1;"
+                    );
+                    fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
+
+                    // Append RLS policies
+                    const policiesFile = path.resolve(process.cwd(), "drizzle", "policies.sql");
+                    if (fs.existsSync(policiesFile)) {
+                        const policiesContent = fs.readFileSync(policiesFile, "utf-8");
+                        fs.appendFileSync(newestMigrationFile, "\n\n" + policiesContent);
+                        logger.info(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
+                        
+                        // Re-hash the migration directory
+                        logger.info(chalk.gray("  Re-hashing migration files..."));
+                        await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
+                        logger.info(chalk.gray("  ✓ Migration directory checksum updated successfully."));
+                    }
+                }
+            }
+        } catch (err) {
+            logger.warn(chalk.yellow(`  ⚠️  Failed to append policies or re-hash migration: ${err instanceof Error ? err.message : String(err)}`));
+        }
+
         logger.info("");
         logger.info(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
         logger.info("");
-    } else if (subcommand === "pull") {
-        logger.info("");
-        logger.info(chalk.yellow("  ⚠ \"rebase db pull\" has been removed."));
-        logger.info(chalk.gray("  Use \"rebase schema introspect\" instead."));
-        logger.info("");
-        process.exit(1);
     } else {
         logger.info("");
         logger.info(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
         logger.info("");
 
         if (subcommand === "push") {
-            logger.info(chalk.gray("  Step 1/2: Generating Drizzle schema from collections..."));
+            logger.info(chalk.gray("  Step 1/3: Generating Drizzle schema & Postgres DDL from collections..."));
             logger.info("");
             await schemaCommand("generate", rawArgs);
+            await generatePostgresDdlCommand(rawArgs);
             logger.info("");
-            logger.info(chalk.gray("  Step 2/2: Pushing schema to database..."));
+            logger.info(chalk.gray("  Step 2/3: Pushing schema to database with Atlas..."));
             logger.info("");
-            await runDrizzleKit("push", rawArgs);
-        } else if (subcommand === "migrate") {
-            await runDrizzleKit("migrate", rawArgs);
-        } else if (subcommand === "studio") {
-            const schemaPath = path.join(process.cwd(), "src", "schema.generated.ts");
-            if (!fs.existsSync(schemaPath)) {
-                logger.info(chalk.yellow("  ⚠ schema.generated.ts not found. Generating schema first..."));
-                await schemaCommand("generate", rawArgs);
+            await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
+            logger.info("");
+            
+            const databaseUrl = process.env.DATABASE_URL;
+            if (databaseUrl) {
+                await applyPolicies(databaseUrl);
+            } else {
+                logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
-            await runDrizzleKit("studio", rawArgs);
-        } else {
-            await runDrizzleKit(subcommand, rawArgs);
+        } else if (subcommand === "migrate") {
+            const extraArgs = argsList._.filter(arg => arg !== "migrate");
+            await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
         }
 
         logger.info("");
         logger.info(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
         logger.info("");
+    }
+}
+
+async function applyPolicies(databaseUrl: string): Promise<void> {
+    try {
+        const policiesPath = path.resolve(process.cwd(), "drizzle", "policies.sql");
+        if (!fs.existsSync(policiesPath)) return;
+        
+        logger.info(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
+        logger.info("");
+        
+        const policiesContent = fs.readFileSync(policiesPath, "utf-8");
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            await client.query(policiesContent);
+            logger.info(chalk.green("  ✓ RLS policies applied successfully."));
+        } finally {
+            await client.end();
+        }
+    } catch (err) {
+        logger.error(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
+        process.exit(1);
     }
 }
 
@@ -296,118 +355,13 @@ function timeAgo(date: Date): string {
     return `${days}d ago`;
 }
 
-/**
- * Post-process generated migration files to fix statement ordering issues.
- *
- * Drizzle-kit can emit DROP POLICY statements *after* ALTER TABLE ... ALTER COLUMN
- * for the same table. Postgres rejects this with:
- *   "cannot alter type of a column used in a policy definition"
- *
- * This scans the drizzle output directory for the most recently modified .sql file
- * and reorders statements so that DROP POLICY on a table always precedes any
- * ALTER TABLE on that same table.
- */
-async function fixMigrationStatementOrder(): Promise<void> {
-    const drizzleDir = path.join(process.cwd(), "drizzle");
-    if (!fs.existsSync(drizzleDir)) return;
 
-    // Find the most recently modified .sql file
-    const sqlFiles = fs.readdirSync(drizzleDir)
-        .filter(f => f.endsWith(".sql"))
-        .map(f => ({
-            name: f,
-            mtime: fs.statSync(path.join(drizzleDir, f)).mtimeMs
-        }))
-        .sort((a, b) => b.mtime - a.mtime);
 
-    if (sqlFiles.length === 0) return;
-
-    const latestFile = path.join(drizzleDir, sqlFiles[0].name);
-    let content = fs.readFileSync(latestFile, "utf-8");
-    const originalContent = content;
-
-    // Replace CREATE SCHEMA with CREATE SCHEMA IF NOT EXISTS to prevent failures
-    content = content.replace(/CREATE SCHEMA "([^"]+)";/g, 'CREATE SCHEMA IF NOT EXISTS "$1";');
-
-    const DELIMITER = "--> statement-breakpoint";
-    const parts = content.split(DELIMITER);
-
-    // Parse each statement to detect DROP POLICY and ALTER TABLE targets
-    const dropPolicyRe = /DROP\s+POLICY\s+.+?\s+ON\s+"([^"]+)"/i;
-    const alterTableRe = /ALTER\s+TABLE\s+"([^"]+)"\s+ALTER\s+COLUMN/i;
-
-    // Collect indices of DROP POLICY statements and what tables they target
-    const dropPolicyIndices = new Map<string, number[]>(); // table -> indices
-    const alterColumnIndices = new Map<string, number>(); // table -> first ALTER index
-
-    for (let i = 0; i < parts.length; i++) {
-        const stmt = parts[i].trim();
-        const dropMatch = stmt.match(dropPolicyRe);
-        if (dropMatch) {
-            const table = dropMatch[1];
-            if (!dropPolicyIndices.has(table)) dropPolicyIndices.set(table, []);
-            dropPolicyIndices.get(table)!.push(i);
-        }
-        const alterMatch = stmt.match(alterTableRe);
-        if (alterMatch) {
-            const table = alterMatch[1];
-            if (!alterColumnIndices.has(table)) alterColumnIndices.set(table, i);
-        }
-    }
-
-    // Check if any DROP POLICY comes after an ALTER COLUMN on the same table
-    let needsReorder = false;
-    for (const [table, dropIndices] of dropPolicyIndices) {
-        const firstAlter = alterColumnIndices.get(table);
-        if (firstAlter !== undefined) {
-            for (const dropIdx of dropIndices) {
-                if (dropIdx > firstAlter) {
-                    needsReorder = true;
-                    break;
-                }
-            }
-        }
-        if (needsReorder) break;
-    }
-
-    if (!needsReorder) {
-        if (content !== originalContent) {
-            fs.writeFileSync(latestFile, content, "utf-8");
-        }
-        return;
-    }
-
-    // Reorder: move DROP POLICY statements for affected tables before their ALTER TABLE
-    // Strategy: stable sort — DROP POLICY on table X gets priority over ALTER on table X
-    const stmtEntries = parts.map((stmt, idx) => ({ stmt,
-idx }));
-
-    stmtEntries.sort((a, b) => {
-        const aDropMatch = a.stmt.trim().match(dropPolicyRe);
-        const bAlterMatch = b.stmt.trim().match(alterTableRe);
-        const bDropMatch = b.stmt.trim().match(dropPolicyRe);
-        const aAlterMatch = a.stmt.trim().match(alterTableRe);
-
-        // If a is DROP POLICY on table X and b is ALTER on table X, a goes first
-        if (aDropMatch && bAlterMatch && aDropMatch[1] === bAlterMatch[1]) return -1;
-        // If b is DROP POLICY on table X and a is ALTER on table X, b goes first
-        if (bDropMatch && aAlterMatch && bDropMatch[1] === aAlterMatch[1]) return 1;
-        // Otherwise preserve original order
-        return a.idx - b.idx;
-    });
-
-    const reordered = stmtEntries.map(e => e.stmt).join(DELIMITER);
-    fs.writeFileSync(latestFile, reordered, "utf-8");
-
-    logger.info(chalk.yellow(`  \u26A0 Reordered migration statements in ${sqlFiles[0].name} (DROP POLICY before ALTER COLUMN)`));
-}
-
-async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> {
-    const drizzleKitBin = resolveLocalBin("drizzle-kit");
-    if (!drizzleKitBin) {
-        logger.error(chalk.red("✗ Could not find drizzle-kit binary."));
-        const isNpm = (process.env.npm_config_user_agent ?? "").startsWith("npm/") || fs.existsSync(path.join(process.cwd(), "package-lock.json"));
-        const installCmd = isNpm ? "npm install -D drizzle-kit" : "pnpm add -D drizzle-kit";
+async function runAtlas(domain: "schema" | "migrate", args: string[], collectionsPath?: string): Promise<void> {
+    const atlasBin = resolveLocalBin("atlas");
+    if (!atlasBin) {
+        logger.error(chalk.red("✗ Could not find atlas binary."));
+        const installCmd = "pnpm add -D @ariga/atlas";
         logger.error(chalk.gray(`  Install it with: ${installCmd}`));
         process.exit(1);
     }
@@ -436,109 +390,92 @@ async function runDrizzleKit(action: string, _rawArgs: string[]): Promise<void> 
             }
         }
     } catch {
-        // dotenv may not be available — fall through
+        // ignore
     }
 
-    const interactive = ["generate", "push"].includes(action) && Boolean(process.stdout.isTTY);
-
-    // For push: always use --strict (prompts before destructive ops) and --verbose
-    // (shows all SQL). This ensures unmapped tables are never silently dropped.
-    const drizzleKitArgs = [action];
-    if (action === "push") {
-        drizzleKitArgs.push("--strict", "--verbose");
+    const databaseUrl = env.DATABASE_URL;
+    if (!databaseUrl) {
+        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        process.exit(1);
     }
 
-    // Forward any additional arguments, excluding schema-generator-specific options
-    const excludedFlags = ["--collections", "-c", "--output", "-o", "--watch", "-w"];
-    for (let i = 2; i < _rawArgs.length; i++) {
-        const arg = _rawArgs[i];
-        if (excludedFlags.includes(arg)) {
-            // Skip this flag and its value if it takes a parameter
-            if (["--collections", "-c", "--output", "-o"].includes(arg)) {
-                i++; // Skip the next arg (the value)
-            }
-            continue;
+    const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
+    await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl);
+
+    const atlasArgs = [domain, ...args];
+
+    if (domain === "schema") {
+        if (args.includes("apply")) {
+            atlasArgs.push("--url", databaseUrl, "--dev-url", devDatabaseUrl);
+        } else if (args.includes("clean") || args.includes("inspect")) {
+            atlasArgs.push("--url", databaseUrl);
         }
-        if (!drizzleKitArgs.includes(arg)) {
-            drizzleKitArgs.push(arg);
+    } else if (domain === "migrate") {
+        if (args.includes("diff")) {
+            atlasArgs.push("--dev-url", devDatabaseUrl);
+        } else if (args.includes("apply") || args.includes("status")) {
+            atlasArgs.push("--url", databaseUrl, "--revisions-schema", "rebase");
+        }
+    }
+
+    if (domain === "schema" && args.includes("apply") && collectionsPath) {
+        const excludes = await getTableExcludes(databaseUrl, collectionsPath);
+        for (const exc of excludes) {
+            atlasArgs.push("--exclude", exc);
         }
     }
 
     try {
-        if (interactive) {
-            await execa(drizzleKitBin, drizzleKitArgs, {
-                cwd: process.cwd(),
-                stdio: "inherit",
-                env
-            });
-        } else {
-            const child = execa(drizzleKitBin, drizzleKitArgs, {
-                cwd: process.cwd(),
-                env,
-                reject: false
-            });
-
-            // Natively stream output while still capturing it for error parsing
-            child.stdout?.pipe(process.stdout);
-            child.stderr?.pipe(process.stderr);
-
-            const result = await child;
-
-            // eslint-disable-next-line no-control-regex
-            const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
-            const stdout = stripAnsi(result.stdout || "").trim();
-            const stderr = stripAnsi(result.stderr || "").trim();
-
-            const hasTtyError = stdout.includes("Interactive prompts require a TTY terminal") ||
-                               stderr.includes("Interactive prompts require a TTY terminal");
-
-            if (result.exitCode !== 0 || hasTtyError) {
-                logger.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
-                if (hasTtyError) {
-                    logger.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
-                    logger.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
-                } else {
-                    const errorOutput = stderr || stdout;
-                    if (errorOutput) {
-                        const lines = errorOutput.split("\n").filter((l: string) => l.trim());
-                        let printedCount = 0;
-                        for (const line of lines) {
-                            if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates") || line.includes("permission denied")) {
-                                logger.error(chalk.red(`  ${line.trim()}`));
-                                printedCount++;
-                            }
-                        }
-                        if (printedCount === 0) {
-                            lines.slice(0, 10).forEach(line => logger.error(chalk.red(`  ${line.trim()}`)));
-                        }
-                    }
-                }
-                logger.error("");
-                process.exit(1);
-            }
-        }
+        await execa(atlasBin, atlasArgs, {
+            cwd: process.cwd(),
+            stdio: "inherit",
+            env
+        });
     } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        // eslint-disable-next-line no-control-regex
-        const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\[?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣷⣯⣟⡿⢿⣻⣽]+\]\s*/g, "");
-        const cleaned = stripAnsi(msg).trim();
-        const hasTtyError = cleaned.includes("Interactive prompts require a TTY terminal");
-        logger.error(chalk.red(`\n✗ drizzle-kit ${action} failed.\n`));
-        if (hasTtyError) {
-            logger.error(chalk.red("  Error: Interactive prompts require a TTY terminal."));
-            logger.error(chalk.gray("  Please run with --force to skip interactive prompts or run in an interactive terminal."));
-        } else {
-            const lines = cleaned.split("\n").filter((l: string) => l.trim());
-            for (const line of lines) {
-                if (line.toLowerCase().includes("error") || line.includes("cannot") || line.includes("already exists") || line.includes("does not exist") || line.includes("violates")) {
-                    logger.error(chalk.red(`  ${line.trim()}`));
-                }
-            }
-            if (lines.length === 0) {
-                logger.error(chalk.gray(`  ${cleaned}`));
-            }
+        logger.error(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
+        process.exit(1);
+    }
+}
+
+async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
+    const argsList = arg(
+        {
+            "--collections": String,
+            "--output": String,
+            "-c": "--collections",
+            "-o": "--output"
+        },
+        {
+            argv: rawArgs.slice(2),
+            permissive: true
         }
-        logger.error("");
+    );
+
+    const ddlScript = path.join(__cliDirname, "schema", "generate-postgres-ddl.ts");
+    const tsxBin = resolveLocalBin("tsx");
+    if (!tsxBin) {
+        logger.error(chalk.red("✗ Could not find tsx binary."));
+        process.exit(1);
+    }
+
+    const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+    const outputPath = argsList["--output"] || path.join("drizzle", "schema.sql");
+
+    const cmdParts = [
+        tsxBin,
+        ddlScript,
+        `--collections=${collectionsPath}`,
+        `--output=${outputPath}`
+    ];
+
+    try {
+        await execa(cmdParts[0], cmdParts.slice(1), {
+            cwd: process.cwd(),
+            stdio: "inherit",
+            env: { ...process.env as Record<string, string> }
+        });
+    } catch (err: unknown) {
+        logger.error(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
         process.exit(1);
     }
 }
@@ -561,8 +498,8 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         );
 
         // Here we just invoke the local generate-drizzle-schema.ts since we are inside the postgresql-backend
-        // If installed in node_modules, __dirname is node_modules/@rebasepro/server-postgresql/dist or src.
-        const generatorScript = path.join(__dirname, "schema", "generate-drizzle-schema.ts");
+        // If installed in node_modules, __cliDirname is node_modules/@rebasepro/server-postgresql/dist or src.
+        const generatorScript = path.join(__cliDirname, "schema", "generate-drizzle-schema.ts");
         if (!fs.existsSync(generatorScript)) {
             logger.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
             process.exit(1);
@@ -619,7 +556,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             }
         );
 
-        const introspectScript = path.join(__dirname, "schema", "introspect-db.ts");
+        const introspectScript = path.join(__cliDirname, "schema", "introspect-db.ts");
         if (!fs.existsSync(introspectScript)) {
             logger.error(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
             process.exit(1);
@@ -677,7 +614,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         }
     );
 
-    const doctorScript = path.join(__dirname, "schema", "doctor-cli.ts");
+    const doctorScript = path.join(__cliDirname, "schema", "doctor-cli.ts");
     if (!fs.existsSync(doctorScript)) {
         logger.error(chalk.red(`✗ Could not find doctor.ts at ${doctorScript}`));
         process.exit(1);
@@ -714,8 +651,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 
 
 // Entry point when called directly
-import fsSync from "fs";
-const argv1Real = process.argv[1] ? fsSync.realpathSync(process.argv[1]) : "";
+const argv1Real = process.argv[1] ? fs.realpathSync(process.argv[1]) : "";
 if (import.meta.url === `file://${argv1Real}`) {
     // Drop node and script path
     runPluginCommand(process.argv.slice(2)).catch(() => process.exit(1));

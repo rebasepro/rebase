@@ -943,9 +943,9 @@ export function CrmDashboardDemo() {
     };
 
     return (
-        <div className="relative overflow-hidden h-[750px] w-full border rounded-xl bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-700 shadow-sm flex flex-row">
+        <div className="relative w-full border rounded-xl bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-700 shadow-sm flex flex-row">
             {/* Dashboard main workspace */}
-            <div className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 transition-all duration-300">
+            <div className="flex-1 flex flex-col p-4 md:p-6 transition-all duration-300">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
                     <div>
@@ -1056,7 +1056,7 @@ export function CrmDashboardDemo() {
 
             {/* Custom Mock Side panel sliding in */}
             <div className={cls(
-                "absolute top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white dark:bg-surface-900 border-l border-surface-200 dark:border-surface-700 shadow-2xl z-40 transition-transform duration-300 ease-in-out flex flex-col",
+                "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white dark:bg-surface-900 border-l border-surface-200 dark:border-surface-700 shadow-2xl z-40 transition-transform duration-300 ease-in-out flex flex-col",
                 activeSideEntity ? "translate-x-0" : "translate-x-full"
             )}>
                 <div className="p-4 flex items-center justify-between border-b border-surface-200 dark:border-surface-800">
@@ -1081,7 +1081,7 @@ export function CrmDashboardDemo() {
             {activeSideEntity && (
                 <div
                     onClick={() => setActiveSideEntity(null)}
-                    className="absolute inset-0 bg-black/20 dark:bg-black/50 z-30 transition-opacity duration-300"
+                    className="fixed inset-0 bg-black/20 dark:bg-black/50 z-30 transition-opacity duration-300"
                 />
             )}
 

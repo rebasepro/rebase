@@ -3,48 +3,10 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chokidar from "chokidar";
-import { generateSchema } from "./generate-drizzle-schema-logic";
+import { generatePostgresDdl, generatePostgresPoliciesDdl } from "./generate-postgres-ddl-logic";
 import { EntityCollection } from "@rebasepro/types";
 import { logger } from "@rebasepro/server-core";
 
-
-// --- Helper Functions ---
-
-const formatTerminalText = (text: string, options: {
-    bold?: boolean;
-    backgroundColor?: "blue" | "green" | "red" | "yellow" | "cyan" | "magenta";
-    textColor?: "white" | "black" | "red" | "green" | "yellow" | "blue" | "magenta" | "cyan";
-} = {}): string => {
-    let codes = "";
-    if (options.bold) codes += "\x1b[1m";
-    if (options.backgroundColor) {
-        const bgColors = {
-            blue: "\x1b[44m",
-            green: "\x1b[42m",
-            red: "\x1b[41m",
-            yellow: "\x1b[43m",
-            cyan: "\x1b[46m",
-            magenta: "\x1b[45m"
-        } as const;
-        codes += bgColors[options.backgroundColor];
-    }
-    if (options.textColor) {
-        const textColors = {
-            white: "\x1b[37m",
-            black: "\x1b[30m",
-            red: "\x1b[31m",
-            green: "\x1b[32m",
-            yellow: "\x1b[33m",
-            blue: "\x1b[34m",
-            magenta: "\x1b[35m",
-            cyan: "\x1b[36m"
-        } as const;
-        codes += textColors[options.textColor];
-    }
-    return `${codes}${text}\x1b[0m`;
-};
-
-// --- Execution and Watch Logic ---
 
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
     try {
@@ -84,35 +46,34 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             collections = imported.backendCollections || imported.collections;
         }
 
-        // If collections directory is empty but exists, or failed to find any, we still want to inject defaults
         if (!collections || !Array.isArray(collections)) {
             collections = [];
         }
 
-
-        // Sort collections by slug alphabetically to ensure deterministic schema generation
+        // Sort collections by slug alphabetically to ensure deterministic DDL generation
         collections.sort((a, b) => a.slug.localeCompare(b.slug));
 
-        const schemaContent = await generateSchema(collections);
+        const ddlContent = await generatePostgresDdl(collections, { includePolicies: false });
+        const policiesContent = generatePostgresPoliciesDdl(collections);
 
         if (outputPath) {
             const outputDir = path.dirname(outputPath);
             await fsPromises.mkdir(outputDir, { recursive: true });
-            await fsPromises.writeFile(outputPath, schemaContent);
-            logger.info(`✅ Drizzle schema generated successfully at ${outputPath}`);
+            await fsPromises.writeFile(outputPath, ddlContent);
+            logger.info(`✅ PostgreSQL DDL generated successfully at ${outputPath}`);
+
+            const policiesPath = path.join(outputDir, "policies.sql");
+            await fsPromises.writeFile(policiesPath, policiesContent);
+            logger.info(`✅ PostgreSQL Policies DDL generated successfully at ${policiesPath}`);
         } else {
-            logger.info("✅ Drizzle schema generated successfully.");
-            logger.info(String(schemaContent));
+            logger.info("✅ PostgreSQL DDL generated successfully.");
+            logger.info(String(ddlContent));
+            logger.info("\n✅ PostgreSQL Policies DDL generated successfully.");
+            logger.info(String(policiesContent));
         }
 
-        logger.info(`You can now run ${formatTerminalText("rebase db generate", {
-            bold: true,
-            backgroundColor: "blue",
-            textColor: "black"
-        })} to generate the SQL migration files.`);
-
     } catch (error) {
-        logger.error("Error generating schema", { error: error });
+        logger.error("Error generating DDL schema", { error: error });
     }
 };
 
@@ -126,7 +87,7 @@ const main = () => {
     const watch = process.argv.includes("--watch");
 
     if (!collectionsFilePath) {
-        logger.info("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
+        logger.info("Usage: ts-node generate-postgres-ddl.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
         return;
     }
 
@@ -141,7 +102,7 @@ const main = () => {
         });
 
         watcher.on("all", (event, filePath) => {
-            logger.info(`[${event}] ${filePath}. Regenerating schema...`);
+            logger.info(`[${event}] ${filePath}. Regenerating DDL schema...`);
             runGeneration(resolvedPath, resolvedOutputPath);
         });
     } else {

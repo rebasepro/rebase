@@ -42,6 +42,9 @@
       "@rebasepro/ui": [
         "../../packages/ui/src"
       ],
+      "@rebasepro/utils": [
+        "../../packages/utils/src"
+      ],
 
       "@rebasepro/plugin-data-enhancement": [
         "../../packages/plugin-data-enhancement/src"

@@ -1,6 +1,6 @@
 import React from "react";
 import { ErrorTooltip } from "./ErrorTooltip";
-import { AlertTriangleIcon, Button, Typography } from "@rebasepro/ui";
+import { AlertTriangleIcon, Button, Typography, iconSize } from "@rebasepro/ui";
 
 /**
  * @group Components
@@ -35,15 +35,29 @@ export function ErrorView({
         : undefined;
 
     const body = (
-        <div
-            className="flex flex-col m-2">
-            <div className="flex items-center gap-2">
-                <AlertTriangleIcon className="shrink-0"/>
-                <div>
-                    {title && <Typography
-                        variant={"body2"}
-                        className="font-medium text-text-primary">{title}</Typography>}
-                    <Typography variant={"body2"} className="text-text-secondary">{message}</Typography>
+        <div className="flex flex-col m-2">
+            <div className="flex items-start gap-2.5">
+                <AlertTriangleIcon
+                    size={iconSize.smallest}
+                    className="shrink-0 text-red-500 dark:text-red-400 mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                    {title && (
+                        <Typography
+                            variant="body2"
+                            color="primary"
+                            className="font-semibold mb-0.5"
+                        >
+                            {title}
+                        </Typography>
+                    )}
+                    <Typography
+                        variant="body2"
+                        color="secondary"
+                        className="leading-relaxed"
+                    >
+                        {message}
+                    </Typography>
                     {errorCode && (
                         <span
                             className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-mono rounded bg-surface-200 dark:bg-surface-700 text-text-secondary"
@@ -54,10 +68,11 @@ export function ErrorView({
                     {onRetry && (
                         <div className="mt-3">
                             <Button
-                                variant="text"
+                                variant="outlined"
+                                color="neutral"
                                 size="small"
                                 onClick={onRetry}
-                                className="text-text-secondary hover:text-text-primary px-2 min-w-0"
+                                className="font-semibold"
                             >
                                 Try again
                             </Button>

@@ -150,7 +150,6 @@ ${chalk.green.bold("Database")}
   ${chalk.blue.bold("db push")}                 Apply schema directly to database ${chalk.gray("(dev)")}
   ${chalk.blue.bold("db generate")}             Generate SQL migration files
   ${chalk.blue.bold("db migrate")}              Run pending migrations
-  ${chalk.blue.bold("db studio")}               Open Drizzle Studio
   ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Show database command help
 
 ${chalk.green.bold("SDK")}

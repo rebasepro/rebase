@@ -7,7 +7,7 @@ import type { AnalyticsEvent } from "@rebasepro/types";
 declare function gtag(...args: any[]): void;
 
 import { useRebaseAuthController } from "@rebasepro/auth";
-import { Rebase, RebaseAuth } from "@rebasepro/core";
+import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/core";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import type { RebasePlugin } from "@rebasepro/types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
@@ -63,6 +63,15 @@ export function App() {
         }
     ], []);
 
+    const customViews = React.useMemo(() => [
+        {
+            slug: "debug/ui",
+            name: "UI Reference / Debug",
+            icon: "Plus",
+            view: <UIReferenceView />
+        }
+    ], []);
+
     return (
         <Rebase
             client={rebaseClient}
@@ -76,6 +85,7 @@ export function App() {
                 collectionEditor={collectionEditor}
                 entityViews={entityViews}
                 plugins={plugins}
+                views={customViews}
             />
             <RebaseStudio/>
             <RebaseShell title="Rebase"/>

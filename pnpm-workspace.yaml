@@ -13,6 +13,7 @@ packages:
   - saas/frontend
   - saas
 allowBuilds:
+  '@ariga/atlas': true
   '@firebase/util': true
   cpu-features: true
   esbuild: true

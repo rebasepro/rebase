@@ -136,4 +136,25 @@ describe("LoginView Component", () => {
 
         expect(mockAuthController.register).toHaveBeenCalledWith("new@rebase.pro", "password123", "New User");
     });
+
+    it("does not render additionalComponent or noUserComponent in bootstrap mode", () => {
+        const additionalText = "Custom Additional Component Content";
+        const noUserText = "Custom No User Component Content";
+
+        render(
+            <LoginView
+                authController={mockAuthController}
+                needsSetup={true}
+                additionalComponent={<div data-testid="additional">{additionalText}</div>}
+                noUserComponent={<div data-testid="no-user">{noUserText}</div>}
+            />
+        );
+
+        // Verify that the setup inputs are present (indicating we are in bootstrap mode)
+        expect(screen.getByPlaceholderText("Jane Doe (optional)")).toBeInTheDocument();
+
+        // Verify that neither of the user-defined components is rendered
+        expect(screen.queryByTestId("additional")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("no-user")).not.toBeInTheDocument();
+    });
 });
