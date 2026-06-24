@@ -121,6 +121,7 @@ export {
     UploadIcon,
     UserCheckIcon,
     UserIcon,
+    UserPlus,
     VideoIcon,
     VoteIcon,
     Wand2Icon,

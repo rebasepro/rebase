@@ -10,7 +10,8 @@ import {
     defaultBorderMixin,
     IconButton,
     Tooltip,
-    Typography
+    Typography,
+    ListView
 } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
 import {
@@ -510,192 +511,62 @@ customEntityActions });
 
     const rowClasses = getRowClasses(size);
 
-    // Initial loading state (no data yet)
-    const isInitialLoading = dataLoading && data.length === 0;
-    // Empty state
-    const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
+    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntities.map(e => e.id)), [selectionController?.selectedEntities]);
+    const highlightedIds = useMemo(() => new Set(highlightedEntities?.map(e => e.id)), [highlightedEntities]);
 
-    // ── Virtualization: scroll-parent windowing ──
-    const estimatedRowHeight = getEstimatedRowHeight(size);
-    const [effectiveScrollTop, setEffectiveScrollTop] = useState(0);
-    const [viewportHeight, setViewportHeight] = useState(800);
-
-    // Keep mutable refs for values used in the scroll handler to avoid
-    // re-attaching the listener every time pagination state changes.
-    const paginationStateRef = useRef({ paginationEnabled,
-noMoreToLoad,
-itemCount,
-pageSize });
-    useEffect(() => {
-        paginationStateRef.current = { paginationEnabled,
-noMoreToLoad,
-itemCount,
-pageSize };
-    }, [paginationEnabled, noMoreToLoad, itemCount, pageSize]);
-
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const scrollEl = getScrollParent(el);
-        if (!scrollEl) return;
-
-        let rafId: number | null = null;
-
-        const update = () => {
-            rafId = null;
-            const scrollRect = scrollEl.getBoundingClientRect();
-            const listRect = el.getBoundingClientRect();
-
-            // How much of the list has scrolled past the viewport top
-            const listTopRelative = listRect.top - scrollRect.top;
-            setEffectiveScrollTop(Math.max(0, -listTopRelative));
-            setViewportHeight(scrollRect.height);
-
-            // Infinite scroll: trigger load-more when near the bottom
-            const { paginationEnabled: pe, noMoreToLoad: nm, itemCount: ic, pageSize: ps } = paginationStateRef.current;
-            if (
-                pe &&
-                !nm &&
-                !isLoadingMore.current &&
-                scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < LOAD_MORE_THRESHOLD
-            ) {
-                isLoadingMore.current = true;
-                setItemCount?.((ic ?? ps) + ps);
-            }
-        };
-
-        const onScroll = () => {
-            if (rafId === null) rafId = requestAnimationFrame(update);
-        };
-
-        scrollEl.addEventListener("scroll", onScroll, { passive: true });
-        const ro = new ResizeObserver(() => update());
-        ro.observe(scrollEl);
-        update(); // initial measurement
-
-        return () => {
-            scrollEl.removeEventListener("scroll", onScroll);
-            ro.disconnect();
-            if (rafId !== null) cancelAnimationFrame(rafId);
-        };
-    }, [setItemCount]); // stable deps only — mutable state via refs
-
-    // Compute the visible window of rows
-    const totalHeight = data.length * estimatedRowHeight;
-    const startIndex = Math.max(0, Math.floor(effectiveScrollTop / estimatedRowHeight) - OVERSCAN_COUNT);
-    const endIndex = Math.min(
-        data.length,
-        Math.ceil((effectiveScrollTop + viewportHeight) / estimatedRowHeight) + OVERSCAN_COUNT
-    );
-    const visibleData = data.slice(startIndex, endIndex);
-    const offsetY = startIndex * estimatedRowHeight;
-
-    // Footer height for loading/end indicators
-    const footerHeight = dataLoading ? 48 : (!dataLoading && noMoreToLoad && data.length > 0) ? 32 : 0;
+    const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        handleSelectionChange(entity, selected);
+    }, [handleSelectionChange]);
 
     return (
-        <div
-            ref={containerRef}
-            className={cls(
-                "w-full",
-                selectedEntityId === undefined && "rounded-lg overflow-hidden border " + defaultBorderMixin
-            )}
-        >
-            {/* Error state */}
-            {dataLoadingError && data.length === 0 ? (
-                <div className="flex items-center justify-center p-8">
-                    <Typography className="text-red-500">
-                        Error loading data: {dataLoadingError.message}
-                    </Typography>
-                </div>
-            ) : isInitialLoading ? (
-                <div className="flex items-center justify-center py-12 px-8">
-                    <CircularProgress size="small"/>
-                </div>
-            ) : isEmpty ? (
-                <div className="w-full flex items-center justify-center py-12 px-8">
-                    {emptyComponent ?? (
-                        <Typography variant="label" color="secondary">
-                            No entries found
-                        </Typography>
-                    )}
-                </div>
-            ) : (
-                /* Spacer with total height — no internal scroll.
-                   The nearest scrollable ancestor provides the scrollbar. */
-                <div style={{ height: totalHeight + footerHeight,
-position: "relative" }}>
-                    {/* Windowed rows */}
-                    <div style={{ position: "absolute",
-top: offsetY,
-left: 0,
-right: 0 }}>
-                        {visibleData.map((entity, i) => {
-                            const actualIndex = startIndex + i;
-                            const isLast = actualIndex === data.length - 1;
-                            return (
-                                <div
-                                    key={entity.id}
-                                    style={{ height: estimatedRowHeight }}
-                                    className={cls(
-                                        !isLast && "border-b",
-                                        !isLast && defaultBorderMixin
-                                    )}
-                                >
-                                    <ListRow
-                                        entity={entity}
-                                        collection={resolvedCollection}
-                                        onClick={handleEntityClick}
-                                        selected={isEntitySelected(entity)}
-                                        highlighted={isEntityHighlighted(entity)}
-                                        onSelectionChange={handleSelectionChange}
-                                        selectionEnabled={selectionEnabled}
-                                        columns={visibleColumns}
-                                        slotKeys={slotKeys}
-                                        rowClasses={rowClasses}
-                                        showImage={showImage}
-                                        size={size}
-                                        isLast={isLast}
-                                        isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
-                                        listViewActions={getListViewActions(entity)}
-                                        context={context}
-                                        path={path}
-                                        selectionController={selectionController}
-                                        openEntityMode={openEntityMode}
-                                    />
-                                </div>
-                            );
-                        })}
+        <ListView<Entity<M>>
+            data={data}
+            dataLoading={dataLoading}
+            noMoreToLoad={noMoreToLoad}
+            dataLoadingError={dataLoadingError}
+            itemCount={itemCount}
+            setItemCount={setItemCount}
+            pageSize={pageSize}
+            paginationEnabled={paginationEnabled}
+            onItemClick={handleEntityClick}
+            selectedIds={selectedIds}
+            highlightedIds={highlightedIds}
+            selectionEnabled={selectionEnabled}
+            emptyComponent={emptyComponent}
+            size={size}
+            selectedEntityId={selectedEntityId}
+            renderRow={useCallback(({ item: entity, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
+                return (
+                    <div
+                        key={entity.id}
+                        style={style}
+                        className={className}
+                    >
+                        <ListRow
+                            entity={entity}
+                            collection={resolvedCollection}
+                            onClick={handleEntityClick}
+                            selected={selected}
+                            highlighted={highlighted}
+                            onSelectionChange={handleRowSelectionChange}
+                            selectionEnabled={selectionEnabled}
+                            columns={visibleColumns}
+                            slotKeys={slotKeys}
+                            rowClasses={rowClasses}
+                            showImage={showImage}
+                            size={size}
+                            isLast={isLast}
+                            isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                            listViewActions={getListViewActions(entity)}
+                            context={context}
+                            path={path}
+                            selectionController={selectionController}
+                            openEntityMode={openEntityMode}
+                        />
                     </div>
-
-                    {/* Loading / end indicators pinned at the bottom */}
-                    {dataLoading && (
-                        <div
-                            className="flex items-center justify-center py-3"
-                            style={{ position: "absolute",
-top: totalHeight,
-left: 0,
-right: 0 }}
-                        >
-                            <CircularProgress size="small"/>
-                        </div>
-                    )}
-                    {!dataLoading && noMoreToLoad && data.length > 0 && (
-                        <div
-                            className="flex items-center justify-center py-2 dark:bg-surface-900"
-                            style={{ position: "absolute",
-top: totalHeight,
-left: 0,
-right: 0 }}
-                        >
-                            <Typography variant="caption" color="secondary">
-                                All {data.length} entries loaded
-                            </Typography>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+                );
+            }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
+        />
     );
 }
 

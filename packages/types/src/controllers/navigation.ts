@@ -191,6 +191,14 @@ export interface AppView {
      */
     nestedRoutes?: boolean;
 
+    /**
+     * Restrict this view to users with at least one of the listed roles.
+     * When omitted or empty, the view is visible to all authenticated users.
+     * Applied during view resolution — the view is filtered out entirely
+     * (not just hidden from nav) if the user lacks a matching role.
+     */
+    roles?: string[];
+
 }
 
 /**

@@ -1,11 +1,12 @@
 import type { EntityCollection } from "@rebasepro/types";
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
 import { EntityCard } from "./EntityCard";
 import {
     cls,
     CircularProgress,
-    Typography
+    Typography,
+    CardView
 } from "@rebasepro/ui";
 import { useComponentOverride } from "@rebasepro/core";
 
@@ -92,8 +93,6 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
 }: EntityCollectionCardViewProps<M>) {
 
     const ResolvedEntityCard = useComponentOverride("Collection.Card", EntityCard) as typeof EntityCard;
-    const containerRef = useRef<HTMLDivElement>(null);
-    const hasRestoredScroll = useRef(false);
 
     const {
         data,
@@ -106,116 +105,6 @@ export function EntityCollectionCardView<M extends Record<string, unknown> = Rec
         paginationEnabled
     } = tableController;
 
-    // Track if we're currently loading to prevent multiple simultaneous load requests
-    const isLoadingMore = useRef(false);
-
-    // Keep mutable refs for values used in the scroll listener callback
-    // to avoid re-attaching the listener every time pagination state changes.
-    const paginationStateRef = useRef({ paginationEnabled,
-noMoreToLoad,
-dataLoading,
-itemCount,
-pageSize });
-    useEffect(() => {
-        paginationStateRef.current = { paginationEnabled,
-noMoreToLoad,
-dataLoading,
-itemCount,
-pageSize };
-    }, [paginationEnabled, noMoreToLoad, dataLoading, itemCount, pageSize]);
-
-    // Reset loading flag when new data arrives (separate effect, like list view)
-    useEffect(() => {
-        if (!dataLoading) isLoadingMore.current = false;
-    }, [dataLoading]);
-
-    // Infinite scroll and resize observer
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const scrollEl = getScrollParent(el);
-        if (!scrollEl) return;
-
-        let rafId: number | null = null;
-
-        const update = () => {
-            rafId = null;
-
-            // Infinite scroll: trigger load-more when near the bottom
-            const { paginationEnabled: pe, noMoreToLoad: nm, itemCount: ic, pageSize: ps } = paginationStateRef.current;
-            if (
-                pe &&
-                !nm &&
-                !isLoadingMore.current &&
-                scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 400
-            ) {
-                isLoadingMore.current = true;
-                setItemCount?.((ic ?? ps) + ps);
-            }
-        };
-
-        const onScrollEvent = () => {
-            if (rafId === null) rafId = requestAnimationFrame(update);
-        };
-
-        scrollEl.addEventListener("scroll", onScrollEvent, { passive: true });
-        const ro = new ResizeObserver(() => update());
-        ro.observe(scrollEl);
-        update(); // initial measurement
-
-        return () => {
-            scrollEl.removeEventListener("scroll", onScrollEvent);
-            ro.disconnect();
-            if (rafId !== null) cancelAnimationFrame(rafId);
-        };
-    }, [setItemCount]);
-
-    // Scroll restoration — deferred to after layout paint
-    useEffect(() => {
-        if (!containerRef.current || !initialScroll || hasRestoredScroll.current || data.length === 0) return;
-
-        const scrollEl = getScrollParent(containerRef.current);
-        if (!scrollEl) return;
-
-        let attempts = 0;
-        const maxAttempts = 5;
-
-        const tryRestore = () => {
-            if (scrollEl.scrollHeight >= initialScroll || attempts >= maxAttempts) {
-                scrollEl.scrollTop = initialScroll;
-                hasRestoredScroll.current = true;
-            } else {
-                attempts++;
-                requestAnimationFrame(tryRestore);
-            }
-        };
-
-        requestAnimationFrame(tryRestore);
-    }, [initialScroll, data.length]);
-
-    // Scroll tracking: call onScroll when user scrolls
-    const lastScrollOffset = useRef(0);
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el || !onScroll) return;
-        const scrollEl = getScrollParent(el);
-        if (!scrollEl) return;
-
-        const handleScroll = () => {
-            const currentOffset = scrollEl.scrollTop;
-            const direction = currentOffset > lastScrollOffset.current ? "forward" : "backward";
-            lastScrollOffset.current = currentOffset;
-            onScroll({
-                scrollDirection: direction,
-                scrollOffset: currentOffset,
-                scrollUpdateWasRequested: false
-            });
-        };
-
-        scrollEl.addEventListener("scroll", handleScroll, { passive: true });
-        return () => scrollEl.removeEventListener("scroll", handleScroll);
-    }, [onScroll]);
-
     const handleEntityClick = useCallback((entity: Entity<M>) => {
         onEntityClick?.(entity);
     }, [onEntityClick]);
@@ -224,84 +113,45 @@ pageSize };
         selectionController?.toggleEntitySelection(entity, selected);
     }, [selectionController]);
 
-    const isEntitySelected = useCallback((entity: Entity<M>) => {
-        return selectionController?.isEntitySelected(entity) ?? false;
-    }, [selectionController]);
+    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntities.map(e => e.id)), [selectionController?.selectedEntities]);
+    const highlightedIds = useMemo(() => new Set(highlightedEntities?.map(e => e.id)), [highlightedEntities]);
 
-    const isEntityHighlighted = useCallback((entity: Entity<M>) => {
-        return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
-    }, [highlightedEntities]);
-
-    const gridColumnsClass = getGridColumnsClass(size);
-
-    // Initial loading state (no data yet)
-    const isInitialLoading = dataLoading && data.length === 0 && !dataLoadingError;
-    // Empty state
-    const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
+    const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        handleSelectionChange(entity, selected);
+    }, [handleSelectionChange]);
 
     return (
-        <div
-            ref={containerRef}
-            className="w-full p-4"
-        >
-            {/* Error state */}
-            {dataLoadingError && data.length === 0 ? (
-                <div className="h-full flex items-center justify-center p-8">
-                    <Typography className="text-red-500">
-                        Error loading data: {dataLoadingError.message}
-                    </Typography>
-                </div>
-            ) : isInitialLoading ? (
-                <div className="flex items-center justify-center py-12 px-8">
-                    <CircularProgress size="small"/>
-                </div>
-            ) : isEmpty ? (
-                <div className="w-full flex items-center justify-center py-12 px-8">
-                    {emptyComponent ?? (
-                        <Typography variant="label" color="secondary">
-                            No entries found
-                        </Typography>
-                    )}
-                </div>
-            ) : (
-                <>
-                    {/* Card Grid with max-width container */}
-                    <div className="max-w-7xl mx-auto">
-                        <div className={cls(
-                            "grid gap-4",
-                            gridColumnsClass
-                        )}>
-                            {data.map((entity) => (
-                                <ResolvedEntityCard
-                                    key={`${entity.path}_${entity.id}`}
-                                    entity={entity}
-                                    collection={collection}
-                                    onClick={handleEntityClick}
-                                    selected={isEntitySelected(entity)}
-                                    highlighted={isEntityHighlighted(entity)}
-                                    onSelectionChange={handleSelectionChange}
-                                    selectionEnabled={selectionEnabled}
-                                    size={size}
-                                />
-                            ))}
-                        </div>
-
-                        {/* Load more trigger / Loading indicator */}
-                        <div
-                            className="flex items-center justify-center py-8"
-                        >
-                            {dataLoading && (
-                                <CircularProgress size="small"/>
-                            )}
-                            {!dataLoading && noMoreToLoad && data.length > 0 && (
-                                <Typography variant="caption" color="secondary">
-                                    All {data.length} entries loaded
-                                </Typography>
-                            )}
-                        </div>
-                    </div>
-                </>
-            )}
-        </div>
+        <CardView<Entity<M>>
+            data={data}
+            dataLoading={dataLoading}
+            noMoreToLoad={noMoreToLoad}
+            dataLoadingError={dataLoadingError}
+            itemCount={itemCount}
+            setItemCount={setItemCount}
+            pageSize={pageSize}
+            paginationEnabled={paginationEnabled}
+            onItemClick={handleEntityClick}
+            selectedIds={selectedIds}
+            highlightedIds={highlightedIds}
+            selectionEnabled={selectionEnabled}
+            onSelectionChange={handleRowSelectionChange}
+            onScroll={onScroll}
+            initialScroll={initialScroll}
+            size={size}
+            emptyComponent={emptyComponent}
+            renderCard={useCallback((entity, { selected, highlighted, onClick }) => (
+                <ResolvedEntityCard
+                    key={`${entity.path}_${entity.id}`}
+                    entity={entity}
+                    collection={collection}
+                    onClick={onClick as any}
+                    selected={selected}
+                    highlighted={highlighted}
+                    onSelectionChange={handleRowSelectionChange}
+                    selectionEnabled={selectionEnabled}
+                    size={size}
+                />
+            ), [collection, selectionEnabled, size, handleRowSelectionChange, ResolvedEntityCard])}
+        />
     );
 }

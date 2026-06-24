@@ -120,6 +120,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return {
             slug: "schema",
             name: "Edit collections",
+            group: "Database",
             icon: "LayoutList",
             nestedRoutes: true,
             view: (
@@ -136,10 +137,27 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return base;
     }, [registry.studioConfig?.devViews, schemaView]);
 
+    // Merge CMS-registered views with Studio dev views.
+    // Order: CMS views (developer's primary content) → Studio dev views (tooling).
+    // Plugin views are merged later inside resolveAppViews.
+    const cmsViews = registry.cmsConfig?.views;
+    const mergedViews = useMemo(() => {
+        if (!cmsViews) return devViews;
+        if (Array.isArray(cmsViews) && cmsViews.length === 0) return devViews;
+        // When cmsViews is a builder function, wrap it to append devViews after resolution
+        if (typeof cmsViews === "function") {
+            return async (params: Parameters<typeof cmsViews>[0]) => {
+                const resolved = await cmsViews(params) ?? [];
+                return [...resolved, ...devViews];
+            };
+        }
+        return [...cmsViews, ...devViews];
+    }, [cmsViews, devViews]);
+
     const navigationStateController = useBuildNavigationStateController({
         plugins: registry.cmsConfig?.plugins ?? EMPTY_PLUGINS,
         collections: collectionsBuilder,
-        views: devViews,
+        views: mergedViews,
         navigationGroupMappings: registry.cmsConfig?.navigationGroupMappings,
         authController: context.authController!,
         data: context.data,

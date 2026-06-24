@@ -178,7 +178,7 @@ export function useTopLevelNavigation(
         ];
 
         const groupOrderValue = (groupName?: string): number => {
-            if (groupName === NAVIGATION_ADMIN_GROUP_NAME) return 1;
+            if (groupName === NAVIGATION_ADMIN_GROUP_NAME || groupName === "Settings" || groupName === "Admin") return 1;
             return 0;
         };
 
@@ -213,9 +213,9 @@ export function useTopLevelNavigation(
         ];
 
         const uniqueGroupsArray = [...new Set(allDefinedGroups)];
-        const adminGroups = uniqueGroupsArray.filter(g => g === NAVIGATION_ADMIN_GROUP_NAME);
-        const nonAdminGroups = uniqueGroupsArray.filter(g => g !== NAVIGATION_ADMIN_GROUP_NAME);
-        const uniqueGroups = [...nonAdminGroups, ...adminGroups] as string[];
+        const lastGroups = uniqueGroupsArray.filter(g => g === NAVIGATION_ADMIN_GROUP_NAME || g === "Settings" || g === "Admin");
+        const otherGroups = uniqueGroupsArray.filter(g => g !== NAVIGATION_ADMIN_GROUP_NAME && g !== "Settings" && g !== "Admin");
+        const uniqueGroups = [...otherGroups, ...lastGroups] as string[];
 
         const computedTopLevelNav = {
             allowDragAndDrop: plugins?.some((plugin: RebasePlugin) => plugin.hooks?.allowDragAndDrop) ?? false,

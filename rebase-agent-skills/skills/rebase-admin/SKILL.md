@@ -17,6 +17,7 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 | Navigate to a collection view | `useUrlController()` | `@rebasepro/admin` |
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/admin` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/admin` |
+| Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/admin` |
 | Open an entity selection dialog | `useEntitySelectionDialog()` | `@rebasepro/admin` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/admin` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/admin` |
@@ -635,6 +636,111 @@ function CreateButton() {
         </button>
     );
 }
+```
+
+---
+
+## 10. Custom Top-Level Views
+
+Add custom pages to the main CMS navigation using the `views` prop on `<RebaseCMS>`. Views appear alongside collections in the sidebar and home page.
+
+### AppView Interface
+
+```typescript
+interface AppView {
+    slug: string;                    // URL path segment (e.g. "dashboard")
+    name: string;                    // Display name in navigation
+    view: React.ReactNode;           // Component to render
+    icon?: string | React.ReactNode; // Lucide icon key or custom element
+    group?: string;                  // Navigation group (default: "Views")
+    description?: string;            // Optional description (Markdown)
+    hideFromNavigation?: boolean;    // Hidden from sidebar but still routable
+    nestedRoutes?: boolean;          // Register slug/* wildcard route
+    roles?: string[];                // Only show to users with at least one matching role
+}
+```
+
+### Static Views
+
+```tsx
+<RebaseCMS
+    collections={collections}
+    views={[
+        { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
+        { slug: "reports",   name: "Reports",   icon: "FileText",        view: <Reports />, group: "Analytics" },
+        { slug: "audit-log", name: "Audit Log",  icon: "ScrollText",     view: <AuditLog />, roles: ["admin"] },
+    ]}
+/>
+```
+
+### Builder Function (Role-Aware)
+
+Pass a function instead of an array to dynamically resolve views based on the current user:
+
+```tsx
+<RebaseCMS
+    collections={collections}
+    views={({ user, authController, data }) => [
+        { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
+        ...(user?.roles?.includes("analyst")
+            ? [{ slug: "reports", name: "Reports", icon: "FileText", view: <Reports /> }]
+            : []),
+    ]}
+/>
+```
+
+The builder receives `{ user, authController, data }` and can return a `Promise<AppView[]>` for async resolution.
+
+### Plugin-Contributed Views
+
+Plugins can also contribute views via the `views` property on `RebasePlugin`:
+
+```tsx
+const myPlugin: RebasePlugin = {
+    key: "analytics",
+    views: [
+        { slug: "analytics", name: "Analytics", icon: "BarChart3", view: <Analytics /> }
+    ]
+};
+
+<RebaseCMS plugins={[myPlugin]} />
+```
+
+All views (CMS, builder, plugin) are merged in order: **CMS views → Studio dev views → Plugin views**.
+
+### Role Filtering
+
+The `roles` field provides declarative access control. When set, the view is excluded entirely (not just hidden from nav) if the user doesn't have at least one matching role:
+
+```tsx
+// Only visible to admin users
+{ slug: "admin-panel", name: "Admin", view: <AdminPanel />, roles: ["admin"] }
+
+// Visible to admin OR editor
+{ slug: "editor", name: "Editor", view: <Editor />, roles: ["admin", "editor"] }
+
+// Visible to everyone (roles omitted)
+{ slug: "dashboard", name: "Dashboard", view: <Dashboard /> }
+```
+
+> **IMPORTANT FOR AGENTS:** The `roles` filter applies to ALL views — CMS views, builder-returned views, and plugin views. Use `roles` for simple role gates and the builder function for dynamic/async conditions. Both compose.
+
+### Navigation Grouping
+
+Views participate in the same navigation group system as collections. Use the `group` property on the view, or control grouping centrally via `navigationGroupMappings`:
+
+```tsx
+<RebaseCMS
+    collections={collections}
+    views={[
+        { slug: "dashboard", name: "Dashboard", view: <Dashboard />, group: "Analytics" },
+        { slug: "reports",   name: "Reports",   view: <Reports />,   group: "Analytics" },
+    ]}
+    navigationGroupMappings={[
+        { name: "Content",   entries: ["posts", "pages"] },
+        { name: "Analytics", entries: ["dashboard", "reports"] },
+    ]}
+/>
 ```
 
 ---

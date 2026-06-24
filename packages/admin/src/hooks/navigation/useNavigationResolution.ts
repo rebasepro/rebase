@@ -211,5 +211,22 @@ export async function resolveAppViews(
         }
     }
 
+    // Filter by roles — applies to CMS, plugin, and builder-returned views
+    resolvedViews = filterViewsByRole(resolvedViews, authController);
+
     return resolvedViews;
+}
+
+/**
+ * Filter views by the `roles` field on AppView.
+ * When `roles` is set, the view is only included if the current user
+ * has at least one of the listed roles. Views without `roles` (or with
+ * an empty array) are always included.
+ */
+function filterViewsByRole(views: AppView[], authController: AuthController): AppView[] {
+    const userRoles = authController.user?.roles ?? [];
+    return views.filter(view => {
+        if (!view.roles || view.roles.length === 0) return true;
+        return view.roles.some(role => userRoles.includes(role));
+    });
 }

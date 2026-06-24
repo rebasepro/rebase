@@ -9,7 +9,7 @@ import { visualizer } from "rollup-plugin-visualizer";
 export default defineConfig({
     envDir: path.resolve(__dirname, ".."),
     server: {
-        port: 5173,
+        port: 5180,
         strictPort: false,
         fs: {
             allow: ["../../.."]
@@ -90,6 +90,8 @@ template: "raw-data" })
     },
     resolve: {
         alias: {
+            "react": path.resolve(__dirname, "./node_modules/react"),
+            "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
             "@rebasepro/core": path.resolve(__dirname, "../../packages/core/src"),
             "@rebasepro/types": path.resolve(__dirname, "../../packages/types/src"),
             "@rebasepro/common": path.resolve(__dirname, "../../packages/common/src"),

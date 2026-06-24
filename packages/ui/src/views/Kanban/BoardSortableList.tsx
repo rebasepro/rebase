@@ -2,13 +2,14 @@ import React, { memo, useEffect, useMemo, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CircularProgress, cls } from "@rebasepro/ui";
+import { CircularProgress } from "../../components";
+import { cls } from "../../util";
 import { BoardItem, BoardItemViewProps } from "./board_types";
 
-interface BoardSortableListProps<M extends Record<string, unknown>> {
+interface BoardSortableListProps<T> {
     columnId: string;
-    items: BoardItem<M>[];
-    ItemComponent: React.ComponentType<BoardItemViewProps<M>>;
+    items: BoardItem<T>[];
+    ItemComponent: React.ComponentType<BoardItemViewProps<T>>;
     isDragging: boolean;
     isDragOverColumn: boolean;
     loading?: boolean;
@@ -16,7 +17,7 @@ interface BoardSortableListProps<M extends Record<string, unknown>> {
     onLoadMore?: () => void;
 }
 
-export function BoardSortableList<M extends Record<string, unknown>>({
+export function BoardSortableList<T>({
     columnId,
     items,
     ItemComponent,
@@ -25,7 +26,7 @@ export function BoardSortableList<M extends Record<string, unknown>>({
     loading = false,
     hasMore = false,
     onLoadMore
-}: BoardSortableListProps<M>) {
+}: BoardSortableListProps<T>) {
     const {
         setNodeRef
     } = useDroppable({
@@ -33,13 +34,11 @@ export function BoardSortableList<M extends Record<string, unknown>>({
         data: { type: "ITEM-LIST" }
     });
 
-    // Infinite scroll sentinel ref - must be inside scrollable container
     const sentinelRef = useRef<HTMLDivElement>(null);
-    const isLoadingRef = useRef(false);
+    const isLoadingRef = useRef(loading);
     isLoadingRef.current = loading;
     const lastLoadTimeRef = useRef(0);
 
-    // Set up IntersectionObserver for infinite scroll
     useEffect(() => {
         if (!sentinelRef.current || !hasMore || !onLoadMore) return;
 
@@ -63,8 +62,6 @@ export function BoardSortableList<M extends Record<string, unknown>>({
 
         observer.observe(sentinel);
 
-        // Check if sentinel is already visible when effect runs
-        // This handles the case where the sentinel was visible before the observer was created
         const rect = sentinel.getBoundingClientRect();
         const containerRect = sentinel.parentElement?.getBoundingClientRect();
         if (containerRect && rect.top < containerRect.bottom && rect.bottom > containerRect.top) {
@@ -78,7 +75,6 @@ export function BoardSortableList<M extends Record<string, unknown>>({
         return () => observer.disconnect();
     }, [hasMore, onLoadMore]);
 
-    // Memoize className to avoid recomputation on every render
     const containerClassName = useMemo(() => cls(
         "flex flex-col p-2 transition-opacity duration-100 transition-bg ease-linear w-full overflow-y-auto no-scrollbar flex-1 rounded-md",
         isDragging && isDragOverColumn
@@ -115,7 +111,6 @@ export function BoardSortableList<M extends Record<string, unknown>>({
                                 ItemComponent={ItemComponent}
                             />
                         ))}
-                        {/* Infinite scroll sentinel - inside scrollable container */}
                         {(loading || hasMore) && (
                             <div ref={sentinelRef} className="flex items-center justify-center py-2 min-h-6">
                                 {loading && <CircularProgress size="smallest"/>}
@@ -128,20 +123,19 @@ export function BoardSortableList<M extends Record<string, unknown>>({
     );
 }
 
-interface SortableItemProps<M extends Record<string, unknown>> {
-    item: BoardItem<M>;
+interface SortableItemProps<T> {
+    item: BoardItem<T>;
     index: number;
     columnId: string;
-    ItemComponent: React.ComponentType<BoardItemViewProps<M>>;
+    ItemComponent: React.ComponentType<BoardItemViewProps<T>>;
 }
 
-// Memoized to prevent unnecessary re-renders when other items in the list change
-const SortableItem = memo(function SortableItem<M extends Record<string, unknown>>({
+const SortableItem = memo(function SortableItem<T>({
     item,
     index,
     columnId,
     ItemComponent
-}: SortableItemProps<M>) {
+}: SortableItemProps<T>) {
     const {
         setNodeRef,
         attributes,
@@ -157,7 +151,6 @@ const SortableItem = memo(function SortableItem<M extends Record<string, unknown
         }
     });
 
-    // Memoize style object to prevent object recreation on each render
     const sortableStyle = useMemo(() => ({
         transform: CSS.Transform.toString(transform),
         transition,
@@ -174,4 +167,4 @@ const SortableItem = memo(function SortableItem<M extends Record<string, unknown
             />
         </div>
     );
-}) as <M extends Record<string, unknown>>(props: SortableItemProps<M>) => React.ReactElement;
+}) as <T>(props: SortableItemProps<T>) => React.ReactElement;

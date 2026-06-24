@@ -3,7 +3,10 @@ import React, { useEffect, useState } from "react";
 import {
     Avatar,
     Button,
+    Card,
+    Chip,
     CircularProgress,
+    cls,
     IconButton,
     Tab,
     Tabs,
@@ -279,16 +282,16 @@ export function UserSettingsView() {
                                 </Button>
                             </div>
                             {sessions.map(session => (
-                                <div key={session.id} className="flex justify-between items-center p-4 bg-white dark:bg-surface-950 border rounded-lg dark:border-surface-700 shadow-sm">
+                                <Card key={session.id} className="flex justify-between items-center p-4">
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-1">
                                             <Typography variant="body1">
                                                 {session.userAgent || t("unknown_device")}
                                             </Typography>
                                             {session.isCurrentSession && (
-                                                <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-primary-100 text-primary-800 dark:bg-primary-900/50 dark:text-primary-200 rounded-full">
+                                                <Chip colorScheme="blue" size="small">
                                                     {t("current")}
-                                                </span>
+                                                </Chip>
                                             )}
                                         </div>
                                         <Typography variant="caption" color="secondary">
@@ -304,7 +307,7 @@ export function UserSettingsView() {
                                             </IconButton>
                                         )}
                                     </div>
-                                </div>
+                                </Card>
                             ))}
                         </div>
                     )}

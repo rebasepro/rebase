@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import type { EntityCollection } from "../types/collections";
-import type { EntityCollectionsBuilder } from "../types/builders";
+import type { EntityCollectionsBuilder, AppViewsBuilder } from "../types/builders";
 import type { EntityCustomView } from "../types/entity_views";
 import type { EntityAction } from "../types/entity_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
@@ -24,6 +24,14 @@ export interface CollectionEditorOptions {
 
 export interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection> {
     collections?: EC[] | EntityCollectionsBuilder<EC>;
+
+    /**
+     * Custom top-level views added to the main navigation.
+     * Accepts a static array of views or an async builder function
+     * that receives the current user/auth context for role-based views.
+     */
+    views?: AppView[] | AppViewsBuilder;
+
     homePage?: ReactNode;
     entityViews?: EntityCustomView[];
     entityActions?: EntityAction[];

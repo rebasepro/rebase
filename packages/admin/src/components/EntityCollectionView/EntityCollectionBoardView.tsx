@@ -1,9 +1,6 @@
-
 import type { EntityCollection } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityTableController, EnumValueConfig, SaveEntityProps, SelectionController } from "@rebasepro/types";
-import { Board } from "./Board";
-import { BoardItem, BoardItemViewProps, ColumnLoadingState } from "./board_types";
 import { EntityBoardCard } from "./EntityBoardCard";
 import {
     Button,
@@ -19,7 +16,11 @@ import {
     iconSize,
     RefreshCwIcon,
     Tooltip,
-    Typography
+    Typography,
+    KanbanView,
+    BoardItem,
+    BoardItemViewProps,
+    ColumnLoadingState
 } from "@rebasepro/ui";
 import { resolveEnumValues } from "@rebasepro/common";
 import { getPropertyInPath } from "../../util/property_utils";
@@ -318,10 +319,10 @@ parentEntityIds,
     }, [columns, boardDataController.columnData]);
 
     // Convert entities to board items per column (data already sorted by orderProperty from controller)
-    const boardItems: BoardItem<M>[] = useMemo(() => {
+    const boardItems: BoardItem<Entity<M>>[] = useMemo(() => {
         return allEntities.map((entity: Entity<M>) => ({
             id: String(entity.id),
-            entity
+            data: entity
         }));
     }, [allEntities]);
 
@@ -341,11 +342,11 @@ parentEntityIds,
     }, [columns, boardDataController.columnData]);
 
     // Use the lookup map to assign columns - ensures items stay in the column they were fetched for
-    const assignColumn = useCallback((item: BoardItem<M>): string => {
+    const assignColumn = useCallback((item: BoardItem<Entity<M>>): string => {
         const column = entityColumnMap[item.id];
         if (column) return column;
         // Fallback: read from entity values (for newly created items or edge cases)
-        const value = item.entity.values?.[columnProperty];
+        const value = item.data.values?.[columnProperty];
         if (value && columns.includes(String(value))) return String(value);
         return columns[0] || "";
     }, [entityColumnMap, columnProperty, columns]);
@@ -462,12 +463,12 @@ parentEntityIds,
     // When ItemComponent identity changes, React.memo'd SortableItem remounts
     // the card → DOM is destroyed/recreated → CSS :hover state is lost → flicker.
     const ItemComponent = useMemo(() => {
-        const Comp = (props: BoardItemViewProps<M>) => (
+        const Comp = (props: BoardItemViewProps<Entity<M>>) => (
             <EntityBoardCard
                 {...props}
                 collection={collectionRef.current as EntityCollection<M>}
                 onClick={stableOnClick}
-                selected={isEntitySelectedRef.current(props.item.entity)}
+                selected={isEntitySelectedRef.current(props.item.data)}
                 onSelectionChange={stableOnSelectionChange}
                 selectionEnabled={selectionEnabledRef.current}
             />
@@ -592,7 +593,7 @@ parentEntityIds,
 
             {/* Main board */}
             <div className="flex-1 overflow-auto no-scrollbar">
-                <Board
+                <KanbanView
                     data={boardItems}
                     columns={columns}
                     columnLabels={columnLabels}

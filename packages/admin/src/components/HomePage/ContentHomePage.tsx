@@ -63,14 +63,23 @@ export function ContentHomePage({
         onNavigationEntriesUpdate = () => {}
     } = navigationStateController.topLevelNavigation || {};
 
-    // Studio mode shows view-type entries (devViews) + admin entries (Users/Roles).
-    // Content mode shows collections, admin entries (Users/Roles), and custom entries — but not studio views.
+    // Build a set of Studio-only dev view slugs so we can distinguish them from
+    // CMS custom views added via <RebaseCMS views={...}> or plugins.
+    const studioViewSlugs = useMemo(() => {
+        const slugs = new Set<string>();
+        (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
+        if (registry.studioConfig && registry.cmsConfig?.collectionEditor) slugs.add("schema");
+        return slugs;
+    }, [registry.studioConfig, registry.cmsConfig?.collectionEditor]);
+
+    // Studio mode shows Studio dev views + admin entries (Users/Roles).
+    // Content mode shows collections, CMS custom views, and admin entries — but not Studio dev views.
     const rawNavigationEntries = useMemo(() => {
         if (adminModeController.mode === "studio") {
             return unFilteredNavigationEntries.filter(e => e.type === "view" || e.type === "admin");
         }
-        return unFilteredNavigationEntries.filter(e => e.type !== "view");
-    }, [unFilteredNavigationEntries, adminModeController.mode]);
+        return unFilteredNavigationEntries.filter(e => e.type !== "view" || !studioViewSlugs.has(e.slug));
+    }, [unFilteredNavigationEntries, adminModeController.mode, studioViewSlugs]);
 
     const groupOrderFromNavController = useMemo(() => {
         const entryGroups = new Set(rawNavigationEntries.map(e => e.group).filter(Boolean));

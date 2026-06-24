@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/formex";
-import { EntityCollection, SaveEntityProps, RebaseData, RebaseContext, AnalyticsController } from "@rebasepro/types";
+import { EntityCollection, SaveEntityProps, RebaseData, RebaseContext, AnalyticsController, Entity } from "@rebasepro/types";
 import { saveEntityWithCallbacks } from "@rebasepro/core";
-import { BoardItem } from "../board_types";
+import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";
 
@@ -33,10 +33,10 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
     // to compute a single new sort key for the moved item.
     // Only one DB write per drag — the moved item gets its new key.
     const handleItemsReorder = useCallback(async (
-        items: BoardItem<M>[],
+        items: BoardItem<Entity<M>>[],
         moveInfo?: { itemId: string; sourceColumn: string; targetColumn: string; }
     ) => {
-        const entity = items.find(item => item.id === moveInfo?.itemId)?.entity;
+        const entity = items.find(item => item.id === moveInfo?.itemId)?.data;
         if (!entity || !moveInfo) return;
 
         analyticsController.onAnalyticsEvent?.("kanban_card_moved", {
@@ -64,10 +64,10 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
 
             // Get the order keys of the neighbours
             const prevKey = movedIndex > 0
-                ? (targetColumnItems[movedIndex - 1].entity.values?.[orderProperty] as string | null) ?? null
+                ? (targetColumnItems[movedIndex - 1].data.values?.[orderProperty] as string | null) ?? null
                 : null;
             const nextKey = movedIndex < targetColumnItems.length - 1
-                ? (targetColumnItems[movedIndex + 1].entity.values?.[orderProperty] as string | null) ?? null
+                ? (targetColumnItems[movedIndex + 1].data.values?.[orderProperty] as string | null) ?? null
                 : null;
 
             try {

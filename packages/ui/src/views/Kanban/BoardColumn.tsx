@@ -5,56 +5,30 @@ import { BoardSortableList } from "./BoardSortableList";
 import { BoardColumnTitle } from "./BoardColumnTitle";
 import { BoardItem, BoardItemViewProps } from "./board_types";
 import {
-    ChipColorKey,
-    ChipColorScheme,
-    cls,
-    defaultBorderMixin,
-    IconButton,
-    iconSize,
-    PlusIcon
-} from "@rebasepro/ui";
+    IconButton
+} from "../../components";
+import { cls } from "../../util";
+import { iconSize, PlusIcon } from "../../icons";
 
-export interface BoardColumnProps<M extends Record<string, unknown>> {
+export interface BoardColumnProps<T> {
     id: string;
     title: string;
-    items: BoardItem<M>[];
+    items: BoardItem<T>[];
     index: number;
-    ItemComponent: React.ComponentType<BoardItemViewProps<M>>;
+    ItemComponent: React.ComponentType<BoardItemViewProps<T>>;
     isDragging: boolean;
     isDragOverColumn: boolean;
-    /**
-     * Whether column reordering is allowed (shows drag handle)
-     */
     allowReorder?: boolean;
-    /**
-     * Whether items are loading for this column
-     */
     loading?: boolean;
-    /**
-     * Whether there are more items to load
-     */
     hasMore?: boolean;
-    /**
-     * Callback to load more items
-     */
     onLoadMore?: () => void;
-    /**
-     * Callback to add a new item to this column
-     */
     onAddItem?: () => void;
-    /**
-     * Total count of entities in this column
-     */
     totalCount?: number;
-    /**
-     * Color of the column header indicator
-     */
-    color?: ChipColorKey | ChipColorScheme;
+    color?: any;
     style?: React.CSSProperties;
 }
 
-// Memoized to prevent unnecessary re-renders when other columns change
-export const BoardColumn = memo(function BoardColumn<M extends Record<string, unknown>>({
+export const BoardColumn = memo(function BoardColumn<T>({
     id,
     title,
     items,
@@ -69,7 +43,7 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
     totalCount,
     color,
     style
-}: BoardColumnProps<M>) {
+}: BoardColumnProps<T>) {
     const {
         setNodeRef,
         attributes,
@@ -90,13 +64,10 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
         zIndex: isColumnBeingDragged ? 2 : 1
     }), [style, transform, transition, isColumnBeingDragged]);
 
-    // Only apply drag listeners if reordering is allowed
     const dragListeners = allowReorder ? listeners : {};
 
-    // Memoize className to avoid recomputation
     const columnClassName = useMemo(() => cls(
-        "border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md",
-        defaultBorderMixin,
+        "border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-surface-200 dark:border-surface-800",
         isColumnBeingDragged ? "ring-2 ring-primary" : ""
     ), [isColumnBeingDragged]);
 
@@ -108,7 +79,6 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
         allowReorder ? "cursor-grab" : ""
     ), [isColumnBeingDragged, allowReorder]);
 
-    // Memoize items IDs array to avoid recreating on each render
     const itemIds = useMemo(() => items.map(i => i.id), [items]);
 
     return (
@@ -162,4 +132,4 @@ export const BoardColumn = memo(function BoardColumn<M extends Record<string, un
             </SortableContext>
         </div>
     );
-}) as <M extends Record<string, unknown>>(props: BoardColumnProps<M>) => React.ReactElement;
+}) as <T>(props: BoardColumnProps<T>) => React.ReactElement;

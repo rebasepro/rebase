@@ -153,7 +153,8 @@ export function useResolvedViews<USER extends User>(
         refreshTrigger,
         adminMode,
         initialLoading,
-        user
+        user,
+        plugins
     ]);
 
     return useMemo(() => ({

@@ -258,6 +258,7 @@ These components can be overridden globally on `<Rebase>` (which acts as a fallb
 ```typescript
 interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection> {
     collections?: EC[] | EntityCollectionsBuilder<EC>;
+    views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
     entityViews?: EntityCustomView[];
     entityActions?: EntityAction[];
@@ -417,10 +418,35 @@ interface AppView {
     group?: string;                  // Navigation group name
     view: React.ReactNode;           // React component to render
     nestedRoutes?: boolean;          // Enable nested routing (slug/*)
+    roles?: string[];                // Only show to users with at least one matching role
 }
 ```
 
-Custom views are typically added through `entityViews` on `<RebaseCMS>` or through plugins.
+Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They can also be contributed by plugins via `plugin.views`.
+
+```tsx
+// Static array
+<RebaseCMS
+    collections={collections}
+    views={[
+        { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
+        { slug: "audit-log", name: "Audit Log", icon: "ScrollText", view: <AuditLog />, roles: ["admin"] },
+    ]}
+/>
+
+// Builder function (role-aware, async-capable)
+<RebaseCMS
+    collections={collections}
+    views={({ user, authController, data }) => [
+        { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
+        ...(user?.roles?.includes("analyst")
+            ? [{ slug: "reports", name: "Reports", icon: "FileText", view: <Reports /> }]
+            : []),
+    ]}
+/>
+```
+
+> **IMPORTANT FOR AGENTS:** The `roles` field on `AppView` provides declarative role filtering — the view is excluded entirely (not just hidden from nav) if the user lacks a matching role. Use `roles` for simple access control and the builder function for dynamic/async cases. Both approaches compose.
 
 ## CollectionPanel Component
 

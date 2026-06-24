@@ -5,10 +5,10 @@ import { Checkbox, Chip, cls, defaultBorderMixin, Markdown } from "@rebasepro/ui
 import { PropertyPreview } from "../../preview";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { IconForView } from "@rebasepro/core";
-import { BoardItemViewProps } from "./board_types";
+import { BoardItemViewProps } from "@rebasepro/ui";
 import { useCollectionSlotKeys, resolveEntitySlots } from "./useEntityPreviewSlots";
 
-export type EntityBoardCardProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<M> & {
+export type EntityBoardCardProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<Entity<M>> & {
     collection: EntityCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
@@ -35,7 +35,7 @@ function EntityBoardCardInner<M extends Record<string, unknown> = Record<string,
     onSelectionChange,
     selectionEnabled = false
 }: EntityBoardCardProps<M>) {
-    const entity = item.entity;
+    const entity = item.data;
     const authController = useAuthController();
     const customizationController = useCustomizationController();
 
@@ -247,14 +247,14 @@ export function createEntityBoardCardComponent<M extends Record<string, unknown>
         onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
         selectionEnabled?: boolean;
     }
-): React.ComponentType<BoardItemViewProps<M>> {
-    return function EntityBoardCardWrapper(props: BoardItemViewProps<M>) {
+): React.ComponentType<BoardItemViewProps<Entity<M>>> {
+    return function EntityBoardCardWrapper(props: BoardItemViewProps<Entity<M>>) {
         return (
             <EntityBoardCard
                 {...props}
                 collection={collection}
                 onClick={options.onClick}
-                selected={options.isEntitySelected?.(props.item.entity)}
+                selected={options.isEntitySelected?.(props.item.data)}
                 onSelectionChange={options.onSelectionChange}
                 selectionEnabled={options.selectionEnabled}
             />

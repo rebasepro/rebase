@@ -33,7 +33,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -123,12 +123,12 @@ jobs:
             exit 1
           fi
 
-      # ── Version bump ────────────────────────────────────────
+      # ── Version bump (working tree only — no commit to main) ──
       - name: Bump versions
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Bump all publishable packages
+          # Bump all publishable packages (working tree only, for npm publish)
           pnpm --filter './packages/*' -r exec node -e "
             const fs=require('fs');
             const p=JSON.parse(fs.readFileSync('package.json','utf8'));
@@ -136,19 +136,17 @@ jobs:
             fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
           "
 
-          # Commit and tag
-          git add -A
-          git commit -m "chore: release v$VERSION" --no-verify
-          git tag -a "v$VERSION" -m "Release v$VERSION"
-
       # ── Publish ─────────────────────────────────────────────
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
         run: pnpm --filter './packages/*' -r publish --no-git-checks --access public --report-summary
 
-      - name: Push tags
+      - name: Tag and push
         if: ${{ !inputs.dry_run }}
-        run: git push origin main --follow-tags
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
 
       # ── GitHub Release ──────────────────────────────────────
       - name: Create GitHub Release (with CHANGELOG notes)

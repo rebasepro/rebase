@@ -2,7 +2,7 @@ import { createSelectionStore } from "./SelectionStore";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { CollectionSize, Entity, EntityRelation, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
-import { CellRendererParams, VirtualTable, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams, VirtualTableWhereFilterOp } from "@rebasepro/ui";
+import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams, VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { enumToObjectEntries } from "@rebasepro/common";
 import { DEFAULT_PAGE_SIZE, EntityCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
 import { FilterFormFieldProps } from "@rebasepro/ui";
@@ -244,7 +244,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
             <div className="h-full w-full flex flex-col bg-white dark:bg-surface-900"
                 ref={ref}>
 
-                <VirtualTable
+                 <TableView
                     data={data as unknown as Record<string, unknown>[]}
                     columns={columns}
                     cellRenderer={(props) => cellRenderer(props as unknown as CellRendererParams<Entity<M>>)}

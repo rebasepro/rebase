@@ -1,11 +1,12 @@
-import { ChipColorKey, ChipColorScheme, getColorSchemeForKey, cls, Typography } from "@rebasepro/ui";
 import React, { useMemo } from "react";
+import { Typography } from "../../components";
+import { cls, getColorSchemeForKey } from "../../util";
 
 export interface BoardColumnTitleProps {
     children: React.ReactNode;
     className?: string;
     "aria-label"?: string;
-    color?: ChipColorKey | ChipColorScheme;
+    color?: any;
 }
 
 export function BoardColumnTitle({
