@@ -1,5 +1,4 @@
 ---
-import SectionBackgroundAccents from "./SectionBackgroundAccents.astro";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
 
 const lang = getLangFromUrl(Astro.url);
@@ -111,7 +110,6 @@ const footerNavs = [
                 ))}
             </div>
         </div>
-        <SectionBackgroundAccents topLine={true} blob={{ position: "top", size: "lg" }}/>
         <div class="mt-8 pt-8 ">
             <div class="sm:flex sm:items-center sm:justify-between">
                 <span class="text-sm sm:text-center text-surface-400">{t("footer.rights")}</span>

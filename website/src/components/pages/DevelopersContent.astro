@@ -4,7 +4,6 @@ const { lang, t } = Astro.props;
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import { CodeBlock } from '../../components/CodeBlock.tsx';
 import ClientLogos from '../../components/ClientLogos.astro';
-import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { NeatBackground } from '../../components/NeatBackground';
 import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
 import AlternativesComparison from '../AlternativesComparison.astro';
@@ -58,7 +57,7 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     
     <!-- -- HERO SECTION -- -->
  <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-     <NeatBackground client:only="react" />
+     <NeatBackground client:idle />
 
         <!-- Background accents and subtle grid -->
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
@@ -265,7 +264,6 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
 
     <!-- -- ISOMORPHIC SDK ARCHITECTURE -- -->
  <section id="sdk-architecture" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
-        <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">
@@ -467,7 +465,6 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
 
     <!-- -- REALTIME ENGINE -- -->
  <section id="realtime" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
-        <SectionBackgroundAccents blob={{ position: "top", size: "md" }}/>
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <div class="lg:col-span-5 space-y-6">
@@ -511,7 +508,6 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
 
     <!-- -- BACKEND & SDK CAPABILITIES -- -->
  <section id="backend" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
-        <SectionBackgroundAccents topLine={true}/>
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">

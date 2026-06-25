@@ -194,11 +194,6 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
                 css += '[data-ab-show="' + exp.id + ':control"]{display:none!important}';
                 css += '[data-ab-show="' + exp.id + ':' + v + '"]{display:block!important}';
             }
-            // Section reorder CSS
-            if (v && v !== "control" && exp.sectionOrders && exp.sectionOrders[v]) {
-                var so = exp.sectionOrders[v];
-                for (var sid in so) css += "#" + sid + "{order:" + so[sid] + "}";
-            }
         });
 
         var existing = document.getElementById("ab-styles");
@@ -241,14 +236,6 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
                         : ''));
             section.appendChild(header);
 
-            // Type indicator
-            if (exp.sectionOrders) {
-                var badge = document.createElement("div");
-                badge.style.cssText = "font-size:10px;color:#64748b;margin-bottom:6px;";
-                badge.textContent = "⇅ Section reorder experiment";
-                section.appendChild(badge);
-            }
-
             // Variant buttons
             var btnRow = document.createElement("div");
             btnRow.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;";
@@ -288,19 +275,6 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
             });
 
             section.appendChild(btnRow);
-
-            // Section order preview for reorder experiments
-            if (exp.sectionOrders && current !== "control" && exp.sectionOrders[current]) {
-                var preview = document.createElement("div");
-                preview.style.cssText = "margin-top:8px;font-size:10px;color:#475569;max-height:100px;overflow-y:auto;";
-                var so = exp.sectionOrders[current];
-                var sorted = Object.keys(so).sort(function(a, b) { return so[a] - so[b]; });
-                preview.innerHTML = sorted.map(function(sid) {
-                    return '<div style="padding:1px 0;"><span style="color:#64748b;width:18px;display:inline-block;">' +
-                        so[sid] + '.</span> <span style="color:#94a3b8;">' + sid.replace('s-', '') + '</span></div>';
-                }).join('');
-                section.appendChild(preview);
-            }
 
             container.appendChild(section);
 

@@ -3,7 +3,6 @@ const { lang, t } = Astro.props;
 
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
-import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { NeatBackground } from '../../components/NeatBackground';
 import ClientLogos from '../../components/ClientLogos.astro';
 import SpotlightCard from '../../components/SpotlightCard.astro';
@@ -239,7 +238,6 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 5 — DATA OWNERSHIP: "YOUR POSTGRES. YOUR RULES."
          ═══════════════════════════════════════════════════════════════ -->
  <section id="why-data-ownership" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents topLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 items-center">
                 <!-- Text side -->
@@ -335,7 +333,6 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 7 — REBASE VS THE ALTERNATIVES
          ═══════════════════════════════════════════════════════════════ -->
  <section id="why-alternatives" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents bottomLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">How we compare</h2>
@@ -446,7 +443,6 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
          SECTION 8 — "CHOOSE YOUR PATH" — PERSONA CARDS
          ═══════════════════════════════════════════════════════════════ -->
  <section id="why-personas" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <SectionBackgroundAccents topLine={true} />
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-2xl text-center mb-14 animate-on-scroll fade-in-up">
                 <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Explore deeper</h2>

@@ -6,7 +6,6 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 // src/pages/startups.astro
-import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { NeatBackground } from '../../components/NeatBackground';
 // The Layout component should handle the Header and Footer
 // import Header from '../../components/Header.astro';
@@ -27,7 +26,7 @@ const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" vi
   <div class="flex flex-col isolate">
     <!-- Hero Section -->
  <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-     <NeatBackground client:only="react" />
+     <NeatBackground client:idle />
 
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
@@ -53,7 +52,6 @@ const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" vi
                 <ClientLogos filter="startups"/>
             </div>
         </div>
-        <SectionBackgroundAccents bottomLine={true}/>
     </section>
 
     <!-- Neat gradient divider -->

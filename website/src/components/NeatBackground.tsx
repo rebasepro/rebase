@@ -156,15 +156,13 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
 
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
 
-        // Add a tiny touch of randomness so each instance feels unique (if enabled)
+        // Add a tiny touch of randomness to position/shape so each instance feels unique (if enabled)
+        // Only affects camera position and shape — never colors or textures.
         if (randomize) {
             const r = () => (Math.random() - 0.5) * 2; // -1 to 1
-            config.textureSeed = (config.textureSeed ?? 478) + Math.floor(Math.random() * 120);
             config.cameraX = (config.cameraX ?? 0) + r() * 1.2;
             config.cameraY = (config.cameraY ?? 0) + r() * 0.8;
             config.planeTwist = (config.planeTwist ?? 1) + r() * 0.08;
-            config.waveFrequencyX = (config.waveFrequencyX ?? 3) + r() * 0.2;
-            config.waveFrequencyY = (config.waveFrequencyY ?? 5) + r() * 0.2;
         }
 
         let neat: NeatGradientInstance | undefined;

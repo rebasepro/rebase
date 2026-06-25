@@ -5,7 +5,6 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 
-import SectionBackgroundAccents from '../../components/SectionBackgroundAccents.astro';
 import { NeatBackground } from '../../components/NeatBackground';
 import ClientUIComponentsShowcase from '../../components/ClientUIComponentsShowcase.tsx';
 import { UIReferenceView } from '@rebasepro/core';
@@ -18,7 +17,7 @@ import { UIReferenceView } from '@rebasepro/core';
   <div>
     <!-- Hero Section -->
  <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-     <NeatBackground client:only="react" />
+     <NeatBackground client:idle />
 
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">

@@ -4,17 +4,12 @@
  * Lightweight, cookie-based, GA4-integrated A/B testing.
  * Zero dependencies. No flicker (inline head script assigns before paint).
  *
- * Supports two experiment types:
- * - **Content variants**: Show/hide elements via `<ABVariant>` component.
- * - **Section reordering**: Reorder page sections via CSS `order` on a flex
- *   container. Each variant defines a map of `#section-id → order` values.
- *   The control variant uses natural HTML order (no CSS injected).
+ * Supports content-variant experiments: show/hide elements via `<ABVariant>` component.
  *
  * How to use:
  * 1. Define experiments in the EXPERIMENTS array below.
- * 2. For content tests, wrap variant content with <ABVariant>.
- * 3. For reorder tests, add `sectionOrders` to the experiment definition.
- * 4. Results are automatically tracked in GA4 as custom events.
+ * 2. Wrap variant content with <ABVariant>.
+ * 3. Results are automatically tracked in GA4 as custom events.
  *
  * Cookie: rb_ab (functional — determines UI state, no consent needed)
  * GA4 events: experiment_impression, experiment_conversion
@@ -31,13 +26,6 @@ export interface Experiment {
     weights?: number[];
     /** ISO date string. Experiment auto-deactivates after this date. */
     expires?: string;
-    /**
-     * For section-reorder experiments: map of variant name → { sectionId: order }.
-     * Only applies to non-control variants. Section IDs should match the `id`
-     * attribute on the target elements (e.g. "s-social-proof", "s-demo-terminal").
-     * Omitted sections keep their natural HTML order.
-     */
-    sectionOrders?: Record<string, Record<string, number>>;
 }
 
 // ─── Active Experiments ──────────────────────────────────────
@@ -45,149 +33,12 @@ export interface Experiment {
 // Changes take effect on next deploy.
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Landing page section IDs (for reference when defining reorder experiments):
- *
- *  s-hero             — Hero (should always stay first)
- *  s-social-proof     — Client logos
- *  s-demo-terminal    — Terminal demo + init command
- *  s-demo-carousel    — Admin panel carousel
- *  s-how-it-works     — 3-step explainer
- *  s-power-features   — Feature video grid
- *  s-collection-power — "One Collection" section
- *  s-mosaic-showcase  — Visual Mosaic Showcase
- *  s-case-study       — SustenTalent showcase
- *  s-scroll-sync      — Scroll-sync feature showcase
- *  s-security         — Security & open-source punches
- *  s-faq              — FAQ accordion
- *  s-roadmap          — Roadmap timeline
- *  s-final-cta        — Bottom CTA (should always stay last)
- */
-
 export const EXPERIMENTS: Experiment[] = [
     {
         id: "navigation-structure",
         variants: ["control", "flat-nav"],
         weights: [50, 50],
         expires: "2026-08-01",
-    },
-    {
-        id: "homepage-section-order",
-        variants: [
-            "control",
-            "demo-first",
-            "social-first",
-            "explain-first",
-            "features-focus",
-            "roadmap-first",
-            "high-velocity"
-        ],
-        weights: [16, 14, 14, 14, 14, 14, 14],
-        expires: "2026-09-01",
-        sectionOrders: {
-            "demo-first": {
-                "s-hero": 1,
-                "s-demo-terminal": 2,
-                "s-demo-carousel": 3,
-                "s-power-features": 4,
-                "s-scroll-sync": 5,
-                "s-mosaic-showcase": 6,
-                "s-collection-power": 7,
-                "s-ai-apps": 8,
-                "s-social-proof": 9,
-                "s-how-it-works": 10,
-                "s-case-study": 11,
-                "s-security": 12,
-                "s-faq": 13,
-                "s-roadmap": 14,
-                "s-final-cta": 15
-            },
-            "social-first": {
-                "s-hero": 1,
-                "s-social-proof": 2,
-                "s-case-study": 3,
-                "s-security": 4,
-                "s-how-it-works": 5,
-                "s-collection-power": 6,
-                "s-ai-apps": 7,
-                "s-mosaic-showcase": 8,
-                "s-demo-terminal": 9,
-                "s-demo-carousel": 10,
-                "s-power-features": 11,
-                "s-scroll-sync": 12,
-                "s-faq": 13,
-                "s-roadmap": 14,
-                "s-final-cta": 15
-            },
-            "explain-first": {
-                "s-hero": 1,
-                "s-how-it-works": 2,
-                "s-collection-power": 3,
-                "s-ai-apps": 4,
-                "s-mosaic-showcase": 5,
-                "s-demo-terminal": 6,
-                "s-demo-carousel": 7,
-                "s-power-features": 8,
-                "s-scroll-sync": 9,
-                "s-case-study": 10,
-                "s-social-proof": 11,
-                "s-security": 12,
-                "s-faq": 13,
-                "s-roadmap": 14,
-                "s-final-cta": 15
-            },
-            "features-focus": {
-                "s-hero": 1,
-                "s-power-features": 2,
-                "s-scroll-sync": 3,
-                "s-mosaic-showcase": 4,
-                "s-collection-power": 5,
-                "s-ai-apps": 6,
-                "s-demo-terminal": 7,
-                "s-demo-carousel": 8,
-                "s-social-proof": 9,
-                "s-how-it-works": 10,
-                "s-case-study": 11,
-                "s-security": 12,
-                "s-faq": 13,
-                "s-roadmap": 14,
-                "s-final-cta": 15
-            },
-            "roadmap-first": {
-                "s-hero": 1,
-                "s-roadmap": 2,
-                "s-security": 3,
-                "s-faq": 4,
-                "s-social-proof": 5,
-                "s-how-it-works": 6,
-                "s-collection-power": 7,
-                "s-ai-apps": 8,
-                "s-case-study": 9,
-                "s-demo-terminal": 10,
-                "s-demo-carousel": 11,
-                "s-power-features": 12,
-                "s-scroll-sync": 13,
-                "s-mosaic-showcase": 14,
-                "s-final-cta": 15
-            },
-            "high-velocity": {
-                "s-hero": 1,
-                "s-demo-terminal": 2,
-                "s-how-it-works": 3,
-                "s-case-study": 4,
-                "s-social-proof": 5,
-                "s-demo-carousel": 6,
-                "s-power-features": 7,
-                "s-scroll-sync": 8,
-                "s-collection-power": 9,
-                "s-ai-apps": 10,
-                "s-mosaic-showcase": 11,
-                "s-security": 12,
-                "s-faq": 13,
-                "s-roadmap": 14,
-                "s-final-cta": 15
-            }
-        }
     },
     {
         id: "manifesto-banner-text",
