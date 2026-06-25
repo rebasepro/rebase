@@ -15,6 +15,7 @@ import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo.tsx';
 import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo.tsx';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo.tsx';
 import { TerminalInit } from '../../components/demos/TerminalInit.tsx';
+import { ArchitectureDiagram } from '../../components/demos/ArchitectureDiagram.tsx';
 import "../../styles/editor.css";
 
 const productDetailPreviewCode = `export function ProductDetailPreview({ modifiedValues }: {
@@ -506,76 +507,32 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
         </div>
     </section>
 
-    <!-- -- BACKEND & SDK CAPABILITIES -- -->
- <section id="backend" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+
+
+
+    <!-- -- FULL-STACK ARCHITECTURE DIAGRAM -- -->
+ <section id="architecture" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">
-                    Batteries Included
+                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                    Full-Stack Architecture
                 </div>
-                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Everything your backend needs.</h2>
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Every layer. One framework.</h2>
                 <p class="mt-4 text-base text-surface-400">
-                    Auth, email, storage, realtime, cron jobs, and more — all built into the framework. No third-party services required.
+                    From database drivers to the CLI — Rebase is a modular, layered architecture where every piece is designed to work together. Hover on any item to learn more.
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Auth SDK</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">signInWithEmail, Google OAuth, onAuthStateChange, session management, MFA, and API keys — all from the client SDK.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Storage SDK</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">uploadFile, getDownloadURL, deleteFile with local or S3 backends. TUS resumable uploads and image transforms built in.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Realtime SDK</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Subscribe to table changes with .listen(), broadcast to channels, track presence — all through the typed client.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">SDK Type Generator</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed"><code class="text-[11px] bg-surface-900 border border-surface-800 px-1.5 py-0.5 rounded text-surface-300 font-mono">rebase generate-sdk</code> outputs database.types.ts with full IntelliSense, enums, and relation types.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">GraphQL & OpenAPI</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Auto-generated GraphQL schema with GraphiQL IDE, plus OpenAPI 3.0 spec with built-in Swagger UI.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Hono Server</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Composable middleware, sub-app mounting, CORS, SPA serving — a modern backend built on Hono + Drizzle ORM.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Custom Functions</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Drop a Hono route in <code class="text-[11px] bg-surface-900 border border-surface-800 px-1.5 py-0.5 rounded text-surface-300 font-mono">functions/</code> — auto-mounted with full auth and DB access. Zero config.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Email Service</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">SMTP integration with password reset, email verification, and transactional templates. Or plug in SES, Resend, Postmark.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Database Branching</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Create isolated database copies for feature development. Branch, experiment, and merge — like git for your data.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Entity History</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Full audit trail with versioning. See who changed what, when, and revert to any previous state programmatically.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Full-Text Search</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Built-in search via <code class="text-[11px] bg-surface-900 border border-surface-800 px-1.5 py-0.5 rounded text-surface-300 font-mono">rebase.data.posts.search("...")</code> — powered by Postgres tsvector.</p>
-                </div>
-                <div class="rounded-2xl bg-surface-900/40 border border-surface-800/60 p-5">
-                    <div class="text-xs font-bold text-white mb-1.5">Self-Host Anywhere</div>
-                    <p class="text-[13px] text-surface-400 leading-relaxed">Deploy with Docker, Railway, Fly.io, or bare metal. Your Postgres, your infrastructure, zero vendor lock-in.</p>
-                </div>
+            <div class="max-w-6xl mx-auto animate-on-scroll fade-in-up">
+                <ArchitectureDiagram client:only="react" />
             </div>
         </div>
     </section>
 
     <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatBackground variant="b" client:visible/>
-    </div>
+        <NeatBackground variant="b" client:visible/>    </div>
 
     <!-- -- ALTERNATIVES COMPARISON -- -->
     <AlternativesComparison />
