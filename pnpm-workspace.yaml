@@ -1,6 +1,7 @@
 trustLockfile: true
 packages:
   - packages/*
+  - rebase-agent-skills
   - app
   - app/*
   - e2e

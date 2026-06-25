@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '\\\\.\\(log|json\\)$')",
+      "Bash(xargs -0 du -h)"
+    ]
+  }
+}

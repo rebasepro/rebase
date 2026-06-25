@@ -34,7 +34,7 @@ function App() {
         }
 
         const idTokenResult = await user?.firebaseUser?.getIdTokenResult();
-        const userIsAdmin = idTokenResult?.claims.admin || user?.email?.endsWith("@firecms.co");
+        const userIsAdmin = idTokenResult?.claims.admin || user?.email?.endsWith("@rebase.pro");
 
         console.log("Allowing access to", user);
 

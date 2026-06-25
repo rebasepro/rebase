@@ -9,7 +9,7 @@ export const en = {
   "demo.badge": "Three commands. Zero boilerplate.",
   "demo.title": "Schema In · Platform Out",
   "demo.init": "✔ Initialized Rebase in current directory.",
-  "demo.pull": "✔ Introspected PostgreSQL schema. Generated types.",
+  "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
   "social.title": "Trusted by developers and startups around the world",
   "howitworks.badge": "Time reclaimed",

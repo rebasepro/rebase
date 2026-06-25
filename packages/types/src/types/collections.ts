@@ -375,7 +375,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * Possible values: "table", "cards", "kanban".
      * Defaults to all three: ["table", "cards", "kanban"].
      * Note: "kanban" will only be available if the collection has at least
-     * one string property with enumValues defined, regardless of this setting.
+     * one string property with `enum` defined, regardless of this setting.
      */
     enabledViews?: ViewMode[];
 
@@ -619,9 +619,9 @@ export function isMongoDBCollection<M extends Record<string, unknown> = Record<s
 export interface KanbanConfig<M extends Record<string, unknown> = Record<string, unknown>> {
     /**
      * Property key to use for Kanban board columns.
-     * Must reference a string property with enumValues defined.
+     * Must reference a string property with `enum` values defined.
      * Entities will be grouped into columns based on this property's value.
-     * The column order is determined by the order of enumValues in the property.
+     * The column order is determined by the order of `enum` values in the property.
      */
     columnProperty: Extract<keyof M, string> | (string & {});
 }

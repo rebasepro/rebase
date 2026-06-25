@@ -9,7 +9,7 @@ export const es = {
   "demo.badge": "Tres comandos. Cero boilerplate.",
   "demo.title": "Schema In · Platform Out",
   "demo.init": "✔ Rebase inicializado en el directorio actual.",
-  "demo.pull": "✔ Esquema PostgreSQL analizado. Tipos generados.",
+  "demo.pull": "✔ Esquema aplicado a la base de datos. Tablas creadas.",
   "demo.dev":
     "✔ Panel de administración, API y servidor WebSocket en ejecución.",
   "social.title":

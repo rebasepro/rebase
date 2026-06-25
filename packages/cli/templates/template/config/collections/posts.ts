@@ -12,9 +12,7 @@ const postsCollection: EntityCollection = {
         id: {
             name: "ID",
             type: "number",
-            validation: {
-                required: true
-            }
+            isId: "increment"
         },
         title: {
             name: "Title",

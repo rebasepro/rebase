@@ -69,6 +69,22 @@ export function extractCauseMessage(error: unknown): string | null {
 }
 
 /**
+ * Detect whether an error is specifically a role-switching permission failure
+ * (e.g. "permission denied to set role" or "must be member of role"),
+ * as opposed to a table-level permission denial.
+ *
+ * This is used by the backend driver to auto-disable role switching when the
+ * connection user lacks SET ROLE privileges, rather than surfacing a confusing
+ * error to the Studio SQL Editor user.
+ */
+export function isRoleSwitchingPermissionError(error: unknown): boolean {
+    const pgError = extractPgError(error);
+    if (!pgError || pgError.code !== "42501") return false;
+    const msg = pgError.message.toLowerCase();
+    return msg.includes("set role") || msg.includes("member of role");
+}
+
+/**
  * Translate a raw PostgreSQL error into a user-friendly message.
  *
  * @param pgError  - The extracted PostgreSQL error (from {@link extractPgError})

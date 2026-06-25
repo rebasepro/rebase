@@ -31,6 +31,7 @@ import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegi
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server-core";
+import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
@@ -43,6 +44,14 @@ export class PostgresBackendDriver implements DataDriver {
     public user?: User;
     public data: RebaseData;
     public client?: RebaseClient;
+
+    /**
+     * Auto-set to `true` when a SET LOCAL ROLE fails with insufficient
+     * privileges, so subsequent queries skip the doomed attempt.
+     * Mirrors the static `DISABLE_DB_ROLE_SWITCHING` env var but is
+     * learned at runtime.
+     */
+    private _roleSwitchingDisabled = false;
 
     /**
      * When true, realtime notifications are deferred until after the
@@ -699,7 +708,7 @@ export class PostgresBackendDriver implements DataDriver {
             // as it's a no-op that can fail on managed Postgres setups where the connection
             // user doesn't have permission to SET ROLE.
             let needsRoleSwitch = false;
-            if (options?.role && process.env.DISABLE_DB_ROLE_SWITCHING !== "true") {
+            if (options?.role && process.env.DISABLE_DB_ROLE_SWITCHING !== "true" && !this._roleSwitchingDisabled) {
                 try {
                     const currentRoleResult = await targetDb.execute(drizzleSql.raw("SELECT current_user AS role"));
                     const currentRole = (currentRoleResult.rows?.[0] as Record<string, unknown>)?.role as string | undefined;
@@ -712,25 +721,40 @@ export class PostgresBackendDriver implements DataDriver {
 
             if (needsRoleSwitch && options?.role) {
                 const safeRole = options.role.replace(/"/g, "\"\"");
-                return await targetDb.transaction(async (tx) => {
-                    await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
-                    let result;
-                    if (options?.params && options.params.length > 0) {
-                        const parts = sqlText.split(/\$(\d+)/);
-                        const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
-                        for (let i = 0; i < parts.length; i++) {
-                            if (i % 2 === 0) {
-                                if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
-                            } else {
-                                chunks.push(drizzleSql.param(options.params[Number(parts[i]) - 1]));
+                try {
+                    return await targetDb.transaction(async (tx) => {
+                        await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
+                        let result;
+                        if (options?.params && options.params.length > 0) {
+                            const parts = sqlText.split(/\$(\d+)/);
+                            const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
+                            for (let i = 0; i < parts.length; i++) {
+                                if (i % 2 === 0) {
+                                    if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
+                                } else {
+                                    chunks.push(drizzleSql.param(options.params[Number(parts[i]) - 1]));
+                                }
                             }
+                            result = await tx.execute(drizzleSql.join(chunks, drizzleSql.raw("")));
+                        } else {
+                            result = await tx.execute(drizzleSql.raw(sqlText));
                         }
-                        result = await tx.execute(drizzleSql.join(chunks, drizzleSql.raw("")));
+                        return result.rows as Record<string, unknown>[];
+                    });
+                } catch (roleError: unknown) {
+                    if (isRoleSwitchingPermissionError(roleError)) {
+                        logger.warn(
+                            `[PostgresBackendDriver] SET LOCAL ROLE "${safeRole}" failed — ` +
+                            `the connection user lacks permission. Falling back to executing ` +
+                            `without role switching. To suppress this warning, set ` +
+                            `DISABLE_DB_ROLE_SWITCHING=true in your .env file.`
+                        );
+                        this._roleSwitchingDisabled = true;
+                        // Fall through to execute without role switching below
                     } else {
-                        result = await tx.execute(drizzleSql.raw(sqlText));
+                        throw roleError;
                     }
-                    return result.rows as Record<string, unknown>[];
-                });
+                }
             }
 
             let result;

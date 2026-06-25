@@ -5,7 +5,6 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import { CodeBlock } from '../../components/CodeBlock.tsx';
 import ClientLogos from '../../components/ClientLogos.astro';
 import { NeatBackground } from '../../components/NeatBackground';
-import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
 import AlternativesComparison from '../AlternativesComparison.astro';
 
 import { SchemaBuilderMiniDemo } from '../../components/demos/SchemaBuilderMiniDemo.tsx';
@@ -17,6 +16,17 @@ import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo.tsx';
 import { TerminalInit } from '../../components/demos/TerminalInit.tsx';
 import { ArchitectureDiagram } from '../../components/demos/ArchitectureDiagram.tsx';
 import "../../styles/editor.css";
+
+const cliCommands = [
+  { cmd: "rebase init", desc: "Scaffold a new project with Postgres, auth, and admin panel", badge: "setup", color: "emerald" },
+  { cmd: "rebase schema generate", desc: "Generate Drizzle ORM schema from your TypeScript collections", badge: "schema", color: "blue" },
+  { cmd: "rebase schema introspect", desc: "Introspect an existing Postgres database into collection definitions", badge: "schema", color: "blue" },
+  { cmd: "rebase db push", desc: "Apply schema changes directly to the database (dev shortcut)", badge: "db", color: "amber" },
+  { cmd: "rebase db generate", desc: "Generate SQL migration files from schema diff", badge: "db", color: "amber" },
+  { cmd: "rebase db migrate", desc: "Run all pending migrations against the database", badge: "db", color: "amber" },
+  { cmd: "rebase generate-sdk", desc: "Generate a typed database.types.ts for end-to-end type safety", badge: "sdk", color: "purple" },
+  { cmd: "rebase dev", desc: "Start frontend + backend concurrently with hot reload", badge: "dev", color: "pink" },
+];
 
 const productDetailPreviewCode = `export function ProductDetailPreview({ modifiedValues }: {
     modifiedValues?: EntityValues<Product>;
@@ -111,7 +121,40 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
 
         <div class="mx-auto max-w-7xl px-6 lg:px-8 space-y-32">
             
-            <!-- -- FEATURE 1: SCHEMA-AS-CODE -- -->
+            <!-- -- FEATURE 1: TYPE-SAFE SDK & INSTANT API -- -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden order-last lg:order-first">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        <span>Universal SDK autocomplete & API response</span>
+                        <span class="text-blue-400 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-[8px]">Type-Safe</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-12">
+                        <!-- Typing Console -->
+                        <div class="md:col-span-7 min-h-[280px] border-r border-surface-800/40">
+                            <SdkMiniDemo client:only="react" />
+                        </div>
+                        <!-- JSON Payload Inspector -->
+                        <div class="md:col-span-5 min-h-[280px]">
+                            <ApiMiniDemo client:only="react" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-semibold">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        Isomorphic Drizzle-Like SDK
+                    </div>
+                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        A Truly Typed SDK
+                    </h2>
+                    <p class="text-base text-surface-400">
+                        Query database records cleanly with deep relational joins, zero N+1 query loops, and compile-time type validation mapping your database schemas.
+                    </p>
+                </div>
+            </div>
+
+            <!-- -- FEATURE 2: SCHEMA-AS-CODE -- -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <div class="lg:col-span-5 space-y-6">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold">
@@ -154,73 +197,41 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
                 </div>
             </div>
 
-            <!-- -- FEATURE 2: TYPE-SAFE SDK & INSTANT API -- -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden order-last lg:order-first">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
-                        <span>Universal SDK autocomplete & API response</span>
-                        <span class="text-blue-400 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-[8px]">Type-Safe</span>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-12">
-                        <!-- Typing Console -->
-                        <div class="md:col-span-7 min-h-[280px] border-r border-surface-800/40">
-                            <SdkMiniDemo client:only="react" />
-                        </div>
-                        <!-- JSON Payload Inspector -->
-                        <div class="md:col-span-5 min-h-[280px]">
-                            <ApiMiniDemo client:only="react" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-5 space-y-6">
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-semibold">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        Isomorphic Drizzle-Like SDK
-                    </div>
-                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                        A Truly Typed SDK
-                    </h2>
-                    <p class="text-base text-surface-400">
-                        Query database records cleanly with deep relational joins, zero N+1 query loops, and compile-time type validation mapping your database schemas.
-                    </p>
-                </div>
-            </div>
-
-            <!-- -- FEATURE 3: CUSTOM FIELDS -- -->
+            <!-- -- FEATURE 3: REALTIME ENGINE -- -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <div class="lg:col-span-5 space-y-6">
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-semibold">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-                        React Extensibility
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-xs font-semibold">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        WebSocket Realtime
                     </div>
                     <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                        Custom Widget Extensions
+                        Live Data. Zero Polling.
                     </h2>
                     <p class="text-base text-surface-400">
-                        Register any standard React components directly into document schema fields. Rebase automatically binds value states and inputs without complex templates.
+                        Subscribe to table changes, broadcast to channels, and track user presence — all through the typed SDK. Changes propagate instantly via WebSocket with automatic reconnection and RLS enforcement.
                     </p>
+                    <div class="rounded-xl bg-[#09090b] border border-surface-800/40 p-4 font-mono text-[11px] leading-relaxed">
+                        <div class="text-surface-500 mb-1">// Subscribe to live changes</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#9cdcfe]">unsub</span> = <span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">users</span></div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">listen</span>((<span class="text-[#9cdcfe]">event</span>) => {"{"}</div>
+                        <div class="ml-4"><span class="text-surface-500">// INSERT | UPDATE | DELETE</span></div>
+                        <div class="ml-4"><span class="text-[#9cdcfe]">console</span>.<span class="text-[#dcdcaa]">log</span>(<span class="text-[#9cdcfe]">event</span>.<span class="text-[#9cdcfe]">type</span>, <span class="text-[#9cdcfe]">event</span>.<span class="text-[#9cdcfe]">record</span>);</div>
+                        <div class="ml-2">{"}"});</div>
+                        <div class="mt-3 text-surface-500">// Broadcast channels</div>
+                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#9cdcfe]">channel</span> = <span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">realtime</span></div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">channel</span>(<span class="text-[#ce9178]">"room:lobby"</span>)</div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">on</span>(<span class="text-[#ce9178]">"message"</span>, <span class="text-[#9cdcfe]">handler</span>)</div>
+                        <div class="ml-2">.<span class="text-[#dcdcaa]">subscribe</span>();</div>
+                    </div>
                 </div>
 
                 <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
-                    <div class="flex items-center px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
-                        schema/fields_widgets.tsx
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        <span>Live data preview</span>
+                        <span class="text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[8px]">Realtime</span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2">
-                        <!-- Custom Component Registration -->
-                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
-<span class="text-purple-400">import</span> &#123; <span class="text-blue-300">ColorPicker</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"./widgets"</span>;
-
-<span class="text-purple-400">export const</span> brand = <span class="text-blue-400">buildProperty</span>(&#123;
-  name: <span class="text-green-400">"Brand Color"</span>,
-  type: <span class="text-green-400">"string"</span>,
-  ui: &#123; Field: <span class="text-blue-300">ColorPicker</span> &#125;,
-  validation: &#123; required: <span class="text-amber-400">true</span> &#125;
-&#125;);</div>
-                        <!-- Live widget panel -->
-                        <div class="p-1 bg-[#09090b] flex flex-col justify-center">
-                            <CustomFieldsDemo client:only="react" />
-                        </div>
+                    <div class="h-[300px]">
+                        <RealtimeMiniDemo client:only="react" />
                     </div>
                 </div>
             </div>
@@ -352,40 +363,81 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
         </div>
     </section>
 
-    <!-- -- UI COMPONENTS TEASER -- -->
- <section id="ui-components" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+    <!-- -- CLI COMMANDS -- -->
+ <section id="cli" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="max-w-3xl mb-16">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary-light text-xs font-semibold mb-6">
-                    <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
-                    Rebase UI components
+            <div class="mx-auto max-w-2xl text-center mb-16">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-xs font-semibold mb-6">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l2-2-2-2M11 13h4M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /></svg>
+                    CLI
                 </div>
-                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Everything for your interface needs</h2>
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">One CLI for the full lifecycle</h2>
                 <p class="mt-4 text-base text-surface-400">
-                    Need custom pages or fields? Build them in minutes using Rebase's library of layout widgets, cards, and input fields.
+                    Scaffold, introspect, migrate, generate SDKs, and run dev servers — all from one tool.
                 </p>
             </div>
 
-            <div class="mx-auto mt-12 max-w-7xl min-h-64">
-                <div class="text-center">
-                    <ClientUIComponentsTeaser client:only="react">
-                        <div class="py-12 text-surface-500 font-mono text-xs">Loading Rebase UI Component preview...</div>
-                    </ClientUIComponentsTeaser>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl mx-auto">
+                {cliCommands.map((c) => (
+                    <div class="group rounded-xl bg-surface-900/50 p-5 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class={`inline-flex items-center py-0.5 px-2 text-[10px] font-bold uppercase rounded-full bg-${c.color}-500/10 text-${c.color}-400 ring-1 ring-inset ring-${c.color}-500/20`}>{c.badge}</span>
+                            <code class="text-sm font-mono text-white font-semibold">{c.cmd}</code>
+                        </div>
+                        <p class="text-sm text-surface-400">{c.desc}</p>
+                    </div>
+                ))}
             </div>
         </div>
     </section>
 
-    <!-- -- CUSTOM REACT VIEWS SECTION -- -->
+    <!-- -- REACT EXTENSIBILITY: CUSTOM VIEWS & WIDGETS (MERGED) -- -->
  <section id="custom-views" class="py-20 sm:py-28 relative border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-6">
             <div class="mx-auto max-w-3xl text-center mb-16">
-                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Build Custom Views</h2>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-semibold mb-6">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                    React Extensibility
+                </div>
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Custom Views & Widget Extensions</h2>
                 <p class="mt-4 text-base text-surface-400">
-                    Use our built-in React hooks to query data, handle errors, and manage transactions directly inside custom dashboards or document views.
+                    Register any standard React components directly into document schema fields, or build full custom dashboards using our built-in hooks to query data, handle errors, and manage transactions.
                 </p>
             </div>
-            
+
+            <!-- Custom Widget Fields -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-20">
+                <div class="lg:col-span-5 space-y-6">
+                    <h3 class="text-2xl font-bold tracking-tight text-white">Custom Field Widgets</h3>
+                    <p class="text-base text-surface-400">
+                        Register any standard React components directly into document schema fields. Rebase automatically binds value states and inputs without complex templates.
+                    </p>
+                </div>
+
+                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
+                    <div class="flex items-center px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
+                        schema/fields_widgets.tsx
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2">
+                        <!-- Custom Component Registration -->
+                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
+<span class="text-purple-400">import</span> &#123; <span class="text-blue-300">ColorPicker</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"./widgets"</span>;
+
+<span class="text-purple-400">export const</span> brand = <span class="text-blue-400">buildProperty</span>(&#123;
+  name: <span class="text-green-400">"Brand Color"</span>,
+  type: <span class="text-green-400">"string"</span>,
+  ui: &#123; Field: <span class="text-blue-300">ColorPicker</span> &#125;,
+  validation: &#123; required: <span class="text-amber-400">true</span> &#125;
+&#125;);</div>
+                        <!-- Live widget panel -->
+                        <div class="p-1 bg-[#09090b] flex flex-col justify-center">
+                            <CustomFieldsDemo client:only="react" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom React Views -->
             <div class="lg:grid lg:grid-cols-12 gap-8 items-stretch">
                 <!-- Code definition panel -->
                 <div class="lg:col-span-6 relative rounded-2xl overflow-hidden border border-surface-800/60 shadow-xl bg-surface-950 flex flex-col">
@@ -464,52 +516,6 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
         </div>
     </section>
 
-    <!-- -- REALTIME ENGINE -- -->
- <section id="realtime" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                <div class="lg:col-span-5 space-y-6">
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-xs font-semibold">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        WebSocket Realtime
-                    </div>
-                    <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                        Live Data. Zero Polling.
-                    </h2>
-                    <p class="text-base text-surface-400">
-                        Subscribe to table changes, broadcast to channels, and track user presence — all through the typed SDK. Changes propagate instantly via WebSocket with automatic reconnection and RLS enforcement.
-                    </p>
-                    <div class="rounded-xl bg-[#09090b] border border-surface-800/40 p-4 font-mono text-[11px] leading-relaxed">
-                        <div class="text-surface-500 mb-1">// Subscribe to live changes</div>
-                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#9cdcfe]">unsub</span> = <span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">data</span>.<span class="text-[#9cdcfe]">users</span></div>
-                        <div class="ml-2">.<span class="text-[#dcdcaa]">listen</span>((<span class="text-[#9cdcfe]">event</span>) => {"{"}</div>
-                        <div class="ml-4"><span class="text-surface-500">// INSERT | UPDATE | DELETE</span></div>
-                        <div class="ml-4"><span class="text-[#9cdcfe]">console</span>.<span class="text-[#dcdcaa]">log</span>(<span class="text-[#9cdcfe]">event</span>.<span class="text-[#9cdcfe]">type</span>, <span class="text-[#9cdcfe]">event</span>.<span class="text-[#9cdcfe]">record</span>);</div>
-                        <div class="ml-2">{"}"});</div>
-                        <div class="mt-3 text-surface-500">// Broadcast channels</div>
-                        <div><span class="text-[#569cd6]">const</span> <span class="text-[#9cdcfe]">channel</span> = <span class="text-[#9cdcfe]">rebase</span>.<span class="text-[#9cdcfe]">realtime</span></div>
-                        <div class="ml-2">.<span class="text-[#dcdcaa]">channel</span>(<span class="text-[#ce9178]">"room:lobby"</span>)</div>
-                        <div class="ml-2">.<span class="text-[#dcdcaa]">on</span>(<span class="text-[#ce9178]">"message"</span>, <span class="text-[#9cdcfe]">handler</span>)</div>
-                        <div class="ml-2">.<span class="text-[#dcdcaa]">subscribe</span>();</div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-7 rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/60 bg-surface-900/30 text-[10px] font-mono text-surface-500">
-                        <span>Live data preview</span>
-                        <span class="text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[8px]">Realtime</span>
-                    </div>
-                    <div class="h-[300px]">
-                        <RealtimeMiniDemo client:only="react" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-
-
-
     <!-- -- FULL-STACK ARCHITECTURE DIAGRAM -- -->
  <section id="architecture" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
@@ -533,6 +539,61 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
     <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
         <NeatBackground variant="b" client:visible/>    </div>
+
+    <!-- -- SECURITY & SELF-HOSTED -- -->
+ <section id="security" class="relative isolate py-20 sm:py-28 overflow-hidden border-b border-surface-800/40">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center mb-16">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-400 text-xs font-semibold mb-6">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 12 2 2 4-4" /></svg>
+                    Security
+                </div>
+                <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Your data. Your infrastructure.</h2>
+                <p class="mt-4 text-base text-surface-400">
+                    Self-hosted, open-source, zero vendor lock-in. Deploy anywhere, stop anytime — your data stays exactly where it is.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 max-w-5xl mx-auto">
+                <div class="rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">100% Data Ownership</h3>
+                    <p class="text-surface-400">Your data lives in your own PostgreSQL. Rebase never stores, accesses, or controls your content.</p>
+                </div>
+                <div class="rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Multi-Layer Security</h3>
+                    <p class="text-surface-400">RBAC at the app layer, RLS at the database layer, JWT auth, and your own network controls.</p>
+                </div>
+                <div class="rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Transparent & Auditable</h3>
+                    <p class="text-surface-400">MIT-licensed open source. Audit every line. No hidden servers, no telemetry, no surprises.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+                <div class="p-5 rounded-lg border bg-surface-900/50 border-surface-800">
+                    <h5 class="font-semibold text-white mb-1">GDPR Ready</h5>
+                    <p class="text-surface-400 text-sm">You're the data controller. Fulfill requests directly from your database.</p>
+                </div>
+                <div class="p-5 rounded-lg border bg-surface-900/50 border-surface-800">
+                    <h5 class="font-semibold text-white mb-1">Data Residency</h5>
+                    <p class="text-surface-400 text-sm">Choose your PostgreSQL deployment region for compliance.</p>
+                </div>
+                <div class="p-5 rounded-lg border bg-surface-900/50 border-surface-800">
+                    <h5 class="font-semibold text-white mb-1">Zero Vendor Lock-in</h5>
+                    <p class="text-surface-400 text-sm">Stop using Rebase anytime. Your data stays exactly where it is.</p>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- -- ALTERNATIVES COMPARISON -- -->
     <AlternativesComparison />

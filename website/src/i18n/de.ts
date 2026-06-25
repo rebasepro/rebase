@@ -9,7 +9,7 @@ export const de = {
   "demo.badge": "Drei Befehle. Null Boilerplate.",
   "demo.title": "Schema rein · Plattform raus",
   "demo.init": "✔ Rebase im aktuellen Verzeichnis initialisiert.",
-  "demo.pull": "✔ PostgreSQL-Schema eingelesen. Typen generiert.",
+  "demo.pull": "✔ Schema in Datenbank übertragen. Tabellen erstellt.",
   "demo.dev": "✔ Admin-Panel, API und WebSocket-Server laufen.",
   "social.title": "Tausende Entwickler und Startups weltweit vertrauen auf Rebase",
   "howitworks.badge": "Zeit zurückgewonnen",

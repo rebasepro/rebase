@@ -2,7 +2,7 @@
  * CLI command: generate-sdk
  *
  * Reads collection definitions from a specified directory (default: ./config/collections),
- * generates a typed JS SDK, and writes it to the output directory (default: ./generated/sdk).
+ * generates a typed TypeScript SDK, and writes it to the output directory (default: ./generated/sdk).
  *
  * Uses jiti for dynamic TypeScript import of collection files.
  */

@@ -100,6 +100,12 @@ const translatePath = useTranslatedPath(lang);
 
         if (!banner) return;
 
+        // Re-apply dismissed state after Astro view transitions reset html classes
+        if (localStorage.getItem("rb_manifesto_banner_dismissed") === "true") {
+            document.documentElement.classList.add("banner-dismissed-instant");
+            return;
+        }
+
         function dismiss() {
             banner?.classList.add("dismissing");
             localStorage.setItem("rb_manifesto_banner_dismissed", "true");

@@ -601,6 +601,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@rebasepro/agent-skills':
+        specifier: workspace:*
+        version: link:../../rebase-agent-skills
       '@rebasepro/sdk-generator':
         specifier: workspace:*
         version: link:../sdk-generator
@@ -1830,6 +1833,8 @@ importers:
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+
+  rebase-agent-skills: {}
 
   saas:
     devDependencies:

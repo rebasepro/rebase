@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient } from "../src/utils/pg-error-utils";
+import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError } from "../src/utils/pg-error-utils";
 
 // Suppress logger output during tests
 jest.mock("@rebasepro/server-core", () => ({
@@ -216,6 +216,55 @@ describe("pg-error-utils", () => {
             expect(result.message).not.toContain("select");
             expect(result.message).not.toContain("Failed query");
             expect(result.message).toContain("Check server logs");
+        });
+    });
+
+    describe("isRoleSwitchingPermissionError", () => {
+        it("returns true for 42501 with 'permission denied to set role'", () => {
+            const pgError = Object.assign(new Error("permission denied to set role \"demo\""), {
+                code: "42501"
+            });
+            expect(isRoleSwitchingPermissionError(pgError)).toBe(true);
+        });
+
+        it("returns true for 42501 with 'must be member of role'", () => {
+            const pgError = Object.assign(new Error("must be member of role \"admin\""), {
+                code: "42501"
+            });
+            expect(isRoleSwitchingPermissionError(pgError)).toBe(true);
+        });
+
+        it("returns true when PG error is wrapped in Drizzle cause chain", () => {
+            const pgError = Object.assign(new Error("permission denied to set role \"viewer\""), {
+                code: "42501"
+            });
+            const drizzleError = new Error("Query failed");
+            (drizzleError as { cause?: unknown }).cause = pgError;
+            expect(isRoleSwitchingPermissionError(drizzleError)).toBe(true);
+        });
+
+        it("returns false for 42501 with 'permission denied for table' (table-level)", () => {
+            const pgError = Object.assign(new Error("permission denied for table clients"), {
+                code: "42501",
+                table: "clients"
+            });
+            expect(isRoleSwitchingPermissionError(pgError)).toBe(false);
+        });
+
+        it("returns false for non-42501 errors", () => {
+            const pgError = Object.assign(new Error("relation does not exist"), {
+                code: "42P01"
+            });
+            expect(isRoleSwitchingPermissionError(pgError)).toBe(false);
+        });
+
+        it("returns false for non-PG errors", () => {
+            expect(isRoleSwitchingPermissionError(new Error("something random"))).toBe(false);
+        });
+
+        it("returns false for null/undefined", () => {
+            expect(isRoleSwitchingPermissionError(null)).toBe(false);
+            expect(isRoleSwitchingPermissionError(undefined)).toBe(false);
         });
     });
 });

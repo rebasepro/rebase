@@ -68,7 +68,6 @@ export async function entry(args: string[]) {
             break;
 
         case "generate-sdk": {
-            // Legacy command — kept for backward compatibility
             const sdkArgs = arg(
                 {
                     "--collections-dir": String,
@@ -153,7 +152,7 @@ ${chalk.green.bold("Database")}
   ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Show database command help
 
 ${chalk.green.bold("SDK")}
-  ${chalk.blue.bold("generate-sdk")}            Generate a typed JS SDK from collections
+  ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from collections
 
 ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth reset-password")}     Reset a user's password

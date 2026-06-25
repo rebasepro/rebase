@@ -1244,7 +1244,7 @@ export interface PropertyConditions {
     defaultValue?: JsonLogicRule;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ENUM CONDITIONS (for string/number properties with enumValues)
+    // ENUM CONDITIONS (for string/number properties with enum values)
     // ═══════════════════════════════════════════════════════════════════════
 
     /**

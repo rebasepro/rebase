@@ -12,6 +12,7 @@ import {
     ensureDevDatabaseExists,
     getTableExcludes
 } from "./cli-helpers";
+import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -164,7 +165,12 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
             await client.end();
         }
     } catch (err) {
-        logger.error(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
+        const hint = diagnoseDbError(err, databaseUrl);
+        if (hint) {
+            logger.error(hint);
+        } else {
+            logger.error(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
+        }
         process.exit(1);
     }
 }
@@ -398,6 +404,11 @@ async function runAtlas(domain: "schema" | "migrate", args: string[], collection
         logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
+
+    // Pre-flight: verify the database is reachable before running Atlas.
+    // This catches ECONNREFUSED / auth failures with a friendly banner
+    // instead of letting Atlas surface a raw error.
+    await checkDatabaseConnectivity(databaseUrl);
 
     const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
     await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl);

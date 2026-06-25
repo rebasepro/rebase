@@ -391,7 +391,7 @@ export async function runSeed() {
             localImages?: string[] | null;
         }
 
-        const firecmsDemoProducts: DemoProduct[] = (demoProductsRaw as DemoProductRaw[]).map((p, index) => ({
+        const demoProducts: DemoProduct[] = (demoProductsRaw as DemoProductRaw[]).map((p, index) => ({
             name: p.name || `Product ${index}`,
             sku: p.asin || `SKU-${Math.floor(Math.random()*100000)}`,
             cat: mapCategory(p.category),
@@ -408,7 +408,7 @@ export async function runSeed() {
         const tagIds = Array.from({ length: NUM_TAGS }, (_, i) => generateUUID("tag", i));
         const postIds = Array.from({ length: POST_COUNT }, (_, i) => generateUUID("post", i));
         const customerIds = Array.from({ length: 40 }, (_, i) => generateUUID("customer", i));
-        const productIds = Array.from({ length: firecmsDemoProducts.length }, (_, i) => generateUUID("product", i));
+        const productIds = Array.from({ length: demoProducts.length }, (_, i) => generateUUID("product", i));
         const orderIds = Array.from({ length: 80 }, (_, i) => generateUUID("order", i));
         const ticketIds = Array.from({ length: 60 }, (_, i) => generateUUID("ticket", i));
 
@@ -561,15 +561,15 @@ tag_id: tagIds[t - 1] });
         await db.insert(customers).values(customerValues);
 
         // ── Products ──────────────────────────────────────────────────
-        console.log("📦 Generating FireCMS Demo products...");
+        console.log("📦 Generating demo products...");
 
         // Map product image URLs to the static seed-asset files (already copied above).
         // The filenames in seed-assets use the same md5(url)[0:5]_filename pattern.
-        const firebaseStorageBase = "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/";
-        for (const p of firecmsDemoProducts) {
+        const demoStorageBase = "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/";
+        for (const p of demoProducts) {
             const localPaths: string[] = [];
             for (const imgUrl of p.imageUrls) {
-                const fullUrl = `${firebaseStorageBase}${encodeURIComponent(imgUrl)}?alt=media`;
+                const fullUrl = `${demoStorageBase}${encodeURIComponent(imgUrl)}?alt=media`;
                 const filename = imgUrl.split("/").pop() || "image.jpg";
                 const id = createHash("md5").update(fullUrl).digest("hex").substring(0, 5);
                 const localName = `${id}_${filename}`;
@@ -579,7 +579,7 @@ tag_id: tagIds[t - 1] });
             p.localImages = localPaths.length > 0 ? localPaths : null;
         }
 
-        const allProducts = firecmsDemoProducts;
+        const allProducts = demoProducts;
 
         const productValues = allProducts.map((p, i) => ({
             id: productIds[i],

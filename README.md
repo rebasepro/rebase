@@ -36,7 +36,7 @@
 
 ## What is Rebase?
 
-Rebase is a **developer-first**, open-source headless CMS and admin panel framework built with **React** and **TypeScript**. It gives you a complete backend-as-a-service layer on top of PostgreSQL — including authentication, S3-compatible storage, a full admin UI, and auto-generated APIs — while letting you extend every layer with custom React components, serverless functions, and scripts.
+Rebase is a **developer-first**, open-source headless CMS and admin panel framework built with **React** and **TypeScript**. It gives you a complete backend-as-a-service layer on top of PostgreSQL — including authentication, S3-compatible storage, a full admin UI, and auto-generated APIs — while letting you extend every layer with custom React components, serverless functions, and scripts. It's fully self-hosted and agent-native, with a built-in MCP server for AI-assisted development.
 
 ### ✨ Key Highlights
 
@@ -55,13 +55,15 @@ Scaffold a complete, self-hosted Rebase application connected to your database:
 
 ```bash
 npx @rebasepro/cli init my-rebase-app
+cd my-rebase-app
 ```
 
-Configure your database in `.env`, then start everything:
+Start the database, push the schema, and launch:
 
 ```bash
-cd my-rebase-app
-npm run dev
+docker compose up -d db
+pnpm run db:push
+pnpm run dev
 ```
 
 Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`.

@@ -10,9 +10,7 @@ const tagsCollection: EntityCollection = {
         id: {
             name: "ID",
             type: "number",
-            validation: {
-                required: true
-            }
+            isId: "increment"
         },
         name: {
             name: "Tag Name",

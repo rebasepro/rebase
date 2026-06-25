@@ -48,7 +48,7 @@ jobs:
           echo "Publishing canary version: $CANARY_VERSION"
 
           # Bump version in all publishable packages (node, not npm, to avoid workspace:* validation)
-          pnpm --filter './packages/*' -r exec node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$CANARY_VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$CANARY_VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
           # Commit version changes locally so pnpm publish doesn't complain about dirty git
           git config user.name "github-actions[bot]"
@@ -57,7 +57,7 @@ jobs:
           git commit -m "chore: canary version $CANARY_VERSION" --no-verify
 
       - name: Publish to npm
-        run: pnpm --filter './packages/*' -r publish --tag canary --no-git-checks --access public --report-summary
+        run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --tag canary --no-git-checks --access public --report-summary
 
       - name: Summary
         run: |

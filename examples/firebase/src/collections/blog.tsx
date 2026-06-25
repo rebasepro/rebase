@@ -1,7 +1,7 @@
 import { buildCollection } from "@rebasepro/common";
 
 /**
- * Blog collection – mirrors the FireCMS demo `blog` Firestore collection.
+ * Blog collection – mirrors the Rebase demo `blog` Firestore collection.
  *
  * Schema includes:
  * - Header image via Firebase Storage

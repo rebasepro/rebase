@@ -612,9 +612,9 @@ selected: true }, { name: "Tags" }].map(c => (
                                 <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;{variant}&quot;</Typography>
                                 <div className="flex flex-wrap gap-3 items-center">
                                     {(["primary", "secondary", "text", "error", "neutral"] as const).map(color => (
-                                        <Button key={color} variant={variant} color={color}>{color}</Button>
+                                        <Button key={color} variant={variant} color={color}>{color.charAt(0).toUpperCase() + color.slice(1)}</Button>
                                     ))}
-                                    <Button variant={variant} disabled>disabled</Button>
+                                    <Button variant={variant} disabled>Disabled</Button>
                                 </div>
                             </div>
                         ))}
@@ -622,7 +622,7 @@ selected: true }, { name: "Tags" }].map(c => (
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">sizes</Typography>
                             <div className="flex flex-wrap items-end gap-3">
                                 {(["small", "medium", "large", "xl", "2xl"] as const).map(s => (
-                                    <Button key={s} size={s}>{s}</Button>
+                                    <Button key={s} size={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</Button>
                                 ))}
                             </div>
                         </div>
@@ -637,20 +637,20 @@ selected: true }, { name: "Tags" }].map(c => (
                                 ]).map(({ s, icon }) => (
                                     <div key={s} className="flex flex-col items-center gap-1">
                                         <IconButton size={s}>{icon}</IconButton>
-                                        <Typography variant="caption" color="secondary">{s}</Typography>
+                                        <Typography variant="caption" color="secondary">{s.charAt(0).toUpperCase() + s.slice(1)}</Typography>
                                     </div>
                                 ))}
                                 <div className="flex flex-col items-center gap-1">
                                     <IconButton disabled><Trash2Icon size={20}/></IconButton>
-                                    <Typography variant="caption" color="secondary">disabled</Typography>
+                                    <Typography variant="caption" color="secondary">Disabled</Typography>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
                                     <IconButton variant="filled"><PlusIcon size={20}/></IconButton>
-                                    <Typography variant="caption" color="secondary">filled</Typography>
+                                    <Typography variant="caption" color="secondary">Filled</Typography>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
                                     <IconButton shape="square"><SettingsIcon size={20}/></IconButton>
-                                    <Typography variant="caption" color="secondary">square</Typography>
+                                    <Typography variant="caption" color="secondary">Square</Typography>
                                 </div>
                             </div>
                         </div>

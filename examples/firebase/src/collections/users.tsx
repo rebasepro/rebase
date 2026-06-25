@@ -1,7 +1,7 @@
 import { buildCollection } from "@rebasepro/common";
 
 /**
- * Users collection – mirrors the FireCMS demo `users` Firestore collection.
+ * Users collection – mirrors the Rebase demo `users` Firestore collection.
  *
  * Schema includes:
  * - Basic profile fields (first_name, last_name, email, phone)

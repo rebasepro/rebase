@@ -1,0 +1,15 @@
+{
+  "name": "@rebasepro/agent-skills",
+  "version": "0.5.0",
+  "private": false,
+  "description": "Bundled AI agent skills for Rebase",
+  "type": "module",
+  "files": [
+    "skills/"
+  ],
+  "exports": {
+    ".": "./package.json",
+    "./package.json": "./package.json",
+    "./skills": "./skills/"
+  }
+}

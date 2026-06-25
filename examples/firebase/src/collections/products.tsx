@@ -1,7 +1,7 @@
 import { buildCollection, buildProperty } from "@rebasepro/common";
 
 /**
- * Product categories enum matching the FireCMS demo data.
+ * Product categories enum matching the Rebase demo data.
  */
 const categories = {
     art_and_decoration: "Art and decoration",
@@ -62,7 +62,7 @@ const localeCollection = buildCollection({
 });
 
 /**
- * Products collection – mirrors the FireCMS demo `products` Firestore collection.
+ * Products collection – mirrors the Rebase demo `products` Firestore collection.
  *
  * Schema includes:
  * - Basic product info (name, brand, category, description)

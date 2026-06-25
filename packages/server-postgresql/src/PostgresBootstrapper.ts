@@ -55,26 +55,8 @@ export interface PostgresDriverInternals {
     poolManager?: DatabasePoolManager;
 }
 
-/**
- * Detect whether an error (or AggregateError wrapping multiple attempts)
- * represents an ECONNREFUSED — i.e. the database is simply not running.
- */
-function isEconnrefused(err: unknown): boolean {
-    if (!err || typeof err !== "object") return false;
-    const e = err as { code?: string; cause?: unknown; errors?: unknown[] };
-    if (e.code === "ECONNREFUSED") return true;
-    // AggregateError from Node net (dual-stack IPv4 + IPv6)
-    if (Array.isArray(e.errors)) {
-        return e.errors.some(inner =>
-            inner && typeof inner === "object" && (inner as { code?: string }).code === "ECONNREFUSED"
-        );
-    }
-    // Drizzle wraps the pg error in `cause`
-    if (e.cause && typeof e.cause === "object") {
-        return isEconnrefused(e.cause);
-    }
-    return false;
-}
+// Re-export from shared CLI error utilities
+import { isEconnrefused } from "./cli-errors";
 
 /**
  * Default PostgreSQL bootstrapper.
