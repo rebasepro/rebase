@@ -1,7 +1,7 @@
 import type { NavigationEntry } from "@rebasepro/types";
 import React from "react";
 import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
-;
+
 import { IconForView } from "@rebasepro/core";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
 import { useTranslation, useComponentOverride } from "@rebasepro/core";
@@ -108,7 +108,7 @@ export function DrawerNavigationGroup({
                     "transition-all duration-200 ease-in-out",
                     "overflow-hidden",
                     !hideHeader && "dark:bg-transparent",
-                    !hideHeader ? (drawerOpen ? "rounded-lg" : "rounded-lg") : "rounded-lg",
+                    "rounded-lg",
                     (!hideHeader && collapsed) ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
                 )}
             >

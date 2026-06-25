@@ -1,8 +1,7 @@
 import type { UrlController } from "@rebasepro/types";
 import React, { createContext } from "react";
-import { NavigateOptions } from "react-router-dom";
 
-;
+
 
 export const UrlContext = createContext<UrlController>({
     basePath: "/",

@@ -746,7 +746,7 @@ export function CrmDashboardDemo() {
                     <div>
                         <Typography variant="caption" color="secondary" className="uppercase text-[9px] tracking-wider block mb-0.5">Notes</Typography>
                         <Typography variant="body2" color="secondary" className="italic whitespace-pre-wrap">
-                            "{task.values.notes}"
+                            &ldquo;{task.values.notes}&rdquo;
                         </Typography>
                     </div>
                 )}
@@ -953,7 +953,7 @@ export function CrmDashboardDemo() {
                             {getGreeting()} 👋
                         </Typography>
                         <Typography variant="body2" color="secondary" className="mt-0.5">
-                            {getFormattedDate()} — here's your crm overview.
+                            {getFormattedDate()} — here&apos;s your crm overview.
                         </Typography>
                     </div>
                     <div className="flex items-center gap-2">

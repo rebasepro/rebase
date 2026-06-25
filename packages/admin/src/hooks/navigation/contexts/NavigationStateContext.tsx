@@ -1,6 +1,6 @@
-import type { NavigationStateController, AppView, NavigationResult, RebasePlugin } from "@rebasepro/types";
+import type { NavigationStateController } from "@rebasepro/types";
 import React, { createContext } from "react";
-;
+
 
 export const NavigationStateContext = createContext<NavigationStateController>({
     loading: true,

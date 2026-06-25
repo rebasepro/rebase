@@ -73,6 +73,7 @@ import {
 } from "@rebasepro/ui";
 import { RebaseLogo } from "../RebaseLogo";
 import { CrmDashboardDemo } from "./crm-dashboard/CrmDashboardDemo";
+import { CollectionTableDemo, CardViewDemo, KanbanBoardDemo } from "./collection-views";
 
 const SECTIONS = [
     { id: "drawer", label: "Drawer", icon: PanelLeftIcon },
@@ -86,7 +87,10 @@ const SECTIONS = [
     { id: "chips-alerts", label: "Chips & Alerts", icon: AlertCircleIcon },
     { id: "users", label: "Users View", icon: UserIcon },
     { id: "user-dialog", label: "User Dialog", icon: CircleUserIcon },
-    { id: "crm-dashboard", label: "CRM Dashboard", icon: LayoutGridIcon }
+    { id: "crm-dashboard", label: "CRM Dashboard", icon: LayoutGridIcon },
+    { id: "collection-table", label: "Collection Table", icon: ListIcon },
+    { id: "card-view", label: "Card View", icon: LayoutGridIcon },
+    { id: "kanban-board", label: "Kanban Board", icon: KanbanIcon }
 ];
 
 export function UIReferenceView() {
@@ -901,6 +905,43 @@ roles: [] }
                     <div className="w-full">
                         <CrmDashboardDemo />
                     </div>
+                </SectionBlock>
+
+                {/* ═══════════════════════════════════════════════
+                    SECTION: Collection Table
+                ═══════════════════════════════════════════════ */}
+                <SectionBlock id="collection-table" title="Collection Table">
+                    <Typography variant="body2" color="secondary" className="mb-4">
+                        Sample data collection rendered as a sortable, searchable, filterable table with row selection.
+                        Uses <code className="font-mono text-xs">Table</code>, <code className="font-mono text-xs">Chip</code>,{" "}
+                        <code className="font-mono text-xs">SearchBar</code>, <code className="font-mono text-xs">Select</code>,{" "}
+                        <code className="font-mono text-xs">Checkbox</code>.
+                    </Typography>
+                    <div className="w-full"><CollectionTableDemo /></div>
+                </SectionBlock>
+
+                {/* ═══════════════════════════════════════════════
+                    SECTION: Card View
+                ═══════════════════════════════════════════════ */}
+                <SectionBlock id="card-view" title="Card View">
+                    <Typography variant="body2" color="secondary" className="mb-4">
+                        Grid of entity cards with thumbnail area, progress bar, status/priority chips, and assignee.
+                        Uses <code className="font-mono text-xs">Card</code>, <code className="font-mono text-xs">Chip</code>,{" "}
+                        <code className="font-mono text-xs">ToggleButtonGroup</code>, <code className="font-mono text-xs">SearchBar</code>.
+                    </Typography>
+                    <div className="w-full"><CardViewDemo /></div>
+                </SectionBlock>
+
+                {/* ═══════════════════════════════════════════════
+                    SECTION: Kanban Board
+                ═══════════════════════════════════════════════ */}
+                <SectionBlock id="kanban-board" title="Kanban Board">
+                    <Typography variant="body2" color="secondary" className="mb-4">
+                        Drag-and-drop kanban board with four status columns.
+                        Uses <code className="font-mono text-xs">KanbanView</code>, <code className="font-mono text-xs">BoardItem</code>,{" "}
+                        <code className="font-mono text-xs">BoardItemViewProps</code>.
+                    </Typography>
+                    <div className="w-full"><KanbanBoardDemo /></div>
                 </SectionBlock>
             </div>
         </div>

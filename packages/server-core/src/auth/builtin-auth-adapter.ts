@@ -62,6 +62,8 @@ export interface BuiltinAuthAdapterConfig {
     authHooks?: AuthHooks;
     /** The parsed auth config from the collection (if `auth` is an object, not just `true`). */
     collectionAuthConfig?: import("@rebasepro/types").AuthCollectionConfig;
+    /** Enable magic link (passwordless email) login. Requires email service. */
+    enableMagicLink?: boolean;
 }
 
 /**
@@ -81,7 +83,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         oauthProviders = [],
         serviceKey,
         authHooks,
-        collectionAuthConfig
+        collectionAuthConfig,
+        enableMagicLink = false
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -188,7 +191,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowRegistration,
                 defaultRole,
                 oauthProviders,
-                authHooks
+                authHooks,
+                enableMagicLink
             });
         },
 
@@ -245,6 +249,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 sessionManagement: true,
                 profileUpdate: true,
                 emailVerification: !!emailService?.isConfigured(),
+                magicLink: enableMagicLink && !!emailService?.isConfigured(),
                 enabledProviders,
                 needsSetup
             };

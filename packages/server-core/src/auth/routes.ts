@@ -15,6 +15,7 @@ import { z } from "zod";
 import { logger } from "../utils/logger";
 import { mountMfaRoutes } from "./mfa-routes";
 import { mountSessionRoutes } from "./session-routes";
+import { mountMagicLinkRoutes } from "./magic-link-routes";
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -43,6 +44,8 @@ export interface AuthModuleConfig {
      * When not provided, falls back to checking if any users exist.
      */
     isBootstrapCompleted?: () => Promise<boolean>;
+    /** Enable magic link (passwordless email) login. Requires email service. */
+    enableMagicLink?: boolean;
 }
 
 /**
@@ -327,6 +330,11 @@ displayName: user.displayName });
 
             const isValidPassword = await ops.verifyPassword(password, user.passwordHash);
             if (!isValidPassword) {
+                logger.warn("[Security Audit] Auth login failure", {
+                    eventType: "auth.login.failure",
+                    email,
+                    userId: user.id
+                });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
         }
@@ -343,6 +351,12 @@ displayName: user.displayName });
                 logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
             });
         }
+
+        logger.info("[Security Audit] Auth login success", {
+            eventType: "auth.login.success",
+            userId: user.id,
+            email
+        });
 
         return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
     });
@@ -735,6 +749,20 @@ aal: "aal1" };
     // MFA / TOTP
     // ═══════════════════════════════════════════════════════════════════════
     mountMfaRoutes(router, config, ops, parseBody);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Magic Link (passwordless email login)
+    // ═══════════════════════════════════════════════════════════════════════
+    if (config.enableMagicLink) {
+        mountMagicLinkRoutes({
+            router,
+            config,
+            ops,
+            parseBody,
+            buildAuthResponse,
+            createSessionAndTokens
+        });
+    }
 
     return router;
 }

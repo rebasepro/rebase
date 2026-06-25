@@ -386,3 +386,85 @@ Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
 html,
 text };
 }
+
+/**
+ * Default magic link email template
+ */
+export function getMagicLinkTemplate(
+    magicLinkUrl: string,
+    user: TemplateUser,
+    appName = "Rebase"
+): { subject: string; html: string; text: string } {
+    const greeting = getGreeting(user);
+
+    const subject = `Sign in to ${appName}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+    <div style="${styles.container}">
+        <div style="${styles.card}">
+            <h1 style="${styles.heading}">Sign In to ${appName}</h1>
+            
+            <p style="${styles.paragraph}">
+                Hi ${greeting},
+            </p>
+            
+            <p style="${styles.paragraph}">
+                We received a request to sign in to your ${appName} account. 
+                Click the button below to log in:
+            </p>
+            
+            <div style="text-align: center;">
+                <a href="${magicLinkUrl}" style="${styles.button}">Sign In</a>
+            </div>
+            
+            <p style="${styles.paragraph}">
+                Or copy and paste this link into your browser:
+            </p>
+            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+                ${magicLinkUrl}
+            </p>
+            
+            <div style="${styles.warning}">
+                ⏰ This link will expire in 15 minutes for security reasons and can only be used once.
+            </div>
+            
+            <div style="${styles.footer}">
+                <p style="margin: 0;">
+                    If you didn't request this sign-in link, you can safely ignore this email. 
+                    No action is needed.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+
+    const text = `
+Sign In to ${appName}
+
+Hi ${greeting},
+
+We received a request to sign in to your ${appName} account.
+
+Click this link to log in:
+${magicLinkUrl}
+
+This link will expire in 15 minutes for security reasons and can only be used once.
+
+If you didn't request this sign-in link, you can safely ignore this email.
+No action is needed.
+    `.trim();
+
+    return { subject,
+html,
+text };
+}

@@ -1,5 +1,5 @@
 import type { AppView, EntityCollection, NavigationResult, RebasePlugin, NavigationStateController, UrlController, NavigationGroupMapping } from "@rebasepro/types";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import { AuthController, RebaseData, CollectionRegistryController, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/types";
@@ -100,10 +100,16 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         collectionRegistryController
     });
 
-    // Expose a combined refresh function
+    // Expose a combined refresh function with microtask batching
+    const pendingRefreshRef = useRef(false);
     const refreshNavigation = useCallback(() => {
-        refreshCollections();
-        refreshViews();
+        if (pendingRefreshRef.current) return;
+        pendingRefreshRef.current = true;
+        queueMicrotask(() => {
+            pendingRefreshRef.current = false;
+            refreshCollections();
+            refreshViews();
+        });
     }, [refreshCollections, refreshViews]);
 
     return useMemo(() => ({
@@ -112,8 +118,7 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         topLevelNavigation,
         loading: collectionsLoading || viewsLoading,
         navigationLoadingError: collectionsError ?? viewsError,
-        refreshNavigation,
-        plugins
+        refreshNavigation
     }), [
         views,
         adminViews,
@@ -122,7 +127,6 @@ export function useBuildNavigationStateController<EC extends EntityCollection, U
         viewsLoading,
         collectionsError,
         viewsError,
-        refreshNavigation,
-        plugins
+        refreshNavigation
     ]);
 }

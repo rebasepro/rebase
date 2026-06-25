@@ -123,6 +123,12 @@ export interface RebaseAuthConfig {
      */
     hooks?: AuthHooks;
 
+    /**
+     * Enable magic link (passwordless email) authentication.
+     * Requires email to be configured.
+     */
+    magicLink?: boolean;
+
     [key: string]: unknown;
 }
 
@@ -561,7 +567,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 oauthProviders,
                 serviceKey,
                 authHooks: safeAuthConfig.hooks,
-                collectionAuthConfig
+                collectionAuthConfig,
+                enableMagicLink: safeAuthConfig.magicLink ?? false
             });
         }
 

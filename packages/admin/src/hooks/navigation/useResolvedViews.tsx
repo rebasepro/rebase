@@ -1,6 +1,6 @@
 
 import type { AppView, AppViewsBuilder, EffectiveRoleController, RebasePlugin } from "@rebasepro/types";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 /**
  * Compare two view arrays by their slug identity.
@@ -20,6 +20,7 @@ function viewSlugsEqual(a: AppView[] | undefined, b: AppView[] | undefined): boo
 import type { AuthController, RebaseData, User } from "@rebasepro/types";
 
 import { resolveAppViews } from "./useNavigationResolution";
+import { useAsyncResolver } from "./useAsyncResolver";
 
 export type UseResolvedViewsProps<USER extends User> = {
     authController: AuthController<USER>;
@@ -38,6 +39,23 @@ export type UseResolvedViewsResult = {
     error: Error | undefined;
     refresh: () => void;
 };
+
+/**
+ * Combined result type for the async resolver — holds both views and
+ * adminViews so they can be resolved together in a single async call.
+ */
+type ResolvedViewsData = {
+    views: AppView[] | undefined;
+    adminViews: AppView[] | undefined;
+};
+
+/**
+ * Equality check for the combined views data.
+ * Compares both views and adminViews by slug identity.
+ */
+function areResolvedViewsEqual(a: ResolvedViewsData, b: ResolvedViewsData): boolean {
+    return viewSlugsEqual(a.views, b.views) && viewSlugsEqual(a.adminViews, b.adminViews);
+}
 
 /**
  * Hook that resolves view and admin view props (which may be async builders or arrays)
@@ -60,21 +78,11 @@ export function useResolvedViews<USER extends User>(
         effectiveRoleController
     } = props;
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | undefined>(undefined);
-    const [resolvedViews, setResolvedViews] = useState<AppView[] | undefined>(undefined);
-    const [resolvedAdminViews, setResolvedAdminViews] = useState<AppView[] | undefined>(undefined);
-
-    // Track the trigger count to allow force-refresh
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-    const refresh = useCallback(() => {
-        setRefreshTrigger(prev => prev + 1);
-    }, []);
-
-    // Refs for change-detection (avoids state updates when views haven't changed)
-    const viewsRef = useRef<AppView[] | undefined>(undefined);
-    const adminViewsRef = useRef<AppView[] | undefined>(undefined);
+    // Stable identity string for the user — avoids re-triggering when the
+    // authController object reference changes but uid/roles are the same.
+    const userIdentity = authController.user
+        ? `${authController.user.uid}:${(authController.user.roles ?? []).sort().join(',')}`
+        : null;
 
     // Use refs for values that may be new objects each render but shouldn't
     // re-trigger the effect. The effect reads them at execution time.
@@ -104,65 +112,26 @@ export function useResolvedViews<USER extends User>(
     resolvedAuthControllerRef.current = resolvedAuthController;
 
     const initialLoading = resolvedAuthController.initialLoading;
-    const user = resolvedAuthController.user;
 
-    useEffect(() => {
-        if (initialLoading) return;
-
-        let cancelled = false;
-
-        (async () => {
-            try {
-                const [newViews, newAdminViews] = await Promise.all([
-                    resolveAppViews(viewsProp, resolvedAuthControllerRef.current, dataRef.current, pluginsRef.current),
-                    resolveAppViews(adminViewsProp, resolvedAuthControllerRef.current, dataRef.current)
-                ]);
-
-                // Compare views by slug identity rather than deepEqual.
-                // Views contain React elements (JSX) whose internal properties
-                // change on every render, making deepEqual unreliable.
-                if (!viewSlugsEqual(viewsRef.current, newViews)) {
-                    viewsRef.current = newViews;
-                    setResolvedViews(newViews);
-                }
-
-                if (!viewSlugsEqual(adminViewsRef.current, newAdminViews)) {
-                    adminViewsRef.current = newAdminViews;
-                    setResolvedAdminViews(newAdminViews);
-                }
-
-                setError(undefined);
-            } catch (e) {
-                if (!cancelled) {
-                    console.error("Error resolving views:", e);
-                    setError(e as Error);
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        viewsProp,
-        adminViewsProp,
-        refreshTrigger,
-        adminMode,
-        initialLoading,
-        user,
-        plugins
-    ]);
+    const { data: resolvedData, loading, error, refresh } = useAsyncResolver<ResolvedViewsData>({
+        resolver: async () => {
+            const [newViews, newAdminViews] = await Promise.all([
+                resolveAppViews(viewsProp, resolvedAuthControllerRef.current, dataRef.current, pluginsRef.current),
+                resolveAppViews(adminViewsProp, resolvedAuthControllerRef.current, dataRef.current)
+            ]);
+            return { views: newViews, adminViews: newAdminViews };
+        },
+        initialValue: { views: undefined, adminViews: undefined },
+        isEqual: areResolvedViewsEqual,
+        deps: [viewsProp, adminViewsProp, adminMode, userIdentity],
+        disabled: initialLoading,
+    });
 
     return useMemo(() => ({
-        views: resolvedViews,
-        adminViews: resolvedAdminViews,
+        views: resolvedData.views,
+        adminViews: resolvedData.adminViews,
         loading,
         error,
         refresh
-    }), [resolvedViews, resolvedAdminViews, loading, error, refresh]);
+    }), [resolvedData, loading, error, refresh]);
 }
-

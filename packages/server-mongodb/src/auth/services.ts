@@ -13,6 +13,7 @@ import {
     CreateRoleData,
     RefreshTokenInfo,
     PasswordResetTokenInfo,
+    MagicLinkTokenInfo,
     UserIdentityData,
     ListUsersOptions,
     PaginatedUsersResult,
@@ -501,6 +502,26 @@ export class MongoTokenRepository implements TokenRepository {
     async deleteExpiredTokens(): Promise<void> {
         await this.passwordResetTokenService.deleteExpired();
     }
+
+    // Magic link token operations
+
+    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        const col = this.db.collection("magic_link_tokens");
+        await col.deleteMany({ userId, usedAt: null });
+        await col.insertOne({ userId, tokenHash, expiresAt, usedAt: null, createdAt: new Date() });
+    }
+
+    async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
+        const col = this.db.collection("magic_link_tokens");
+        const doc = await col.findOne({ tokenHash, usedAt: null, expiresAt: { $gt: new Date() } });
+        if (!doc) return null;
+        return { userId: doc.userId as string, expiresAt: doc.expiresAt as Date };
+    }
+
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
+        const col = this.db.collection("magic_link_tokens");
+        await col.updateOne({ tokenHash }, { $set: { usedAt: new Date() } });
+    }
 }
 
 export class MongoAuthRepository implements AuthRepository {
@@ -652,6 +673,20 @@ export class MongoAuthRepository implements AuthRepository {
 
     async deleteExpiredTokens(): Promise<void> {
         await this.tokenRepository.deleteExpiredTokens();
+    }
+
+    // Magic link token operations
+
+    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.tokenRepository.createMagicLinkToken(userId, tokenHash, expiresAt);
+    }
+
+    async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
+        return this.tokenRepository.findValidMagicLinkToken(tokenHash);
+    }
+
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
+        await this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
     }
 
     // MFA Repository Stub

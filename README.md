@@ -15,11 +15,11 @@
   <a href="https://demo.rebase.pro">Live Demo</a> •
   <a href="https://rebase.pro/docs">Documentation</a> •
   <a href="https://rebase.pro/features">Features</a> •
-  <a href="https://github.com/rebasepro/rebase">GitHub</a> •
   <a href="https://discord.gg/fxy7xsQm3m">Discord</a>
 </p>
 
 <p align="center">
+  <a href="https://github.com/rebasepro/rebase/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rebasepro/rebase/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
   <a href="https://www.npmjs.com/package/@rebasepro/core"><img src="https://img.shields.io/npm/v/@rebasepro/core.svg?style=flat-square&color=orange" alt="NPM Version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-purple.svg?style=flat-square" alt="License: MIT" /></a>
   <a href="https://www.npmjs.com/package/@rebasepro/core"><img src="https://img.shields.io/npm/dw/@rebasepro/core?style=flat-square&color=blue" alt="NPM Downloads" /></a>
@@ -264,6 +264,12 @@ If your AI coding agent or database role permissions cause a `permission denied 
 - 💬 [Discord Community](https://discord.gg/fxy7xsQm3m)
 - 🐛 [GitHub Issues](https://github.com/rebasepro/rebase/issues)
 - 📝 [Changelog](./CHANGELOG.md)
+
+---
+
+## ⭐ Star Us
+
+If you find Rebase useful, please consider giving us a star on GitHub — it helps more developers discover the project!
 
 ---
 

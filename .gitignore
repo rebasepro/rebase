@@ -92,6 +92,7 @@ app/uploads/
 
 # Test results
 test-results/
+playwright-report/
 
 # Backend scratch files
 app/backend/scratch/
@@ -103,3 +104,18 @@ app/backend/scratch/
 /full_test_results.log
 /test_results.log
 /tsc_results.log
+
+# IDE & AI agent configuration (personal/local)
+.antigravity/
+.claude/
+.fallowrc.json
+AGENT.md
+
+# Marketing & asset templates
+og-template.html
+
+# Yarn PnP leftovers (project uses pnpm)
+.pnp.*
+
+# Astro build cache
+.astro/

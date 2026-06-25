@@ -93,6 +93,8 @@ export interface AuthAdapterCapabilities {
     profileUpdate: boolean;
     /** Supports email verification. */
     emailVerification: boolean;
+    /** Supports passwordless magic link login. */
+    magicLink: boolean;
     /** List of enabled OAuth provider IDs (e.g. `["google", "github"]`). */
     enabledProviders: string[];
 

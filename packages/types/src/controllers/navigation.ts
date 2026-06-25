@@ -1,7 +1,7 @@
 import React from "react";
 import type { EntityReference } from "../types/entities";
 import type { EntityCollection } from "../types/collections";
-import type { RebasePlugin } from "../types/plugins";
+
 
 /**
  * Controller that handles URL path building and resolution.
@@ -104,17 +104,12 @@ export type NavigationStateController = {
     /**
      * Was there an error while loading the navigation data
      */
-    navigationLoadingError?: unknown;
+    navigationLoadingError?: Error;
 
     /**
      * Call this method to recalculate the navigation
      */
     refreshNavigation: () => void;
-
-    /**
-     * Plugin system allowing to extend the CMS functionality.
-     */
-    plugins?: RebasePlugin[];
 };
 
 export interface NavigateOptions {
@@ -126,13 +121,7 @@ export interface NavigateOptions {
     viewTransition?: boolean;
 }
 
-// currently not used, in favor of a single blocker in `RebaseRoute`
-export type NavigationBlocker = {
-    updateBlockListener: (path: string, block: boolean, basePath?: string) => () => void;
-    isBlocked: (path: string) => boolean;
-    proceed?: () => void;
-    reset?: () => void;
-};
+
 
 /**
  * Custom additional views created by the developer, added to the main
@@ -181,9 +170,13 @@ export interface AppView {
 
     /**
      * Component to be rendered. This can be any React component, and can use
-     * any of the provided hooks
+     * any of the provided hooks.
+     *
+     * Pass a `ComponentType` to enable lazy rendering — the component will
+     * only be instantiated when the route is visited. This is recommended
+     * for dynamic views generated from database data.
      */
-    view: React.ReactNode;
+    view: React.ReactNode | React.ComponentType;
 
     /**
      * If true, a wildcard route (slug/*) is automatically registered

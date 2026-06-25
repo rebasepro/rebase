@@ -118,6 +118,7 @@ describe("createCustomAuthAdapter", () => {
             sessionManagement: false,
             profileUpdate: false,
             emailVerification: false,
+            magicLink: false,
             enabledProviders: []
         });
     });

@@ -1,55 +1,75 @@
-Thank you for your interest in contributing to this project! If you are new to contributing to open source, please read
-the [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/) guide.
+# Contributing to Rebase
 
-If you would like to make changes to the source, feel free to submit a PR!
+Thank you for your interest in contributing! Whether it's a bug fix, new feature, or documentation improvement, we appreciate your help.
+
+If you're new to open source, check out [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/).
+
+## Prerequisites
+
+- **Node.js** ≥ 20
+- **pnpm** ≥ 11 (`corepack enable` to activate)
+- **Docker** (for the local PostgreSQL database)
 
 ## Getting Started
 
-This project is a monorepo managed with [Yarn workspaces](https://classic.yarnpkg.com/en/docs/workspaces/).
-
-You can find all the Rebase packages in the `packages` folder.
-The code that simulates a final project implemented by a user can be found in the `examples` folder.
-
-All dependencies are linked automatically and just running the following commands should be enough to get you started.
-
-After pulling the code you just need to run:
+1. **Fork & clone** the repository:
 
 ```bash
-npm install
-npm run dev
+git clone https://github.com/<your-username>/rebase.git
+cd rebase
 ```
 
-or
+2. **Install dependencies**:
 
 ```bash
-yarn
-yarn dev
-``` 
-
-to start the demo project.
-
-You can also run:
-
-```bash
-npm install
-npm run pro
+pnpm install
 ```
 
-or
+3. **Start the database** and push the schema:
 
 ```bash
-yarn
-yarn pro
-``` 
+docker compose up -d db
+pnpm run db:push
+```
 
-to use the example project with the Pro version of Rebase.
+4. **Launch the dev server**:
 
-## Support and discussion
+```bash
+pnpm run dev
+```
 
-Please join our [Discord channel](https://discord.gg/fxy7xsQm3m) to discuss any details regarding adaptations. We are
-happy to help!
+The admin panel runs at `http://localhost:5173` and the API at `http://localhost:3001`.
 
-You are encouraged to check with us before implementing any major changes to the library, that would like
-to be submitted as a PR.
+## Project Structure
 
+| Path | Description |
+|---|---|
+| `packages/` | All library packages (published to npm) |
+| `app/` | Example application that consumes the packages |
+| `website/` | Documentation site |
+| `e2e/` | End-to-end tests (Playwright) |
+| `scripts/` | Build, release, and utility scripts |
 
+## Code Quality
+
+Before submitting a PR, make sure all checks pass:
+
+```bash
+./scripts/verify-quality.sh
+```
+
+This runs TypeScript compilation, ESLint, unit tests, and Playwright E2E tests.
+
+## Submitting a Pull Request
+
+1. Create a feature branch from `main`.
+2. Make your changes — keep commits focused and well-described.
+3. Run `./scripts/verify-quality.sh` and ensure everything passes.
+4. Open a PR with a clear description of what changed and why.
+5. Link any related issues.
+
+> **Tip:** For major changes, please open an issue or reach out on Discord first so we can align on the approach.
+
+## Support & Discussion
+
+Join our [Discord community](https://discord.gg/fxy7xsQm3m) — we're happy to help with questions, ideas, or contribution guidance.

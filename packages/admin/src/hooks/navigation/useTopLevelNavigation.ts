@@ -16,7 +16,7 @@ export type UseTopLevelNavigationProps = {
     viewsOrder?: string[];
     urlController: UrlController;
     adminMode?: "content" | "studio" | "settings";
-    collectionRegistryController: CollectionRegistryController<any> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
+    collectionRegistryController: CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 };
 
 export type UseTopLevelNavigationResult = {
@@ -182,22 +182,26 @@ export function useTopLevelNavigation(
             return 0;
         };
 
-        navigationEntries = navigationEntries.sort((a, b) => {
-            return groupOrderValue(a.group) - groupOrderValue(b.group);
-        });
-
         const usedViewsOrder = viewsOrder ?? navigationEntriesOrder;
-        if (usedViewsOrder) {
-            navigationEntries = navigationEntries.sort((a, b) => {
+        navigationEntries = navigationEntries.sort((a, b) => {
+            // Primary: group priority (admin/settings last)
+            const groupDiff = groupOrderValue(a.group) - groupOrderValue(b.group);
+            if (groupDiff !== 0) return groupDiff;
+
+            // Secondary: explicit view order (if provided)
+            if (usedViewsOrder) {
                 const getSortPath = (navEntry: NavigationEntry) => typeof navEntry.slug === "string" ? navEntry.slug : navEntry.slug[0];
                 const aIndex = usedViewsOrder.indexOf(getSortPath(a));
                 const bIndex = usedViewsOrder.indexOf(getSortPath(b));
-                if (aIndex === -1 && bIndex === -1) return 0;
-                if (aIndex === -1) return 1;
-                if (bIndex === -1) return -1;
-                return aIndex - bIndex;
-            });
-        }
+                if (aIndex !== -1 || bIndex !== -1) {
+                    if (aIndex === -1) return 1;
+                    if (bIndex === -1) return -1;
+                    return aIndex - bIndex;
+                }
+            }
+
+            return 0;
+        });
 
         const collectedGroupsFromEntries = navigationEntries
             .map(e => e.group)

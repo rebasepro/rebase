@@ -633,7 +633,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             await ensureAdmin();
         }
 
-        let cmdArgs = [...cliTool.cmd];
+        const cmdArgs = [...cliTool.cmd];
         if (name === "rebase_auth_reset_password") {
             const argsObj = args as { email: string; password?: string };
             cmdArgs.push("--email", argsObj.email);

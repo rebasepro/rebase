@@ -10,9 +10,10 @@ export type {
     PasswordResetTemplateFunction,
     EmailVerificationTemplateFunction,
     UserInvitationTemplateFunction,
-    WelcomeEmailTemplateFunction
+    WelcomeEmailTemplateFunction,
+    MagicLinkTemplateFunction
 } from "./types";
 
 export { SMTPEmailService, createEmailService } from "./smtp-email-service";
 
-export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate, getWelcomeEmailTemplate } from "./templates";
+export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate, getWelcomeEmailTemplate, getMagicLinkTemplate } from "./templates";

@@ -118,6 +118,18 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         createdAt: timestamp("created_at").defaultNow().notNull()
     });
 
+    /**
+     * Magic link tokens for passwordless email login
+     */
+    const magicLinkTokens = tableCreator("magic_link_tokens", {
+        id: uuid("id").defaultRandom().primaryKey(),
+        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+        expiresAt: timestamp("expires_at").notNull(),
+        usedAt: timestamp("used_at"),
+        createdAt: timestamp("created_at").defaultNow().notNull()
+    });
+
     return {
         usersSchema,
         users,
@@ -127,7 +139,8 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         userIdentities,
         mfaFactors,
         mfaChallenges,
-        recoveryCodes
+        recoveryCodes,
+        magicLinkTokens
     };
 }
 
@@ -144,6 +157,7 @@ export const userIdentities = defaultAuthSchema.userIdentities;
 export const mfaFactors = defaultAuthSchema.mfaFactors;
 export const mfaChallenges = defaultAuthSchema.mfaChallenges;
 export const recoveryCodes = defaultAuthSchema.recoveryCodes;
+export const magicLinkTokens = defaultAuthSchema.magicLinkTokens;
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -151,7 +165,8 @@ export const usersRelations = relations(users, ({ many }) => ({
     passwordResetTokens: many(passwordResetTokens),
     userIdentities: many(userIdentities),
     mfaFactors: many(mfaFactors),
-    recoveryCodes: many(recoveryCodes)
+    recoveryCodes: many(recoveryCodes),
+    magicLinkTokens: many(magicLinkTokens)
 }));
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
@@ -197,6 +212,13 @@ export const recoveryCodesRelations = relations(recoveryCodes, ({ one }) => ({
     })
 }));
 
+export const magicLinkTokensRelations = relations(magicLinkTokens, ({ one }) => ({
+    user: one(users, {
+        fields: [magicLinkTokens.userId],
+        references: [users.id]
+    })
+}));
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -208,3 +230,4 @@ export type NewUserIdentity = typeof userIdentities.$inferInsert;
 export type MfaFactorRow = typeof mfaFactors.$inferSelect;
 export type MfaChallengeRow = typeof mfaChallenges.$inferSelect;
 export type RecoveryCodeRow = typeof recoveryCodes.$inferSelect;
+export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;

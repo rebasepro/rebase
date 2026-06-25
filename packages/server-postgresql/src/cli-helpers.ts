@@ -86,7 +86,7 @@ export async function getTableIncludesFromCollections(collections: EntityCollect
 
 export async function getTableIncludes(collectionsPath: string): Promise<string[]> {
     const resolvedPath = path.resolve(collectionsPath);
-    let collections: EntityCollection[] = [];
+    const collections: EntityCollection[] = [];
     if (fs.existsSync(resolvedPath)) {
         const stats = fs.statSync(resolvedPath);
         if (stats.isDirectory()) {

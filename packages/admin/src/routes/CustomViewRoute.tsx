@@ -1,8 +1,6 @@
+import React, { useEffect, useRef } from "react";
 import type { AppView } from "@rebasepro/types";
-;
-import { useEffect } from "react";
-import { useBreadcrumbsController } from "../index";
-import { useUrlController } from "../index";
+import { useBreadcrumbsController, useUrlController } from "../index";
 
 export function CustomViewRoute({ view }: {
     view: AppView
@@ -11,8 +9,14 @@ export function CustomViewRoute({ view }: {
     const breadcrumbs = useBreadcrumbsController();
     const urlController = useUrlController();
 
+    // Use a ref to avoid breadcrumbs identity in the dep array —
+    // breadcrumbs.set() creates a new context value each call, which would
+    // re-trigger this effect and cause an infinite render loop.
+    const breadcrumbsRef = useRef(breadcrumbs);
+    breadcrumbsRef.current = breadcrumbs;
+
     useEffect(() => {
-        breadcrumbs.set({
+        breadcrumbsRef.current.set({
             breadcrumbs: [{
                 title: view.name,
                 url: urlController.buildAppUrlPath(view.slug)
@@ -20,5 +24,9 @@ export function CustomViewRoute({ view }: {
         });
     }, [view.slug, urlController]);
 
-    return view.view;
+    if (typeof view.view === 'function') {
+        const ViewComponent = view.view;
+        return <ViewComponent />;
+    }
+    return <>{view.view}</>;
 }

@@ -35,6 +35,8 @@ export type { AuthMiddlewareOptions, AuthResult } from "./middleware";
 export { createAuthRoutes } from "./routes";
 export type { AuthModuleConfig } from "./routes";
 
+export { mountMagicLinkRoutes } from "./magic-link-routes";
+
 export { createResetPasswordRoute } from "./reset-password-admin";
 export type { ResetPasswordRouteConfig } from "./reset-password-admin";
 

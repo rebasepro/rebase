@@ -836,7 +836,8 @@ export class PostgresBackendDriver implements DataDriver {
         const internalPrefixes = ["_rebase_", "_auth_"];
         const internalExact = [
             "users", "roles", "user_roles", "refresh_tokens",
-            "password_reset_tokens", "email_verification_tokens"
+            "password_reset_tokens", "email_verification_tokens",
+            "magic_link_tokens"
         ];
 
         const allTables = result

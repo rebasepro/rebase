@@ -2,7 +2,7 @@ import { eq, getTableName, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import type { RebasePgTable } from "../types";
-import { users, refreshTokens, passwordResetTokens, userIdentities } from "../schema/auth-schema";
+import { users, refreshTokens, passwordResetTokens, userIdentities, magicLinkTokens } from "../schema/auth-schema";
 import {
     UserRepository,
     RoleRepository,
@@ -15,6 +15,7 @@ import {
     CreateRoleData,
     RefreshTokenInfo,
     PasswordResetTokenInfo,
+    MagicLinkTokenInfo,
     UserIdentityData,
     ListUsersOptions,
     PaginatedUsersResult,
@@ -694,12 +695,75 @@ export class PasswordResetTokenService {
 }
 
 /**
+ * Magic link token service.
+ * Handles magic link token storage for passwordless email login.
+ */
+export class MagicLinkTokenService {
+    private magicLinkTokensTable: RebasePgTable;
+
+    constructor(
+        private db: NodePgDatabase,
+        tableOrTables?: RebasePgTable | Partial<AuthSchemaTables>
+    ) {
+        this.magicLinkTokensTable = (magicLinkTokens as unknown as RebasePgTable);
+    }
+
+    private getQualifiedTableName(): string {
+        const name = getTableName(this.magicLinkTokensTable);
+        const schema = getTableConfig(this.magicLinkTokensTable).schema || "public";
+        return `"${schema}"."${name}"`;
+    }
+
+    async createToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        // Delete any existing unused tokens for this user
+        const tableName = this.getQualifiedTableName();
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)} 
+            WHERE user_id = ${userId} AND used_at IS NULL
+        `);
+
+        await this.db.insert(this.magicLinkTokensTable).values({
+            userId,
+            tokenHash,
+            expiresAt
+        });
+    }
+
+    async findValidByHash(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
+        const tableName = this.getQualifiedTableName();
+        const result = await this.db.execute(sql`
+            SELECT user_id, expires_at 
+            FROM ${sql.raw(tableName)} 
+            WHERE token_hash = ${tokenHash} 
+              AND used_at IS NULL 
+              AND expires_at > NOW()
+        `);
+
+        if (result.rows.length === 0) return null;
+
+        const row = result.rows[0] as { user_id: string; expires_at: string | number | Date };
+        return {
+            userId: row.user_id,
+            expiresAt: new Date(row.expires_at)
+        };
+    }
+
+    async markAsUsed(tokenHash: string): Promise<void> {
+        await this.db
+            .update(this.magicLinkTokensTable)
+            .set({ usedAt: new Date() })
+            .where(eq(this.magicLinkTokensTable.tokenHash, tokenHash));
+    }
+}
+
+/**
  * PostgreSQL implementation of TokenRepository.
  * Combines refresh token and password reset token operations.
  */
 export class PostgresTokenRepository implements TokenRepository {
     private refreshTokenService: RefreshTokenService;
     private passwordResetTokenService: PasswordResetTokenService;
+    private magicLinkTokenService: MagicLinkTokenService;
 
     constructor(
         private db: NodePgDatabase,
@@ -707,6 +771,7 @@ export class PostgresTokenRepository implements TokenRepository {
     ) {
         this.refreshTokenService = new RefreshTokenService(db, tableOrTables);
         this.passwordResetTokenService = new PasswordResetTokenService(db, tableOrTables);
+        this.magicLinkTokenService = new MagicLinkTokenService(db, tableOrTables);
     }
 
     // Refresh token operations
@@ -755,6 +820,20 @@ export class PostgresTokenRepository implements TokenRepository {
 
     async deleteExpiredTokens(): Promise<void> {
         await this.passwordResetTokenService.deleteExpired();
+    }
+
+    // Magic link token operations
+
+    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.magicLinkTokenService.createToken(userId, tokenHash, expiresAt);
+    }
+
+    async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
+        return this.magicLinkTokenService.findValidByHash(tokenHash);
+    }
+
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
+        await this.magicLinkTokenService.markAsUsed(tokenHash);
     }
 }
 
@@ -953,6 +1032,20 @@ collectionPermissions: null }
 
     async deleteExpiredTokens(): Promise<void> {
         await this.tokenRepository.deleteExpiredTokens();
+    }
+
+    // Magic link token operations
+
+    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.tokenRepository.createMagicLinkToken(userId, tokenHash, expiresAt);
+    }
+
+    async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
+        return this.tokenRepository.findValidMagicLinkToken(tokenHash);
+    }
+
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
+        await this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
     }
 
     // MFA operations (delegate to MfaService)

@@ -1,5 +1,5 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useCallback, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
 import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
@@ -156,9 +156,11 @@ export function useBuildCollectionRegistryController(props: {
 
     // Determine initialised automatically based on whether collections exist,
     // though the NavigationStateController also plays a role in overall init
-    if (!initialised && collections.length > 0) {
-        setInitialised(true);
-    }
+    useEffect(() => {
+        if (!initialised && collections.length > 0) {
+            setInitialised(true);
+        }
+    }, [initialised, collections.length]);
 
     return useMemo(() => ({
         collections,

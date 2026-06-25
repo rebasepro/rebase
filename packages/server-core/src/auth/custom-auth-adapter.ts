@@ -51,6 +51,7 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
         sessionManagement: false,
         profileUpdate: false,
         emailVerification: false,
+        magicLink: false,
         enabledProviders: [],
         ...options.capabilities
     };

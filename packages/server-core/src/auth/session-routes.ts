@@ -230,6 +230,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             needsSetup,
             registrationEnabled: registrationAllowed,
             emailServiceEnabled: isEmailConfigured(),
+            magicLinkEnabled: !!config.enableMagicLink && isEmailConfigured(),
             enabledProviders
         });
     });

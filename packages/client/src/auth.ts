@@ -35,6 +35,7 @@ export interface AuthConfig {
     emailServiceEnabled?: boolean;
     passwordReset?: boolean;
     emailVerification?: boolean;
+    magicLink?: boolean;
     enabledProviders: string[];
 }
 
@@ -428,6 +429,33 @@ newPassword })
         return body as { success: boolean; message: string; };
     }
 
+    async function sendMagicLink(email: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/magic-link"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        return body as { success: boolean; message: string; };
+    }
+
+    async function verifyMagicLink(token: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/magic-link/verify"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
+    }
+
     async function getSessions() {
         const data = await transport.request<{ sessions: Record<string, unknown>[] }>(authPath + "/sessions", { method: "GET" });
         return data.sessions;
@@ -517,6 +545,8 @@ newPassword })
         changePassword,
         sendVerificationEmail,
         verifyEmail,
+        sendMagicLink,
+        verifyMagicLink,
         getSessions,
         revokeSession,
         revokeAllSessions,

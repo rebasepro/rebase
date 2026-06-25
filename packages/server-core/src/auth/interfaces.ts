@@ -131,6 +131,14 @@ export interface PasswordResetTokenInfo {
     expiresAt: Date;
 }
 
+/**
+ * Magic link token info
+ */
+export interface MagicLinkTokenInfo {
+    userId: string;
+    expiresAt: Date;
+}
+
 // =============================================================================
 // AUTH REPOSITORY INTERFACES
 // =============================================================================
@@ -359,6 +367,23 @@ export interface TokenRepository {
      * Clean up expired tokens
      */
     deleteExpiredTokens(): Promise<void>;
+
+    // Magic link tokens
+
+    /**
+     * Create a magic link token
+     */
+    createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+
+    /**
+     * Find a valid (not expired, not used) magic link token by hash
+     */
+    findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null>;
+
+    /**
+     * Mark a magic link token as used
+     */
+    markMagicLinkTokenUsed(tokenHash: string): Promise<void>;
 }
 
 // =============================================================================

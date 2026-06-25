@@ -211,6 +211,22 @@ export async function resolveAppViews(
         }
     }
 
+    // Detect duplicate view slugs (dev warning)
+    if (process.env.NODE_ENV !== 'production') {
+        const slugCounts = new Map<string, number>();
+        resolvedViews.forEach(v => {
+            slugCounts.set(v.slug, (slugCounts.get(v.slug) ?? 0) + 1);
+        });
+        slugCounts.forEach((count, slug) => {
+            if (count > 1) {
+                console.warn(
+                    `[Rebase] Duplicate view slug "${slug}" detected (${count} views). ` +
+                    `Last-write-wins. Ensure unique slugs across CMS views and plugins.`
+                );
+            }
+        });
+    }
+
     // Filter by roles — applies to CMS, plugin, and builder-returned views
     resolvedViews = filterViewsByRole(resolvedViews, authController);
 

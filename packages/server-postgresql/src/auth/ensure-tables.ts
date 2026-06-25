@@ -185,6 +185,31 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
             ON ${sql.raw(passwordResetTokensTableName)}(user_id)
         `);
 
+        // Create magic link tokens table
+        const magicLinkTokensTableName = `"${authSchema}"."magic_link_tokens"`;
+        await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ${sql.raw(magicLinkTokensTableName)} (
+                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                used_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        `);
+
+        // Create index on token_hash for magic link lookups
+        await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_hash 
+            ON ${sql.raw(magicLinkTokensTableName)}(token_hash)
+        `);
+
+        // Create index on user_id for magic link cleanup
+        await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_user 
+            ON ${sql.raw(magicLinkTokensTableName)}(user_id)
+        `);
+
         // Create app config table
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(appConfigTableName)} (

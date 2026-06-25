@@ -58,6 +58,14 @@ export type WelcomeEmailTemplateFunction = (
 ) => { subject: string; html: string; text?: string };
 
 /**
+ * Template function for magic link emails
+ */
+export type MagicLinkTemplateFunction = (
+    magicLinkUrl: string,
+    user: { email: string; displayName?: string | null }
+) => { subject: string; html: string; text?: string };
+
+/**
  * Complete email configuration
  */
 export interface EmailConfig {
@@ -90,6 +98,13 @@ export interface EmailConfig {
     verifyEmailUrl?: string;
 
     /**
+     * Base URL for magic link login (e.g., "https://myapp.com")
+     * The magic link will be: {baseUrl}/auth/magic-link?token={token}
+     * Falls back to `resetPasswordUrl` if not set.
+     */
+    magicLinkUrl?: string;
+
+    /**
      * Application name to use in email templates
      */
     appName?: string;
@@ -102,5 +117,6 @@ export interface EmailConfig {
         emailVerification?: EmailVerificationTemplateFunction;
         userInvitation?: UserInvitationTemplateFunction;
         welcomeEmail?: WelcomeEmailTemplateFunction;
+        magicLink?: MagicLinkTemplateFunction;
     };
 }

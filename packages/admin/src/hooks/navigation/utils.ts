@@ -1,12 +1,12 @@
 import type { AppView, EntityCollection, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
-;
+
 import { getSubcollections } from "@rebasepro/common";
 import { deepEqual as equal } from "fast-equals";
 
 export const NAVIGATION_DEFAULT_GROUP_NAME = "Views";
 export const NAVIGATION_ADMIN_GROUP_NAME = "Admin";
 
-export function getGroup(collectionOrView: EntityCollection<any, any> | AppView) {
+export function getGroup(collectionOrView: EntityCollection | AppView) {
     const trimmed = collectionOrView.group?.trim();
     if (!trimmed || trimmed === "") {
         return NAVIGATION_DEFAULT_GROUP_NAME;
@@ -28,8 +28,11 @@ export function computeNavigationGroups({
 
     // Deep clone the input groups upfront to avoid mutating the caller's data
     let result = navigationGroupMappings
-        ? navigationGroupMappings.map(g => ({ name: g.name,
-entries: [...g.entries] }))
+        ? navigationGroupMappings.map(g => ({
+            name: g.name,
+            entries: [...g.entries],
+            ...(g.collapsedByDefault !== undefined && { collapsedByDefault: g.collapsedByDefault })
+        }))
         : navigationGroupMappings;
 
     // Merge plugin navigation entries

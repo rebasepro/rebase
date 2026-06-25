@@ -1,5 +1,5 @@
 import type { EntityCollection, RebasePlugin } from "@rebasepro/types";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useRef, useMemo } from "react";
 
 import { AuthController, CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
 import type { EntityCollectionsBuilder } from "@rebasepro/types";
@@ -8,6 +8,7 @@ import { CollectionRegistry } from "@rebasepro/common";
 
 import { resolveCollections } from "./useNavigationResolution";
 import { areCollectionListsEqual } from "./utils";
+import { useAsyncResolver } from "./useAsyncResolver";
 
 export type UseResolvedCollectionsProps<EC extends EntityCollection, USER extends User> = {
     authController: AuthController<USER>;
@@ -50,16 +51,11 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
         collectionRegistryController
     } = props;
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | undefined>(undefined);
-    const [resolvedCollections, setResolvedCollections] = useState<EntityCollection[]>([]);
-
-    // Track the trigger count to allow force-refresh
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-    const refresh = useCallback(() => {
-        setRefreshTrigger(prev => prev + 1);
-    }, []);
+    // Stable identity string for the user — avoids re-triggering when the
+    // authController object reference changes but uid/roles are the same.
+    const userIdentity = authController.user
+        ? `${authController.user.uid}:${(authController.user.roles ?? []).sort().join(',')}`
+        : null;
 
     // Use refs for values that may be new objects each render but shouldn't
     // re-trigger the effect. The effect reads them at execution time.
@@ -70,74 +66,36 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
     const pluginsRef = useRef(plugins);
     pluginsRef.current = plugins;
 
+    const { data: collections, loading, error, refresh } = useAsyncResolver<EntityCollection[]>({
+        resolver: async () => {
+            const resolved = await resolveCollections(
+                collectionsProp,
+                authControllerRef.current,
+                dataRef.current,
+                pluginsRef.current
+            );
 
-    // Ref for resolved collections change detection
-    const resolvedCollectionsRef = useRef<EntityCollection[]>([]);
+            const deduped = [...resolved];
 
-    const initialLoading = authController.initialLoading;
-    const user = authController.user;
+            // Register with the CollectionRegistry; returns true if changed
+            const changed = collectionRegistryController.collectionRegistryRef.current.registerMultiple(deduped);
 
-    useEffect(() => {
-        if (disabled || initialLoading) return;
-
-        let cancelled = false;
-
-        (async () => {
-            try {
-                const resolved = await resolveCollections(
-                    collectionsProp,
-                    authControllerRef.current,
-                    dataRef.current,
-                    pluginsRef.current
-                );
-
-                if (cancelled) return;
-
-                const deduped = [...resolved];
-
-                // Register with the CollectionRegistry; returns true if changed
-                const changed = collectionRegistryController.collectionRegistryRef.current.registerMultiple(deduped);
-
-                if (changed) {
-                    console.debug("Collections have changed", deduped);
-                }
-
-                // Only update state if collections actually changed
-                if (!areCollectionListsEqual(resolvedCollectionsRef.current, deduped)) {
-                    resolvedCollectionsRef.current = deduped;
-                    setResolvedCollections(deduped);
-                }
-
-                setError(undefined);
-            } catch (e) {
-                if (!cancelled) {
-                    console.error(e);
-                    setError(e as Error);
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
+            if (changed) {
+                console.debug("Collections have changed", deduped);
             }
-        })();
 
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        collectionsProp,
-        disabled,
-        collectionRegistryController.collectionRegistryRef,
-        refreshTrigger,
-        initialLoading,
-        user
-    ]);
+            return deduped;
+        },
+        initialValue: [],
+        isEqual: areCollectionListsEqual,
+        deps: [collectionsProp, userIdentity, disabled],
+        disabled: disabled || authController.initialLoading,
+    });
 
     return useMemo(() => ({
-        collections: resolvedCollections,
+        collections,
         loading,
         error,
         refresh
-    }), [resolvedCollections, loading, error, refresh]);
+    }), [collections, loading, error, refresh]);
 }
-
