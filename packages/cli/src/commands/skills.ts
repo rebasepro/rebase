@@ -2,10 +2,9 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import inquirer from "inquirer";
-import { fileURLToPath } from "url";
+import { createRequire } from "module";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
 
 /** Supported agent environments and their target directories. */
 const AGENTS = {
@@ -53,29 +52,23 @@ const AGENTS = {
 
 type AgentKey = keyof typeof AGENTS;
 
-function findParentDir(currentDir: string, targetName: string): string | null {
-    const root = path.parse(currentDir).root;
-    while (currentDir && currentDir !== root) {
-        if (path.basename(currentDir) === targetName) {
-            return currentDir;
-        }
-        currentDir = path.dirname(currentDir);
-    }
-    return null;
-}
-
-/** Resolve the path to the bundled skills directory. */
+/**
+ * Resolve the path to the skills directory from @rebasepro/agent-skills.
+ * Works in both workspace (symlink) and published (real files) layouts.
+ */
 function getSkillsSourceDir(): string {
-    const cliRoot = findParentDir(__dirname, "cli");
-    if (cliRoot) {
-        const dir = path.join(cliRoot, "skills");
-        if (fs.existsSync(dir)) return dir;
-    }
-    // Fallback: look relative to dist/ (published package layout)
-    const distSkills = path.resolve(__dirname, "../../skills");
-    if (fs.existsSync(distSkills)) return distSkills;
+    const pkgJsonPath = require.resolve("@rebasepro/agent-skills/package.json");
+    const pkgRoot = path.dirname(pkgJsonPath);
+    const skillsDir = path.join(pkgRoot, "skills");
 
-    throw new Error("Could not find bundled skills directory. Make sure the CLI was built with `pnpm build`.");
+    if (!fs.existsSync(skillsDir)) {
+        throw new Error(
+            `Skills directory not found at ${skillsDir}. ` +
+            `Make sure @rebasepro/agent-skills is installed.`
+        );
+    }
+
+    return skillsDir;
 }
 
 /** Read all skill directories and return their names + content. */
@@ -152,7 +145,7 @@ export async function skillsCommand(subcommand: string | undefined, _args: strin
 async function skillsInstall() {
     const projectDir = process.cwd();
 
-    // 1. Load bundled skills
+    // 1. Load skills from @rebasepro/agent-skills
     let skillsDir: string;
     try {
         skillsDir = getSkillsSourceDir();
