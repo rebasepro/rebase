@@ -11,12 +11,12 @@ docker run -d \
   -p 9000:9000 \
   -p 9001:9001 \
   -v /mnt/stateful_partition/minio-data:/data \
-  -e MINIO_ROOT_USER=rebase-admin \
-  -e MINIO_ROOT_PASSWORD=rebase-minio-secret-2026 \
+  -e MINIO_ROOT_USER=${MINIO_ROOT_USER:-rebase-admin} \
+  -e MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set} \
   minio/minio:latest server /data --console-address ":9001"
 
 # Wait for MinIO to be ready, then create the default bucket
 sleep 15
 docker run --rm --network host \
-  -e MC_HOST_local=http://rebase-admin:rebase-minio-secret-2026@localhost:9000 \
+  -e MC_HOST_local=http://${MINIO_ROOT_USER:-rebase-admin}:${MINIO_ROOT_PASSWORD}@localhost:9000 \
   minio/mc mb --ignore-existing local/rebase-storage

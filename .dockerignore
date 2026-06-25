@@ -6,3 +6,8 @@
 e2e-screenshots
 scratch
 test-cli-init-project
+
+# Prevent secrets from being copied into Docker images
+**/.env
+**/.env.*
+!**/.env.example

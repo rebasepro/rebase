@@ -180,12 +180,37 @@ export class EntityService implements EntityRepository {
     /**
      * Execute raw SQL
      */
-    async executeSql(sqlText: string): Promise<Record<string, unknown>[]> {
+    async executeSql(sqlText: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
         if (process.env.NODE_ENV !== "production") {
-            console.debug("Executing raw SQL:", sqlText);
+            console.debug("Executing raw SQL:", sqlText, params?.length ? `with ${params.length} params` : "");
         }
         const { sql } = await import("drizzle-orm");
-        const result = await this.db.execute(sql.raw(sqlText));
+
+        let result;
+        if (params && params.length > 0) {
+            // Build a parameterized query using Drizzle's sql tagged template.
+            // Split the SQL text on $1, $2, … placeholders and interleave
+            // with sql.param() calls so the underlying pg driver binds them safely.
+            const parts = sqlText.split(/\$(\d+)/);
+            const chunks: ReturnType<typeof sql.raw | typeof sql.param>[] = [];
+            for (let i = 0; i < parts.length; i++) {
+                if (i % 2 === 0) {
+                    // Literal SQL text fragment
+                    if (parts[i].length > 0) {
+                        chunks.push(sql.raw(parts[i]));
+                    }
+                } else {
+                    // Parameter reference — $N (1-indexed)
+                    const paramIndex = Number(parts[i]) - 1;
+                    chunks.push(sql.param(params[paramIndex]));
+                }
+            }
+            const query = sql.join(chunks, sql.raw(""));
+            result = await this.db.execute(query);
+        } else {
+            result = await this.db.execute(sql.raw(sqlText));
+        }
+
         const rows = result.rows;
         if (process.env.NODE_ENV !== "production") {
             console.debug(`SQL executed successfully. Returned ${Array.isArray(rows) ? rows.length : "non-array"} rows.`);

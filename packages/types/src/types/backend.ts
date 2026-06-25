@@ -367,7 +367,7 @@ export interface SQLAdmin {
     /**
      * Execute raw SQL against the database.
      */
-    executeSql(sql: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 
     /**
      * Fetch the available databases on the server.

@@ -43,7 +43,8 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
         return undefined;
     }
 
-    const exec = admin.executeSql.bind(admin);
+    const exec = (sqlText: string, options?: { params?: unknown[] }) =>
+        admin.executeSql(sqlText, options ? { params: options.params } : undefined);
 
     return {
         async ensureTable(): Promise<void> {
@@ -80,22 +81,22 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
             try {
                 const resultJson = entry.result !== undefined ? JSON.stringify(entry.result) : null;
                 const logsJson = entry.logs.length > 0 ? JSON.stringify(entry.logs) : null;
-                const errorEscaped = entry.error ? entry.error.replace(/'/g, "''") : null;
 
-                await exec(`
-                    INSERT INTO ${TABLE} (job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual)
-                    VALUES (
-                        '${entry.jobId}',
-                        '${entry.startedAt}',
-                        '${entry.finishedAt}',
-                        ${entry.durationMs},
-                        ${entry.success},
-                        ${errorEscaped ? `'${errorEscaped}'` : "NULL"},
-                        ${resultJson ? `'${resultJson.replace(/'/g, "''")}'::jsonb` : "NULL"},
-                        ${logsJson ? `'${logsJson.replace(/'/g, "''")}'::jsonb` : "NULL"},
-                        ${entry.manual}
-                    )
-                `);
+                await exec(
+                    `INSERT INTO ${TABLE} (job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)`,
+                    { params: [
+                        entry.jobId,
+                        entry.startedAt,
+                        entry.finishedAt,
+                        entry.durationMs,
+                        entry.success,
+                        entry.error || null,
+                        resultJson,
+                        logsJson,
+                        entry.manual
+                    ]}
+                );
             } catch (err) {
                 // Non-blocking — log persistence should never crash the scheduler
                 logger.error(`[cron-store] Failed to persist log for "${entry.jobId}"`, { error: err });
@@ -104,13 +105,14 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
 
         async fetchLogs(jobId: string, limit = 50): Promise<CronJobLogEntry[]> {
             try {
-                const rows = await exec(`
-                    SELECT job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual
-                    FROM ${TABLE}
-                    WHERE job_id = '${jobId}'
-                    ORDER BY started_at DESC
-                    LIMIT ${limit}
-                `);
+                const rows = await exec(
+                    `SELECT job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual
+                     FROM ${TABLE}
+                     WHERE job_id = $1
+                     ORDER BY started_at DESC
+                     LIMIT $2`,
+                    { params: [jobId, limit] }
+                );
 
                 return rows.map(rowToLogEntry);
             } catch (err) {

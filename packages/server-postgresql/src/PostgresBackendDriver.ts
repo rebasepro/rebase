@@ -684,10 +684,11 @@ export class PostgresBackendDriver implements DataDriver {
 
     async executeSql(sqlText: string, options?: {
         database?: string,
-        role?: string
+        role?: string,
+        params?: unknown[]
     }): Promise<Record<string, unknown>[]> {
         if (!options?.database && !options?.role) {
-            return this.entityService.executeSql(sqlText);
+            return this.entityService.executeSql(sqlText, options?.params);
         }
 
         const targetDb = this.getTargetDb(options?.database);
@@ -713,12 +714,40 @@ export class PostgresBackendDriver implements DataDriver {
                 const safeRole = options.role.replace(/"/g, "\"\"");
                 return await targetDb.transaction(async (tx) => {
                     await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
-                    const result = await tx.execute(drizzleSql.raw(sqlText));
+                    let result;
+                    if (options?.params && options.params.length > 0) {
+                        const parts = sqlText.split(/\$(\d+)/);
+                        const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
+                        for (let i = 0; i < parts.length; i++) {
+                            if (i % 2 === 0) {
+                                if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
+                            } else {
+                                chunks.push(drizzleSql.param(options.params[Number(parts[i]) - 1]));
+                            }
+                        }
+                        result = await tx.execute(drizzleSql.join(chunks, drizzleSql.raw("")));
+                    } else {
+                        result = await tx.execute(drizzleSql.raw(sqlText));
+                    }
                     return result.rows as Record<string, unknown>[];
                 });
             }
 
-            const result = await targetDb.execute(drizzleSql.raw(sqlText));
+            let result;
+            if (options?.params && options.params.length > 0) {
+                const parts = sqlText.split(/\$(\d+)/);
+                const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
+                for (let i = 0; i < parts.length; i++) {
+                    if (i % 2 === 0) {
+                        if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
+                    } else {
+                        chunks.push(drizzleSql.param(options.params[Number(parts[i]) - 1]));
+                    }
+                }
+                result = await targetDb.execute(drizzleSql.join(chunks, drizzleSql.raw("")));
+            } else {
+                result = await targetDb.execute(drizzleSql.raw(sqlText));
+            }
             return result.rows as Record<string, unknown>[];
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);

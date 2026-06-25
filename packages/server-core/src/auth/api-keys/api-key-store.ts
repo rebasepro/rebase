@@ -100,13 +100,6 @@ function rowToApiKey(row: Record<string, unknown>): ApiKey {
     };
 }
 
-/**
- * Escape a string for safe inline SQL usage.
- */
-function esc(value: string): string {
-    return value.replace(/'/g, "''");
-}
-
 // ─── Public API ──────────────────────────────────────────────────────
 
 export interface ApiKeyStore {
@@ -147,7 +140,8 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
         return undefined;
     }
 
-    const exec = admin.executeSql.bind(admin);
+    const exec = (sqlText: string, options?: { params?: unknown[] }) =>
+        admin.executeSql(sqlText, options ? { params: options.params } : undefined);
 
     return {
         // ── Schema bootstrap ────────────────────────────────────────
@@ -194,26 +188,21 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             const hash = hashKey(plaintext);
             const prefix = keyPrefix(plaintext);
             const permissionsJson = JSON.stringify(request.permissions);
-            const rateLimitSql = request.rate_limit !== null && request.rate_limit !== undefined
-                ? String(request.rate_limit)
-                : "NULL";
-            const expiresAtSql = request.expires_at
-                ? `'${esc(request.expires_at)}'`
-                : "NULL";
 
-            const rows = await exec(`
-                INSERT INTO ${TABLE} (name, key_prefix, key_hash, permissions, rate_limit, created_by, expires_at)
-                VALUES (
-                    '${esc(request.name)}',
-                    '${esc(prefix)}',
-                    '${esc(hash)}',
-                    '${esc(permissionsJson)}'::jsonb,
-                    ${rateLimitSql},
-                    '${esc(createdBy)}',
-                    ${expiresAtSql}
-                )
-                RETURNING *
-            `);
+            const rows = await exec(
+                `INSERT INTO ${TABLE} (name, key_prefix, key_hash, permissions, rate_limit, created_by, expires_at)
+                 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
+                 RETURNING *`,
+                { params: [
+                    request.name,
+                    prefix,
+                    hash,
+                    permissionsJson,
+                    request.rate_limit ?? null,
+                    createdBy,
+                    request.expires_at ?? null
+                ]}
+            );
 
             const apiKey = rowToApiKey(rows[0]);
             return {
@@ -224,11 +213,12 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
 
         // ── Lookup by hash ──────────────────────────────────────────
         async findByKeyHash(hash: string): Promise<ApiKey | null> {
-            const rows = await exec(`
-                SELECT * FROM ${TABLE}
-                WHERE key_hash = '${esc(hash)}'
-                LIMIT 1
-            `);
+            const rows = await exec(
+                `SELECT * FROM ${TABLE}
+                 WHERE key_hash = $1
+                 LIMIT 1`,
+                { params: [hash] }
+            );
             if (rows.length === 0) return null;
             return rowToApiKey(rows[0]);
         },
@@ -244,11 +234,12 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
 
         // ── Get by ID (masked) ──────────────────────────────────────
         async getApiKeyById(id: string): Promise<ApiKeyMasked | null> {
-            const rows = await exec(`
-                SELECT * FROM ${TABLE}
-                WHERE id = '${esc(id)}'
-                LIMIT 1
-            `);
+            const rows = await exec(
+                `SELECT * FROM ${TABLE}
+                 WHERE id = $1
+                 LIMIT 1`,
+                { params: [id] }
+            );
             if (rows.length === 0) return null;
             return toMasked(rowToApiKey(rows[0]));
         },
@@ -256,26 +247,32 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
         // ── Update ──────────────────────────────────────────────────
         async updateApiKey(id: string, updates: UpdateApiKeyRequest): Promise<ApiKeyMasked | null> {
             const setClauses: string[] = [];
+            const params: unknown[] = [];
+            let paramIdx = 1;
 
             if (updates.name !== undefined) {
-                setClauses.push(`name = '${esc(updates.name)}'`);
+                setClauses.push(`name = $${paramIdx++}`);
+                params.push(updates.name);
             }
             if (updates.permissions !== undefined) {
-                setClauses.push(`permissions = '${esc(JSON.stringify(updates.permissions))}'::jsonb`);
+                setClauses.push(`permissions = $${paramIdx++}::jsonb`);
+                params.push(JSON.stringify(updates.permissions));
             }
             if (updates.rate_limit !== undefined) {
-                setClauses.push(
-                    updates.rate_limit !== null
-                        ? `rate_limit = ${updates.rate_limit}`
-                        : "rate_limit = NULL"
-                );
+                if (updates.rate_limit !== null) {
+                    setClauses.push(`rate_limit = $${paramIdx++}`);
+                    params.push(updates.rate_limit);
+                } else {
+                    setClauses.push("rate_limit = NULL");
+                }
             }
             if (updates.expires_at !== undefined) {
-                setClauses.push(
-                    updates.expires_at !== null
-                        ? `expires_at = '${esc(updates.expires_at)}'`
-                        : "expires_at = NULL"
-                );
+                if (updates.expires_at !== null) {
+                    setClauses.push(`expires_at = $${paramIdx++}`);
+                    params.push(updates.expires_at);
+                } else {
+                    setClauses.push("expires_at = NULL");
+                }
             }
 
             if (setClauses.length === 0) {
@@ -284,12 +281,16 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
 
             setClauses.push("updated_at = NOW()");
 
-            const rows = await exec(`
-                UPDATE ${TABLE}
-                SET ${setClauses.join(", ")}
-                WHERE id = '${esc(id)}'
-                RETURNING *
-            `);
+            // The WHERE id = $N uses the next available param index
+            params.push(id);
+
+            const rows = await exec(
+                `UPDATE ${TABLE}
+                 SET ${setClauses.join(", ")}
+                 WHERE id = $${paramIdx}
+                 RETURNING *`,
+                { params }
+            );
 
             if (rows.length === 0) return null;
             return toMasked(rowToApiKey(rows[0]));
@@ -297,23 +298,25 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
 
         // ── Revoke (soft-delete) ────────────────────────────────────
         async revokeApiKey(id: string): Promise<boolean> {
-            const rows = await exec(`
-                UPDATE ${TABLE}
-                SET revoked_at = NOW(), updated_at = NOW()
-                WHERE id = '${esc(id)}' AND revoked_at IS NULL
-                RETURNING id
-            `);
+            const rows = await exec(
+                `UPDATE ${TABLE}
+                 SET revoked_at = NOW(), updated_at = NOW()
+                 WHERE id = $1 AND revoked_at IS NULL
+                 RETURNING id`,
+                { params: [id] }
+            );
             return rows.length > 0;
         },
 
         // ── Touch last_used_at ──────────────────────────────────────
         async updateLastUsed(id: string): Promise<void> {
             try {
-                await exec(`
-                    UPDATE ${TABLE}
-                    SET last_used_at = NOW()
-                    WHERE id = '${esc(id)}'
-                `);
+                await exec(
+                    `UPDATE ${TABLE}
+                     SET last_used_at = NOW()
+                     WHERE id = $1`,
+                    { params: [id] }
+                );
             } catch (err) {
                 // Non-blocking — don't fail requests because of a usage timestamp update
                 logger.error("[api-key-store] Failed to update last_used_at", { error: err });

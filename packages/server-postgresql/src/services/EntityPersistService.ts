@@ -40,19 +40,21 @@ export class EntityPersistService {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = getPrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
-
-        if (!idField) {
-            throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
-        }
 
         const parsedIdObj = parseIdValues(entityId, idInfoArray);
-        const parsedId = parsedIdObj[idInfo.fieldName];
+
+        const conditions = [];
+        for (const info of idInfoArray) {
+            const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
+            if (!field) {
+                throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
+            }
+            conditions.push(eq(field, parsedIdObj[info.fieldName]));
+        }
 
         await this.db
             .delete(table)
-            .where(eq(idField, parsedId));
+            .where(and(...conditions));
     }
 
     /**

@@ -19,6 +19,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      dompurify:
+        specifier: '>=3.4.11'
+        version: 3.4.11
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -26,6 +30,9 @@ importers:
       '@playwright/test':
         specifier: 1.60.0
         version: 1.60.0
+      '@types/dompurify':
+        specifier: ^3.2.0
+        version: 3.2.0
       '@types/json-logic-js':
         specifier: 2.0.8
         version: 2.0.8
@@ -409,6 +416,9 @@ importers:
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
+      dompurify:
+        specifier: '>=3.4.11'
+        version: 3.4.11
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
@@ -500,6 +510,9 @@ importers:
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@types/dompurify':
+        specifier: ^3.2.0
+        version: 3.2.0
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
@@ -5152,6 +5165,10 @@ packages:
 
   '@types/dom-webcodecs@0.1.13':
     resolution: {integrity: sha512-O5hkiFIcjjszPIYyUSyvScyvrBoV3NOEEZx/pMlsu44TKzWNkLVBBxnxJz42in5n3QIolYOcBYFCPZZ0h8SkwQ==}
+
+  '@types/dompurify@3.2.0':
+    resolution: {integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==}
+    deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
 
   '@types/eslint-scope@3.7.7':
     resolution: {integrity: sha512-MzMFlSLBqNF2gcHWO0G1vP/YQyfvrxZ0bF+u7mzUdZ1/xK4A4sru+nraZz5i3iEIk1l1uyicaDVTB4QbbEkAYg==}
@@ -14550,6 +14567,10 @@ snapshots:
       '@types/dom-webcodecs': 0.1.13
 
   '@types/dom-webcodecs@0.1.13': {}
+
+  '@types/dompurify@3.2.0':
+    dependencies:
+      dompurify: 3.4.11
 
   '@types/eslint-scope@3.7.7':
     dependencies:
