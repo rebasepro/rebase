@@ -57,7 +57,8 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                     providerId: p.id,
                     email: p.email,
                     displayName: p.display_name || null,
-                    photoUrl: p.images?.[0]?.url || null
+                    photoUrl: p.images?.[0]?.url || null,
+                    emailVerified: true
                 };
             } catch (error) {
                 logger.error("Spotify OAuth error", { error: error });

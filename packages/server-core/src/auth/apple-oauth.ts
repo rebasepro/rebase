@@ -110,7 +110,8 @@ export function createAppleProvider(config: {
                     providerId: decoded.sub,
                     email,
                     displayName,
-                    photoUrl: null // Apple does not provide a profile photo
+                    photoUrl: null, // Apple does not provide a profile photo
+                    emailVerified: decoded.email_verified === true || decoded.email_verified === "true"
                 };
             } catch (error) {
                 logger.error("Apple OAuth error", { error: error });

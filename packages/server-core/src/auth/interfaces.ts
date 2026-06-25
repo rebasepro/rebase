@@ -60,6 +60,8 @@ export interface OAuthProviderProfile {
     email: string;
     displayName?: string | null;
     photoUrl?: string | null;
+    /** Whether the OAuth provider has verified the user's email address */
+    emailVerified?: boolean;
 }
 
 /**

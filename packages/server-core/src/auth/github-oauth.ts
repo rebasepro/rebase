@@ -100,7 +100,8 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                     providerId: String(profileData.id),
                     email,
                     displayName: profileData.name || profileData.login || null,
-                    photoUrl: profileData.avatar_url || null
+                    photoUrl: profileData.avatar_url || null,
+                    emailVerified: true
                 };
             } catch (error) {
                 logger.error("GitHub OAuth error", { error: error });

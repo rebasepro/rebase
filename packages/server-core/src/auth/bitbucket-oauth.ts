@@ -72,7 +72,8 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                     providerId: p.uuid,
                     email,
                     displayName: p.display_name || p.username || null,
-                    photoUrl: p.links?.avatar?.href || null
+                    photoUrl: p.links?.avatar?.href || null,
+                    emailVerified: true
                 };
             } catch (error) {
                 logger.error("Bitbucket OAuth error", { error: error });

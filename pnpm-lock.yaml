@@ -416,9 +416,6 @@ importers:
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
-      dompurify:
-        specifier: '>=3.4.11'
-        version: 3.4.11
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
@@ -510,9 +507,6 @@ importers:
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@types/dompurify':
-        specifier: ^3.2.0
-        version: 3.2.0
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
@@ -1419,8 +1413,8 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2
       chalk:
-        specifier: ^5.6.2
-        version: 5.6.2
+        specifier: ^4.1.2
+        version: 4.1.2
       chokidar:
         specifier: 5.0.0
         version: 5.0.0

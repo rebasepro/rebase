@@ -73,7 +73,8 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                     providerId: profileData.id,
                     email: profileData.email,
                     displayName: profileData.global_name || profileData.username || null,
-                    photoUrl
+                    photoUrl,
+                    emailVerified: profileData.verified === true
                 };
             } catch (error) {
                 logger.error("Discord OAuth error", { error: error });

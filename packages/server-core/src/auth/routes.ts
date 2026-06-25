@@ -374,6 +374,13 @@ displayName: user.displayName });
                     user = await authRepo.getUserByEmail(externalUser.email);
 
                     if (user) {
+                        // Only auto-link if the OAuth provider confirmed the email is verified
+                        if (!externalUser.emailVerified) {
+                            throw ApiError.forbidden(
+                                "Cannot auto-link account: email not verified by the OAuth provider. Please log in with your password first and link the provider from your profile.",
+                                "EMAIL_NOT_VERIFIED"
+                            );
+                        }
                         // Link Provider to existing account
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
 

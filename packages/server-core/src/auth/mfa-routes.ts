@@ -11,12 +11,14 @@ import {
     generateRecoveryCodes,
     hashRecoveryCode
 } from "./mfa";
+import { encryptTotpSecret, decryptTotpSecret } from "./mfa-crypto";
 import {
     generateAccessToken,
     generateRefreshToken,
     hashRefreshToken,
     getRefreshTokenExpiry,
-    getAccessTokenExpiry
+    getAccessTokenExpiry,
+    type AccessTokenPayload
 } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -53,11 +55,12 @@ export function mountMfaRoutes(
         // Generate TOTP secret
         const { secret, uri } = generateTotpSecret(issuer, user.email);
 
-        // Store the factor (unverified until user confirms with a valid code)
+        // Encrypt the TOTP secret before storage (AES-256-GCM envelope encryption)
+        const encryptedSecret = encryptTotpSecret(secret);
         const factor = await authRepo.createMfaFactor(
             user.id,
             "totp",
-            secret, // In production, encrypt this before storage
+            encryptedSecret,
             friendlyName
         );
 
@@ -110,8 +113,9 @@ export function mountMfaRoutes(
             throw ApiError.badRequest("Factor is already verified", "ALREADY_VERIFIED");
         }
 
-        // Verify the TOTP code
-        const secretBuffer = base32Decode(factor.secretEncrypted);
+        // Decrypt and verify the TOTP code
+        const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
+        const secretBuffer = base32Decode(decryptedSecret);
         const isValid = verifyTotp(secretBuffer, code);
 
         if (!isValid) {
@@ -191,7 +195,8 @@ export function mountMfaRoutes(
         }
 
         // Try TOTP verification first (standard 6-digit codes)
-        const secretBuffer = base32Decode(factor.secretEncrypted);
+        const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
+        const secretBuffer = base32Decode(decryptedSecret);
         let isValid = verifyTotp(secretBuffer, code);
 
         // Fall back to recovery code verification if TOTP didn't match
@@ -267,9 +272,17 @@ export function mountMfaRoutes(
      * Remove an MFA factor
      */
     router.delete("/mfa/unenroll", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
+        }
+
+        // Require aal2 (MFA-verified session) to unenroll MFA factors
+        if (userCtx.aal !== "aal2") {
+            throw ApiError.forbidden(
+                "MFA verification required to unenroll. Please re-authenticate with your second factor.",
+                "AAL2_REQUIRED"
+            );
         }
 
         const unenrollSchema = z.object({

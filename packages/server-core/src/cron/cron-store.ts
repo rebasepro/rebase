@@ -44,7 +44,7 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
     }
 
     const exec = (sqlText: string, options?: { params?: unknown[] }) =>
-        admin.executeSql(sqlText, options ? { params: options.params } : undefined);
+        admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
 
     return {
         async ensureTable(): Promise<void> {

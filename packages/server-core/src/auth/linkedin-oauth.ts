@@ -71,7 +71,8 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
                     providerId: profileData.sub,
                     email: profileData.email,
                     displayName: profileData.name || null,
-                    photoUrl: profileData.picture || null
+                    photoUrl: profileData.picture || null,
+                    emailVerified: profileData.email_verified === true
                 };
             } catch (error) {
                 logger.error("LinkedIn OAuth error", { error: error });

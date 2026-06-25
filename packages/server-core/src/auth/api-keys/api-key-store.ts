@@ -141,7 +141,7 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
     }
 
     const exec = (sqlText: string, options?: { params?: unknown[] }) =>
-        admin.executeSql(sqlText, options ? { params: options.params } : undefined);
+        admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
 
     return {
         // ── Schema bootstrap ────────────────────────────────────────

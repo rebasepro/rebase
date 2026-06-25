@@ -89,7 +89,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         providerId: content.sub,
                         email: content.email || "",
                         displayName: content.name || null,
-                        photoUrl: content.picture || null
+                        photoUrl: content.picture || null,
+                        emailVerified: true
                     };
                 }
 
@@ -115,7 +116,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         providerId: info.sub,
                         email: info.email,
                         displayName: info.name || null,
-                        photoUrl: info.picture || null
+                        photoUrl: info.picture || null,
+                        emailVerified: true
                     };
                 }
 
@@ -176,7 +178,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                             providerId: content.sub,
                             email: content.email || "",
                             displayName: content.name || null,
-                            photoUrl: content.picture || null
+                            photoUrl: content.picture || null,
+                            emailVerified: true
                         };
                     }
 
@@ -202,7 +205,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                             providerId: info.sub,
                             email: info.email,
                             displayName: info.name || null,
-                            photoUrl: info.picture || null
+                            photoUrl: info.picture || null,
+                            emailVerified: true
                         };
                     }
 
