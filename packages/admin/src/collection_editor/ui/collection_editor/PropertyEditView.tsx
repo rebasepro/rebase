@@ -1,12 +1,15 @@
 
-import React, { useDeferredValue, useEffect, useRef, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/formex";
 import { ConfirmationDialog } from "@rebasepro/core";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
+import { EntityCollection, Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
+import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
+import { toSerializableProperty, toSerializableCollection } from "../../serializable_utils";
+import type { SerializableProperty, SerializableCollection } from "../../serializable_types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import {
     AlertTriangleIcon,
@@ -82,6 +85,15 @@ export type PropertyFormProps = {
     getData?: () => Promise<object[]>;
     getController?: (formex: FormexController<PropertyWithId>) => void;
     propertyConfigs: Record<string, PropertyConfig>;
+    propertyTypePresets?: PropertyTypePreset[];
+    hiddenPropertyTypes?: PropertyType[];
+    renderExtraPropertyFields?: (params: {
+        metadata: Record<string, unknown>;
+        onMetadataChange: (key: string, value: unknown) => void;
+        property: SerializableProperty;
+        collection: SerializableCollection;
+    }) => React.ReactNode;
+    collectionValues?: EntityCollection;
 
 };
 
@@ -108,7 +120,11 @@ export const PropertyForm = React.memo(
             allowDataInference,
             getController,
             getData,
-            propertyConfigs
+            propertyConfigs,
+            propertyTypePresets,
+            hiddenPropertyTypes,
+            renderExtraPropertyFields,
+            collectionValues
         } = props;
 
         const initialValue: PropertyWithId = {
@@ -228,6 +244,10 @@ export const PropertyForm = React.memo(
                 getData={getData}
                 allowDataInference={allowDataInference}
                 propertyConfigs={propertyConfigs}
+                propertyTypePresets={propertyTypePresets}
+                hiddenPropertyTypes={hiddenPropertyTypes}
+                renderExtraPropertyFields={renderExtraPropertyFields}
+                collectionValues={collectionValues}
                 {...formexController}/>
         </Formex>;
     }, (a, b) =>
@@ -324,7 +344,11 @@ function PropertyEditFormFields({
     inArray,
     getData,
     allowDataInference,
-    propertyConfigs
+    propertyConfigs,
+    propertyTypePresets,
+    hiddenPropertyTypes,
+    renderExtraPropertyFields,
+    collectionValues
 }: {
     includeIdAndTitle?: boolean;
     existing: boolean;
@@ -341,6 +365,10 @@ function PropertyEditFormFields({
     getData?: () => Promise<object[]>;
     allowDataInference: boolean;
     propertyConfigs: Record<string, PropertyConfig>;
+    propertyTypePresets?: PropertyTypePreset[];
+    hiddenPropertyTypes?: PropertyType[];
+    renderExtraPropertyFields?: PropertyFormProps["renderExtraPropertyFields"];
+    collectionValues?: EntityCollection;
 
 } & FormexController<PropertyWithId>) {
 
@@ -388,6 +416,29 @@ function PropertyEditFormFields({
             nameFieldRef.current?.focus();
         }, 0);
     };
+
+    const onPresetSelected = useCallback((preset: PropertyTypePreset) => {
+        // Map baseType to the default widgetId
+        const BASE_TYPE_TO_WIDGET: Record<string, string> = {
+            "string": "text_field",
+            "number": "number_input",
+            "boolean": "switch",
+            "date": "date_time",
+            "reference": "reference",
+            "relation": "relation",
+            "map": "group",
+            "array": "repeat",
+            "vector": "vector_input",
+            "geopoint": "text_field",
+            "binary": "text_field",
+        };
+        const widgetId = BASE_TYPE_TO_WIDGET[preset.baseType] || "text_field";
+        setSelectedFieldConfigId(widgetId);
+        // Merge preset defaults into the property
+        const updatedValues = updatePropertyFromWidget(values, widgetId, propertyConfigs);
+        const mergedValues = { ...updatedValues, ...preset.defaults, propertyConfig: widgetId };
+        setValues(mergedValues as PropertyWithId);
+    }, [values, propertyConfigs, setValues]);
 
     let childComponent;
     if (selectedFieldConfigId === "text_field" ||
@@ -520,7 +571,10 @@ function PropertyEditFormFields({
                         showError={Boolean(selectedWidgetError)}
                         existing={existing}
                         propertyConfigs={propertyConfigs}
-                        inArray={inArray}/>
+                        inArray={inArray}
+                        propertyTypePresets={propertyTypePresets}
+                        hiddenPropertyTypes={hiddenPropertyTypes}
+                        onPresetSelected={onPresetSelected}/>
 
                     {!!selectedWidgetError &&
                         <Typography variant="caption"
@@ -552,6 +606,23 @@ function PropertyEditFormFields({
                         ref={nameFieldRef}/>}
 
                 {childComponent}
+
+                {renderExtraPropertyFields && collectionValues && (
+                    <div className="col-span-12 mt-4 px-2">
+                        {renderExtraPropertyFields({
+                            metadata: ((values as unknown as Record<string, unknown>).metadata as Record<string, unknown>) ?? {},
+                            onMetadataChange: (key: string, value: unknown) => {
+                                const currentMetadata = ((values as unknown as Record<string, unknown>).metadata as Record<string, unknown>) ?? {};
+                                setValues({
+                                    ...values,
+                                    metadata: { ...currentMetadata, [key]: value },
+                                } as PropertyWithId);
+                            },
+                            property: toSerializableProperty(values as Property),
+                            collection: toSerializableCollection(collectionValues),
+                        })}
+                    </div>
+                )}
 
                 <div className={"col-span-12"}>
                     <AdvancedPropertyValidation disabled={disabled}/>
@@ -626,6 +697,34 @@ const WIDGET_TYPE_MAP: Record<PropertyConfigId, string> = {
     vector_input: "Number"
 };
 
+const WIDGET_BASE_TYPE_MAP: Record<string, PropertyType> = {
+    text_field: "string",
+    multiline: "string",
+    markdown: "string",
+    url: "string",
+    email: "string",
+    select: "string",
+    multi_select: "string",
+    file_upload: "string",
+    multi_file_upload: "string",
+    reference_as_string: "string",
+    user_select: "string",
+    number_input: "number",
+    number_select: "number",
+    multi_number_select: "number",
+    switch: "boolean",
+    date_time: "date",
+    reference: "reference",
+    multi_references: "reference",
+    relation: "relation",
+    group: "map",
+    key_value: "map",
+    block: "map",
+    repeat: "array",
+    custom_array: "array",
+    vector_input: "vector",
+};
+
 function WidgetSelectView({
     initialProperty,
     value,
@@ -636,7 +735,10 @@ function WidgetSelectView({
     showError,
     existing,
     propertyConfigs,
-    inArray
+    inArray,
+    propertyTypePresets,
+    hiddenPropertyTypes,
+    onPresetSelected
 }: {
     initialProperty?: PropertyWithId,
     value?: PropertyConfigId,
@@ -647,14 +749,24 @@ function WidgetSelectView({
     disabled: boolean,
     existing: boolean,
     propertyConfigs: Record<string, PropertyConfig>,
-    inArray?: boolean
+    inArray?: boolean,
+    propertyTypePresets?: PropertyTypePreset[],
+    hiddenPropertyTypes?: PropertyType[],
+    onPresetSelected?: (preset: PropertyTypePreset) => void,
 }) {
 
     const allSupportedFields = Object.entries(supportedFields).concat(Object.entries(propertyConfigs));
 
+    const filteredFields = hiddenPropertyTypes && !propertyTypePresets
+        ? allSupportedFields.filter(([key]) => {
+            const baseType = WIDGET_BASE_TYPE_MAP[key];
+            return !baseType || !hiddenPropertyTypes.includes(baseType);
+        })
+        : allSupportedFields;
+
     const displayedWidgets = (inArray
-        ? allSupportedFields.filter(([_, propertyConfig]) => !isPropertyBuilder(propertyConfig.property as Property) && (propertyConfig.property as Property)?.type !== "array")
-        : allSupportedFields)
+        ? filteredFields.filter(([_, propertyConfig]) => !isPropertyBuilder(propertyConfig.property as Property) && (propertyConfig.property as Property)?.type !== "array")
+        : filteredFields)
         .map(([key, propertyConfig]) => ({
             [key]: propertyConfig
         }))
@@ -664,6 +776,11 @@ function WidgetSelectView({
                 ...b
             }
         }, {});
+
+    const activePreset = useMemo(() => {
+        if (!propertyTypePresets || !initialProperty) return undefined;
+        return propertyTypePresets.find(p => p.detect?.(toSerializableProperty(initialProperty as Property)));
+    }, [propertyTypePresets, initialProperty]);
 
     const key = value;
     const propertyConfig = key ? (DEFAULT_FIELD_CONFIGS[key] ?? propertyConfigs[key]) : undefined;
@@ -711,9 +828,36 @@ function WidgetSelectView({
             onOpenChange={(open: boolean) => onOpenChange(open, Boolean(value))}
             maxWidth={"4xl"}>
             <DialogTitle>
-                Select a property widget
+                {propertyTypePresets ? "Select a property type" : "Select a property widget"}
             </DialogTitle>
             <DialogContent>
+                {propertyTypePresets ? (
+                    <div className={"grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mt-4"}>
+                        {propertyTypePresets.map((preset) => (
+                            <Card
+                                key={preset.id}
+                                onClick={() => {
+                                    onPresetSelected?.(preset);
+                                    onOpenChange(false, true);
+                                }}
+                                className={cls(
+                                    "flex flex-row items-center px-4 py-2 m-1",
+                                    activePreset?.id === preset.id && "ring-2 ring-primary"
+                                )}>
+                                <div className={cls("flex flex-row items-center text-base min-h-[48px]")}>
+                                    {preset.icon && (
+                                        <div className={"mr-4 text-2xl"}>
+                                            {typeof preset.icon === "string" ? preset.icon : preset.icon}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <Typography variant={"label"}>{preset.label}</Typography>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
                 <div>
                     {groups.map(group => {
                         return <div key={group} className={"mt-4"}>
@@ -749,6 +893,7 @@ function WidgetSelectView({
                     {/*        existing={existing}/>;*/}
                     {/*})}*/}
                 </div>
+                )}
             </DialogContent>
         </Dialog>
     </>;

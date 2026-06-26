@@ -3,6 +3,8 @@ import type { RebaseData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
+import type { ApiKeysAPI } from "../types/api_keys";
+
 
 /**
  * Event type for authentication state changes
@@ -86,6 +88,8 @@ export interface AdminAPI {
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(userId: string): Promise<{ success: boolean }>;
+    resetPassword(userId: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean }>;
+    listRoles(): Promise<{ roles: Array<{ id: string; name: string }> }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }
 
@@ -170,6 +174,10 @@ export interface RebaseClient<DB = unknown> {
 
     /** Custom backend functions API */
     functions?: FunctionsAPI;
+
+    /** Service API keys management API */
+    apiKeys?: ApiKeysAPI;
+
 
     /** Base HTTP URL of the backend server */
     baseUrl?: string;

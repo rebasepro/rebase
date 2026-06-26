@@ -249,7 +249,7 @@ export const JSEditorSidebar = ({
                                 [...history].reverse().map((code, i) => (
                                     <div
                                         key={i}
-                                        className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-950 cursor-pointer group transition-colors flex items-start"
+                                        className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-900 cursor-pointer group transition-colors flex items-start"
                                         onClick={() => onSelectSnippet(code)}
                                     >
                                         <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +277,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
     return (
         <div>
             <div
-                className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors group relative"
+                className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors group relative"
                 onClick={() => setExpanded(!expanded)}
             >
                 <svg
@@ -310,7 +310,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                     {collection.properties.map(prop => (
                         <div
                             key={prop}
-                            className="flex items-center p-1 pl-2 hover:bg-surface-50 dark:hover:bg-surface-950 rounded-r cursor-pointer transition-colors group/prop relative min-h-[28px]"
+                            className="flex items-center p-1 pl-2 hover:bg-surface-50 dark:hover:bg-surface-900 rounded-r cursor-pointer transition-colors group/prop relative min-h-[28px]"
                             onClick={() => onInsertCode(`"${prop}"`)}
                         >
                             <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>

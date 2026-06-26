@@ -182,6 +182,11 @@ export interface SerializableBaseProperty {
      * These are the declarative alternative to `dynamicProps` functions.
      */
     conditions?: PropertyConditions;
+    /**
+     * Arbitrary key-value metadata for external consumers.
+     * Not interpreted by Rebase — passed through serialization unchanged.
+     */
+    metadata?: Record<string, unknown>;
     // dynamicProps and callbacks are dropped (functions)
 }
 
@@ -442,6 +447,12 @@ export interface SerializableCollection {
 
     // ── Owner ─────────────────────────────────────────────────────────
     ownerId?: string;
+
+    /**
+     * Arbitrary key-value metadata for external consumers.
+     * Not interpreted by Rebase — passed through serialization unchanged.
+     */
+    metadata?: Record<string, unknown>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

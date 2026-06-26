@@ -53,6 +53,15 @@ export type {
     JsonCollectionStore,
 } from "./serializable_types";
 
+export type {
+    PropertyTypePreset,
+    PropertyType,
+    CollectionEditorTab,
+    CollectionEditorExtensionProps,
+    ExtraPropertyFieldsParams,
+    ExtraCollectionFieldsParams,
+} from "./extensibility_types";
+
 export {
     validateCollectionJson,
     type CollectionValidationError,
@@ -93,4 +102,6 @@ export * from "./ui/collection_editor/util";
 export type { CollectionEditorDialogProps } from "./ui/collection_editor/CollectionEditorDialog";
 export type { CollectionStudioViewProps } from "./ui/collection_editor/CollectionStudioView";
 export type { CollectionsStudioViewProps } from "./ui/collection_editor/CollectionsStudioView";
+export type { RouterCollectionStudioViewProps } from "./ui/collection_editor/RouterCollectionStudioView";
+export type { RouterCollectionsStudioViewProps } from "./ui/collection_editor/RouterCollectionsStudioView";
 export type { PropertyFormProps, OnPropertyChangedParams } from "./ui/collection_editor/PropertyEditView";

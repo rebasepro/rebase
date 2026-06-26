@@ -29,7 +29,7 @@ export function findProjectRoot(startDir: string = process.cwd()): string | null
                 // Check for workspace-based project (monorepo root)
                 if (pkg.workspaces && Array.isArray(pkg.workspaces)) {
                     const hasBackend = pkg.workspaces.some((w: string) =>
-                        w === "backend" || w.includes("backend")
+                        w === "backend"
                     );
                     if (hasBackend) return dir;
                 }

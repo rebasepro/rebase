@@ -13,3 +13,9 @@ export type { CollectionStudioViewProps } from "./collection_editor/ui/collectio
 
 export { CollectionsStudioView } from "./collection_editor/ui/collection_editor/CollectionsStudioView";
 export type { CollectionsStudioViewProps } from "./collection_editor/ui/collection_editor/CollectionsStudioView";
+
+export { RouterCollectionStudioView } from "./collection_editor/ui/collection_editor/RouterCollectionStudioView";
+export type { RouterCollectionStudioViewProps } from "./collection_editor/ui/collection_editor/RouterCollectionStudioView";
+
+export { RouterCollectionsStudioView } from "./collection_editor/ui/collection_editor/RouterCollectionsStudioView";
+export type { RouterCollectionsStudioViewProps } from "./collection_editor/ui/collection_editor/RouterCollectionsStudioView";

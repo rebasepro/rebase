@@ -53,6 +53,23 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         });
     }
 
+    async function resetPassword(userId: string, options?: { password?: string }) {
+        return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean }>(
+            adminPath + "/users/" + encodeURIComponent(userId) + "/reset-password",
+            {
+                method: "POST",
+                ...(options?.password ? { body: JSON.stringify({ password: options.password }) } : {})
+            }
+        );
+    }
+
+    async function listRoles() {
+        return transport.request<{ roles: Array<{ id: string; name: string }> }>(
+            adminPath + "/roles",
+            { method: "GET" }
+        );
+    }
+
     async function bootstrap() {
         return transport.request<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>(adminPath + "/bootstrap", {
             method: "POST"
@@ -66,6 +83,8 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         createUser,
         updateUser,
         deleteUser,
+        resetPassword,
+        listRoles,
         bootstrap
     };
 }

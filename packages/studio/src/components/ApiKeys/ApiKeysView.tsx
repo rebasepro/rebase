@@ -22,8 +22,8 @@ import {
     SelectItem,
     Checkbox,
     CopyIcon,
-    AddIcon,
-    DeleteIcon,
+    PlusIcon as AddIcon,
+    Trash2Icon as DeleteIcon,
     AlertCircleIcon,
     CheckCircleIcon
 } from "@rebasepro/ui";

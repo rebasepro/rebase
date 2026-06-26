@@ -1,0 +1,302 @@
+/**
+ * Standalone admin endpoint for user management.
+ *
+ * Mounts:
+ *   GET /users
+ *   GET /users/:userId
+ *   POST /users
+ *   PUT /users/:userId
+ *   DELETE /users/:userId
+ *   POST /bootstrap
+ */
+
+import { Hono } from "hono";
+import { ApiError, errorHandler } from "../api/errors";
+import type { AuthRepository } from "./interfaces";
+import { createRequireAuth, requireAdmin } from "./middleware";
+import type { AuthHooks } from "./auth-hooks";
+import { resolveAuthHooks } from "./auth-hooks";
+import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
+import type { EmailService, EmailConfig } from "../email";
+import type { HonoEnv } from "../api/types";
+import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
+import { logger } from "../utils/logger";
+
+export interface AdminUsersRouteConfig {
+    authRepo: AuthRepository;
+    emailService?: EmailService;
+    emailConfig?: EmailConfig;
+    serviceKey?: string;
+    authHooks?: AuthHooks;
+    collectionAuthConfig?: AuthCollectionConfig;
+    isBootstrapCompleted?: () => Promise<boolean>;
+    setBootstrapCompleted?: () => Promise<void>;
+}
+
+export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoEnv> {
+    const router = new Hono<HonoEnv>();
+    const authRepo = config.authRepo;
+    const { emailService, emailConfig, collectionAuthConfig } = config;
+    const ops = resolveAuthHooks(config.authHooks);
+
+    function toAdminUser(
+        u: {
+            id: string;
+            email: string;
+            displayName?: string | null;
+            photoUrl?: string | null;
+            createdAt?: Date | string;
+            updatedAt?: Date | string;
+        },
+        roles: string[]
+    ): AdminUser {
+        return {
+            uid: u.id,
+            email: u.email,
+            displayName: u.displayName ?? null,
+            photoURL: u.photoUrl ?? null,
+            provider: "custom",
+            roles,
+            createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : (u.createdAt ?? new Date().toISOString()),
+            updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : (u.updatedAt ?? new Date().toISOString())
+        };
+    }
+
+    router.onError(errorHandler);
+    router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
+
+    router.post("/bootstrap", async (c) => {
+        const user = c.get("user");
+        if (!user || typeof user !== "object") {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+
+        if (config.isBootstrapCompleted) {
+            const alreadyDone = await config.isBootstrapCompleted();
+            if (alreadyDone) {
+                throw ApiError.forbidden("Bootstrap has already been completed.", "BOOTSTRAP_COMPLETED");
+            }
+        }
+
+        const users = await authRepo.listUsers();
+        let hasAdmin = false;
+
+        for (const u of users) {
+            const roles = await authRepo.getUserRoleIds(u.id);
+            if (roles.includes("admin")) {
+                hasAdmin = true;
+                break;
+            }
+        }
+
+        if (hasAdmin) {
+            throw ApiError.forbidden("Admin users already exist. Bootstrap not allowed.", "BOOTSTRAP_COMPLETED");
+        }
+
+        const userId = "userId" in user ? (user as { userId: string }).userId : ("uid" in user ? (user as { uid: string }).uid : undefined);
+        if (!userId) {
+            throw ApiError.unauthorized("User ID not found in auth context");
+        }
+        const caller = await authRepo.getUserById(userId);
+        if (!caller) {
+            throw ApiError.notFound("Authenticated user does not exist in the database.", "USER_NOT_FOUND");
+        }
+        await authRepo.setUserRoles(userId, ["admin"]);
+
+        if (config.setBootstrapCompleted) {
+            await config.setBootstrapCompleted();
+        }
+
+        return c.json({
+            success: true,
+            message: "You are now an admin",
+            user: {
+                uid: userId,
+                roles: ["admin"]
+            }
+        });
+    });
+
+    router.get("/users", requireAdmin, async (c) => {
+        const limitParam = c.req.query("limit");
+        const offsetParam = c.req.query("offset");
+        const search = c.req.query("search");
+        const orderBy = c.req.query("orderBy");
+        const orderDir = c.req.query("orderDir") as "asc" | "desc" | undefined;
+
+        const limit = limitParam ? parseInt(limitParam, 10) : 25;
+        const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
+
+        const result = await authRepo.listUsersPaginated({
+            limit,
+            offset,
+            search: search || undefined,
+            orderBy: orderBy || undefined,
+            orderDir: orderDir || undefined,
+            roleId: c.req.query("role") || undefined
+        });
+
+        const usersWithRoles = await Promise.all(
+            result.users.map(async (u) => {
+                const roles = await authRepo.getUserRoleIds(u.id);
+                return toAdminUser(u, roles);
+            })
+        );
+
+        return c.json({
+            users: usersWithRoles,
+            total: result.total,
+            limit: result.limit,
+            offset: result.offset
+        });
+    });
+
+    router.get("/users/:userId", requireAdmin, async (c) => {
+        const userId = c.req.param("userId");
+        const result = await authRepo.getUserWithRoles(userId);
+
+        if (!result) {
+            throw ApiError.notFound("User not found");
+        }
+
+        const adminUser = toAdminUser(result.user, result.roles.map((r) => r.id));
+        return c.json({ user: adminUser });
+    });
+
+    router.post("/users", requireAdmin, async (c) => {
+        const body = await c.req.json();
+        const { email, roles } = body;
+        if (!email) {
+            throw ApiError.badRequest("Email is required");
+        }
+
+        const existing = await authRepo.getUserByEmail(email.toLowerCase());
+        if (existing) {
+            throw ApiError.conflict("A user with this email already exists");
+        }
+
+        const prepResult = await prepareAdminUserValues(body, {
+            authRepo,
+            emailService,
+            emailConfig,
+            resolvedHooks: ops,
+            collectionAuthConfig
+        });
+
+        const user = await authRepo.createUser({
+            email: prepResult.values.email as string,
+            passwordHash: prepResult.values.passwordHash as string | undefined,
+            displayName: prepResult.values.displayName as string | undefined,
+            photoUrl: prepResult.values.photoUrl as string | undefined,
+            metadata: prepResult.values.metadata as Record<string, unknown> | undefined
+        });
+
+        if (roles && Array.isArray(roles)) {
+            await authRepo.setUserRoles(user.id, roles);
+        }
+
+        const finalizeResult = await finalizeAdminUserCreation(
+            { id: user.id, values: prepResult.values },
+            prepResult.clearPassword,
+            {
+                authRepo,
+                emailService,
+                emailConfig,
+                resolvedHooks: ops,
+                collectionAuthConfig
+            }
+        );
+
+        const userRoles = await authRepo.getUserRoleIds(user.id);
+        const adminUser = toAdminUser(user, userRoles);
+
+        return c.json(
+            {
+                user: adminUser,
+                invitationSent: finalizeResult.invitationSent,
+                ...(finalizeResult.temporaryPassword ? { temporaryPassword: finalizeResult.temporaryPassword } : {})
+            },
+            201
+        );
+    });
+
+    router.put("/users/:userId", requireAdmin, async (c) => {
+        const userId = c.req.param("userId");
+        const body = await c.req.json();
+        const { password, email, displayName, roles } = body;
+
+        const existing = await authRepo.getUserById(userId);
+        if (!existing) {
+            throw ApiError.notFound("User not found");
+        }
+
+        const updates: Record<string, unknown> = {};
+        if (email !== undefined) updates.email = email.toLowerCase();
+        if (displayName !== undefined) updates.displayName = displayName;
+
+        if (password) {
+            const validation = ops.validatePasswordStrength(password);
+            if (!validation.valid) {
+                throw ApiError.badRequest(`Password too weak: ${validation.errors.join(". ")}`);
+            }
+            updates.passwordHash = await ops.hashPassword(password);
+        }
+
+        if (Object.keys(updates).length > 0) {
+            await authRepo.updateUser(userId, updates);
+        }
+
+        if (roles !== undefined && Array.isArray(roles)) {
+            const currentRoles = await authRepo.getUserRoleIds(userId);
+            const wasAdmin = currentRoles.includes("admin");
+            const willBeAdmin = roles.includes("admin");
+
+            if (wasAdmin && !willBeAdmin) {
+                const adminUsers = await authRepo.listUsersPaginated({
+                    roleId: "admin",
+                    limit: 1
+                });
+                if (adminUsers.total <= 1) {
+                    throw ApiError.forbidden("Cannot demote the last administrator", "LAST_ADMIN");
+                }
+            }
+            await authRepo.setUserRoles(userId, roles);
+        }
+
+        const result = await authRepo.getUserWithRoles(userId);
+        const adminUser = toAdminUser(result!.user, result!.roles.map((r) => r.id));
+
+        return c.json({ user: adminUser });
+    });
+
+    router.delete("/users/:userId", requireAdmin, async (c) => {
+        const userId = c.req.param("userId");
+        const authUser = c.get("user") as { uid?: string; userId?: string } | undefined;
+        const currentUserId = authUser?.uid || authUser?.userId;
+
+        if (currentUserId === userId) {
+            throw ApiError.badRequest("Cannot delete your own account", "SELF_DELETE");
+        }
+
+        const existing = await authRepo.getUserById(userId);
+        if (!existing) {
+            throw ApiError.notFound("User not found");
+        }
+
+        const roles = await authRepo.getUserRoleIds(userId);
+        if (roles.includes("admin")) {
+            const adminUsers = await authRepo.listUsersPaginated({
+                roleId: "admin",
+                limit: 1
+            });
+            if (adminUsers.total <= 1) {
+                throw ApiError.forbidden("Cannot delete the last administrator", "LAST_ADMIN");
+            }
+        }
+
+        await authRepo.deleteUser(userId);
+        return c.json({ success: true });
+    });
+
+    return router;
+}

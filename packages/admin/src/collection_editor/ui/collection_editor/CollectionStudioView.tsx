@@ -1,23 +1,31 @@
 
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
-import { useUrlController } from "../../_cms_internals";
 import * as React from "react";
-import { useState, useMemo, useEffect } from "react";
+import { useState } from "react";
 import { Button, PlusIcon, Typography } from "@rebasepro/ui";
-import { useSnackbarController } from "@rebasepro/core";
 import { CollectionEditorDialogProps } from "./CollectionEditorDialog";
 import { AIModifiedPathsProvider } from "./AIModifiedPathsContext";
 import { CollectionEditor } from "./CollectionEditorDialog";
-import { useNavigate } from "react-router-dom";
+import type { EntityCollection } from "@rebasepro/types";
 
 export type CollectionStudioViewProps = Omit<CollectionEditorDialogProps, "open" | "isNewCollection" | "editedCollectionId" | "handleClose" | "handleCancel"> & {
     collectionId?: string | "new";
+
+    /**
+     * Called after a successful save.
+     * Receives the saved collection (or undefined if dismissed without saving).
+     * When not provided, save completes silently.
+     */
+    onSave?: (collection?: EntityCollection) => void;
+
+    /**
+     * Called when the user cancels editing.
+     * When not provided, cancel is a no-op.
+     */
+    onCancel?: () => void;
 };
 
-export function CollectionStudioView({ collectionId, ...props }: CollectionStudioViewProps) {
-    const snackbarController = useSnackbarController();
-    const navigate = useNavigate();
-    const urlController = useUrlController();
+export function CollectionStudioView({ collectionId, onSave, onCancel, ...props }: CollectionStudioViewProps) {
 
     // Form state from the editor
     const [formDirty, setFormDirty] = useState<boolean>(false);
@@ -28,12 +36,11 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
         () => setFormDirty(false)
     );
 
-    // Map collectionId from URL params if missing? We can pass it directly.
     const activeCollectionId = collectionId;
 
     const handleCancelClick = () => {
         if (!formDirty) {
-            navigate(urlController.buildAppUrlPath("/"));
+            onCancel?.();
         } else {
             setCancelRequested(true);
             triggerDialog();
@@ -41,7 +48,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
     };
 
     return (
-        <div className="flex-grow flex flex-col h-full w-full bg-white dark:bg-surface-950">
+        <div className="flex-grow flex flex-col h-full w-full bg-surface-50 dark:bg-surface-800">
             <AIModifiedPathsProvider>
                 {activeCollectionId ? (
                     <CollectionEditor
@@ -55,13 +62,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
                         handleClose={(savedCollection) => {
                             setFormDirty(false);
                             if (savedCollection) {
-                                snackbarController.open({
-                                    type: "success",
-                                    message: `Collection ${savedCollection.name || savedCollection.slug} saved`
-                                });
-                                if (activeCollectionId === "new") {
-                                    navigate(urlController.buildAppUrlPath(`s/schema/${savedCollection.slug}`));
-                                }
+                                onSave?.(savedCollection);
                             }
                         }}
                         setFormDirty={setFormDirty}
@@ -73,7 +74,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
                         </Typography>
                         <Button
                             disabled={props.configController?.readOnly}
-                            onClick={() => navigate(urlController.buildAppUrlPath("schema/new"))}
+                            onClick={() => onSave?.()}
                         >
                             <PlusIcon/>
                             Add new collection
@@ -86,7 +87,7 @@ export function CollectionStudioView({ collectionId, ...props }: CollectionStudi
                     handleOk={() => {
                         dialogProps.handleOk();
                         if (cancelRequested) {
-                            navigate(urlController.buildAppUrlPath("/"));
+                            onCancel?.();
                             setCancelRequested(false);
                         }
                     }}

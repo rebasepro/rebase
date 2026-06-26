@@ -1,7 +1,7 @@
 
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { EntityCollection, Property } from "@rebasepro/types";
@@ -27,9 +27,11 @@ import { useCollectionsConfigController } from "../../useCollectionsConfigContro
 import { unslugify } from "@rebasepro/utils";
 
 export function DisplaySettingsForm({
-    expandKanban
+    expandKanban,
+    standalone,
 }: {
     expandKanban?: boolean;
+    standalone?: boolean;
 }) {
 
     const {
@@ -41,9 +43,9 @@ export function DisplaySettingsForm({
 
     const [orderPropertyDialogOpen, setOrderPropertyDialogOpen] = useState(false);
 
-    const authController = useAuthController();
     const customizationController = useCustomizationController();
-    const configController = useCollectionsConfigController();
+    const configControllerFromContext = useCollectionsConfigController();
+    const configController = standalone ? { readOnly: false } : configControllerFromContext;
 
     // Get text properties (for orderProperty - uses string fractional indexing keys)
     const textProperties = useMemo(() => {
@@ -118,7 +120,7 @@ export function DisplaySettingsForm({
                                                 }
                                                 const prop = textProperties.find(p => p.key === value);
                                                 if (!prop) return "Select a property";
-                                                const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
+                                                const fieldConfig = getFieldConfig(prop.property, customizationController?.propertyConfigs ?? {});
                                                 return (
                                                     <div className="flex items-center gap-2">
                                                         <PropertyConfigBadge propertyConfig={fieldConfig}/>
@@ -139,7 +141,7 @@ export function DisplaySettingsForm({
                                             ) : undefined}
                                         >
                                             {textProperties.map((prop) => {
-                                                const fieldConfig = getFieldConfig(prop.property, customizationController.propertyConfigs);
+                                                const fieldConfig = getFieldConfig(prop.property, customizationController?.propertyConfigs ?? {});
                                                 return (
                                                     <SelectItem key={prop.key} value={prop.key}>
                                                         <div className="flex items-center gap-3">
@@ -205,7 +207,7 @@ hideFromCollection: true }
                                             autoUpdateId={false}
                                             inArray={false}
                                             allowDataInference={false}
-                                            propertyConfigs={customizationController.propertyConfigs}
+                                            propertyConfigs={customizationController?.propertyConfigs ?? {}}
 
                                             existingPropertyKeys={Object.keys(values.properties ?? {})}
                                             onPropertyChanged={({ id, property }) => {

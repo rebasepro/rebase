@@ -141,6 +141,7 @@ function toSerializableBaseFields(property: Property): Omit<SerializableBaseProp
     if (property.columnName) result.columnName = property.columnName;
     if (property.defaultValue !== undefined) result.defaultValue = property.defaultValue;
     if (property.conditions) result.conditions = property.conditions;
+    if (property.metadata) result.metadata = property.metadata;
     // dynamicProps and callbacks are intentionally dropped (functions)
 
     const ui = toSerializableUIConfig(property.ui);
@@ -419,6 +420,7 @@ export function toSerializableCollection(collection: EntityCollection): Serializ
     if (collection.databaseId) result.databaseId = collection.databaseId;
     if (collection.titleProperty) result.titleProperty = collection.titleProperty as string;
     if (collection.ownerId) result.ownerId = collection.ownerId;
+    if (collection.metadata) result.metadata = collection.metadata;
     if (collection.table) result.table = collection.table;
     if ("schema" in collection && collection.schema) result.schema = collection.schema as string;
     if (collection.orderProperty) result.orderProperty = collection.orderProperty as string;

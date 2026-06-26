@@ -276,6 +276,7 @@ export function PropertyTreeEntry({
                     {!isPropertyBuilder(property) && !additionalField && editable
                         ? <PropertyFieldPreview
                             property={property}
+                            propertyKey={propertyKey}
                             onClick={onPropertyClick ? () => onPropertyClick(propertyKey, namespace) : undefined}
                             includeName={true}
                             selected={selected}

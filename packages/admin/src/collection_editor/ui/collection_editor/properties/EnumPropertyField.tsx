@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { getIn, useFormex } from "@rebasepro/formex";
-import { useSnackbarController, useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/core";
+import { useSafeSnackbarController } from "../../../useSafeSnackbarController";
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import { Select, SelectItem } from "@rebasepro/ui";
@@ -34,7 +35,7 @@ export function EnumPropertyField({
         setFieldValue
     } = useFormex<PropertyWithId>();
 
-    const snackbarContext = useSnackbarController();
+    const snackbarContext = useSafeSnackbarController();
     const { t } = useTranslation();
 
     const enumValuesPath = multiselect ? "of.enum" : "enum";
@@ -56,7 +57,7 @@ export function EnumPropertyField({
             const enumIds = value.filter(v => Boolean(v?.id)).map((v: EnumValueConfig) => v.id);
             if (defaultValue && !enumIds.includes(defaultValue)) {
                 setFieldValue("defaultValue", undefined);
-                snackbarContext.open({
+                snackbarContext?.open({
                     type: "warning",
                     message: "Default value was cleared"
                 })

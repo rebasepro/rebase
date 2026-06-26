@@ -4,6 +4,7 @@ import { useNavigationStateController, useCollectionRegistryController, useUrlCo
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmationDialog, ErrorView, useAuthController, useCustomizationController, useSnackbarController } from "@rebasepro/core";
+import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import {
     ArrowLeftIcon,
@@ -46,8 +47,9 @@ import { CollectionRLSTab } from "./CollectionRLSTab";
 import { buildCollectionFromTableMetadata } from "../../pgColumnToProperty";
 import { TableMetadata } from "@rebasepro/types";
 import { mergeDeep, randomString, removeUndefined } from "@rebasepro/utils";
+import type { CollectionEditorExtensionProps, CollectionEditorTab } from "../../extensibility_types";
 
-export interface CollectionEditorDialogProps {
+export interface CollectionEditorDialogProps extends CollectionEditorExtensionProps {
     open: boolean;
     isNewCollection: boolean;
     initialValues?: {
@@ -139,6 +141,7 @@ export function CollectionEditorDialog(props: CollectionEditorDialogProps) {
             fullHeight={true}
             scrollable={false}
             maxWidth={"7xl"}
+            className="bg-surface-50 dark:bg-surface-800"
             onOpenChange={(open) => !open ? handleCancel() : undefined}
         >
             <DialogTitle hidden>Collection editor</DialogTitle>
@@ -168,17 +171,23 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     handleCancel: () => void,
     setFormDirty: (dirty: boolean) => void
 }) {
-    const { propertyConfigs } = useCustomizationController();
+    const { standalone } = props;
+
+    const customizationController = useCustomizationController();
     const navigationState = useNavigationStateController();
     const collectionRegistry = useCollectionRegistryController();
     const authController = useAuthController();
 
-    const {
-        topLevelNavigation
-    } = navigationState;
-    const {
-        collections
-    } = collectionRegistry;
+    // In standalone mode, use safe defaults instead of context values
+    const propertyConfigs = standalone
+        ? (customizationController?.propertyConfigs ?? {})
+        : customizationController.propertyConfigs;
+    const topLevelNavigation = standalone
+        ? (navigationState?.topLevelNavigation ?? [])
+        : navigationState.topLevelNavigation;
+    const collections = standalone
+        ? (collectionRegistry?.collections ?? [])
+        : collectionRegistry.collections;
 
     const initialValuesProp = props.initialValues;
     const copyFromProp = props.copyFrom;
@@ -192,7 +201,13 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
 
     useEffect(() => {
         try {
-            if (collectionRegistry.initialised) {
+            const initialised = (standalone
+                ? true
+                : (collectionRegistry?.initialised ?? true)) && !props.configController?.loading;
+            const getRawCollection = standalone
+                ? (() => undefined)
+                : collectionRegistry.getRawCollection;
+            if (initialised) {
                 if (props.editedCollectionId) {
                     // We must use getRawCollection so the editor schema fields
                     // aren't polluted with dynamically injected runtime `relations`.
@@ -200,7 +215,9 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                     const collectionPath = [...(props.parentCollectionSlugs ?? []), props.editedCollectionId]
                         .reduce((acc, segment, i) => i === 0 ? segment : `${acc}/fake_id/${segment}`, "");
 
-                    setCollection(collectionRegistry.getRawCollection(collectionPath) as EntityCollection<any>);
+                    const registryCol = getRawCollection ? getRawCollection(collectionPath) : undefined;
+                    const configCol = props.configController?.collections?.find(c => c.slug === props.editedCollectionId);
+                    setCollection((registryCol ?? configCol) as EntityCollection<any>);
                 } else {
                     setCollection(undefined);
                 }
@@ -209,7 +226,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         } catch (e) {
             console.error(e);
         }
-    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, collectionRegistry.initialised, collectionRegistry.getRawCollection]);
+    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading]);
 
 
     const initialCollection = collection
@@ -246,7 +263,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         return <CircularProgressCenter/>;
     }
 
-    if (!props.isNewCollection && (!collectionRegistry.initialised || !initialLoadingCompleted)) {
+    if (!props.isNewCollection && (!(standalone ? true : (collectionRegistry?.initialised ?? true)) || !initialLoadingCompleted)) {
         return <CircularProgressCenter/>;
     }
 
@@ -290,7 +307,13 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     onAnalyticsEvent,
     fullScreen,
     unmappedTables,
-    onFetchTableMetadata
+    onFetchTableMetadata,
+    propertyTypePresets,
+    hiddenPropertyTypes,
+    renderExtraPropertyFields,
+    renderExtraCollectionFields,
+    visibleTabs,
+    standalone
 }: CollectionEditorDialogProps & {
     handleCancel: () => void,
     setFormDirty: (dirty: boolean) => void,
@@ -304,10 +327,33 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 }
 ) {
 
-    const importConfig = useImportConfig();
-    const urlController = useUrlController();
-    const collectionRegistry = useCollectionRegistryController();
-    const snackbarController = useSnackbarController();
+    const importConfigRaw = useImportConfig();
+    const urlControllerRaw = useUrlController();
+    const collectionRegistryRaw = useCollectionRegistryController();
+    const snackbarControllerRaw = useSafeSnackbarController();
+
+    // In standalone mode, use safe defaults
+    const importConfig = standalone ? undefined : importConfigRaw;
+    const urlController = standalone
+        ? {
+            basePath: "/",
+            baseCollectionPath: "/c",
+            urlPathToDataPath: () => "",
+            homeUrl: "/",
+            isUrlCollectionPath: () => false,
+            buildUrlCollectionPath: () => "",
+            buildAppUrlPath: () => "",
+            resolveDatabasePathsFrom: (p: string) => p,
+            navigate: () => { }
+        }
+        : urlControllerRaw;
+    const collectionRegistryInternal = standalone
+        ? { convertIdsToPaths: (ids: string[]) => ids }
+        : collectionRegistryRaw;
+    const snackbarController = snackbarControllerRaw ?? {
+        open: () => { },
+        close: () => { }
+    };
 
     // Use this ref to store which properties have errors
     const propertyErrorsRef = useRef<Record<string, any>>({});
@@ -316,6 +362,12 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         ? (includeTemplates ? "welcome" : "general")
         : (initialViewProp ?? "properties");
     const [currentView, setCurrentView] = useState<EditorView>(initialView); // this view can edit either the details view or the properties one
+
+    useEffect(() => {
+        if (visibleTabs && !visibleTabs.includes(currentView as CollectionEditorTab)) {
+            setCurrentView(visibleTabs[0] || "general");
+        }
+    }, [visibleTabs, currentView]);
 
     const [error, setError] = React.useState<Error | undefined>();
 
@@ -345,7 +397,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const setNextMode = () => {
         if (currentView === "general") {
-            if (importConfig.inUse) {
+            if (importConfig?.inUse) {
                 setCurrentView("import_data_saving");
             } else if (extraView) {
                 setCurrentView("extra_view");
@@ -439,7 +491,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 setNextMode();
                 formexController.resetForm({ values: newCollectionState });
             } else if (currentView === "general") {
-                if (extraView || importConfig.inUse) {
+                if (extraView || importConfig?.inUse) {
                     formexController.resetForm({ values: newCollectionState });
                     setNextMode();
                 } else if (isNewCollection) {
@@ -537,7 +589,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const usedPath = getTableName(values);
     const pathError = validatePath(usedPath, isNewCollection, existingPaths, values.slug);
 
-    const parentPaths = !pathError && parentCollectionSlugs ? collectionRegistry.convertIdsToPaths(parentCollectionSlugs) : undefined;
+    const parentPaths = !pathError && parentCollectionSlugs ? collectionRegistryInternal.convertIdsToPaths(parentCollectionSlugs) : undefined;
 
     const updatedFullPath = parentPaths && parentPaths.length > 0
         ? [...parentPaths, usedPath].join("/fake_id/")
@@ -558,18 +610,18 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     }, [dirty]);
 
     function onImportDataSet(data: object[], propertiesOrder?: string[]) {
-        importConfig.setInUse(true);
+        importConfig?.setInUse(true);
         buildEntityPropertiesFromData(data, getInferenceType)
-            .then((properties: any) => {
+            .then((properties: unknown) => {
                 const res = cleanPropertiesFromImport(properties as Properties);
 
-                importConfig.setIdColumn(res.idColumn);
-                importConfig.setImportData(data);
-                importConfig.setHeadersMapping(res.headersMapping);
+                importConfig?.setIdColumn(res.idColumn);
+                importConfig?.setImportData(data);
+                importConfig?.setHeadersMapping(res.headersMapping);
                 const filteredHeadingsOrder = ((propertiesOrder ?? [])
                     .filter((key) => res.headersMapping[key]) as string[]) ?? Object.keys(res.properties);
-                importConfig.setHeadingsOrder(filteredHeadingsOrder);
-                importConfig.setOriginProperties(res.properties);
+                importConfig?.setHeadingsOrder(filteredHeadingsOrder);
+                importConfig?.setOriginProperties(res.properties);
 
                 const mappedHeadings = (propertiesOrder ?? []).map((key) => res.headersMapping[key]).filter(Boolean) as string[] ?? Object.keys(res.properties);
                 setFieldValue("properties", res.properties);
@@ -581,7 +633,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const onImportMappingComplete = () => {
         const updatedProperties = { ...values.properties };
-        if (importConfig.idColumn)
+        if (importConfig?.idColumn)
             delete updatedProperties[importConfig.idColumn];
         setFieldValue("properties", updatedProperties);
         // setFieldValue("propertiesOrder", Object.values(importConfig.headersMapping));
@@ -620,25 +672,25 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    return <div className="h-full w-full flex flex-col bg-white dark:bg-surface-950">
+    return <div className="h-full w-full flex flex-col bg-surface-50 dark:bg-surface-800">
         <Formex value={formController}>
 
             <>
-                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-surface-50 dark:bg-surface-950 border-b", defaultBorderMixin)}>
+                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-surface-50 dark:bg-surface-900 border-b", defaultBorderMixin)}>
                     <div className="flex flex-1 items-center justify-end gap-4 min-w-0">
                         <Tabs value={currentView}
                             className="bg-transparent !w-fit max-w-full"
                             onValueChange={(v) => setCurrentView(v as EditorView)}>
-                            <Tab value={"general"}>
+                            {(!visibleTabs || visibleTabs.includes("general")) && <Tab value={"general"}>
                                 General
-                            </Tab>
-                            <Tab value={"display"}>
+                            </Tab>}
+                            {(!visibleTabs || visibleTabs.includes("display")) && <Tab value={"display"}>
                                 Display
-                            </Tab>
-                            <Tab value={"properties"}>
+                            </Tab>}
+                            {(!visibleTabs || visibleTabs.includes("properties")) && <Tab value={"properties"}>
                                 Properties
-                            </Tab>
-                            {getDataSourceCapabilities(values.driver).supportsRLS && <Tab value={"rls"}>
+                            </Tab>}
+                            {(!visibleTabs || visibleTabs.includes("rls")) && getDataSourceCapabilities(values.driver).supportsRLS && <Tab value={"rls"}>
                                 RLS
                             </Tab>}
                         </Tabs>
@@ -673,7 +725,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                     onSubmit={formController.handleSubmit}
                     className="flex-grow flex flex-col min-h-0 relative">
 
-                    <div className="flex-grow flex flex-col min-h-0 overflow-y-auto no-scrollbar relative w-full h-full">
+                    <div className="flex-grow flex flex-col min-h-0 no-scrollbar relative w-full h-full bg-surface-50 dark:bg-surface-800">
 
                         {currentView === "loading" &&
                             <CircularProgressCenter/>}
@@ -736,14 +788,16 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
                         {currentView === "general" &&
                             <GeneralSettingsForm
+                                isNewCollection={isNewCollection}
                                 existingPaths={existingPaths}
                                 existingIds={existingIds}
                                 parentCollection={parentCollection}
-                                isNewCollection={isNewCollection}/>
+                                renderExtraCollectionFields={renderExtraCollectionFields}
+                                standalone={standalone}/>
                         }
 
                         {currentView === "display" &&
-                            <DisplaySettingsForm expandKanban={expandKanban}/>
+                            <DisplaySettingsForm expandKanban={expandKanban} standalone={standalone}/>
                         }
 
                         {currentView === "rls" && getDataSourceCapabilities(values.driver).supportsRLS &&
@@ -766,25 +820,28 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 getData={getDataWithPath}
                                 doCollectionInference={doCollectionInference}
                                 propertyConfigs={propertyConfigs}
-
+                                propertyTypePresets={propertyTypePresets}
+                                hiddenPropertyTypes={hiddenPropertyTypes}
+                                renderExtraPropertyFields={renderExtraPropertyFields}
                                 extraIcon={extraView?.icon &&
                                     <IconButton
                                         color={"primary"}
                                         onClick={() => setCurrentView("extra_view")}>
                                         {extraView.icon}
-                                    </IconButton>}/>
+                                    </IconButton>}
+                                standalone={standalone}/>
                         }
 
                     </div>
                     {(!fullScreen || isNewCollection || !!error) && (
-                        <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-surface-200 dark:border-surface-900 flex items-center justify-between gap-4 bg-white dark:bg-surface-950">
+                        <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-surface-200 dark:border-surface-900 flex items-center justify-between gap-4 bg-surface-50 dark:bg-surface-900">
                             {error && <ErrorView error={error}/>}
 
                             {isNewCollection && includeTemplates && currentView === "import_data_mapping" &&
                                 <Button variant={"text"}
                                     type="button"
                                     onClick={() => {
-                                        importConfig.setInUse(false);
+                                        importConfig?.setInUse(false);
                                         return setCurrentView("welcome");
                                     }}>
                                     Back

@@ -322,6 +322,13 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     ownerId?: string;
 
     /**
+     * Arbitrary key-value metadata for external consumers.
+     * Not interpreted by Rebase — passed through serialization unchanged.
+     * Used by domain apps to store custom per-collection config.
+     */
+    metadata?: Record<string, unknown>;
+
+    /**
      * Overrides for the entity view, like the data source or the storage source.
      */
     overrides?: EntityOverrides;

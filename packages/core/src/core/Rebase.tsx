@@ -224,7 +224,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         </RebaseI18nProvider>
     );
 
-    const resolvedApiUrl = apiUrl ?? client?.baseUrl;
+    const resolvedApiUrl = apiUrl || client?.baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
 
     if (resolvedApiUrl) {
         return (

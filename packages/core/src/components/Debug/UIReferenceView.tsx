@@ -165,7 +165,7 @@ export function UIReferenceView() {
                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                     <div className={cls(
                         "flex flex-row items-center rounded-lg cursor-pointer",
-                        "hover:bg-surface-accent-100 dark:hover:bg-surface-950",
+                        "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
                         "transition-colors duration-150",
                         "py-2"
                     )}>
@@ -215,7 +215,7 @@ export function UIReferenceView() {
                                     </div>
                                 </div>
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
-                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-950 transition-colors duration-150 py-2">
+                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                                             <ChevronsRightIcon size={iconSize.small}/>
                                         </div>
@@ -273,7 +273,7 @@ active: false }
                                 </div>
                                 {/* DrawerToggle */}
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
-                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-950 transition-colors duration-150 py-2">
+                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                                             <ChevronsLeftIcon size={iconSize.small}/>
                                         </div>
@@ -445,13 +445,13 @@ active: false }
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     {/* Schema tree items — from SchemaBrowser */}
                                     <div className="mb-2">
-                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors">
+                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors">
                                             <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
                                         <div className="ml-3 mt-1 space-y-1">
                                             {["users", "posts", "comments"].map(t => (
-                                                <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors group">
+                                                <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors group">
                                                     <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate">{t}</Typography>
                                                 </div>
@@ -478,7 +478,7 @@ active: false }
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     <div className="mb-2">
-                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors">
+                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors">
                                             <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
@@ -487,7 +487,7 @@ active: false }
 enabled: true }, { name: "posts",
 enabled: true }, { name: "sessions",
 enabled: false }].map(t => (
-                                                <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary")}>
+                                                <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary")}>
                                                     <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-xs truncate flex-1">{t.name}</Typography>
                                                     <div className={cls("w-1.5 h-1.5 rounded-full shrink-0", t.enabled ? "bg-green-500" : "bg-orange-400 opacity-50")}/>
@@ -512,7 +512,7 @@ enabled: false }].map(t => (
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-2 space-y-0.5">
                                     {[{ name: "Authors" }, { name: "Posts",
 selected: true }, { name: "Tags" }].map(c => (
-                                        <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark")}>
+                                        <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark")}>
                                             <FolderIcon size={iconSize.small} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")}/>
                                             <span className="truncate flex-1">{c.name}</span>
                                         </div>

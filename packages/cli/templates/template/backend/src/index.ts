@@ -148,7 +148,7 @@ pass: env.SMTP_PASS! }
     if (!isProduction) {
         // Dev mode: retry the next port if the current one is in use
         const projectRoot = path.resolve(__dirname, "../..");
-        const actualPort = await listenWithPortRetry(server, PORT, { portFileDir: projectRoot });
+        const actualPort = await listenWithPortRetry(server, PORT, { portFileDir: projectRoot, serviceKey: env.REBASE_SERVICE_KEY });
 
         // Clean up port file on exit
         const cleanup = () => cleanupDevPortFile(projectRoot);

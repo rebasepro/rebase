@@ -3,9 +3,9 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import {
-    useLargeLayout,
-    useSnackbarController
+    useLargeLayout
 } from "@rebasepro/core";
+import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { ErrorBoundary } from "@rebasepro/ui";
 import {
     Button,
@@ -16,6 +16,7 @@ import {
     defaultBorderMixin,
     FileSearchIcon,
     IconButton,
+    iconSize,
     PlusIcon,
     Tooltip,
     Typography
@@ -29,6 +30,8 @@ import { PropertyTree } from "./PropertyTree";
 import { GetCodeDialog } from "./GetCodeDialog";
 import { useAIModifiedPaths } from "./AIModifiedPathsContext";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
+import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
+import type { SerializableProperty, SerializableCollection } from "../../serializable_types";
 
 type PropertyOrBuilder = Property | Record<string, unknown>;
 
@@ -43,7 +46,15 @@ type CollectionEditorFormProps = {
     getData?: () => Promise<object[]>;
     doCollectionInference?: (collection: EntityCollection) => Promise<Partial<EntityCollection> | null> | undefined;
     propertyConfigs: Record<string, PropertyConfig>;
-
+    propertyTypePresets?: PropertyTypePreset[];
+    hiddenPropertyTypes?: PropertyType[];
+    renderExtraPropertyFields?: (params: {
+        metadata: Record<string, unknown>;
+        onMetadataChange: (key: string, value: unknown) => void;
+        property: SerializableProperty;
+        collection: SerializableCollection;
+    }) => React.ReactNode;
+    standalone?: boolean;
 };
 
 export function CollectionPropertiesEditorForm({
@@ -56,7 +67,11 @@ export function CollectionPropertiesEditorForm({
     getUser,
     getData,
     doCollectionInference,
-    propertyConfigs
+    propertyConfigs,
+    propertyTypePresets,
+    hiddenPropertyTypes,
+    renderExtraPropertyFields,
+    standalone,
 
 }: CollectionEditorFormProps) {
 
@@ -69,11 +84,12 @@ export function CollectionPropertiesEditorForm({
         dirty
     } = useFormex<EntityCollection>();
 
-    const snackbarController = useSnackbarController();
-    const configController = useCollectionsConfigController();
+    const snackbarController = useSafeSnackbarController();
+    const configControllerFromContext = useCollectionsConfigController();
+    const configController = standalone ? { readOnly: false } : configControllerFromContext;
 
     const largeLayout = useLargeLayout();
-    const asDialog = !largeLayout
+    const asDialog = standalone ? false : !largeLayout
 
     // index of the selected property within the namespace
     const [selectedPropertyIndex, setSelectedPropertyIndex] = useState<number | undefined>();
@@ -115,7 +131,7 @@ export function CollectionPropertiesEditorForm({
             promise.then((newCollection) => {
 
                     if (!newCollection) {
-                        snackbarController.open({
+                        snackbarController?.open?.({
                             type: "error",
                             message: "Could not infer properties from data"
                         });
@@ -222,7 +238,7 @@ export function CollectionPropertiesEditorForm({
 
                     // Check if there are any changes (new properties or modified nested properties)
                     if (allNewPropertyKeys.length === 0) {
-                        snackbarController.open({
+                        snackbarController?.open?.({
                             type: "info",
                             message: "No new properties found in existing data"
                         });
@@ -241,7 +257,7 @@ export function CollectionPropertiesEditorForm({
                     updatePropertiesOrder(updatedPropertiesOrder);
                     setInferredPropertyKeys(allNewPropertyKeys);
 
-                    snackbarController.open({
+                    snackbarController?.open?.({
                         type: "success",
                         message: `Added ${allNewPropertyKeys.length} new ${allNewPropertyKeys.length === 1 ? "property" : "properties"}`
                     });
@@ -404,98 +420,87 @@ export function CollectionPropertiesEditorForm({
     };
 
     const body = (
-        <div className={"grid grid-cols-12 gap-2 h-full bg-white dark:bg-surface-950"}>
+        <div className={"grid grid-cols-12 h-full bg-surface-50 dark:bg-surface-800"}>
             <div className={cls(
-                "bg-surface-50 dark:bg-surface-900",
-                "p-4 md:p-8",
-                "col-span-12 lg:col-span-5 h-full overflow-auto",
+                "col-span-12 lg:col-span-5 h-full flex flex-col bg-surface-50 dark:bg-surface-800",
                 !asDialog && "border-r " + defaultBorderMixin
             )}>
-
-                <div className="flex my-2">
-
-                    <div className="grow mb-4">
-
+                {/* Sidebar Header */}
+                <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px] shrink-0", defaultBorderMixin)}>
+                    <div className="flex-grow min-w-0 pr-2">
                         <Field
                             name={"name"}
                             as={DebouncedTextField}
                             invisible={true}
                             className="-ml-1"
-                            inputClassName="text-2xl font-headers"
+                            inputClassName="text-sm font-semibold truncate bg-transparent border-0 outline-none focus:ring-0"
                             placeholder={"Collection name"}
                             size={"small"}
                             required
                             error={Boolean(errors?.name)}/>
-
-                        {owner &&
-                            <Typography variant={"body2"}
-                                className={"ml-2"}
-                                color={"secondary"}>
-                                Created by {owner.displayName}
-                            </Typography>}
                     </div>
 
-                    {extraIcon && <div className="ml-4">
-                        {extraIcon}
-                    </div>}
+                    {extraIcon && <div className="flex-shrink-0">{extraIcon}</div>}
 
-                    <div className="ml-4 flex flex-row gap-2 items-center flex-shrink-0">
-                        {/* <Tooltip title={"Get the code for this collection"}
-                            asChild={true}>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        {inferPropertiesFromData && (
+                            <Tooltip title={"Add new properties based on data"} asChild={true}>
+                                <IconButton
+                                    size="small"
+                                    disabled={inferringProperties}
+                                    onClick={inferPropertiesFromData}
+                                >
+                                    {inferringProperties ? <CircularProgress size={"smallest"}/> : <FileSearchIcon size={iconSize.smallest}/>}
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        <Tooltip title={"Add new property"} asChild={true}>
                             <IconButton
-                                variant={"filled"}
-                                disabled={inferringProperties}
-                                onClick={() => setCodeDialogOpen(true)}>
-                                <CodeIcon />
-                            </IconButton>
-                        </Tooltip> */}
-                        {inferPropertiesFromData && <Tooltip title={"Add new properties based on data"}
-                            asChild={true}>
-                            <IconButton
-                                variant={"filled"}
-                                disabled={inferringProperties}
-                                onClick={inferPropertiesFromData}>
-                                {inferringProperties ? <CircularProgress size={"small"}/> : <FileSearchIcon/>}
-                            </IconButton>
-                        </Tooltip>}
-                        <Tooltip title={"Add new property"}
-                            asChild={true}>
-                            <Button
+                                size="small"
                                 disabled={configController?.readOnly}
-                                onClick={() => setNewPropertyDialogOpen(true)}>
-                                <PlusIcon/>
-                            </Button>
+                                onClick={() => setNewPropertyDialogOpen(true)}
+                            >
+                                <PlusIcon size={iconSize.smallest}/>
+                            </IconButton>
                         </Tooltip>
                     </div>
                 </div>
 
-                <ErrorBoundary>
-                    <PropertyTree
-                        className={"mt-2"}
-                        inferredPropertyKeys={inferredPropertyKeys}
-                        selectedPropertyKey={selectedPropertyKey ? getFullId(selectedPropertyKey, selectedPropertyNamespace) : undefined}
-                        properties={values.properties}
-                        additionalFields={values.additionalFields}
-                        propertiesOrder={usedPropertiesOrder}
-                        onPropertyClick={onPropertyClick}
-                        onPropertyMove={onPropertyMove}
-                        onPropertyRemove={(isNewCollection || (inferredPropertyKeys && inferredPropertyKeys.length > 0)) && !configController?.readOnly ? deleteProperty : undefined}
+                {/* Sidebar Content */}
+                <div className="flex-grow overflow-y-auto p-3 no-scrollbar space-y-3 bg-surface-50 dark:bg-surface-800">
+                    {owner && (
+                        <div className="px-1 py-0.5">
+                            <Typography variant="body2" color="secondary">
+                                Created by {owner.displayName}
+                            </Typography>
+                        </div>
+                    )}
+                    <ErrorBoundary>
+                        <PropertyTree
+                            inferredPropertyKeys={inferredPropertyKeys}
+                            selectedPropertyKey={selectedPropertyKey ? getFullId(selectedPropertyKey, selectedPropertyNamespace) : undefined}
+                            properties={values.properties}
+                            additionalFields={values.additionalFields}
+                            propertiesOrder={usedPropertiesOrder}
+                            onPropertyClick={onPropertyClick}
+                            onPropertyMove={onPropertyMove}
+                            onPropertyRemove={(isNewCollection || (inferredPropertyKeys && inferredPropertyKeys.length > 0)) && !configController?.readOnly ? deleteProperty : undefined}
+                            errors={errors}/>
+                    </ErrorBoundary>
 
-                        errors={errors}/>
-                </ErrorBoundary>
-
-                <Button className={"mt-4 xl:mt-8 w-full"}
-                    variant="filled"
-                    color="neutral"
-                    disabled={configController?.readOnly}
-                    onClick={() => setNewPropertyDialogOpen(true)}
-                    startIcon={<PlusIcon/>}>
-                    Add new property
-                </Button>
+                    <Button className={"w-full"}
+                        variant="outlined"
+                        color="neutral"
+                        disabled={configController?.readOnly}
+                        onClick={() => setNewPropertyDialogOpen(true)}
+                        startIcon={<PlusIcon/>}>
+                        Add new property
+                    </Button>
+                </div>
             </div>
 
             {!asDialog &&
-                <div className={"col-span-12 lg:col-span-7 p-4 md:py-8 md:px-4 h-full overflow-auto"}>
+                <div className={"col-span-12 lg:col-span-7 p-4 md:py-8 md:px-4 h-full overflow-auto bg-surface-50 dark:bg-surface-800"}>
                     <div
                         className="sticky top-8 min-h-full w-full flex flex-col justify-center">
 
@@ -519,6 +524,10 @@ export function CollectionPropertiesEditorForm({
                                 initialErrors={initialErrors}
                                 getData={getData}
                                 propertyConfigs={propertyConfigs}
+                                propertyTypePresets={propertyTypePresets}
+                                hiddenPropertyTypes={hiddenPropertyTypes}
+                                renderExtraPropertyFields={renderExtraPropertyFields}
+                                collectionValues={values}
 
                             />}
 
@@ -563,6 +572,10 @@ export function CollectionPropertiesEditorForm({
                 initialErrors={initialErrors}
                 getData={getData}
                 propertyConfigs={propertyConfigs}
+                propertyTypePresets={propertyTypePresets}
+                hiddenPropertyTypes={hiddenPropertyTypes}
+                renderExtraPropertyFields={renderExtraPropertyFields}
+                collectionValues={values}
 
                 onCancel={closePropertyDialog}
                 onOkClicked={asDialog
@@ -589,6 +602,10 @@ export function CollectionPropertiesEditorForm({
             getData={getData}
             allowDataInference={!isNewCollection}
             propertyConfigs={propertyConfigs}
+            propertyTypePresets={propertyTypePresets}
+            hiddenPropertyTypes={hiddenPropertyTypes}
+            renderExtraPropertyFields={renderExtraPropertyFields}
+            collectionValues={values}
             existingPropertyKeys={values.propertiesOrder as string[]}/>
 
         <ErrorBoundary>

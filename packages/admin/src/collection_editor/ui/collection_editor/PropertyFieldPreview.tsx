@@ -36,9 +36,9 @@ export function PropertyFieldPreview({
 
     return <ErrorBoundary>
         <div onClick={onClick} className={onClick ? "cursor-pointer" : ""}>
-        <Paper
+        <div
             className={cls(
-                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-white dark:bg-surface-800 shadow-xs",
+                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-white dark:bg-surface-900 shadow-xs",
                 borderColorClass || "border-surface-200 dark:border-surface-700",
                 selected
                     ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light ring-1 ring-inset ring-primary border-primary/30"
@@ -81,7 +81,7 @@ export function PropertyFieldPreview({
             </ErrorBoundary>
 
             {includeEditButton && <Typography variant={"button"}>EDIT</Typography>}
-        </Paper>
+        </div>
         </div>
     </ErrorBoundary>
 }
@@ -103,9 +103,9 @@ export function NonEditablePropertyPreview({
 
     return (
         <div onClick={onClick} className={onClick ? "cursor-pointer" : ""}>
-        <Paper
+        <div
             className={cls(
-                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-white dark:bg-surface-800 border-surface-200 dark:border-surface-700 shadow-xs",
+                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700 shadow-xs",
                 selected
                     ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light ring-1 ring-inset ring-primary border-primary/30"
                     : "hover:bg-surface-50 dark:hover:bg-surface-700"
@@ -149,7 +149,7 @@ export function NonEditablePropertyPreview({
                     {"columnType" in property ? (property as { columnType?: string }).columnType ?? property.type : property.type}
                 </Typography>
             </ErrorBoundary>}
-        </Paper>
+        </div>
         </div>
     )
 }

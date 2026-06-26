@@ -9,7 +9,8 @@ import {
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv } from "dotenv";
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 
 // ── Package Manager Detection ───────────────────────────────────────────────
 
@@ -70,14 +71,147 @@ async function loadClientSdk(): Promise<(opts: Record<string, unknown>) => unkno
     return mod.createRebaseClient;
 }
 
-// ── Environment ─────────────────────────────────────────────────────────────
+// ── Project Registry ────────────────────────────────────────────────────────
 
-const PROJECT_DIR = process.env.REBASE_PROJECT_DIR || process.cwd();
+/** Configuration for a single Rebase project. */
+export interface ProjectConfig {
+    name: string;
+    /** Absolute path to the project directory (for local projects). */
+    projectDir?: string;
+    /** Backend URL (e.g. http://localhost:3001 or https://staging.myapp.com). */
+    baseUrl: string;
+    /** Auth token — a service key, API key, or JWT. */
+    token: string;
+    /** ISO timestamp when the project was registered. */
+    addedAt: string;
+}
+
+/** Persisted project registry file structure. */
+interface ProjectRegistryFile {
+    projects: Record<string, ProjectConfig>;
+    activeProject: string | null;
+}
+
+/** Path to the project registry file. */
+const REGISTRY_PATH = resolve(homedir(), ".rebase", "projects.json");
+
+/** In-memory project registry. */
+let registry: ProjectRegistryFile = { projects: {}, activeProject: null };
+
+/**
+ * Load the project registry from disk. Creates the file if it doesn't exist.
+ */
+function loadRegistry(): ProjectRegistryFile {
+    try {
+        if (existsSync(REGISTRY_PATH)) {
+            const raw = readFileSync(REGISTRY_PATH, "utf-8");
+            const parsed = JSON.parse(raw) as ProjectRegistryFile;
+            return {
+                projects: parsed.projects || {},
+                activeProject: parsed.activeProject || null
+            };
+        }
+    } catch {
+        // Corrupted file — start fresh
+    }
+    return { projects: {}, activeProject: null };
+}
+
+/**
+ * Save the project registry to disk.
+ */
+function saveRegistry(): void {
+    try {
+        const dir = resolve(homedir(), ".rebase");
+        if (!existsSync(dir)) {
+            mkdirSync(dir, { recursive: true });
+        }
+        writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2), "utf-8");
+    } catch {
+        // Non-fatal — registry won't persist across restarts
+    }
+}
+
+/**
+ * Read `.rebase/state.json` from a project directory to auto-discover
+ * a running dev server's URL and service key.
+ */
+function readDevState(projectDir: string): { baseUrl: string; serviceKey?: string; pid?: number } | null {
+    try {
+        const statePath = resolve(projectDir, ".rebase", "state.json");
+        if (!existsSync(statePath)) return null;
+        const raw = readFileSync(statePath, "utf-8");
+        const state = JSON.parse(raw) as { baseUrl?: string; serviceKey?: string; pid?: number };
+        if (!state.baseUrl) return null;
+
+        // Verify the process is still running (liveness check)
+        if (state.pid) {
+            try {
+                process.kill(state.pid, 0); // signal 0 = check existence
+            } catch {
+                return null; // process is dead — stale state file
+            }
+        }
+
+        return {
+            baseUrl: state.baseUrl,
+            serviceKey: state.serviceKey,
+            pid: state.pid
+        };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Try to auto-discover the backend from `.rebase/state.json` in the project dir.
+ * Updates the project config in the registry if a running server is found.
+ */
+function autoDiscoverLocal(project: ProjectConfig): ProjectConfig {
+    if (!project.projectDir) return project;
+
+    const devState = readDevState(project.projectDir);
+    if (devState) {
+        return {
+            ...project,
+            baseUrl: devState.baseUrl,
+            token: devState.serviceKey || project.token
+        };
+    }
+
+    return project;
+}
+
+/**
+ * Read `.env` from a project directory and extract REBASE_SERVICE_KEY.
+ */
+function readServiceKeyFromEnv(projectDir: string): string | undefined {
+    for (const envPath of [
+        resolve(projectDir, ".env"),
+        resolve(projectDir, "app", ".env")
+    ]) {
+        try {
+            if (!existsSync(envPath)) continue;
+            const content = readFileSync(envPath, "utf-8");
+            const match = content.match(/^REBASE_SERVICE_KEY\s*=\s*["']?([^"'\n\r]+)["']?/m);
+            if (match?.[1] && match[1].trim().length >= 32) {
+                return match[1].trim();
+            }
+        } catch {
+            // ignore
+        }
+    }
+    return undefined;
+}
+
+// ── Environment & Initialization ────────────────────────────────────────────
+
+const ENV_PROJECT_DIR = process.env.REBASE_PROJECT_DIR || process.cwd();
 
 // Try to load .env from the project directory
 for (const envPath of [
-    resolve(PROJECT_DIR, ".env"),
-    resolve(PROJECT_DIR, "app", ".env")
+    resolve(ENV_PROJECT_DIR, ".env"),
+    resolve(ENV_PROJECT_DIR, "app", ".env")
 ]) {
     if (existsSync(envPath)) {
         loadDotenv({ path: envPath });
@@ -85,14 +219,46 @@ for (const envPath of [
     }
 }
 
-const BASE_URL = process.env.REBASE_BASE_URL || "http://localhost:3001";
-const API_TOKEN = process.env.REBASE_API_TOKEN || process.env.REBASE_TOKEN || "";
+const ENV_BASE_URL = process.env.REBASE_BASE_URL || "";
+const ENV_API_TOKEN = process.env.REBASE_API_TOKEN || process.env.REBASE_TOKEN || "";
 
-// ── Rebase Client (lazy) ────────────────────────────────────────────────────
+/**
+ * Initialize the project registry.
+ *
+ * Priority:
+ * 1. REBASE_PROJECT_DIR env → single-project mode (backward-compatible)
+ * 2. Load ~/.rebase/projects.json
+ * 3. Auto-discover from .rebase/state.json in the project dir
+ */
+function initializeRegistry(): void {
+    registry = loadRegistry();
+
+    // Ensure a "default" project exists from env vars or CWD
+    if (!registry.projects["default"]) {
+        const devState = readDevState(ENV_PROJECT_DIR);
+        const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
+        registry.projects["default"] = {
+            name: "default",
+            projectDir: ENV_PROJECT_DIR,
+            baseUrl: ENV_BASE_URL || devState?.baseUrl || "http://localhost:3001",
+            token: ENV_API_TOKEN || devState?.serviceKey || envServiceKey || "",
+            addedAt: new Date().toISOString()
+        };
+    }
+
+    if (!registry.activeProject || !registry.projects[registry.activeProject]) {
+        registry.activeProject = "default";
+    }
+}
+
+initializeRegistry();
+
+// ── Rebase Client (per-project) ─────────────────────────────────────────────
 
 type RebaseClient = {
     auth: {
         getUser: () => Promise<{ uid: string; email: string | null; roles?: string[] }>;
+        signInWithEmailAndPassword: (email: string, password: string) => Promise<{ user: { uid: string }; tokens: { accessToken: string } }>;
     };
     data: {
         collection: (slug: string) => {
@@ -105,9 +271,11 @@ type RebaseClient = {
     };
     admin: {
         listUsers: () => Promise<unknown>;
+        listUsersPaginated: (options?: { search?: string; limit?: number; offset?: number }) => Promise<{ users: Array<{ uid?: string; id?: string; email: string }>; total: number }>;
         createUser: (opts: Record<string, unknown>) => Promise<unknown>;
         updateUser: (id: string, opts: Record<string, unknown>) => Promise<unknown>;
         deleteUser: (id: string) => Promise<unknown>;
+        resetPassword: (userId: string, options?: { password?: string }) => Promise<{ user: unknown; temporaryPassword?: string; invitationSent?: boolean }>;
         listRoles: () => Promise<unknown>;
     };
     cron: {
@@ -127,17 +295,45 @@ type RebaseClient = {
     };
 };
 
-let _client: RebaseClient | null = null;
+/** Client instances keyed by project name. */
+const clientCache = new Map<string, RebaseClient>();
+
+/** Get the active project config, with auto-discovery applied. */
+function getActiveProject(): ProjectConfig {
+    const name = registry.activeProject || "default";
+    const project = registry.projects[name];
+    if (!project) {
+        throw new Error(`No active project configured. Use rebase_project_add to register one.`);
+    }
+    return autoDiscoverLocal(project);
+}
+
+/** Get the project directory for the active project. */
+function getProjectDir(): string {
+    const project = getActiveProject();
+    return project.projectDir || ENV_PROJECT_DIR;
+}
 
 async function getClient(): Promise<RebaseClient> {
-    if (!_client) {
-        const createRebaseClient = await loadClientSdk();
-        _client = createRebaseClient({
-            baseUrl: BASE_URL,
-            token: API_TOKEN || undefined
-        }) as RebaseClient;
-    }
-    return _client;
+    const project = getActiveProject();
+    const cacheKey = `${project.name}::${project.baseUrl}::${project.token}`;
+
+    const cached = clientCache.get(cacheKey);
+    if (cached) return cached;
+
+    const createRebaseClient = await loadClientSdk();
+    const client = createRebaseClient({
+        baseUrl: project.baseUrl,
+        token: project.token || undefined
+    }) as RebaseClient;
+
+    clientCache.set(cacheKey, client);
+    return client;
+}
+
+/** Clear cached clients (used when switching projects). */
+function clearClientCache(): void {
+    clientCache.clear();
 }
 
 async function ensureAdmin(): Promise<void> {
@@ -147,8 +343,9 @@ async function ensureAdmin(): Promise<void> {
         if (!user.roles?.includes("admin")) {
             throw new Error("Access denied: User does not have the 'admin' role.");
         }
-    } catch (err: any) {
-        throw new Error(`Admin authorization failed: ${err.message}`);
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`Admin authorization failed: ${msg}`);
     }
 }
 
@@ -156,7 +353,7 @@ async function ensureAdmin(): Promise<void> {
 
 export const server = new Server(
     { name: "rebase-mcp-server",
-      version: "0.0.1" },
+      version: "0.1.0" },
     { capabilities: { tools: {},
       resources: {} } }
 );
@@ -223,19 +420,6 @@ properties: {} },
         cmd: ["doctor"]
     },
     {
-        name: "rebase_auth_reset_password",
-        description: "Reset a user's password in the Rebase project.",
-        inputSchema: {
-            type: "object",
-            properties: {
-                email: { type: "string", description: "Email of the user to reset" },
-                password: { type: "string", description: "New password to set (defaults to 'NewPassword123!')" }
-            },
-            required: ["email"]
-        },
-        cmd: ["auth", "reset-password"]
-    },
-    {
         name: "rebase_db_branch_create",
         description: "Create a new database branch (Admins only).",
         inputSchema: {
@@ -298,7 +482,7 @@ description: "Sort field, optionally with :asc or :desc suffix" },
                 where: {
                     type: "object",
                     description: "Filter object, e.g. { \"status\": \"eq.active\", \"price\": \"gte.100\" }",
-                    additionalProperties: { type: "string" }
+                    additionalProperties: true
                 }
             },
             required: ["collection"]
@@ -327,7 +511,7 @@ description: "Document ID" }
                 collection: { type: "string",
 description: "Collection slug" },
                 data: { type: "object",
-description: "Document fields",
+description: "Document data",
 additionalProperties: true }
             },
             required: ["collection", "data"]
@@ -425,6 +609,18 @@ description: "User UID" }
         description: "List all roles defined in the Rebase backend.",
         inputSchema: { type: "object",
 properties: {} }
+    },
+    {
+        name: "rebase_auth_reset_password",
+        description: "Reset a user's password via the admin API. Looks up the user by email, then resets their password. Returns a temporary password if email is not configured, or sends a reset email.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                email: { type: "string", description: "Email of the user to reset" },
+                password: { type: "string", description: "New password to set (optional — if omitted, a secure temporary password is generated)" }
+            },
+            required: ["email"]
+        }
     }
 ];
 
@@ -565,6 +761,60 @@ const FUNCTION_TOOLS: ToolDef[] = [
     }
 ];
 
+const PROJECT_TOOLS: ToolDef[] = [
+    {
+        name: "rebase_project_list",
+        description: "List all registered Rebase projects and show which one is active.",
+        inputSchema: { type: "object", properties: {} }
+    },
+    {
+        name: "rebase_project_switch",
+        description: "Switch the active Rebase project by name. All subsequent API calls will target this project.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Name of the project to switch to" }
+            },
+            required: ["name"]
+        }
+    },
+    {
+        name: "rebase_project_add",
+        description: "Register a new Rebase project. For local projects, provide projectDir (auto-discovers URL and service key). For remote projects, provide baseUrl and token.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Unique name for this project (e.g. 'my-app', 'staging')" },
+                projectDir: { type: "string", description: "Absolute path to the project directory (for local projects)" },
+                baseUrl: { type: "string", description: "Backend URL (e.g. https://staging.myapp.com)" },
+                token: { type: "string", description: "Auth token — service key or API key (for remote projects)" }
+            },
+            required: ["name"]
+        }
+    },
+    {
+        name: "rebase_project_remove",
+        description: "Remove a registered project from the project registry.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Name of the project to remove" }
+            },
+            required: ["name"]
+        }
+    },
+    {
+        name: "rebase_project_current",
+        description: "Show details about the currently active Rebase project, including resolved URL and auth status.",
+        inputSchema: { type: "object", properties: {} }
+    },
+    {
+        name: "rebase_project_status",
+        description: "Health-check the active project's backend by calling GET /api/health.",
+        inputSchema: { type: "object", properties: {} }
+    }
+];
+
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...DATA_TOOLS,
@@ -572,7 +822,8 @@ export const ALL_TOOLS: ToolDef[] = [
     ...DEV_TOOLS,
     ...STORAGE_TOOLS,
     ...CRON_TOOLS,
-    ...FUNCTION_TOOLS
+    ...FUNCTION_TOOLS,
+    ...PROJECT_TOOLS
 ];
 
 // ── Tool Handlers ───────────────────────────────────────────────────────────
@@ -583,13 +834,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 /** Spawn the rebase CLI using the project's detected package manager. */
 function runRebaseCmd(commandArgs: string[]): Promise<string> {
-    const pm = detectPackageManager(PROJECT_DIR);
+    const projectDir = getProjectDir();
+    const pm = detectPackageManager(projectDir);
     const { command, args: execArgs } = getExecCommand(pm);
     return new Promise((resolve) => {
         const child = spawn(command, [...execArgs, "rebase", ...commandArgs], {
-            cwd: PROJECT_DIR,
+            cwd: projectDir,
             shell: true,
-            env: { ...process.env }
+            env: {
+                ...process.env,
+                PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
+            }
         });
         const chunks: string[] = [];
         child.stdout?.on("data", (d: Buffer) => chunks.push(d.toString()));
@@ -634,13 +889,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const cmdArgs = [...cliTool.cmd];
-        if (name === "rebase_auth_reset_password") {
-            const argsObj = args as { email: string; password?: string };
-            cmdArgs.push("--email", argsObj.email);
-            if (argsObj.password) {
-                cmdArgs.push("--password", argsObj.password);
-            }
-        } else if (name === "rebase_db_branch_create") {
+        if (name === "rebase_db_branch_create") {
             const argsObj = args as { name: string; from?: string };
             cmdArgs.push(argsObj.name);
             if (argsObj.from) {
@@ -655,7 +904,137 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return textResult(result);
     }
 
-    // ── Data tools (via @rebasepro/client) ──────────────────────────────
+    // ── Project management tools ────────────────────────────────────────
+    switch (name) {
+        case "rebase_project_list": {
+            const projects = Object.values(registry.projects).map((p) => ({
+                name: p.name,
+                projectDir: p.projectDir || null,
+                baseUrl: p.baseUrl,
+                hasToken: !!p.token,
+                active: p.name === registry.activeProject,
+                addedAt: p.addedAt
+            }));
+            return jsonResult({ projects, activeProject: registry.activeProject });
+        }
+
+        case "rebase_project_switch": {
+            const argsObj = args as { name: string };
+            if (!registry.projects[argsObj.name]) {
+                return textResult(`Project "${argsObj.name}" not found. Available: ${Object.keys(registry.projects).join(", ")}`);
+            }
+            registry.activeProject = argsObj.name;
+            clearClientCache();
+            saveRegistry();
+            const project = getActiveProject();
+            return jsonResult({
+                message: `Switched to project "${argsObj.name}"`,
+                project: {
+                    name: project.name,
+                    baseUrl: project.baseUrl,
+                    hasToken: !!project.token,
+                    projectDir: project.projectDir || null
+                }
+            });
+        }
+
+        case "rebase_project_add": {
+            const argsObj = args as { name: string; projectDir?: string; baseUrl?: string; token?: string };
+            const { name: projectName } = argsObj;
+
+            let baseUrl = argsObj.baseUrl || "";
+            let token = argsObj.token || "";
+
+            // Auto-discover from project dir if provided
+            if (argsObj.projectDir) {
+                const devState = readDevState(argsObj.projectDir);
+                if (devState) {
+                    baseUrl = baseUrl || devState.baseUrl;
+                    token = token || devState.serviceKey || "";
+                }
+                if (!token) {
+                    const envKey = readServiceKeyFromEnv(argsObj.projectDir);
+                    if (envKey) token = envKey;
+                }
+            }
+
+            if (!baseUrl) {
+                return textResult("Error: Could not determine baseUrl. Provide --baseUrl or ensure the dev server is running in the project directory.");
+            }
+
+            registry.projects[projectName] = {
+                name: projectName,
+                projectDir: argsObj.projectDir,
+                baseUrl,
+                token,
+                addedAt: new Date().toISOString()
+            };
+            saveRegistry();
+            return jsonResult({
+                message: `Project "${projectName}" registered`,
+                project: {
+                    name: projectName,
+                    baseUrl,
+                    hasToken: !!token,
+                    projectDir: argsObj.projectDir || null
+                }
+            });
+        }
+
+        case "rebase_project_remove": {
+            const argsObj = args as { name: string };
+            if (argsObj.name === "default") {
+                return textResult("Cannot remove the default project.");
+            }
+            if (!registry.projects[argsObj.name]) {
+                return textResult(`Project "${argsObj.name}" not found.`);
+            }
+            delete registry.projects[argsObj.name];
+            if (registry.activeProject === argsObj.name) {
+                registry.activeProject = "default";
+                clearClientCache();
+            }
+            saveRegistry();
+            return textResult(`Project "${argsObj.name}" removed.`);
+        }
+
+        case "rebase_project_current": {
+            const project = getActiveProject();
+            return jsonResult({
+                name: project.name,
+                projectDir: project.projectDir || null,
+                baseUrl: project.baseUrl,
+                hasToken: !!project.token,
+                tokenPrefix: project.token ? project.token.substring(0, 8) + "..." : null,
+                addedAt: project.addedAt
+            });
+        }
+
+        case "rebase_project_status": {
+            const project = getActiveProject();
+            try {
+                const res = await fetch(`${project.baseUrl}/api/health`);
+                const body = await res.json() as Record<string, unknown>;
+                return jsonResult({
+                    project: project.name,
+                    baseUrl: project.baseUrl,
+                    status: res.ok ? "healthy" : "unhealthy",
+                    httpStatus: res.status,
+                    ...body
+                });
+            } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : String(err);
+                return jsonResult({
+                    project: project.name,
+                    baseUrl: project.baseUrl,
+                    status: "unreachable",
+                    error: msg
+                });
+            }
+        }
+    }
+
+    // ── Data & admin tools (via @rebasepro/client) ──────────────────────
     const client = await getClient();
 
     switch (name) {
@@ -737,6 +1116,32 @@ roles });
             return jsonResult(result);
         }
 
+        case "rebase_auth_reset_password": {
+            const argsObj = args as { email: string; password?: string };
+            const { email, password } = argsObj;
+
+            // Step 1: Find user by email
+            const usersResult = await client.admin.listUsersPaginated({ search: email, limit: 1 });
+            const user = usersResult.users.find((u) => u.email === email);
+            if (!user) {
+                return textResult(`User with email "${email}" not found.`);
+            }
+            const userId = user.uid || user.id;
+            if (!userId) {
+                return textResult(`Could not determine user ID for "${email}".`);
+            }
+
+            // Step 2: Reset password via admin API
+            const resetResult = await client.admin.resetPassword(userId, password ? { password } : undefined);
+
+            return jsonResult({
+                message: `Password reset for ${email}`,
+                user: resetResult.user,
+                temporaryPassword: resetResult.temporaryPassword,
+                invitationSent: resetResult.invitationSent
+            });
+        }
+
         // ── Storage Tools ──────────────────────────────────────────────────
         case "storage_list_objects": {
             const argsObj = args as { prefix?: string; bucket?: string; maxResults?: number; pageToken?: string };
@@ -803,10 +1208,11 @@ roles });
                 return textResult("Dev server is already running (PID " + devProcess.pid + ")");
             }
             devLogs.length = 0;
-            const pm = detectPackageManager(PROJECT_DIR);
+            const projectDir = getProjectDir();
+            const pm = detectPackageManager(projectDir);
             const { command: runCmd, args: runArgs } = getRunCommand(pm);
             devProcess = spawn(runCmd, [...runArgs, "dev"], {
-                cwd: resolve(PROJECT_DIR, "app"),
+                cwd: resolve(projectDir, "app"),
                 shell: true,
                 env: { ...process.env }
             });
@@ -847,10 +1253,11 @@ roles });
 // ── Resources ───────────────────────────────────────────────────────────────
 
 function findCollectionsDir(): string | null {
+    const projectDir = getProjectDir();
     const candidates = [
-        resolve(PROJECT_DIR, "app", "config", "collections"),
-        resolve(PROJECT_DIR, "config", "collections"),
-        resolve(PROJECT_DIR, "collections")
+        resolve(projectDir, "app", "config", "collections"),
+        resolve(projectDir, "config", "collections"),
+        resolve(projectDir, "collections")
     ];
     for (const dir of candidates) {
         if (existsSync(dir)) return dir;
@@ -877,7 +1284,8 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
     }
 
     // Generated schema
-    const schemaPath = resolve(PROJECT_DIR, "app", "backend", "src", "schema.generated.ts");
+    const projectDir = getProjectDir();
+    const schemaPath = resolve(projectDir, "app", "backend", "src", "schema.generated.ts");
     if (existsSync(schemaPath)) {
         resources.push({
             uri: "rebase://schema",
@@ -892,9 +1300,10 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const { uri } = request.params;
+    const projectDir = getProjectDir();
 
     if (uri === "rebase://schema") {
-        const schemaPath = resolve(PROJECT_DIR, "app", "backend", "src", "schema.generated.ts");
+        const schemaPath = resolve(projectDir, "app", "backend", "src", "schema.generated.ts");
         if (!existsSync(schemaPath)) {
             throw new Error("Generated schema not found. Run `rebase schema generate` first.");
         }

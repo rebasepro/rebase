@@ -343,7 +343,7 @@ totalPolicies };
                                             Object.entries(groupedTables).map(([schemaName, schemaTables]) => (
                                                 <div key={schemaName} className="mb-2">
                                                     <div
-                                                        className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-950 rounded transition-colors"
+                                                        className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors"
                                                         onClick={() => setExpandedSchemas(prev => ({ ...prev,
 [schemaName]: !prev[schemaName] }))}
                                                     >
@@ -364,7 +364,7 @@ totalPolicies };
                                                                             "flex items-center p-1 cursor-pointer rounded transition-colors group relative",
                                                                             isSelected
                                                                                 ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                                                                : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
+                                                                                : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark"
                                                                         )}
                                                                     >
                                                                         <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>

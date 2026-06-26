@@ -2,7 +2,7 @@
 import { AIIcon } from "@rebasepro/core";
 import { useCollectionRegistryController } from "../../_cms_internals";
 import React, { useState } from "react";
-import { useSnackbarController } from "@rebasepro/core";
+import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { EntityCollection } from "@rebasepro/types";
 import {
     Button,
@@ -76,7 +76,7 @@ export function AICollectionGeneratorPopover({
 
     const collectionRegistry = useCollectionRegistryController();
     const configController = useCollectionsConfigController();
-    const snackbarController = useSnackbarController();
+    const snackbarController = useSafeSnackbarController();
 
     const existingCollections = collectionRegistry.collections ?? [];
 
@@ -117,7 +117,7 @@ export function AICollectionGeneratorPopover({
                 mode,
                 operationsCount: result.operations?.length
             });
-            snackbarController.open({
+            snackbarController?.open({
                 type: "success",
                 message: existingCollection
                     ? "Collection updated with AI suggestions"
@@ -133,7 +133,7 @@ export function AICollectionGeneratorPopover({
                 mode,
                 error: errorMessage
             });
-            snackbarController.open({
+            snackbarController?.open({
                 type: "error",
                 message: errorMessage
             });

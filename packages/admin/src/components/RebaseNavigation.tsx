@@ -35,8 +35,8 @@ import { ConfigControllerProvider } from "../collection_editor/ConfigControllerP
 
 // Lazy-load the schema view — only fetched when studio schema tool is active
 const CollectionsStudioView = lazy(() =>
-    import("../collection_editor/ui/collection_editor/CollectionsStudioView")
-        .then(m => ({ default: m.CollectionsStudioView }))
+    import("../collection_editor/ui/collection_editor/RouterCollectionsStudioView")
+        .then(m => ({ default: m.RouterCollectionsStudioView }))
 );
 
 export interface RebaseNavigationProps {

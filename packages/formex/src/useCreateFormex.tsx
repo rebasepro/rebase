@@ -203,6 +203,12 @@ export function useCreateFormex<T = any>({
         historyIndexRef.current = 0;
     }, [onReset, initialTouched]);
 
+    useEffect(() => {
+        if (!equal(initialValuesRef.current, initialValues)) {
+            resetForm({ values: initialValues });
+        }
+    }, [initialValues, resetForm]);
+
     const undo = useCallback(() => {
         if (historyIndexRef.current > 0) {
             const newIndex = historyIndexRef.current - 1;

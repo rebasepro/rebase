@@ -37,7 +37,9 @@ title: "Updated Doc" }),
         updateUser: vi.fn().mockResolvedValue({ userId: "1",
 email: "updated@rebase.pro" }),
         deleteUser: vi.fn().mockResolvedValue(true),
-        listRoles: vi.fn().mockResolvedValue(["admin", "user"])
+        listRoles: vi.fn().mockResolvedValue(["admin", "user"]),
+        listUsersPaginated: vi.fn().mockResolvedValue({ users: [{ uid: "user-1", email: "user@rebase.pro" }], total: 1, limit: 25, offset: 0 }),
+        resetPassword: vi.fn().mockResolvedValue({ user: { uid: "user-1", email: "user@rebase.pro" }, temporaryPassword: "TmpPass123!" })
     },
     cron: {
         listJobs: vi.fn().mockResolvedValue({ jobs: [{ jobId: "cleanup", enabled: true }] }),
@@ -76,6 +78,13 @@ describe("MCP Server", () => {
         expect(toolNames).toContain("delete_document");
         expect(toolNames).toContain("list_users");
         expect(toolNames).toContain("create_user");
+        expect(toolNames).toContain("rebase_project_list");
+        expect(toolNames).toContain("rebase_project_switch");
+        expect(toolNames).toContain("rebase_project_add");
+        expect(toolNames).toContain("rebase_project_remove");
+        expect(toolNames).toContain("rebase_project_current");
+        expect(toolNames).toContain("rebase_project_status");
+        expect(toolNames).toContain("rebase_auth_reset_password");
     });
 
     it("handles list tools request", async () => {
@@ -163,6 +172,63 @@ data: { title: "New Doc" } }
             }
         });
         expect(funcResult.content[0].text).toContain("success");
+    });
+
+    it("resets password via admin API", async () => {
+        const handler = (server as any)._requestHandlers.get("tools/call");
+        const result = await handler({
+            method: "tools/call",
+            params: {
+                name: "rebase_auth_reset_password",
+                arguments: { email: "user@rebase.pro", password: "NewPass123!" }
+            }
+        });
+        expect(mockClient.admin.listUsersPaginated).toHaveBeenCalledWith({ search: "user@rebase.pro", limit: 1 });
+        expect(mockClient.admin.resetPassword).toHaveBeenCalledWith("user-1", { password: "NewPass123!" });
+        expect(result.content[0].text).toContain("Password reset");
+    });
+
+    it("routes list_roles to admin.listRoles", async () => {
+        const handler = (server as any)._requestHandlers.get("tools/call");
+        const result = await handler({
+            method: "tools/call",
+            params: { name: "list_roles", arguments: {} }
+        });
+        expect(mockClient.admin.listRoles).toHaveBeenCalled();
+        expect(result.content[0].text).toContain("admin");
+    });
+
+    describe("Project management tools", () => {
+        it("lists projects including default", async () => {
+            const handler = (server as any)._requestHandlers.get("tools/call");
+            const result = await handler({
+                method: "tools/call",
+                params: { name: "rebase_project_list", arguments: {} }
+            });
+            const data = JSON.parse(result.content[0].text);
+            expect(data.projects.length).toBeGreaterThanOrEqual(1);
+            expect(data.activeProject).toBeDefined();
+        });
+
+        it("shows current project details", async () => {
+            const handler = (server as any)._requestHandlers.get("tools/call");
+            const result = await handler({
+                method: "tools/call",
+                params: { name: "rebase_project_current", arguments: {} }
+            });
+            const data = JSON.parse(result.content[0].text);
+            expect(data.name).toBeDefined();
+            expect(data.baseUrl).toBeDefined();
+        });
+
+        it("rejects removing the default project", async () => {
+            const handler = (server as any)._requestHandlers.get("tools/call");
+            const result = await handler({
+                method: "tools/call",
+                params: { name: "rebase_project_remove", arguments: { name: "default" } }
+            });
+            expect(result.content[0].text).toContain("Cannot remove");
+        });
     });
 
     it("verifies admin role for database branching operations", async () => {

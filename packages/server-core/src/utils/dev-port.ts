@@ -37,6 +37,8 @@ export function listenWithPortRetry(
         maxAttempts?: number;
         /** Absolute path to write the resolved port file into.  Defaults to `process.cwd()`. */
         portFileDir?: string;
+        /** Service key to include in the state file for MCP server auto-discovery. */
+        serviceKey?: string;
     }
 ): Promise<number> {
     const host = options?.host ?? "0.0.0.0";
@@ -122,7 +124,7 @@ export function listenWithPortRetry(
 
                     // Write .rebase/state.json so external scripts can discover
                     // the running server port, URL, etc.
-                    writeStateFile(portFileDir, port);
+                    writeStateFile(portFileDir, port, options?.serviceKey);
                 }
 
                 resolve(port);
@@ -159,10 +161,11 @@ export function cleanupDevPortFile(dir: string): void {
  * Write `.rebase/state.json` with runtime info for external scripts.
  *
  * Scripts can read this file to discover:
- * - `port`      — the actual port the backend is listening on
- * - `baseUrl`   — full URL including protocol and port
- * - `pid`       — the backend process ID
- * - `startedAt` — ISO timestamp of when the server started
+ * - `port`       — the actual port the backend is listening on
+ * - `baseUrl`    — full URL including protocol and port
+ * - `pid`        — the backend process ID
+ * - `startedAt`  — ISO timestamp of when the server started
+ * - `serviceKey` — (dev only) the REBASE_SERVICE_KEY for MCP auto-discovery
  *
  * @example Reading from a script:
  * ```ts
@@ -170,19 +173,22 @@ export function cleanupDevPortFile(dir: string): void {
  * const apiUrl = state.baseUrl; // "http://localhost:3519"
  * ```
  */
-function writeStateFile(projectRoot: string, port: number): void {
+function writeStateFile(projectRoot: string, port: number, serviceKey?: string): void {
     try {
         const rebaseDir = path.join(projectRoot, ".rebase");
         if (!fs.existsSync(rebaseDir)) {
             fs.mkdirSync(rebaseDir, { recursive: true });
         }
         const stateFile = path.join(rebaseDir, "state.json");
-        const state = {
+        const state: Record<string, unknown> = {
             port,
             baseUrl: `http://localhost:${port}`,
             pid: process.pid,
             startedAt: new Date().toISOString()
         };
+        if (serviceKey) {
+            state.serviceKey = serviceKey;
+        }
         fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), "utf-8");
     } catch {
         // Non-fatal

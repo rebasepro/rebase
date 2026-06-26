@@ -22,11 +22,13 @@ import type {
     BootstrappedAuth
 } from "@rebasepro/types";
 
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
 import { createResetPasswordRoute } from "./reset-password-admin";
+import { createAdminRolesRoute } from "./admin-roles-route";
+import { createAdminUsersRoute } from "./admin-users-route";
 import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
 import type { AuthHooks, ResolvedAuthHooks } from "./auth-hooks";
@@ -197,7 +199,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         },
 
         createAdminRoutes(): Hono<HonoEnv> | undefined {
-            return createResetPasswordRoute({
+            const router = new Hono<HonoEnv>();
+            const resetPasswordRoute = createResetPasswordRoute({
                 authRepo: authRepository,
                 emailService,
                 emailConfig,
@@ -205,6 +208,22 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 authHooks,
                 collectionAuthConfig
             });
+            const rolesRoute = createAdminRolesRoute({
+                authRepo: authRepository,
+                serviceKey
+            });
+            const adminUsersRoute = createAdminUsersRoute({
+                authRepo: authRepository,
+                emailService,
+                emailConfig,
+                serviceKey,
+                authHooks,
+                collectionAuthConfig
+            });
+            router.route("/", resetPasswordRoute);
+            router.route("/", rolesRoute);
+            router.route("/", adminUsersRoute);
+            return router;
         },
 
         async prepareUserCreation(values, collectionAuth) {

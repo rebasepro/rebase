@@ -1,4 +1,4 @@
-import { useSnackbarController } from "@rebasepro/core";
+import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { EntityCollection } from "@rebasepro/types";
 import { Button, CopyIcon, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import React from "react";
@@ -14,7 +14,7 @@ export function GetCodeDialog({
     open
 }: { onOpenChange: (open: boolean) => void, collection: EntityCollection, open: boolean }) {
 
-    const snackbarController = useSnackbarController();
+    const snackbarController = useSafeSnackbarController();
 
     const code = collection
         ? "import { EntityCollection } from \"@rebasepro/core\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:EntityCollection = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
@@ -64,7 +64,7 @@ export function GetCodeDialog({
                 onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    snackbarController.open({
+                    snackbarController?.open({
                         type: "success",
                         message: "Copied"
                     })

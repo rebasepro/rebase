@@ -221,6 +221,14 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     callbacks?: PropertyCallbacks;
 
+    /**
+     * Arbitrary key-value metadata for external consumers.
+     * Not interpreted by Rebase — passed through serialization unchanged.
+     * Used by domain apps to store custom per-property config
+     * (e.g. CRM visibility flags, display hints).
+     */
+    metadata?: Record<string, unknown>;
+
 }
 
 /**

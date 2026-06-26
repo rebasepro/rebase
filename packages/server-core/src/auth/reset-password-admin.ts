@@ -54,8 +54,24 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
         let invitationSent = false;
         let temporaryPassword: string | undefined;
 
+        // Parse optional body — if a password is provided, set it directly
+        const body = await c.req.json().catch(() => ({}));
+
+        if (body.password) {
+            const password = body.password as string;
+            const validation = ops.validatePasswordStrength(password);
+            if (!validation.valid) {
+                throw ApiError.badRequest(
+                    `Password too weak: ${validation.errors.join(", ")}`
+                );
+            }
+            const passwordHash = await ops.hashPassword(password);
+            await authRepo.updatePassword(existing.id, passwordHash);
+            temporaryPassword = undefined;
+            invitationSent = false;
+        }
         // 1. Collection-level hook (closest to the data)
-        if (collectionAuthConfig?.onResetPassword) {
+        else if (collectionAuthConfig?.onResetPassword) {
             const isEmailConfigured = !!(emailService && emailService.isConfigured());
             const hookResult = await collectionAuthConfig.onResetPassword(existing.id, {
                 hashPassword: (password: string) => ops.hashPassword(password),

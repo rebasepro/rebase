@@ -2,7 +2,7 @@
 import { IconForView } from "@rebasepro/core";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+
 import { SearchIconsView } from "../../_cms_internals";
 import type { EntityCollection, PostgresCollection } from "@rebasepro/types";
 import {
@@ -26,17 +26,23 @@ import {
 import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { singular, toSnakeCase } from "@rebasepro/utils";
+import type { ExtraCollectionFieldsParams } from "../../extensibility_types";
+import { toSerializableCollection } from "../../serializable_utils";
 
 export function GeneralSettingsForm({
     isNewCollection,
     existingPaths,
     existingIds,
-    parentCollection
+    parentCollection,
+    renderExtraCollectionFields,
+    standalone,
 }: {
     isNewCollection: boolean;
     existingPaths?: string[];
     existingIds?: string[];
     parentCollection?: EntityCollection;
+    renderExtraCollectionFields?: (params: ExtraCollectionFieldsParams) => React.ReactNode;
+    standalone?: boolean;
 }) {
 
     const {
@@ -51,9 +57,8 @@ export function GeneralSettingsForm({
 
     const [iconDialogOpen, setIconDialogOpen] = useState(false);
 
-    const authController = useAuthController();
-    const customizationController = useCustomizationController();
-    const configController = useCollectionsConfigController();
+    const configControllerFromContext = useCollectionsConfigController();
+    const configController = standalone ? { readOnly: false } : configControllerFromContext;
 
     const updateDatabaseId = (databaseId: string) => {
         setFieldValue("databaseId", databaseId ?? undefined);
@@ -242,6 +247,18 @@ export function GeneralSettingsForm({
                             }}/>
                     </div>
                 </Dialog>
+
+                {renderExtraCollectionFields && (
+                    <div className="mt-4">
+                        {renderExtraCollectionFields({
+                            metadata: (values.metadata ?? {}) as Record<string, unknown>,
+                            onMetadataChange: (key: string, value: unknown) => {
+                                setFieldValue(`metadata.${key}`, value);
+                            },
+                            collection: toSerializableCollection(values),
+                        })}
+                    </div>
+                )}
 
             </Container>
         </div>
