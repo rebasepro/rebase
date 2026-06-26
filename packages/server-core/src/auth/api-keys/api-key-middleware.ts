@@ -88,11 +88,8 @@ code: "UNAUTHORIZED" }
 
     // Set user identity — API keys represent service accounts
     const userId = `api-key:${apiKey.id}`;
-    // API keys get the "service" role — distinct from "admin" to prevent
-    // access to admin-only routes while allowing RLS policies to identify
-    // machine-to-machine requests.
-    c.set("user", { userId,
-roles: ["service"] });
+    const roles: string[] = apiKey.admin ? ["admin", "service"] : ["service"];
+    c.set("user", { userId, roles });
 
     // Expose masked key metadata for downstream permission checks
     const masked: ApiKeyMasked = {
@@ -100,6 +97,7 @@ roles: ["service"] });
         name: apiKey.name,
         key_prefix: apiKey.key_prefix,
         permissions: apiKey.permissions,
+        admin: apiKey.admin,
         rate_limit: apiKey.rate_limit,
         created_by: apiKey.created_by,
         created_at: apiKey.created_at,
@@ -115,7 +113,7 @@ roles: ["service"] });
     try {
         const scopedDriver = await scopeDataDriver(driver, {
             uid: userId,
-            roles: ["service"]
+            roles
         });
         c.set("driver", scopedDriver);
     } catch (error) {

@@ -32,6 +32,8 @@ export interface ApiKey {
     /** SHA-256 hash of the full plaintext key. */
     key_hash: string;
     permissions: ApiKeyPermission[];
+    /** When true, the key is granted the `admin` role (access to admin routes). */
+    admin: boolean;
     /** Requests per 15-minute window. `null` means unlimited. */
     rate_limit: number | null;
     created_by: string;
@@ -51,6 +53,8 @@ export interface ApiKeyMasked {
     name: string;
     key_prefix: string;
     permissions: ApiKeyPermission[];
+    /** When true, the key is granted the `admin` role (access to admin routes). */
+    admin: boolean;
     rate_limit: number | null;
     created_by: string;
     created_at: string;
@@ -66,6 +70,8 @@ export interface ApiKeyMasked {
 export interface CreateApiKeyRequest {
     name: string;
     permissions: ApiKeyPermission[];
+    /** When true, grants the `admin` role — allows access to admin routes. */
+    admin?: boolean;
     /** Requests per 15-minute window. Omit or `null` for unlimited. */
     rate_limit?: number | null;
     /** ISO-8601 expiration timestamp. Omit for no expiration. */
@@ -79,6 +85,8 @@ export interface CreateApiKeyRequest {
 export interface UpdateApiKeyRequest {
     name?: string;
     permissions?: ApiKeyPermission[];
+    /** When true, grants the `admin` role — allows access to admin routes. */
+    admin?: boolean;
     rate_limit?: number | null;
     expires_at?: string | null;
 }

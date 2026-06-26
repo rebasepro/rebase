@@ -7,12 +7,12 @@ import type { EntityFormProps, OnUpdateParams } from "../types/components/Entity
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
-import { AlignLeftIcon, CheckIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
+import { AlignLeftIcon, CheckIcon, LoaderIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor, getLocalChangesBackup, isHidden, isReadOnly } from "@rebasepro/common";
 
 import { saveEntityWithCallbacks, useAuthController, useCustomizationController, useData, useSnackbarController, useTranslation, useSlot } from "@rebasepro/core";
 import { getFormFieldKeys } from "@rebasepro/core";
-import { Alert, Chip, cls, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
+import { Alert, Button, Chip, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, getIn, setIn, useCreateFormex } from "@rebasepro/formex";
 import { useAnalyticsController } from "@rebasepro/core";
 
@@ -193,13 +193,15 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const [valuesToBeSaved, setValuesToBeSaved] = useState<EntityValues<M> | undefined>(undefined);
     useDebouncedCallback(valuesToBeSaved, () => {
-        if (valuesToBeSaved)
+        if (valuesToBeSaved) {
+            setIsSavingAutoSave(true);
             saveEntity({
                 entityId: entityIdProp,
                 collection,
                 path,
                 values: valuesToBeSaved
-            });
+            }).finally(() => setIsSavingAutoSave(false));
+        }
     }, false, 2000);
 
     const dataClient = useData();
@@ -221,6 +223,8 @@ export function EntityForm<M extends Record<string, unknown>>({
     const [entityId, setEntityId] = useState<string | number | undefined>(initialEntityId);
     const [entityIdError, setEntityIdError] = useState<boolean>(false);
     const [savingError, setSavingError] = useState<Error | undefined>();
+    const [isSavingAutoSave, setIsSavingAutoSave] = useState<boolean>(false);
+    const [discardDialogOpen, setDiscardDialogOpen] = useState<boolean>(false);
 
     const autoSave = collection.formAutoSave;
 
@@ -335,8 +339,12 @@ export function EntityForm<M extends Record<string, unknown>>({
             const isRedo =
                 ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "z") ||
                 ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "y");
+            const isSave = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s";
 
-            if (isUndo && formex.canUndo) {
+            if (isSave && !disabled && formex.dirty) {
+                e.preventDefault();
+                formex.handleSubmit();
+            } else if (isUndo && formex.canUndo) {
                 e.preventDefault();
                 formex.undo();
             } else if (isRedo && formex.canRedo) {
@@ -604,6 +612,9 @@ parentEntityIds,
                 formContext={formContext}
             />;
         }
+        const isNewEntity = status === "new" || status === "copy";
+        let firstFocusableIndex = -1;
+
         return (
             <FormLayout>
                 {formFieldKeys.map((key) => {
@@ -621,6 +632,10 @@ parentEntityIds,
                         const hidden = isHidden(property);
                         if (hidden) return null;
                         const widthPercentage = property.ui?.widthPercentage ?? 100;
+
+                        const shouldAutoFocus = isNewEntity && !disabled && firstFocusableIndex === -1;
+                        if (shouldAutoFocus) firstFocusableIndex = 0;
+
                         const cmsFormFieldProps: PropertyFieldBindingProps<M> = {
                             propertyKey: key,
                             disabled,
@@ -630,7 +645,7 @@ parentEntityIds,
                             context: formContext,
                             partOfArray: false,
                             minimalistView: false,
-                            autoFocus: false
+                            autoFocus: shouldAutoFocus
                         };
 
                         return (
@@ -683,6 +698,8 @@ parentEntityIds,
 
     const formRef = useRef<HTMLDivElement>(null);
 
+    const hasFormErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
+
     const formView = <ErrorBoundary>
         <>
             {pluginFormBefore}
@@ -713,6 +730,10 @@ parentEntityIds,
                 {t("entity_does_not_exist")}
             </Alert>}
 
+            {hasFormErrors && <Alert color={"error"} size={"small"} outerClassName={"w-full mt-2"}>
+                {t("fix_errors_before_saving") ?? "Please fix the highlighted errors before saving."}
+            </Alert>}
+
             {formContext && <>
                 <div className="mt-12 flex flex-col gap-8" ref={formRef}>
                     {formFields()}
@@ -723,6 +744,28 @@ parentEntityIds,
             {pluginFormAfter}
 
             {forceActionsAtTheBottom && <div className="h-16"/>}
+
+            <Dialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen} maxWidth={"sm"}>
+                <DialogTitle>{status === "existing" ? t("discard_changes") ?? "Discard changes?" : t("clear_form") ?? "Clear form?"}</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        {status === "existing"
+                            ? t("discard_changes_confirmation") ?? "All unsaved changes will be lost. This cannot be undone."
+                            : t("clear_form_confirmation") ?? "All entered values will be cleared. This cannot be undone."}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant={"text"} onClick={() => setDiscardDialogOpen(false)}>
+                        {t("cancel") ?? "Cancel"}
+                    </Button>
+                    <Button variant={"filled"} color={"error"} onClick={() => {
+                        setDiscardDialogOpen(false);
+                        formex.resetForm({ values: baseInitialValues as M });
+                    }}>
+                        {status === "existing" ? t("discard") ?? "Discard" : t("clear") ?? "Clear"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     </ErrorBoundary>;
 
@@ -757,9 +800,14 @@ parentEntityIds,
         <Formex value={formex}>
             <form
                 onSubmit={formex.handleSubmit}
-                onReset={() => formex.resetForm({
-                    values: baseInitialValues as M
-                })}
+                onReset={(e) => {
+                    e.preventDefault();
+                    if (formex.dirty) {
+                        setDiscardDialogOpen(true);
+                    } else {
+                        formex.resetForm({ values: baseInitialValues as M });
+                    }
+                }}
                 noValidate
                 className={cls("@container flex-1 flex flex-row w-full overflow-y-auto justify-center", className)}>
                 <div
@@ -773,7 +821,7 @@ parentEntityIds,
                             : "pt-12 pb-16 px-4 sm:px-8 md:px-10"
                     )}>
                         <div
-                            className={"flex flex-row gap-4 self-end sticky top-4 z-10"}>
+                            className={"flex flex-row gap-4 justify-end h-0 overflow-visible sticky top-4 z-10"}>
 
                             {manualApplyLocalChanges && hasLocalChanges &&
                                 <LocalChangesMenu<M>
@@ -784,17 +832,23 @@ parentEntityIds,
                                     onClearLocalChanges={() => setLocalChangesCleared(true)}
                                 />}
 
-                            {formex.dirty
-                                ? <Tooltip title={t("form_modified")}>
-                                    <Chip size={"small"} className={"py-1"} colorScheme={"orangeDarker"}>
-                                        <PencilIcon size={iconSize.smallest}/>
+                            {isSavingAutoSave
+                                ? <Tooltip title={t("saving") ?? "Saving…"}>
+                                    <Chip size={"small"} className={"py-1"} colorScheme={"blueDarker"}>
+                                        <LoaderIcon size={iconSize.smallest} className={"animate-spin"}/>
                                     </Chip>
                                 </Tooltip>
-                                : <Tooltip title={t("form_in_sync")}>
-                                    <Chip size={"small"} className={"py-1"}>
-                                        <CheckIcon size={iconSize.smallest}/>
-                                    </Chip>
-                                </Tooltip>}
+                                : formex.dirty
+                                    ? <Tooltip title={t("form_modified")}>
+                                        <Chip size={"small"} className={"py-1"} colorScheme={"orangeDarker"}>
+                                            <PencilIcon size={iconSize.smallest}/>
+                                        </Chip>
+                                    </Tooltip>
+                                    : <Tooltip title={t("form_in_sync")}>
+                                        <Chip size={"small"} className={"py-1"}>
+                                            <CheckIcon size={iconSize.smallest}/>
+                                        </Chip>
+                                    </Tooltip>}
                         </div>
 
                         {formView}

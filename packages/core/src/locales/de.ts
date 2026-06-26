@@ -28,6 +28,9 @@ export const de: RebaseTranslations = {
     unsaved_changes_body: "Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen?",
     discard_changes: "Änderungen verwerfen",
     keep_editing: "Weiter bearbeiten",
+    clear_form: "Formular leeren?",
+    discard_changes_confirmation: "Alle nicht gespeicherten Änderungen gehen verloren. Dies kann nicht rückgängig gemacht werden.",
+    clear_form_confirmation: "Alle eingegebenen Werte werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: "Suchen",
@@ -96,6 +99,7 @@ export const de: RebaseTranslations = {
     entity_does_not_exist: "Dieser Eintrag existiert nicht in der Datenbank",
     form_modified: "Dieses Formular wurde geändert",
     form_in_sync: "Das aktuelle Formular ist mit der Datenbank synchron",
+    fix_errors_before_saving: "Markierte Fehler vor dem Speichern beheben",
 
     admin: "Admin",
     home: "Startseite",

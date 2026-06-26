@@ -38,6 +38,9 @@ export const en: RebaseTranslations = {
     unsaved_changes_body: "You have unsaved changes. Do you want to discard them?",
     discard_changes: "Discard changes",
     keep_editing: "Keep editing",
+    clear_form: "Clear form?",
+    discard_changes_confirmation: "All unsaved changes will be lost. This cannot be undone.",
+    clear_form_confirmation: "All entered values will be cleared. This cannot be undone.",
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: "Search",
@@ -106,6 +109,7 @@ export const en: RebaseTranslations = {
     entity_does_not_exist: "This entity does not exist in the database",
     form_modified: "This form has been modified",
     form_in_sync: "The current form is in sync with the database",
+    fix_errors_before_saving: "Fix highlighted errors before saving",
 
     admin: "Admin",
     home: "Home",

@@ -296,7 +296,64 @@ The OpenAPI spec is auto-generated from your collection definitions and includes
 
 ## API Keys
 
-For external integrations, you can use API keys instead of user tokens. API keys support per-collection permission scoping (read, write, delete).
+API keys provide machine-to-machine authentication for agents, MCP servers, CI pipelines, and external integrations. They support per-collection permission scoping and optional full admin access.
+
+### Creating an API Key
+
+```bash
+# Via CLI
+rebase api-keys create --name "My Integration" \
+  --permissions '[{"collection":"orders","operations":["read","write"]}]'
+
+# Via REST (requires admin auth)
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Integration",
+    "permissions": [{ "collection": "orders", "operations": ["read", "write"] }]
+  }'
+```
+
+The response includes the full plaintext key (`rk_live_...`) **exactly once** — store it immediately.
+
+### Using an API Key
+
+```bash
+curl http://localhost:3000/api/data/orders \
+  -H "Authorization: Bearer rk_live_abc123..."
+```
+
+### Admin Access for Agents and MCP
+
+By default, API keys get the `service` role (data access only). Add `"admin": true` to grant the key full admin access — including `/api/admin/*` routes for schema management, user management, and more. Use this for agents, MCP servers, and CI:
+
+```bash
+# CLI
+rebase api-keys create --name "My Agent" --admin
+
+# REST
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Agent",
+    "admin": true,
+    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
+  }'
+```
+
+### Key Options
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Human-readable label |
+| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = all collections) |
+| `admin` | `boolean` | Grant admin role — access to all admin routes |
+| `rate_limit` | `number \| null` | Requests per 15-min window (`null` = unlimited) |
+| `expires_at` | `string \| null` | ISO-8601 expiration timestamp |
+
+Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the `rebase api-keys` CLI commands.
 
 ## Metadata Endpoint
 

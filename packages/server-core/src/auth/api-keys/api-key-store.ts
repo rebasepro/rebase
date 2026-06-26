@@ -59,6 +59,7 @@ function toMasked(row: ApiKey): ApiKeyMasked {
         name: row.name,
         key_prefix: row.key_prefix,
         permissions: row.permissions,
+        admin: row.admin,
         rate_limit: row.rate_limit,
         created_by: row.created_by,
         created_at: row.created_at,
@@ -88,6 +89,7 @@ function rowToApiKey(row: Record<string, unknown>): ApiKey {
         key_prefix: row.key_prefix as string,
         key_hash: row.key_hash as string,
         permissions,
+        admin: Boolean(row.admin),
         rate_limit: row.rate_limit !== null && row.rate_limit !== undefined
             ? Number(row.rate_limit)
             : null,
@@ -155,6 +157,7 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                         key_prefix TEXT NOT NULL,
                         key_hash TEXT NOT NULL UNIQUE,
                         permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
+                        admin BOOLEAN NOT NULL DEFAULT FALSE,
                         rate_limit INTEGER,
                         created_by TEXT NOT NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -175,6 +178,12 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                     ON ${TABLE}(key_prefix)
                 `);
 
+                // Migration: add admin column to existing tables
+                await exec(`
+                    ALTER TABLE ${TABLE}
+                    ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE
+                `);
+
                 logger.info("✅ API keys table ready");
             } catch (err) {
                 logger.error("❌ Failed to create API keys table", { error: err });
@@ -190,14 +199,15 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             const permissionsJson = JSON.stringify(request.permissions);
 
             const rows = await exec(
-                `INSERT INTO ${TABLE} (name, key_prefix, key_hash, permissions, rate_limit, created_by, expires_at)
-                 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
+                `INSERT INTO ${TABLE} (name, key_prefix, key_hash, permissions, admin, rate_limit, created_by, expires_at)
+                 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
                  RETURNING *`,
                 { params: [
                     request.name,
                     prefix,
                     hash,
                     permissionsJson,
+                    request.admin ?? false,
                     request.rate_limit ?? null,
                     createdBy,
                     request.expires_at ?? null
@@ -257,6 +267,10 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             if (updates.permissions !== undefined) {
                 setClauses.push(`permissions = $${paramIdx++}::jsonb`);
                 params.push(JSON.stringify(updates.permissions));
+            }
+            if (updates.admin !== undefined) {
+                setClauses.push(`admin = $${paramIdx++}`);
+                params.push(updates.admin);
             }
             if (updates.rate_limit !== undefined) {
                 if (updates.rate_limit !== null) {

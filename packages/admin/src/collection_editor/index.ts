@@ -17,6 +17,41 @@ export {
 export {
     useLocalCollectionsConfigController
 } from "./useLocalCollectionsConfigController";
+export {
+    useJsonCollectionsConfigController,
+    type UseJsonCollectionsConfigControllerOptions,
+} from "./useJsonCollectionsConfigController";
+
+export {
+    toSerializableCollection,
+    toSerializableProperty,
+    toSerializableProperties,
+    fromSerializableCollection,
+    fromSerializableProperty,
+    fromSerializableProperties,
+} from "./serializable_utils";
+
+export type {
+    SerializableCollection,
+    SerializableProperty,
+    SerializableProperties,
+    SerializableBaseProperty,
+    SerializableStringProperty,
+    SerializableNumberProperty,
+    SerializableBooleanProperty,
+    SerializableDateProperty,
+    SerializableGeopointProperty,
+    SerializableReferenceProperty,
+    SerializableRelationProperty,
+    SerializableArrayProperty,
+    SerializableMapProperty,
+    SerializableVectorProperty,
+    SerializableBinaryProperty,
+    SerializableStorageConfig,
+    SerializableStringValidation,
+    SerializableDateValidation,
+    JsonCollectionStore,
+} from "./serializable_types";
 
 export {
     validateCollectionJson,

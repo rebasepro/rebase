@@ -28,6 +28,9 @@ export const it: RebaseTranslations = {
     unsaved_changes_body: "Hai modifiche non salvate. Vuoi scartarle?",
     discard_changes: "Scarta le modifiche",
     keep_editing: "Continua a modificare",
+    clear_form: "Svuotare il modulo?",
+    discard_changes_confirmation: "Tutte le modifiche non salvate andranno perse. Questa azione non può essere annullata.",
+    clear_form_confirmation: "Tutti i valori inseriti verranno cancellati. Questa azione non può essere annullata.",
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: "Cerca",
@@ -96,6 +99,7 @@ export const it: RebaseTranslations = {
     entity_does_not_exist: "Questa entità non esiste nel database",
     form_modified: "Questo modulo è stato modificato",
     form_in_sync: "Il modulo attuale è sincronizzato con il database",
+    fix_errors_before_saving: "Correggi gli errori evidenziati prima di salvare",
 
     admin: "Admin",
     home: "Home",

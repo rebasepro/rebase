@@ -47,6 +47,12 @@ export interface RebaseTranslations {
     unsaved_changes_body: string;
     discard_changes: string;
     keep_editing: string;
+    /** Dialog title when clearing a new/copy form */
+    clear_form?: string;
+    /** Confirmation body when discarding changes on an existing entity */
+    discard_changes_confirmation?: string;
+    /** Confirmation body when clearing a new/copy form */
+    clear_form_confirmation?: string;
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: string;
@@ -175,6 +181,8 @@ export interface RebaseTranslations {
     form_modified: string;
     /** Tooltip when the form is in sync with the database */
     form_in_sync: string;
+    /** Tooltip/alert shown when form has validation errors */
+    fix_errors_before_saving?: string;
 
     admin: string;
     home: string;

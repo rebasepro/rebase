@@ -153,6 +153,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
         {
             "--name": String,
             "--permissions": String,
+            "--admin": Boolean,
             "--rate-limit": Number,
             "--expires": String,
             "-n": "--name"
@@ -218,6 +219,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
         const body: Record<string, unknown> = {
             name,
             permissions,
+            admin: args["--admin"] ?? false,
             rate_limit: args["--rate-limit"] ?? null,
             expires_at
         };
@@ -334,6 +336,7 @@ ${chalk.green.bold("create Options")}
   ${chalk.blue("--name, -n")}        Key name ${chalk.gray("(required)")}
   ${chalk.blue("--permissions")}     JSON array of permissions
                     ${chalk.gray('Default: [{"collection":"*","operations":["read","write","delete"]}]')}
+  ${chalk.blue("--admin")}           Grant admin role (access to admin routes)
   ${chalk.blue("--rate-limit")}      Requests per 15-min window ${chalk.gray("(default: 1000)")}
   ${chalk.blue("--expires")}         Expiration: 7d, 30d, 90d, 1y, or ISO date
 

@@ -28,6 +28,9 @@ export const fr: RebaseTranslations = {
     unsaved_changes_body: "Vous avez des modifications non enregistrées. Voulez-vous les ignorer ?",
     discard_changes: "Ignorer les modifications",
     keep_editing: "Continuer l'édition",
+    clear_form: "Vider le formulaire ?",
+    discard_changes_confirmation: "Toutes les modifications non enregistrées seront perdues. Cette action est irréversible.",
+    clear_form_confirmation: "Toutes les valeurs saisies seront effacées. Cette action est irréversible.",
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: "Rechercher",
@@ -96,6 +99,7 @@ export const fr: RebaseTranslations = {
     entity_does_not_exist: "Cette entité n'existe pas dans la base de données",
     form_modified: "Ce formulaire a été modifié",
     form_in_sync: "Le formulaire actuel est synchronisé avec la base de données",
+    fix_errors_before_saving: "Corrigez les erreurs signalées avant d'enregistrer",
 
     admin: "Admin",
     home: "Accueil",

@@ -8,7 +8,7 @@ import { PropertyPreview } from "../../preview";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
-import { cls, paperMixin } from "@rebasepro/ui";
+import { cls } from "@rebasepro/ui";
 
 /**
  *
@@ -47,7 +47,12 @@ export function ReadOnlyFieldBinding({
             }
 
             <div
-                className={cls(!skipCardWrapper && paperMixin, "w-full min-h-14 overflow-x-scroll no-scrollbar", !skipCardWrapper && "p-4 md:p-6")}>
+                className={cls(
+                    "w-full overflow-x-scroll no-scrollbar flex items-center",
+                    skipCardWrapper
+                        ? ""
+                        : "rounded-lg border border-surface-200 dark:border-surface-700 px-4 md:px-6 min-h-10 opacity-80"
+                )}>
 
                 <ErrorBoundary>
                     <PropertyPreview propertyKey={propertyKey}

@@ -374,13 +374,34 @@ interface MfaChallengeInfo {
 
 ## API Keys
 
-API keys provide machine-to-machine authentication for scripts, cron jobs, and third-party integrations. They are scoped to specific collections and operations.
+API keys provide machine-to-machine authentication for agents, MCP servers, CI pipelines, cron jobs, and third-party integrations. They are scoped to specific collections and operations, and can optionally be granted full admin access.
 
 ### Key Format
 
 - Prefix: `rk_` (e.g. `rk_live_abc123...`)
 - Storage: SHA-256 hash of the full key. The plaintext key is returned **exactly once** at creation.
 - Display: Only the first 12 characters (`key_prefix`) are shown in subsequent API responses.
+
+### Admin Access for Agents / MCP
+
+By default API keys get the `service` role (data access only). Set `"admin": true` to grant the key the `admin` role, which allows it to call **all admin routes** (`/api/admin/*`) — including schema management, user management, and API key management itself.
+
+> **Use `admin: true` for agents, MCP servers, and CI pipelines that need full control over the Rebase instance.**
+
+```bash
+# CLI — create an admin API key
+rebase api-keys create --name "My Agent" --admin
+
+# REST
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Agent",
+    "admin": true,
+    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
+  }'
+```
 
 ### API Key Admin Endpoints
 
@@ -391,7 +412,7 @@ All endpoints are mounted under `/api/admin/api-keys` and require **admin** auth
 | `GET` | `/api/admin/api-keys` | List all API keys (masked — no hashes). |
 | `POST` | `/api/admin/api-keys` | Create a new API key. Returns the full plaintext key once. |
 | `GET` | `/api/admin/api-keys/:id` | Get single API key details (masked). |
-| `PUT` | `/api/admin/api-keys/:id` | Update name, permissions, rate_limit, or expires_at. |
+| `PUT` | `/api/admin/api-keys/:id` | Update name, permissions, admin, rate_limit, or expires_at. |
 | `DELETE` | `/api/admin/api-keys/:id` | Revoke (soft-delete) an API key. |
 
 ### Create API Key Request
@@ -400,6 +421,7 @@ All endpoints are mounted under `/api/admin/api-keys` and require **admin** auth
 interface CreateApiKeyRequest {
   name: string;
   permissions: ApiKeyPermission[];
+  admin?: boolean;           // true = grant admin role (access to all admin routes)
   rate_limit?: number | null;    // Requests per 15-min window. null = unlimited
   expires_at?: string | null;    // ISO-8601 timestamp. null = no expiration
 }
@@ -410,7 +432,9 @@ interface ApiKeyPermission {
 }
 ```
 
-### Example: Create an API Key
+### Examples
+
+**Scoped key (read-only on one collection):**
 
 ```bash
 curl -X POST http://localhost:3000/api/admin/api-keys \
@@ -427,6 +451,19 @@ curl -X POST http://localhost:3000/api/admin/api-keys \
   }'
 ```
 
+**Admin key (for agents / MCP / CI):**
+
+```bash
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <admin-token-or-service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI Agent",
+    "admin": true,
+    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
+  }'
+```
+
 ### Using an API Key
 
 ```bash
@@ -437,13 +474,21 @@ curl http://localhost:3000/api/data/events \
 ### API Key Middleware Behavior
 
 When a request arrives with a `rk_` prefixed bearer token:
-1. The token is SHA-256 hashed and looked up in the `_rebase_api_keys` table.
+1. The token is SHA-256 hashed and looked up in the `rebase.api_keys` table.
 2. Expiry and revocation status are checked.
-3. Permissions are validated against the requested collection and HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`).
-4. The DataDriver is scoped with `withAuth()` using the key's created_by user, effectively **bypassing RLS** (the key operates as a service account).
-5. Per-key rate limiting is enforced if `rate_limit` is set.
+3. If `admin: true`, the key is assigned `roles: ["admin", "service"]` — granting access to admin routes. Otherwise `roles: ["service"]`.
+4. Permissions are validated against the requested collection and HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`).
+5. The DataDriver is scoped with `withAuth()` using the key's service identity (bypasses RLS).
+6. Per-key rate limiting is enforced if `rate_limit` is set.
 
 > **WARNING FOR AGENTS:** API keys bypass RLS. They are designed for trusted server-side use only. Never expose API keys to client-side code.
+
+### Role Summary
+
+| Key type | `roles` assigned | Admin routes | Data routes |
+|---|---|---|---|
+| Default (no `admin`) | `["service"]` | ✗ | ✓ (scoped by `permissions`) |
+| `admin: true` | `["admin", "service"]` | ✓ | ✓ |
 
 ### API Key Response Types
 
@@ -455,6 +500,7 @@ interface ApiKeyWithSecret {
   key_prefix: string;       // First 12 chars, for display
   key: string;              // FULL plaintext key — save this immediately
   permissions: ApiKeyPermission[];
+  admin: boolean;
   rate_limit: number | null;
   created_by: string;
   created_at: string;
@@ -470,6 +516,7 @@ interface ApiKeyMasked {
   name: string;
   key_prefix: string;
   permissions: ApiKeyPermission[];
+  admin: boolean;
   rate_limit: number | null;
   created_by: string;
   created_at: string;
@@ -478,6 +525,31 @@ interface ApiKeyMasked {
   expires_at: string | null;
   revoked_at: string | null;
 }
+```
+
+### Also update `admin` on an existing key
+
+```bash
+curl -X PUT http://localhost:3000/api/admin/api-keys/<id> \
+  -H "Authorization: Bearer <admin-token-or-service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{ "admin": true }'
+```
+
+### CLI
+
+```bash
+# List all keys
+rebase api-keys list
+
+# Create a scoped key
+rebase api-keys create --name "Read Only" --permissions '[{"collection":"orders","operations":["read"]}]'
+
+# Create an admin key (for agents / MCP / CI)
+rebase api-keys create --name "My Agent" --admin
+
+# Revoke a key
+rebase api-keys revoke <key-id>
 ```
 
 ---
@@ -725,7 +797,7 @@ Requests with the `serviceKey` bypass RLS — they receive admin-level access wi
 
 ### API Key Scoping
 
-API keys bypass RLS entirely. The driver is scoped using the key's `created_by` user with admin-like access, since API keys are meant for trusted server-to-server use.
+API keys use a service identity for RLS scoping: `uid: "api-key:{id}"`, `roles: ["service"]` (or `["admin", "service"]` when `admin: true`). They do not inherit the `created_by` user's identity.
 
 ---
 

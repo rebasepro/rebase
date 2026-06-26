@@ -9,7 +9,7 @@ export function FormLayout({
     className?: string;
 }) {
     return (
-        <div className={cls("flex flex-wrap gap-x-4 w-full space-y-8", className)}>
+        <div className={cls("flex flex-wrap gap-x-4 w-full space-y-6", className)}>
             {children}
         </div>
     );

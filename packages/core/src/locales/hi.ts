@@ -28,6 +28,9 @@ export const hi: RebaseTranslations = {
     unsaved_changes_body: "आपके पास सहेजे नहीं गए परिवर्तन हैं। क्या आप उन्हें रद्द करना चाहते हैं?",
     discard_changes: "परिवर्तन रद्द करें",
     keep_editing: "संपादन जारी रखें",
+    clear_form: "फ़ॉर्म साफ़ करें?",
+    discard_changes_confirmation: "सभी सहेजे नहीं गए परिवर्तन खो जाएँगे। इसे पूर्ववत नहीं किया जा सकता।",
+    clear_form_confirmation: "सभी दर्ज किए गए मान साफ़ कर दिए जाएँगे। इसे पूर्ववत नहीं किया जा सकता।",
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: "खोजें",
@@ -96,6 +99,7 @@ export const hi: RebaseTranslations = {
     entity_does_not_exist: "यह प्रविष्टि डेटाबेस में मौजूद नहीं है",
     form_modified: "इस फ़ॉर्म में बदलाव किए गए हैं",
     form_in_sync: "वर्तमान फ़ॉर्म डेटाबेस के साथ सिंक में है",
+    fix_errors_before_saving: "सहेजने से पहले हाइलाइट की गई त्रुटियों को ठीक करें",
 
     admin: "एडमिन",
     home: "होम",

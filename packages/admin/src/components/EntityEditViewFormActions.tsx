@@ -164,6 +164,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
         {formActions.length > 0 && <div className="grow flex overflow-auto no-scrollbar">
             {formActions.map((action, index) => {
 
+
                 const props = {
                     view: "form",
                     entity,
@@ -208,17 +209,19 @@ function buildBottomActions<M extends Record<string, unknown>>({
                 {t("back_to_detail") ?? "Back to details"}
             </Button>
         )}
-        <Button variant={canClose ? "text" : "filled"}
-            color="primary"
-            type="submit"
-            disabled={disabled || formex.isSubmitting}
-            onClick={() => {
-                sideDialogContext.setPendingClose(false);
-            }}>
-            {status === "existing" && t("save")}
-            {status === "copy" && t("create_copy")}
-            {status === "new" && t("create")}
-        </Button>
+        <Tooltip title={hasErrors ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving") : undefined}>
+            <Button variant={canClose ? "text" : "filled"}
+                color="primary"
+                type="submit"
+                disabled={disabled || formex.isSubmitting}
+                onClick={() => {
+                    sideDialogContext.setPendingClose(false);
+                }}>
+                {status === "existing" && t("save")}
+                {status === "copy" && t("create_copy")}
+                {status === "new" && t("create")}
+            </Button>
+        </Tooltip>
         {canClose && <LoadingButton variant="filled"
             color="primary"
             type="submit"
@@ -256,19 +259,22 @@ function buildSideActions<M extends Record<string, unknown>>({
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
     return <div
         className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin, className)}>
-        <LoadingButton fullWidth={true}
-            variant="filled"
-            color="primary"
-            type="submit"
-            startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
-            disabled={disabled || formex.isSubmitting}
-            onClick={() => {
-                sideDialogContext.setPendingClose?.(false);
-            }}>
-            {status === "existing" && t("save")}
-            {status === "copy" && t("create_copy")}
-            {status === "new" && t("create")}
-        </LoadingButton>
+        <Tooltip title={hasErrors ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving") : undefined}>
+            <LoadingButton fullWidth={true}
+                variant="filled"
+                color="primary"
+                type="submit"
+                loading={formex.isSubmitting}
+                startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
+                disabled={disabled || formex.isSubmitting}
+                onClick={() => {
+                    sideDialogContext.setPendingClose?.(false);
+                }}>
+                {status === "existing" && t("save")}
+                {status === "copy" && t("create_copy")}
+                {status === "new" && t("create")}
+            </LoadingButton>
+        </Tooltip>
 
         <Button fullWidth={true} variant="text" disabled={disabled || formex.isSubmitting} type="reset">
             {status === "existing" ? t("discard") : t("clear")}
@@ -293,7 +299,7 @@ function buildSideActions<M extends Record<string, unknown>>({
                     openEntityMode,
                     navigateBack,
                     formContext
-                } satisfies EntityActionClickProps<any>;
+                } satisfies EntityActionClickProps<Record<string, unknown>>;
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
                     <EntityActionButton key={action.key ?? action.name ?? index} action={action} enabled={isEnabled} props={props}/>

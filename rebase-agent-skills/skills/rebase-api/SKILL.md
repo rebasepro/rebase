@@ -337,6 +337,17 @@ Authorization: Bearer rk_live_abc123...
 
 If an API key lacks the required permission for an operation, a `403 API_KEY_FORBIDDEN` error is returned.
 
+**Admin API keys** — set `"admin": true` when creating a key to grant it the `admin` role. This gives access to all `/api/admin/*` routes (schema, users, other API keys, etc.). Use this for agents, MCP servers, and CI pipelines:
+
+```bash
+# CLI
+rebase api-keys create --name "My Agent" --admin
+
+# REST
+POST /api/admin/api-keys
+{ "name": "My Agent", "admin": true, "permissions": [{ "collection": "*", "operations": ["read","write","delete"] }] }
+```
+
 ### Authentication Enforcement
 
 - **Default:** Auth is required (`requireAuth: true`). Requests without a valid token receive `401`.

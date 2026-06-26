@@ -9,7 +9,7 @@ import { visualizer } from "rollup-plugin-visualizer";
 export default defineConfig({
     envDir: path.resolve(__dirname, ".."),
     server: {
-        port: 5180,
+        port: 5173,
         strictPort: false,
         fs: {
             allow: ["../../.."]

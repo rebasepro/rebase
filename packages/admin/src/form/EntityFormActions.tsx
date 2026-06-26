@@ -13,6 +13,7 @@ import {
     DialogActions,
     IconButton,
     LoadingButton,
+    Tooltip,
     Typography
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
@@ -163,15 +164,18 @@ function buildBottomActions<M extends Record<string, unknown>>({
             type="reset">
             {status === "existing" ? t("discard") : t("clear")}
         </Button>
-        <Button variant={"filled"}
-            color="primary"
-            type="submit"
-            disabled={disabled || formex.isSubmitting}
-            startIcon={hasErrors ? <AlertCircleIcon/> : undefined}>
-            {status === "existing" && t("save")}
-            {status === "copy" && t("create_copy")}
-            {status === "new" && t("create")}
-        </Button>
+        <Tooltip title={hasErrors ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving") : undefined}>
+            <LoadingButton variant={"filled"}
+                color="primary"
+                type="submit"
+                loading={formex.isSubmitting}
+                disabled={disabled || formex.isSubmitting}
+                startIcon={hasErrors ? <AlertCircleIcon/> : undefined}>
+                {status === "existing" && t("save")}
+                {status === "copy" && t("create_copy")}
+                {status === "new" && t("create")}
+            </LoadingButton>
+        </Tooltip>
 
     </DialogActions>;
 }
@@ -197,16 +201,19 @@ function buildSideActions<M extends Record<string, unknown>>({
 
     return <div
         className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin, className)}>
-        <LoadingButton fullWidth={true}
-            variant="filled"
-            color="primary"
-            type="submit"
-            startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
-            disabled={disabled || formex.isSubmitting}>
-            {status === "existing" && t("save")}
-            {status === "copy" && t("create_copy")}
-            {status === "new" && t("create")}
-        </LoadingButton>
+        <Tooltip title={hasErrors ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving") : undefined}>
+            <LoadingButton fullWidth={true}
+                variant="filled"
+                color="primary"
+                type="submit"
+                loading={formex.isSubmitting}
+                startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
+                disabled={disabled || formex.isSubmitting}>
+                {status === "existing" && t("save")}
+                {status === "copy" && t("create_copy")}
+                {status === "new" && t("create")}
+            </LoadingButton>
+        </Tooltip>
         <Button fullWidth={true} variant="text" disabled={disabled || formex.isSubmitting} type="reset">
             {status === "existing" ? t("discard") : t("clear")}
         </Button>

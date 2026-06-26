@@ -59,7 +59,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
     // POST / — Create a new API key
     router.post("/", async (c) => {
         const body = await c.req.json() as Record<string, unknown>;
-        const { name, permissions, rate_limit, expires_at } = body;
+        const { name, permissions, admin, rate_limit, expires_at } = body;
 
         if (!name || typeof name !== "string" || name.trim().length === 0) {
             throw ApiError.badRequest("Name is required", "INVALID_INPUT");
@@ -70,6 +70,10 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
                 "Permissions must be an array of { collection: string, operations: ('read' | 'write' | 'delete')[] }",
                 "INVALID_INPUT"
             );
+        }
+
+        if (admin !== undefined && typeof admin !== "boolean") {
+            throw ApiError.badRequest("admin must be a boolean", "INVALID_INPUT");
         }
 
         if (rate_limit !== undefined && rate_limit !== null) {
@@ -96,6 +100,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         const request: CreateApiKeyRequest = {
             name: name.trim(),
             permissions: permissions as ApiKeyPermission[],
+            admin: (admin as boolean) ?? false,
             rate_limit: (rate_limit as number | null) ?? null,
             expires_at: (expires_at as string | null) ?? null
         };
@@ -121,7 +126,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
     router.put("/:id", async (c) => {
         const id = c.req.param("id");
         const body = await c.req.json() as Record<string, unknown>;
-        const { name, permissions, rate_limit, expires_at } = body;
+        const { name, permissions, admin, rate_limit, expires_at } = body;
 
         // Validate fields if provided
         if (name !== undefined) {
@@ -137,6 +142,10 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
                     "INVALID_INPUT"
                 );
             }
+        }
+
+        if (admin !== undefined && typeof admin !== "boolean") {
+            throw ApiError.badRequest("admin must be a boolean", "INVALID_INPUT");
         }
 
         if (rate_limit !== undefined && rate_limit !== null) {
@@ -155,6 +164,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         const updates: UpdateApiKeyRequest = {};
         if (name !== undefined) updates.name = (name as string).trim();
         if (permissions !== undefined) updates.permissions = permissions as ApiKeyPermission[];
+        if (admin !== undefined) updates.admin = admin as boolean;
         if (rate_limit !== undefined) updates.rate_limit = rate_limit as number | null;
         if (expires_at !== undefined) updates.expires_at = expires_at as string | null;
 

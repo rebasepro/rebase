@@ -36,6 +36,9 @@ export const es: RebaseTranslations = {
     unsaved_changes_body: "Tienes cambios sin guardar. ¿Quieres descartarlos?",
     discard_changes: "Descartar cambios",
     keep_editing: "Seguir editando",
+    clear_form: "¿Vaciar formulario?",
+    discard_changes_confirmation: "Todos los cambios no guardados se perderán. Esta acción no se puede deshacer.",
+    clear_form_confirmation: "Todos los valores introducidos se borrarán. Esta acción no se puede deshacer.",
 
     // ─── Collection table / toolbar ──────────────────────────────
     search: "Buscar",
@@ -104,6 +107,7 @@ export const es: RebaseTranslations = {
     entity_does_not_exist: "Esta entidad no existe en la base de datos",
     form_modified: "Este formulario ha sido modificado",
     form_in_sync: "El formulario actual está sincronizado con la base de datos",
+    fix_errors_before_saving: "Corrija los errores resaltados antes de guardar",
 
     admin: "Admin",
     home: "Inicio",
