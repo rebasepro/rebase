@@ -88,8 +88,11 @@ code: "UNAUTHORIZED" }
 
     // Set user identity — API keys represent service accounts
     const userId = `api-key:${apiKey.id}`;
+    // API keys get the "service" role — distinct from "admin" to prevent
+    // access to admin-only routes while allowing RLS policies to identify
+    // machine-to-machine requests.
     c.set("user", { userId,
-roles: [] });
+roles: ["service"] });
 
     // Expose masked key metadata for downstream permission checks
     const masked: ApiKeyMasked = {

@@ -10,6 +10,7 @@ import { startCommand } from "./commands/start";
 import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
 import { skillsCommand } from "./commands/skills";
+import { apiKeysCommand } from "./commands/api-keys";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -53,7 +54,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor", "skills"];
+    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -120,6 +121,10 @@ export async function entry(args: string[]) {
             await skillsCommand(effectiveSubcommand, args);
             break;
 
+        case "api-keys":
+            await apiKeysCommand(effectiveSubcommand, args);
+            break;
+
         default:
             console.log(chalk.red(`Unknown command: ${command}`));
             console.log("");
@@ -163,6 +168,12 @@ ${chalk.green.bold("Diagnostics")}
 
 ${chalk.green.bold("AI Agent Skills")}
   ${chalk.blue.bold("skills install")}           Install Rebase agent skills for your AI coding assistant
+
+${chalk.green.bold("API Keys")}
+  ${chalk.blue.bold("api-keys list")}            List all service API keys
+  ${chalk.blue.bold("api-keys create")}          Create a new scoped API key
+  ${chalk.blue.bold("api-keys revoke")}          Revoke an existing API key
+  ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}          Show API key command help
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--version, -v")}   Show version number

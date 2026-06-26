@@ -14,6 +14,7 @@ const SchemaVisualizer = lazy(() => import("./SchemaVisualizer/SchemaVisualizer"
 const BranchesView = lazy(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
 const ApiExplorer = lazy(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
 const LogsExplorer = lazy(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
+const ApiKeysView = lazy(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
 
 import { StudioHomePage } from "./StudioHomePage";
 
@@ -34,7 +35,7 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "api", "logs"];
+        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "api", "logs", "api-keys"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
 
         if (activeTools.includes("sql")) {
@@ -108,6 +109,14 @@ group: "Database",
 icon: "Activity",
 description: "Real-time system and query logs",
 view: suspense(<LogsExplorer/>) });
+        }
+        if (activeTools.includes("api-keys")) {
+            views.push({ slug: "api-keys",
+name: "API Keys",
+group: "Access Control",
+icon: "KeyRound",
+description: "Create and manage scoped API keys",
+view: suspense(<ApiKeysView/>) });
         }
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.

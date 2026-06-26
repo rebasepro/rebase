@@ -2,6 +2,7 @@ import { createTransport, RebaseClientConfig } from "./transport";
 import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
+import { createApiKeys, CreateApiKeysOptions } from "./api-keys";
 import { createCollectionClient, CollectionClient } from "./collection";
 import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
@@ -13,6 +14,7 @@ export * from "./transport";
 export * from "./auth";
 export * from "./admin";
 export * from "./cron";
+export * from "./api-keys";
 export * from "./collection";
 export * from "./query_builder";
 export * from "./websocket";
@@ -25,6 +27,7 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
     admin?: CreateAdminOptions;
     cron?: CreateCronOptions;
+    apiKeys?: CreateApiKeysOptions;
 }
 
 // ─── Typed Data Proxy ────────────────────────────────────────────────────────
@@ -62,6 +65,7 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     auth: ReturnType<typeof createAuth>;
     admin: ReturnType<typeof createAdmin>;
     cron: ReturnType<typeof createCron>;
+    apiKeys: ReturnType<typeof createApiKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
     storage: StorageSource;
@@ -110,6 +114,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
     const cron = createCron(transport, options.cron);
+    const apiKeys = createApiKeys(transport, options.apiKeys);
     const storage = createStorage(transport);
     const functions = createFunctionsClient(transport);
 
@@ -198,6 +203,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         auth,
         admin,
         cron,
+        apiKeys,
         functions,
         storage,
         ws,

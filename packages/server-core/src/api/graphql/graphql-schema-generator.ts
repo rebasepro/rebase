@@ -12,6 +12,14 @@ import {
     GraphQLInputFieldConfig
 } from "graphql";
 import { DataDriver, EntityCollection, FetchCollectionProps, Property, Entity } from "@rebasepro/types";
+import { isOperationAllowed, type ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
+import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+
+/** Context shape provided by @hono/graphql-server (Hono's Context object). */
+type GraphQLResolverContext = {
+    get?: (key: string) => unknown;
+    driver?: DataDriver;
+};
 
 /**
  * Lightweight GraphQL schema generator that leverages existing DataDriver
@@ -26,6 +34,28 @@ export class GraphQLSchemaGenerator {
     constructor(collections: EntityCollection[], driver: DataDriver) {
         this.collections = collections;
         this.driver = driver;
+    }
+
+    /**
+     * Enforce API key permission scoping for a GraphQL resolver.
+     *
+     * Extracts the `apiKey` from the Hono context passed by `@hono/graphql-server`.
+     * If the request was made with an API key and the key does not have the
+     * required permission for the target collection/operation, an error is thrown.
+     * Non-API-key requests (e.g. session auth) are allowed through.
+     */
+    private enforceApiKeyPermission(
+        context: GraphQLResolverContext | undefined,
+        collectionSlug: string,
+        operation: ApiKeyOperation
+    ): void {
+        const apiKey = context?.get?.("apiKey") as ApiKeyMasked | undefined;
+        if (!apiKey) return;
+        if (!isOperationAllowed(apiKey.permissions, collectionSlug, operation)) {
+            throw new Error(
+                `API key does not have "${operation}" permission for collection "${collectionSlug}"`
+            );
+        }
     }
 
     /**
@@ -184,8 +214,9 @@ export class GraphQLSchemaGenerator {
                     id: { type: new GraphQLNonNull(GraphQLString) }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver;
+                    const ctx = context as GraphQLResolverContext | undefined;
+                    this.enforceApiKeyPermission(ctx, collection.slug, "read");
+                    const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                     if (!ds) throw new Error("Scoped driver not available");
                     const entity = await ds.fetchEntity({
                         path: collection.slug,
@@ -208,8 +239,9 @@ defaultValue: 0 },
                     orderBy: { type: GraphQLString }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver;
+                    const ctx = context as GraphQLResolverContext | undefined;
+                    this.enforceApiKeyPermission(ctx, collection.slug, "read");
+                    const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                     if (!ds) throw new Error("Scoped driver not available");
                     let filter: FetchCollectionProps["filter"] | undefined;
                     if (args.where) {
@@ -261,8 +293,9 @@ defaultValue: 0 },
                     input: { type: new GraphQLNonNull(inputType) }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver;
+                    const ctx = context as GraphQLResolverContext | undefined;
+                    this.enforceApiKeyPermission(ctx, collection.slug, "write");
+                    const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                     if (!ds) throw new Error("Scoped driver not available");
                     const path = collection.slug;
                     const entity = await ds.saveEntity({
@@ -283,8 +316,9 @@ defaultValue: 0 },
                     input: { type: new GraphQLNonNull(inputType) }
                 },
                 resolve: async (_, args, context: unknown) => {
-                    const ctx = context as { driver?: DataDriver } | undefined;
-                    const ds = ctx?.driver;
+                    const ctx = context as GraphQLResolverContext | undefined;
+                    this.enforceApiKeyPermission(ctx, collection.slug, "write");
+                    const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                     if (!ds) throw new Error("Scoped driver not available");
                     const entity = await ds.saveEntity({
                         path: collection.slug,
@@ -304,9 +338,10 @@ defaultValue: 0 },
                     id: { type: new GraphQLNonNull(GraphQLString) }
                 },
                 resolve: async (_, args, context: unknown) => {
+                    const ctx = context as GraphQLResolverContext | undefined;
+                    this.enforceApiKeyPermission(ctx, collection.slug, "delete");
                     try {
-                        const ctx = context as { driver?: DataDriver } | undefined;
-                        const ds = ctx?.driver;
+                        const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                         if (!ds) throw new Error("Scoped driver not available");
                         const existingEntity = await ds.fetchEntity({
                             path: collection.slug,

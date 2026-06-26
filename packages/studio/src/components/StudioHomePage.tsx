@@ -105,7 +105,11 @@ icon: "group" },
             { path: "/roles",
 name: "Roles",
 description: "Create and configure fine-grained access permissions",
-icon: "ShieldEllipsis" }
+icon: "ShieldEllipsis" },
+            { path: "/api-keys",
+name: "API Keys",
+description: "Create and manage scoped keys for machine-to-machine access",
+icon: "KeyRound" }
         ]
     }
 ];

@@ -563,15 +563,18 @@ tag_id: tagIds[t - 1] });
         // ── Products ──────────────────────────────────────────────────
         console.log("📦 Generating demo products...");
 
-        // Map product image URLs to the static seed-asset files (already copied above).
-        // The filenames in seed-assets use the same md5(url)[0:5]_filename pattern.
-        const demoStorageBase = "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/";
+        // Map product image paths to the static seed-asset files (already copied above).
+        // The filenames in seed-assets use an md5(hashSalt + path)[0:5]_filename pattern.
+        // NOTE: IMAGE_HASH_SALT is a legacy string kept ONLY so that the md5 hashes
+        // continue to match the pre-existing seed-asset filenames on disk. It is NOT
+        // a live URL — nothing is ever fetched from this address.
+        const IMAGE_HASH_SALT = "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/";
         for (const p of demoProducts) {
             const localPaths: string[] = [];
             for (const imgUrl of p.imageUrls) {
-                const fullUrl = `${demoStorageBase}${encodeURIComponent(imgUrl)}?alt=media`;
+                const hashInput = `${IMAGE_HASH_SALT}${encodeURIComponent(imgUrl)}?alt=media`;
                 const filename = imgUrl.split("/").pop() || "image.jpg";
-                const id = createHash("md5").update(fullUrl).digest("hex").substring(0, 5);
+                const id = createHash("md5").update(hashInput).digest("hex").substring(0, 5);
                 const localName = `${id}_${filename}`;
                 // Reference the file whether it exists or not — it should be in seed-assets
                 localPaths.push(`product_images/${localName}`);
