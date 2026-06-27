@@ -150,7 +150,7 @@ export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUr
 
 export async function getTableExcludes(databaseUrl: string, collectionsPath: string): Promise<string[]> {
     const includes = await getTableIncludes(collectionsPath);
-    const excludes: string[] = ["atlas_schema_revisions.*"];
+    const excludes: string[] = ["atlas_schema_revisions.*", "auth.*"];
     
     try {
         const { Client } = await import("pg");

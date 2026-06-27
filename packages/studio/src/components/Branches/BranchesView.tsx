@@ -330,13 +330,12 @@ export function BranchesView() {
                         <div>
                             <Select
                                 label="Source Database"
-                                value={sourceBranch ?? ""}
-                                onValueChange={(v) => setSourceBranch(v || undefined)}
+                                value={sourceBranch ?? "__main__"}
+                                onValueChange={(v) => setSourceBranch(v === "__main__" ? undefined : v)}
                                 placeholder="Default (main database)"
                                 size="small"
-                                renderValue={(v) => v || "Default (main database)"}
                             >
-                                <SelectItem value="">Default (main database)</SelectItem>
+                                <SelectItem value="__main__">Default (main database)</SelectItem>
                                 {branches.map(b => (
                                     <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>
                                 ))}

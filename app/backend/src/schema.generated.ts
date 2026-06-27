@@ -209,7 +209,18 @@ export const users = rebaseSchema.table("users", {
     metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
-}).enableRLS();
+}, (table) => ([
+    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`auth.uid() IS NULL OR id = auth.uid()::uuid OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_write_policy_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_write_policy_update", { as: "permissive", for: "update", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']`, withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_write_policy_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']`, withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_require_admin_write_insert", { as: "restrictive", for: "insert", to: ["public"], withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_require_admin_write_update", { as: "restrictive", for: "update", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']`, withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_require_admin_write_delete", { as: "restrictive", for: "delete", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+])).enableRLS();
 
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
     "posts": many(posts, { relationName: "posts_author_id" })

@@ -4,6 +4,7 @@ import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelatio
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
 import { logger } from "@rebasepro/server-core";
+import { getEffectiveSecurityRules } from "./auth-default-policies";
 // --- Helper Functions ---
 
 /**
@@ -707,8 +708,8 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
 
             schemaContent += `${Array.from(columns).join(",\n")}`;
 
-            const securityRules = isPostgresCollection(collection) ? collection.securityRules : undefined;
-            if (!stripPolicies && securityRules && securityRules.length > 0) {
+            const securityRules = getEffectiveSecurityRules(collection);
+            if (!stripPolicies && securityRules.length > 0) {
                 schemaContent += "\n}, (table) => ([\n";
                 securityRules.forEach((rule: SecurityRule, idx: number) => {
                     schemaContent += generatePolicyCode(collection, rule, idx);

@@ -32,6 +32,7 @@ import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server-core";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
+import { classifyTable, detectJunctionTables } from "./utils/table-classification";
 
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
@@ -833,49 +834,15 @@ export class PostgresBackendDriver implements DataDriver {
             ORDER BY table_name;
         `);
 
-        const internalPrefixes = ["_rebase_", "_auth_"];
-        const internalExact = [
-            "users", "roles", "user_roles", "refresh_tokens",
-            "password_reset_tokens", "email_verification_tokens",
-            "magic_link_tokens"
-        ];
-
         const allTables = result
             .map((r: Record<string, unknown>) => r.table_name as string)
-            .filter((name: string) => {
-                if (internalPrefixes.some(prefix => name.startsWith(prefix))) return false;
-                if (internalExact.includes(name)) return false;
-                return true;
-            });
+            .filter((name: string) => classifyTable(name, "public") !== "rebase-internal");
 
         // Detect junction tables: tables where every column is part of a foreign key.
         // These are typically many-to-many connection tables and shouldn't be suggested.
         let junctionTables = new Set<string>();
         try {
-            const junctionResult = await this.executeSql(`
-                SELECT t.table_name
-                FROM information_schema.tables t
-                WHERE t.table_schema = 'public'
-                  AND t.table_type = 'BASE TABLE'
-                  AND NOT EXISTS (
-                    -- Find columns that are NOT part of any foreign key
-                    SELECT 1
-                    FROM information_schema.columns c
-                    WHERE c.table_schema = t.table_schema
-                      AND c.table_name = t.table_name
-                      AND c.column_name NOT IN (
-                        SELECT kcu.column_name
-                        FROM information_schema.key_column_usage kcu
-                        JOIN information_schema.table_constraints tc
-                          ON tc.constraint_name = kcu.constraint_name
-                          AND tc.table_schema = kcu.table_schema
-                        WHERE tc.constraint_type = 'FOREIGN KEY'
-                          AND kcu.table_schema = t.table_schema
-                          AND kcu.table_name = t.table_name
-                      )
-                  );
-            `);
-            junctionTables = new Set(junctionResult.map((r: Record<string, unknown>) => r.table_name as string));
+            junctionTables = await detectJunctionTables(this.executeSql.bind(this));
         } catch (e) {
             logger.warn("Could not detect junction tables", { error: e });
         }

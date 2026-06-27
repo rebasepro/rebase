@@ -5,14 +5,16 @@ import {
     Alert,
     AlertTriangleIcon,
     Button,
-    Card,
     Chip,
     CircularProgress,
     cls,
+    DatabaseIcon,
     defaultBorderMixin,
     IconButton,
     iconSize,
     KeyIcon,
+    Link2Icon,
+    LockIcon,
     Paper,
     RefreshCwIcon,
     ResizablePanels,
@@ -25,7 +27,27 @@ import {
 } from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/core";
 import { isPostgresCollection } from "@rebasepro/types";
+import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
+
+type TableCategory = "collection" | "junction" | "internal" | "other";
+
+function classifyTableClient(
+    tableName: string,
+    schemaName: string,
+    junctionTableNames: Set<string>,
+    isMappedToCollection: boolean
+): TableCategory {
+    if (
+        REBASE_INTERNAL_SCHEMAS.includes(schemaName) ||
+        REBASE_INTERNAL_PREFIXES.some((prefix) => tableName.startsWith(prefix))
+    ) {
+        return "internal";
+    }
+    if (isMappedToCollection) return "collection";
+    if (junctionTableNames.has(tableName)) return "junction";
+    return "other";
+}
 
 /**
  * Validates and double-quotes a SQL identifier to prevent injection.
@@ -57,6 +79,82 @@ interface TableRLSStatus {
     policies: PostgresPolicy[];
 }
 
+// ─── Sidebar helper components ──────────────────────────────────────
+
+function SidebarSection({ title, icon, expanded, onToggle, count, children }: {
+    title: string;
+    icon: React.ReactNode;
+    expanded: boolean;
+    onToggle: () => void;
+    count?: number;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="mb-2">
+            <div
+                className="flex items-center p-1.5 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors"
+                onClick={onToggle}
+            >
+                <svg className={cls("w-3 h-3 mr-1.5 transition-transform text-text-disabled dark:text-text-disabled-dark", expanded ? "rotate-90" : "")} fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
+                {icon}
+                <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs truncate flex-grow ml-1.5">{title}</Typography>
+                {count !== undefined && (
+                    <span className="text-[10px] text-text-disabled dark:text-text-disabled-dark font-medium tabular-nums mr-1">{count}</span>
+                )}
+            </div>
+            {expanded && (
+                <div className="ml-3 mt-0.5 space-y-0.5">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
+    table: TableRLSStatus;
+    isSelected: boolean;
+    onSelect: () => void;
+    badge?: string;
+    dimmed?: boolean;
+    t: (key: string) => string;
+}) {
+    return (
+        <div
+            onClick={onSelect}
+            className={cls(
+                "flex items-center p-1 cursor-pointer rounded transition-colors group relative",
+                isSelected
+                    ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
+                    : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark",
+                dimmed && !isSelected && "opacity-60"
+            )}
+        >
+            <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                {badge && (
+                    <span className="text-[9px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark bg-surface-200 dark:bg-surface-800 rounded px-1 py-px">
+                        {badge}
+                    </span>
+                )}
+                {table.rlsEnabled ? (
+                    <Tooltip title={t("studio_rls_enabled")}>
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
+                    </Tooltip>
+                ) : (
+                    <Tooltip title={t("studio_rls_disabled")}>
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400 opacity-50"/>
+                    </Tooltip>
+                )}
+                <span className="text-[10px] opacity-40 group-hover:opacity-100 min-w-[1.2rem] text-right font-medium">
+                    {table.policies.length}
+                </span>
+            </div>
+        </div>
+    );
+}
+
 export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const { databaseAdmin } = useRebaseContext();
     const snackbarController = useSnackbarController();
@@ -68,6 +166,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const [tables, setTables] = useState<TableRLSStatus[]>([]);
     const [selectedTable, setSelectedTable] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState(0);
+    const [junctionTableNames, setJunctionTableNames] = useState<Set<string>>(new Set());
 
     const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
 
@@ -80,7 +179,11 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         }
     });
 
-    const [expandedSchemas, setExpandedSchemas] = useState<Record<string, boolean>>({ public: true });
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+        collection: true,
+        other: true,
+        internal: false
+    });
 
     // Sidebar tab: "tables" or "info"
     const [sidebarTab, setSidebarTab] = useState<"tables" | "info">("tables");
@@ -188,8 +291,25 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
             const sortedTables = Object.values(tableMap).sort((a, b) => a.tableName.localeCompare(b.tableName));
             setTables(sortedTables);
 
+            // Detect junction tables (where all columns are FKs)
+            try {
+                const junctionResult = await databaseAdmin!.executeSql!(JUNCTION_TABLES_SQL);
+                const jRows = extractRows(junctionResult);
+                setJunctionTableNames(new Set(
+                    jRows.map((r: Record<string, unknown>) => r.table_name as string).filter(Boolean)
+                ));
+            } catch {
+                // Junction detection is best-effort
+            }
+
             if (sortedTables.length > 0 && !selectedTable) {
-                setSelectedTable(`${sortedTables[0].schemaName}.${sortedTables[0].tableName}`);
+                // Auto-select first public/collection table, skip internal
+                const firstUserTable = sortedTables.find(t => !REBASE_INTERNAL_SCHEMAS.includes(t.schemaName));
+                if (firstUserTable) {
+                    setSelectedTable(`${firstUserTable.schemaName}.${firstUserTable.tableName}`);
+                } else {
+                    setSelectedTable(`${sortedTables[0].schemaName}.${sortedTables[0].tableName}`);
+                }
             }
 
         } catch (e: unknown) {
@@ -213,16 +333,30 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         return tables.find(t => `${t.schemaName}.${t.tableName}` === selectedTable) || null;
     }, [selectedTable, tables]);
 
-    const groupedTables = useMemo(() => {
-        const groups: Record<string, TableRLSStatus[]> = {};
+    /** Categorize tables into 4 buckets for the sidebar. */
+    const categorizedTables = useMemo(() => {
+        const groups: Record<TableCategory, TableRLSStatus[]> = {
+            collection: [],
+            junction: [],
+            internal: [],
+            other: []
+        };
+
         tables.forEach(table => {
-            if (!groups[table.schemaName]) {
-                groups[table.schemaName] = [];
-            }
-            groups[table.schemaName].push(table);
+            const isMapped = !!collectionRegistry.collections?.find(
+                (c: { id?: string, path?: string, table?: string, slug?: string, collectionId?: string }) =>
+                    c.id === table.tableName ||
+                    c.path === table.tableName ||
+                    c.table === table.tableName ||
+                    c.slug === table.tableName ||
+                    c.collectionId === table.tableName
+            );
+            const cat = classifyTableClient(table.tableName, table.schemaName, junctionTableNames, isMapped);
+            groups[cat].push(table);
         });
+
         return groups;
-    }, [tables]);
+    }, [tables, junctionTableNames, collectionRegistry.collections]);
 
     const activeCollection = useMemo(() => {
         if (!activeTableData) return null;
@@ -234,6 +368,13 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
             c.collectionId === activeTableData.tableName
         ) || null;
     }, [activeTableData, collectionRegistry.collections]);
+
+    /** The category of the currently selected table. */
+    const activeTableCategory = useMemo((): TableCategory | null => {
+        if (!activeTableData) return null;
+        const isMapped = !!activeCollection;
+        return classifyTableClient(activeTableData.tableName, activeTableData.schemaName, junctionTableNames, isMapped);
+    }, [activeTableData, activeCollection, junctionTableNames]);
 
     const mergedPolicies = useMemo(() => {
         if (!activeTableData) return [];
@@ -335,61 +476,85 @@ totalPolicies };
                                     <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                         {isLoading && tables.length === 0 ? (
                                             <div className="flex justify-center p-4"><CircularProgress size="small"/></div>
-                                        ) : Object.keys(groupedTables).length === 0 ? (
+                                        ) : tables.length === 0 ? (
                                             <div className="p-4 text-center">
                                                 <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark italic">{t("studio_rls_no_tables")}</Typography>
                                             </div>
                                         ) : (
-                                            Object.entries(groupedTables).map(([schemaName, schemaTables]) => (
-                                                <div key={schemaName} className="mb-2">
-                                                    <div
-                                                        className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors"
-                                                        onClick={() => setExpandedSchemas(prev => ({ ...prev,
-[schemaName]: !prev[schemaName] }))}
-                                                    >
-                                                        <svg className={cls("w-3 h-3 mr-1 transition-transform", expandedSchemas[schemaName] ? "rotate-90" : "")} fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
-                                                        <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs truncate flex-grow">{schemaName}</Typography>
-                                                    </div>
+                                            <>
+                                            {/* ── Schema Collections ── */}
+                                            {categorizedTables.collection.length > 0 && (
+                                                <SidebarSection
+                                                    title="Schema Collections"
+                                                    icon={<DatabaseIcon size={12} className="text-primary dark:text-primary-light"/>}
+                                                    expanded={expandedSections.collection ?? true}
+                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, collection: !(prev.collection ?? true) }))}
+                                                >
+                                                    {categorizedTables.collection.map(table => (
+                                                        <SidebarTableRow
+                                                            key={`${table.schemaName}.${table.tableName}`}
+                                                            table={table}
+                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
+                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                </SidebarSection>
+                                            )}
 
-                                                    {expandedSchemas[schemaName] && (
-                                                        <div className="ml-3 mt-1 space-y-0.5">
-                                                            {schemaTables.map(table => {
-                                                                const key = `${table.schemaName}.${table.tableName}`;
-                                                                const isSelected = selectedTable === key;
-                                                                return (
-                                                                    <div
-                                                                        key={key}
-                                                                        onClick={() => setSelectedTable(key)}
-                                                                        className={cls(
-                                                                            "flex items-center p-1 cursor-pointer rounded transition-colors group relative",
-                                                                            isSelected
-                                                                                ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                                                                : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark"
-                                                                        )}
-                                                                    >
-                                                                        <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                                                        <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
-                                                                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                                                                            {table.rlsEnabled ? (
-                                                                                <Tooltip title={t("studio_rls_enabled")}>
-                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
-                                                                                </Tooltip>
-                                                                            ) : (
-                                                                                <Tooltip title={t("studio_rls_disabled")}>
-                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400 opacity-50"/>
-                                                                                </Tooltip>
-                                                                            )}
-                                                                            <span className="text-[10px] opacity-40 group-hover:opacity-100 min-w-[1.2rem] text-right font-medium">
-                                                                                {table.policies.length}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))
+                                            {/* ── Other Tables (unmapped + junction) ── */}
+                                            {(categorizedTables.other.length > 0 || categorizedTables.junction.length > 0) && (
+                                                <SidebarSection
+                                                    title="Other Tables"
+                                                    icon={<AlertTriangleIcon size={12} className="text-yellow-500 dark:text-yellow-400"/>}
+                                                    expanded={expandedSections.other ?? true}
+                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, other: !(prev.other ?? true) }))}
+                                                >
+                                                    {categorizedTables.other.map(table => (
+                                                        <SidebarTableRow
+                                                            key={`${table.schemaName}.${table.tableName}`}
+                                                            table={table}
+                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
+                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                    {categorizedTables.junction.map(table => (
+                                                        <SidebarTableRow
+                                                            key={`${table.schemaName}.${table.tableName}`}
+                                                            table={table}
+                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
+                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
+                                                            badge="Junction"
+                                                            dimmed
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                </SidebarSection>
+                                            )}
+
+                                            {/* ── Rebase Internal ── */}
+                                            {categorizedTables.internal.length > 0 && (
+                                                <SidebarSection
+                                                    title="Rebase Internal"
+                                                    icon={<LockIcon size={12} className="text-text-disabled dark:text-text-disabled-dark"/>}
+                                                    expanded={expandedSections.internal ?? false}
+                                                    onToggle={() => setExpandedSections(prev => ({ ...prev, internal: !(prev.internal ?? false) }))}
+                                                    count={categorizedTables.internal.length}
+                                                >
+                                                    {categorizedTables.internal.map(table => (
+                                                        <SidebarTableRow
+                                                            key={`${table.schemaName}.${table.tableName}`}
+                                                            table={table}
+                                                            isSelected={selectedTable === `${table.schemaName}.${table.tableName}`}
+                                                            onSelect={() => setSelectedTable(`${table.schemaName}.${table.tableName}`)}
+                                                            dimmed
+                                                            t={t}
+                                                        />
+                                                    ))}
+                                                </SidebarSection>
+                                            )}
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -495,10 +660,11 @@ totalPolicies };
                                             size="small"
                                             onClick={async () => {
                                                 const table = activeTableData.tableName;
+                                                const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData.schemaName)}.${sanitizeSqlIdentifier(table)}`;
                                                 const action = activeTableData.rlsEnabled ? "DISABLE" : "ENABLE";
                                                 if (!confirm(`Are you sure you want to ${action.toLowerCase()} Row Level Security on "${table}"?`)) return;
                                                 try {
-                                                    await databaseAdmin!.executeSql!(`ALTER TABLE ${sanitizeSqlIdentifier(table)} ${action} ROW LEVEL SECURITY`);
+                                                    await databaseAdmin!.executeSql!(`ALTER TABLE ${qualifiedTable} ${action} ROW LEVEL SECURITY`);
                                                     snackbarController.open({ type: "success",
 message: `RLS ${action.toLowerCase()}d on ${table}` });
                                                     fetchRLSData();
@@ -527,7 +693,6 @@ message: e instanceof Error ? e.message : String(e) });
                                         <Button
                                             size="small"
                                             color="primary"
-                                            disabled={!activeCollection}
                                             onClick={() => setEditingPolicy("new")}
                                         >
                                             {t("studio_rls_create_policy")}
@@ -558,42 +723,77 @@ message: e instanceof Error ? e.message : String(e) });
                                 schema={activeTableData.schemaName}
                                 table={activeTableData.tableName}
                                 onSave={async (newPolicy) => {
-                                    if (!activeCollection) return;
-                                    const rule: Record<string, unknown> = {
-                                        name: newPolicy.policyname,
-                                        operation: newPolicy.cmd?.toLowerCase(),
-                                        mode: newPolicy.permissive?.toLowerCase(),
-                                        using: newPolicy.qual || undefined,
-                                        withCheck: newPolicy.with_check || undefined,
-                                        roles: newPolicy.roles
-                                    };
+                                    if (activeCollection) {
+                                        // Collection-mapped table: save via schema-editor API
+                                        const rule: Record<string, unknown> = {
+                                            name: newPolicy.policyname,
+                                            operation: newPolicy.cmd?.toLowerCase(),
+                                            mode: newPolicy.permissive?.toLowerCase(),
+                                            using: newPolicy.qual || undefined,
+                                            withCheck: newPolicy.with_check || undefined,
+                                            roles: newPolicy.roles
+                                        };
 
-                                    const existingRules = (isPostgresCollection(activeCollection) ? activeCollection.securityRules : undefined) || [];
-                                    let newRules;
-                                    if (editingPolicy === "new") {
-                                        newRules = [...existingRules, rule];
-                                    } else {
-                                        newRules = existingRules.map((r: { name?: string }) => r.name === editingPolicy.policyname ? rule : r);
-                                    }
+                                        const existingRules = (isPostgresCollection(activeCollection) ? activeCollection.securityRules : undefined) || [];
+                                        let newRules;
+                                        if (editingPolicy === "new") {
+                                            newRules = [...existingRules, rule];
+                                        } else {
+                                            newRules = existingRules.map((r: { name?: string }) => r.name === editingPolicy.policyname ? rule : r);
+                                        }
 
-                                    try {
-                                        const response = await fetch(`${apiUrl}/api/schema-editor/collection/save`, {
-                                            method: "POST",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({
-                                                collectionId: (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData.tableName,
-                                                collectionData: { securityRules: newRules }
-                                            })
-                                        });
-                                        if (!response.ok) throw new Error("Failed to save policy");
+                                        try {
+                                            const response = await fetch(`${apiUrl}/api/schema-editor/collection/save`, {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    collectionId: (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData.tableName,
+                                                    collectionData: { securityRules: newRules }
+                                                })
+                                            });
+                                            if (!response.ok) throw new Error("Failed to save policy");
 
-                                        snackbarController.open({ type: "success",
+                                            snackbarController.open({ type: "success",
 message: "Policy saved successfully" });
-                                        setEditingPolicy(null);
-                                        fetchRLSData();
-                                    } catch (e: unknown) {
-                                        snackbarController.open({ type: "error",
+                                            setEditingPolicy(null);
+                                            fetchRLSData();
+                                        } catch (e: unknown) {
+                                            snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
+                                        }
+                                    } else {
+                                        // Non-collection table (internal/junction/unmapped): apply policy directly via SQL
+                                        try {
+                                            const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData.schemaName)}.${sanitizeSqlIdentifier(activeTableData.tableName)}`;
+                                            const policyName = sanitizeSqlIdentifier(newPolicy.policyname || "unnamed_policy");
+                                            const cmd = newPolicy.cmd || "ALL";
+                                            const permissive = (newPolicy.permissive || "PERMISSIVE") === "PERMISSIVE" ? "PERMISSIVE" : "RESTRICTIVE";
+                                            const roles = newPolicy.roles && newPolicy.roles.length > 0
+                                                ? newPolicy.roles.map(r => sanitizeSqlIdentifier(r)).join(", ")
+                                                : "public";
+
+                                            // Drop existing policy if editing
+                                            if (editingPolicy !== "new") {
+                                                await databaseAdmin!.executeSql!(`DROP POLICY IF EXISTS ${policyName} ON ${qualifiedTable}`);
+                                            }
+
+                                            let sql = `CREATE POLICY ${policyName} ON ${qualifiedTable}`;
+                                            sql += ` AS ${permissive}`;
+                                            sql += ` FOR ${cmd}`;
+                                            sql += ` TO ${roles}`;
+                                            if (newPolicy.qual) sql += ` USING (${newPolicy.qual})`;
+                                            if (newPolicy.with_check) sql += ` WITH CHECK (${newPolicy.with_check})`;
+
+                                            await databaseAdmin!.executeSql!(sql);
+
+                                            snackbarController.open({ type: "success",
+message: `Policy "${newPolicy.policyname}" applied directly via SQL` });
+                                            setEditingPolicy(null);
+                                            fetchRLSData();
+                                        } catch (e: unknown) {
+                                            snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
+                                        }
                                     }
                                 }}
                                 onCancel={() => setEditingPolicy(null)}
@@ -602,16 +802,54 @@ message: e instanceof Error ? e.message : String(e) });
                             <div className="flex-grow flex flex-col overflow-hidden">
                                 <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-50 dark:bg-surface-900">
                                     <div className="max-w-4xl mx-auto flex flex-col gap-6">
-                                    {activeTableData && !activeCollection && (
-                                        <Alert
-                                            color="warning"
-                                        >
-                                            <Typography variant="body2" className="mb-1">
-                                                Table not managed by Rebase
-                                            </Typography>
-                                            <Typography variant="caption" className="opacity-80">
-                                                This table is not mapped to a Rebase Schema via code. To edit security policies visually, you must first import this table into a Schema configuration file.
-                                            </Typography>
+                                    {/* Context-aware banner based on table category */}
+                                    {activeTableData && activeTableCategory === "internal" && (
+                                        <Alert color="info">
+                                            <div className="flex items-start gap-2">
+                                                <LockIcon size={16} className="shrink-0 mt-0.5"/>
+                                                <div>
+                                                    <Typography variant="body2" className="mb-1 font-semibold">
+                                                        Rebase System Table
+                                                    </Typography>
+                                                    <Typography variant="caption" className="opacity-80">
+                                                        This table is managed internally by Rebase. Its security policies are configured automatically.
+                                                        Editing policies on system tables is an advanced operation.
+                                                    </Typography>
+                                                </div>
+                                            </div>
+                                        </Alert>
+                                    )}
+                                    {activeTableData && activeTableCategory === "junction" && (
+                                        <Alert color="info">
+                                            <div className="flex items-start gap-2">
+                                                <Link2Icon size={16} className="shrink-0 mt-0.5"/>
+                                                <div>
+                                                    <Typography variant="body2" className="mb-1 font-semibold">
+                                                        Junction Table
+                                                    </Typography>
+                                                    <Typography variant="caption" className="opacity-80">
+                                                        This is an auto-generated junction table for a many-to-many relation.
+                                                        Its access is typically managed through the related collections' policies.
+                                                        You can still add RLS policies directly if needed.
+                                                    </Typography>
+                                                </div>
+                                            </div>
+                                        </Alert>
+                                    )}
+                                    {activeTableData && activeTableCategory === "other" && (
+                                        <Alert color="warning">
+                                            <div className="flex items-start gap-2">
+                                                <AlertTriangleIcon size={16} className="shrink-0 mt-0.5"/>
+                                                <div>
+                                                    <Typography variant="body2" className="mb-1 font-semibold">
+                                                        Unmapped Table
+                                                    </Typography>
+                                                    <Typography variant="caption" className="opacity-80">
+                                                        This table exists in the database but isn't mapped to a collection definition.
+                                                        Import it into a Schema configuration file to manage security policies visually.
+                                                    </Typography>
+                                                </div>
+                                            </div>
                                         </Alert>
                                     )}
 
@@ -714,7 +952,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                 Import to codebase
                                                             </Button>
                                                         )}
-                                                        <Button size="small" variant="text" color="primary" onClick={() => setEditingPolicy(policy)} disabled={!activeCollection}>
+                                                        <Button size="small" variant="text" color="primary" onClick={() => setEditingPolicy(policy)}>
                                                             {t("studio_rls_edit")}
                                                         </Button>
                                                         {policy.status !== "code_only" && (
@@ -723,9 +961,10 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     size="small"
                                                                     onClick={async () => {
                                                                         const table = activeTableData!.tableName;
+                                                                        const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData!.schemaName)}.${sanitizeSqlIdentifier(table)}`;
                                                                         if (!confirm(`Drop policy "${policy.policyname}" from table "${table}"?`)) return;
                                                                         try {
-                                                                            await databaseAdmin!.executeSql!(`DROP POLICY ${sanitizeSqlIdentifier(policy.policyname)} ON ${sanitizeSqlIdentifier(table)}`);
+                                                                            await databaseAdmin!.executeSql!(`DROP POLICY ${sanitizeSqlIdentifier(policy.policyname)} ON ${qualifiedTable}`);
                                                                             snackbarController.open({ type: "success",
 message: `Policy "${policy.policyname}" dropped` });
                                                                             fetchRLSData();
@@ -754,16 +993,14 @@ message: e instanceof Error ? e.message : String(e) });
                                             <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark max-w-sm mb-4">
                                                 RLS is enabled on this table but no policies exist. All access is denied by default (Postgres deny-all). Create a policy to allow specific access.
                                             </Typography>
-                                            {activeCollection && (
-                                                <Button
-                                                    size="small"
-                                                    variant="filled"
-                                                    color="primary"
-                                                    onClick={() => setEditingPolicy("new")}
-                                                >
-                                                    {t("studio_rls_create_policy")}
-                                                </Button>
-                                            )}
+                                            <Button
+                                                size="small"
+                                                variant="filled"
+                                                color="primary"
+                                                onClick={() => setEditingPolicy("new")}
+                                            >
+                                                {t("studio_rls_create_policy")}
+                                            </Button>
                                         </div>
                                     )}
 

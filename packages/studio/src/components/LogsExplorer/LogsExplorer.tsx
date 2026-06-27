@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Select, SelectItem, TextField, Checkbox, Label } from "@rebasepro/ui";
+import { Select, SelectItem, TextField, Checkbox, Label, Typography, cls, defaultBorderMixin } from "@rebasepro/ui";
 
 interface LogEntry {
     id: string;
@@ -11,32 +11,32 @@ interface LogEntry {
 }
 
 const LEVEL_COLORS: Record<string, string> = {
-    debug: "#6c7086",
-    info: "#89b4fa",
-    warn: "#f9e2af",
-    error: "#f38ba8"
+    debug: "text-surface-500",
+    info: "text-blue-600 dark:text-blue-500",
+    warn: "text-amber-600 dark:text-amber-500",
+    error: "text-red-600 dark:text-red-500"
 };
 
 const SOURCE_COLORS: Record<string, string> = {
-    api: "#74c7ec",
-    auth: "#cba6f7",
-    storage: "#a6e3a1",
-    realtime: "#fab387",
-    system: "#6c7086"
+    api: "text-sky-600 dark:text-sky-400",
+    auth: "text-purple-600 dark:text-purple-400",
+    storage: "text-green-600 dark:text-green-500",
+    realtime: "text-orange-600 dark:text-orange-400",
+    system: "text-surface-600 dark:text-surface-400"
 };
 
 export function LogsExplorer() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [level, setLevel] = useState<string>("");
-    const [source, setSource] = useState<string>("");
+    const [level, setLevel] = useState<string>("all");
+    const [source, setSource] = useState<string>("all");
     const [search, setSearch] = useState("");
     const [autoScroll, setAutoScroll] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
     const fetchLogs = useCallback(async () => {
         try {
             const params = new URLSearchParams();
-            if (level) params.set("level", level);
-            if (source) params.set("source", source);
+            if (level && level !== "all") params.set("level", level);
+            if (source && source !== "all") params.set("source", source);
             if (search) params.set("search", search);
             params.set("limit", "200");
 
@@ -88,38 +88,20 @@ export function LogsExplorer() {
         }
     }, [logs, autoScroll]);
 
-    const selectStyle: React.CSSProperties = {
-        background: "#313244",
-        color: "#cdd6f4",
-        border: "1px solid #45475a",
-        borderRadius: 4,
-        padding: "4px 8px"
-    };
-
     return (
-        <div style={{
-            display: "flex",
-            flexDirection: "column",
-            height: "calc(100vh - 64px)",
-            background: "#1e1e2e",
-            color: "#cdd6f4"
-        }}>
+        <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-surface-50 dark:bg-surface-800">
             {/* Toolbar */}
-            <div style={{
-                display: "flex",
-                gap: 8,
-                padding: "8px 16px",
-                borderBottom: "1px solid #313244",
-                alignItems: "center",
-                flexWrap: "wrap"
-            }}>
+            <div className={cls(
+                "flex gap-2 p-3 border-b items-center flex-wrap shrink-0",
+                defaultBorderMixin
+            )}>
                 <Select
                     value={level}
                     onValueChange={setLevel}
                     size="small"
                     placeholder="All Levels"
                 >
-                    <SelectItem value="">All Levels</SelectItem>
+                    <SelectItem value="all">All Levels</SelectItem>
                     <SelectItem value="debug">Debug</SelectItem>
                     <SelectItem value="info">Info</SelectItem>
                     <SelectItem value="warn">Warn</SelectItem>
@@ -131,7 +113,7 @@ export function LogsExplorer() {
                     size="small"
                     placeholder="All Sources"
                 >
-                    <SelectItem value="">All Sources</SelectItem>
+                    <SelectItem value="all">All Sources</SelectItem>
                     <SelectItem value="api">API</SelectItem>
                     <SelectItem value="auth">Auth</SelectItem>
                     <SelectItem value="storage">Storage</SelectItem>
@@ -145,7 +127,7 @@ export function LogsExplorer() {
                     onChange={e => setSearch(e.target.value)}
                     className="flex-1 min-w-[200px]"
                 />
-                <div className="flex items-center gap-1.5 cursor-pointer">
+                <div className="flex items-center gap-1.5 cursor-pointer ml-2">
                     <Checkbox
                         id="auto-scroll"
                         checked={autoScroll}
@@ -155,70 +137,50 @@ export function LogsExplorer() {
                     />
                     <Label
                         htmlFor="auto-scroll"
-                        className="text-xs select-none cursor-pointer"
+                        className="text-xs select-none cursor-pointer text-surface-600 dark:text-surface-400"
                     >
                         Auto-scroll
                     </Label>
                 </div>
-                <span style={{ fontSize: 12,
-color: "#6c7086" }}>
-                    {logs.length} entries
-                </span>
+                <div className="ml-auto pl-4">
+                    <Typography variant="caption" color="secondary">
+                        {logs.length} entries
+                    </Typography>
+                </div>
             </div>
+            
             {/* Log entries */}
             <div
                 ref={containerRef}
-                style={{
-                    flex: 1,
-                    overflow: "auto",
-                    fontFamily: "monospace",
-                    fontSize: 12,
-                    padding: "8px 0"
-                }}
+                className="flex-1 overflow-auto py-2"
             >
                 {logs.map(log => (
                     <div
                         key={log.id}
-                        style={{
-                            padding: "2px 16px",
-                            display: "flex",
-                            gap: 8,
-                            borderBottom: "1px solid #181825"
-                        }}
+                        className={cls(
+                            "flex gap-4 px-4 py-[6px] border-b hover:bg-surface-100 dark:hover:bg-surface-900 transition-colors",
+                            defaultBorderMixin
+                        )}
                     >
-                        <span style={{ color: "#6c7086",
-flexShrink: 0 }}>
+                        <Typography variant="body2" color="secondary" className="w-[72px] shrink-0 font-mono">
                             {new Date(log.timestamp).toLocaleTimeString()}
-                        </span>
-                        <span style={{
-                            color: LEVEL_COLORS[log.level] || "#cdd6f4",
-                            width: 40,
-                            flexShrink: 0,
-                            textTransform: "uppercase",
-                            fontWeight: 600
-                        }}>
+                        </Typography>
+                        <Typography variant="body2" className={cls("w-[48px] shrink-0 uppercase font-semibold font-mono", LEVEL_COLORS[log.level] || "text-surface-500")}>
                             {log.level}
-                        </span>
-                        <span style={{
-                            color: SOURCE_COLORS[log.source] || "#cdd6f4",
-                            width: 64,
-                            flexShrink: 0
-                        }}>
+                        </Typography>
+                        <Typography variant="body2" className={cls("w-[80px] shrink-0 font-mono", SOURCE_COLORS[log.source] || "text-surface-500")}>
                             [{log.source}]
-                        </span>
-                        <span style={{ color: "#cdd6f4",
-flex: 1 }}>
+                        </Typography>
+                        <Typography variant="body2" className="flex-1 font-mono break-all whitespace-pre-wrap text-surface-900 dark:text-surface-100">
                             {log.message}
-                        </span>
+                        </Typography>
                     </div>
                 ))}
                 {logs.length === 0 && (
-                    <div style={{
-                        padding: 32,
-                        textAlign: "center",
-                        color: "#6c7086"
-                    }}>
-                        No log entries yet. Logs will appear here as requests come in.
+                    <div className="p-8 text-center">
+                        <Typography variant="body2" color="secondary">
+                            No log entries yet. Logs will appear here as requests come in.
+                        </Typography>
                     </div>
                 )}
             </div>

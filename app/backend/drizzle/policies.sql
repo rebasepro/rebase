@@ -51,4 +51,26 @@ DROP POLICY IF EXISTS "test_policy" ON "public"."tickets";
 CREATE POLICY "test_policy" ON "public"."tickets" AS PERMISSIVE FOR ALL TO "authenticated" USING (true) WITH CHECK (true);
 
 ALTER TABLE "rebase"."users" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "rebase"."users" FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "users_read_policy" ON "rebase"."users";
+CREATE POLICY "users_read_policy" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING (auth.uid() IS NULL OR id = auth.uid()::uuid OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_write_policy_insert" ON "rebase"."users";
+CREATE POLICY "users_write_policy_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_write_policy_update" ON "rebase"."users";
+CREATE POLICY "users_write_policy_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_write_policy_delete" ON "rebase"."users";
+CREATE POLICY "users_write_policy_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_default_admin_write_insert" ON "rebase"."users";
+CREATE POLICY "users_default_admin_write_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_default_admin_write_update" ON "rebase"."users";
+CREATE POLICY "users_default_admin_write_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_default_admin_write_delete" ON "rebase"."users";
+CREATE POLICY "users_default_admin_write_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_require_admin_write_insert" ON "rebase"."users";
+CREATE POLICY "users_require_admin_write_insert" ON "rebase"."users" AS RESTRICTIVE FOR INSERT TO "public" WITH CHECK (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_require_admin_write_update" ON "rebase"."users";
+CREATE POLICY "users_require_admin_write_update" ON "rebase"."users" AS RESTRICTIVE FOR UPDATE TO "public" USING (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+DROP POLICY IF EXISTS "users_require_admin_write_delete" ON "rebase"."users";
+CREATE POLICY "users_require_admin_write_delete" ON "rebase"."users" AS RESTRICTIVE FOR DELETE TO "public" USING (auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
 
