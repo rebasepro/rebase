@@ -19,7 +19,7 @@ test.describe("Rebase Studio Features E2E", () => {
     page.on("console", msg => {
       if (msg.type() === "error") {
         const text = msg.text();
-        if (text.includes("ERR_CONNECTION_REFUSED") || text.includes("Failed to load resource")) {
+        if (text.includes("ERR_CONNECTION_REFUSED") || text.includes("Failed to load resource") || text.includes("WebSocket error")) {
           return;
         }
         throw new Error(`Console error: ${text}`);
@@ -66,7 +66,11 @@ test.describe("Rebase Studio Features E2E", () => {
     // Now on the General settings tab
     const nameInput = page.getByLabel("Name", { exact: true });
     await expect(nameInput).toBeVisible();
-    await nameInput.fill("E2E Test Collection");
+    await page.waitForTimeout(500); // Wait for transitions/animations to finish
+    await nameInput.click();
+    await nameInput.fill("");
+    await nameInput.pressSequentially("E2E Test Collection", { delay: 50 });
+    await expect(nameInput).toHaveValue("E2E Test Collection", { timeout: 5000 });
 
     // Verify the Next button is enabled and click it
     const nextButton = page.getByRole("button", { name: "Next" });

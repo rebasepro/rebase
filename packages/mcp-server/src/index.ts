@@ -810,7 +810,7 @@ const PROJECT_TOOLS: ToolDef[] = [
     },
     {
         name: "rebase_project_status",
-        description: "Health-check the active project's backend by calling GET /api/health.",
+        description: "Health-check the active project's backend by calling GET /health.",
         inputSchema: { type: "object", properties: {} }
     }
 ];
@@ -879,7 +879,8 @@ function jsonResult(data: unknown) {
 }
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    try {
+        const { name, arguments: args } = request.params;
 
     // ── CLI tools ───────────────────────────────────────────────────────
     const cliTool = CLI_TOOLS.find((t) => t.name === name);
@@ -1013,8 +1014,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "rebase_project_status": {
             const project = getActiveProject();
             try {
-                const res = await fetch(`${project.baseUrl}/api/health`);
-                const body = await res.json() as Record<string, unknown>;
+                // Try `/health` first (standard Rebase backend), fall back to `/api/health` if it 404s
+                let res = await fetch(`${project.baseUrl}/health`);
+                if (res.status === 404) {
+                    const fallbackRes = await fetch(`${project.baseUrl}/api/health`);
+                    if (fallbackRes.status !== 404) {
+                        res = fallbackRes;
+                    }
+                }
+                
+                let body: Record<string, unknown> = {};
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    try {
+                        body = await res.json() as Record<string, unknown>;
+                    } catch {
+                        // ignore
+                    }
+                } else {
+                    body = { responseText: await res.text().catch(() => "") };
+                }
+
                 return jsonResult({
                     project: project.name,
                     baseUrl: project.baseUrl,
@@ -1247,6 +1267,16 @@ roles });
 
         default:
             throw new Error(`Unknown tool: ${name}`);
+        }
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+            content: [{
+                type: "text" as const,
+                text: `Error: ${msg}`
+            }],
+            isError: true
+        };
     }
 });
 

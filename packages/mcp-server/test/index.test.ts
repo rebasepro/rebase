@@ -238,13 +238,15 @@ data: { title: "New Doc" } }
         // Make user a non-admin
         mockClient.auth.getUser.mockResolvedValueOnce({ uid: "user-id", email: "user@rebase.pro", roles: ["user"] });
 
-        await expect(handler({
+        const resultErr = await handler({
             method: "tools/call",
             params: {
                 name: "rebase_db_branch_list",
                 arguments: {}
             }
-        })).rejects.toThrow("Admin authorization failed: Access denied: User does not have the 'admin' role.");
+        });
+        expect(resultErr.isError).toBe(true);
+        expect(resultErr.content[0].text).toContain("Admin authorization failed: Access denied: User does not have the 'admin' role.");
 
         // As an admin, it should execute the CLI command
         mockClient.auth.getUser.mockResolvedValueOnce({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] });

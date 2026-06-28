@@ -31,7 +31,7 @@ export function navigateToEntity({
 }:
 
     {
-        openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+        openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
         collection?: EntityCollection;
         entityId?: string | number;
         selectedTab?: string;

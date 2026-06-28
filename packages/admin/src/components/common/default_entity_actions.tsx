@@ -36,7 +36,7 @@ export const editEntityAction: EntityAction = {
 
         highlightEntity?.(entity);
 
-        context.analyticsController?.onAnalyticsEvent?.("entity_click", {
+        context?.analyticsController?.onAnalyticsEvent?.("entity_click", {
             path: entity.path,
             entityId: entity.id
         });
@@ -62,7 +62,7 @@ export const editEntityAction: EntityAction = {
             path: newFullIdPath,
             sideEntityController,
             onClose: () => unhighlightEntity?.(entity),
-            navigation: context.urlController!,
+            navigation: context?.urlController!,
             selectedTab: defaultSelectedView
         });
 
@@ -92,7 +92,7 @@ export const copyEntityAction: EntityAction = {
             throw new Error("INTERNAL: copyEntityAction: sideEntityController is undefined");
         }
         highlightEntity?.(entity);
-        context.analyticsController?.onAnalyticsEvent?.("copy_entity_click", {
+        context?.analyticsController?.onAnalyticsEvent?.("copy_entity_click", {
             path: entity.path,
             entityId: entity.id
         });
@@ -106,7 +106,7 @@ export const copyEntityAction: EntityAction = {
             copy: true,
             sideEntityController,
             onClose: () => unhighlightEntity?.(entity),
-            navigation: context.urlController!
+            navigation: context?.urlController!
         });
 
         return Promise.resolve(undefined);
@@ -131,7 +131,7 @@ export const deleteEntityAction: EntityAction = {
         if (!entity) {
             throw new Error("INTERNAL: deleteEntityAction: Entity is undefined");
         }
-        if (!context.dialogsController) {
+        if (!context?.dialogsController) {
             throw new Error("INTERNAL: deleteEntityAction: context.dialogsController is undefined");
         }
         const { closeDialog } = context.dialogsController.open({
@@ -146,14 +146,14 @@ export const deleteEntityAction: EntityAction = {
                     callbacks={collection.callbacks}
                     open={open}
                     onEntityDelete={() => {
-                        context.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
+                        context?.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
                             path
                         });
                         selectionController?.setSelectedEntities(selectionController.selectedEntities.filter(e => e.id !== entity.id));
                         onCollectionChange?.();
                         // In full-screen mode, navigateBack would go to the deleted entity's
                         // detail URL, which no longer exists. Navigate to the parent collection instead.
-                        if (openEntityMode === "full_screen" && context.urlController) {
+                        if (openEntityMode === "full_screen" && context?.urlController) {
                             const collectionUrl = context.urlController.buildUrlCollectionPath(path);
                             context.urlController.navigate(collectionUrl, { replace: true });
                         } else {
@@ -258,7 +258,7 @@ export const resetPasswordAction: EntityAction = {
         if (!entity) {
             throw new Error("INTERNAL: resetPasswordAction: Entity is undefined");
         }
-        if (!context.dialogsController) {
+        if (!context?.dialogsController) {
             throw new Error("INTERNAL: resetPasswordAction: context.dialogsController is undefined");
         }
 
@@ -272,7 +272,7 @@ export const resetPasswordAction: EntityAction = {
             roles: entity.values?.roles as string[] || []
         };
 
-        const { closeDialog } = context.dialogsController.open({
+        const { closeDialog } = context!.dialogsController.open({
             key: "reset_password_dialog_" + entity.id,
             Component: ({ open }) => (
                 <ResetPasswordActionDialog

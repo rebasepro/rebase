@@ -13,7 +13,7 @@ export interface EntityFormActionsProps {
     disabled: boolean;
     status: "new" | "existing" | "copy";
     pluginActions: React.ReactNode[];
-    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     showDefaultActions?: boolean;
     navigateBack: () => void;
     formContext: FormContext

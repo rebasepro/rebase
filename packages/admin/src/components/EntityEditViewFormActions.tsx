@@ -123,7 +123,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     status: "new" | "existing" | "copy",
     sideDialogContext: SideDialogController,
     pluginActions?: React.ReactNode[],
-    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<Record<string, unknown>>;

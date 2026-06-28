@@ -1,30 +1,22 @@
-import type { EntityCollection, EntityCustomViewParams } from "@rebasepro/types";
+import type { EntityCollection, EntityCustomViewParams, AdditionalFieldDelegateProps } from "@rebasepro/types";
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
-import type { PluginFormActionProps, PropertyConfig } from "@rebasepro/types";
+import type { PropertyConfig } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AuthController, AnalyticsEvent, Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
 import { AlignLeftIcon, CheckIcon, LoaderIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
-import { getDefaultValuesFor, getLocalChangesBackup, isHidden, isReadOnly } from "@rebasepro/common";
+import { getDefaultValuesFor, isHidden, isReadOnly } from "@rebasepro/common";
 
-import { saveEntityWithCallbacks, useAuthController, useCustomizationController, useData, useSnackbarController, useTranslation, useSlot } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/core";
 import { getFormFieldKeys } from "@rebasepro/core";
 import { Alert, Button, Chip, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
-import { Formex, FormexController, getIn, setIn, useCreateFormex } from "@rebasepro/formex";
-import { useAnalyticsController } from "@rebasepro/core";
+import { Formex, FormexController, useCreateFormex } from "@rebasepro/formex";
 
 import { FormEntry, FormLayout, LabelWithIconAndTooltip, PropertyFieldBinding } from "../form";
-import { z } from "zod";
-import {
-    flattenKeys,
-    getEntityFromCache,
-    removeEntityFromCache,
-    removeEntityFromMemoryCache,
-    saveEntityToCache
-} from "@rebasepro/core";
+import { flattenKeys } from "@rebasepro/core";
 import { ErrorFocus } from "./components/ErrorFocus";
 import { CustomFieldValidator, getEntitySchema } from "./validation";
 import { EntityFormActions } from "./EntityFormActions";
@@ -32,115 +24,21 @@ import type { EntityFormActionsProps } from "../types/components/EntityFormActio
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 
 import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";
-import { getValueInPath, isObject, mergeDeep } from "@rebasepro/utils";
-import { useCollectionRegistryController, useSideEntityController, useCMSContext } from "../index";
-
-// extract touched values for nested touched trees and map to current values
-export function extractTouchedValues(values: unknown, touched: Record<string, boolean>): Record<string, unknown> {
-    let acc: Record<string, unknown> = {};
-    if (!touched || typeof touched !== "object") {
-        return acc;
-    }
-
-    Object.entries(touched).forEach(([key, value]) => {
-        if (value) {
-            acc = setIn(acc, key, getIn(values, key)) as Record<string, unknown>;
-        }
-    })
-
-    return acc;
-}
+import { getValueInPath, mergeDeep } from "@rebasepro/utils";
+import {
+    getChanges,
+    zodToFormErrors
+} from "./form_utils";
 
 /**
- * Recursively removes empty plain objects `{}` and empty arrays `[]` from a value tree.
- * This prevents ghost containers created by `setIn` intermediate path construction
- * (e.g. `{ address: {} }` when only `address.city` was touched but value is undefined)
- * from falsely triggering the unsaved local changes indicator.
+ * Headless entity form component.
+ *
+ * Renders a form for an entity collection without any CMS or backend dependencies.
+ * All backend concerns (save, caching, analytics, plugin slots) are provided via
+ * callback props. For CMS-connected usage, use {@link EntityFormBinding} instead.
+ *
+ * @group Components
  */
-/**
- * CheckIcon if a value is semantically empty (null, undefined, or empty string).
- */
-function isSemanticEmpty(v: unknown): boolean {
-    return v === null || v === undefined || v === "";
-}
-
-function removeEmptyContainers(obj: unknown): unknown {
-    if (Array.isArray(obj)) {
-        const cleaned = obj.map(removeEmptyContainers);
-        // Keep arrays even if they contain only nulls/undefined — that's intentional data
-        return cleaned;
-    }
-    if (obj && typeof obj === "object" && Object.getPrototypeOf(obj) === Object.prototype) {
-        const result: Record<string, unknown> = {};
-        for (const key of Object.keys(obj)) {
-            const cleaned = removeEmptyContainers((obj as Record<string, unknown>)[key]);
-            // Skip empty plain objects
-            if (cleaned && typeof cleaned === "object" && !Array.isArray(cleaned)
-                && Object.getPrototypeOf(cleaned) === Object.prototype
-                && Object.keys(cleaned).length === 0) {
-                continue;
-            }
-            result[key] = cleaned;
-        }
-        // After cleaning, check if all remaining values are semantically empty
-        // (null, undefined, or ""). This catches ghost objects like {type: "", value: null}
-        // created by oneOf block initialization that aren't meaningful changes.
-        if (Object.keys(result).length > 0 && Object.values(result).every(isSemanticEmpty)) {
-            return {};
-        }
-        return result;
-    }
-    return obj;
-}
-
-export function getChanges<T extends object>(source: Partial<T>, comparison: Partial<T>): Partial<T> {
-    const changes: Partial<T> = {};
-
-    if (!source) {
-        return {};
-    }
-    if (!comparison) {
-        return source;
-    }
-
-    const allKeys = Array.from(new Set([...Object.keys(source), ...Object.keys(comparison)]));
-
-    for (const key of allKeys) {
-        const sourceValue = (source as Record<string, unknown>)[key];
-        const comparisonValue = (comparison as Record<string, unknown>)[key];
-
-        if (equal(sourceValue, comparisonValue)) {
-            continue;
-        }
-
-        const sourceHasKey = source && typeof source === "object" && Object.prototype.hasOwnProperty.call(source, key);
-        const comparisonHasKey = comparison && typeof comparison === "object" && Object.prototype.hasOwnProperty.call(comparison, key);
-
-        if (comparisonHasKey && !sourceHasKey) {
-            (changes as Record<string, unknown>)[key] = undefined;
-        } else if (Array.isArray(sourceValue)) {
-            const comparisonArray = Array.isArray(comparisonValue) ? comparisonValue : [];
-            if (sourceValue.length !== comparisonArray.length) {
-                (changes as Record<string, unknown>)[key] = sourceValue;
-                continue;
-            }
-            const hasChanges = sourceValue.some((item, index) => !equal(item, comparisonArray[index]));
-            if (hasChanges) {
-                (changes as Record<string, unknown>)[key] = sourceValue;
-            }
-        } else if (isObject(sourceValue) && sourceValue && isObject(comparisonValue) && comparisonValue) {
-            const nestedChanges = getChanges(sourceValue, comparisonValue);
-            if (Object.keys(nestedChanges).length > 0) {
-                (changes as Record<string, unknown>)[key] = nestedChanges;
-            }
-        } else {
-            (changes as Record<string, unknown>)[key] = sourceValue;
-        }
-    }
-
-    return changes;
-}
-
 export function EntityForm<M extends Record<string, unknown>>({
     path,
     entityId: entityIdProp,
@@ -164,26 +62,33 @@ export function EntityForm<M extends Record<string, unknown>>({
     showDefaultActions = true,
     showEntityPath = true,
     navigateBack: navigateBackProp,
-    children
+    children,
+    // Headless callback props
+    onSubmit: onSubmitProp,
+    onValuesChangeDeferred: onValuesChangeDeferredProp,
+    onReset: onResetProp,
+    uniqueFieldValidator: uniqueFieldValidatorProp,
+    // Slots
+    beforeFields,
+    afterFields,
+    pluginActions: pluginActionsProp,
+    // Local changes (managed externally)
+    computedInitialValues,
+    hasLocalChanges: hasLocalChangesProp,
+    localChangesData,
+    manualApplyLocalChanges,
+    localChangesCacheKey,
+    onClearLocalChanges
 }: EntityFormProps<M>) {
-    const { t } = useTranslation();
-    const sideEntityController = useSideEntityController();
-    const collectionRegistryController = useCollectionRegistryController();
+
+    const customizationController = useCustomizationController();
 
     const navigateBack = useCallback(() => {
         if (navigateBackProp) {
             navigateBackProp();
-            return;
         }
-        if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
-            // If we are in side panel mode or dialog mode, we close the panel
-            sideEntityController.close();
-        } else {
-            window.history.back();
-        }
-    }, [navigateBackProp, openEntityMode, sideEntityController]);
+    }, [navigateBackProp]);
 
-    const authController = useAuthController();
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
 
     const updateStatus = (status: EntityStatus) => {
@@ -193,22 +98,12 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const [valuesToBeSaved, setValuesToBeSaved] = useState<EntityValues<M> | undefined>(undefined);
     useDebouncedCallback(valuesToBeSaved, () => {
-        if (valuesToBeSaved) {
+        if (valuesToBeSaved && onSubmitProp) {
             setIsSavingAutoSave(true);
-            saveEntity({
-                entityId: entityIdProp,
-                collection,
-                path,
-                values: valuesToBeSaved
-            }).finally(() => setIsSavingAutoSave(false));
+            Promise.resolve(onSubmitProp(valuesToBeSaved, formex))
+                .finally(() => setIsSavingAutoSave(false));
         }
     }, false, 2000);
-
-    const dataClient = useData();
-    const snackbarController = useSnackbarController();
-    const customizationController = useCustomizationController();
-    const context = useCMSContext();
-    const analyticsController = useAnalyticsController();
 
     const [underlyingChanges] = useState<Partial<EntityValues<M>>>({});
 
@@ -228,17 +123,24 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const autoSave = collection.formAutoSave;
 
-    const baseInitialValues = useMemo(() => getInitialEntityValues(authController, collection, path, status, entity, customizationController.propertyConfigs), [authController, collection, path, status, entity, customizationController.propertyConfigs]);
-
-    const localChangesDataRaw = useMemo(() => entityId
-        ? getEntityFromCache(path + "/" + entityId)
-        : getEntityFromCache(path + "#new"), [entityId, path]);
+    // Use externally computed initial values if provided, otherwise compute from entity + collection
+    const baseInitialValues = useMemo(() => {
+        if (computedInitialValues !== undefined) {
+            return computedInitialValues;
+        }
+        // Fallback: compute from entity/collection (requires authController from context)
+        // In headless mode without computedInitialValues, use entity values or defaults
+        if ((status === "existing" || status === "copy") && entity) {
+            return entity.values ?? getDefaultValuesFor(collection.properties);
+        }
+        return getDefaultValuesFor(collection.properties);
+    }, [computedInitialValues, collection.properties, status, entity]);
 
     const [localChangesCleared, setLocalChangesCleared] = useState<boolean>(false);
 
-    const localChangesBackup = getLocalChangesBackup(collection);
-    const autoApplyLocalChanges = localChangesBackup === "auto_apply";
-    const manualApplyLocalChanges = localChangesBackup === "manual_apply";
+    const hasLocalChanges = hasLocalChangesProp !== undefined
+        ? (hasLocalChangesProp && !localChangesCleared)
+        : false;
 
     const onSubmit = (values: EntityValues<M>, formexController: FormexController<EntityValues<M>>) => {
 
@@ -251,7 +153,13 @@ export function EntityForm<M extends Record<string, unknown>>({
             throw Error("New FormType added, check EntityForm");
         }
 
-        return save(values)
+        if (!onSubmitProp) {
+            console.warn("EntityForm: no onSubmit callback provided. Form submission has no effect.");
+            formexController.setSubmitting(false);
+            return;
+        }
+
+        return Promise.resolve(save(values))
             ?.then((savedEntity) => {
                 if (savedEntity) {
                     formexController.resetForm({
@@ -259,12 +167,6 @@ export function EntityForm<M extends Record<string, unknown>>({
                         submitCount: 0,
                         touched: {}
                     });
-                    if (!autoSave) {
-                        snackbarController.open({
-                            type: "success",
-                            message: `${collection.singularName ?? collection.name}: ${t("saved_correctly")}`
-                        });
-                    }
                 }
             })
             .finally(() => {
@@ -273,27 +175,10 @@ export function EntityForm<M extends Record<string, unknown>>({
     };
 
     const [initialValues, initialDirty] = useMemo(() => {
-        const initialValuesWithLocalChanges: Partial<M> = autoApplyLocalChanges && localChangesDataRaw ? mergeDeep(baseInitialValues, localChangesDataRaw as Partial<M>) : baseInitialValues;
-        const initialValues = initialDirtyValues ? mergeDeep(initialValuesWithLocalChanges, initialDirtyValues) : initialValuesWithLocalChanges;
+        const initialValues = initialDirtyValues ? mergeDeep(baseInitialValues, initialDirtyValues) : baseInitialValues;
         const initialDirty = Boolean(initialDirtyValues) && initialDirtyValues && Object.keys(initialDirtyValues).length > 0;
         return [initialValues, initialDirty];
-    }, [autoApplyLocalChanges, localChangesDataRaw, baseInitialValues, initialDirtyValues]);
-
-    const localChangesData = useMemo(() => {
-        if (!localChangesDataRaw) {
-            return undefined;
-        }
-        const changes = getChanges(localChangesDataRaw, initialValues);
-        // Strip ghost empty containers (e.g. {content: {}}) left by intermediate
-        // path construction so they don't falsely trigger the unsaved-changes banner.
-        const cleaned = removeEmptyContainers(changes);
-        if (cleaned && typeof cleaned === "object" && Object.keys(cleaned).length === 0) {
-            return undefined;
-        }
-        return cleaned;
-    }, [localChangesDataRaw, initialValues]);
-
-    const hasLocalChanges = !localChangesCleared && !!localChangesData && Object.keys(localChangesData as object).length > 0;
+    }, [baseInitialValues, initialDirtyValues]);
 
     const internalFormex = useCreateFormex<M>({
         initialValues: initialValues as M,
@@ -308,21 +193,10 @@ export function EntityForm<M extends Record<string, unknown>>({
             : {},
         onSubmit,
         onReset: () => {
-            clearDirtyCache();
+            onResetProp?.();
             onValuesModified?.(false, initialValues as M);
         },
-        onValuesChangeDeferred: (values: M, controller: FormexController<M>) => {
-            const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
-            if (controller.dirty) {
-                const touchedValues = removeEmptyContainers(extractTouchedValues(values, controller.touched));
-                if (touchedValues && Object.keys(touchedValues).length > 0) {
-                    saveEntityToCache(key, touchedValues);
-                } else {
-                    // Clean up ghost cache entries that contain only empty containers
-                    removeEntityFromCache(key);
-                }
-            }
-        },
+        onValuesChangeDeferred: onValuesChangeDeferredProp,
         validation: async (values): Promise<Record<string, string>> => {
             if (!validationSchema) return {};
             const result = await validationSchema.safeParseAsync(values);
@@ -358,35 +232,8 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     }, [formex]);
 
-    const beforeSaveHookError = useCallback((e: Error) => {
-        snackbarController.open({
-            type: "error",
-            message: `${t("error_before_saving")}: ${e?.message}`
-        });
-        console.error(e);
-    }, [snackbarController]);
-
-    const afterSaveHookError = useCallback((e: Error) => {
-        snackbarController.open({
-            type: "error",
-            message: `${t("error_after_saving")}: ${e?.message}`
-        });
-        console.error(e);
-    }, [snackbarController]);
-
-    function clearDirtyCache() {
-        if (status === "new" || status === "copy") {
-            removeEntityFromMemoryCache(path + "#new");
-            removeEntityFromCache(path + "#new");
-        } else {
-            removeEntityFromMemoryCache(path + "/" + entityId);
-            removeEntityFromCache(path + "/" + entityId);
-        }
-    }
-
     const afterSave = (updatedEntity: Entity<M>) => {
-
-        clearDirtyCache();
+        onResetProp?.();
         onValuesModified?.(false, updatedEntity.values);
         onEntityChange?.(updatedEntity);
         updateStatus("existing");
@@ -403,76 +250,6 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
     };
 
-    const afterSaveError = useCallback((e: Error) => {
-        snackbarController.open({
-            type: "error",
-            title: t("error_saving_entity"),
-            message: e?.message
-        });
-        console.error("Error saving entity", path, entityId, e);
-        console.error(e);
-    }, [entityId, path, snackbarController]);
-
-    const saveEntity = ({
-        values,
-        previousValues,
-        entityId,
-        collection,
-        path
-    }: {
-        collection: EntityCollection<M>,
-        path: string,
-        entityId: string | number | undefined,
-        values: M,
-        previousValues?: M,
-    }): Promise<Entity<M>> => {
-        return saveEntityWithCallbacks({
-            path: path,
-            entityId,
-            values,
-            previousValues,
-            collection,
-            status,
-            data: dataClient,
-            context,
-            afterSave,
-            afterSaveError
-        });
-    };
-
-    type EntityFormSaveParams<M extends Record<string, unknown>> = {
-        collection: EntityCollection<M>,
-        path: string,
-        entityId: string | number | undefined,
-        values: EntityValues<M>,
-        previousValues?: EntityValues<M>,
-        autoSave: boolean
-    };
-
-    const onSaveEntityRequest = async ({
-        collection,
-        path,
-        entityId,
-        values,
-        previousValues,
-        autoSave
-    }: EntityFormSaveParams<M>): Promise<Entity<M> | void> => {
-        if (!status)
-            return;
-        if (autoSave) {
-            setValuesToBeSaved(values);
-            return Promise.resolve();
-        } else {
-            return saveEntity({
-                collection,
-                path,
-                entityId,
-                values,
-                previousValues
-            });
-        }
-    };
-
     const lastSavedValues = useRef<EntityValues<M> | undefined>(entity?.values);
     const save = async (values: EntityValues<M>): Promise<Entity<M> | void> => {
         const valuesToSave = status === "existing"
@@ -484,29 +261,34 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
 
         lastSavedValues.current = values;
-        return onSaveEntityRequest({
-            collection,
-            path,
-            entityId,
-            values: valuesToSave,
-            previousValues: entity?.values,
-            autoSave: autoSave ?? false
-        }).then((savedEntity) => {
-            const eventName: AnalyticsEvent = status === "new"
-                ? "new_entity_saved"
-                : (status === "copy" ? "entity_copied" : (status === "existing" ? "entity_edited" : "unmapped_event"));
-            analyticsController.onAnalyticsEvent?.(eventName, { path });
-            return savedEntity;
-        }).catch(e => {
-            console.error(e);
-            setSavingError(e);
-        });
+
+        if (!onSubmitProp) {
+            return;
+        }
+
+        const autoSaveEnabled = autoSave ?? false;
+
+        if (autoSaveEnabled) {
+            setValuesToBeSaved(values);
+            return Promise.resolve();
+        }
+
+        return Promise.resolve(onSubmitProp(valuesToSave as M, formex))
+            .then((result) => {
+                if (result) {
+                    afterSave(result as Entity<M>);
+                }
+                return result as Entity<M> | void;
+            })
+            .catch(e => {
+                console.error(e);
+                setSavingError(e);
+            });
     };
 
     const disabled = formex.isSubmitting || Boolean(disabledProp);
 
     const formContext: FormContext<M> = {
-
         setFieldValue: useCallback((key: string, value: unknown) => formex.setFieldValue(key, value), []),
         values: formex.values,
         collection,
@@ -527,24 +309,6 @@ export function EntityForm<M extends Record<string, unknown>>({
     }, [formex.version, collection, entityId, path]);
 
     const actionsDisabled = disabled || formex.isSubmitting || (status === "existing" && !formex.dirty) || Boolean(disabledProp);
-    const parentCollectionSlugs = collectionRegistryController.getParentCollectionSlugs(path);
-    const parentEntityIds = collectionRegistryController.getParentEntityIds(path);
-
-    const formActionProps: PluginFormActionProps = {
-        entityId,
-        parentCollectionSlugs,
-parentEntityIds,
-        path: path,
-        status,
-        collection: collection as EntityCollection,
-        context,
-        formContext: formContext as FormContext<Record<string, unknown>>,
-        openEntityMode,
-        disabled: actionsDisabled
-    };
-    const pluginFormActions = useSlot("form.actions", formActionProps);
-    const pluginFormBefore = useSlot("form.before", formActionProps);
-    const pluginFormAfter = useSlot("form.after", formActionProps);
 
     const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
     const rawTitle = formex.values && titlePropertyKey ? getValueInPath(formex.values, titlePropertyKey) : undefined;
@@ -552,31 +316,23 @@ parentEntityIds,
         ? resolveTitleToString(rawTitle)
         : (collection.singularName ?? collection.name);
 
+    const modified = formex.dirty;
+
     useEffect(() => {
         if (!autoSave) {
             onValuesModified?.(modified, formex.values);
         }
     }, [formex.dirty]);
 
-    const modified = formex.dirty;
+    // Default no-op unique field validator — always passes
+    const defaultUniqueFieldValidator: CustomFieldValidator = useCallback(async () => true, []);
 
-    const uniqueFieldValidator: CustomFieldValidator = useCallback(async ({
-        name,
-        value
-    }) => {
-        try {
-            const accessor = dataClient.collection(path);
-            const { data } = await accessor.find({
-                where: { [name]: `eq.${value}` },
-                limit: 2
-            });
-            const otherEntities = entityId ? data.filter(e => e.id !== entityId) : data;
-            return otherEntities.length === 0;
-        } catch (e: unknown) {
-            console.error("Error checking unique field", e);
-            return true;
+    const uniqueFieldValidator: CustomFieldValidator = useMemo(() => {
+        if (uniqueFieldValidatorProp) {
+            return uniqueFieldValidatorProp as CustomFieldValidator;
         }
-    }, [dataClient, path, entityId]);
+        return defaultUniqueFieldValidator;
+    }, [uniqueFieldValidatorProp, defaultUniqueFieldValidator]);
 
     const validationSchema = useMemo(() => getEntitySchema(
         entityId,
@@ -588,7 +344,7 @@ parentEntityIds,
 
     useEffect(() => {
         if (!autoSave && !formex.isSubmitting && underlyingChanges && entity) {
-            // we update the form fields from the Firestore data
+            // we update the form fields from the driver data
             // if they were not touched
             Object.entries(underlyingChanges).forEach(([key, value]) => {
                 const formValue = formex.values[key];
@@ -659,16 +415,17 @@ parentEntityIds,
 
                     const additionalField = collection.additionalFields?.find(f => f.key === key);
                     if (additionalField && entity) {
-                        const Builder = additionalField.Builder;
-                        if (!Builder && !additionalField.value) {
+                        const AdditionalFieldBuilder = additionalField.Builder;
+                        if (!AdditionalFieldBuilder && !additionalField.value) {
                             throw new Error("When using additional fields you need to provide a Builder or a value");
                         }
-                        const child = Builder
-                            ? <Builder entity={entity} context={context}/>
+                        const additionalFieldContext = formContext as unknown as AdditionalFieldDelegateProps['context'];
+                        const child = AdditionalFieldBuilder
+                            ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
                             : <div className={"w-full"}>
                                 {additionalField.value?.({
                                     entity,
-                                    context
+                                    context: additionalFieldContext
                                 })?.toString()}
                             </div>;
 
@@ -702,7 +459,7 @@ parentEntityIds,
 
     const formView = <ErrorBoundary>
         <>
-            {pluginFormBefore}
+            {beforeFields}
 
             {!Builder && <div className={"w-full flex flex-col items-start my-4 lg:my-6"}>
                 <Typography
@@ -713,7 +470,7 @@ parentEntityIds,
 
                 {!entity?.values && initialStatus === "existing" &&
                     <Alert color={"warning"} size={"small"} outerClassName={"w-full mb-4 text-xs"}>
-                        {t("entity_does_not_exist")}
+                        This entity does not exist yet
                     </Alert>}
 
                 {showEntityPath && <Alert color={"base"} outerClassName={"w-full"} size={"small"}>
@@ -727,11 +484,11 @@ parentEntityIds,
             {children}
 
             {initialEntityId && !entity && initialStatus !== "new" && <Alert color={"info"} size={"small"}>
-                {t("entity_does_not_exist")}
+                This entity does not exist yet
             </Alert>}
 
             {hasFormErrors && <Alert color={"error"} size={"small"} outerClassName={"w-full mt-2"}>
-                {t("fix_errors_before_saving") ?? "Please fix the highlighted errors before saving."}
+                Please fix the highlighted errors before saving.
             </Alert>}
 
             {formContext && <>
@@ -741,28 +498,28 @@ parentEntityIds,
                 </div>
             </>}
 
-            {pluginFormAfter}
+            {afterFields}
 
             {forceActionsAtTheBottom && <div className="h-16"/>}
 
             <Dialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen} maxWidth={"sm"}>
-                <DialogTitle>{status === "existing" ? t("discard_changes") ?? "Discard changes?" : t("clear_form") ?? "Clear form?"}</DialogTitle>
+                <DialogTitle>{status === "existing" ? "Discard changes?" : "Clear form?"}</DialogTitle>
                 <DialogContent>
                     <Typography>
                         {status === "existing"
-                            ? t("discard_changes_confirmation") ?? "All unsaved changes will be lost. This cannot be undone."
-                            : t("clear_form_confirmation") ?? "All entered values will be cleared. This cannot be undone."}
+                            ? "All unsaved changes will be lost. This cannot be undone."
+                            : "All entered values will be cleared. This cannot be undone."}
                     </Typography>
                 </DialogContent>
                 <DialogActions>
                     <Button variant={"text"} onClick={() => setDiscardDialogOpen(false)}>
-                        {t("cancel") ?? "Cancel"}
+                        Cancel
                     </Button>
                     <Button variant={"filled"} color={"error"} onClick={() => {
                         setDiscardDialogOpen(false);
                         formex.resetForm({ values: baseInitialValues as M });
                     }}>
-                        {status === "existing" ? t("discard") ?? "Discard" : t("clear") ?? "Clear"}
+                        {status === "existing" ? "Discard" : "Clear"}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -789,7 +546,7 @@ parentEntityIds,
         formex={formex as FormexController<Record<string, unknown>>}
         disabled={actionsDisabled}
         status={status}
-        pluginActions={pluginFormActions ?? []}
+        pluginActions={pluginActionsProp ?? []}
         openEntityMode={openEntityMode}
         showDefaultActions={showDefaultActions}
         navigateBack={navigateBack}
@@ -823,28 +580,31 @@ parentEntityIds,
                         <div
                             className={"flex flex-row gap-4 justify-end h-0 overflow-visible sticky top-4 z-10"}>
 
-                            {manualApplyLocalChanges && hasLocalChanges &&
+                            {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&
                                 <LocalChangesMenu<M>
-                                    cacheKey={status === "new" || status === "copy" ? path + "#new" : path + "/" + entityId}
+                                    cacheKey={localChangesCacheKey}
                                     properties={collection.properties}
                                     cachedData={localChangesData as Partial<M>}
                                     formex={formex}
-                                    onClearLocalChanges={() => setLocalChangesCleared(true)}
+                                    onClearLocalChanges={() => {
+                                        setLocalChangesCleared(true);
+                                        onClearLocalChanges?.();
+                                    }}
                                 />}
 
                             {isSavingAutoSave
-                                ? <Tooltip title={t("saving") ?? "Saving…"}>
+                                ? <Tooltip title={"Saving…"}>
                                     <Chip size={"small"} className={"py-1"} colorScheme={"blueDarker"}>
                                         <LoaderIcon size={iconSize.smallest} className={"animate-spin"}/>
                                     </Chip>
                                 </Tooltip>
                                 : formex.dirty
-                                    ? <Tooltip title={t("form_modified")}>
+                                    ? <Tooltip title={"Form has been modified"}>
                                         <Chip size={"small"} className={"py-1"} colorScheme={"orangeDarker"}>
                                             <PencilIcon size={iconSize.smallest}/>
                                         </Chip>
                                     </Tooltip>
-                                    : <Tooltip title={t("form_in_sync")}>
+                                    : <Tooltip title={"Form is in sync"}>
                                         <Chip size={"small"} className={"py-1"}>
                                             <CheckIcon size={iconSize.smallest}/>
                                         </Chip>
@@ -865,57 +625,7 @@ parentEntityIds,
     );
 }
 
-export function getInitialEntityValues<M extends Record<string, unknown>>(
-    authController: AuthController,
-    collection: EntityCollection,
-    path: string,
-    status: "new" | "existing" | "copy",
-    entity: Entity<M> | undefined,
-    propertyConfigs?: Record<string, PropertyConfig>
-): Partial<EntityValues<M>> {
-    const properties = collection.properties;
-    if ((status === "existing" || status === "copy") && entity) {
-        let values: Partial<EntityValues<M>>;
-        if (!collection.alwaysApplyDefaultValues) {
-            values = entity.values ?? getDefaultValuesFor(properties);
-        } else {
-            const defaultValues = getDefaultValuesFor(properties);
-            values = mergeDeep(defaultValues, entity.values ?? {});
-        }
-        // When copying, clear ID fields so the database generates new IDs
-        if (status === "copy") {
-            const result = { ...values };
-            for (const [key, property] of Object.entries(properties)) {
-                if (property && "isId" in property && property.isId) {
-                    delete (result as Record<string, unknown>)[key];
-                }
-            }
-            return result;
-        }
-        return values;
-    } else if (status === "new") {
-        return getDefaultValuesFor(properties);
-    } else {
-        console.error({
-            status,
-            entity
-        });
-        throw new Error("Form has not been initialised with the correct parameters");
-    }
-}
-
-export function zodToFormErrors(zodError: z.ZodError): Record<string, string> {
-    let errors: Record<string, string> = {};
-    for (const issue of zodError.issues) {
-        const path = issue.path.join(".");
-        if (path && !getIn(errors, path)) {
-            errors = setIn(errors, path, issue.message) as Record<string, string>;
-        }
-    }
-    return errors;
-}
-
-function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<any>, lastSavedValues: React.MutableRefObject<any>, save: (values: EntityValues<any>) => Promise<Entity<any> | void>) {
+function useOnAutoSave<M extends Record<string, unknown>>(autoSave: undefined | boolean, formex: FormexController<M>, lastSavedValues: React.MutableRefObject<EntityValues<M> | undefined>, save: (values: EntityValues<M>) => Promise<Entity<M> | void>) {
     useEffect(() => {
         if (!autoSave) return;
         if (formex.values && !equal(formex.values, lastSavedValues.current)) {
@@ -923,4 +633,3 @@ function useOnAutoSave(autoSave: undefined | boolean, formex: FormexController<a
         }
     }, [autoSave, formex.values]);
 }
-

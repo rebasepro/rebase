@@ -75,7 +75,10 @@ async function run() {
 
     try {
         // Example: Check backend health
-        const health = await fetch(`${baseUrl}/api/health`).then(res => res.json());
+        const res = await fetch(`${baseUrl}/health`);
+        const health = res.headers.get("content-type")?.includes("application/json")
+            ? await res.json()
+            : { status: res.status, text: await res.text() };
         console.log("✅ Backend health:", health);
 
         // Example: Fetch some data (requires auth if backend is secure-by-default)

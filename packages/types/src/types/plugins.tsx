@@ -311,7 +311,7 @@ export interface PluginFormActionProps<USER extends User = User, EC extends Enti
     disabled: boolean;
     formContext?: FormContext;
     context: RebaseContext<USER>;
-    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }
 
 /**

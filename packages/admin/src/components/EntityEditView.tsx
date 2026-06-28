@@ -39,8 +39,9 @@ import {
     getIcon
 } from "@rebasepro/core";
 import { getEntityFromMemoryCache } from "@rebasepro/core";
-import { EntityForm } from "../form";
-import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
+import { EntityFormBinding } from "../form";
+import type { EntityFormBindingProps } from "../form";
+import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EntityEditViewFormActions } from "./EntityEditViewFormActions";
 import { EntityJsonPreview } from "../components/EntityJsonPreview";
 // Lazy-load history view — only loaded when user clicks the HistoryIcon tab
@@ -85,7 +86,7 @@ export interface EntityEditViewProps<M extends Record<string, unknown> = Record<
     navigateBack?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => React.ReactNode;
-    formProps?: Partial<EntityFormProps<M>>,
+    formProps?: Partial<EntityFormBindingProps<M>>,
     /**
      * Pre-populate the form with these values when creating a new entity.
      * Only applied when the form is in "new" mode (no entityId).
@@ -197,7 +198,7 @@ export function EntityEditViewInner<M extends Record<string, unknown>>({
 }) {
 
     const ResolvedFormActions = useComponentOverride("Entity.FormActions", EntityEditViewFormActions);
-    const ResolvedEntityForm = useComponentOverride("Entity.Form", EntityForm) as typeof EntityForm;
+    const ResolvedEntityForm = useComponentOverride("Entity.Form", EntityFormBinding) as typeof EntityFormBinding;
     const ResolvedCollectionView = useComponentOverride("Collection.View", EntityCollectionView);
 
     const context = useRebaseContext();

@@ -213,7 +213,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
 
     savingError?: Error;
 
-    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * This is the underlying formex controller that powers the form.
@@ -223,6 +223,12 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     formex: FormexController<M>;
 
     disabled: boolean;
+
+    /**
+     * Whether the form context is in read-only detail view mode.
+     * Custom entity views can use this to adjust their rendering.
+     */
+    readOnly?: boolean;
 }
 
 /**

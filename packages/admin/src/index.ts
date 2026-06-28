@@ -92,6 +92,11 @@ export {
     getEntityTitlePropertyKey
 } from "./util";
 
+// Headless collection view adapters
+// Map entity types to the data-agnostic CollectionView from @rebasepro/ui
+export { mapPropertyToConfig, mapPropertiesToConfigs } from "./util/propertyConfigMapper";
+export { useCollectionDataController, createStaticDataController } from "./util/dataControllerAdapter";
+
 // Data import/export — merged from former standalone packages
 export * from "./data_import";
 export * from "./data_export";

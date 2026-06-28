@@ -62,7 +62,9 @@ export function CollectionStudioView({ collectionId, onSave, onCancel, ...props 
                         handleClose={(savedCollection) => {
                             setFormDirty(false);
                             if (savedCollection) {
-                                onSave?.(savedCollection);
+                                setTimeout(() => {
+                                    onSave?.(savedCollection);
+                                }, 0);
                             }
                         }}
                         setFormDirty={setFormDirty}

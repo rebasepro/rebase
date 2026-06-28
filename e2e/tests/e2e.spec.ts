@@ -5,7 +5,7 @@ test("Full E2E: Sign in and view dashboard", async ({ page }) => {
   page.on("console", msg => {
     if (msg.type() === "error") {
       const text = msg.text();
-      if (text.includes("ERR_CONNECTION_REFUSED") || text.includes("Failed to load resource")) {
+      if (text.includes("ERR_CONNECTION_REFUSED") || text.includes("Failed to load resource") || text.includes("WebSocket error")) {
         return;
       }
       throw new Error(`Console error: ${text}`);

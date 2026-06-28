@@ -226,38 +226,45 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         } catch (e) {
             console.error(e);
         }
-    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading]);
+    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading, collections]);
 
 
-    const initialCollection = collection
-        ? {
-            ...collection,
-            slug: collection.slug ?? randomString(16)
-        }
-        : undefined;
+    const initialIcon = React.useMemo(() => coolIconKeys[Math.floor(Math.random() * coolIconKeys.length)], []);
+    const fallbackSlug = React.useMemo(() => randomString(16), []);
+
+    const initialCollection = React.useMemo(() => {
+        return collection
+            ? {
+                ...collection,
+                slug: collection.slug ?? fallbackSlug
+            }
+            : undefined;
+    }, [collection, fallbackSlug]);
 
     // Build initial values - handle copyFrom for duplication
-    const initialValues: EntityCollection<any> = initialCollection
-        ? applyPropertyConfigs(initialCollection, propertyConfigs)
-        : copyFromProp
-            ? (() => {
-                // When duplicating, copy all properties but clear identifiers
-                const { subcollections: _sub, ...rest } = copyFromProp as unknown as Record<string, unknown>;
-                return {
-                    ...rest,
-                    name: "",
+    const initialValues: EntityCollection<any> = React.useMemo(() => {
+        return initialCollection
+            ? applyPropertyConfigs(initialCollection, propertyConfigs)
+            : copyFromProp
+                ? (() => {
+                    // When duplicating, copy all properties but clear identifiers
+                    const { subcollections: _sub, ...rest } = copyFromProp as unknown as Record<string, unknown>;
+                    return {
+                        ...rest,
+                        name: "",
+                        ownerId: authController.user?.uid ?? ""
+                    } as EntityCollection<any>;
+                })()
+                : {
+                    slug: initialValuesProp?.slug ?? fallbackSlug,
+                    table: initialValuesProp?.slug ?? "",
+                    name: initialValuesProp?.name ?? "",
+                    properties: {} as Properties,
+                    propertiesOrder: [],
+                    icon: initialIcon,
                     ownerId: authController.user?.uid ?? ""
-                } as EntityCollection<any>;
-            })()
-            : {
-                slug: initialValuesProp?.slug ?? randomString(16),
-                table: initialValuesProp?.slug ?? "",
-                name: initialValuesProp?.name ?? "",
-                properties: {} as Properties,
-                propertiesOrder: [],
-                icon: coolIconKeys[Math.floor(Math.random() * coolIconKeys.length)],
-                ownerId: authController.user?.uid ?? ""
-            };
+                };
+    }, [initialCollection, propertyConfigs, copyFromProp, initialValuesProp, fallbackSlug, initialIcon, authController.user?.uid]);
 
     if (!initialLoadingCompleted) {
         return <CircularProgressCenter/>;

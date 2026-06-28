@@ -1,9 +1,9 @@
 
 import type { EntityCollection } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
-import type { EntityAction, SideEntityController } from "@rebasepro/types";
+import type { EntityAction } from "@rebasepro/types";
 import React from "react";
-import { Entity, RebaseContext } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import {
     AlertCircleIcon,
@@ -16,9 +16,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
 import { FormexController } from "@rebasepro/formex";
-import { useCMSContext } from "../index";
 
 export function EntityFormActions({
     path,
@@ -35,17 +33,11 @@ export function EntityFormActions({
     formContext
 }: EntityFormActionsProps) {
 
-    const context = useCMSContext();
-    const sideEntityController = context.sideEntityController;
-    const { t } = useTranslation();
-
     const bottomActionsProps = {
         path,
         savingError,
         entity,
         collection,
-        context,
-        sideEntityController,
         disabled,
         status,
         pluginActions,
@@ -53,7 +45,6 @@ export function EntityFormActions({
         navigateBack,
         formContext,
         formex,
-        t,
         className: layout === "responsive" ? "@6xl:hidden" : undefined
     };
 
@@ -62,8 +53,6 @@ export function EntityFormActions({
         savingError,
         entity,
         collection,
-        context,
-        sideEntityController,
         disabled,
         status,
         pluginActions,
@@ -71,7 +60,6 @@ export function EntityFormActions({
         navigateBack,
         formContext,
         formex,
-        t,
         className: layout === "responsive" ? "hidden @6xl:flex" : undefined
     };
 
@@ -94,16 +82,13 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     entity: Entity<M> | undefined,
     formActions?: EntityAction[],
     collection: EntityCollection,
-    context: RebaseContext,
-    sideEntityController: SideEntityController,
     disabled: boolean,
     status: "new" | "existing" | "copy",
     pluginActions?: React.ReactNode[],
-    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<Record<string, unknown>>;
-    t: (key: string) => string;
     className?: string;
 };
 
@@ -113,8 +98,6 @@ function buildBottomActions<M extends Record<string, unknown>>({
     path,
     formActions,
     collection,
-    context,
-    sideEntityController,
     disabled,
     status,
     pluginActions,
@@ -122,7 +105,6 @@ function buildBottomActions<M extends Record<string, unknown>>({
     navigateBack,
     formContext,
     formex,
-    t,
     className
 }: ActionsViewProps<M>) {
 
@@ -147,8 +129,8 @@ function buildBottomActions<M extends Record<string, unknown>>({
                                 entity,
                                 path: path ?? collection.slug,
                                 collection: collection,
-                                context,
-                                sideEntityController,
+                                context: undefined,
+                                sideEntityController: undefined,
                                 openEntityMode: openEntityMode,
                                 navigateBack,
                                 formContext
@@ -162,18 +144,18 @@ function buildBottomActions<M extends Record<string, unknown>>({
         <Button variant="text" disabled={disabled || formex.isSubmitting}
             color={"primary"}
             type="reset">
-            {status === "existing" ? t("discard") : t("clear")}
+            {status === "existing" ? "Discard" : "Clear"}
         </Button>
-        <Tooltip title={hasErrors ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving") : undefined}>
+        <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
             <LoadingButton variant={"filled"}
                 color="primary"
                 type="submit"
                 loading={formex.isSubmitting}
                 disabled={disabled || formex.isSubmitting}
                 startIcon={hasErrors ? <AlertCircleIcon/> : undefined}>
-                {status === "existing" && t("save")}
-                {status === "copy" && t("create_copy")}
-                {status === "new" && t("create")}
+                {status === "existing" && "Save"}
+                {status === "copy" && "Create copy"}
+                {status === "new" && "Create"}
             </LoadingButton>
         </Tooltip>
 
@@ -187,13 +169,10 @@ function buildSideActions<M extends Record<string, unknown>>({
     path,
     openEntityMode,
     collection,
-    context,
-    sideEntityController,
     disabled,
     status,
     pluginActions,
     formex,
-    t,
     className
 }: ActionsViewProps<M>) {
 
@@ -201,7 +180,7 @@ function buildSideActions<M extends Record<string, unknown>>({
 
     return <div
         className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin, className)}>
-        <Tooltip title={hasErrors ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving") : undefined}>
+        <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
             <LoadingButton fullWidth={true}
                 variant="filled"
                 color="primary"
@@ -209,13 +188,13 @@ function buildSideActions<M extends Record<string, unknown>>({
                 loading={formex.isSubmitting}
                 startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
                 disabled={disabled || formex.isSubmitting}>
-                {status === "existing" && t("save")}
-                {status === "copy" && t("create_copy")}
-                {status === "new" && t("create")}
+                {status === "existing" && "Save"}
+                {status === "copy" && "Create copy"}
+                {status === "new" && "Create"}
             </LoadingButton>
         </Tooltip>
         <Button fullWidth={true} variant="text" disabled={disabled || formex.isSubmitting} type="reset">
-            {status === "existing" ? t("discard") : t("clear")}
+            {status === "existing" ? "Discard" : "Clear"}
         </Button>
 
         {pluginActions}

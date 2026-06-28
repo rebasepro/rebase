@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { cls } from "../util";
 import { defaultBorderMixin } from "../styles";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { usePortalContainer } from "../hooks/PortalContainerContext";
+import { usePortalContainer, PortalContainerProvider } from "../hooks/PortalContainerContext";
 
 interface SheetProps {
     children: React.ReactNode;
@@ -45,6 +45,7 @@ export const Sheet: React.FC<SheetProps> = ({
     ...props
 }) => {
     const [displayed, setDisplayed] = useState(false);
+    const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
 
     // Get the portal container from context
     const contextContainer = usePortalContainer();
@@ -90,7 +91,8 @@ export const Sheet: React.FC<SheetProps> = ({
                 />}
                 <DialogPrimitive.Content
                     {...props}
-                    onFocusCapture={(event) => event.preventDefault()}
+                    ref={setContentEl}
+                    onOpenAutoFocus={(event) => event.preventDefault()}
                     onPointerDownOutside={onPointerDownOutside}
                     onInteractOutside={onInteractOutside}
                     className={cls(
@@ -112,10 +114,12 @@ export const Sheet: React.FC<SheetProps> = ({
                     )}
                     style={style}
                 >
-                    <DialogPrimitive.Title autoFocus tabIndex={0} className="sr-only outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0">
+                    <DialogPrimitive.Title className="sr-only outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0">
                         {title ?? "Sheet"}
                     </DialogPrimitive.Title>
-                    {children}
+                    <PortalContainerProvider container={contentEl}>
+                        {children}
+                    </PortalContainerProvider>
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>
         </DialogPrimitive.Root>

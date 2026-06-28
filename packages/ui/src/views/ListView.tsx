@@ -178,7 +178,8 @@ export function ListView<T>({
 
     const getItemId = useCallback((item: T): string | number => {
         if (item && typeof item === "object" && "id" in item) {
-            return (item as any).id;
+            const id = (item as Record<"id", unknown>).id;
+            return typeof id === "number" ? id : String(id);
         }
         return String(item);
     }, []);

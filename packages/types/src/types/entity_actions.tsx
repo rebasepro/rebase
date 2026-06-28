@@ -69,7 +69,7 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
 
 export type EntityActionClickProps<M extends Record<string, unknown>, USER extends User = User> = {
     entity?: Entity<M>;
-    context: RebaseContext<USER>;
+    context?: RebaseContext<USER>;
 
     path?: string;
     collection?: EntityCollection<M>;
@@ -93,7 +93,7 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     /**
      * If the action is rendered in the form, is it open in a side panel or full screen?
      */
-    openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * Optional selection controller, present if the action is being called from a collection view

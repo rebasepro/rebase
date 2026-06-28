@@ -185,7 +185,7 @@ Built entirely on modern, battle-tested web standards:
 | 🔌 **WebSockets** | Real-time synchronization |
 | 🗄️ **Drizzle ORM** | Type-safe SQL migrations and queries |
 | 🧱 **Radix UI** | Accessible UI primitives |
-| 📝 **TipTap v3** | Rich text editing |
+| 📝 **ProseMirror** | Rich text editing engine |
 | 🌐 **Hono** | Ultrafast HTTP server framework |
 
 ---

@@ -142,7 +142,7 @@ export const de = {
     "Designe dein Datenmodell visuell in Rebase Studio. Jede Änderung wird per AST in deine lokalen TypeScript-Dateien zurückgeschrieben — dein Code bleibt clean, dein Team bleibt synchron.",
   "showcase.sync.tab4.title": "Rich Text im Notion-Stil",
   "showcase.sync.tab4.desc":
-    "Ein vollwertiger Block-Editor mit Slash Commands, Markdown-Shortcuts, Drag-and-Drop, Inline-Bildern, Code-Blöcken und Task-Listen — powered by TipTap und ProseMirror.",
+    "Ein vollwertiger Block-Editor mit Slash Commands, Markdown-Shortcuts, Drag-and-Drop, Inline-Bildern, Code-Blöcken und Task-Listen — powered by ProseMirror.",
   "power.title":
     'Eine Collection.<br/><span class="text-primary subtle-shimmer">Alles generiert.</span>',
   "power.subtitle":
