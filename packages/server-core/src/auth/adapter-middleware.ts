@@ -15,7 +15,7 @@
  * token verification strategy is pluggable.
  */
 
-import type { MiddlewareHandler } from "hono";
+import type { MiddlewareHandler, Context } from "hono";
 import type { DataDriver, AuthAdapter } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
@@ -29,6 +29,12 @@ export interface AdapterAuthMiddlewareOptions {
     /** The DataDriver to scope via withAuth() for RLS. */
     driver: DataDriver;
     /**
+     * Optional per-request driver resolver for multi-data-source backends.
+     * Returns the unscoped delegate to use for this request (e.g. Postgres vs
+     * Mongo). When omitted, `driver` is used for every request.
+     */
+    resolveDriver?: (c: Context<HonoEnv>) => DataDriver;
+    /**
      * If true, return 401 when no valid user is resolved.
      * Defaults to `true` (secure by default).
      */
@@ -41,9 +47,11 @@ export interface AdapterAuthMiddlewareOptions {
  * Create a Hono middleware that uses an `AuthAdapter` for request verification.
  */
 export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOptions): MiddlewareHandler<HonoEnv> {
-    const { adapter, driver, requireAuth: enforceAuth = true, apiKeyStore } = options;
+    const { adapter, driver: baseDriver, resolveDriver, requireAuth: enforceAuth = true, apiKeyStore } = options;
 
     return async (c, next) => {
+        // Pick the per-request delegate (multi-data-source) before scoping.
+        const driver = resolveDriver ? resolveDriver(c) : baseDriver;
         // ── API Key check (Rebase-level, independent of auth adapter) ────
         if (apiKeyStore) {
             const authHeader = c.req.header("authorization") || "";

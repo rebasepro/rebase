@@ -6,6 +6,7 @@ import { serve } from "@hono/node-server";
 import { GraphQLSchemaGenerator } from "./graphql/graphql-schema-generator";
 import { RestApiGenerator } from "./rest/api-generator";
 import { DataDriver, EntityCollection, Relation } from "@rebasepro/types";
+import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
 import { ApiConfig, HonoEnv } from "./types";
 import { loadCollectionsFromDirectory } from "../collections/loader";
 import { createSchemaEditorRoutes } from "./schema-editor-routes";
@@ -142,9 +143,16 @@ export class RebaseApiServer {
             return c.json({ data: collectionsMetadata });
         });
 
+        // Server data routes are only generated for server-transport
+        // collections; direct/custom sources are client-only.
+        const dataSourceRegistry = createDataSourceRegistry(this.config.dataSources);
+        const serverCollections = (this.config.collections || []).filter(
+            (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
+        );
+
         // GraphQL endpoint
         if (this.config.enableGraphQL) {
-            const schemaGenerator = new GraphQLSchemaGenerator(this.config.collections || [], this.driver);
+            const schemaGenerator = new GraphQLSchemaGenerator(serverCollections, this.driver);
             const schema = schemaGenerator.generateSchema();
 
             // Context is automatically passed to resolvers via contextValue containing Hono's 'c'
@@ -182,7 +190,7 @@ export class RebaseApiServer {
         }
 
         if (this.config.enableREST) {
-            const restGenerator = new RestApiGenerator(this.config.collections || [], this.driver);
+            const restGenerator = new RestApiGenerator(serverCollections, this.driver);
             const restRoutes = restGenerator.generateRoutes();
             this.router.route(basePath, restRoutes);
         }

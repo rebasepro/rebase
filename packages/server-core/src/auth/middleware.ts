@@ -23,6 +23,13 @@ export interface AuthMiddlewareOptions {
     /** DataDriver to scope via withAuth() for RLS */
     driver: DataDriver;
     /**
+     * Optional per-request driver resolver for multi-data-source backends.
+     * Given the request context, returns the unscoped delegate to use (e.g.
+     * Postgres vs Mongo, picked by the request's collection data source).
+     * When omitted, `driver` is used for every request.
+     */
+    resolveDriver?: (c: Context<HonoEnv>) => DataDriver;
+    /**
      * If true, return 401 when no valid token is present.
      *
      * **Defaults to `true` (secure by default).** Set to `false` only for
@@ -232,9 +239,11 @@ export function extractUserFromToken(token: string): AccessTokenPayload | null {
  */
 
 export function createAuthMiddleware(options: AuthMiddlewareOptions): MiddlewareHandler<HonoEnv> {
-    const { driver, requireAuth: enforceAuth = true, validator, serviceKey, apiKeyStore } = options;
+    const { driver: baseDriver, resolveDriver, requireAuth: enforceAuth = true, validator, serviceKey, apiKeyStore } = options;
 
     return async (c, next) => {
+        // Pick the per-request delegate (multi-data-source) before scoping.
+        const driver = resolveDriver ? resolveDriver(c) : baseDriver;
         if (validator) {
             // Custom validator path (e.g., Firebase Auth, API keys)
             try {

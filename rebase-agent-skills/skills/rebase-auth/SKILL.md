@@ -33,6 +33,8 @@ Rebase ships a complete, built-in authentication system with JWT sessions, OAuth
 
 Authentication is configured via the `auth` property of `initializeRebaseBackend()`. It accepts **either** a `RebaseAuthConfig` object (built-in auth) or an `AuthAdapter` (external auth).
 
+> **Auth & multiple data sources.** The built-in auth system (users, sessions, API keys) is bootstrapped on the **default** data source — the auth collection must live there (the backend warns at boot otherwise). **RLS only protects Postgres**: server collections on engines without row-level security (e.g. MongoDB) still require authentication but enforce authorization at the app layer (the backend warns for these). **Direct data sources (e.g. Firestore) bypass Rebase auth entirely** — they're governed by the external backend's own rules/token; use an `AuthAdapter` (e.g. Firebase Auth) to unify identity. See the **rebase-collections** skill for the data-source model.
+
 ### RebaseAuthConfig
 
 | Property | Type | Default | Description |

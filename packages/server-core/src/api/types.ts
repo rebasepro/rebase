@@ -28,6 +28,12 @@ export type HonoEnv = {
 export interface ApiConfig {
     collections?: EntityCollection[];
     collectionsDir?: string;
+    /**
+     * Declared data sources. When provided, collections on a `direct`/`custom`
+     * transport are treated as client-only and no server routes are generated
+     * for them.
+     */
+    dataSources?: import("@rebasepro/types").DataSourceDefinition[];
     basePath?: string;
     enableGraphQL?: boolean;
     enableREST?: boolean;

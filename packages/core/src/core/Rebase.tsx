@@ -3,9 +3,9 @@ import type { RebaseProps } from "./RebaseProps";
 import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/types";
 import type { ComponentOverrideMap } from "@rebasepro/types";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
-import { RebaseContext, User, CollectionRegistryController } from "@rebasepro/types";
+import { RebaseContext, User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext } from "../contexts";
@@ -15,6 +15,7 @@ import { ErrorView } from "../components";
 import { StorageSourceContext } from "../contexts/StorageSourceContext";
 import { UserConfigurationPersistenceContext } from "../contexts/UserConfigurationPersistenceContext";
 import { RebaseDataContext } from "../contexts/RebaseDataContext";
+import { DataSourcesContext, DataSourcesContextValue } from "../contexts/DataSourcesContext";
 import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
 import { ModeControllerProvider, AdminModeControllerProvider, SnackbarProvider } from "../contexts";
 import { RebaseI18nProvider } from "../i18n/RebaseI18nProvider";
@@ -55,6 +56,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         authController: authControllerProp,
         storageSource: storageSourceProp,
         driver: driverProp,
+        dataSources: dataSourcesProp,
+        drivers: driversProp,
         data: dataProp,
         databaseAdmin,
         plugins: pluginsProp,
@@ -92,13 +95,61 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);
     const authController = authControllerProp ?? clientAuthController;
 
-    // Data fallback logic
+    // Normalize `dataSources` (+ the deprecated `drivers` shorthand) into a
+    // flat list of data sources carrying an optional client-side driver.
+    const normalizedDataSources = useMemo(() => {
+        const list: (DataSourceDefinition & { driver?: DataDriver })[] = [];
+        for (const ds of dataSourcesProp ?? []) list.push(ds);
+        for (const [key, driver] of Object.entries(driversProp ?? {})) {
+            list.push({ key, engine: key, transport: "direct", driver });
+        }
+        return list;
+    }, [dataSourcesProp, driversProp]);
+
+    // Build the data-source context: the declared registry plus a RebaseData
+    // per direct/custom source (those carrying a client-side driver). Server-
+    // mediated sources have no entry — they ride the default client.
+    //
+    // Shallow-compared against the previous build (keys + driver instances) so
+    // inline `dataSources` literals don't rebuild RebaseData instances every
+    // render and thrash data-fetch effects that key off the data identity.
+    const dataSourcesRef = useRef<{
+        sig: { key: string; driver?: DataDriver }[];
+        value: DataSourcesContextValue;
+    } | null>(null);
+    const dataSourcesValue = useMemo<DataSourcesContextValue>(() => {
+        const sig = normalizedDataSources.map((d) => ({ key: d.key, driver: d.driver }));
+        const prev = dataSourcesRef.current;
+        if (prev
+            && prev.sig.length === sig.length
+            && sig.every((s, i) => prev.sig[i].key === s.key && prev.sig[i].driver === s.driver)) {
+            return prev.value;
+        }
+        const registry: Record<string, DataSourceDefinition> = {};
+        const sources: Record<string, RebaseData> = {};
+        for (const ds of normalizedDataSources) {
+            const { driver, ...definition } = ds;
+            registry[ds.key] = definition;
+            if (driver) sources[ds.key] = buildRebaseData(driver);
+        }
+        const value: DataSourcesContextValue = { registry, sources };
+        dataSourcesRef.current = { sig, value };
+        return value;
+    }, [normalizedDataSources]);
+
+    // Data fallback logic. The resolved value is the *default* data source,
+    // serving every collection not routed to a registered direct/custom source.
     const resolvedData = useMemo(() => {
         if (dataProp) return dataProp;
         if (driverProp) return buildRebaseData(driverProp);
         if (client?.data) return client.data;
-        throw new Error("Rebase requires either `client`, `data`, or `driver` to be provided");
-    }, [dataProp, driverProp, client]);
+        // No explicit default — fall back to a registered default-keyed source
+        // (e.g. a single direct driver registered as "(default)").
+        const defaultSource = dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY]
+            ?? Object.values(dataSourcesValue.sources)[0];
+        if (defaultSource) return defaultSource;
+        throw new Error("Rebase requires either `client`, `data`, `driver`, or `dataSources` to be provided");
+    }, [dataProp, driverProp, client, dataSourcesValue]);
 
     // Storage fallback logic
     const resolvedStorage = storageSourceProp ?? client?.storage;
@@ -191,6 +242,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                     value={userConfigPersistence}>
                     <StorageSourceContext.Provider
                         value={resolvedStorage!}>
+                        <DataSourcesContext.Provider
+                            value={dataSourcesValue}>
                         <RebaseDataContext.Provider
                             value={resolvedData}>
                             <DatabaseAdminContext.Provider
@@ -212,6 +265,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                                 </AuthControllerContext.Provider>
                             </DatabaseAdminContext.Provider>
                         </RebaseDataContext.Provider>
+                        </DataSourcesContext.Provider>
                     </StorageSourceContext.Provider>
                 </UserConfigurationPersistenceContext.Provider>
             </CustomizationControllerContext.Provider>

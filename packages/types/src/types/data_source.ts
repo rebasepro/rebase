@@ -53,6 +53,90 @@ export interface DataSourceCapabilities {
  */
 export type DataSourceFeatures = Omit<DataSourceCapabilities, "key" | "label">;
 
+/**
+ * The default data-source key, used when a collection does not name a
+ * `dataSource`. Shared by the frontend router and the backend driver
+ * registry so both agree on "the default database".
+ * @group Models
+ */
+export const DEFAULT_DATA_SOURCE_KEY = "(default)";
+
+/**
+ * How the *frontend* reaches a data source.
+ *
+ * - `"server"` — through the Rebase backend (the `RebaseClient`). The backend
+ *   holds the actual database adapter and routes by data-source key. This is
+ *   the default and covers Postgres, MongoDB, and any other server-mediated
+ *   engine.
+ * - `"direct"` — straight from the client to the external backend via its own
+ *   SDK driver (e.g. Firestore). The Rebase backend is not in the data path.
+ * - `"custom"` — a developer-supplied {@link DataDriver}, transport unspecified.
+ *
+ * @group Models
+ */
+export type DataSourceTransport = "server" | "direct" | "custom";
+
+/**
+ * Declarative definition of a data source — a named place data lives.
+ *
+ * Declared once and shared front and back: the frontend uses it to decide
+ * transport (client vs direct driver), the backend uses the same `key` to
+ * resolve a database adapter, and the editor derives capabilities from
+ * `engine`. Collections reference a definition by its `key` via
+ * `collection.dataSource`.
+ *
+ * @group Models
+ */
+export interface DataSourceDefinition {
+    /**
+     * Unique identifier for this data source. Collections point at it via
+     * `dataSource`. Defaults to {@link DEFAULT_DATA_SOURCE_KEY}.
+     */
+    key: string;
+
+    /**
+     * The engine backing this data source (e.g. `"postgres"`, `"mongodb"`,
+     * `"firestore"`, or a custom id). Determines the
+     * {@link DataSourceCapabilities} surfaced in the editor.
+     */
+    engine: string;
+
+    /**
+     * How the frontend reaches this source. Defaults to `"server"`.
+     */
+    transport: DataSourceTransport;
+
+    /**
+     * The physical database/schema/Firestore-database within the engine.
+     * Threaded to drivers/adapters as the existing `databaseId` runtime
+     * parameter. Defaults to the engine's own default.
+     */
+    databaseId?: string;
+
+    /** Human-readable label for the UI. */
+    label?: string;
+}
+
+/**
+ * The resolved data source for a collection: the single source of truth that
+ * the frontend router, backend registry, and editor all derive from.
+ * Produced by `resolveDataSource(collection, registry)`.
+ *
+ * @group Models
+ */
+export interface ResolvedDataSource {
+    /** Data-source key (routing key, shared front + back). */
+    key: string;
+    /** Engine backing the source (drives capabilities). */
+    engine: string;
+    /** Frontend transport. */
+    transport: DataSourceTransport;
+    /** Within-engine instance, if any (the `databaseId` runtime param). */
+    databaseId?: string;
+    /** Capabilities derived from {@link engine}. */
+    capabilities: DataSourceCapabilities;
+}
+
 // ── Built-in driver capabilities ─────────────────────────────────────
 
 /** @group Models */

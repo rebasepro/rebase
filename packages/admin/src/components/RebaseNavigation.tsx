@@ -1,4 +1,4 @@
-import React, { useMemo, lazy, Suspense } from "react";
+import React, { useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import {
     useRebaseRegistry,
     useRebaseContext,
@@ -7,10 +7,14 @@ import {
     useAdminModeController,
     useBuildLocalConfigurationPersistence,
     useRebaseClient,
+    useData,
+    useDataSources,
     StudioBridgeRegistryProvider,
     useBridgeRegistration,
-    CustomizationControllerContext
+    CustomizationControllerContext,
+    RebaseDataContext
 } from "@rebasepro/core";
+import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, EntityCollection, RebasePlugin } from "@rebasepro/types";
 import type { CollectionRegistryController } from "@rebasepro/types";
@@ -86,7 +90,24 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // ── Build the navigation controllers ──────────────────────────────
     const collectionsBuilder = useMemo(() => Array.isArray(cmsCollections) ? () => [...cmsCollections] : cmsCollections, [cmsCollections]);
 
-    const collectionRegistryController = useBuildCollectionRegistryController({ userConfigPersistence });
+    const dataSources = useDataSources();
+    const collectionRegistryController = useBuildCollectionRegistryController({ userConfigPersistence, dataSources: dataSources.registry });
+
+    // ── Multi-data-source routing ─────────────────────────────────────
+    // Combine the default data source (server transport) with the registered
+    // direct/custom sources from <Rebase> and route each collection by its
+    // resolved data-source key, looked up by path against the collection
+    // registry. A stable resolver ref keeps the routed data instance
+    // referentially stable across registry rebuilds, so data-effect
+    // dependencies don't thrash.
+    const defaultData = useData();
+    const getCollectionRef = useRef(collectionRegistryController.getCollection);
+    getCollectionRef.current = collectionRegistryController.getCollection;
+    const routedData = useMemo(() => buildRoutedRebaseData({
+        defaultData,
+        sources: dataSources.sources,
+        resolveKey: (slugOrPath) => resolveDataSource(getCollectionRef.current(slugOrPath), dataSources.registry).key
+    }), [defaultData, dataSources]);
 
     const urlController = useBuildUrlController({
         basePath: "/",
@@ -101,6 +122,26 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         () => Array.isArray(cmsCollections) ? cmsCollections : [],
         [cmsCollections]
     );
+
+    // ── Dev-only data-source sanity check ─────────────────────────────
+    // Warn about data sources declared with a direct/custom transport that
+    // have no client-side driver — these silently fall back to the default
+    // (server) source, a common source of misrouting. Unambiguous: it never
+    // false-positives on server-mediated sources (which intentionally have
+    // no client driver).
+    useEffect(() => {
+        if (process.env.NODE_ENV === "production") return;
+        const { registry, sources } = dataSources;
+        const missing = Object.values(registry)
+            .filter((d) => (d.transport === "direct" || d.transport === "custom") && !sources[d.key])
+            .map((d) => d.key);
+        if (missing.length > 0) {
+            console.warn(
+                `[Rebase] These data source(s) declare a direct/custom transport but have no client-side driver and will fall back to the default data source: ${missing.map(k => `"${k}"`).join(", ")}. ` +
+                `Provide a \`driver\` for them in \`dataSources\` on <Rebase>.`
+            );
+        }
+    }, [dataSources]);
 
     const internalConfigController = useLocalCollectionsConfigController(
         rebaseClient,
@@ -160,7 +201,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         views: mergedViews,
         navigationGroupMappings: registry.cmsConfig?.navigationGroupMappings,
         authController: context.authController!,
-        data: context.data,
+        data: routedData,
         collectionRegistryController,
         urlController,
         adminMode: adminModeController?.mode
@@ -193,7 +234,11 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);
 
     // ── Inner content with all context providers ──────────────────────
+    // Re-provide RebaseDataContext with the routed data so that every CMS
+    // consumer (list/entity views, references, board, import/export, and
+    // `context.data`) is routed to the correct driver by collection path.
     const navigationContent = (
+        <RebaseDataContext.Provider value={routedData}>
         <CustomizationControllerContext.Provider value={enrichedCustomizationController}>
         <StudioBridgeRegistryProvider>
             <CollectionRegistryContext.Provider value={collectionRegistryController}>
@@ -212,6 +257,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             </CollectionRegistryContext.Provider>
         </StudioBridgeRegistryProvider>
         </CustomizationControllerContext.Provider>
+        </RebaseDataContext.Provider>
     );
 
     // ── Wrap with ConfigControllerProvider when collection editor is enabled ──

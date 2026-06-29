@@ -139,7 +139,9 @@ export default productsCollection;
 | `description` | `string` | — | Description shown in the UI (supports Markdown) |
 | `icon` | `string \| ReactNode` | — | Lucide icon name or React element |
 | `group` | `string` | `"Views"` | Sidebar group heading |
-| `driver` | `"postgres" \| undefined` | `undefined` | Backend driver (Postgres is default) |
+| `dataSource` | `string` | `"(default)"` | Data-source key — routes the collection to a backend registered on `<Rebase dataSources>` / `initializeRebaseBackend({ dataSources })`. See **Data sources & multiple backends** below. |
+| `driver` | `string` | `undefined` | **Deprecated** — engine hint (`"postgres"`/`"firestore"`/`"mongodb"`). Prefer `dataSource`. When `dataSource` is omitted, `driver` doubles as the routing key. |
+| `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
 | `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
 | `defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
 | `enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
@@ -185,6 +187,59 @@ export default productsCollection;
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
 | `components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
 
+
+## Data sources & multiple backends
+
+A collection lives in a **data source** identified by `collection.dataSource`
+(default `"(default)"`). A data source has an **engine** (`postgres`,
+`mongodb`, `firestore`, custom → drives editor capabilities) and a **transport**:
+
+- **`server`** — through the Rebase backend/client. Covers Postgres, MongoDB,
+  and any server-mediated engine. This is the default; such collections need no
+  registration.
+- **`direct`** — straight from the client to an external backend via its SDK
+  (e.g. Firestore). The Rebase backend is not in the data path.
+- **`custom`** — a developer-supplied `DataDriver`.
+
+Register the non-default (direct/custom) sources once; server engines ride the
+client and only need a backend bootstrapper.
+
+```tsx
+// Frontend — register direct/custom sources (Postgres rides the client)
+<Rebase
+  client={rebaseClient}
+  dataSources={[
+    { key: "analytics", engine: "firestore", transport: "direct", driver: firestoreDriver }
+  ]}
+/>
+
+// A collection opts in by key:
+{ slug: "events", dataSource: "analytics", properties: { /* … */ } }
+```
+
+```ts
+// Backend — multiple engines in one instance (Postgres + MongoDB)
+initializeRebaseBackend({
+  bootstrappers: [pgBootstrapper /* isDefault */, mongoBootstrapper],
+  // Declare direct/custom sources so the backend skips server routes for them:
+  dataSources: [{ key: "analytics", engine: "firestore", transport: "direct" }],
+  collections: [
+    { slug: "products" },                  // → Postgres (default)
+    { slug: "orders", driver: "mongodb" }  // → MongoDB
+  ],
+});
+```
+
+Routing is automatic and resolved by collection path: list/entity views,
+references, board, import/export, and `context.data` all hit the right backend
+with no per-collection wiring. The data-source key matches the backend
+bootstrapper id/type (e.g. `"mongodb"`). RLS is applied per-engine where
+supported. The deprecated `drivers={{ key: driver }}` prop is a shorthand for a
+single `direct` `dataSources` entry.
+
+> **Migration note:** collection-level `driver` is deprecated in favor of
+> `dataSource`. It still works (and provides the engine hint), so existing
+> Firestore collections using `driver: "firestore"` keep functioning.
 
 ## Common Property Options (BaseProperty)
 

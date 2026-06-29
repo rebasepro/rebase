@@ -435,7 +435,8 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-
 | `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty) |
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
 | `database` | `DatabaseAdapter` | — | Database adapter (takes precedence over `bootstrappers`) |
-| `bootstrappers` | `BackendBootstrapper[]` | `[]` | Database bootstrappers (legacy — prefer `database`) |
+| `bootstrappers` | `BackendBootstrapper[]` | `[]` | Database bootstrappers. Use one per engine for multiple engines in a single instance (e.g. Postgres + MongoDB); mark one `isDefault` |
+| `dataSources` | `DataSourceDefinition[]` | `[]` | Declared data sources (`key`, `engine`, `transport`). Drives capabilities and the server-vs-direct distinction. Collections on a `direct`/`custom` transport are client-only — the backend skips data routes for them. Server engines need no entry |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration |
 | `history` | `unknown` | — | Entity history/audit-log configuration |

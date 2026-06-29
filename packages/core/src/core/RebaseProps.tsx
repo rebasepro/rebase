@@ -1,5 +1,21 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
+
+/**
+ * A data source registered on `<Rebase>`. Extends the shared
+ * {@link DataSourceDefinition} with the frontend {@link DataDriver} used for
+ * `direct`/`custom` transports. Server-mediated sources omit `driver` — they
+ * are reached through the `client`.
+ *
+ * @group Models
+ */
+export type RebaseDataSource = DataSourceDefinition & {
+    /**
+     * The client-side driver for this source. Required for `direct`/`custom`
+     * transports; omit for `server` transport (handled by the `client`).
+     */
+    driver?: DataDriver;
+};
 
 /** DeepPartial helper — allows partial overrides at any nesting level */
 type DeepPartial<T> = T extends object
@@ -74,9 +90,53 @@ export type RebaseProps<USER extends User> = {
     data?: RebaseData;
 
     /**
-     * Optional override for DataDriver if not using `client`
+     * Optional override for DataDriver if not using `client`.
+     *
+     * This sets the **default** data driver — it handles every collection
+     * that does not match an entry in {@link drivers}.
      */
     driver?: DataDriver;
+
+    /**
+     * Additional data sources beyond the default `client`/`driver`/`data`.
+     *
+     * Register the **direct** (e.g. Firestore, talking straight to its backend)
+     * and **custom** sources here. Server-mediated sources (Postgres, MongoDB,
+     * …) do *not* need an entry — they ride the `client` and are routed by the
+     * Rebase backend.
+     *
+     * Collections are routed automatically by their `dataSource` key (resolved
+     * by collection path against the registry), so routing works transparently
+     * for list/entity views, references, the board view, import/export, and
+     * programmatic `context.data` access — no per-collection wiring.
+     *
+     * @example
+     * ```tsx
+     * // Postgres via the Rebase client (default) + a direct Firestore source.
+     * <Rebase
+     *     client={rebaseClient}
+     *     dataSources={[
+     *         { key: "analytics", engine: "firestore", transport: "direct", driver: firestoreDriver }
+     *     ]}
+     * >
+     * // Collections opt in with `{ ..., dataSource: "analytics" }`.
+     * ```
+     */
+    dataSources?: RebaseDataSource[];
+
+    /**
+     * Map of direct/custom data drivers, keyed by data-source key.
+     *
+     * @deprecated Use {@link dataSources} instead. This is a shorthand kept for
+     * backward compatibility — each entry is treated as
+     * `{ key, engine: key, transport: "direct", driver }`.
+     *
+     * @example
+     * ```tsx
+     * <Rebase client={rebaseClient} drivers={{ firestore: firestoreDriver }}>
+     * ```
+     */
+    drivers?: Record<string, DataDriver>;
 
     /**
      * Optional override for AuthController if not using `client`

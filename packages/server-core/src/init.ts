@@ -5,6 +5,7 @@ import {
     BootstrappedAuth,
     DatabaseAdapter,
     DataDriver,
+    DataSourceDefinition,
     EntityCollection,
     HealthCheckResult,
     InitializedDriver,
@@ -13,9 +14,11 @@ import {
     RealtimeProvider,
     SecurityRule
 } from "@rebasepro/types";
+import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
+import { createRoutedRealtimeService } from "./services/routed-realtime-service";
 import { Server } from "http";
 
 import { RestApiGenerator } from "./api/rest/api-generator";
@@ -138,6 +141,16 @@ export interface RebaseBackendConfig {
     server: Server;
     app: Hono<HonoEnv>;
     basePath?: string;
+
+    /**
+     * Declared data sources, shared with the frontend `<Rebase dataSources>`.
+     *
+     * Used to resolve each collection's engine (capabilities) and transport.
+     * Collections on a `direct`/`custom` transport are client-only: the backend
+     * still owns their schema/registry but does **not** generate server data
+     * routes for them. Server-mediated sources (the default) need no entry.
+     */
+    dataSources?: DataSourceDefinition[];
 
     /**
      * Database bootstrappers.
@@ -319,6 +332,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     configureMiddlewares(config.app, basePath, isProduction, config);
 
     const collectionRegistry = new BackendCollectionRegistry();
+    // Declared data sources — drives engine resolution (capabilities) and the
+    // server-vs-direct transport distinction. Set before collections register
+    // so normalization can resolve each collection's engine.
+    const dataSourceRegistry = createDataSourceRegistry(config.dataSources);
+    collectionRegistry.setDataSources(dataSourceRegistry);
     let activeCollections = config.collections || [];
     if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
@@ -407,6 +425,56 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
 
+    // Resolve a collection path (e.g. "products", "authors/1/posts") to its
+    // data-source key — shared by the data-driver router and the realtime
+    // router. Falls back to the default key for unknown paths.
+    const keyForCollectionPath = (collectionPath: string): string => {
+        const slug = collectionPath.replace(/^\/+/, "").split("/")[0]?.split("?")[0];
+        if (!slug) return DEFAULT_DRIVER_ID;
+        const collection = collectionRegistry.get(slug) ?? collectionRegistry.getCollectionByPath(slug);
+        if (!collection) return DEFAULT_DRIVER_ID;
+        return resolveDataSource(collection, dataSourceRegistry).key;
+    };
+
+    // ── Data-source misconfiguration check ────────────────────────────────
+    // A server-transport collection whose resolved data-source key has no
+    // registered driver delegate would silently fall back to the default
+    // driver — i.e. land in the wrong database. Warn loudly so this surfaces
+    // at boot rather than as mysterious data going to the wrong engine.
+    {
+        const unresolved = new Map<string, string[]>();
+        const nonRlsEngines = new Set<string>();
+        for (const collection of activeCollections) {
+            const ds = resolveDataSource(collection, dataSourceRegistry);
+            if (ds.transport !== "server") continue; // direct/custom are client-only
+            // Server engines without row-level security enforce authorization
+            // only at the application layer — surface this so it isn't a
+            // silent assumption. (The default Postgres engine supports RLS.)
+            if (!ds.capabilities.supportsRLS) nonRlsEngines.add(ds.engine);
+            if (ds.key === DEFAULT_DRIVER_ID) continue; // always maps to the default
+            if (!driverRegistry.has(ds.key)) {
+                const slugs = unresolved.get(ds.key) ?? [];
+                slugs.push(collection.slug ?? collection.name ?? "?");
+                unresolved.set(ds.key, slugs);
+            }
+        }
+        for (const [key, slugs] of unresolved) {
+            logger.warn(
+                `[DataSource] No driver registered for data source "${key}" ` +
+                `(used by: ${slugs.join(", ")}). These collections will fall back to the ` +
+                `default driver "${defaultDriverId}" — register a bootstrapper with this id, ` +
+                `or mark the data source as a direct/custom transport in \`dataSources\`.`
+            );
+        }
+        for (const engine of nonRlsEngines) {
+            logger.warn(
+                `[DataSource] Engine "${engine}" does not support row-level security; ` +
+                `authorization for its collections is enforced only at the application layer ` +
+                `(authentication still applies). Ensure app-level checks or engine-native rules are in place.`
+            );
+        }
+    }
+
     // 2. Initialize Auth & History via the default driver's bootstrapper
     let authConfigResult: BootstrappedAuth | undefined = undefined;
     let serviceKey: string | undefined;
@@ -442,6 +510,23 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 if (foundAuthCollection) {
                     safeAuthConfig.collection = foundAuthCollection;
                     logger.info("Auto-discovered auth collection from collection definitions", { slug: foundAuthCollection.slug });
+                }
+            }
+
+            // The built-in auth subsystem (users, sessions, repository) is
+            // bootstrapped on the DEFAULT driver. If the auth collection is
+            // routed to a non-default data source, login would read/write the
+            // default engine while the collection's data views hit another —
+            // a split-brain user store. Warn loudly.
+            if (safeAuthConfig.collection) {
+                const authDs = resolveDataSource(safeAuthConfig.collection, dataSourceRegistry);
+                if (authDs.key !== DEFAULT_DRIVER_ID) {
+                    logger.warn(
+                        `[Auth] The auth collection "${safeAuthConfig.collection.slug}" is on data source ` +
+                        `"${authDs.key}", but the built-in auth system always uses the default data source. ` +
+                        `Move the auth collection to the default data source, or replace auth with an AuthAdapter ` +
+                        `that manages users in "${authDs.key}".`
+                    );
                 }
             }
 
@@ -675,18 +760,39 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             );
         }
 
+        // Multi-data-source routing: when more than one database engine is
+        // registered (e.g. Postgres + MongoDB in one instance), resolve the
+        // delegate per request from the request's collection data source. The
+        // auth middleware then scopes that delegate (RLS for Postgres, no-op
+        // for engines without `withAuth()`) into the request context. For a
+        // single-engine backend this is omitted — behaviour is unchanged.
+        const dataPathMarker = `${basePath}/data/`;
+        const resolveRequestDriver = (reqPath: string): DataDriver => {
+            const i = reqPath.indexOf(dataPathMarker);
+            const collectionPath = i >= 0 ? reqPath.slice(i + dataPathMarker.length) : reqPath;
+            const key = keyForCollectionPath(collectionPath);
+            // Use the authoritative default for the default key; otherwise the
+            // named delegate, falling back to default if it isn't registered.
+            if (!key || key === DEFAULT_DRIVER_ID) return defaultDriver;
+            return driverRegistry.get(key) ?? defaultDriver;
+        };
+        const multiEngine = bootstrappers.length > 1;
+        const resolveDriver = multiEngine ? ((c: { req: { path: string } }) => resolveRequestDriver(c.req.path)) : undefined;
+
         // Use adapter middleware when an AuthAdapter is available,
         // falling back to the built-in JWT middleware otherwise.
         if (authAdapter) {
             dataRouter.use("/*", createAdapterAuthMiddleware({
                 adapter: authAdapter,
                 driver: defaultDriver,
+                resolveDriver,
                 requireAuth: dataRequireAuth,
                 apiKeyStore
             }));
         } else {
             dataRouter.use("/*", createAuthMiddleware({
                 driver: defaultDriver,
+                resolveDriver,
                 requireAuth: dataRequireAuth,
                 serviceKey,
                 apiKeyStore
@@ -709,8 +815,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             dataRouter.route("/", historyRoutes);
         }
 
+        // Only generate server data routes for server-mediated collections.
+        // Collections on a direct/custom transport are client-only — the
+        // backend must not expose a (mis-engined) endpoint for them.
+        const serverCollections = activeCollections.filter(
+            (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
+        );
+
         const restGenerator = new RestApiGenerator(
-            activeCollections,
+            serverCollections,
             defaultDriver,
             config.hooks?.data,
             authAdapter
@@ -883,8 +996,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    if (defaultBootstrapper.initializeWebsockets && defaultRealtimeService) {
-        await defaultBootstrapper.initializeWebsockets(config.server, defaultRealtimeService, defaultDriver, config.auth, authAdapter);
+    // With multiple realtime-capable engines, route subscriptions to the
+    // provider owning each collection (the realtime counterpart of the data
+    // router). The single WebSocket server is driven by this composite.
+    // Single-engine setups use the default provider unchanged.
+    const effectiveRealtimeService: RealtimeProvider = Object.keys(realtimeServices).length > 1
+        ? createRoutedRealtimeService({
+            providers: realtimeServices,
+            defaultKey: defaultDriverId,
+            resolveKey: keyForCollectionPath
+        })
+        : defaultRealtimeService as RealtimeProvider;
+
+    if (defaultBootstrapper.initializeWebsockets && effectiveRealtimeService) {
+        await defaultBootstrapper.initializeWebsockets(config.server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter);
     }
 
     logger.info("Rebase Backend Initialized");
@@ -903,7 +1028,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         driverRegistry,
         driver: defaultDriver,
         realtimeServices,
-        realtimeService: defaultRealtimeService as RealtimeProvider,
+        realtimeService: effectiveRealtimeService,
         auth: authConfigResult,
         history: historyConfigResult,
         storageRegistry,

@@ -4,6 +4,8 @@ export * from "./AdminModeController";
 export * from "./EffectiveRoleController";
 export * from "./AuthControllerContext";
 export * from "./DataDriverContext";
+export * from "./DataSourcesContext";
+export * from "./RebaseDataContext";
 export * from "./AnalyticsContext";
 export * from "./StorageSourceContext";
 export * from "./UserConfigurationPersistenceContext";

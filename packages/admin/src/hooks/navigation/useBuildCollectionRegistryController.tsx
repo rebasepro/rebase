@@ -1,16 +1,21 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { EntityCollection, DataSourceDefinition } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
 import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
 
 export function useBuildCollectionRegistryController(props: {
-    userConfigPersistence?: UserConfigurationPersistence
+    userConfigPersistence?: UserConfigurationPersistence,
+    dataSources?: Record<string, DataSourceDefinition>
 }): CollectionRegistryController & {
     collectionRegistryRef: React.MutableRefObject<CollectionRegistry>;
 } {
-    const { userConfigPersistence } = props;
-    const collectionRegistryRef = useRef<CollectionRegistry>(new CollectionRegistry());
+    const { userConfigPersistence, dataSources } = props;
+    const collectionRegistryRef = useRef<CollectionRegistry>(new CollectionRegistry(undefined, dataSources));
+    // Keep the registry's data sources in sync (used to resolve engine during
+    // normalization). Applied synchronously before the async registration
+    // effect in useResolvedCollections runs.
+    if (dataSources) collectionRegistryRef.current.setDataSources(dataSources);
     const [initialised, setInitialised] = useState(false);
 
     const getCollection = useCallback((

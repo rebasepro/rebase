@@ -58,34 +58,44 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
 
     /**
-     * Which driver handles this collection.
-     * Use this to route collections to different backends:
-     * - `"postgres"` - Route to PostgreSQL backend
-     * - `"firestore"` - Route to Firestore (client-side)
-     * - `"mongodb"` - Route to MongoDB backend
-     * - Custom IDs for your own driver implementations
+     * The data source this collection belongs to — the routing key shared by
+     * the frontend router and the backend driver registry. It points at a
+     * {@link DataSourceDefinition} registered on `<Rebase dataSources>` (front)
+     * and `initRebase({ dataSources })` (back).
      *
-     * If not specified, the default driver `"(default)"` is used.
+     * If not specified, the default data source `"(default)"` is used, which
+     * for a standard Rebase app is the server-mediated Postgres backend.
      *
      * @example
-     * // Simple - no driver needed for default
+     * // Default data source (server-mediated Postgres)
      * { slug: "products" }
      *
-     * // Firestore collection (client-side real-time)
-     * { slug: "analytics", driver: "firestore" }
+     * // A direct-transport Firestore data source registered as "analytics"
+     * { slug: "events", dataSource: "analytics" }
+     */
+    dataSource?: string;
+
+    /**
+     * The engine backing this collection (`"postgres"`, `"firestore"`,
+     * `"mongodb"`, or a custom id). Drives editor capabilities (relations vs
+     * subcollections, RLS, column types).
      *
-     * // Multiple databases within a driver
-     * { slug: "orders", driver: "postgres", databaseId: "orders_db" }
+     * @deprecated Prefer {@link dataSource} for routing. `driver` is retained
+     * as an engine hint and for backward compatibility: when `dataSource` is
+     * omitted it also acts as the data-source key.
+     *
+     * If not specified, `"postgres"` is assumed.
      */
     driver?: string;
 
     /**
-     * Which database within the driver.
+     * Which database within the engine.
      * - For Firestore: The Firestore database ID (e.g., for multi-database projects)
      * - For PostgreSQL: Schema or database name
      * - For MongoDB: Database name
      *
-     * If not specified, the default database of the driver is used.
+     * If not specified, the default database of the engine is used. Resolved
+     * from the collection's {@link DataSourceDefinition} when omitted here.
      */
     databaseId?: string;
 

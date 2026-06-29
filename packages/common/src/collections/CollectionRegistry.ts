@@ -15,8 +15,16 @@ import { deepEqual } from "fast-equals";
 
 import { enumToObjectEntries, getSubcollections, getTableName, resolveCollectionRelations, findRelation, sanitizeRelation } from "../util";
 import { removeFunctions, mergeDeep, deepClone } from "@rebasepro/utils";
+import { resolveDataSource, DataSourceRegistry } from "../data/resolveDataSource";
 
 export class CollectionRegistry {
+
+    /**
+     * Declared data sources, used during normalization to resolve each
+     * collection's engine (so `dataSource`-only collections get the right
+     * capabilities). Empty by default → behaviour keys off `driver` as before.
+     */
+    private dataSources: DataSourceRegistry = {};
 
     // Normalized runtime layer (used by Data Grid / UI)
     private collectionsByTableName = new Map<string, EntityCollection>();
@@ -34,10 +42,22 @@ export class CollectionRegistry {
     // to avoid the issue where normalization creates new objects that always fail equality.
     private lastRawInputSnapshot: ReturnType<typeof removeFunctions>[] | null = null;
 
-    constructor(collections?: EntityCollection[]) {
+    constructor(collections?: EntityCollection[], dataSources?: DataSourceRegistry) {
+        if (dataSources) this.dataSources = dataSources;
         if (collections) {
             this.registerMultiple(collections);
         }
+    }
+
+    /**
+     * Provide the declared data sources used to resolve each collection's
+     * engine during normalization. Set this before registering collections.
+     * Returns true if the registry changed (callers may re-register).
+     */
+    setDataSources(dataSources: DataSourceRegistry): boolean {
+        if (deepEqual(this.dataSources, dataSources)) return false;
+        this.dataSources = dataSources ?? {};
+        return true;
     }
 
     reset() {
@@ -162,6 +182,19 @@ export class CollectionRegistry {
         // This is critical for idempotency (the raw input must not be changed)
         // and for preventing mutation of module-level collection singletons.
         const result = { ...collection } as EntityCollection;
+
+        // 0. For `dataSource`-only collections (no explicit `driver`), resolve
+        //    the engine from the data-source registry and stamp it as `driver`
+        //    on the normalized copy, so downstream capability lookups (which
+        //    read `driver`) are correct. Surgical on purpose: collections that
+        //    already set `driver`, and plain default collections (no driver,
+        //    no dataSource), are left untouched. Only the normalized layer is
+        //    affected — the raw layer used by the collection editor keeps the
+        //    author's original fields.
+        if (result.dataSource && !result.driver) {
+            const engine = resolveDataSource(result, this.dataSources).engine;
+            if (engine) (result as { driver?: string }).driver = engine;
+        }
 
         // 1. Extract relations from properties that have inline config (target set)
         const extractedRelations = this.extractRelationsFromProperties(result.properties);
