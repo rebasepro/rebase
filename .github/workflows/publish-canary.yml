@@ -58,6 +58,8 @@ jobs:
 
       - name: Publish to npm
         run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --tag canary --no-git-checks --access public --report-summary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Summary
         run: |

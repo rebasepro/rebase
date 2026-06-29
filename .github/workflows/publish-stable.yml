@@ -140,6 +140,8 @@ jobs:
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
         run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --no-git-checks --access public --report-summary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag and push
         if: ${{ !inputs.dry_run }}
