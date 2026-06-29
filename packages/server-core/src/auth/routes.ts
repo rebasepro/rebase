@@ -16,6 +16,7 @@ import { logger } from "../utils/logger";
 import { mountMfaRoutes } from "./mfa-routes";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
+import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -56,7 +57,7 @@ function buildAuthResponse(
     roleIds: string[],
     accessToken: string,
     refreshToken: string
-) {
+): AuthResponsePayload {
     return {
         user: {
             uid: user.id,
@@ -97,6 +98,29 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     const authRepo = config.authRepo;
     const { emailService, emailConfig, allowRegistration = false } = config;
     const ops = resolveAuthHooks(config.authHooks);
+
+    /**
+     * Apply the `transformAuthResponse` hook if provided.
+     *
+     * Errors are caught and logged — the untransformed response is returned
+     * as a graceful fallback so auth never breaks due to a hook failure.
+     */
+    async function applyTransformHook(
+        response: AuthResponsePayload,
+        method: TransformAuthResponseContext["method"],
+        request: Request,
+        userId: string
+    ): Promise<AuthResponsePayload> {
+        if (!ops.transformAuthResponse) return response;
+        try {
+            return await ops.transformAuthResponse(response, { userId, method, request });
+        } catch (err) {
+            logger.error("[AuthHooks] transformAuthResponse error", {
+                error: err instanceof Error ? err.message : err
+            });
+            return response;
+        }
+    }
 
     // ── Zod input schemas ──────────────────────────────────────────────
     const registerSchema = z.object({
@@ -294,7 +318,9 @@ displayName: user.displayName });
             });
         }
 
-        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken);
+        const finalResponse = await applyTransformHook(authResponse, "register", c.req.raw, user.id);
+        return c.json(finalResponse, 201);
     });
 
     /**
@@ -358,7 +384,9 @@ displayName: user.displayName });
             email
         });
 
-        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken);
+        const finalResponse = await applyTransformHook(authResponse, "login", c.req.raw, user.id);
+        return c.json(finalResponse);
     });
 
     /**
@@ -451,7 +479,9 @@ displayName: user.displayName });
                     c.req.header("x-forwarded-for") || "unknown"
                 );
 
-                return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
+                const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken);
+                const finalResponse = await applyTransformHook(authResponse, "oauth", c.req.raw, user.id);
+                return c.json(finalResponse);
             });
         }
     }
@@ -727,13 +757,15 @@ aal: "aal1" };
             ipAddress
         );
 
-        return c.json({
+        const refreshResponse: AuthResponsePayload = {
             tokens: {
                 accessToken: newAccessToken,
                 refreshToken: newRefreshToken,
                 accessTokenExpiresAt: getAccessTokenExpiry()
             }
-        });
+        };
+        const finalResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.userId);
+        return c.json(finalResponse);
     });
 
     mountSessionRoutes({
@@ -742,13 +774,14 @@ aal: "aal1" };
         ops,
         parseBody,
         buildAuthResponse,
-        createSessionAndTokens
+        createSessionAndTokens,
+        applyTransformHook
     });
 
     // ═══════════════════════════════════════════════════════════════════════
     // MFA / TOTP
     // ═══════════════════════════════════════════════════════════════════════
-    mountMfaRoutes(router, config, ops, parseBody);
+    mountMfaRoutes(router, config, ops, parseBody, applyTransformHook);
 
     // ═══════════════════════════════════════════════════════════════════════
     // Magic Link (passwordless email login)
@@ -760,7 +793,8 @@ aal: "aal1" };
             ops,
             parseBody,
             buildAuthResponse,
-            createSessionAndTokens
+            createSessionAndTokens,
+            applyTransformHook
         });
     }
 

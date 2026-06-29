@@ -10,6 +10,7 @@ import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
+import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 interface SessionRoutesConfig {
     router: Hono<HonoEnv>;
@@ -27,10 +28,16 @@ interface SessionRoutesConfig {
         accessToken: string;
         refreshToken: string;
     }>;
+    applyTransformHook: (
+        response: AuthResponsePayload,
+        method: TransformAuthResponseContext["method"],
+        request: Request,
+        userId: string
+    ) => Promise<AuthResponsePayload>;
 }
 
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens } = opts;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = opts;
     const authRepo = config.authRepo;
 
     const logoutSchema = z.object({
@@ -284,7 +291,9 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             });
         }
 
-        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken), 201);
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken) as AuthResponsePayload;
+        const finalResponse = await applyTransformHook(authResponse, "anonymous", c.req.raw, user.id);
+        return c.json(finalResponse, 201);
     });
 
     /**
@@ -337,6 +346,8 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             c.req.header("x-forwarded-for") || "unknown"
         );
 
-        return c.json(buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken));
+        const authResponse = buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken) as AuthResponsePayload;
+        const finalResponse = await applyTransformHook(authResponse, "anonymous", c.req.raw, user.id);
+        return c.json(finalResponse);
     });
 }

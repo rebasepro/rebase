@@ -220,6 +220,49 @@ export interface UserCreationFinalizeResult {
     invitationSent: boolean;
 }
 
+// ─── Auth Response Transform ─────────────────────────────────────────────────
+
+/**
+ * The auth response payload shape that flows through `transformAuthResponse`.
+ *
+ * For login, register, OAuth, anonymous, and magic-link flows the payload
+ * contains both `user` and `tokens`. For refresh and MFA flows the payload
+ * contains only `tokens` (no `user`).
+ *
+ * @group Auth
+ */
+export interface AuthResponsePayload {
+    user?: {
+        uid: string;
+        email: string;
+        displayName: string | null;
+        photoURL: string | null;
+        roles: string[];
+        metadata: Record<string, unknown>;
+    };
+    tokens: {
+        accessToken: string;
+        refreshToken: string;
+        accessTokenExpiresAt: number;
+        /** Additional tokens injected by `transformAuthResponse`. */
+        [key: string]: unknown;
+    };
+}
+
+/**
+ * Context passed to the `transformAuthResponse` hook.
+ *
+ * @group Auth
+ */
+export interface TransformAuthResponseContext {
+    /** The authenticated user's ID. */
+    userId: string;
+    /** The auth method that triggered this response. */
+    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "mfa";
+    /** The raw HTTP request (for reading headers, IP, etc.). */
+    request: Request;
+}
+
 // ─── Auth Adapter ────────────────────────────────────────────────────────────
 
 /**
@@ -381,6 +424,28 @@ export interface AuthAdapter {
      * normal token verification and are granted admin-level access.
      */
     serviceKey?: string;
+
+    // ── Response Transform ───────────────────────────────────────────────
+
+    /**
+     * Transform the auth response before sending it to the client.
+     *
+     * Called after successful login, register, refresh, OAuth, anonymous,
+     * magic-link, and MFA flows. The hook receives the fully-formed
+     * response and returns a (potentially enriched) response.
+     *
+     * Use cases:
+     * - Inject tokens from external auth systems (Firebase Custom Tokens, etc.)
+     * - Add project-specific metadata to the response
+     * - Enrich the user object with data from external sources
+     *
+     * The hook runs in the request path — keep it fast.
+     * Heavy work should be offloaded to `onAuthenticated` (fire-and-forget).
+     */
+    transformAuthResponse?(
+        response: AuthResponsePayload,
+        context: TransformAuthResponseContext
+    ): Promise<AuthResponsePayload>;
 }
 
 // ─── Custom Auth Adapter Options ─────────────────────────────────────────────
@@ -415,4 +480,13 @@ export interface CustomAuthAdapterOptions {
 
     /** Override default capabilities. */
     capabilities?: Partial<AuthAdapterCapabilities>;
+
+    /**
+     * Transform the auth response before sending it to the client.
+     * Same semantics as `AuthAdapter.transformAuthResponse`.
+     */
+    transformAuthResponse?: (
+        response: AuthResponsePayload,
+        context: TransformAuthResponseContext
+    ) => Promise<AuthResponsePayload>;
 }

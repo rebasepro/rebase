@@ -22,12 +22,19 @@ import {
 } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import { resolveAuthHooks } from "./auth-hooks";
+import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 export function mountMfaRoutes(
     router: Hono<HonoEnv>,
     config: AuthModuleConfig,
     ops: ReturnType<typeof resolveAuthHooks>,
-    parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T
+    parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T,
+    applyTransformHook?: (
+        response: AuthResponsePayload,
+        method: TransformAuthResponseContext["method"],
+        request: Request,
+        userId: string
+    ) => Promise<AuthResponsePayload>
 ): void {
     const authRepo = config.authRepo;
     const emailConfig = config.emailConfig;
@@ -236,13 +243,17 @@ export function mountMfaRoutes(
             });
         }
 
-        return c.json({
+        let mfaResponse: AuthResponsePayload = {
             tokens: {
                 accessToken,
                 refreshToken,
                 accessTokenExpiresAt: getAccessTokenExpiry()
             }
-        });
+        };
+        if (applyTransformHook) {
+            mfaResponse = await applyTransformHook(mfaResponse, "mfa", c.req.raw, userCtx.userId);
+        }
+        return c.json(mfaResponse);
     });
 
     /**

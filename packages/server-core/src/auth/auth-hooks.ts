@@ -45,6 +45,7 @@ import {
 import type { PasswordValidationResult } from "./password";
 import type { AuthRepository, UserData, CreateUserData } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
+import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /**
  * Authentication method identifier for lifecycle hooks.
@@ -180,6 +181,26 @@ export interface AuthHooks {
      * @returns Modified claims to include in the JWT.
      */
     customizeAccessToken?(claims: Record<string, unknown>, user: UserData): Promise<Record<string, unknown>>;
+
+    /**
+     * Transform the auth response before sending it to the client.
+     *
+     * Called after successful login, register, refresh, OAuth, anonymous,
+     * magic-link, and MFA flows. The hook receives the fully-formed
+     * response and returns a (potentially enriched) response.
+     *
+     * Use cases:
+     * - Inject tokens from external auth systems (Firebase Custom Tokens, etc.)
+     * - Add project-specific metadata to the response
+     * - Enrich the user object with data from external sources
+     *
+     * The hook runs in the request path — keep it fast.
+     * Heavy work should be offloaded to `onAuthenticated` (fire-and-forget).
+     */
+    transformAuthResponse?(
+        response: AuthResponsePayload,
+        context: TransformAuthResponseContext
+    ): Promise<AuthResponsePayload>;
 
     /**
      * Called after a successful password reset.

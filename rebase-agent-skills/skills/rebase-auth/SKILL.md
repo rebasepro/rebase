@@ -251,6 +251,7 @@ The `AuthHooks` interface lets you customize specific behaviors of the built-in 
 | `afterLogout` | `(userId: string) => Promise<void>` | — | Post-logout cleanup. Fire-and-forget. |
 | `onMfaVerified` | `(userId: string, factorId: string) => Promise<void>` | — | Called after successful MFA verification. Fire-and-forget. |
 | `customizeAccessToken` | `(claims: Record<string, unknown>, user: UserData) => Promise<Record<string, unknown>>` | — | Modify JWT access token claims before signing. |
+| `transformAuthResponse` | `(response: AuthResponsePayload, context: TransformAuthResponseContext) => Promise<AuthResponsePayload>` | — | Transform the auth response before sending to client. Runs in-request (not fire-and-forget). Errors are caught and logged; untransformed response returned as fallback. |
 | `onPasswordReset` | `(userId: string) => Promise<void>` | — | Called after successful password reset. Fire-and-forget. |
 | `beforeUserDelete` | `(userId: string) => Promise<void>` | — | Throw to prevent deletion. |
 | `afterUserDelete` | `(userId: string) => Promise<void>` | — | Post-deletion cleanup. Fire-and-forget. |
@@ -258,6 +259,37 @@ The `AuthHooks` interface lets you customize specific behaviors of the built-in 
 ### AuthMethod Values
 
 `"login"` | `"register"` | `"oauth"` | `"refresh"` | `"password-reset"` | `"anonymous"` | `"magic-link"` | `"mfa"`
+
+### AuthResponsePayload
+
+```typescript
+interface AuthResponsePayload {
+  user?: {
+    uid: string;
+    email: string;
+    displayName: string | null;
+    photoURL: string | null;
+    roles: string[];
+    metadata: Record<string, unknown>;
+  };
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    accessTokenExpiresAt: number;
+    [key: string]: unknown;
+  };
+}
+```
+
+### TransformAuthResponseContext
+
+```typescript
+interface TransformAuthResponseContext {
+  userId: string;
+  method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "mfa";
+  request: Request;
+}
+```
 
 ### PasswordValidationResult
 
@@ -316,6 +348,28 @@ hooks: {
   },
 }
 ```
+
+### Example: Firebase Custom Token Bridge
+
+```typescript
+import admin from "firebase-admin";
+
+hooks: {
+  transformAuthResponse: async (response, context) => {
+    // Generate a Firebase Custom Token for the authenticated user
+    const firebaseToken = await admin.auth().createCustomToken(context.userId);
+    return {
+      ...response,
+      tokens: {
+        ...response.tokens,
+        firebaseToken,
+      },
+    };
+  },
+}
+```
+
+The frontend can then call `signInWithCustomToken(firebaseToken)` immediately after login.
 
 ---
 
@@ -608,6 +662,8 @@ All login/register/OAuth endpoints return:
 }
 ```
 
+> **TIP:** Use the `transformAuthResponse` hook to inject additional tokens (e.g., Firebase Custom Tokens) or metadata into this response. See [Auth Lifecycle Hooks](#auth-lifecycle-hooks).
+
 ### Error Response Format
 
 ```json
@@ -875,6 +931,7 @@ interface AuthAdapter {
   initialize?(): Promise<void>;
   destroy?(): Promise<void>;
   serviceKey?: string;
+  transformAuthResponse?(response: AuthResponsePayload, context: TransformAuthResponseContext): Promise<AuthResponsePayload>;
 }
 
 interface AuthenticatedUser {
@@ -933,6 +990,15 @@ const auth = createCustomAuthAdapter({
     emailPasswordLogin: false,
     registration: false,
     enabledProviders: ["google"],
+  },
+
+  // Optional: enrich auth responses with external tokens
+  transformAuthResponse: async (response, context) => {
+    const externalToken = await generateExternalToken(context.userId);
+    return {
+      ...response,
+      tokens: { ...response.tokens, externalToken },
+    };
   },
 });
 

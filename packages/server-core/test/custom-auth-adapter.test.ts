@@ -1,5 +1,5 @@
 import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
-import type { AuthenticatedUser, CustomAuthAdapterOptions } from "@rebasepro/types";
+import type { AuthenticatedUser, AuthResponsePayload, CustomAuthAdapterOptions } from "@rebasepro/types";
 
 const TEST_USER: AuthenticatedUser = {
     uid: "user-123",
@@ -167,5 +167,23 @@ registration: true }
             verifyRequest: async () => null
         });
         expect(adapter.userManagement).toBeUndefined();
+    });
+
+    // ── transformAuthResponse ────────────────────────────────────────────
+
+    it("passes through transformAuthResponse when provided", () => {
+        const transformFn = jest.fn(async (response: AuthResponsePayload) => response);
+        const adapter = createCustomAuthAdapter({
+            verifyRequest: async () => null,
+            transformAuthResponse: transformFn
+        });
+        expect(adapter.transformAuthResponse).toBe(transformFn);
+    });
+
+    it("omits transformAuthResponse when not provided", () => {
+        const adapter = createCustomAuthAdapter({
+            verifyRequest: async () => null
+        });
+        expect(adapter.transformAuthResponse).toBeUndefined();
     });
 });

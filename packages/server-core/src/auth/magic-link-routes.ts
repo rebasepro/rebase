@@ -8,6 +8,7 @@ import { getMagicLinkTemplate } from "../email/templates";
 import { strictAuthLimiter } from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
+import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
 /**
  * Magic link token expiry (15 minutes from now)
@@ -33,8 +34,14 @@ export function mountMagicLinkRoutes(deps: {
         refreshToken: string
     ) => unknown;
     createSessionAndTokens: (userId: string, userAgent: string, ipAddress: string) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
+    applyTransformHook: (
+        response: AuthResponsePayload,
+        method: TransformAuthResponseContext["method"],
+        request: Request,
+        userId: string
+    ) => Promise<AuthResponsePayload>;
 }) {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens } = deps;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = deps;
     const { authRepo, emailService, emailConfig } = config;
 
     const magicLinkSchema = z.object({
@@ -153,6 +160,8 @@ export function mountMagicLinkRoutes(deps: {
             });
         }
 
-        return c.json(buildAuthResponse(user, roleIds, accessToken, refreshToken));
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken) as AuthResponsePayload;
+        const finalResponse = await applyTransformHook(authResponse, "magic-link", c.req.raw, user.id);
+        return c.json(finalResponse);
     });
 }
