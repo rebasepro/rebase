@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/server-postgresql",
   "type": "module",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "PostgreSQL data source backend implementation for Rebase with Drizzle ORM",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
@@ -42,7 +42,10 @@
       "^.+\\.tsx?$": "ts-jest"
     },
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-    "testPathIgnorePatterns": ["/node_modules/", "test/e2e/"],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "test/e2e/"
+    ],
     "moduleFileExtensions": [
       "ts",
       "tsx",
