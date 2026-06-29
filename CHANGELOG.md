@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.7.0] - 2026-06-29
+
+### Features & Improvements
+
+- **Multi-Datasource Architecture** — Introduced a first-class `DataSourceDefinition` / `DataSourceCapabilities` system that lets a single Rebase instance route collections to different database engines (Postgres, Firestore, MongoDB, or custom drivers). Collections declare a `dataSource` key, and the frontend router, backend driver registry, and collection editor all resolve capabilities from the same definition. Includes `resolveDataSource()`, `createDataSourceRegistry()`, `registerDataSourceCapabilities()`, and a new `DataSourcesContext` React provider. The editor automatically shows/hides tabs (Relations, Subcollections, RLS) and property types based on each source's declared feature flags.
+- **Headless Collection Views** — Extracted reusable, data-agnostic collection view components (`CollectionView`, `CollectionTableView`, `CollectionCardView`, `CollectionListView`, `CollectionKanbanView`) into `@rebasepro/ui`. These headless components accept a generic `CollectionDataController<T>` — no coupling to entities or the CMS data layer — making them usable in custom pages, standalone apps, and third-party integrations. Includes a `CollectionViewToolbar` with view-mode toggle, search, filters, and pagination.
+- **Headless Entity Forms** — Decoupled `EntityForm`, `EntityFormActions`, and `EntityFormBinding` from the admin package internals. Forms now accept pluggable field bindings and layout props, enabling standalone entity editing outside the CMS shell. Added `PopupFormField` for inline editing and extended form layout controls.
+- **Auth Hooks Expansion** — Significantly expanded the `AuthHooks` interface with new lifecycle hooks: `beforeLogin`, `afterLogout`, `onPasswordReset`, `beforeUserDelete`, `afterUserDelete`, `onAdminCreateUser`, `onAdminResetPassword`, and `transformAuthResponse`. The `transformAuthResponse` hook lets developers inject external tokens (e.g. Firebase Custom Tokens) or project-specific metadata into every auth response. Added `AuthMethod` type covering all authentication methods.
+- **Custom Auth Adapter** — New `createCustomAuthAdapter()` factory for plugging existing auth systems into Rebase with minimal config. Only `verifyRequest` is required — capabilities, user lookup, and registration are all optional overrides.
+- **Magic Link Authentication** — Added passwordless magic-link login flow with `mountMagicLinkRoutes()`. Generates secure tokens with 15-minute expiry, sends branded emails via the configured email provider, and integrates with the `transformAuthResponse` hook and rate limiting.
+- **API Keys** — Full API key management with collection-level permission scoping (`read` / `write` / `delete`), admin keys, rate limiting, expiration, and revocation. Includes server-side middleware (`api-key-middleware.ts`), a Postgres-backed key store, a Studio management UI (`ApiKeysView`), a CLI command (`rebase api-keys list|create|revoke`), and a client SDK module (`@rebasepro/client` `api-keys.ts`). Keys are stored with hashed secrets; the full key is only returned on creation.
+- **Atlas Migrations (replaces Drizzle Kit)** — Replaced `drizzle-kit` with [Atlas](https://atlasgo.io/) for schema migrations. Added `generate-postgres-ddl-logic.ts` that produces raw SQL DDL (with enums, RLS policies, and indexes) from collection definitions. Migrations are now version-controlled SQL files under `drizzle/migrations/` with an `atlas.sum` integrity file. CLI `rebase db` commands updated accordingly.
+- **Improved RLS Editor** — Overhauled the Studio RLS editor with better policy visualization, shared `table-classification.ts` module (classifying tables as `rebase-internal`, `junction`, or `user`), and improved default auth policies generation.
+- **Headless Collection Editor** — Made the collection schema editor headless and decoupled from the admin shell. Extracted serializable types and utilities, allowing the editor to be embedded in custom Studio views or third-party tools.
+- **Security Audit Logging** — Added structured security audit logging across all OAuth providers (Apple, Google, GitHub, GitLab, Facebook, Discord, Microsoft, LinkedIn, Slack, Spotify, Twitter, Bitbucket). Improved `ECONNREFUSED` error handling with actionable diagnostics, and fixed `chalk` CJS compatibility.
+- **Landing Page & Demos** — New layered architecture diagram on the developers page, improved CRM dashboard demo (`CrmDashboardDemo`), and fixed NEAT gradient mismatches across all landing pages.
+- **CLI Skills Enhancements** — Extended the `rebase skills` command with updated skill definitions for auth, security, collections, realtime, and SDK documentation.
+
+### Fixes
+
+- **Security Hardening** — Parameterized queries in API key store and cron store to prevent SQL injection. Hardened WebSocket connection safeguards, strengthened `EntityPersistService` input validation, and added `.dockerignore` / `.gitignore` rules to prevent secrets leakage. Sanitized environment variable handling in production.
+- **Repo Cleanup** — Reorganized internal documentation (`BREAKING_CHANGES_POSTGRES.md`, `PUBLISHING.md`, `REBASE_ARCHITECTURE.md`) into `.github/internal/`. Cleaned up legacy `formex` `.yarn/cache` artifacts, updated `CONTRIBUTING.md`, `README.md`, and `AGENT.md`. Deprecated export documentation moved to `docs/DEPRECATED_EXPORTS.md`.
+- **UI & Ergonomics** — Multiple ergonomic fixes across the admin panel: improved Sheet/Dialog focus management, refined `DrawerNavigationGroup` and breadcrumb context, stabilized navigation resolution hooks, and cleaned up `BreadcrumbsContext` and `CollectionRegistryContext`.
+
+### Testing
+
+- **Multi-Datasource Tests** — New test suites for `buildRoutedRebaseData`, `resolveDataSource`, `collection_registry_datasource`, `routing_integration`, `multi-datasource-routing`, and `routed-realtime-service`.
+- **Auth Tests** — Added tests for `custom-auth-adapter`, `transform-auth-response`, and extended `auth-routes` tests covering magic links and lifecycle hooks.
+- **Postgres Tests** — New `auth-default-policies` tests, extended `cli-helpers-extended` tests, `connection` tests, `databasePoolManager` tests, `doctor-extended` tests, and `generate-postgres-ddl` tests.
+- **UI Tests** — Added `views.test.tsx` covering the new headless `CollectionView`, `ListView`, `CardView`, and `TableView` components.
+- **E2E Tests** — Updated Playwright E2E tests for collections, studio features, and the new API keys flow.
+
+---
+
 ## [0.6.1] - 2026-06-23
 
 ### Fixes
