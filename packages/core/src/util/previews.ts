@@ -27,6 +27,25 @@ function isHiddenProperty(property: Property | undefined): boolean {
     return Boolean(property.ui?.hideFromCollection);
 }
 
+/**
+ * Returns true when the property holds file-storage content (single image,
+ * array of images, generic upload, …).  These properties are rendered by the
+ * dedicated image-slot and should NOT appear as regular preview columns.
+ */
+function isStorageProperty(property: Property | undefined): boolean {
+    if (!property) return false;
+    // Single string with storage config
+    if (property.type === "string" && property.storage) return true;
+    // String displayed as image URL
+    if (property.type === "string" && property.ui?.url === "image") return true;
+    // Array whose inner element has storage config or image URL
+    if (property.type === "array" && property.of && !Array.isArray(property.of)) {
+        const inner = property.of;
+        if (inner.type === "string" && (inner.storage || inner.url === "image")) return true;
+    }
+    return false;
+}
+
 export function getEntityPreviewKeys(
     authController: AuthController,
     targetCollection: EntityCollection<any>,
@@ -50,7 +69,7 @@ export function getEntityPreviewKeys(
             })
             .filter(key => {
                 const property = targetCollection.properties[key];
-                return property && !isPropertyBuilder(property) && !isReferenceProperty(property) && !isRelationProperty(property) && !isHiddenProperty(property);
+                return property && !isPropertyBuilder(property) && !isReferenceProperty(property) && !isRelationProperty(property) && !isHiddenProperty(property) && !isStorageProperty(property as Property);
             }).slice(0, limit);
     }
 }

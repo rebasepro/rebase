@@ -402,7 +402,18 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             "id"
         ]);
 
-        const availableExtraKeys = allKeys.filter(k => !usedKeys.has(k) && resolvedCollection.properties[k]);
+        const availableExtraKeys = allKeys.filter(k => {
+            if (usedKeys.has(k)) return false;
+            const prop = resolvedCollection.properties[k] as Property | undefined;
+            if (!prop) return false;
+            // Exclude storage/image properties — they are already rendered in the image slot
+            if (prop.type === "string" && (prop.storage || prop.ui?.url === "image")) return false;
+            if (prop.type === "array" && prop.of && !Array.isArray(prop.of)) {
+                const inner = prop.of;
+                if (inner.type === "string" && (inner.storage || inner.url === "image")) return false;
+            }
+            return true;
+        });
 
         availableExtraKeys.forEach(key => {
             const prop = resolvedCollection.properties[key] as Property;

@@ -736,7 +736,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             controller: storageController,
             registry: storageRegistry,
             sources: config.storageSources,
-            requireAuth: resolveRequireAuth(config.auth)
+            requireAuth: resolveRequireAuth(config.auth),
+            authAdapter
         });
 
         // Apply a permissive body limit specifically for the upload endpoint

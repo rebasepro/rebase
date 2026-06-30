@@ -4,7 +4,7 @@ import type { EntityCallbacks } from "./entity_callbacks";
 
 import type { EnumValues, Properties } from "./properties";
 import type { ExportConfig } from "./export_import";
-import type { EntityOverrides } from "./entity_overrides";
+
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
@@ -357,11 +357,6 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * Used by domain apps to store custom per-collection config.
      */
     metadata?: Record<string, unknown>;
-
-    /**
-     * Overrides for the entity view, like the data source or the storage source.
-     */
-    overrides?: EntityOverrides;
 
     /**
      * Width of the side dialog (in pixels) when opening an entity in this collection.

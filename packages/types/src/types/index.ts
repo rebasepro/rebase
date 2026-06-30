@@ -9,7 +9,6 @@ export * from "./locales";
 export * from "./entity_link_builder";
 export * from "./user_management_delegate";
 export * from "./entity_callbacks";
-export * from "./entity_overrides";
 export * from "./export_import";
 export * from "./modify_collections";
 export * from "./formex";

@@ -7,14 +7,14 @@
  * is used.
  */
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import type { StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "@rebasepro/types";
-import { requireAuth as jwtRequireAuth, optionalAuth } from "../auth/middleware";
+import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth } from "../auth/middleware";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
@@ -50,6 +50,13 @@ export interface StorageRoutesConfig {
     /** Allow unauthenticated read access to stored files (default: false).
      *  When false and requireAuth is true, reads also require authentication. */
     publicRead?: boolean;
+    /**
+     * When provided, storage routes delegate auth to this adapter instead
+     * of the built-in JWT module. This mirrors how data routes use
+     * `createAdapterAuthMiddleware()` and avoids the "JWT secret not
+     * configured" crash when `configureJwt()` was never called.
+     */
+    authAdapter?: AuthAdapter;
 }
 
 /**
@@ -92,12 +99,63 @@ function sanitizeStorageKey(key: string): string {
 }
 
 /**
+ * Build adapter-aware auth middleware for storage routes.
+ *
+ * When an `AuthAdapter` is provided, token verification is delegated to the
+ * adapter instead of the built-in JWT module. This mirrors how data routes
+ * use `createAdapterAuthMiddleware()`, but without RLS driver scoping (storage
+ * routes don't interact with the DataDriver).
+ *
+ * Returns both a "write" middleware (enforces auth when `requireAuth` is true)
+ * and a "read" middleware (enforces auth unless `publicRead` is set).
+ */
+function buildAdapterAuthMiddleware(
+    adapter: AuthAdapter,
+    requireAuth: boolean,
+    publicRead: boolean
+): { writeAuthMiddleware: MiddlewareHandler<HonoEnv>; readAuthMiddleware: MiddlewareHandler<HonoEnv> } {
+    /**
+     * Core middleware: verifies the request via the adapter. When `enforce`
+     * is true, returns 401 if no authenticated user is resolved.
+     */
+    const createMiddleware = (enforce: boolean): MiddlewareHandler<HonoEnv> => {
+        return async (c, next) => {
+            let authenticatedUser = null;
+            try {
+                authenticatedUser = await adapter.verifyRequest(c.req.raw);
+            } catch {
+                return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+            }
+
+            if (authenticatedUser) {
+                c.set("user", {
+                    userId: authenticatedUser.uid,
+                    email: authenticatedUser.email,
+                    roles: authenticatedUser.roles
+                });
+            }
+
+            if (enforce && !authenticatedUser) {
+                return c.json({ error: { message: "Unauthorized: Authentication required", code: "UNAUTHORIZED" } }, 401);
+            }
+
+            return next();
+        };
+    };
+
+    return {
+        writeAuthMiddleware: createMiddleware(requireAuth),
+        readAuthMiddleware: createMiddleware(!publicRead && requireAuth)
+    };
+}
+
+/**
  * Create storage REST API routes
  */
 export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
-    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false } = config;
+    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter } = config;
 
     /**
      * Resolve the storage controller for a request.
@@ -121,11 +179,17 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         throw new Error("No storage controller or registry available");
     };
 
-    // Use actual JWT auth middleware from auth module
-    const writeAuthMiddleware = requireAuth ? jwtRequireAuth : optionalAuth;
-
-    // For read operations: respect publicRead config.
-    const readAuthMiddleware = (publicRead || !requireAuth) ? optionalAuth : jwtRequireAuth;
+    // ── Auth middleware selection ────────────────────────────────────────
+    // When an AuthAdapter is available, delegate token verification to it
+    // (mirroring the data-routes pattern). This avoids calling the JWT
+    // module which may not have been configured (e.g. custom auth).
+    // When no adapter is present, fall back to the built-in JWT middleware.
+    const { writeAuthMiddleware, readAuthMiddleware } = authAdapter
+        ? buildAdapterAuthMiddleware(authAdapter, requireAuth, publicRead)
+        : {
+            writeAuthMiddleware: requireAuth ? jwtRequireAuth : jwtOptionalAuth,
+            readAuthMiddleware: (publicRead || !requireAuth) ? jwtOptionalAuth : jwtRequireAuth
+        };
 
     /**
      * Parse bucket and path from a combined file path.
