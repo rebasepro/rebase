@@ -1,4 +1,4 @@
-import type { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import type { EntityCollection, PostgresProperties, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
 
 /**
  * Maps a PostgreSQL column data type to a Rebase property type.
@@ -301,7 +301,7 @@ export function buildCollectionFromTableMetadata(
         name: prettifiedName,
         slug: tableName,
         table: tableName,
-        properties,
+        properties: properties as PostgresProperties,
         propertiesOrder,
         ...(relations.length > 0 ? { relations } : {}),
         ...(securityRules.length > 0 ? { securityRules } : {})

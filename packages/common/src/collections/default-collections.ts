@@ -48,7 +48,7 @@ unique: true }
             name: "Photo URL",
             type: "string",
             columnName: "photo_url",
-            url: "image"
+            ui: { url: "image" }
         },
         roles: {
             name: "Roles",

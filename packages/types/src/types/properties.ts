@@ -83,6 +83,13 @@ export type MongoProperties = {
 };
 
 /**
+ * Union of all engine-specific property maps. Use this at engine-agnostic
+ * boundaries (collection editor, normalization) where the concrete engine is
+ * unknown but the narrowed property constraint must be satisfied.
+ */
+export type EngineProperties = PostgresProperties | FirebaseProperties | MongoProperties;
+
+/**
  * A helper type to infer the underlying data type from a Property definition.
  * This is the core of the type inference system.
  */
@@ -242,10 +249,27 @@ export interface BaseProperty<CustomProps = unknown> {
  * @group Entity properties
  */
 export interface StringUIConfig extends BaseUIConfig {
+    /**
+     * Is this string property long enough so it should be displayed in
+     * a multiple line field. Defaults to false. If set to true,
+     * the number of lines adapts to the content
+     */
     multiline?: boolean;
+    /**
+     * Should this string property be displayed as a markdown field. If true,
+     * the field is rendered as a text editor that supports markdown highlight
+     * syntax. It also includes a preview of the result.
+     */
     markdown?: boolean;
+    /**
+     * Should this string be rendered as a tag instead of just text.
+     */
     previewAsTag?: boolean;
     clearable?: boolean;
+    /**
+     * If the value of this property is a URL, you can set this flag to true
+     * to add a link, or one of the supported media types to render a preview
+     */
     url?: boolean | PreviewType;
 }
 
@@ -287,18 +311,6 @@ export interface StringProperty extends BaseProperty {
      */
     enum?: EnumValues;
     /**
-     * Is this string property long enough so it should be displayed in
-     * a multiple line field. Defaults to false. If set to true,
-     * the number of lines adapts to the content
-     */
-    multiline?: boolean;
-    /**
-     * Should this string property be displayed as a markdown field. If true,
-     * the field is rendered as a text editors that supports markdown highlight
-     * syntax. It also includes a preview of the result.
-     */
-    markdown?: boolean;
-    /**
      * You can specify a `Storage` configuration. It is used to
      * indicate that this string refers to a path in your storage provider.
      */
@@ -315,18 +327,9 @@ export interface StringProperty extends BaseProperty {
     userSelect?: boolean;
 
     /**
-     * If the value of this property is a URL, you can set this flag to true
-     * to add a link, or one of the supported media types to render a preview
-     */
-    url?: boolean | PreviewType;
-    /**
      * Does this field include an email
      */
     email?: boolean;
-    /**
-     * Should this string be rendered as a tag instead of just text.
-     */
-    previewAsTag?: boolean;
 }
 
 /**
@@ -406,6 +409,9 @@ export interface BinaryProperty extends BaseProperty {
  * @group Entity properties
  */
 export interface DateUIConfig extends BaseUIConfig {
+    /**
+     * Add an icon to clear the value and set it to `null`. Defaults to `false`
+     */
     clearable?: boolean;
 }
 
@@ -437,10 +443,6 @@ export interface DateProperty extends BaseProperty {
      * `updated_on` fields
      */
     autoValue?: "on_create" | "on_update";
-    /**
-     * Add an icon to clear the value and set it to `null`. Defaults to `false`
-     */
-    clearable?: boolean;
 }
 
 /**

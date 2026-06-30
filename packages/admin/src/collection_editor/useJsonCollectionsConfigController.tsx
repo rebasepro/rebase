@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EntityCollection, FirebaseProperties, MongoProperties, NavigationGroupMapping, PostgresProperties, Property } from "@rebasepro/types";
+import type { EngineProperties, EntityCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
 import type {
     CollectionsConfigController,
     SaveCollectionParams,
@@ -171,7 +171,7 @@ export function useJsonCollectionsConfigController({
             collection.properties = {
                 ...collection.properties,
                 [propertyKey]: property,
-            } as PostgresProperties | FirebaseProperties | MongoProperties;
+            } as EngineProperties;
             if (newPropertiesOrder) {
                 collection.propertiesOrder = newPropertiesOrder as typeof collection.propertiesOrder;
             }

@@ -23,7 +23,7 @@ import {
     Tabs,
     Typography
 } from "@rebasepro/ui";
-import { Entity, EntityCollection, FirebaseProperties, MapProperty, MongoProperties, PostgresProperties, Properties, Property, PropertyConfig, User, getDataSourceCapabilities } from "@rebasepro/types";
+import { EngineProperties, Entity, EntityCollection, MapProperty, Properties, Property, PropertyConfig, User, getDataSourceCapabilities } from "@rebasepro/types";
 import type { PostgresCollection } from "@rebasepro/types";
 import { getSubcollections, isPropertyBuilder, removeInitialAndTrailingSlashes, getTableName } from "@rebasepro/common";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
@@ -259,7 +259,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                     slug: initialValuesProp?.slug ?? fallbackSlug,
                     table: initialValuesProp?.slug ?? "",
                     name: initialValuesProp?.name ?? "",
-                    properties: {} as PostgresProperties | FirebaseProperties | MongoProperties,
+                    properties: {} as EngineProperties,
                     propertiesOrder: [],
                     icon: initialIcon,
                     ownerId: authController.user?.uid ?? ""
@@ -455,7 +455,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
             };
 
             if (Object.keys(inferredCollection.properties ?? {}).length > 0) {
-                values.properties = inferredCollection.properties as PostgresProperties | FirebaseProperties | MongoProperties;
+                values.properties = inferredCollection.properties as EngineProperties;
                 values.propertiesOrder = inferredCollection.propertiesOrder as Extract<keyof M, string>[];
             }
 
@@ -974,7 +974,7 @@ function applyPropertyConfigs<M extends Record<string, unknown> = Record<string,
 
     return {
         ...rest,
-        properties: propertiesResult as PostgresProperties | FirebaseProperties | MongoProperties
+        properties: propertiesResult as EngineProperties
     } as EntityCollection<M>;
 }
 

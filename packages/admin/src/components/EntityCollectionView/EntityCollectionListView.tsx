@@ -410,7 +410,7 @@ export function EntityCollectionListView<M extends Record<string, unknown> = Rec
             if (prop.type === "string" && (prop.storage || prop.ui?.url === "image")) return false;
             if (prop.type === "array" && prop.of && !Array.isArray(prop.of)) {
                 const inner = prop.of;
-                if (inner.type === "string" && (inner.storage || inner.url === "image")) return false;
+                if (inner.type === "string" && (inner.storage || inner.ui?.url === "image")) return false;
             }
             return true;
         });

@@ -202,13 +202,9 @@ export interface SerializableStringProperty extends SerializableBaseProperty {
     validation?: SerializableStringValidation;
     isId?: boolean | "manual" | "uuid" | "cuid" | string;
     enum?: EnumValues;
-    multiline?: boolean;
-    markdown?: boolean;
     storage?: SerializableStorageConfig;
     userSelect?: boolean;
-    url?: boolean | "image" | "video" | "audio" | "file";
     email?: boolean;
-    previewAsTag?: boolean;
     reference?: SerializableReferenceProperty;
 }
 
@@ -238,7 +234,6 @@ export interface SerializableDateProperty extends SerializableBaseProperty {
     mode?: "date" | "date_time";
     timezone?: string;
     autoValue?: "on_create" | "on_update";
-    clearable?: boolean;
 }
 
 /** JSON-serializable `GeopointProperty`. */

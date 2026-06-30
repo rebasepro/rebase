@@ -194,8 +194,8 @@ export function resolveCollectionSlotKeys(
         : [...previewKeys].sort((a, b) => {
             const propA = collection.properties[a] as Property | undefined;
             const propB = collection.properties[b] as Property | undefined;
-            const scoreA = propA?.type === "string" ? (propA.multiline ? 2 : 1) : 0;
-            const scoreB = propB?.type === "string" ? (propB.multiline ? 2 : 1) : 0;
+            const scoreA = propA?.type === "string" ? (propA.ui?.multiline ? 2 : 1) : 0;
+            const scoreB = propB?.type === "string" ? (propB.ui?.multiline ? 2 : 1) : 0;
             return scoreB - scoreA;
         });
     const subtitleKey = sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined;
@@ -468,7 +468,7 @@ function resolveRelationDisplayName(
 
             // Helper to check if a property is a visible, non-id string
             const isDisplayCandidate = (p: Property): boolean => {
-                return p.type === "string" && !p.multiline && !p.markdown && !p.storage
+                return p.type === "string" && !p.ui?.multiline && !p.ui?.markdown && !p.storage
                     && !("isId" in p && p.isId) && !isHiddenProp(p);
             };
 

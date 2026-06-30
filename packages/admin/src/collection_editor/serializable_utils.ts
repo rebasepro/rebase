@@ -168,12 +168,8 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (sp.columnType) result.columnType = sp.columnType;
             if (sp.isId !== undefined) result.isId = sp.isId;
             if (sp.enum) result.enum = sp.enum;
-            if (sp.multiline) result.multiline = sp.multiline;
-            if (sp.markdown) result.markdown = sp.markdown;
             if (sp.userSelect) result.userSelect = sp.userSelect;
-            if (sp.url) result.url = sp.url;
             if (sp.email) result.email = sp.email;
-            if (sp.previewAsTag) result.previewAsTag = sp.previewAsTag;
 
             // Convert validation.matches from RegExp to string
             if (sp.validation) {
@@ -224,7 +220,6 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (dp.mode) result.mode = dp.mode;
             if (dp.timezone) result.timezone = dp.timezone;
             if (dp.autoValue) result.autoValue = dp.autoValue;
-            if (dp.clearable) result.clearable = dp.clearable;
 
             // Convert Date validation min/max to ISO strings
             if (dp.validation) {

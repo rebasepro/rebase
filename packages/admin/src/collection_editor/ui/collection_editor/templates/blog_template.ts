@@ -93,7 +93,7 @@ export const blogCollectionTemplate = {
         publish_date: {
             name: "Publish date",
             type: "date",
-            clearable: true
+            ui: { clearable: true }
         },
         reviewed: {
             name: "Reviewed",
