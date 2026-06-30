@@ -34,7 +34,7 @@
     "@types/react-dom": "^19.2.3",
     "astro": "^6.4.6",
     "clsx": "^2.1.1",
-    "firebase": "^12.14.0",
+    "firebase": "^12.15.0",
     "gray-matter": "^4.0.3",
     "lucide-react": "1.18.0",
     "react": "^19.2.7",

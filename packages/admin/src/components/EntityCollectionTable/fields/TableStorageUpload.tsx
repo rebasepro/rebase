@@ -8,7 +8,7 @@ import { useDropzone } from "react-dropzone";
 import { PropertyPreview } from "../../../preview";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { cls, IconButton, PencilIcon, Typography } from "@rebasepro/ui";
-import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController } from "@rebasepro/core";
+import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController, StorageSourceContext } from "@rebasepro/core";
 import { getThumbnailMeasure } from "../../../preview/util";
 import { StorageUploadProgress } from "../../../form/components/StorageUploadProgress";
 import { EntityTableCellActions } from "../internal/EntityTableCellActions";
@@ -64,7 +64,8 @@ export function TableStorageUpload(props: {
         storage,
         onFileUploadComplete,
         storagePathBuilder,
-        multipleFilesSupported
+        multipleFilesSupported,
+        resolvedStorageSource
     } = useStorageUploadController({
         entityValues: entity.values,
         entityId: entity.id,
@@ -79,24 +80,26 @@ export function TableStorageUpload(props: {
 
     return (
 
-        <StorageUpload
-            internalValue={internalValue}
-            setInternalValue={setInternalValue}
-            name={propertyKey}
-            disabled={disabled}
-            autoFocus={false}
-            openPopup={openPopup}
-            error={error}
-            selected={selected}
-            property={property}
-            onChange={updateValue}
-            entity={entity}
-            storagePathBuilder={storagePathBuilder}
-            storage={storage}
-            multipleFilesSupported={multipleFilesSupported}
-            onFilesAdded={onFilesAdded}
-            onFileUploadComplete={onFileUploadComplete}
-            previewSize={previewSize}/>
+        <StorageSourceContext.Provider value={resolvedStorageSource}>
+            <StorageUpload
+                internalValue={internalValue}
+                setInternalValue={setInternalValue}
+                name={propertyKey}
+                disabled={disabled}
+                autoFocus={false}
+                openPopup={openPopup}
+                error={error}
+                selected={selected}
+                property={property}
+                onChange={updateValue}
+                entity={entity}
+                storagePathBuilder={storagePathBuilder}
+                storage={storage}
+                multipleFilesSupported={multipleFilesSupported}
+                onFilesAdded={onFilesAdded}
+                onFileUploadComplete={onFileUploadComplete}
+                previewSize={previewSize}/>
+        </StorageSourceContext.Provider>
 
     );
 }

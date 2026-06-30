@@ -4,6 +4,7 @@ import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
 import type { ApiKeysAPI } from "../types/api_keys";
+import type { StorageSourceDefinition } from "../types/storage_source";
 
 
 /**
@@ -157,8 +158,29 @@ export interface RebaseClient<DB = unknown> {
     /** Unified Authentication layer */
     auth: AuthClient;
 
-    /** Unified Storage layer */
+    /** Unified Storage layer (default storage source, backward-compatible) */
     storage?: StorageSource;
+
+    /** Registry of all named storage sources for multi-backend support */
+    storageRegistry?: StorageSourceRegistry;
+
+    /**
+     * Build a server-backed {@link StorageSource} for a named storage source.
+     * The returned source forwards `storageId` to the backend so requests are
+     * routed to the matching `StorageController`. Used to lazily wire
+     * `transport: "server"` sources on the frontend.
+     */
+    createStorageSource?(storageId: string): StorageSource;
+
+    /**
+     * Discover the storage sources declared on the backend via
+     * `GET /api/storage/sources`. Server-transport sources are auto-registered
+     * into {@link storageRegistry}; `direct` sources are returned so the app
+     * can supply the live {@link StorageSource} instance. The result is cached
+     * (a failed call is retryable). This makes the backend the single source of
+     * truth for storage-source configuration.
+     */
+    fetchStorageSources?(): Promise<StorageSourceDefinition[]>;
 
     /**
      * Server-side email service.
@@ -205,5 +227,43 @@ export interface RebaseClient<DB = unknown> {
      * Only available server-side with a SQL database.
      */
     sql?(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+}
+
+/**
+ * Client-side registry for managing multiple storage sources.
+ *
+ * Mirrors the server-side `StorageRegistry` pattern. Allows collection
+ * properties to reference a named storage backend via
+ * `StorageConfig.storageSource`.
+ *
+ * @group Models
+ */
+export interface StorageSourceRegistry {
+    /**
+     * Get a storage source by key.
+     * @param key - Storage source key, or undefined/null for default
+     * @returns The StorageSource, or undefined if not found
+     */
+    get(key: string | undefined | null): StorageSource | undefined;
+
+    /**
+     * Get the default storage source (key = "(default)").
+     * @throws Error if no default storage is registered
+     */
+    getDefault(): StorageSource;
+
+    /**
+     * Get a storage source by key, with fallback to default.
+     * @param key - Storage source key, or undefined/null for default
+     * @returns The StorageSource (falls back to default if key not found)
+     * @throws Error if neither the specified nor default storage exists
+     */
+    getOrDefault(key: string | undefined | null): StorageSource;
+
+    /** Check if a storage source with the given key exists */
+    has(key: string): boolean;
+
+    /** List all registered storage source keys */
+    list(): string[];
 }
 

@@ -10,6 +10,7 @@ import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { isReadOnly } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
 import { useAuthController, useSnackbarController, useStorageSource, useTranslation } from "@rebasepro/core";
+import { StorageSourceContext } from "@rebasepro/core";
 import {
     closestCenter,
     DndContext,
@@ -72,7 +73,8 @@ export function StorageUploadFieldBinding({
         storage,
         onFileUploadComplete,
         storagePathBuilder,
-        multipleFilesSupported
+        multipleFilesSupported,
+        resolvedStorageSource
     } = useStorageUploadController({
         entityValues: context.values,
         entityId: context.entityId,
@@ -103,19 +105,21 @@ export function StorageUploadFieldBinding({
                     title={property.name ?? propertyKey}
                     className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
 
-            <StorageUpload
-                value={internalValue}
-                name={propertyKey}
-                disabled={disabled ?? false}
-                autoFocus={autoFocus ?? false}
-                property={property}
-                onChange={setValue}
-                setInternalValue={setInternalValue}
-                onFilesAdded={onFilesAdded}
-                onFileUploadComplete={onFileUploadComplete}
-                storagePathBuilder={storagePathBuilder}
-                storage={storage}
-                multipleFilesSupported={multipleFilesSupported}/>
+            <StorageSourceContext.Provider value={resolvedStorageSource}>
+                <StorageUpload
+                    value={internalValue}
+                    name={propertyKey}
+                    disabled={disabled ?? false}
+                    autoFocus={autoFocus ?? false}
+                    property={property}
+                    onChange={setValue}
+                    setInternalValue={setInternalValue}
+                    onFilesAdded={onFilesAdded}
+                    onFileUploadComplete={onFileUploadComplete}
+                    storagePathBuilder={storagePathBuilder}
+                    storage={storage}
+                    multipleFilesSupported={multipleFilesSupported}/>
+            </StorageSourceContext.Provider>
 
             <FieldHelperText includeDescription={includeDescription}
                              showError={showError}

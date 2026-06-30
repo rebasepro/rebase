@@ -3,9 +3,9 @@ import type { RebaseProps } from "./RebaseProps";
 import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/types";
 import type { ComponentOverrideMap } from "@rebasepro/types";
 
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
-import { RebaseContext, User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
+import { RebaseContext, User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext } from "../contexts";
@@ -16,6 +16,7 @@ import { StorageSourceContext } from "../contexts/StorageSourceContext";
 import { UserConfigurationPersistenceContext } from "../contexts/UserConfigurationPersistenceContext";
 import { RebaseDataContext } from "../contexts/RebaseDataContext";
 import { DataSourcesContext, DataSourcesContextValue } from "../contexts/DataSourcesContext";
+import { StorageSourcesContext, StorageSourcesContextValue } from "../contexts/StorageSourcesContext";
 import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
 import { ModeControllerProvider, AdminModeControllerProvider, SnackbarProvider } from "../contexts";
 import { RebaseI18nProvider } from "../i18n/RebaseI18nProvider";
@@ -57,6 +58,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         storageSource: storageSourceProp,
         driver: driverProp,
         dataSources: dataSourcesProp,
+        storageSources: storageSourcesProp,
         drivers: driversProp,
         data: dataProp,
         databaseAdmin,
@@ -154,6 +156,100 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     // Storage fallback logic
     const resolvedStorage = storageSourceProp ?? client?.storage;
 
+    // ── Storage sources (mirrors the dataSources pattern) ────────────
+    // Storage-source definitions discovered from the backend via
+    // `GET /api/storage/sources`. The backend is the single source of truth;
+    // server-transport sources are auto-wired on the client, `direct` sources
+    // are completed by the `storageSources` prop (which holds live instances).
+    const [remoteStorageSources, setRemoteStorageSources] = useState<StorageSourceDefinition[]>([]);
+    const authUser = authController.user;
+    const loginSkipped = authController.loginSkipped;
+    useEffect(() => {
+        if (!client?.fetchStorageSources) return;
+        let cancelled = false;
+        client.fetchStorageSources()
+            .then((defs) => { if (!cancelled) setRemoteStorageSources(defs); })
+            .catch((e) => {
+                // A 401 before auth is expected; the effect re-runs once the
+                // user logs in (authUser/loginSkipped change) and retries.
+                console.debug("[Rebase] Could not load storage sources", e);
+            });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [client, authUser, loginSkipped]);
+
+    // Normalize the prop + discovered definitions into a registry + sources map.
+    const storageSourcesRef = useRef<{
+        propList: { key: string; source?: StorageSource; transport?: string }[];
+        remote: StorageSourceDefinition[];
+        resolvedStorage?: StorageSource;
+        client?: typeof client;
+        value: StorageSourcesContextValue;
+    } | null>(null);
+    const storageSourcesValue = useMemo<StorageSourcesContextValue>(() => {
+        const list = storageSourcesProp ?? [];
+        const prev = storageSourcesRef.current;
+        // Stable identity unless an input actually changed (the prop may be a
+        // fresh array literal on every render; sources are compared by identity).
+        if (prev
+            && prev.remote === remoteStorageSources
+            && prev.resolvedStorage === resolvedStorage
+            && prev.client === client
+            && prev.propList.length === list.length
+            && list.every((s, i) => prev.propList[i].key === s.key
+                && prev.propList[i].source === s.source
+                && prev.propList[i].transport === s.transport)) {
+            return prev.value;
+        }
+        const registry: Record<string, StorageSourceDefinition> = {};
+        const sources: Record<string, StorageSource> = {};
+
+        // 1. Definitions discovered from the backend (labels, engine, transport).
+        for (const def of remoteStorageSources) {
+            registry[def.key] = def;
+        }
+
+        // 2. Server-backed named sources wired on the client registry: the
+        //    default, `createRebaseClient({ storageSources })`, and any
+        //    server-transport sources auto-registered by `fetchStorageSources`.
+        if (client?.storageRegistry) {
+            for (const key of client.storageRegistry.list()) {
+                const source = client.storageRegistry.get(key);
+                if (source) sources[key] = source;
+            }
+        }
+
+        // 3. App-provided definitions: `direct` live sources and overrides.
+        for (const ss of list) {
+            const { source, ...definition } = ss;
+            registry[ss.key] = definition;
+            if (source) {
+                // `direct` transport: app-provided live source (e.g. Firebase).
+                sources[ss.key] = source;
+            } else if (!sources[ss.key]
+                && ss.transport === "server"
+                && ss.key !== DEFAULT_STORAGE_SOURCE_KEY
+                && client?.createStorageSource) {
+                // `server` transport declared only on the prop: build a
+                // backend-routed source so requests carry `?storageId=key`.
+                sources[ss.key] = client.createStorageSource(ss.key);
+            }
+        }
+        // 4. Default/server storage from the client.
+        if (resolvedStorage && !sources[DEFAULT_STORAGE_SOURCE_KEY]) {
+            sources[DEFAULT_STORAGE_SOURCE_KEY] = resolvedStorage;
+        }
+        const value: StorageSourcesContextValue = { registry, sources };
+        storageSourcesRef.current = {
+            propList: list.map((s) => ({ key: s.key, source: s.source, transport: s.transport })),
+            remote: remoteStorageSources,
+            resolvedStorage,
+            client,
+            value
+        };
+        return value;
+    }, [storageSourcesProp, remoteStorageSources, resolvedStorage, client]);
+
     // Database admin — use explicit prop, or derive from client.ws / driver when available.
     const resolvedDatabaseAdmin = useMemo(() => {
         if (databaseAdmin) return databaseAdmin;
@@ -240,6 +336,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
             <CustomizationControllerContext.Provider value={customizationController}>
                 <UserConfigurationPersistenceContext.Provider
                     value={userConfigPersistence}>
+                    <StorageSourcesContext.Provider
+                        value={storageSourcesValue}>
                     <StorageSourceContext.Provider
                         value={resolvedStorage!}>
                         <DataSourcesContext.Provider
@@ -267,6 +365,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                         </RebaseDataContext.Provider>
                         </DataSourcesContext.Provider>
                     </StorageSourceContext.Provider>
+                    </StorageSourcesContext.Provider>
                 </UserConfigurationPersistenceContext.Provider>
             </CustomizationControllerContext.Provider>
         </AnalyticsContext.Provider>

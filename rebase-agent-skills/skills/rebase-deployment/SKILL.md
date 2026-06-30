@@ -367,7 +367,7 @@ All variables recognized by the base `rebaseEnvSchema`:
 | `DB_POOL_CONNECT_TIMEOUT` | `string` → `number` | No | `"10000"` → `10000` | Connection timeout (ms) |
 | `DATABASE_DIRECT_URL` | `string` (URL) | No | — | Direct database URL (bypasses pooler) |
 | `DATABASE_READ_URL` | `string` (URL) | No | — | Read replica database URL |
-| `STORAGE_TYPE` | `enum` | No | `"local"` | `"local"` or `"s3"` |
+| `STORAGE_TYPE` | `enum` | No | `"local"` | `"local"`, `"s3"`, or `"gcs"` |
 | `STORAGE_PATH` | `string` | No | — | Local file storage directory |
 | `FORCE_LOCAL_STORAGE` | `optionalBoolString` | No | `undefined` → `false` | Suppress local-storage-in-production warning |
 | `S3_BUCKET` | `string` | If S3 | — | S3 bucket name |
@@ -376,6 +376,9 @@ All variables recognized by the base `rebaseEnvSchema`:
 | `S3_SECRET_ACCESS_KEY` | `string` | If S3 | — | S3 secret key |
 | `S3_ENDPOINT` | `string` (URL) | No | — | Custom S3 endpoint (MinIO, R2) |
 | `S3_FORCE_PATH_STYLE` | `optionalBoolString` | No | `undefined` → `false` | Use path-style S3 URLs (required for MinIO) |
+| `GCS_BUCKET` | `string` | If GCS | — | Google Cloud Storage bucket name |
+| `GCS_PROJECT_ID` | `string` | If GCS | — | GCP project ID for GCS |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `string` | If GCS (non-GCP) | — | Path to GCP service account JSON key file (not needed on GCP with default credentials) |
 
 ### Zod Type Helpers
 
@@ -573,7 +576,13 @@ Internet → Cloud Run (HTTPS, auto-scaling) → Cloud SQL PostgreSQL
      --allow-unauthenticated
    ```
 4. **Custom Domain** — Map a custom domain in Cloud Run settings. Cloud Run provides HTTPS automatically.
-5. **File Storage** — Use `STORAGE_TYPE=s3` with a GCS bucket via the S3-compatible interop endpoint, or use a dedicated S3 provider like Cloudflare R2.
+5. **File Storage** — Use native GCS support with `STORAGE_TYPE=gcs`:
+   ```bash
+   STORAGE_TYPE=gcs
+   GCS_BUCKET=your-rebase-uploads
+   GCS_PROJECT_ID=your-gcp-project-id
+   ```
+   On Cloud Run, the default service account credentials are used automatically — no key file needed. Alternatively, you can fall back to `STORAGE_TYPE=s3` with the GCS S3-compatible interop endpoint.
 
 ### Cloud SQL Auth Proxy (Connection String)
 

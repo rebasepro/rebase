@@ -14,6 +14,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
 import type { StorageController } from "./types";
+import type { StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
 
 /** Metadata for an in-progress resumable upload. */
@@ -57,7 +58,8 @@ export class TusHandler {
 
     constructor(
         storageBaseDir: string,
-        private storageController?: StorageController
+        private storageController?: StorageController,
+        private storageRegistry?: StorageRegistry
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -283,7 +285,17 @@ export class TusHandler {
     private async finalize(upload: TusUpload): Promise<void> {
         upload.completed = true;
 
-        if (!this.storageController) {
+        // Resolve the target controller: prefer storageId from TUS metadata,
+        // then fall back to the registry default, then the single controller.
+        const storageId = upload.metadata.storageId;
+        let targetController = this.storageController;
+        if (this.storageRegistry) {
+            targetController = storageId
+                ? this.storageRegistry.getOrDefault(storageId)
+                : this.storageRegistry.getDefault();
+        }
+
+        if (!targetController) {
             // No controller — leave temp file in place
             logger.warn("[TUS] Upload completed but no StorageController configured. Temp file remains:", { filePath: upload.filePath });
             return;
@@ -297,7 +309,7 @@ export class TusHandler {
 
             const file = new File([data], fileName, { type: mimeType });
 
-            await this.storageController.putObject({
+            await targetController.putObject({
                 file,
                 key: fileName,
                 bucket: upload.bucket
@@ -307,7 +319,7 @@ export class TusHandler {
             try { await unlink(upload.filePath); } catch { /* ok */ }
             this.uploads.delete(upload.id);
 
-            logger.info(`[TUS] Upload ${upload.id} finalized → ${fileName}`);
+            logger.info(`[TUS] Upload ${upload.id} finalized → ${fileName}`, storageId ? { storageId } : {});
         } catch (err) {
             logger.error(`[TUS] Failed to finalize upload ${upload.id}`, { error: err });
         }

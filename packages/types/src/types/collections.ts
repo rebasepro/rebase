@@ -562,6 +562,24 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
     driver: "firestore";
 
     /**
+     * The Firestore collection path to query. Defaults to `slug` if not set.
+     * Use this when the Firestore path differs from the slug
+     * (e.g., when a PostgreSQL collection already uses the same slug).
+     *
+     * @example
+     * ```typescript
+     * const fsCustomer: FirebaseCollection = {
+     *     slug: "fs_customer",        // URL: /c/fs_customer
+     *     path: "customer",           // Firestore path: customer
+     *     name: "Customers (Firestore)",
+     *     driver: "firestore",
+     *     properties: { ... }
+     * };
+     * ```
+     */
+    path?: string;
+
+    /**
      * You can add subcollections to your entity in the same way you define the root
      * collections. The collections added here will be displayed when opening
      * the side dialog of an entity.
@@ -584,6 +602,24 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
      * The driver for this collection. Must be set to `"mongodb"`.
      */
     driver: "mongodb";
+
+    /**
+     * The MongoDB collection name to use. Defaults to `slug` if not set.
+     * Use this when the MongoDB collection name differs from the slug
+     * (e.g., when a PostgreSQL collection already uses the same slug).
+     *
+     * @example
+     * ```typescript
+     * const mongoCustomer: MongoDBCollection = {
+     *     slug: "mongo_customer",      // URL: /c/mongo_customer
+     *     path: "customer",            // MongoDB collection: customer
+     *     name: "Customers (MongoDB)",
+     *     driver: "mongodb",
+     *     properties: { ... }
+     * };
+     * ```
+     */
+    path?: string;
 }
 
 /**
@@ -646,6 +682,23 @@ export function isMongoDBCollection<M extends Record<string, unknown> = Record<s
     collection: EntityCollection<M, USER>
 ): collection is MongoDBCollection<M, USER> {
     return collection.driver === "mongodb";
+}
+
+/**
+ * Returns the data path for a collection.
+ * For Firestore or MongoDB collections with a `path`, returns that value;
+ * otherwise falls back to `slug`.
+ */
+export function getCollectionDataPath<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
+    collection: EntityCollection<M, USER>
+): string {
+    if (isFirebaseCollection(collection) && collection.path) {
+        return collection.path;
+    }
+    if (isMongoDBCollection(collection) && collection.path) {
+        return collection.path;
+    }
+    return collection.slug;
 }
 
 

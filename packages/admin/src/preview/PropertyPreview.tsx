@@ -82,6 +82,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 content = <StorageThumbnail
                     interactive={interactive}
                     storeUrl={property.storage?.storeUrl ?? false}
+                    storageSourceKey={stringProperty.storage.storageSource}
                     size={props.size}
                     fill={fill}
                     storagePathOrDownloadUrl={filePath}/>;

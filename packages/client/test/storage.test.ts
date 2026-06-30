@@ -175,6 +175,28 @@ alsoNope: null } as any
             expect(result.url).not.toContain("?token=");
         });
 
+        it("appends storageId with ? when there is no token", async () => {
+            // Regression: a hand-built `&storageId` produced an invalid URL
+            // (no `?`) when no auth token was present.
+            const storage = createStorage(mockTransport, "media");
+
+            mockTransport.request.mockResolvedValueOnce({ data: {} });
+            mockTransport.resolveToken.mockResolvedValueOnce(null);
+
+            const result = await storage.getSignedUrl("file.jpg");
+            expect(result.url).toBe("http://localhost:3000/api/storage/file/file.jpg?storageId=media");
+        });
+
+        it("appends storageId with & when a token is present", async () => {
+            const storage = createStorage(mockTransport, "media");
+
+            mockTransport.request.mockResolvedValueOnce({ data: {} });
+            mockTransport.resolveToken.mockResolvedValueOnce("tok");
+
+            const result = await storage.getSignedUrl("file.jpg");
+            expect(result.url).toBe("http://localhost:3000/api/storage/file/file.jpg?token=tok&storageId=media");
+        });
+
         it("returns cached result on subsequent calls", async () => {
             const storage = createStorage(mockTransport);
 

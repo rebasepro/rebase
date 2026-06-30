@@ -437,6 +437,29 @@ const { items, nextPageToken } = await rebase.storage.listObjects('prefix/', {
 });
 ```
 
+### Multi-Backend Storage
+
+`rebase.storage` accesses the **default** storage source. For multi-backend setups (e.g. S3 + GCS/Firebase), collection properties can specify `storage.storageSource` in their schema to route uploads to a named backend.
+
+On the frontend, register direct storage sources via the `storageSources` prop on `<Rebase>`:
+
+```tsx
+import { getStorage } from "firebase/storage";
+
+const firebaseStorageSource = getStorage(firebaseApp);
+
+<Rebase
+    client={rebaseClient}
+    storageSources={[
+        { key: "firebase", engine: "firebase", transport: "direct", source: firebaseStorageSource }
+    ]}
+>
+    {children}
+</Rebase>
+```
+
+The system resolves the correct source per-property via `StorageSourcesContext` (mirroring `DataSourcesContext`). Properties bound to a `direct` storage source bypass the Rebase backend and upload/download directly to the provider (e.g. Firebase Storage), while `server` sources route through the Rebase API with a `?storageId` query parameter for backend routing.
+
 ## Custom Functions
 
 Invoke custom server-side functions defined in the backend:

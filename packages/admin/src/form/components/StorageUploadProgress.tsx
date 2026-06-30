@@ -3,6 +3,7 @@ import React, { useCallback } from "react";
 import { useSnackbarController, useStorageSource } from "@rebasepro/core";
 import { StorageFieldItem } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
+import type { StorageSource } from "@rebasepro/types";
 import { cls, paperMixin, Skeleton } from "@rebasepro/ui";
 
 export interface StorageUploadItemProps {
@@ -15,6 +16,10 @@ export interface StorageUploadItemProps {
         uploadedUrl?: string) => Promise<void>;
     imageSize: number;
     simple: boolean;
+    /** Override the storage source for this upload. When provided, this source
+     *  is used instead of the default from context — enabling per-property
+     *  multi-backend uploads. */
+    storageSource?: StorageSource;
 }
 
 export function StorageUploadProgress({
@@ -23,10 +28,12 @@ export function StorageUploadProgress({
     metadata,
     onFileUploadComplete,
     imageSize,
-    simple
+    simple,
+    storageSource: storageSourceProp
 }: StorageUploadItemProps) {
 
-    const storageSource = useStorageSource();
+    const defaultStorageSource = useStorageSource();
+    const storageSource = storageSourceProp ?? defaultStorageSource;
 
     const snackbarController = useSnackbarController();
 

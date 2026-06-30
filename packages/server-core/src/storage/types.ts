@@ -45,18 +45,40 @@ export interface S3StorageConfig {
 }
 
 /**
- * Storage configuration — local filesystem or S3-compatible.
+ * Google Cloud Storage configuration (works with GCS and Firebase Storage)
+ */
+export interface GCSStorageConfig {
+    type: "gcs";
+    /** GCS bucket name (e.g. "my-project.appspot.com" for Firebase Storage) */
+    bucket: string;
+    /** GCP project ID (optional, auto-detected from credentials) */
+    projectId?: string;
+    /** Path to service account JSON key file */
+    keyFilename?: string;
+    /** Service account credentials object (alternative to keyFilename) */
+    credentials?: { client_email: string; private_key: string; project_id?: string };
+    /** Maximum file size in bytes (default: 50MB) */
+    maxFileSize?: number;
+    /** Allowed MIME types */
+    allowedMimeTypes?: string[];
+    /** Signed URL expiration in seconds (default: 3600) */
+    signedUrlExpiration?: number;
+}
+
+/**
+ * Storage configuration — local filesystem, S3-compatible, or Google Cloud Storage.
  *
  * **Built-in providers:**
  * - `local` — Zero-config filesystem storage. Great for dev and single-server deployments (Hetzner, bare metal).
  * - `s3` — Any S3-compatible provider. AWS S3, Cloudflare R2, MinIO, Hetzner Object Storage,
  *           Backblaze B2, DigitalOcean Spaces, and even GCS (via its S3-compatible interoperability API).
+ * - `gcs` — Native Google Cloud Storage / Firebase Storage via `@google-cloud/storage`.
  *
  * **Custom providers:**
- * For cloud-native storage (GCS, Azure Blob, etc.), implement the `StorageController`
+ * For other cloud storage (Azure Blob, etc.), implement the `StorageController`
  * interface and pass the instance directly to the `storage` config.
  */
-export type BackendStorageConfig = LocalStorageConfig | S3StorageConfig;
+export type BackendStorageConfig = LocalStorageConfig | S3StorageConfig | GCSStorageConfig;
 
 /**
  * Storage controller interface for backend implementations

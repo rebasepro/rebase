@@ -31,6 +31,8 @@ import {
     PlusIcon,
     RefreshCwIcon,
     ResizablePanels,
+    Select,
+    SelectItem,
     TextField,
     Tooltip,
     Trash2Icon,
@@ -39,8 +41,8 @@ import {
     VideoIcon,
     XIcon
 } from "@rebasepro/ui";
-import { useStorageSource, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/core";
-import type { StorageListResult } from "@rebasepro/types";
+import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/core";
+import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
 import { useSearchParams } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 
@@ -469,8 +471,21 @@ function FilePreviewPanel({
 // ──────────────────────────────────────────────
 
 export const StorageView = () => {
-    const storageSource = useStorageSource();
+    const defaultStorageSource = useStorageSource();
+    const storageSources = useStorageSources();
     const snackbarController = useSnackbarController();
+
+    // Available backends to browse. Always includes the default; named
+    // sources come from `<Rebase storageSources={...}>`.
+    const sourceKeys = useMemo(() => {
+        const keys = Object.keys(storageSources.sources);
+        if (!keys.includes(DEFAULT_STORAGE_SOURCE_KEY)) keys.unshift(DEFAULT_STORAGE_SOURCE_KEY);
+        return keys;
+    }, [storageSources.sources]);
+
+    const [selectedSourceKey, setSelectedSourceKey] = useState<string>(DEFAULT_STORAGE_SOURCE_KEY);
+
+    const storageSource = storageSources.sources[selectedSourceKey] ?? defaultStorageSource;
 
     // Navigation
     const [searchParams, setSearchParams] = useSearchParams();
@@ -559,8 +574,10 @@ export const StorageView = () => {
     }, []);
 
     useEffect(() => {
+        // `selectedSourceKey` is a dep so switching backend re-lists; the
+        // ref-sync effect above runs first, so `storageSourceRef` is current.
         fetchContents(currentPath);
-    }, [currentPath, fetchContents]);
+    }, [currentPath, fetchContents, selectedSourceKey]);
 
     // Navigate to path
     const handleNavigate = useCallback((path: string) => {
@@ -1265,6 +1282,28 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
 
                                 <div className="flex shrink-0 items-center justify-end gap-1.5 pr-1">
+
+                                    {/* Backend picker — only shown when more than one storage source is available */}
+                                    {sourceKeys.length > 1 && (
+                                        <Select
+                                            size="small"
+                                            position="item-aligned"
+                                            value={selectedSourceKey}
+                                            onValueChange={(value) => {
+                                                if (value) setSelectedSourceKey(value);
+                                            }}
+                                            renderValue={(key) => {
+                                                const label = storageSources.registry[key]?.label;
+                                                return label ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? "Default" : key);
+                                            }}>
+                                            {sourceKeys.map((key) => (
+                                                <SelectItem key={key} value={key}>
+                                                    {storageSources.registry[key]?.label
+                                                        ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? "Default" : key)}
+                                                </SelectItem>
+                                            ))}
+                                        </Select>
+                                    )}
 
                                     <Tooltip title="Grid view">
                                         <IconButton

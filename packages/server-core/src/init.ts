@@ -188,11 +188,22 @@ export interface RebaseBackendConfig {
     /**
      * Storage configuration. Accepts:
      *
-     * - A `BackendStorageConfig` object (`{ type: 'local' | 's3', ... }`)
-     * - A `StorageController` instance (for custom providers like GCS, Azure, etc.)
+     * - A `BackendStorageConfig` object (`{ type: 'local' | 's3' | 'gcs', ... }`)
+     * - A `StorageController` instance (for custom providers like Azure, etc.)
      * - A `Record<string, ...>` of either, for multi-backend setups
      */
     storage?: BackendStorageConfig | StorageController | Record<string, BackendStorageConfig | StorageController>;
+
+    /**
+     * Declared storage sources. Drives the client-side StorageSourceRegistry
+     * and the transport distinction (server vs direct).
+     *
+     * Server-backed sources are auto-derived from the `storage` map — you
+     * only need explicit entries for "direct" transport sources (e.g.
+     * Firebase Storage) that the backend does not proxy.
+     */
+    storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
+
     history?: unknown;
     /**
      * Default security rules applied to any collection that does not define
@@ -723,6 +734,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         const storageRoutes = createStorageRoutes({
             controller: storageController,
+            registry: storageRegistry,
+            sources: config.storageSources,
             requireAuth: resolveRequireAuth(config.auth)
         });
 

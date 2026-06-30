@@ -370,4 +370,82 @@ autoRefresh: false }
             expect(result).toBeDefined();
         });
     });
+
+    // -----------------------------------------------------------------------
+    // Storage sources bootstrap
+    // -----------------------------------------------------------------------
+    describe("fetchStorageSources()", () => {
+        const sourcesResponse = {
+            success: true,
+            data: [
+                { key: "(default)", engine: "local", transport: "server" },
+                { key: "media", engine: "s3", transport: "server", label: "S3 Media" },
+                { key: "firebase", engine: "firebase", transport: "direct", label: "Firebase" }
+            ]
+        };
+
+        const makeFetch = (counter: { n: number }) =>
+            jest.fn(async (_url: RequestInfo | URL) => {
+                counter.n++;
+                return {
+                    ok: true,
+                    status: 200,
+                    text: async () => JSON.stringify(sourcesResponse),
+                    headers: new Headers()
+                } as unknown as Response;
+            }) as unknown as typeof globalThis.fetch;
+
+        it("hits /api/storage/sources and returns the definitions", async () => {
+            const counter = { n: 0 };
+            const mockFetch = makeFetch(counter);
+            const client = createRebaseClient({ baseUrl: "http://localhost", fetch: mockFetch });
+
+            const defs = await client.fetchStorageSources();
+
+            expect(counter.n).toBe(1);
+            const urlArg = ((mockFetch as any).mock.calls[0])[0];
+            expect(urlArg.toString()).toContain("/api/storage/sources");
+            expect(defs.map((d) => d.key)).toEqual(["(default)", "media", "firebase"]);
+        });
+
+        it("auto-registers server sources but not direct ones", async () => {
+            const client = createRebaseClient({ baseUrl: "http://localhost", fetch: makeFetch({ n: 0 }) });
+
+            await client.fetchStorageSources();
+
+            expect(client.storageRegistry.has("media")).toBe(true);
+            expect(client.storageRegistry.has("firebase")).toBe(false);
+            expect(client.storageRegistry.get("media")).toBeDefined();
+        });
+
+        it("caches the result across calls", async () => {
+            const counter = { n: 0 };
+            const client = createRebaseClient({ baseUrl: "http://localhost", fetch: makeFetch(counter) });
+
+            await client.fetchStorageSources();
+            await client.fetchStorageSources();
+
+            expect(counter.n).toBe(1);
+        });
+
+        it("retries after a failed fetch", async () => {
+            let attempt = 0;
+            const mockFetch = jest.fn(async () => {
+                attempt++;
+                if (attempt === 1) throw new Error("network down");
+                return {
+                    ok: true,
+                    status: 200,
+                    text: async () => JSON.stringify(sourcesResponse),
+                    headers: new Headers()
+                } as unknown as Response;
+            }) as unknown as typeof globalThis.fetch;
+            const client = createRebaseClient({ baseUrl: "http://localhost", fetch: mockFetch });
+
+            await expect(client.fetchStorageSources()).rejects.toThrow();
+            const defs = await client.fetchStorageSources();
+            expect(defs.map((d) => d.key)).toContain("media");
+            expect(attempt).toBe(2);
+        });
+    });
 });

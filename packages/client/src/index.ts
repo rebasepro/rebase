@@ -6,8 +6,9 @@ import { createApiKeys, CreateApiKeysOptions } from "./api-keys";
 import { createCollectionClient, CollectionClient } from "./collection";
 import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
+import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
-import { RebaseClient, RebaseData, StorageSource } from "@rebasepro/types";
+import { RebaseClient, RebaseData, StorageSource, StorageSourceDefinition, StorageSourceRegistry, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 export * from "./transport";
@@ -19,6 +20,7 @@ export * from "./collection";
 export * from "./query_builder";
 export * from "./websocket";
 export * from "./storage";
+export * from "./storage-registry";
 export * from "./reviver";
 export * from "./functions";
 export type { Entity, FindResponse } from "@rebasepro/types";
@@ -28,6 +30,14 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
     admin?: CreateAdminOptions;
     cron?: CreateCronOptions;
     apiKeys?: CreateApiKeysOptions;
+    /**
+     * Declared storage sources for multi-backend support. Server-transport
+     * entries are auto-wired into `client.storageRegistry`; `direct` sources
+     * are registered app-side (e.g. via a Firebase Storage hook). The default
+     * source (`storage`) is always registered under
+     * {@link DEFAULT_STORAGE_SOURCE_KEY}.
+     */
+    storageSources?: StorageSourceDefinition[];
 }
 
 // ─── Typed Data Proxy ────────────────────────────────────────────────────────
@@ -69,6 +79,9 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
     storage: StorageSource;
+    storageRegistry: StorageSourceRegistry;
+    createStorageSource: (storageId: string) => StorageSource;
+    fetchStorageSources: () => Promise<StorageSourceDefinition[]>;
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
     data: TypedDataLayer<DB>;
 };
@@ -117,6 +130,48 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const apiKeys = createApiKeys(transport, options.apiKeys);
     const storage = createStorage(transport);
     const functions = createFunctionsClient(transport);
+
+    // Build a server-backed StorageSource for a given storage-source key.
+    const createStorageSource = (storageId: string): StorageSource =>
+        storageId === DEFAULT_STORAGE_SOURCE_KEY ? storage : createStorage(transport, storageId);
+
+    // Storage registry: always holds the default source, plus any declared
+    // server-transport sources. `direct` sources are registered app-side.
+    const storageRegistry = new ClientStorageSourceRegistry();
+    storageRegistry.register(DEFAULT_STORAGE_SOURCE_KEY, storage);
+    for (const def of options.storageSources ?? []) {
+        if (def.transport === "server" && def.key !== DEFAULT_STORAGE_SOURCE_KEY) {
+            storageRegistry.register(def.key, createStorageSource(def.key));
+        }
+    }
+
+    // Discover storage sources from the backend, making the server the single
+    // source of truth. Server-transport sources are auto-wired into the
+    // registry; `direct` sources are returned for the app to register. The
+    // promise is cached on success and reset on failure so it can be retried
+    // (e.g. once the user authenticates).
+    let storageSourcesPromise: Promise<StorageSourceDefinition[]> | undefined;
+    const fetchStorageSources = (): Promise<StorageSourceDefinition[]> => {
+        if (storageSourcesPromise) return storageSourcesPromise;
+        storageSourcesPromise = transport
+            .request<{ data: StorageSourceDefinition[] }>("/storage/sources")
+            .then((res) => {
+                const defs = res.data ?? [];
+                for (const def of defs) {
+                    if (def.transport === "server"
+                        && def.key !== DEFAULT_STORAGE_SOURCE_KEY
+                        && !storageRegistry.has(def.key)) {
+                        storageRegistry.register(def.key, createStorageSource(def.key));
+                    }
+                }
+                return defs;
+            })
+            .catch((e) => {
+                storageSourcesPromise = undefined; // allow retry
+                throw e;
+            });
+        return storageSourcesPromise;
+    };
 
     const resolvedWsUrl = options.websocketUrl ?? deriveWebSocketUrl(options.baseUrl);
 
@@ -206,6 +261,9 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         apiKeys,
         functions,
         storage,
+        storageRegistry,
+        createStorageSource,
+        fetchStorageSources,
         ws,
         setToken: transport.setToken,
         setAuthTokenGetter: transport.setAuthTokenGetter,

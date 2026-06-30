@@ -1,15 +1,16 @@
 ---
 title: Storage Configuration
 sidebar_label: Storage Configuration
-description: Configure local filesystem or S3-compatible storage backends for file uploads, images, and media.
+description: Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
 ---
 
 ## Overview
 
-Rebase supports two storage backends:
+Rebase supports three storage backends:
 
 - **Local filesystem** — Files stored on disk (great for development)
 - **S3-compatible** — AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces
+- **Google Cloud Storage / Firebase Storage** — Native GCS support via `@google-cloud/storage`
 
 ## Configuration
 
@@ -44,6 +45,21 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+### GCS / Firebase Storage
+
+```typescript
+const backend = await initializeRebaseBackend({
+    // ...
+    storage: {
+        type: "gcs",
+        bucket: env.GCS_BUCKET!,
+        projectId: env.GCS_PROJECT_ID,
+    }
+});
+```
+
+On GCP (Cloud Run, GCE, GKE), the default service account credentials are used automatically. Outside GCP, set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the path of your service account key file.
+
 ### Multiple Storage Backends
 
 You can configure multiple named backends and route different fields to different storage:
@@ -63,7 +79,7 @@ image: {
     name: "Image",
     storage: {
         storagePath: "products",
-        backend: "media"       // Routes to the "media" S3 backend
+        storageSource: "media"  // Routes to the "media" S3 backend
     }
 }
 ```
@@ -73,7 +89,9 @@ image: {
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Direct file upload |
+| `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
 | `GET` | `/api/storage/files/:path` | Retrieve a file |
+| `GET` | `/api/storage/files/:path?storageId=<key>` | Retrieve a file from a specific backend |
 | `DELETE` | `/api/storage/files/:path` | Delete a file |
 | `OPTIONS` | `/api/storage/tus` | Query supported TUS protocol capabilities |
 | `POST` | `/api/storage/tus` | Initiate a resumable TUS upload session |
@@ -131,7 +149,7 @@ Client                                                   Rebase Server
 
 | Variable | Description |
 |----------|-------------|
-| `STORAGE_TYPE` | `"local"` or `"s3"` |
+| `STORAGE_TYPE` | `"local"`, `"s3"`, or `"gcs"` |
 | `STORAGE_PATH` | Local storage directory (default: `./uploads`) |
 | `S3_BUCKET` | S3 bucket name |
 | `S3_REGION` | AWS region (default: `"auto"`) |
@@ -139,6 +157,29 @@ Client                                                   Rebase Server
 | `S3_SECRET_ACCESS_KEY` | AWS secret key |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, R2) |
 | `S3_FORCE_PATH_STYLE` | Use path-style URLs (required for MinIO) |
+| `GCS_BUCKET` | Google Cloud Storage bucket name |
+| `GCS_PROJECT_ID` | GCP project ID for GCS |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to GCP service account key file (not needed on GCP with default credentials) |
+
+## Frontend Storage Sources
+
+When using multiple storage backends, pass `storageSources` to the `<Rebase>` provider so the frontend knows how to route uploads directly:
+
+```tsx
+import { Rebase } from "@rebasepro/admin";
+
+<Rebase
+    apiUrl="https://api.example.com"
+    storageSources={[
+        { key: "media", label: "Media CDN" },
+        { key: "firebase", label: "Firebase Storage" },
+    ]}
+>
+    {/* ... */}
+</Rebase>
+```
+
+Each source's `key` must match a backend key registered in the server's `storage` map. The `StorageSourcesContext` React context resolves the active source for each upload field.
 
 ## Production Tips
 

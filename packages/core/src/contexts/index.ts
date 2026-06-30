@@ -8,6 +8,7 @@ export * from "./DataSourcesContext";
 export * from "./RebaseDataContext";
 export * from "./AnalyticsContext";
 export * from "./StorageSourceContext";
+export * from "./StorageSourcesContext";
 export * from "./UserConfigurationPersistenceContext";
 export * from "./DialogsProvider";
 export * from "./RebaseClientInstanceContext";

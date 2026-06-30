@@ -1,5 +1,5 @@
 
-import type { EntityCollection } from "@rebasepro/types";
+import { type EntityCollection, getCollectionDataPath } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { EntityAction } from "@rebasepro/types";
 import React from "react";
@@ -127,7 +127,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                             action.onClick({
                                 view: "form",
                                 entity,
-                                path: path ?? collection.slug,
+                                path: path ?? getCollectionDataPath(collection),
                                 collection: collection,
                                 context: undefined,
                                 sideEntityController: undefined,

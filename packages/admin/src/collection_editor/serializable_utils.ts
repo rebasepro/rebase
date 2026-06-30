@@ -90,6 +90,7 @@ function toSerializableStorageConfig(storage: StorageConfig | undefined): Serial
     if (storage.includeBucketUrl !== undefined) result.includeBucketUrl = storage.includeBucketUrl;
     if (storage.storeUrl !== undefined) result.storeUrl = storage.storeUrl;
     if (storage.maxSize !== undefined) result.maxSize = storage.maxSize;
+    if (storage.storageSource !== undefined) result.storageSource = storage.storageSource;
     // processFile, postProcess, previewUrl are intentionally dropped (functions)
 
     return result;

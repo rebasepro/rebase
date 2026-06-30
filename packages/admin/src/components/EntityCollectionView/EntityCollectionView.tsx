@@ -10,7 +10,7 @@ import { deepEqual as equal } from "fast-equals"
 const EMPTY_ARRAY: any[] = [];
 const DEFAULT_ENTITY_OPEN_MODE = "split";
 
-import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, PartialEntityCollection, ViewMode } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, getCollectionDataPath, PartialEntityCollection, ViewMode } from "@rebasepro/types";
 import {
     EntityCollectionRowActions,
     EntityCollectionTable
@@ -163,7 +163,7 @@ const EntityCollectionViewInner = React.memo(
         const collectionRegistry = useCollectionRegistryController();
         const urlController = useUrlController();
         const breadcrumbs = useBreadcrumbsController();
-        const path = pathProp ?? collectionProp.slug;
+        const path = pathProp ?? getCollectionDataPath(collectionProp);
         const dataClient = useData();
         const sideEntityController = useSideEntityController();
         const authController = useAuthController();
@@ -894,7 +894,7 @@ parentEntityIds,
                     collection={collection}
                     tableController={tableController}
                     path={path}
-                    relativePath={collection.slug}
+                    relativePath={getCollectionDataPath(collection)}
                     selectionController={usedSelectionController}
                     collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
@@ -909,7 +909,7 @@ parentEntityIds,
                         onNewClick={onNewClick}
                         openNewDocument={openNewDocument}
                         path={path}
-                        relativePath={collection.slug}
+                        relativePath={getCollectionDataPath(collection)}
                         selectionController={usedSelectionController}
                         selectionEnabled={activeSelectionEnabled}
                         collectionEntitiesCount={docsCount ?? undefined}

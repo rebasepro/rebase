@@ -13,7 +13,8 @@ import {
 } from "@rebasepro/ui";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
-import { useTranslation } from "@rebasepro/core";
+import { useStorageSources, useTranslation } from "@rebasepro/core";
+import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
 import { ArrayPropertyValidation } from "./validation/ArrayPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
@@ -42,9 +43,11 @@ export function StoragePropertyField({
         setFieldValue
     } = useFormex();
     const { t } = useTranslation();
+    const storageSources = useStorageSources();
 
     const baseStoragePath = multiple ? "of.storage" : "storage";
     const acceptedFiles = `${baseStoragePath}.acceptedFiles`;
+    const storageSource = `${baseStoragePath}.storageSource`;
 
     const metadata = `${baseStoragePath}.metadata`;
     const fileName = `${baseStoragePath}.fileName`;
@@ -76,6 +79,11 @@ export function StoragePropertyField({
     const fileTypesValue: string[] | undefined = Array.isArray(storedValue) ? storedValue : undefined;
     const allFileTypesSelected = !fileTypesValue || fileTypesValue.length === 0;
 
+    // Available storage backends (from `<Rebase storageSources={...}>`).
+    const sourceKeys = Object.keys(storageSources.sources)
+        .filter((key) => key !== DEFAULT_STORAGE_SOURCE_KEY);
+    const storageSourceValue = (getIn(values, storageSource) as string | undefined) ?? DEFAULT_STORAGE_SOURCE_KEY;
+
     const handleTypesChange = (value: string[]) => {
         if (!value) setFieldValue(acceptedFiles, undefined);
         else setFieldValue(acceptedFiles, value);
@@ -101,6 +109,32 @@ export function StoragePropertyField({
                     }>
 
                     <div className={"grid grid-cols-12 gap-2 p-4"}>
+
+                        {sourceKeys.length > 0 && (
+                            <div className={"col-span-12"}>
+                                <Select
+                                    className={"w-full"}
+                                    disabled={disabled}
+                                    name={storageSource}
+                                    value={storageSourceValue}
+                                    onValueChange={(value) =>
+                                        setFieldValue(storageSource, !value || value === DEFAULT_STORAGE_SOURCE_KEY ? undefined : value)}
+                                    label={"Storage backend"}
+                                    renderValue={(key) => {
+                                        const label = storageSources.registry[key]?.label;
+                                        return label ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? "Default" : key);
+                                    }}>
+                                    <SelectItem value={DEFAULT_STORAGE_SOURCE_KEY}>
+                                        Default
+                                    </SelectItem>
+                                    {sourceKeys.map((key) => (
+                                        <SelectItem key={key} value={key}>
+                                            {storageSources.registry[key]?.label ?? key}
+                                        </SelectItem>
+                                    ))}
+                                </Select>
+                            </div>
+                        )}
 
                         <div className={"col-span-12"}>
 

@@ -388,7 +388,7 @@ When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) wit
 | `DB_POOL_MAX` | `string` → `number` | `"20"` | No | Max database pool connections |
 | `DB_POOL_IDLE_TIMEOUT` | `string` → `number` | `"30000"` | No | Pool idle timeout (ms) |
 | `DB_POOL_CONNECT_TIMEOUT` | `string` → `number` | `"10000"` | No | Pool connect timeout (ms) |
-| `STORAGE_TYPE` | `"local" \| "s3"` | `"local"` | No | File storage backend type |
+| `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | No | File storage backend type |
 | `STORAGE_PATH` | `string` | — | No | Local storage directory path |
 | `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | — | No | Force local storage even in production |
 | `S3_BUCKET` | `string` | — | When S3 | S3 bucket name |
@@ -397,6 +397,9 @@ When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) wit
 | `S3_SECRET_ACCESS_KEY` | `string` | — | When S3 | S3 secret key |
 | `S3_ENDPOINT` | `string` (URL) | — | No | Custom S3 endpoint (MinIO, R2, etc.) |
 | `S3_FORCE_PATH_STYLE` | `"true" \| "false"` | — | No | Use path-style S3 URLs |
+| `GCS_BUCKET` | `string` | — | When GCS | GCS/Firebase Storage bucket name |
+| `GCS_PROJECT_ID` | `string` | — | When GCS | GCP project ID |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `string` (path) | — | When GCS | Path to GCP service account JSON |
 
 ### Production Validations
 
@@ -438,7 +441,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-
 | `bootstrappers` | `BackendBootstrapper[]` | `[]` | Database bootstrappers. Use one per engine for multiple engines in a single instance (e.g. Postgres + MongoDB); mark one `isDefault` |
 | `dataSources` | `DataSourceDefinition[]` | `[]` | Declared data sources (`key`, `engine`, `transport`). Drives capabilities and the server-vs-direct distinction. Collections on a `direct`/`custom` transport are client-only — the backend skips data routes for them. Server engines need no entry |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
-| `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration |
+| `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
 | `history` | `unknown` | — | Entity history/audit-log configuration |
 | `defaultSecurityRules` | `SecurityRule[]` | — | Default RLS rules for collections without their own |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI spec at `/api/docs` and Swagger UI at `/api/swagger` (dev only) |
@@ -546,6 +549,8 @@ await initializeRebaseBackend({
             ? { clientId: env.GOOGLE_CLIENT_ID }
             : undefined,
     },
+    // Single backend: { type: "local" | "s3" | "gcs" }
+    // Multi-backend: Record<string, StorageController> with named sources
     storage: { type: env.STORAGE_TYPE },
     defaultSecurityRules: [
         { operation: "select", access: "public" },

@@ -1,5 +1,5 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -15,6 +15,23 @@ export type RebaseDataSource = DataSourceDefinition & {
      * transports; omit for `server` transport (handled by the `client`).
      */
     driver?: DataDriver;
+};
+
+/**
+ * A storage source registered on `<Rebase>`. Extends the shared
+ * {@link StorageSourceDefinition} with an optional frontend
+ * {@link StorageSource} for `direct` transports. Server-mediated sources
+ * omit `source` — they are reached through the `client`.
+ *
+ * @group Models
+ */
+export type RebaseStorageSource = StorageSourceDefinition & {
+    /**
+     * The client-side StorageSource for this backend. Required for `direct`
+     * transport (e.g. Firebase Storage via `@firebase/storage`); omit for
+     * `server` transport (proxied by the Rebase backend).
+     */
+    source?: StorageSource;
 };
 
 /** DeepPartial helper — allows partial overrides at any nesting level */
@@ -147,6 +164,28 @@ export type RebaseProps<USER extends User> = {
      * Optional override for StorageSource if not using `client`
      */
     storageSource?: StorageSource;
+
+    /**
+     * Additional storage sources beyond the default `client.storage`.
+     *
+     * Register **direct** (e.g. Firebase Storage, talking straight to the
+     * cloud) sources here. Server-mediated sources (S3, GCS proxied by the
+     * Rebase backend) do *not* need an entry — they are routed by
+     * `storageId` query parameter on the REST API.
+     *
+     * Collection properties opt in via `storage.storageSource: "key"`.
+     *
+     * @example
+     * ```tsx
+     * <Rebase
+     *     client={rebaseClient}
+     *     storageSources={[
+     *         { key: "firebase", engine: "firebase", transport: "direct", source: firebaseStorageSource }
+     *     ]}
+     * >
+     * ```
+     */
+    storageSources?: RebaseStorageSource[];
 
     /**
      * Administrative database operations (SQL, schema discovery).

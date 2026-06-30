@@ -1,6 +1,7 @@
 import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
+import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { Entity, getDataSourceCapabilities } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
@@ -61,7 +62,7 @@ export function MultipleRelationFieldBinding({
 
     const referenceDialogController = useEntitySelectionDialog({
         multiselect: true,
-        path: collection.slug,
+        path: getCollectionDataPath(collection),
         collection,
         onMultipleEntitiesSelected,
         selectedEntityIds,

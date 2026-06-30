@@ -1,6 +1,7 @@
 import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
+import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { Entity, EntityRelation, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
@@ -124,7 +125,7 @@ function SingleRelationFieldBinding({
 
     const referenceDialogController = useEntitySelectionDialog({
         multiselect: false,
-        path: collection.slug,
+        path: getCollectionDataPath(collection),
         collection,
         onSingleEntitySelected,
         selectedEntityIds: validValue && normalizedValue ? [normalizedValue.id] : undefined,

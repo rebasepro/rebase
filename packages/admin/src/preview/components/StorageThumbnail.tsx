@@ -2,7 +2,8 @@ import React, { useEffect } from "react";
 
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
-import { ErrorView, useStorageSource } from "@rebasepro/core";
+import { ErrorView, useStorageSource, useStorageSources } from "@rebasepro/core";
+import { resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { Skeleton } from "@rebasepro/ui";
@@ -12,6 +13,8 @@ type StorageThumbnailProps = {
     size: PreviewSize;
     interactive?: boolean;
     fill?: boolean;
+    /** Key of the storage source backing this property (`StorageConfig.storageSource`). */
+    storageSourceKey?: string;
 };
 
 /**
@@ -24,7 +27,8 @@ function areEqual(prevProps: StorageThumbnailProps, nextProps: StorageThumbnailP
         prevProps.storagePathOrDownloadUrl === nextProps.storagePathOrDownloadUrl &&
         prevProps.storeUrl === nextProps.storeUrl &&
         prevProps.interactive === nextProps.interactive &&
-        prevProps.fill === nextProps.fill;
+        prevProps.fill === nextProps.fill &&
+        prevProps.storageSourceKey === nextProps.storageSourceKey;
 }
 
 const URL_CACHE: Record<string, DownloadConfig> = {};
@@ -34,13 +38,26 @@ export function StorageThumbnailInternal({
     interactive,
     storagePathOrDownloadUrl,
     size,
-    fill
+    fill,
+    storageSourceKey
 }: StorageThumbnailProps) {
 
     const [error, setError] = React.useState<Error | undefined>(undefined);
-    const storage = useStorageSource();
+    const defaultStorage = useStorageSource();
+    const storageSources = useStorageSources();
+    // Resolve the per-property backend so previews of `storeUrl: false`
+    // properties pointing at a named source hit the right backend.
+    const storage = resolveStorageSource({
+        sourceKey: storageSourceKey,
+        sources: storageSources.sources,
+        defaultSource: defaultStorage
+    });
 
-    const [downloadConfig, setDownloadConfig] = React.useState<DownloadConfig>(URL_CACHE[storagePathOrDownloadUrl]);
+    // Cache key is namespaced by source so the same path on two backends
+    // does not collide.
+    const cacheKey = `${storageSourceKey ?? ""}::${storagePathOrDownloadUrl}`;
+
+    const [downloadConfig, setDownloadConfig] = React.useState<DownloadConfig>(URL_CACHE[cacheKey]);
 
     useEffect(() => {
         if (!storagePathOrDownloadUrl)
@@ -50,13 +67,13 @@ export function StorageThumbnailInternal({
             .then(function (downloadConfig) {
                 if (!unmounted) {
                     setDownloadConfig(downloadConfig);
-                    URL_CACHE[storagePathOrDownloadUrl] = downloadConfig;
+                    URL_CACHE[cacheKey] = downloadConfig;
                 }
             }).catch(setError);
         return () => {
             unmounted = true;
         };
-    }, [storagePathOrDownloadUrl]);
+    }, [storagePathOrDownloadUrl, cacheKey]);
 
     if (!storagePathOrDownloadUrl) return null;
 

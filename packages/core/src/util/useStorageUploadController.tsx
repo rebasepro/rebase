@@ -3,9 +3,10 @@ import type { ArrayProperty, Property, StringProperty } from "@rebasepro/types";
 import Compressor from "compressorjs";
 import { deepEqual as equal } from "fast-equals";
 
-import { EntityValues, StorageConfig, StorageSource } from "@rebasepro/types";import { useCallback, useEffect, useState } from "react";
-import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
+import { EntityValues, StorageConfig, StorageSource, StorageSourceRegistry } from "@rebasepro/types";import { useCallback, useEffect, useMemo, useState } from "react";
+import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource } from "@rebasepro/common";
 import { useAuthController } from "../hooks";
+import { useStorageSources } from "../contexts/StorageSourcesContext";
 import { randomString } from "@rebasepro/utils";
 
 export type StorageFieldSize = "smallest" | "small" | "medium" | "large" | number;
@@ -33,6 +34,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
     property,
     propertyKey,
     storageSource,
+    storageSourceRegistry,
     disabled,
     onChange
 }:
@@ -44,17 +46,30 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         propertyKey: string,
         property: StringProperty | ArrayProperty | StringProperty | ArrayProperty,
         storageSource: StorageSource,
+        /** Optional explicit registry. When omitted, the hook reads from the
+         *  `StorageSourcesContext` provided by `<Rebase storageSources={...}>`. */
+        storageSourceRegistry?: StorageSourceRegistry,
         disabled: boolean,
         onChange: (value: string | string[] | null) => void
     }) {
 
     const authController = useAuthController();
+    const storageSources = useStorageSources();
     const storage: StorageConfig | undefined = property.type === "string"
         ? property.storage
         : property.type === "array" &&
             (property.of as Property).type === "string"
             ? (property.of as StringProperty).storage
             : undefined;
+
+    // Resolve the correct storage source for this property.
+    // Priority: explicit registry prop → StorageSourcesContext → default.
+    const resolvedStorageSource = useMemo(() => resolveStorageSource({
+        sourceKey: storage?.storageSource,
+        registry: storageSourceRegistry,
+        sources: storageSources.sources,
+        defaultSource: storageSource
+    }), [storage?.storageSource, storageSourceRegistry, storageSources.sources, storageSource]);
 
     const multipleFilesSupported = property.type === "array";
 
@@ -132,7 +147,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         }
 
         if (storage.storeUrl) {
-            uploadPathOrDownloadUrl = (await storageSource.getSignedUrl(uploadedPath)).url;
+            uploadPathOrDownloadUrl = (await resolvedStorageSource.getSignedUrl(uploadedPath)).url;
         }
         if (storage.postProcess && uploadPathOrDownloadUrl) {
             uploadPathOrDownloadUrl = await storage.postProcess(uploadPathOrDownloadUrl);
@@ -161,7 +176,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         } else {
             onChange(fieldValue ? fieldValue[0] : null);
         }
-    }, [internalValue, multipleFilesSupported, onChange, storage, storageSource]);
+    }, [internalValue, multipleFilesSupported, onChange, storage, resolvedStorageSource]);
 
     const onFileUploadError = useCallback((entry: StorageFieldItem) => {
         console.debug("onFileUploadError", entry);
@@ -236,7 +251,10 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         onFileUploadComplete,
         onFileUploadError,
         onFilesAdded,
-        multipleFilesSupported
+        multipleFilesSupported,
+        /** The resolved StorageSource for this property — may differ from the
+         *  default context source when `StorageConfig.storageSource` is set. */
+        resolvedStorageSource
     }
 }
 

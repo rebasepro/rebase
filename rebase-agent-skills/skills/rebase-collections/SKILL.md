@@ -367,6 +367,23 @@ avatar: {
 | `postProcess` | `(pathOrUrl) => Promise<string>` | — | Transform saved path/URL after upload |
 | `includeBucketUrl` | `boolean` | `false` | Include bucket URL in saved path |
 | `storeUrl` | `boolean` | `false` | Save download URL instead of storage path |
+| `storageSource` | `string` | `undefined` (default backend) | Named storage source key — routes uploads to a specific backend registered in the backend `storage` map or in `storageSources` on `<Rebase>`. Must match a `StorageSourceDefinition.key`. |
+
+#### Per-Property Backend Binding
+
+When using multiple storage backends, use `storageSource` to route a specific property's uploads to a named backend:
+
+```typescript
+// Route this property's uploads to Firebase Storage
+image: {
+    type: "string",
+    storage: {
+        storageSource: "firebase",
+        storagePath: "products/{entityId}",
+        acceptedFiles: ["image/*"],
+    }
+}
+```
 
 ### ImageResize Options
 

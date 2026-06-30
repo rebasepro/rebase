@@ -1,6 +1,8 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { useAuthController, useStorageSource } from "@rebasepro/core";
+import { useStorageSources } from "@rebasepro/core";
+import { resolveStorageSource } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, StringProperty } from "@rebasepro/types";
@@ -84,8 +86,17 @@ export function MarkdownEditorFieldBinding({
     const disabled = disabledProp || isSubmitting;
     const highlight = customProps?.highlight;
     const editorProps = customProps?.editorProps;
-    const storageSource = useStorageSource();
+    const defaultStorageSource = useStorageSource();
     const storage = property.storage;
+    const storageSources = useStorageSources();
+
+    // Resolve the correct storage source for this property.
+    // Mirrors the resolution in useStorageUploadController.
+    const storageSource = useMemo(() => resolveStorageSource({
+        sourceKey: storage?.storageSource,
+        sources: storageSources.sources,
+        defaultSource: defaultStorageSource
+    }), [storage?.storageSource, storageSources.sources, defaultStorageSource]);
 
     const entityValues = context.values;
     const entityId = context.entityId;

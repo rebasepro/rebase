@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { AuthAdapter, DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
@@ -318,7 +318,7 @@ values: entity.values as Record<string, unknown> },
                 const hookCtx = this.buildHookContext(c, "PUT");
 
                 const existingEntity = await driver.fetchEntity({
-                    path: collection.slug,
+                    path: getCollectionDataPath(collection),
                     entityId: String(id),
                     collection: resolvedCollection
                 });
@@ -334,7 +334,7 @@ values: entity.values as Record<string, unknown> },
                 }
 
                 const entity = await driver.saveEntity({
-                    path: collection.slug,
+                    path: getCollectionDataPath(collection),
                     entityId: String(id),
                     values: body,
                     collection: resolvedCollection,
@@ -374,7 +374,7 @@ values: entity.values as Record<string, unknown> },
             const hookCtx = this.buildHookContext(c, "DELETE");
 
             const existingEntity = await driver.fetchEntity({
-                path: collection.slug,
+                path: getCollectionDataPath(collection),
                 entityId: String(id),
                 collection: resolvedCollection
             });
@@ -686,7 +686,7 @@ entityId };
      */
     private async fetchRawCollection(driver: DataDriver, collection: EntityCollection, queryOptions: QueryOptions, searchString?: string) {
         const entities = await driver.fetchCollection({
-            path: collection.slug,
+            path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where as FetchCollectionProps["filter"],
             limit: queryOptions.limit,
@@ -705,7 +705,7 @@ entityId };
      */
     private async countRawEntities(driver: DataDriver, collection: EntityCollection, queryOptions: QueryOptions, searchString?: string): Promise<number> {
         return driver.countEntities ? await driver.countEntities({
-            path: collection.slug,
+            path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where as FetchCollectionProps["filter"],
             searchString
@@ -717,7 +717,7 @@ entityId };
      */
     private async fetchRawEntity(driver: DataDriver, collection: EntityCollection, entityId: string) {
         const entity = await driver.fetchEntity({
-            path: collection.slug,
+            path: getCollectionDataPath(collection),
             entityId,
             collection
         });

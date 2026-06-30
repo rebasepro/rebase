@@ -2,7 +2,7 @@ import type { ComponentRef, EntityCollection, EntityCustomViewParams, FormViewCo
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, EntityStatus } from "@rebasepro/types";
+import { Entity, EntityStatus, getCollectionDataPath } from "@rebasepro/types";
 import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 
 import { EntityCollectionView, EntityView } from "../components";
@@ -416,7 +416,7 @@ parentEntityIds,
 
     const subCollectionsViews = subcollections && subcollections.map((subcollection) => {
         const subcollectionId = subcollection.slug;
-        const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(subcollection.slug)}` : undefined;
+        const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(getCollectionDataPath(subcollection))}` : undefined;
 
         if (activeTab !== subcollectionId) return null;
         return (

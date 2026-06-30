@@ -25,6 +25,7 @@ import {
     findFrontendDir,
     findEnvFile,
     resolveTsx,
+    validateTsxInstallation,
     getActiveBackendPlugin,
     resolvePluginCliScript
 } from "../utils/project";
@@ -246,6 +247,19 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             process.exit(1);
         }
 
+        // Verify the tsx installation is intact (not just the symlink)
+        const tsxValidationError = validateTsxInstallation(tsxBin);
+        if (tsxValidationError) {
+            const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
+            const installCmd = pmCmdsLocal.install.join(" ");
+            console.error(chalk.red("  ✗ tsx installation appears corrupted."));
+            console.error(chalk.gray(`    ${tsxValidationError}`));
+            console.error("");
+            console.error(chalk.gray("    To fix, run:"));
+            console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
+            process.exit(1);
+        }
+
         const envFile = findEnvFile(projectRoot);
         const env: Record<string, string> = { ...process.env as Record<string, string> };
         if (envFile) {
@@ -396,10 +410,38 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             });
         });
 
+        /** Whether we've already shown a corrupted-modules recovery hint. */
+        let corruptedModulesWarned = false;
+
         backendChild.stderr?.on("data", (data: Buffer) => {
             const lines = data.toString().split("\n").filter(Boolean);
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
+
+                // Detect corrupted node_modules at runtime
+                // (covers tsx and any other dependency whose pnpm store entry is broken)
+                if (!corruptedModulesWarned) {
+                    const cleanLine = stripAnsi(line);
+                    if (
+                        cleanLine.includes("Cannot find module") &&
+                        cleanLine.includes("node_modules/.pnpm/")
+                    ) {
+                        corruptedModulesWarned = true;
+                        // Delay slightly so the full Node.js error stack prints first
+                        setTimeout(() => {
+                            const pm = detectPackageManager(projectRoot);
+                            const installCmd = getPMCommands(pm).install.join(" ");
+                            console.error("");
+                            console.error(chalk.red("  ✗ node_modules appears corrupted — a required file is missing."));
+                            console.error(chalk.gray("    This usually happens when a previous install was interrupted"));
+                            console.error(chalk.gray("    or the package manager store was cleaned."));
+                            console.error("");
+                            console.error(chalk.gray("    To fix, stop the dev server and run:"));
+                            console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
+                            console.error("");
+                        }, 200);
+                    }
+                }
             });
         });
 

@@ -180,6 +180,56 @@ export function resolveTsx(projectRoot: string): string | null {
 }
 
 /**
+ * Validate that a resolved tsx binary actually has an intact installation.
+ *
+ * `resolveLocalBin` only checks whether `node_modules/.bin/tsx` (a symlink)
+ * exists. If the pnpm content-addressable store was cleaned or a previous
+ * install was interrupted, the symlink can exist while critical files inside
+ * the tsx package (e.g. `dist/preflight.cjs`) are missing — causing a
+ * confusing MODULE_NOT_FOUND error at runtime.
+ *
+ * This function follows the symlink, walks up to find the tsx package root
+ * (`package.json` with `name: "tsx"`), and verifies that `dist/preflight.cjs`
+ * is present. Returns `null` when the installation looks healthy, or an
+ * error description string when it appears corrupted.
+ */
+export function validateTsxInstallation(tsxBinPath: string): string | null {
+    try {
+        // Follow the symlink chain to the real tsx entry script
+        const realPath = fs.realpathSync(tsxBinPath);
+
+        // Walk up from the real binary to locate the tsx package root
+        let dir = path.dirname(realPath);
+        const fsRoot = path.parse(dir).root;
+        for (let depth = 0; depth < 10 && dir !== fsRoot; depth++) {
+            const pkgPath = path.join(dir, "package.json");
+            if (fs.existsSync(pkgPath)) {
+                try {
+                    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+                    if (pkg.name === "tsx") {
+                        // Found the tsx package root — verify critical preload file
+                        const preflightPath = path.join(dir, "dist", "preflight.cjs");
+                        if (!fs.existsSync(preflightPath)) {
+                            return `tsx package at ${dir} is missing dist/preflight.cjs`;
+                        }
+                        return null; // Installation looks healthy
+                    }
+                } catch {
+                    // Malformed package.json — keep walking
+                }
+            }
+            dir = path.dirname(dir);
+        }
+
+        // Could not determine tsx root — don't block, assume valid
+        return null;
+    } catch (err) {
+        // realpathSync throws if the symlink target is completely gone
+        return `tsx binary symlink is broken: ${err instanceof Error ? err.message : String(err)}`;
+    }
+}
+
+/**
  * Require the project root or exit with a helpful error.
  */
 export function requireProjectRoot(): string {

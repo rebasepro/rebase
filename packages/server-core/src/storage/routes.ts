@@ -1,5 +1,10 @@
 /**
  * Storage REST API routes using Hono
+ *
+ * Supports multi-backend routing via `StorageRegistry`. Each endpoint
+ * accepts an optional `storageId` parameter (query string or form field)
+ * to target a named storage backend. When omitted, the default backend
+ * is used.
  */
 
 import { Hono } from "hono";
@@ -7,6 +12,8 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
+import type { StorageRegistry } from "./storage-registry";
+import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "@rebasepro/types";
 import { requireAuth as jwtRequireAuth, optionalAuth } from "../auth/middleware";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
@@ -17,7 +24,25 @@ import { TusHandler } from "./tus-handler";
 const transformCache = new TransformCache();
 
 export interface StorageRoutesConfig {
-    controller: StorageController;
+    /**
+     * Single storage controller (backward-compatible).
+     * Used as fallback when no `registry` is provided.
+     */
+    controller?: StorageController;
+    /**
+     * Full storage registry for multi-backend routing.
+     * When provided, endpoints resolve the controller from `storageId`
+     * parameter. Takes precedence over `controller`.
+     */
+    registry?: StorageRegistry;
+    /**
+     * Declared storage sources, surfaced by `GET /sources` so the client can
+     * bootstrap its registry. Carries the frontend `transport` (server vs
+     * direct) and human-readable labels. Server-transport sources are also
+     * derived from the registry; `direct` sources (e.g. Firebase Storage) only
+     * exist here since the backend does not proxy them.
+     */
+    sources?: StorageSourceDefinition[];
     /** Base path for storage routes (default: '/api/storage') */
     basePath?: string;
     /** Require authentication for write operations (default: true) */
@@ -72,7 +97,29 @@ function sanitizeStorageKey(key: string): string {
 export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
-    const { controller, requireAuth = true, publicRead = false } = config;
+    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false } = config;
+
+    /**
+     * Resolve the storage controller for a request.
+     * Looks up by `storageId` in the registry, falls back to the single
+     * controller, and finally to the registry default.
+     */
+    const resolveController = (storageId?: string | null): StorageController => {
+        if (registry) {
+            return registry.getOrDefault(storageId);
+        }
+        if (controller) {
+            return controller;
+        }
+        throw new Error("No storage controller or registry available");
+    };
+
+    /** Get the default controller (used for TUS and base-path derivation). */
+    const getDefaultController = (): StorageController => {
+        if (registry) return registry.getDefault();
+        if (controller) return controller;
+        throw new Error("No storage controller or registry available");
+    };
 
     // Use actual JWT auth middleware from auth module
     const writeAuthMiddleware = requireAuth ? jwtRequireAuth : optionalAuth;
@@ -116,6 +163,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         const key = typeof body["key"] === "string" ? body["key"] : "";
         const bucket = typeof body["bucket"] === "string" ? body["bucket"] : undefined;
+        const storageId = typeof body["storageId"] === "string" ? body["storageId"] : c.req.query("storageId");
 
         const finalKey = sanitizeStorageKey(key || uploadedFile.name || "unnamed");
 
@@ -127,7 +175,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             }
         }
 
-        const result = await controller.putObject({
+        const resolved = resolveController(storageId);
+        const result = await resolved.putObject({
             file: uploadedFile,
             key: finalKey,
             metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
@@ -155,13 +204,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         const filePath = decodeURIComponent(rawPath);
+        const storageId = c.req.query("storageId");
+        const resolved = resolveController(storageId);
 
         // Parse image transform query params (e.g. ?width=300&format=webp)
         const transformOpts = parseTransformOptions(c.req.query() as Record<string, string>);
 
         // For local storage, serve the file directly from disk
-        if (controller.getType() === "local") {
-            const localController = controller as LocalStorageController;
+        if (resolved.getType() === "local") {
+            const localController = resolved as LocalStorageController;
             const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
             const absolutePath = localController.getAbsolutePath(resolvedPath, bucket);
@@ -208,7 +259,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         //  1. Mixed-content (HTTPS page → HTTP MinIO) is blocked by browsers
         //  2. Internal IPs / VPC endpoints are unreachable from the browser
         const { bucket: parsedBucket, resolvedPath: parsedPath } = parseBucketAndPath(filePath);
-        const fileObject = await controller.getObject(parsedPath, parsedBucket);
+        const fileObject = await resolved.getObject(parsedPath, parsedBucket);
         if (!fileObject) {
             throw ApiError.notFound("File not found");
         }
@@ -249,9 +300,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         const filePath = decodeURIComponent(rawPath);
+        const storageId = c.req.query("storageId");
+        const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
-        const downloadConfig = await controller.getSignedUrl(resolvedPath, bucket);
+        const downloadConfig = await resolved.getSignedUrl(resolvedPath, bucket);
 
         if (downloadConfig.fileNotFound) {
             throw ApiError.notFound("File not found");
@@ -274,9 +327,11 @@ message: "No file to delete" });
         }
 
         const filePath = decodeURIComponent(rawPath);
+        const storageId = c.req.query("storageId");
+        const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
-        await controller.deleteObject(resolvedPath, bucket);
+        await resolved.deleteObject(resolvedPath, bucket);
 
         return c.json({
             success: true,
@@ -293,11 +348,13 @@ message: "No file to delete" });
         const bucket = c.req.query("bucket");
         const maxResults = c.req.query("maxResults");
         const pageToken = c.req.query("pageToken");
+        const storageId = c.req.query("storageId");
+        const resolved = resolveController(storageId);
 
-        const result = await controller.listObjects(
+        const result = await resolved.listObjects(
             storagePrefix,
             {
-                bucket: bucket ?? (controller.getType() === "local" ? "default" : undefined),
+                bucket: bucket ?? (resolved.getType() === "local" ? "default" : undefined),
                 maxResults: maxResults ? parseInt(maxResults, 10) : undefined,
                 pageToken
             }
@@ -316,27 +373,29 @@ message: "No file to delete" });
     router.post("/folder", writeAuthMiddleware, async (c) => {
         const body = await c.req.json();
         const folderPath = body.path;
+        const storageId = typeof body.storageId === "string" ? body.storageId : c.req.query("storageId");
 
         if (!folderPath || typeof folderPath !== "string") {
             throw ApiError.badRequest("Folder path is required");
         }
 
+        const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(folderPath);
 
         if (!resolvedPath || resolvedPath.trim() === "") {
             throw ApiError.badRequest("Invalid folder path");
         }
 
-        if (controller.getType() === "local") {
+        if (resolved.getType() === "local") {
             // For local storage, create the directory
-            const localController = controller as LocalStorageController;
+            const localController = resolved as LocalStorageController;
             const absolutePath = localController.getAbsolutePath(resolvedPath, bucket);
             fs.mkdirSync(absolutePath, { recursive: true });
         } else {
-            // For S3-compatible storage, create a zero-byte marker object with trailing slash
+            // For S3/GCS-compatible storage, create a zero-byte marker object with trailing slash
             const key = resolvedPath.endsWith("/") ? resolvedPath : resolvedPath + "/";
             const emptyFile = new File([], key, { type: "application/x-directory" });
-            await controller.putObject({
+            await resolved.putObject({
                 file: emptyFile,
                 key
             });
@@ -352,10 +411,11 @@ message: "No file to delete" });
     // TUS Resumable Uploads
     // -----------------------------------------------------------------------
 
-    const tusBaseDir = controller.getType() === "local"
-        ? (controller as LocalStorageController).getBasePath()
+    const defaultCtrl = getDefaultController();
+    const tusBaseDir = defaultCtrl.getType() === "local"
+        ? (defaultCtrl as LocalStorageController).getBasePath()
         : (process.env.STORAGE_PATH || "./uploads");
-    const tusHandler = new TusHandler(tusBaseDir, controller);
+    const tusHandler = new TusHandler(tusBaseDir, defaultCtrl, registry);
     tusHandler.startCleanup();
 
     router.options("/tus", (_c) => tusHandler.options());
@@ -363,6 +423,50 @@ message: "No file to delete" });
     router.get("/tus/:id", readAuthMiddleware, (c) => tusHandler.head(c, c.req.param("id")));
     router.patch("/tus/:id", writeAuthMiddleware, async (c) => tusHandler.patch(c, c.req.param("id")));
     router.delete("/tus/:id", writeAuthMiddleware, async (c) => tusHandler.delete(c, c.req.param("id")));
+
+    // -----------------------------------------------------------------------
+    // Storage Sources Discovery
+    // -----------------------------------------------------------------------
+
+    /**
+     * GET /sources — list all registered storage backends.
+     * The client can bootstrap its StorageSourceRegistry from this endpoint.
+     */
+    router.get("/sources", readAuthMiddleware, (c) => {
+        const byKey = new Map<string, { key: string; engine: string; transport: "server" | "direct"; label?: string }>();
+
+        // 1. Server-backed sources derived from the registry (source of truth
+        //    for the actual engine type), or the single controller.
+        if (registry) {
+            for (const key of registry.list()) {
+                byKey.set(key, {
+                    key,
+                    engine: registry.get(key)?.getType() ?? "unknown",
+                    transport: "server",
+                });
+            }
+        } else {
+            byKey.set(DEFAULT_STORAGE_SOURCE_KEY, {
+                key: DEFAULT_STORAGE_SOURCE_KEY,
+                engine: defaultCtrl.getType(),
+                transport: "server",
+            });
+        }
+
+        // 2. Overlay declared definitions: adds `direct` sources the backend
+        //    does not proxy, plus labels and explicit transport/engine.
+        for (const def of declaredSources ?? []) {
+            const existing = byKey.get(def.key);
+            byKey.set(def.key, {
+                key: def.key,
+                engine: def.engine ?? existing?.engine ?? "unknown",
+                transport: def.transport ?? existing?.transport ?? "server",
+                label: def.label ?? existing?.label,
+            });
+        }
+
+        return c.json({ success: true, data: Array.from(byKey.values()) });
+    });
 
     return router;
 }

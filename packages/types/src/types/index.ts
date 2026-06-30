@@ -23,6 +23,7 @@ export * from "./entity_actions";
 export * from "./property_config";
 export * from "./entity_views";
 export * from "./data_source";
+export * from "./storage_source";
 export * from "./cron";
 export * from "./backend_hooks";
 export * from "./component_ref";

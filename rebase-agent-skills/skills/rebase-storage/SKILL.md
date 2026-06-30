@@ -1,11 +1,11 @@
 ---
 name: rebase-storage
-description: Guide for setting up and using file storage in Rebase. Use this skill when the user needs to configure S3 or local file storage, handle file uploads, TUS resumable uploads, image transformations, or integrate the media manager.
+description: Guide for setting up and using file storage in Rebase. Use this skill when the user needs to configure S3, GCS/Firebase Storage, or local file storage, handle file uploads, TUS resumable uploads, image transformations, multi-backend frontend storage sources, or integrate the media manager.
 ---
 
 # Rebase Storage
 
-Rebase provides built-in file storage with support for local filesystem and S3-compatible services, TUS v1.0.0 resumable uploads, on-the-fly image transformation, and a multi-backend registry.
+Rebase provides built-in file storage with support for local filesystem, S3-compatible services, and GCS/Firebase Storage, TUS v1.0.0 resumable uploads, on-the-fly image transformation, a multi-backend registry, and frontend storage sources.
 
 > **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first before using this skill. Storage requires a running Rebase backend with `initializeRebaseBackend()`.
 
@@ -15,7 +15,7 @@ The `storage` option in `initializeRebaseBackend()` accepts three forms:
 
 | Form | Type | Description |
 |------|------|-------------|
-| Single config | `BackendStorageConfig` | `{ type: 'local' | 's3', ... }` — creates a single `(default)` backend |
+| Single config | `BackendStorageConfig` | `{ type: 'local' | 's3' | 'gcs', ... }` — creates a single `(default)` backend |
 | Single controller | `StorageController` | A custom controller instance — registered as `(default)` |
 | Multi-backend map | `Record<string, BackendStorageConfig \| StorageController>` | Named backends, first becomes `(default)` if no `(default)` key |
 
@@ -43,6 +43,19 @@ The `storage` option in `initializeRebaseBackend()` accepts three forms:
 | `maxFileSize` | `number` | `52428800` (50 MB) | Maximum file size in bytes |
 | `allowedMimeTypes` | `string[]` | `undefined` (all allowed) | Restrict uploads to these MIME types |
 | `signedUrlExpiration` | `number` | `3600` | Signed URL expiry in seconds |
+
+### GCSStorageConfig
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `type` | `"gcs"` | — | **Required.** Must be `"gcs"` |
+| `bucket` | `string` | — | **Required.** GCS bucket name |
+| `projectId` | `string` | `undefined` | Google Cloud project ID (auto-detected from credentials if omitted) |
+| `maxFileSize` | `number` | `52428800` (50 MB) | Maximum file size in bytes |
+| `allowedMimeTypes` | `string[]` | `undefined` (all allowed) | Restrict uploads to these MIME types |
+| `signedUrlExpiration` | `number` | `3600` | Signed URL expiry in seconds |
+
+> **IMPORTANT FOR AGENTS:** GCS requires `@google-cloud/storage` as a peer dependency. Install it: `pnpm add @google-cloud/storage`. Authentication uses Application Default Credentials — set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to point to a service account key file, or rely on the default credentials when running on GCP.
 
 ### StorageRoutesConfig
 
@@ -93,7 +106,7 @@ Local storage includes **path traversal protection** — any resolved path that 
 
 ### S3-Compatible Storage
 
-Works with AWS S3, MinIO, DigitalOcean Spaces, Cloudflare R2, Hetzner Object Storage, Backblaze B2, and any S3-compatible service. GCS also works via its S3-compatible interoperability API.
+Works with AWS S3, MinIO, DigitalOcean Spaces, Cloudflare R2, Hetzner Object Storage, Backblaze B2, and any S3-compatible service.
 
 ```typescript
 const backend = await initializeRebaseBackend({
@@ -118,6 +131,29 @@ The S3 controller:
 - Supports `s3://` and `gs://` URL schemes in key parameters for backward compatibility
 - Flattens nested metadata to string values (S3 requirement)
 
+### GCS / Firebase Storage
+
+Native Google Cloud Storage support via the `@google-cloud/storage` SDK. Also works with Firebase Storage buckets (which are GCS buckets under the hood). This is the preferred approach for GCS — no S3 interop layer needed.
+
+```typescript
+const backend = await initializeRebaseBackend({
+    server, app,
+    bootstrappers: [/* ... */],
+    storage: {
+        type: "gcs",
+        bucket: process.env.GCS_BUCKET!,
+        projectId: process.env.GCS_PROJECT_ID, // optional, auto-detected on GCP
+    },
+});
+```
+
+The GCS controller:
+- Uses `@google-cloud/storage` natively (no S3 interop overhead)
+- Authenticates via Application Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`)
+- Maps the logical bucket name `"default"` to the configured GCS bucket
+- Supports `gs://` URL scheme in key parameters
+- Generates signed URLs using GCS's native signed URL mechanism
+
 ### Multiple Storage Backends
 
 Rebase supports multiple storage backends simultaneously via the `StorageRegistry`:
@@ -138,7 +174,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-> **IMPORTANT FOR AGENTS:** If no `"(default)"` key is provided, the first entry is automatically registered as the default (with a console warning). The REST API routes always use the default controller. Use `storageRegistry.get("media")` or `storageRegistry.getOrDefault("media")` to access named backends programmatically.
+> **IMPORTANT FOR AGENTS:** If no `"(default)"` key is provided, the first entry is automatically registered as the default (with a console warning). The REST API routes use the default controller unless a `?storageId=<key>` query parameter is provided (see [REST API Endpoints](#rest-api-endpoints)). Use `storageRegistry.get("media")` or `storageRegistry.getOrDefault("media")` to access named backends programmatically.
 
 ### StorageRegistry API
 
@@ -156,7 +192,7 @@ The `StorageRegistry` interface:
 
 ### Custom Storage Providers
 
-Implement the `StorageController` interface for unsupported providers (Azure Blob, native GCS SDK, etc.):
+GCS/Firebase Storage is now built-in (see [GCS / Firebase Storage](#gcs--firebase-storage)). Implement the `StorageController` interface for other unsupported providers (Azure Blob, etc.):
 
 ```typescript
 interface StorageController {
@@ -185,7 +221,7 @@ The backend validates storage-related environment variables via a Zod schema:
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `STORAGE_TYPE` | `"local" \| "s3"` | `"local"` | Storage provider type |
+| `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | Storage provider type |
 | `STORAGE_PATH` | `string` | `"./uploads"` | Base path for local storage / TUS temp directory |
 | `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Suppress the production warning for local storage |
 | `S3_BUCKET` | `string` | — | S3 bucket name |
@@ -194,8 +230,12 @@ The backend validates storage-related environment variables via a Zod schema:
 | `S3_SECRET_ACCESS_KEY` | `string` | — | S3 secret access key |
 | `S3_ENDPOINT` | `string` (URL) | — | Custom S3-compatible endpoint |
 | `S3_FORCE_PATH_STYLE` | `"true" \| "false"` | — | Enable path-style URLs |
+| `GCS_BUCKET` | `string` | — | GCS bucket name |
+| `GCS_PROJECT_ID` | `string` | — | Google Cloud project ID (auto-detected on GCP) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `string` (path) | — | Path to GCP service account key JSON file |
 
 ```env
+# S3 example
 STORAGE_TYPE=s3
 S3_BUCKET=my-bucket
 S3_REGION=us-east-1
@@ -203,11 +243,34 @@ S3_ACCESS_KEY_ID=AKIA...
 S3_SECRET_ACCESS_KEY=...
 S3_ENDPOINT=https://minio.example.com    # Optional: for MinIO, R2, etc.
 S3_FORCE_PATH_STYLE=true                 # Optional: for MinIO
+
+# GCS example
+STORAGE_TYPE=gcs
+GCS_BUCKET=my-gcs-bucket
+GCS_PROJECT_ID=my-gcp-project             # Optional: auto-detected on GCP
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ```
 
 ## REST API Endpoints
 
 All storage routes are mounted at `/api/storage` by default. Write operations require authentication when `requireAuth` is `true` (the default). Read operations also require authentication unless `publicRead` is `true`.
+
+### Multi-Backend Routing (`storageId`)
+
+All storage endpoints accept a `?storageId=<key>` query parameter that routes the request to a specific named backend in the `StorageRegistry`. For multipart uploads (`POST /api/storage/upload`), the `storageId` can also be sent as a form field.
+
+If `storageId` is omitted, the request is routed to the `(default)` backend.
+
+```
+# Upload to the "media" backend
+POST /api/storage/upload?storageId=media
+
+# Download from the "media" backend
+GET /api/storage/file/images/photo.jpg?storageId=media
+
+# List files in the "media" backend
+GET /api/storage/list?prefix=images/&storageId=media
+```
 
 ### Standard Endpoints
 
@@ -241,6 +304,7 @@ Upload a file via `multipart/form-data`.
 | `file` | `File` | Yes | The file to upload |
 | `key` | `string` | No | Storage key/path. Falls back to original filename, then `"unnamed"` |
 | `bucket` | `string` | No | Target bucket name |
+| `storageId` | `string` | No | Route to a named backend (alternative to `?storageId` query param) |
 | `metadata_*` | `string` | No | Custom metadata keys prefixed with `metadata_` |
 
 **Response** (201):
@@ -562,6 +626,24 @@ Transformed responses include `Cache-Control: public, max-age=31536000, immutabl
 
 The `@rebasepro/client` package provides a `StorageSource` interface via `createStorage(transport)`. These methods are available on `client.storage` (or through the React/Studio hooks).
 
+All SDK methods accept an optional `storageId` parameter (passed as a query parameter) to route the request to a specific named backend:
+
+```typescript
+// Upload to a specific backend
+const result = await client.storage.putObject({
+    file: myFile,
+    key: "products/images/photo.jpg",
+    storageId: "media",   // routes to the "media" backend
+});
+
+// Get signed URL from a specific backend
+const config = await client.storage.getSignedUrl(
+    "products/images/photo.jpg",
+    "default",     // bucket
+    { storageId: "media" }
+);
+```
+
 ### putObject
 
 Upload a file.
@@ -662,7 +744,8 @@ const productsCollection: PostgresCollection = {
             name: "Product Image",
             type: "string",
             storage: {
-                storagePath: "products/images",
+                storageSource: "firebase",              // routes to the named backend
+                storagePath: "products/images/{entityId}",
                 acceptedFiles: ["image/*"],
                 maxSize: 5 * 1024 * 1024, // 5MB
             }
@@ -673,6 +756,7 @@ const productsCollection: PostgresCollection = {
             of: {
                 type: "string",
                 storage: {
+                    storageSource: "media",              // routes to the "media" backend
                     storagePath: "products/documents",
                     acceptedFiles: ["application/pdf", "application/msword"],
                 }
@@ -681,6 +765,87 @@ const productsCollection: PostgresCollection = {
     }
 };
 ```
+
+The `storageSource` field maps to a named backend registered in the `StorageRegistry` (server-side) or in the `storageSources` prop (client-side). When omitted, the `(default)` backend is used.
+
+### StorageConfig Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `storageSource` | `string` | Named backend to route uploads to (optional, defaults to `(default)`) |
+| `storagePath` | `string` | Path template for uploaded files. Supports `{entityId}` placeholder |
+| `acceptedFiles` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`) |
+| `maxSize` | `number` | Maximum file size in bytes |
+
+## Frontend Storage Sources
+
+The `<Rebase>` component accepts a `storageSources` prop to register client-side storage sources, following the same pattern as `dataSources` for databases. This enables **direct** (client-to-provider) file operations, bypassing the Rebase backend.
+
+### Registering Storage Sources
+
+```tsx
+import type { RebaseStorageSource } from "@rebasepro/core";
+import { firebaseStorageSource } from "./my-firebase-storage";
+
+<Rebase
+    client={rebaseClient}
+    storageSources={[
+        {
+            key: "firebase",
+            engine: "firebase",
+            transport: "direct",
+            source: firebaseStorageSource,
+        },
+        {
+            key: "media",
+            engine: "s3",
+            transport: "server",   // proxied through the Rebase backend
+            label: "Media Storage",
+        },
+    ]}
+>
+    {children}
+</Rebase>
+```
+
+### StorageSourceDefinition
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `key` | `string` | **Required.** Unique identifier for this storage source |
+| `engine` | `string` | **Required.** Storage engine type (e.g., `"firebase"`, `"s3"`, `"gcs"`, `"local"`) |
+| `transport` | `"server" \| "direct"` | **Required.** `"server"` routes through the backend; `"direct"` talks to the provider from the client |
+| `source` | `StorageSource` | The client-side `StorageSource` implementation (required when `transport` is `"direct"`) |
+| `label` | `string` | Optional human-readable label for the UI |
+
+### StorageSourcesContext
+
+Registered storage sources are exposed to the component tree via `StorageSourcesContext`, mirroring the `DataSourcesContext` pattern:
+
+```typescript
+import { useStorageSources } from "@rebasepro/core";
+
+function MyUploadComponent() {
+    const storageSources = useStorageSources();
+
+    // Get a specific source
+    const firebaseSource = storageSources.find(s => s.key === "firebase");
+
+    // Use it for direct uploads
+    if (firebaseSource?.source) {
+        await firebaseSource.source.putObject({ file, key: "photos/image.jpg" });
+    }
+}
+```
+
+### Direct vs Server Transport
+
+| Transport | Description | Use Case |
+|-----------|-------------|----------|
+| `"server"` | File operations are proxied through the Rebase backend REST API | S3, GCS, or local backends managed by the server |
+| `"direct"` | File operations go directly from the client to the storage provider | Firebase Storage, client-side GCS with Firebase Auth, or any provider with client-side SDKs |
+
+> **IMPORTANT FOR AGENTS:** Direct transport sources must provide a `source` property implementing the `StorageSource` interface. Server transport sources use the built-in SDK transport and only need `key` and `engine`.
 
 ## Storage Browser (Studio)
 

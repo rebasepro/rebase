@@ -3,7 +3,7 @@ import type { EntityCollection } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { EntityAction, EntityActionClickProps, SideEntityController } from "@rebasepro/types";
 import React, { useMemo } from "react";
-import { Entity, RebaseContext } from "@rebasepro/types";
+import { Entity, getCollectionDataPath, RebaseContext } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { copyEntityAction, deleteEntityAction } from "../components";
 import { mergeEntityActions } from "../util/entity_actions";
@@ -168,7 +168,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                 const props = {
                     view: "form",
                     entity,
-                    path: collection.slug,
+                    path: getCollectionDataPath(collection),
                     collection: collection,
                     context,
                     sideEntityController,
@@ -292,7 +292,7 @@ function buildSideActions<M extends Record<string, unknown>>({
                 const props = {
                     view: "form",
                     entity,
-                    path: collection.slug,
+                    path: getCollectionDataPath(collection),
                     collection: collection,
                     context,
                     sideEntityController,

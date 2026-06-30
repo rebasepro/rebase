@@ -1,5 +1,6 @@
 import { useEntitySelectionDialog } from "../../../hooks/useEntitySelectionDialog";
 import type { EntityCollection } from "@rebasepro/types";
+import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals"
 
@@ -90,7 +91,7 @@ export const TableRelationFieldInternal = React.memo(
 
         const relationDialogController = useEntitySelectionDialog({
             multiselect,
-            path: collection.slug,
+            path: getCollectionDataPath(collection),
             collection,
             onMultipleEntitiesSelected,
             onSingleEntitySelected,

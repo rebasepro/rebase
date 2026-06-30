@@ -11,7 +11,7 @@ import {
     GraphQLInputObjectType,
     GraphQLInputFieldConfig
 } from "graphql";
-import { DataDriver, EntityCollection, FetchCollectionProps, Property, Entity } from "@rebasepro/types";
+import { DataDriver, EntityCollection, FetchCollectionProps, Property, Entity, getCollectionDataPath } from "@rebasepro/types";
 import { isOperationAllowed, type ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 
@@ -219,7 +219,7 @@ export class GraphQLSchemaGenerator {
                     const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                     if (!ds) throw new Error("Scoped driver not available");
                     const entity = await ds.fetchEntity({
-                        path: collection.slug,
+                        path: getCollectionDataPath(collection),
                         entityId: args.id,
                         collection
                     });
@@ -256,7 +256,7 @@ defaultValue: 0 },
                         }
                     }
                     const entities = await ds.fetchCollection({
-                        path: collection.slug,
+                        path: getCollectionDataPath(collection),
                         collection,
                         filter,
                         limit: args.limit,
@@ -321,7 +321,7 @@ defaultValue: 0 },
                     const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                     if (!ds) throw new Error("Scoped driver not available");
                     const entity = await ds.saveEntity({
-                        path: collection.slug,
+                        path: getCollectionDataPath(collection),
                         entityId: args.id,
                         values: args.input,
                         collection,
@@ -344,7 +344,7 @@ defaultValue: 0 },
                         const ds = ctx?.get?.("driver") as DataDriver | undefined ?? (ctx as Record<string, unknown> | undefined)?.driver as DataDriver | undefined;
                         if (!ds) throw new Error("Scoped driver not available");
                         const existingEntity = await ds.fetchEntity({
-                            path: collection.slug,
+                            path: getCollectionDataPath(collection),
                             entityId: args.id,
                             collection
                         });

@@ -109,6 +109,8 @@ export interface SerializableStorageConfig {
     includeBucketUrl?: boolean;
     storeUrl?: boolean;
     maxSize?: number;
+    /** Key of the named storage backend to use (see `StorageConfig.storageSource`). */
+    storageSource?: string;
     // processFile, postProcess, previewUrl are dropped (functions)
 }
 

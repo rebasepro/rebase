@@ -922,6 +922,15 @@ export interface ArrayPropertyValidationSchema extends PropertyValidationSchema 
  */
 export type StorageConfig = {
     /**
+     * Key referencing a named storage backend from the StorageRegistry.
+     * Must match a `StorageSourceDefinition.key` or a key registered
+     * in `initializeRebaseBackend({ storage: { ... } })`.
+     *
+     * When omitted, the default storage source is used.
+     */
+    storageSource?: string;
+
+    /**
      * File MIME types that can be uploaded to this reference. Don't specify for
      * all.
      * Note that you can also use the asterisk notation, so `image/*`

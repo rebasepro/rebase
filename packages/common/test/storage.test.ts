@@ -1,5 +1,5 @@
-import { resolveStoragePathString, resolveStorageFilenameString } from "../src/util/storage";
-import { StorageConfig, StringProperty } from "@rebasepro/types";
+import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageSource } from "../src/util/storage";
+import { StorageConfig, StringProperty, StorageSource } from "@rebasepro/types";
 
 // Minimal File mock for Node environment
 class MockFile {
@@ -142,5 +142,36 @@ fileName: "avatar.png" });
             expect(result).toBeTruthy();
             expect(result.length).toBeGreaterThan(0);
         });
+    });
+});
+
+describe("resolveStorageSource", () => {
+    const defaultSource = { id: "default" } as unknown as StorageSource;
+    const mediaSource = { id: "media" } as unknown as StorageSource;
+    const sources = { media: mediaSource };
+
+    it("returns the default when no key is given", () => {
+        expect(resolveStorageSource({ defaultSource })).toBe(defaultSource);
+        expect(resolveStorageSource({ sourceKey: null, sources, defaultSource })).toBe(defaultSource);
+    });
+
+    it("resolves a key from the sources map", () => {
+        expect(resolveStorageSource({ sourceKey: "media", sources, defaultSource })).toBe(mediaSource);
+    });
+
+    it("falls back to default for an unknown key", () => {
+        expect(resolveStorageSource({ sourceKey: "missing", sources, defaultSource })).toBe(defaultSource);
+    });
+
+    it("prefers an explicit registry over the sources map", () => {
+        const registrySource = { id: "registry" } as unknown as StorageSource;
+        const registry = {
+            get: () => undefined,
+            getDefault: () => defaultSource,
+            getOrDefault: () => registrySource,
+            has: () => true,
+            list: () => ["media"]
+        };
+        expect(resolveStorageSource({ sourceKey: "media", sources, registry, defaultSource })).toBe(registrySource);
     });
 });
