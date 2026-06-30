@@ -188,11 +188,6 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const storage = toSerializableStorageConfig(sp.storage);
             if (storage) result.storage = storage;
 
-            // Reference sub-property
-            if (sp.reference) {
-                result.reference = toSerializableProperty(sp.reference) as SerializableReferenceProperty;
-            }
-
             return result;
         }
 
@@ -544,10 +539,6 @@ export function fromSerializableProperty(serialized: SerializableProperty): Prop
         case "string": {
             const sp = serialized as SerializableStringProperty;
             const result = { ...sp } as unknown as StringProperty;
-            // Convert reference sub-property
-            if (sp.reference) {
-                result.reference = fromSerializableProperty(sp.reference) as ReferenceProperty;
-            }
             return result;
         }
 

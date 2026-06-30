@@ -1,6 +1,6 @@
 
 import type { Properties } from "@rebasepro/types";
-import type { EntityCollection, MapProperty, Property, PropertyConfig, StringProperty } from "@rebasepro/types";
+import type { EntityCollection, MapProperty, Property, PropertyConfig } from "@rebasepro/types";
 import React from "react";
 
 import { isPropertyBuilder } from "@rebasepro/common";
@@ -75,7 +75,6 @@ function getDefaultIconForProperty(property: Property): LucideIcon {
             if (property.ui?.url) return GlobeIcon;
             if (property.email) return MailIcon;
             if (property.ui?.multiline || property.ui?.markdown) return AlignLeftIcon;
-            if ((property as StringProperty).reference) return LinkIcon;
             return TextIcon;
         }
         case "number":

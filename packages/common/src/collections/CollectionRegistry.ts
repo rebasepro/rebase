@@ -3,7 +3,10 @@ import {
     CollectionWithRelations,
     CollectionWithSubcollections,
     EntityCollection,
+    FirebaseProperties,
+    MongoProperties,
     NumberProperty,
+    PostgresProperties,
     Properties,
     Property,
     Relation,
@@ -244,7 +247,7 @@ export class CollectionRegistry {
 
         // 4. Normalize properties (which stamps relation on each property)
         const properties: Properties = this.normalizeProperties(result.properties, mergedRelations);
-        result.properties = properties;
+        result.properties = properties as PostgresProperties | FirebaseProperties | MongoProperties;
 
         // Populate childCollections from driver-specific fields
         if (!result.childCollections) {

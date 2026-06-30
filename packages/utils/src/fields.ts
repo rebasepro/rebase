@@ -14,7 +14,6 @@ export function isDefaultFieldConfigId(id: string): boolean {
         "multi_number_select",
         "file_upload",
         "multi_file_upload",
-        "reference_as_string",
         "reference",
         "multi_references",
         "relation",

@@ -1,4 +1,4 @@
-import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata } from "@rebasepro/types";
+import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, PostgresProperties } from "@rebasepro/types";
 import { prettifyIdentifier } from "@rebasepro/utils";
 
 /**
@@ -282,7 +282,7 @@ export function buildCollectionFromTableMetadata(
         name: prettifiedName,
         slug: tableName,
         table: tableName,
-        properties,
+        properties: properties as PostgresProperties,
         propertiesOrder,
         ...(relations.length > 0 ? { relations } : {}),
         ...(securityRules.length > 0 ? { securityRules } : {})

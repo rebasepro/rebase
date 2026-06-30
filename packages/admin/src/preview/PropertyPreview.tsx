@@ -108,22 +108,6 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                     propertyKey={propertyKey}
                     size={props.size}
                 />;
-            } else if (stringProperty.reference) {
-                if (typeof stringProperty.reference.path === "string") {
-                    content = <ReferencePreview
-                        disabled={!stringProperty.reference.path}
-                        previewProperties={stringProperty.reference?.ui?.previewProperties}
-                        includeId={stringProperty.reference.includeId}
-                        includeEntityLink={stringProperty.reference.includeEntityLink}
-                        size={props.size}
-                        reference={new EntityReference({ id: value,
-path: stringProperty.reference.path })}
-                        textOnly={props.textOnly}
-                    />;
-                } else {
-                    content = <EmptyValue/>;
-                }
-
             } else {
                 content = <StringPropertyPreview {...props}
                     property={stringProperty}

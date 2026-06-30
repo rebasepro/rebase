@@ -9,7 +9,6 @@ import { KeyValueFieldBinding } from "../form/field_bindings/KeyValueFieldBindin
 import { MapFieldBinding } from "../form/field_bindings/MapFieldBinding";
 import { MarkdownEditorFieldBinding } from "../form/field_bindings/MarkdownEditorFieldBinding";
 import { MultiSelectFieldBinding } from "../form/field_bindings/MultiSelectFieldBinding";
-import { ReferenceAsStringFieldBinding } from "../form/field_bindings/ReferenceAsStringFieldBinding";
 import { ReferenceFieldBinding } from "../form/field_bindings/ReferenceFieldBinding";
 import { RepeatFieldBinding } from "../form/field_bindings/RepeatFieldBinding";
 import { SelectFieldBinding } from "../form/field_bindings/SelectFieldBinding";
@@ -220,17 +219,6 @@ Field: TextFieldBinding }
             ui: { Field: StorageUploadFieldBinding }
         }
     },
-    reference_as_string: {
-        key: "reference_as_string",
-        name: "Reference (as string)",
-        description: "The value refers to a different collection (it is saved as a string)",
-        Icon: LinkIcon,
-        color: "#154fb3",
-        property: {
-            type: "string",
-            ui: { Field: ReferenceAsStringFieldBinding }
-        }
-    },
     reference: {
         key: "reference",
         name: "Reference",
@@ -393,8 +381,6 @@ export function getDefaultFieldId(property: Property) {
             return "select";
         } else if (property.userSelect) {
             return "user_select";
-        } else if ((property as StringProperty).reference) {
-            return "reference_as_string";
         } else {
             return "text_field";
         }

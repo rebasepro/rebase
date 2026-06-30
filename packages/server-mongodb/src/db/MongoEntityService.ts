@@ -6,7 +6,7 @@
  */
 
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
-import { Entity, FilterValues, EntityRepository, EntityCollection } from "@rebasepro/types";
+import { Entity, FilterValues, EntityRepository, EntityCollection, EntityReference } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
 import { logger } from "@rebasepro/server-core";
 
@@ -87,12 +87,25 @@ export class MongoEntityService implements EntityRepository {
             return value.map(v => this.convertFromMongoValue(v));
         }
 
-        // Handle EntityReference-like objects
-        if (typeof value === "object" && "path" in value && "id" in value) {
-            return {
-                path: value.path,
-                id: value.id instanceof ObjectId ? value.id.toString() : value.id
-            };
+        // Handle stored EntityReference. New writes are tagged with the
+        // `__type: "reference"` sentinel (see convertToMongoValue), which is
+        // unambiguous. We also accept the legacy shape — an object whose ONLY
+        // keys are `id` and `path` — so references written before the sentinel
+        // existed still decode. We deliberately do NOT treat any object that
+        // merely *contains* `id` and `path` as a reference, because that
+        // silently rewrites ordinary embedded sub-documents.
+        if (typeof value === "object") {
+            const keys = Object.keys(value);
+            const isTagged = value.__type === "reference" && "id" in value && "path" in value;
+            const isLegacy = keys.length === 2 && keys.includes("id") && keys.includes("path");
+            if (isTagged || isLegacy) {
+                return new EntityReference({
+                    id: value.id instanceof ObjectId ? value.id.toString() : String(value.id),
+                    path: value.path,
+                    driver: value.driver,
+                    databaseId: value.databaseId
+                });
+            }
         }
 
         // Handle nested objects
@@ -122,12 +135,18 @@ export class MongoEntityService implements EntityRepository {
     private convertToMongoValue(value: any): any {
         if (value === null || value === undefined) return value;
 
-        // Handle EntityReference
+        // Handle EntityReference. Persist with a `__type: "reference"` sentinel
+        // so it round-trips unambiguously, and preserve `driver`/`databaseId`
+        // so cross-datasource pointers don't lose their target on write.
         if (typeof value === "object" && value.isEntityReference?.()) {
-            return {
+            const ref: Record<string, unknown> = {
+                __type: "reference",
                 id: ObjectId.isValid(value.id) ? new ObjectId(value.id) : value.id,
                 path: value.path
             };
+            if (value.driver !== undefined) ref.driver = value.driver;
+            if (value.databaseId !== undefined) ref.databaseId = value.databaseId;
+            return ref;
         }
 
         // Handle Date

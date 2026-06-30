@@ -75,6 +75,13 @@ export type FirebaseProperties = {
     [key: string]: FirebaseProperty;
 };
 
+// MongoDB is a document store: it uses references (stored pointers), not
+// SQL-style relations/joins. Same gating as Firestore.
+export type MongoProperty = Exclude<Property, RelationProperty>;
+export type MongoProperties = {
+    [key: string]: MongoProperty;
+};
+
 /**
  * A helper type to infer the underlying data type from a Property definition.
  * This is the core of the type inference system.
@@ -320,14 +327,6 @@ export interface StringProperty extends BaseProperty {
      * Should this string be rendered as a tag instead of just text.
      */
     previewAsTag?: boolean;
-
-    /**
-     * You can use this property (a string) to behave as a reference to another
-     * collection. The stored value is the ID of the entity in the
-     * collection, and the `path` prop is used to
-     * define the collection this reference points to.
-     */
-    reference?: ReferenceProperty;
 }
 
 /**
@@ -463,6 +462,22 @@ export interface ReferenceUIConfig extends BaseUIConfig {
     previewProperties?: string[];
 }
 
+/**
+ * A pointer to an entity, stored **as a value** on the row (id + path, and
+ * optionally a `driver`/`databaseId` for cross-datasource pointers).
+ *
+ * This is the native primitive of **document databases** — it maps 1:1 to a
+ * Firestore `DocumentReference`, and is persisted by the MongoDB driver as a
+ * tagged sub-document. It carries no schema-level relationship (no foreign key,
+ * no join, no cascade) and is resolved on demand.
+ *
+ * **Which to use:**
+ * - Firestore / MongoDB collection → use `reference`.
+ * - Postgres collection → use {@link RelationProperty} (`type: "relation"`),
+ *   which models a real foreign key / join with prefetch and cascade.
+ *
+ * @group Entity properties
+ */
 export interface ReferenceProperty extends BaseProperty {
     ui?: ReferenceUIConfig;
     type: "reference";
@@ -507,6 +522,22 @@ export interface RelationUIConfig extends BaseUIConfig {
     widget?: "select" | "dialog";
 }
 
+/**
+ * A schema-level relationship between collections **within a single
+ * datasource** — backed by a foreign key, junction table, or explicit join
+ * path. The resolved value (an `EntityRelation`) can carry a prefetched entity
+ * payload to eliminate N+1 queries, and supports `onUpdate`/`onDelete` cascade.
+ *
+ * This is the native primitive of **relational databases** (Postgres). It is
+ * the SQL counterpart to {@link ReferenceProperty}.
+ *
+ * **Which to use:**
+ * - Postgres collection → use `relation`.
+ * - Firestore / MongoDB collection → use {@link ReferenceProperty}
+ *   (`type: "reference"`), a stored pointer with no join engine.
+ *
+ * @group Entity properties
+ */
 export interface RelationProperty extends BaseProperty {
     ui?: RelationUIConfig;
     type: "relation";

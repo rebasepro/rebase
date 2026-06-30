@@ -65,33 +65,7 @@ export function getTableBindingForProperty(
 ): TableFieldConfig | undefined {
     const isAStorageProperty = isStorageProperty(property);
 
-    if (property.type === "string" && (property as StringProperty).reference?.path) {
-        return {
-            Component: ({ propertyKey, property, internalValue, updateValue, disabled, size, path }: TableFieldBindingProps) => {
-                const referenceProperty = (property as StringProperty).reference;
-                if (!referenceProperty) return null;
-                const referenceValue = internalValue ? new EntityReference({ id: internalValue as string,
- path: referenceProperty.path as string }) : undefined;
-                return (
-                    <TableReferenceField
-                        name={propertyKey}
-                        internalValue={referenceValue}
-                        updateValue={(v) => updateValue(v ? (v as EntityReference).id : null)}
-                        disabled={disabled}
-                        size={size}
-                        path={referenceProperty.path as string}
-                        multiselect={false}
-                        previewProperties={referenceProperty.ui?.previewProperties}
-                        includeId={referenceProperty.includeId}
-                        includeEntityLink={referenceProperty.includeEntityLink}
-                        title={property.name}
-                        fixedFilter={referenceProperty.fixedFilter}
-                    />
-                );
-            },
-            allowScroll: false
-        };
-    } else if (isAStorageProperty) {
+    if (isAStorageProperty) {
         return {
             Component: ({ validationError, error, disabled, selected, openPopup, property, entity, path, internalValue, size, updateValue, propertyKey }: TableFieldBindingProps) => (
                 <TableStorageUpload
@@ -185,7 +159,7 @@ export function getTableBindingForProperty(
                 ),
                 fullHeight: true
             };
-        } else if (stringProperty.ui?.markdown || !stringProperty.storage || !stringProperty.reference) {
+        } else if (stringProperty.ui?.markdown || !stringProperty.storage) {
             const multiline = Boolean(stringProperty.ui?.multiline) || Boolean(stringProperty.ui?.markdown);
             return {
                 Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: TableFieldBindingProps) => (

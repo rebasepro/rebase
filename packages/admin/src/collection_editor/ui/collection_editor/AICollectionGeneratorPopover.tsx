@@ -95,7 +95,7 @@ export function AICollectionGeneratorPopover({
                 name: c.name,
                 properties: c.properties,
                 propertiesOrder: c.propertiesOrder
-            }));
+            } as Partial<EntityCollection>));
 
             const result = await generateCollection({
                 prompt: prompt.trim(),
@@ -106,7 +106,7 @@ export function AICollectionGeneratorPopover({
                         name: existingCollection.name,
                         properties: existingCollection.properties,
                         propertiesOrder: existingCollection.propertiesOrder
-                    }
+                    } as Partial<EntityCollection>
                 })
             });
 

@@ -6,6 +6,7 @@
 
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
+import { EntityReference } from "@rebasepro/types";
 import { MongoEntityService } from "../src/db/MongoEntityService";
 
 describe("MongoEntityService", () => {
@@ -129,6 +130,71 @@ createdAt: now };
             const entity = await entityService.saveEntity("items", values);
 
             expect(entity.values.createdAt).toEqual(now);
+        });
+    });
+
+    describe("EntityReference round-trip", () => {
+        it("should round-trip an EntityReference, preserving driver/databaseId", async () => {
+            const ref = new EntityReference({
+                id: new ObjectId().toString(),
+                path: "authors",
+                driver: "firestore",
+                databaseId: "analytics"
+            });
+            const created = await entityService.saveEntity("posts", { title: "Hi",
+author: ref });
+
+            const fetched = await entityService.fetchEntity<{ title: string; author: EntityReference }>(
+                "posts",
+                created.id
+            );
+
+            const fetchedRef = fetched!.values.author;
+            expect(fetchedRef).toBeInstanceOf(EntityReference);
+            expect(fetchedRef.isEntityReference()).toBe(true);
+            expect(fetchedRef.id).toBe(ref.id);
+            expect(fetchedRef.path).toBe("authors");
+            expect(fetchedRef.driver).toBe("firestore");
+            expect(fetchedRef.databaseId).toBe("analytics");
+        });
+
+        it("should decode the legacy { id, path } shape into an EntityReference", async () => {
+            // Simulate a reference written before the __type sentinel existed.
+            const legacyId = new ObjectId();
+            await db.collection("posts").insertOne({
+                _id: legacyId,
+                title: "Legacy",
+                author: { id: "abc123",
+path: "authors" }
+            } as never);
+
+            const fetched = await entityService.fetchEntity<{ author: EntityReference }>(
+                "posts",
+                legacyId.toString()
+            );
+
+            const fetchedRef = fetched!.values.author;
+            expect(fetchedRef).toBeInstanceOf(EntityReference);
+            expect(fetchedRef.id).toBe("abc123");
+            expect(fetchedRef.path).toBe("authors");
+        });
+
+        it("should NOT coerce an ordinary embedded object that merely contains id and path", async () => {
+            // A real sub-document with extra keys must stay a plain object —
+            // this is the regression the old `"id" in v && "path" in v` heuristic caused.
+            const values = {
+                title: "Post",
+                location: { id: "loc-1",
+path: "/maps/somewhere",
+label: "HQ" }
+            };
+            const created = await entityService.saveEntity("posts", values);
+            const fetched = await entityService.fetchEntity<typeof values>("posts", created.id);
+
+            expect(fetched!.values.location).not.toBeInstanceOf(EntityReference);
+            expect(fetched!.values.location).toEqual({ id: "loc-1",
+path: "/maps/somewhere",
+label: "HQ" });
         });
     });
 

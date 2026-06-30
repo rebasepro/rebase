@@ -206,14 +206,6 @@ export function updatePropertyFromWidget(propertyData: any,
                 propertyConfig: "reference"
             } as Property
         );
-    } else if (selectedWidgetId === "reference_as_string") {
-        updatedProperty = mergeDeep(
-            propertyData,
-            {
-                type: "string",
-                propertyConfig: "reference_as_string"
-            } as Property
-        );
     } else if (selectedWidgetId === "multi_references") {
         updatedProperty = mergeDeep(
             propertyData,

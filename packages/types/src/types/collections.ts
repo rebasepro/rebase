@@ -2,7 +2,7 @@ import React, { Dispatch, SetStateAction } from "react";
 import type { Entity, EntityStatus, EntityValues } from "./entities";
 import type { EntityCallbacks } from "./entity_callbacks";
 
-import type { EnumValues, Properties } from "./properties";
+import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, MongoProperties } from "./properties";
 import type { ExportConfig } from "./export_import";
 
 import type { User } from "../users";
@@ -496,7 +496,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
  */
 export interface PostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     extends BaseEntityCollection<M, USER> {
-    properties: Properties;
+    properties: PostgresProperties;
 
     /**
      * The driver for this collection. For Postgres collections this
@@ -557,6 +557,12 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
     driver: "firestore";
 
     /**
+     * Set of properties that compose an entity.
+     * Firestore collections support `reference` properties but not `relation`.
+     */
+    properties: FirebaseProperties;
+
+    /**
      * The Firestore collection path to query. Defaults to `slug` if not set.
      * Use this when the Firestore path differs from the slug
      * (e.g., when a PostgreSQL collection already uses the same slug).
@@ -597,6 +603,12 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
      * The driver for this collection. Must be set to `"mongodb"`.
      */
     driver: "mongodb";
+
+    /**
+     * Set of properties that compose an entity.
+     * MongoDB collections support `reference` properties but not `relation`.
+     */
+    properties: MongoProperties;
 
     /**
      * The MongoDB collection name to use. Defaults to `slug` if not set.
