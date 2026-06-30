@@ -1,3 +1,10 @@
 export { VirtualTable } from "./VirtualTable";
 export * from "./VirtualTableProps";
 export type { FilterFormFieldProps } from "./VirtualTableHeader";
+export * from "./selection/SelectionStore";
+export * from "./selection/SelectionContext";
+export * from "./fields/VirtualTableInput";
+export * from "./fields/VirtualTableNumberInput";
+export * from "./fields/VirtualTableSwitch";
+export * from "./fields/VirtualTableDateField";
+export * from "./fields/VirtualTableSelect";

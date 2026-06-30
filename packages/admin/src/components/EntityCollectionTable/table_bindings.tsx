@@ -1,12 +1,14 @@
 import React from "react";
 import { ArrayProperty, DateProperty, Entity, EntityReference, EntityRelation, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
-import { TableSize } from "@rebasepro/core";
+import { TableSize, useCustomizationController } from "@rebasepro/core";
+import {
+    VirtualTableInput,
+    VirtualTableNumberInput,
+    VirtualTableSwitch,
+    VirtualTableDateField
+} from "@rebasepro/ui";
 
-import { VirtualTableInput } from "./fields/VirtualTableInput";
 import { VirtualTableSelect } from "./fields/VirtualTableSelect";
-import { VirtualTableNumberInput } from "./fields/VirtualTableNumberInput";
-import { VirtualTableSwitch } from "./fields/VirtualTableSwitch";
-import { VirtualTableDateField } from "./fields/VirtualTableDateField";
 import { VirtualTableUserSelect } from "./fields/VirtualTableUserSelect";
 import { TableStorageUpload } from "./fields/TableStorageUpload";
 import { TableReferenceField } from "./fields/TableReferenceField";
@@ -213,17 +215,21 @@ export function getTableBindingForProperty(
         };
     } else if (property.type === "date") {
         return {
-            Component: ({ propertyKey, error, validationError, disabled, selected, property, internalValue, updateValue }: TableFieldBindingProps) => (
-                <VirtualTableDateField
-                    name={propertyKey}
-                    error={validationError ?? error}
-                    disabled={disabled}
-                    mode={(property as DateProperty).mode}
-                    focused={selected}
-                    internalValue={internalValue as Date}
-                    updateValue={updateValue}
-                />
-            ),
+            Component: ({ propertyKey, error, validationError, disabled, selected, property, internalValue, updateValue }: TableFieldBindingProps) => {
+                const { locale } = useCustomizationController();
+                return (
+                    <VirtualTableDateField
+                        name={propertyKey}
+                        error={validationError ?? error}
+                        disabled={disabled}
+                        mode={(property as DateProperty).mode}
+                        focused={selected}
+                        internalValue={internalValue as Date}
+                        updateValue={updateValue}
+                        locale={locale}
+                    />
+                );
+            },
             fullHeight: true,
             hideOverflow: false,
             allowScroll: false

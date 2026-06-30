@@ -1,18 +1,14 @@
 import React, { useEffect } from "react";
-import { BooleanSwitch } from "@rebasepro/ui";
+import { BooleanSwitch } from "../../BooleanSwitch";
 
 export function VirtualTableSwitch(props: {
-    error: Error | undefined;
+    error?: Error;
     internalValue?: boolean;
     focused: boolean;
     disabled: boolean;
     updateValue: (newValue: (boolean | null)) => void;
 }) {
-    const {
-        internalValue,
-        updateValue,
-        focused
-    } = props;
+    const { internalValue, updateValue, focused } = props;
     const ref = React.useRef<HTMLButtonElement>(null);
 
     useEffect(() => {

@@ -1,29 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
-
-import { useDebouncedCallback, focusedDisabled, TextareaAutosize } from "@rebasepro/ui";
+import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
+import { focusedDisabled } from "../../../styles";
+import { TextareaAutosize } from "../../TextareaAutosize";
 
 export function VirtualTableInput(props: {
-    error: Error | undefined;
+    error?: Error;
     value: string;
-    multiline: boolean;
+    multiline?: boolean;
     focused: boolean;
     disabled: boolean;
     updateValue: (newValue: (string | null)) => void;
     onBlur?: () => void;
 }) {
-
     const ref = React.useRef<HTMLTextAreaElement>(null);
-
-    const {
-        disabled,
-        value,
-        multiline,
-        updateValue,
-        focused
-    } = props;
-
+    const { disabled, value, multiline = false, updateValue, focused } = props;
     const prevValue = useRef<string | null>(value);
-
     const [internalValue, setInternalValue] = useState<typeof value>(value);
     const focusedState = useRef<boolean>(false);
 
@@ -35,14 +26,15 @@ export function VirtualTableInput(props: {
 
     const doUpdate = React.useCallback(() => {
         const emptyInitialValue = !value;
-        if (emptyInitialValue && !internalValue)
-            return;
+        if (emptyInitialValue && !internalValue) return;
         if (internalValue !== value && internalValue !== prevValue.current) {
             prevValue.current = internalValue;
             updateValue(internalValue);
         }
     }, [internalValue, updateValue, value]);
+
     useDebouncedCallback(internalValue, doUpdate, !focused, 400);
+
     useEffect(() => {
         if (ref.current && focused && !focusedState.current) {
             focusedState.current = true;

@@ -1,4 +1,4 @@
-import { createSelectionStore } from "./SelectionStore";
+import { createSelectionStore, AdminSelectedCell } from "./SelectionStore";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { CollectionSize, Entity, EntityRelation, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
@@ -192,7 +192,15 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
 
     const select = useCallback((cell?: SelectedCellProps<M>) => {
         setLocalSelectedCell(cell);
-        selectionStore.select(cell);
+        if (cell) {
+            selectionStore.select({
+                ...cell,
+                columnKey: cell.propertyKey,
+                rowId: cell.entityId
+            } as AdminSelectedCell);
+        } else {
+            selectionStore.select(undefined);
+        }
     }, [selectionStore]);
 
     const unselect = useCallback(() => {

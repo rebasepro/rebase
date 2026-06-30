@@ -11,4 +11,4 @@ export * from "./EntityCollectionRowActions";
 
 export * from "./column_utils";
 
-export { VirtualTableInput } from "./fields/VirtualTableInput";
+export { VirtualTableInput } from "@rebasepro/ui";

@@ -848,6 +848,97 @@ Key props: `data`, `columns` (array of `VirtualTableColumn`), `cellRenderer`, `o
 
 See `VirtualTableProps` and `VirtualTableColumn` types for full API.
 
+#### Generic Editable Tables & Cell Selection
+
+`@rebasepro/ui` includes a generic, high-performance selection engine and primitive cell inputs that allow you to construct keyboard-navigable editable grid tables without any Rebase database dependencies.
+
+**Selection Hooks & Context:**
+* `createVirtualTableSelectionStore()` — Instantiates a selection store tracking active selection by `rowId` and `columnKey`. It uses `useSyncExternalStore` so that selection changes only trigger re-renders on the active cell (preventing whole-table lag).
+* `VirtualTableSelectionProvider` — React context provider to pass down the selection store.
+* `useVirtualTableSelection()` — Hook to access the selection store and triggers inside custom cells.
+* `useVirtualTableCellSelected(store, columnKey, rowId)` — Returns `boolean` indicating if this cell is currently focused.
+
+**Generic Cell Inputs:**
+* `VirtualTableInput` — Auto-growing, debounced multiline/single text input.
+* `VirtualTableNumberInput` — Constrained numeric input.
+* `VirtualTableSwitch` — Small boolean switch toggle.
+* `VirtualTableDateField` — Decoupled Date/DateTime picker (accepts `locale`, `timezone`, `mode`).
+* `VirtualTableSelect` — Option-based single/multi dropdown list using chips. Takes `options: { value, label, color? }[]`.
+
+**Example Custom Editable Table:**
+```tsx
+import React, { useMemo, useState, useCallback } from "react";
+import { 
+    VirtualTable, 
+    createVirtualTableSelectionStore, 
+    VirtualTableSelectionProvider, 
+    useVirtualTableCellSelected, 
+    useVirtualTableSelection,
+    VirtualTableInput 
+} from "@rebasepro/ui";
+
+function EditableCell({ rowId, columnKey, value, onUpdate }) {
+    const { selectionStore } = useVirtualTableSelection();
+    const selected = useVirtualTableCellSelected(selectionStore, columnKey, rowId);
+
+    return (
+        <div 
+            className="w-full h-full flex items-center px-2 cursor-text"
+            onClick={(e) => selectionStore.select({ 
+                rowId, 
+                columnKey, 
+                cellRect: e.currentTarget.getBoundingClientRect(),
+                width: e.currentTarget.offsetWidth,
+                height: e.currentTarget.offsetHeight
+            })}
+        >
+            <VirtualTableInput
+                value={value}
+                updateValue={onUpdate}
+                focused={selected}
+                disabled={false}
+                multiline={false}
+            />
+        </div>
+    );
+}
+
+export function MyEditableGrid() {
+    const [data, setData] = useState([
+        { id: "row-1", name: "Project Alpha" },
+        { id: "row-2", name: "Project Beta" }
+    ]);
+
+    const selectionStore = useMemo(() => createVirtualTableSelectionStore(), []);
+
+    const updateCell = useCallback((rowId: string, value: string) => {
+        setData(prev => prev.map(row => row.id === rowId ? { ...row, name: value } : row));
+    }, []);
+
+    const columns = [
+        { key: "name", title: "Name", width: 300 }
+    ];
+
+    return (
+        <VirtualTableSelectionProvider store={selectionStore}>
+            <VirtualTable
+                data={data}
+                columns={columns}
+                rowHeight={52}
+                cellRenderer={({ rowData, column }) => (
+                    <EditableCell
+                        rowId={rowData.id}
+                        columnKey={column.key}
+                        value={rowData.name}
+                        onUpdate={(val) => updateCell(rowData.id, val || "")}
+                    />
+                )}
+            />
+        </VirtualTableSelectionProvider>
+    );
+}
+```
+
 ### ToggleButtonGroup
 
 Single-select button group for toggling between options.

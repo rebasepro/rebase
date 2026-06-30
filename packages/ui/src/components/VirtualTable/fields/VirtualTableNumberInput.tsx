@@ -1,24 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useDebouncedCallback, cls, focusedDisabled, TextField } from "@rebasepro/ui";
+import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
+import { cls } from "../../../util";
+import { focusedDisabled } from "../../../styles";
+import { TextField } from "../../TextField";
 
 export function VirtualTableNumberInput(props: {
-    error: Error | undefined;
+    error?: Error;
     value: number;
-    align: "right" | "left" | "center";
+    align?: "right" | "left" | "center";
     updateValue: (newValue: (number | null)) => void;
     focused: boolean;
     disabled: boolean;
 }) {
-
-    const {
-        align,
-        value,
-        updateValue,
-        focused
-    } = props;
+    const { align = "left", value, updateValue, focused } = props;
     const propStringValue = (value && typeof value === "number") ? value.toString() : "";
     const [internalValue, setInternalValue] = useState<string | null>(propStringValue);
-
     const prevValue = useRef<number | null>(value);
 
     useEffect(() => {
@@ -31,24 +27,20 @@ export function VirtualTableNumberInput(props: {
         if (internalValue !== propStringValue) {
             if (internalValue !== undefined && internalValue !== null) {
                 const numberValue = parseFloat(internalValue);
-                if (isNaN(numberValue))
-                    return;
-                if (numberValue !== undefined && numberValue !== null)
-                    updateValue(numberValue);
+                if (isNaN(numberValue)) return;
+                updateValue(numberValue);
             } else {
                 updateValue(null);
             }
         }
-
     }, [internalValue, value]);
+
     useDebouncedCallback(internalValue, doUpdate, !focused, 400);
-    useEffect(
-        () => {
-            if (!focused && propStringValue !== internalValue)
-                setInternalValue(value !== undefined && value !== null ? value.toString() : null);
-        },
-        [value, focused]
-    );
+
+    useEffect(() => {
+        if (!focused && propStringValue !== internalValue)
+            setInternalValue(value !== undefined && value !== null ? value.toString() : null);
+    }, [value, focused]);
 
     const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -67,16 +59,12 @@ export function VirtualTableNumberInput(props: {
             size="small"
             className="w-full"
             inputClassName={cls("p-0 m-0 bg-transparent border-none outline-hidden font-normal leading-normal text-unset", focusedDisabled)}
-            inputStyle={{
-                textAlign: align
-            }}
+            inputStyle={{ textAlign: align }}
             value={internalValue ?? ""}
             onChange={(evt) => {
                 const newValue = evt.target.value.replace(",", ".");
-                if (newValue.length === 0)
-                    setInternalValue(null);
-                if (regexp.test(newValue) || newValue.startsWith("-"))
-                    setInternalValue(newValue);
+                if (newValue.length === 0) setInternalValue(null);
+                if (regexp.test(newValue) || newValue.startsWith("-")) setInternalValue(newValue);
             }}
         />
     );

@@ -16,7 +16,7 @@ export { FieldCaption } from "../components/FieldCaption";
 export { SearchIconsView } from "../components/SearchIconsView";
 export { PropertyConfigBadge } from "../components/PropertyConfigBadge";
 export { EntityCollectionTable } from "../components/EntityCollectionTable";
-export { VirtualTableInput } from "../components/EntityCollectionTable/fields/VirtualTableInput";
+export { VirtualTableInput } from "@rebasepro/ui";
 export { ArrayContainer } from "../components/ArrayContainer";
 export type { ArrayEntryParams } from "../components/ArrayContainer";
 export { useSelectionController } from "../components/EntityCollectionView/useSelectionController";
