@@ -56,6 +56,40 @@ jobs:
           git add -A
           git commit -m "chore: canary version $CANARY_VERSION" --no-verify
 
+      - name: Validate no workspace protocol in packed output
+        run: |
+          echo "Packing and validating all publishable packages..."
+          PACK_DIR=$(mktemp -d)
+          trap 'rm -rf "$PACK_DIR"' EXIT
+          ERRORS=0
+
+          for pkg_dir in packages/*/ rebase-agent-skills/; do
+            [ -f "$pkg_dir/package.json" ] || continue
+            is_private=$(node -e "console.log(require('./$pkg_dir/package.json').private || false)")
+            [ "$is_private" = "true" ] && continue
+            pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)")
+
+            (cd "$pkg_dir" && pnpm pack --pack-destination "$PACK_DIR") > /dev/null 2>&1
+            tarball=$(ls -t "$PACK_DIR"/*.tgz 2>/dev/null | head -1)
+            if [ -n "$tarball" ]; then
+              packed=$(tar -xzf "$tarball" -O package/package.json 2>/dev/null)
+              if echo "$packed" | grep -q '"workspace:'; then
+                echo "❌ $pkg_name has workspace: references in packed tarball!"
+                echo "$packed" | grep '"workspace:'
+                ERRORS=$((ERRORS + 1))
+              else
+                echo "✅ $pkg_name"
+              fi
+              rm -f "$tarball"
+            fi
+          done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "❌ $ERRORS package(s) have workspace: references. ABORTING."
+            exit 1
+          fi
+          echo "✅ All packages clean — safe to publish."
+
       - name: Publish to npm
         run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --tag canary --no-git-checks --access public --report-summary
         env:

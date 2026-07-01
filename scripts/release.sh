@@ -221,10 +221,16 @@ step "Pushing to origin"
 git push origin main --follow-tags
 ok "Pushed to origin with tags"
 
+# ── Pre-publish validation ──────────────────────────────────
+step "Validating no workspace: references in packed output"
+
+"$SCRIPT_DIR/validate-no-workspace-protocol.sh"
+ok "Pre-publish validation passed"
+
 # ── Publish to npm ──────────────────────────────────────────
 step "Publishing to npm"
 
-echo "Skipped publishing to npm (requires NPM token refresh)"
+pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --no-git-checks --access public
 ok "Published all packages to npm"
 
 # ── GitHub Release ──────────────────────────────────────────

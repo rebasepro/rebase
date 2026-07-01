@@ -156,6 +156,38 @@ if [ "$(error_count)" = "$PREV" ]; then
 fi
 
 # ──────────────────────────────────────────────────────────────
+section "7. workspace: protocol resolution check"
+# ──────────────────────────────────────────────────────────────
+PREV=$(error_count)
+PACK_DIR=$(mktemp -d)
+# Check a subset of packages to keep the check fast
+for pkg in server-core cli; do
+    pkg_dir="$PACKAGES_DIR/$pkg"
+    [ -d "$pkg_dir" ] || continue
+    pkg_name=$(node -e "console.log(require('$pkg_dir/package.json').name)" 2>/dev/null)
+
+    pack_out=$( (cd "$pkg_dir" && pnpm pack --pack-destination "$PACK_DIR") 2>&1 ) || {
+        warn "$pkg — pnpm pack failed (skipping workspace: check)"
+        continue
+    }
+    tarball=$(ls -t "$PACK_DIR"/*.tgz 2>/dev/null | head -1)
+    if [ -n "$tarball" ]; then
+        packed=$(tar -xzf "$tarball" -O package/package.json 2>/dev/null)
+        if echo "$packed" | grep -q '"workspace:'; then
+            err "$pkg packed tarball contains workspace: references — publishing will be broken!"
+            echo "$packed" | grep '"workspace:' | head -5
+        else
+            ok "$pkg packed tarball is clean (no workspace: references)"
+        fi
+        rm -f "$tarball"
+    fi
+done
+rm -rf "$PACK_DIR"
+if [ "$(error_count)" = "$PREV" ]; then
+    ok "workspace: protocol resolves correctly in packed output"
+fi
+
+# ──────────────────────────────────────────────────────────────
 section "Summary"
 # ──────────────────────────────────────────────────────────────
 TOTAL=$(error_count)
