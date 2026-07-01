@@ -24,6 +24,28 @@ export function sqlToPolicy(sql: string): PolicyExpression {
     if (trimmed.toLowerCase() === "true") return policy.true();
     if (trimmed.toLowerCase() === "false") return policy.false();
 
+    // Handle roles overlap (&&)
+    // Matches: string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']
+    const overlapMatch = trimmed.match(/^string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\s*\[(.+)\]$/i);
+    if (overlapMatch) {
+        const roles = overlapMatch[1].split(",").map(s => s.trim().replace(/^'|'$/g, ""));
+        return policy.rolesOverlap(roles);
+    }
+
+    // Handle roles containment (@>)
+    // Matches: string_to_array(auth.roles(), ',') @> ARRAY['admin']
+    const containMatch = trimmed.match(/^string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\s*\[(.+)\]$/i);
+    if (containMatch) {
+        const roles = containMatch[1].split(",").map(s => s.trim().replace(/^'|'$/g, ""));
+        return policy.rolesContain(roles);
+    }
+
+    // Handle OR
+    if (trimmed.toUpperCase().includes(" OR ")) {
+        const parts = trimmed.split(/ OR /i);
+        return policy.or(...parts.map(sqlToPolicy));
+    }
+
     // Handle AND (very basic split, doesn't handle nested parens properly)
     if (trimmed.toUpperCase().includes(" AND ")) {
         const parts = trimmed.split(/ AND /i);

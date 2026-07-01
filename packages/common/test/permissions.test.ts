@@ -338,6 +338,7 @@ user_id: "x" });
         it("denies when rules exist for different operations", () => {
             const col = makeCollection([
                 { operation: "select",
+access: "public",
 mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController();
@@ -552,8 +553,8 @@ status: "draft" });
 
             // User has only one
             const justAdmin = makeAuthController({ roles: ["admin"] });
-            expect(canReadCollection(col, justAdmin)).toBe(true);
-            // ^ Note: canReadCollection passes null entity, so evaluateAST gets null entity and returns true optimistically
+            expect(canReadCollection(col, justAdmin)).toBe(false);
+            // ^ Note: This now returns false because rolesContain is accurately evaluated even without an entity.
         });
     });
 });

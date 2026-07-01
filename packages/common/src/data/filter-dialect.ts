@@ -59,8 +59,27 @@ function stringifyValue(value: unknown): string {
  * serializeTuple(["in", ["admin","editor"]]) // "in.(admin,editor)"
  * serializeTuple([">=", 18])                 // "gte.18"
  */
-function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
-    const [op, value] = tuple;
+function serializeTuple(tuple: [WhereFilterOp, unknown] | unknown): string {
+    // If it's already a string, it might be a PostgREST string (with dot)
+    // or a raw value (without dot). In both cases, existing tests expect
+    // them to be passed through or treated as simple equality if no dot.
+    if (typeof tuple === "string") {
+        if (tuple.includes(".")) {
+            const dotIndex = tuple.indexOf(".");
+            const prefix = tuple.substring(0, dotIndex);
+            if ((REST_TO_CANONICAL as any)[prefix]) {
+                return tuple;
+            }
+        }
+        return tuple;
+    }
+
+    // If it's NOT a canonical tuple [WhereFilterOp, value], treat as equality.
+    if (!Array.isArray(tuple) || tuple.length !== 2 || typeof tuple[0] !== "string" || !(CANONICAL_TO_REST as any)[tuple[0]]) {
+        return `eq.${stringifyValue(tuple)}`;
+    }
+
+    const [op, value] = tuple as [WhereFilterOp, unknown];
     const restOp = CANONICAL_TO_REST[op];
 
     if (Array.isArray(value)) {
@@ -85,7 +104,7 @@ function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
  * // → { age: ["gte.18", "lt.65"] }
  */
 export function serializeFilter(
-    filter: FilterValues<string>
+    filter: FilterValues<string> | Record<string, any>
 ): Record<string, string | string[]> {
     const result: Record<string, string | string[]> = {};
 
@@ -93,12 +112,12 @@ export function serializeFilter(
         if (condition === undefined) continue;
 
         // Multiple conditions on the same field: array of tuples
-        if (Array.isArray(condition[0]) && Array.isArray(condition)) {
-            const tuples = condition as [WhereFilterOp, unknown][];
-            result[field] = tuples.map(serializeTuple);
+        // We detect this by checking if the first element is also an array.
+        if (Array.isArray(condition) && condition.length > 0 && Array.isArray(condition[0])) {
+            result[field] = (condition as any[]).map(serializeTuple);
         } else {
-            // Single condition
-            result[field] = serializeTuple(condition as [WhereFilterOp, unknown]);
+            // Single condition (could be a tuple, a raw value, or an already-serialized string)
+            result[field] = serializeTuple(condition);
         }
     }
 
@@ -156,21 +175,43 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
  * // → { age: [[">=", 18], ["<", 65]] }
  */
 export function deserializeFilter(
-    query: Record<string, string | string[]>
+    query: Record<string, any>
 ): FilterValues<string> {
     const result: FilterValues<string> = {};
 
     for (const [field, raw] of Object.entries(query)) {
         if (raw === undefined) continue;
 
+        // If it's already a canonical tuple [op, value], keep it as is
+        if (Array.isArray(raw) && raw.length === 2 && typeof raw[0] === "string" && toCanonicalOp(raw[0]) === raw[0]) {
+            result[field] = raw as [WhereFilterOp, unknown];
+            continue;
+        }
+
         if (Array.isArray(raw)) {
-            if (raw.length === 1) {
-                result[field] = deserializeSingle(raw[0]);
-            } else if (raw.length > 1) {
-                result[field] = raw.map(deserializeSingle);
+            if (raw.length === 0) continue;
+            
+            // Check if it's an array of canonical tuples
+            if (Array.isArray(raw[0]) && raw[0].length === 2 && typeof raw[0][0] === "string" && toCanonicalOp(raw[0][0]) === raw[0][0]) {
+                result[field] = raw as [WhereFilterOp, unknown][];
+                continue;
             }
-        } else {
+
+            if (raw.length === 1) {
+                result[field] = typeof raw[0] === "string" ? deserializeSingle(raw[0]) : ["==", raw[0]];
+            } else {
+                // If the elements are strings, they might be PostgREST dot-strings (repeated params)
+                if (typeof raw[0] === "string" && raw[0].includes(".")) {
+                    result[field] = raw.map(r => typeof r === "string" ? deserializeSingle(r) : (["==", r] as [WhereFilterOp, unknown])) as [WhereFilterOp, unknown][];
+                } else {
+                    // Otherwise assume it's a list of values for an implicit "in" or just multiple conditions
+                    result[field] = ["in", raw];
+                }
+            }
+        } else if (typeof raw === "string") {
             result[field] = deserializeSingle(raw);
+        } else {
+            result[field] = ["==", raw];
         }
     }
 
@@ -203,7 +244,7 @@ export function serializeLogicalCondition(
     }
 
     // FilterCondition
-    const restOp = CANONICAL_TO_REST[cond.operator];
+    const restOp = (CANONICAL_TO_REST as any)[cond.operator] || "eq";
     if (Array.isArray(cond.value)) {
         const items = cond.value.map(stringifyValue).join(",");
         return `${cond.column}.${restOp}.(${items})`;

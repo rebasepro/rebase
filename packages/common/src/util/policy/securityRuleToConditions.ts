@@ -54,7 +54,7 @@ function baseWithCheck(rule: SecurityRule): PolicyExpression | null {
  * sides.
  */
 function withRoles(base: PolicyExpression | null, rule: SecurityRule): PolicyExpression | null {
-    if (!rule.roles || rule.roles.length === 0) return base ?? policy.true();
+    if (!rule.roles || rule.roles.length === 0) return base;
     const rolesExpr = policy.rolesOverlap(rule.roles);
     if (rule.mode === "restrictive") {
         // Restrictive rule: applies ONLY if user has the roles.

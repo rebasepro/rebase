@@ -1,5 +1,6 @@
 import type { VectorSearchParams, LogicalCondition, FilterCondition, WhereFilterOp } from "@rebasepro/types";
 import { toCanonicalOp } from "@rebasepro/types";
+export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
 import { QueryOptions } from "../types";
 
 function getLastValue(val: unknown): unknown {

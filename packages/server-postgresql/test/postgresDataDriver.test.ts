@@ -39,7 +39,8 @@ describe("PostgresBackendDriver", () => {
             getCollectionByPath: jest.fn().mockReturnValue({ slug: "test_coll",
 properties: {} }),
             getCollections: jest.fn().mockReturnValue([]),
-            getTable: jest.fn().mockReturnValue({})
+            getTable: jest.fn().mockReturnValue({}),
+            getGlobalCallbacks: jest.fn().mockReturnValue(undefined)
         } as any;
         delegate = new PostgresBackendDriver(mockDb, mockRealtimeService, mockRegistry);
     });

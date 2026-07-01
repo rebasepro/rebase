@@ -162,9 +162,10 @@ roles: ["author"] }
         expect(canReadCollection(collection, mockAuthController)).toBe(true);
     });
 
-    test("11. Empty roles array [] on rule grants access to everyone (public)", () => {
+    test("11. Empty roles array [] adds no role restriction (public rule stays public)", () => {
         const collection = createMockCollection([
             { operation: "insert",
+access: "public",
 roles: [] }
         ]);
         expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
@@ -172,9 +173,10 @@ roles: [] }
         expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
     });
 
-    test("12. Undefined roles on rule grants access to everyone (public)", () => {
+    test("12. Undefined roles on a public rule grants access to everyone", () => {
         const collection = createMockCollection([
-            { operation: "insert" }
+            { operation: "insert",
+access: "public" }
         ]);
         expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
         expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(true);

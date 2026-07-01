@@ -545,7 +545,7 @@ passwordHash: "custom-hash" },
                 } as any
             ];
 
-            const generator = new RestApiGenerator(authCollections, mockDriver, undefined, mockAuthAdapter as any);
+            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter as any);
             app.route("/api", generator.generateRoutes());
 
             mockDriver.saveEntity.mockResolvedValue({

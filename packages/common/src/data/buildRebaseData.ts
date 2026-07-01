@@ -12,6 +12,7 @@ import {
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
+import { deserializeFilter } from "./filter-dialect";
 
 /**
  * Parse an orderBy string like "created_at:desc" into [field, direction].
@@ -31,11 +32,14 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             const orderParsed = parseOrderBy(params?.orderBy);
+            // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
+            const filter = params?.where ? deserializeFilter(params.where as any) : undefined;
+            
             const entities = await driver.fetchCollection<M>({
                 path: slug,
                 limit: params?.limit,
                 offset: params?.offset,
-                filter: params?.where,
+                filter,
                 orderBy: orderParsed?.[0],
                 order: orderParsed?.[1],
                 searchString: params?.searchString
@@ -92,9 +96,10 @@ values: {} as Record<string, unknown> }
 
         count: driver.countEntities
             ? async (params?: FindParams): Promise<number> => {
+                const filter = params?.where ? deserializeFilter(params.where as any) : undefined;
                 return driver.countEntities!({
                     path: slug,
-                    filter: params?.where
+                    filter
                 });
             }
             : undefined,
