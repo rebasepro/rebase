@@ -349,12 +349,13 @@ const clerkAuthAdapter = createCustomAuthAdapter({
             // Verify Clerk JWT token against JWKS
             const { payload } = await jwtVerify(token, JWKS);
             
-            const roles = (payload.metadata as any)?.roles || [];
+            const metadata = payload.metadata as Record<string, unknown> | undefined;
+            const roles = Array.isArray(metadata?.roles) ? metadata.roles as string[] : [];
             
             return {
                 uid: payload.sub!,
-                email: (payload as any).email || "",
-                displayName: (payload as any).name || null,
+                email: (payload as Record<string, unknown>).email as string || "",
+                displayName: (payload as Record<string, unknown>).name as string || null,
                 roles: roles,
                 isAdmin: roles.includes("admin"),
                 claims: payload as Record<string, unknown>
@@ -406,13 +407,13 @@ const firebaseAuthAdapter = createCustomAuthAdapter({
                 audience: FIREBASE_PROJECT_ID
             });
 
-            const roles = (payload as any).roles || [];
+            const roles = Array.isArray((payload as Record<string, unknown>).roles) ? (payload as Record<string, unknown>).roles as string[] : [];
 
             return {
                 uid: payload.sub!,
-                email: (payload as any).email || "",
-                displayName: (payload as any).name || null,
-                photoUrl: (payload as any).picture || null,
+                email: (payload as Record<string, unknown>).email as string || "",
+                displayName: (payload as Record<string, unknown>).name as string || null,
+                photoUrl: (payload as Record<string, unknown>).picture as string || null,
                 roles: roles,
                 isAdmin: roles.includes("admin"),
                 claims: payload as Record<string, unknown>

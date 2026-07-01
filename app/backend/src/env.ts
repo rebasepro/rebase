@@ -12,7 +12,7 @@ export const env = loadEnv({
     extend: z.object({
         SMTP_HOST: z.string().optional(),
         SMTP_PORT: z.string().default("587").transform(Number),
-        SMTP_SECURE: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+        SMTP_SECURE: z.enum(["true", "false", ""]).default("false").transform((v: string) => v === "true"),
         SMTP_USER: z.string().optional(),
         SMTP_PASS: z.string().optional(),
         SMTP_FROM: z.string().optional(),

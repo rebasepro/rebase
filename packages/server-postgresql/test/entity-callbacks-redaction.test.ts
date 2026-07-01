@@ -5,11 +5,8 @@ import type { Entity, EntityAfterReadProps, EntityCallbacks } from "@rebasepro/t
  * Regression guard for the PII-redaction pattern.
  *
  * PII masking is defined in per-collection {@link EntityCallbacks.afterRead},
- * which runs inside the DataDriver. Because the driver is the single seam that
- * every read path funnels through, a field masked there stays masked on ALL
- * paths — REST, server-side `rebase.data`, and realtime — so a REST-only
- * `BackendHooks.data.afterRead` is neither required nor safe to rely on for
- * redaction.
+ * which runs inside the DataDriver on every read path — REST, server-side
+ * `rebase.data`, and realtime.
  *
  * This suite proves the redaction contract:
  *   1. the `afterRead` masker redacts values (and does not mutate the source), and

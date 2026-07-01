@@ -4,7 +4,7 @@ import "@fontsource/rubik";
 import type { AnalyticsEvent } from "@rebasepro/types";
 
 // Global gtag function injected by the GA4 script in index.html
-declare function gtag(...args: any[]): void;
+declare function gtag(...args: unknown[]): void;
 
 import { useRebaseAuthController } from "@rebasepro/auth";
 import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/core";
@@ -84,7 +84,6 @@ export function App() {
                 collections={collections}
                 collectionEditor={collectionEditor}
                 entityViews={entityViews}
-                plugins={plugins}
                 views={customViews}
             />
             <RebaseStudio/>

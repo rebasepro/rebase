@@ -22,7 +22,7 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
         async ({ name, value, property, entityId }: Parameters<UniqueFieldValidator>[0]) => {
             const accessor = dataClient.collection(path);
             const res = await accessor.find({
-                where: { [name]: "eq." + value }
+                where: { [name]: ["==", value] }
             });
 
             const conflictingEntities = res.data;

@@ -56,8 +56,7 @@ export interface BuiltinAuthAdapterConfig {
     /** Default role to assign to new users. */
     defaultRole?: string;
     /** OAuth providers to register. */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    oauthProviders?: OAuthProvider<any>[];
+    oauthProviders?: OAuthProvider<unknown>[];
     /** Static service key for server-to-server auth. */
     serviceKey?: string;
     /** Auth hooks for customizing password, credentials, lifecycle, etc. */

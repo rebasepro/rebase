@@ -1,11 +1,11 @@
 import {
     AuthAdapter,
     BackendBootstrapper,
-    BackendHooks,
     BootstrappedAuth,
     DatabaseAdapter,
     DataDriver,
     DataSourceDefinition,
+    EntityCallbacks,
     EntityCollection,
     HealthCheckResult,
     InitializedDriver,
@@ -83,7 +83,7 @@ export interface RebaseAuthConfig {
      *
      * When a request includes `Authorization: Bearer <serviceKey>`, it is
      * granted admin-level access without JWT verification. This is the
-     * Rebase equivalent of a Firebase Service Account key.
+     * Rebase equivalent of a Service Account key.
      *
      * Generate with: `node -e "logger.info(require('crypto').randomBytes(48).toString('base64'))"`
      *
@@ -92,6 +92,14 @@ export interface RebaseAuthConfig {
      */
     serviceKey?: string;
     email?: EmailConfig;
+    // ── Convenience shortcuts ─────────────────────────────────────────
+    // Each named field below is syntactic sugar that internally resolves
+    // to an `OAuthProvider` via the corresponding `create*Provider`
+    // factory at startup. They are equivalent to constructing the
+    // provider manually and passing it in the `providers` array.
+    //
+    // For providers not listed here, or for full control over the
+    // provider configuration, use the `providers` array directly.
     google?: { clientId: string; clientSecret?: string };
     linkedin?: { clientId: string; clientSecret: string };
     github?: { clientId: string; clientSecret: string };
@@ -106,15 +114,30 @@ export interface RebaseAuthConfig {
     spotify?: { clientId: string; clientSecret: string };
     defaultRole?: string;
     /**
-     * Additional OAuth providers beyond the named ones above (`google`,
-     * `github`, etc.). This is the canonical extension point for any
-     * provider not already covered by a named field — including the
-     * twelve above, each of which can also be constructed and passed
-     * here via its `create*Provider` factory (e.g. `createGoogleProvider`
-     * from `@rebasepro/server-core`).
+     * Canonical array of OAuth providers.
+     *
+     * This is the primary extension point for **all** OAuth integrations.
+     * Each entry is an `OAuthProvider<unknown>` constructed via one of
+     * the `create*Provider` factories exported from `@rebasepro/server-core`
+     * (e.g. `createGoogleProvider`, `createGitHubProvider`).
+     *
+     * The named convenience fields above (`google`, `github`, etc.) are
+     * automatically resolved into this array at startup. You can mix both
+     * approaches; named fields and explicit entries are merged (named
+     * fields are appended after explicit entries).
+     *
+     * @example
+     * ```ts
+     * import { createGoogleProvider } from "@rebasepro/server-core";
+     *
+     * auth: {
+     *   providers: [
+     *     createGoogleProvider({ clientId: "…", clientSecret: "…" }),
+     *   ],
+     * }
+     * ```
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    providers?: OAuthProvider<any>[];
+    providers?: OAuthProvider<unknown>[];
     /**
      * Override specific parts of the built-in auth implementation.
      *
@@ -206,7 +229,7 @@ export interface RebaseBackendConfig {
      *
      * Server-backed sources are auto-derived from the `storage` map — you
      * only need explicit entries for "direct" transport sources (e.g.
-     * Firebase Storage) that the backend does not proxy.
+     * external storage) that the backend does not proxy.
      */
     storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
 
@@ -259,14 +282,24 @@ export interface RebaseBackendConfig {
         origin: string | string[] | ((origin: string) => boolean);
     };
     /**
-     * Backend-level hooks for intercepting collection entity data
-     * at the REST API boundary. These run server-side after database
-     * operations and before API responses are sent.
+     * Global lifecycle callbacks applied to every collection.
      *
-     * Complement the per-collection `EntityCallbacks` system which
-     * handles collection CRUD operations.
+     * Same type as per-collection `callbacks` — fires on **every** data path
+     * (REST API, WebSocket / realtime, server-side `rebase.data`).
+     *
+     * Execution order: global callbacks → collection callbacks → property callbacks.
+     *
+     * @example
+     * ```ts
+     * callbacks: {
+     *     afterRead({ entity, collection }) {
+     *         console.log(`Read ${collection.slug}/${entity.id}`);
+     *         return entity;
+     *     }
+     * }
+     * ```
      */
-    hooks?: BackendHooks;
+    callbacks?: EntityCallbacks;
 }
 
 /**
@@ -354,6 +387,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // so normalization can resolve each collection's engine.
     const dataSourceRegistry = createDataSourceRegistry(config.dataSources);
     collectionRegistry.setDataSources(dataSourceRegistry);
+
+    // Global lifecycle callbacks — applied to every collection, on all data paths.
+    if (config.callbacks) {
+        collectionRegistry.setGlobalCallbacks(config.callbacks);
+    }
     let activeCollections = config.collections || [];
     if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
@@ -624,8 +662,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (!isAuthAdapter(config.auth)) {
             const safeAuthConfig = config.auth as RebaseAuthConfig;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const oauthProviders: OAuthProvider<any>[] = [...(safeAuthConfig.providers || [])];
+            const oauthProviders: OAuthProvider<unknown>[] = [...(safeAuthConfig.providers || [])];
 
             // Resolve configured OAuth providers via data-driven registration.
             // Each entry maps a config key to its factory function name and required fields.
@@ -845,7 +882,6 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const restGenerator = new RestApiGenerator(
             serverCollections,
             defaultDriver,
-            config.hooks?.data,
             authAdapter
         );
         dataRouter.route("/", restGenerator.generateRoutes());

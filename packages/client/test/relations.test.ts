@@ -762,7 +762,7 @@ name: "Full" });
 // ==========================================================================
 // 14. parseWhereFilter — exhaustive edge cases via listen
 // ==========================================================================
-describe("parseWhereFilter via listen", () => {
+describe("FilterValues passthrough via listen", () => {
     function setup() {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
 listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
@@ -770,22 +770,19 @@ listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
         return { client: createCollectionClient<any>(transport, "posts", mockWs),
 mockWs };
     }
-    it("eq", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: "eq.published" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["==", "published"]); });
-    it("neq", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: "neq.draft" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["!=", "draft"]); });
-    it("gt numeric", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: "gt.5" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual([">", "5"]); });
-    it("gte", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: "gte.10" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual([">=", "10"]); });
-    it("lt", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: "lt.3" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual(["<", "3"]); });
-    it("lte", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: "lte.0" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual(["<=", "0"]); });
-    it("in with parens", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: "in.(active,pending)" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["in", ["active", "pending"]]); });
-    it("nin with parens", () => { const { client, mockWs } = setup(); client.listen!({ where: { type: "nin.(a,b)" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.type).toEqual(["not-in", ["a", "b"]]); });
-    it("cs (array-contains)", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: "cs.featured" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.tags).toEqual(["array-contains", "featured"]); });
-    it("csa (array-contains-any)", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: "csa.(a,b,c)" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.tags).toEqual(["array-contains-any", ["a", "b", "c"]]); });
-    it("boolean true", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: "eq.true" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.active).toEqual(["==", true]); });
-    it("boolean false", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: "eq.false" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.active).toEqual(["==", false]); });
-    it("null", () => { const { client, mockWs } = setup(); client.listen!({ where: { d: "eq.null" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.d).toEqual(["==", null]); });
-    it("plain value = implicit eq", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: "published" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["==", "published"]); });
-    it("unknown op defaults to eq with full value", () => { const { client, mockWs } = setup(); client.listen!({ where: { x: "xyz.something" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.x).toEqual(["==", "xyz.something"]); });
-    it("float value stays as string", () => { const { client, mockWs } = setup(); client.listen!({ where: { price: "gte.19.99" } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.price[1]).toBe("19.99"); });
+    it("==", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["==", "published"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["==", "published"]); });
+    it("!=", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["!=", "draft"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["!=", "draft"]); });
+    it("> numeric", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: [">", 5] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual([">", 5]); });
+    it(">=", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: [">=", 10] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual([">=", 10]); });
+    it("<", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: ["<", 3] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual(["<", 3]); });
+    it("<=", () => { const { client, mockWs } = setup(); client.listen!({ where: { count: ["<=", 0] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.count).toEqual(["<=", 0]); });
+    it("in", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["in", ["active", "pending"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.status).toEqual(["in", ["active", "pending"]]); });
+    it("not-in", () => { const { client, mockWs } = setup(); client.listen!({ where: { type: ["not-in", ["a", "b"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.type).toEqual(["not-in", ["a", "b"]]); });
+    it("array-contains", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: ["array-contains", "featured"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.tags).toEqual(["array-contains", "featured"]); });
+    it("array-contains-any", () => { const { client, mockWs } = setup(); client.listen!({ where: { tags: ["array-contains-any", ["a", "b", "c"]] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.tags).toEqual(["array-contains-any", ["a", "b", "c"]]); });
+    it("boolean true", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: ["==", true] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.active).toEqual(["==", true]); });
+    it("boolean false", () => { const { client, mockWs } = setup(); client.listen!({ where: { active: ["==", false] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.active).toEqual(["==", false]); });
+    it("null", () => { const { client, mockWs } = setup(); client.listen!({ where: { d: ["==", null] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter.d).toEqual(["==", null]); });
     it("no where returns undefined filter", () => { const { client, mockWs } = setup(); client.listen!({}, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter).toBeUndefined(); });
     it("undefined params returns undefined filter", () => { const { client, mockWs } = setup(); client.listen!(undefined, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter).toBeUndefined(); });
 });

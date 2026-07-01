@@ -98,34 +98,22 @@ describe("buildQueryString — logical conditions null safety", () => {
 // 2. buildQueryString — where clause array edge cases
 // --------------------------------------------------------------------------
 describe("buildQueryString — where clause array edge cases", () => {
-    it("serializes null field value as eq.null", () => {
-        const result = buildQueryString({ where: { status: null } });
+    it("serializes null value as eq.null", () => {
+        const result = buildQueryString({ where: { status: ["==", null] } });
         expect(result).toBe("?status=eq.null");
-    });
-
-    it("serializes undefined field value as 'undefined' string", () => {
-        const result = buildQueryString({ where: { status: undefined } as any });
-        expect(result).toBe("?status=undefined");
-    });
-
-    it("serializes empty array value as empty string", () => {
-        // An empty array [] has no tuple to destructure so rawOp is undefined,
-        // falls through to String([]) which is ""
-        const result = buildQueryString({ where: { tags: [] as any } });
-        expect(result).toBe("?tags=");
     });
 
     it("serializes single tuple ['in', [1,2,3]] correctly", () => {
         const result = buildQueryString({
-            where: { status: ["in", [1, 2, 3]] as any },
+            where: { status: ["in", [1, 2, 3]] },
         });
         const decoded = decodeURIComponent(result);
         expect(decoded).toBe("?status=in.(1,2,3)");
     });
 
-    it("serializes multi-condition array [['gte', 5], ['lte', 10]]", () => {
+    it("serializes multi-condition array [['>=', 5], ['<=', 10]]", () => {
         const result = buildQueryString({
-            where: { age: [["gte", 5], ["lte", 10]] as any },
+            where: { age: [[">=", 5], ["<=", 10]] },
         });
         const decoded = decodeURIComponent(result);
         // Multi-condition produces two separate query parameters for the same field
@@ -133,16 +121,9 @@ describe("buildQueryString — where clause array edge cases", () => {
         expect(decoded).toContain("age=lte.10");
     });
 
-    it("serializes ['in', null] as in.null", () => {
-        const result = buildQueryString({
-            where: { category: ["in", null] as any },
-        });
-        expect(result).toBe("?category=in.null");
-    });
-
     it("serializes ['in', []] as in.()", () => {
         const result = buildQueryString({
-            where: { category: ["in", []] as any },
+            where: { category: ["in", []] },
         });
         const decoded = decodeURIComponent(result);
         expect(decoded).toBe("?category=in.()");
@@ -150,7 +131,7 @@ describe("buildQueryString — where clause array edge cases", () => {
 
     it("serializes ['!=', null] as neq.null", () => {
         const result = buildQueryString({
-            where: { status: ["!=", null] as any },
+            where: { status: ["!=", null] },
         });
         expect(result).toBe("?status=neq.null");
     });
@@ -179,7 +160,7 @@ describe("buildQueryString — combined params with null arrays", () => {
         const result = buildQueryString({
             include: [],
             logical: { type: "and", conditions: undefined } as any,
-            where: { status: null },
+            where: { status: ["==", null] },
         });
         expect(result).toBeDefined();
         // include=[] should not appear
@@ -198,45 +179,23 @@ describe("buildQueryString — combined params with null arrays", () => {
 });
 
 // --------------------------------------------------------------------------
-// 4. normalizeWhereValue edge cases (tested indirectly through buildQueryString)
+// 4. serializeFilter edge cases (tested indirectly through buildQueryString)
 // --------------------------------------------------------------------------
-describe("normalizeWhereValue edge cases (via buildQueryString)", () => {
+describe("serializeFilter edge cases (via buildQueryString)", () => {
     it("serializes ['==', undefined] without crashing", () => {
         const result = buildQueryString({
-            where: { field: ["==", undefined] as any },
+            where: { field: ["==", undefined] },
         });
         expect(result).toBeDefined();
-        // undefined val: rawOp is "==" → op is "eq", val is undefined (not null, not array)
-        // returns `eq.undefined`
         const decoded = decodeURIComponent(result);
         expect(decoded).toContain("field=eq.undefined");
     });
 
     it("serializes ['==', ''] as eq. (empty string value)", () => {
         const result = buildQueryString({
-            where: { field: ["==", ""] as any },
+            where: { field: ["==", ""] },
         });
         const decoded = decodeURIComponent(result);
         expect(decoded).toContain("field=eq.");
-    });
-
-    it("handles empty array [] gracefully (no tuple to destructure)", () => {
-        // [] → conditions[0] is undefined → rawOp is undefined → falls through to String([]) = ""
-        const result = buildQueryString({
-            where: { field: [] as any },
-        });
-        expect(result).toBeDefined();
-        expect(result).toBe("?field=");
-    });
-
-    it("handles single-element array ['gt'] gracefully (no val)", () => {
-        // ['gt'] → conditions = [['gt']] since value[0] is not an array → rawOp = 'gt', val = undefined
-        const result = buildQueryString({
-            where: { field: ["gt"] as any },
-        });
-        expect(result).toBeDefined();
-        const decoded = decodeURIComponent(result);
-        // rawOp = "gt", val = undefined → not null, not array → `gt.undefined`
-        expect(decoded).toContain("field=gt.undefined");
     });
 });

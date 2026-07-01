@@ -263,7 +263,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     onColumnResize={onColumnResize}
                     rowHeight={getRowHeight(size)}
                     loading={dataLoading}
-                    filter={filterValues}
+                    filter={filterValues as any}
                     onFilterUpdate={setFilterValues ? onFilterUpdate : undefined}
                     sortBy={sortBy}
                     onSortByUpdate={setSortBy as ((sortBy?: [string, "asc" | "desc"]) => void)}

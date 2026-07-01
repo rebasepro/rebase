@@ -91,25 +91,8 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
     // Map to PostgREST format for orderBy
     const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
 
-    // Convert filterValues to PostgREST where clause
-    const whereMap: Record<string, string> = {};
-    if (filterValues) {
-        Object.entries(filterValues).forEach(([key, value]) => {
-            if (value && Array.isArray(value)) {
-                const [op, val] = value;
-                const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                let stringVal: string;
-                if (Array.isArray(val)) {
-                    stringVal = `(${val.join(",")})`;
-                } else {
-                    stringVal = String(val);
-                }
-                whereMap[key] = `${postgrestOp}.${stringVal}`;
-            }
-        });
-    }
-    const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
+    // filterValues is already FilterValues — pass directly
+    const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
 
     const [data, setData] = useState<Entity<M>[]>([]);
 

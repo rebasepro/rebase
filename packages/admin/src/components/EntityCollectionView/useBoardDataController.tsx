@@ -238,25 +238,11 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             return;
         }
 
-        // Build where map for this column
-        const whereMap: Record<string, string> = {};
-        if (currentFilterValues) {
-            Object.entries(currentFilterValues).forEach(([key, value]) => {
-                if (value && Array.isArray(value)) {
-                    const [op, val] = value;
-                    const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                    let stringVal: string;
-                    if (Array.isArray(val)) {
-                        stringVal = `(${val.join(",")})`;
-                    } else {
-                        stringVal = String(val);
-                    }
-                    whereMap[key] = `${postgrestOp}.${stringVal}`;
-                }
-            });
-        }
-        whereMap[currentColumnProperty] = `eq.${column}`;
+        // Build filter map for this column — pass FilterValues directly
+        const whereFilter: FilterValues<string> = {
+            ...(currentFilterValues ?? {}),
+            [currentColumnProperty]: ["==", column]
+        };
 
         const orderByParam = currentOrderProperty ? `${currentOrderProperty}:asc` : undefined;
 
@@ -420,14 +406,14 @@ values: { ...e.values,
         const accessor = currentDataClient.collection(currentResolvedPath);
         if (accessor.listen) {
             const unsubscribe = accessor.listen({
-                where: whereMap,
+                where: whereFilter,
                 limit: itemCount,
                 orderBy: orderByParam
             }, res => onUpdate(res.data as Entity<M>[]), onError);
             unsubscribersRef.current[column] = unsubscribe;
         } else {
             accessor.find({
-                where: whereMap,
+                where: whereFilter,
                 limit: itemCount,
                 orderBy: orderByParam
             })
@@ -479,27 +465,13 @@ values: { ...e.values,
                 const accessor = currentDataClient.collection(currentResolvedPath);
                 if (accessor.count) {
 
-                    const whereMap: Record<string, string> = {};
-                    if (currentFilterValues) {
-                        Object.entries(currentFilterValues).forEach(([key, value]) => {
-                            if (value && Array.isArray(value)) {
-                                const [op, val] = value;
-                                const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                                let stringVal: string;
-                                if (Array.isArray(val)) {
-                                    stringVal = `(${val.join(",")})`;
-                                } else {
-                                    stringVal = String(val);
-                                }
-                                whereMap[key] = `${postgrestOp}.${stringVal}`;
-                            }
-                        });
-                    }
-                    whereMap[currentColumnProperty] = `eq.${column}`;
+                    const whereFilter: FilterValues<string> = {
+                        ...(currentFilterValues ?? {}),
+                        [currentColumnProperty]: ["==", column]
+                    };
 
                     accessor.count({
-                        where: whereMap
+                        where: whereFilter
                     }).then(count => {
                         if (isCleaningUpRef.current) return;
                         setColumnData(prev => ({

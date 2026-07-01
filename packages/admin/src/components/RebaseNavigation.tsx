@@ -195,8 +195,10 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return [...cmsViews, ...devViews];
     }, [cmsViews, devViews]);
 
+    const parentCustomizationController = useCustomizationController();
+
     const navigationStateController = useBuildNavigationStateController({
-        plugins: registry.cmsConfig?.plugins ?? EMPTY_PLUGINS,
+        plugins: parentCustomizationController.plugins ?? EMPTY_PLUGINS,
         collections: collectionsBuilder,
         views: mergedViews,
         navigationGroupMappings: registry.cmsConfig?.navigationGroupMappings,
@@ -213,7 +215,6 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // automatically merged. We re-provide an enriched controller here so that
     // downstream consumers (EntityEditView, side panels, etc.) can resolve
     // string-keyed entity views like "blog_preview".
-    const parentCustomizationController = useCustomizationController();
     const enrichedCustomizationController = useMemo(() => {
         const cmsEntityViews = (registry.cmsConfig?.entityViews ?? []) as EntityCustomView[];
         const cmsEntityActions = (registry.cmsConfig?.entityActions ?? []) as EntityAction[];

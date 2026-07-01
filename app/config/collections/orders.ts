@@ -1,12 +1,13 @@
-import { defineCollection } from "@rebasepro/common";
+import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
+import { Entity } from "@rebasepro/types";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import { maskValues } from "../masking";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
-const getRelationId = (val: any): string | number | undefined => {
+const getRelationId = (val: unknown): string | number | undefined => {
     if (!val) return undefined;
-    if (typeof val === "object" && "id" in val) return val.id;
+    if (typeof val === "object" && val !== null && "id" in val) return (val as { id: string | number }).id;
     if (typeof val === "string" || typeof val === "number") return val;
     return undefined;
 };
@@ -291,7 +292,7 @@ const ordersCollection = defineCollection({
 });
 
 // Helper function to update customer lifetime value and total orders count
-async function updateCustomerMetrics(customerId: string | number, context: any) {
+async function updateCustomerMetrics(customerId: string | number, context: EntityCallbackContext) {
     const { data: customerOrders } = await context.data.collection("orders").find({
         where: {
             customer: ["==", customerId],
@@ -300,7 +301,7 @@ async function updateCustomerMetrics(customerId: string | number, context: any) 
     });
 
     const totalOrders = customerOrders.length;
-    const lifetimeValue = customerOrders.reduce((sum: number, order: any) => {
+    const lifetimeValue = customerOrders.reduce((sum: number, order: Entity) => {
         // Sum only paid or delivered orders
         if (order.values.payment_status === "paid" || order.values.status === "delivered") {
             return sum + Number(order.values.total ?? 0);

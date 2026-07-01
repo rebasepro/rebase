@@ -138,25 +138,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         setError(undefined);
         setLoading(true);
 
-        // Convert fixedFilter to PostgREST where clause
-        const whereMap: Record<string, string> = {};
-        if (fixedFilter) {
-            Object.entries(fixedFilter).forEach(([key, value]) => {
-                if (value && Array.isArray(value)) {
-                    const [op, val] = value;
-                    const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                    let stringVal: string;
-                    if (Array.isArray(val)) {
-                        stringVal = `(${val.join(",")})`;
-                    } else {
-                        stringVal = String(val);
-                    }
-                    whereMap[key] = `${postgrestOp}.${stringVal}`;
-                }
-            });
-        }
-        const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
+        // fixedFilter is already FilterValues — pass directly
+        const whereParams = fixedFilter && Object.keys(fixedFilter).length > 0 ? fixedFilter : undefined;
 
         const onEntitiesUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
             const newItems = res.data.map((e) => entityToRelationItem(e));

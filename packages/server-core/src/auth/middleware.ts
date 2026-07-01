@@ -37,7 +37,7 @@ export interface AuthMiddlewareOptions {
      * to Postgres Row-Level Security policies.
      */
     requireAuth?: boolean;
-    /** Optional custom validator (for non-JWT auth, e.g. Firebase Auth) */
+    /** Optional custom validator (for non-JWT auth, e.g. external auth providers) */
     validator?: (c: Context<HonoEnv>) => Promise<AuthResult>;
     /**
      * A static secret key for server-to-server / script authentication.
@@ -47,7 +47,7 @@ export interface AuthMiddlewareOptions {
      * roles: `["admin"]`) **without** JWT verification. The driver is scoped
      * via `withAuth()` with the service identity.
      *
-     * This is the Rebase equivalent of a Firebase Service Account key.
+     * This is the Rebase equivalent of a Service Account key.
      * Set via `REBASE_SERVICE_KEY` in `.env` and pass through the backend config.
      *
      * **Security:** The comparison uses constant-time equality to prevent
@@ -245,7 +245,7 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
         // Pick the per-request delegate (multi-data-source) before scoping.
         const driver = resolveDriver ? resolveDriver(c) : baseDriver;
         if (validator) {
-            // Custom validator path (e.g., Firebase Auth, API keys)
+            // Custom validator path (e.g., API keys, external auth)
             try {
                 const authResult = await validator(c);
                 if (authResult && typeof authResult === "object") {
@@ -291,7 +291,7 @@ code: "UNAUTHORIZED" } }, 401);
 
                 // ── Service Key check ──────────────────────────────────
                 // Check BEFORE JWT verification. Service keys are static
-                // secrets (like Firebase SA keys) that grant admin access
+                // secrets (like Service Account keys) that grant admin access
                 // for scripts, cron jobs, and server-to-server calls.
                 if (serviceKey && safeCompare(token, serviceKey)) {
                     const serviceUser: AccessTokenPayload = {

@@ -42,7 +42,7 @@ describe("createCollectionClient", () => {
 
             const client = createCollectionClient(transport, "products");
             const result = await client.count({
-                where: { status: "eq.published" }
+                where: { status: ["==", "published"] }
             });
 
             expect(transport.request).toHaveBeenCalledWith(
@@ -111,7 +111,7 @@ offset: 10 });
             const client = createCollectionClient(transport, "orders");
             await client.count({
                 where: {
-                    status: "eq.active",
+                    status: ["==", "active"],
                     total: [">=", 100]
                 }
             });

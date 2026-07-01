@@ -485,7 +485,7 @@ values: { title: "Test" } };
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
             client.listen!(
-                { where: { status: "eq.published" },
+                { where: { status: ["==", "published"] },
 searchString: "test" },
                 jest.fn()
             );
@@ -638,9 +638,9 @@ extra_field: "kept" });
 });
 
 // --------------------------------------------------------------------------
-// parseWhereFilter (tested indirectly through listen)
+// FilterValues passthrough (tuples are now passed directly to the driver)
 // --------------------------------------------------------------------------
-describe("parseWhereFilter edge cases", () => {
+describe("FilterValues passthrough", () => {
     let transport: Transport;
     let mockRequest: jest.Mock<Transport["request"]>;
 
@@ -659,98 +659,85 @@ describe("parseWhereFilter edge cases", () => {
 mockWs };
     }
 
-    it("parses gt operator", () => {
+    it("passes > operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { count: "gt.5" } }, jest.fn());
+        client.listen!({ where: { count: [">", 5] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.count).toEqual([">", "5"]);
+        expect(filter.count).toEqual([">", 5]);
     });
 
-    it("parses gte operator", () => {
+    it("passes >= operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { count: "gte.10" } }, jest.fn());
+        client.listen!({ where: { count: [">=", 10] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.count).toEqual([">=", "10"]);
+        expect(filter.count).toEqual([">=", 10]);
     });
 
-    it("parses lt and lte operators", () => {
+    it("passes < operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { count: "lt.3" } }, jest.fn());
+        client.listen!({ where: { count: ["<", 3] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.count).toEqual(["<", "3"]);
+        expect(filter.count).toEqual(["<", 3]);
     });
 
-    it("parses neq operator", () => {
+    it("passes != operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { status: "neq.draft" } }, jest.fn());
+        client.listen!({ where: { status: ["!=", "draft"] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.status).toEqual(["!=", "draft"]);
     });
 
-    it("parses in operator with parentheses", () => {
+    it("passes in operator with array value through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { status: "in.(active,pending)" } }, jest.fn());
+        client.listen!({ where: { status: ["in", ["active", "pending"]] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.status).toEqual(["in", ["active", "pending"]]);
     });
 
-    it("parses nin operator", () => {
+    it("passes not-in operator through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { type: "nin.(a,b)" } }, jest.fn());
+        client.listen!({ where: { type: ["not-in", ["a", "b"]] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.type).toEqual(["not-in", ["a", "b"]]);
     });
 
-    it("parses cs (array-contains) operator", () => {
+    it("passes array-contains operator through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { tags: "cs.featured" } }, jest.fn());
+        client.listen!({ where: { tags: ["array-contains", "featured"] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.tags).toEqual(["array-contains", "featured"]);
     });
 
-    it("parses csa (array-contains-any) operator", () => {
+    it("passes array-contains-any operator through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { tags: "csa.(a,b,c)" } }, jest.fn());
+        client.listen!({ where: { tags: ["array-contains-any", ["a", "b", "c"]] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.tags).toEqual(["array-contains-any", ["a", "b", "c"]]);
     });
 
-    it("parses boolean true values", () => {
+    it("passes == with boolean true through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { active: "eq.true" } }, jest.fn());
+        client.listen!({ where: { active: ["==", true] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.active).toEqual(["==", true]);
     });
 
-    it("parses boolean false values", () => {
+    it("passes == with null through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { active: "eq.false" } }, jest.fn());
-        const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.active).toEqual(["==", false]);
-    });
-
-    it("parses null values", () => {
-        const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { deletedAt: "eq.null" } }, jest.fn());
+        client.listen!({ where: { deletedAt: ["==", null] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.deletedAt).toEqual(["==", null]);
     });
 
-    it("handles plain values without operators as eq", () => {
+    it("passes == with string value through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { status: "published" } }, jest.fn());
+        client.listen!({ where: { status: ["==", "published"] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.status).toEqual(["==", "published"]);
     });
-
-    it("handles unknown operators by defaulting to eq with full value", () => {
-        const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { strange: "xyz.something" } }, jest.fn());
-        const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        // Unknown op defaults to == with full original value
-        expect(filter.strange).toEqual(["==", "xyz.something"]);
-    });
 });
+
+
 
 function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<Transport["request"]> } {
     const mockRequest = jest.fn() as jest.Mock<Transport["request"]>;

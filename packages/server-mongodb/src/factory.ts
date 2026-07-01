@@ -57,6 +57,7 @@ export interface MongoBackendInstance extends BackendInstance {
  */
 export class MongoCollectionRegistry implements CollectionRegistryInterface {
     private collections = new Map<string, EntityCollection>();
+    private _globalCallbacks?: any;
 
     /**
      * Register a collection
@@ -77,6 +78,20 @@ export class MongoCollectionRegistry implements CollectionRegistryInterface {
      */
     getCollections(): EntityCollection[] {
         return Array.from(this.collections.values());
+    }
+
+    /**
+     * Get the currently registered global callbacks, if any.
+     */
+    getGlobalCallbacks(): any | undefined {
+        return this._globalCallbacks;
+    }
+
+    /**
+     * Set global lifecycle callbacks that apply to every collection.
+     */
+    setGlobalCallbacks(callbacks: any): void {
+        this._globalCallbacks = callbacks;
     }
 }
 

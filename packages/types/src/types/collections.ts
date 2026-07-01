@@ -13,6 +13,7 @@ import type { EntityAction } from "./entity_actions";
 import type { PolicyExpression } from "./policy";
 import type { ComponentRef } from "./component_ref";
 import type { CollectionComponentOverrideMap } from "./component_overrides";
+import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -817,57 +818,8 @@ export interface SelectionController<M extends Record<string, unknown> = Record<
     toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
 }
 
-/**
- * Filter conditions in a `Query.where()` clause are specified using the
- * strings `<`, `<=`, `==`, `>=`, `>`, `array-contains`, `in`, and `array-contains-any`.
- * @group Models
- */
-export type WhereFilterOp =
-    | "<"
-    | "<="
-    | "=="
-    | "!="
-    | ">="
-    | ">"
-    | "array-contains"
-    | "in"
-    | "not-in"
-    | "array-contains-any";
-
-/**
- * Used to define filters applied in collections
- *
- * e.g. `{ age: [">=", 18] }`
- *
- * @group Models
- */
-export type FilterValues<Key extends string> =
-    Partial<Record<Key, [WhereFilterOp, unknown] | [WhereFilterOp, unknown][]>>;
-
-/**
- * A pre-defined filter preset for quick access in the collection toolbar.
- * Users can select a preset to instantly apply a set of filters and
- * optionally a sort order.
- *
- * @group Models
- */
-export interface FilterPreset<Key extends string = string> {
-    /**
-     * Display label shown in the preset menu.
-     * If omitted, a summary is auto-generated from the filter keys.
-     */
-    label?: string;
-
-    /**
-     * The filter values to apply when this preset is selected.
-     */
-    filterValues: FilterValues<Key>;
-
-    /**
-     * Optional sort override to apply alongside the filter values.
-     */
-    sort?: [Key, "asc" | "desc"];
-}
+// Canonical filter types — re-exported from the single source-of-truth.
+export type { WhereFilterOp, FilterValues, WireFilterValues, FilterPreset } from "./filter-operators";
 
 
 /**

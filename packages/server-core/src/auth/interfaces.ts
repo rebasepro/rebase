@@ -74,8 +74,17 @@ export interface OAuthProvider<T = unknown> {
     /** Zod schema validating the expected request payload (e.g. { code: string }) */
     schema: z.ZodSchema<T>;
 
-    /** Verify external tokens/codes and return a standardized user profile */
-    verify: (payload: T) => Promise<OAuthProviderProfile | null>;
+    /**
+     * Verify external tokens/codes and return a standardized user profile.
+     *
+     * NOTE: Declared as method syntax (not arrow property) intentionally.
+     * This makes `OAuthProvider` bivariant in `T`, which is correct because
+     * each provider is self-contained — `schema` validates the request body
+     * and `verify` consumes the same `T`. Bivariance lets heterogeneous
+     * providers (`OAuthProvider<SpecificPayload>`) coexist in a single
+     * `OAuthProvider<unknown>[]` array without resorting to `any`.
+     */
+    verify(payload: T): Promise<OAuthProviderProfile | null>;
 }
 
 /**

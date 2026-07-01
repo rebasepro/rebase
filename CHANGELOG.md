@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.8.0] - 2026-07-01
+
+### Features & Improvements
+
+- **Unified Policy & Filter Engine** — Replaced ad-hoc permission checks with a centralized `evaluatePolicy` system and `Policy` type. This system translates high-level security rules into both frontend conditions (for UI gating) and backend-specific filters (Postgres RLS, Firestore security rules). Includes `policyToPostgres` and `securityRuleToConditions` utilities, ensuring the admin UI matches database enforcement by construction.
+- **Multi-Backend Storage Sources** — Introduced a first-class `StorageSource` system allowing a single project to use multiple storage backends (S3, GCS, Local, Firebase) simultaneously. Added `GCSStorageController` for native Google Cloud Storage support with TUS resumable uploads. Managed via `StorageSourcesContext` and `StorageRegistry`, enabling complex multi-cloud storage architectures.
+- **Custom Backend Functions** — New `defineFunction()` API for creating type-safe, discoverable backend endpoints. Functions are automatically mounted, type-checked, and can be invoked directly from the client SDK with full type safety. Includes a new `invoke_function` MCP tool for interacting with custom endpoints from AI agents.
+- **Property Schema Consolidation** — Refactored the property system to unify how database-level schemas, UI configurations, and validation rules are defined. Removed overlapping property types and introduced a more robust `PropertyConfig` system that handles complex relations and references consistently across all data drivers (Postgres, MongoDB, Firestore).
+- **Editable UI Table** — Significantly enhanced `VirtualTable` with native editable cells (`VirtualTableInput`, `VirtualTableSelect`, `VirtualTableNumberInput`, `VirtualTableDateField`). Added a new `SelectionStore` and `SelectionContext` for robust multi-row selection, keyboard navigation, and batch operations within the CMS.
+- **Expanded Agent Skills** — Massive overhaul of the Rebase AI coding skills. Added new specialized skills for `rebase-custom-functions`, `rebase-ui-components`, and `rebase-storage`. Expanded existing skills for auth, security, and SDK with deep architectural context, common patterns, and safety rules.
+- **Public API Refinement** — Cleaned up the public API surface of `@rebasepro/client` and `@rebasepro/core`, simplifying integration into existing applications. Consolidated data controllers, improved type inference, and refined the `Rebase` component props for better developer experience.
+- **NPM Publishing Safeguards** — Added `validate-no-workspace-protocol.sh` and `check-packages.sh` scripts to the release pipeline. These prevent publishing packages with `workspace:` dependencies or inconsistent versions, ensuring library consumers always get stable, resolved dependencies.
+
+### Fixes
+
+- **Dependency Management** — Resolved workspace-wide dependency conflicts and fixed "workspace protocol" leakage in built artifacts that caused installation failures in certain environments.
+- **Lifecycle Interception** — Unified lifecycle interception systems across different data drivers. This ensures consistent execution of `beforeSave`, `afterSave`, `beforeDelete`, and `afterDelete` hooks regardless of whether the collection is backed by Postgres, MongoDB, or Firestore.
+- **OAuth Configuration** — Refactored and stabilized OAuth provider configuration. Resolved inconsistencies in how environment variables were parsed for Discord, Microsoft, and LinkedIn providers.
+- **MongoDB & Firestore Parity** — Improved collection support for MongoDB and Firestore, bringing their relation/reference capabilities and storage integration closer to parity with the PostgreSQL driver.
+- **Any Type Audit** — Conducted a comprehensive audit of `any` types across the core packages, replacing them with strict types or narrowing guards (e.g., `isSQLAdmin`) to improve overall codebase robustness and prevent runtime errors.
+
+### Testing
+
+- **Security Policy Tests** — New test suites for `evaluatePolicy`, `policyToPostgres`, and `securityRuleToConditions` covering Kleene logic and complex nested expressions.
+- **Storage Tests** — Added comprehensive integration tests for `GCSStorageController`, multi-storage routing, and TUS upload flows.
+- **UI Tests** — New unit and integration tests for `VirtualTable` editable fields, selection logic, and keyboard accessibility.
+- **Schema Gates** — Added `collection_registry_property_gates` tests to validate property resolution and permission-based visibility gating at the registry level.
+
+---
+
 ## [0.7.0] - 2026-06-29
 
 ### Features & Improvements

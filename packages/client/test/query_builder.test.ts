@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { QueryBuilder, FilterOperator } from "../src/query_builder";
+import { QueryBuilder } from "../src/query_builder";
 import { CollectionClient } from "../src/collection";
 import { FindParams } from "@rebasepro/types";
 

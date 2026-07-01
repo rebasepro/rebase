@@ -50,12 +50,8 @@ export interface FieldProps<
     /**
      * Current value of this field, inferred from the property type P
      */
-    value: any;
-
-    /**
-     * Set value of field directly
-     */
-    setValue: (value: any | null, shouldValidate?: boolean) => void;
+    value: InferPropertyType<P> | any;
+    setValue: (value: InferPropertyType<P> | null | any, shouldValidate?: boolean) => void;
 
     /**
      * Set value of a different field directly

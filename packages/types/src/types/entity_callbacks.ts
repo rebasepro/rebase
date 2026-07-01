@@ -4,34 +4,25 @@ import type { User } from "../users";
 import type { RebaseCallContext } from "../rebase_context";
 
 /**
- * Per-collection lifecycle callbacks, invoked when an entity is read, created,
- * updated or deleted. Defined on a collection via its `callbacks` field.
- * Useful for adding your own logic or blocking the execution of the operation.
+ * Lifecycle callbacks for entity CRUD operations.
  *
- * ## Layer & scope
+ * Register per-collection on the collection's `callbacks` field, or globally
+ * via `initBackend({ callbacks })`. Fires on **every** data path — REST API,
+ * WebSocket / realtime subscriptions, and server-side `rebase.data`.
  *
- * These run **inside the DataDriver**, so they fire on **every** data path —
- * REST API, realtime / WebSocket subscriptions, and server-side `rebase.data`.
- * This is the correct home for security-critical logic like PII redaction or
- * row filtering, because no read path bypasses it.
- *
- * They run **before** the REST-boundary {@link DataHooks}. Execution order for
- * a REST read is:
- *
- *   DataDriver → `EntityCallbacks` (all paths) → {@link DataHooks} (REST only)
- *
- * | Read path                       | `EntityCallbacks` | {@link DataHooks} |
- * | ------------------------------- | :---------------: | :---------------: |
- * | REST API (`GET /:slug`)         |        ✅         |        ✅         |
- * | Realtime / WebSocket            |        ✅         |        ❌         |
- * | Server-side `rebase.data.*`     |        ✅         |        ❌         |
+ * When both global and per-collection callbacks are registered, execution
+ * order is: **global → collection → property callbacks**.
  *
  * @group Models
  */
 export type EntityCallbacks<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
 
     /**
-     * Callback used after fetching data
+     * Callback used after fetching data.
+     *
+     * Fires on every read path. Use this for security-critical redaction
+     * (PII masking, row filtering) — no read path bypasses it.
+     *
      * @param props
      */
     afterRead?(props: EntityAfterReadProps<M, USER>)
@@ -43,13 +34,15 @@ export type EntityCallbacks<M extends Record<string, unknown> = Record<string, u
      * saved. If you throw an error in this method the process stops, and an
      * error snackbar gets displayed.
      * This runs after schema validation.
+     *
      * @param props
      */
     beforeSave?(props: EntityBeforeSaveProps<M, USER>)
         : Promise<Partial<EntityValues<M>>> | Partial<EntityValues<M>>;
 
     /**
-     * Callback used when save is successful
+     * Callback used when save is successful.
+     *
      * @param props
      */
     afterSave?(props: EntityAfterSaveProps<M, USER>)
@@ -76,7 +69,7 @@ export type EntityCallbacks<M extends Record<string, unknown> = Record<string, u
      *
      * @param props
      */
-    afterDelete?(props: EntityAfterDeleteProps<M, USER>): void;
+    afterDelete?(props: EntityAfterDeleteProps<M, USER>): Promise<void> | void;
 
 }
 
@@ -233,4 +226,3 @@ export interface EntityAfterDeleteProps<M extends Record<string, unknown> = Reco
      */
     context: RebaseCallContext<USER>;
 }
-

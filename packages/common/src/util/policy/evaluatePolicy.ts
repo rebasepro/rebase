@@ -20,7 +20,7 @@ export interface PolicyEvalContext {
     /** The current user's application roles. */
     roles?: string[];
     /** The row being evaluated, or null when no specific row is available. */
-    entity: Entity<any> | null;
+    entity: Entity | null;
 }
 
 /**
@@ -47,11 +47,11 @@ export function evaluatePolicy(expr: PolicyExpression, ctx: PolicyEvalContext): 
             return evaluateCompare(expr.op, expr.left, expr.right, ctx);
         case "rolesOverlap": {
             const userRoles = ctx.roles ?? [];
-            return expr.roles.some(r => userRoles.includes(r));
+            return expr.roles.some(r => r === "public" || userRoles.includes(r));
         }
         case "rolesContain": {
             const userRoles = ctx.roles ?? [];
-            return expr.roles.every(r => userRoles.includes(r));
+            return expr.roles.every(r => r === "public" || userRoles.includes(r));
         }
         case "authenticated":
             return ctx.uid != null;
@@ -109,20 +109,38 @@ function evaluateCompare(
     const r = resolveOperand(right, ctx);
     if (!l.known || !r.known) return "unknown";
 
-    const a = l.value as any;
-    const b = r.value as any;
-    switch (op) {
-        case "eq":
-            return a === b;
-        case "neq":
-            return a !== b;
-        case "lt":
-            return a < b;
-        case "lte":
-            return a <= b;
-        case "gt":
-            return a > b;
-        case "gte":
-            return a >= b;
+    const a = l.value;
+    const b = r.value;
+
+    if (a === null || b === null) {
+        if (op === "eq") return false;
+        if (op === "neq") return true;
+        return "unknown";
     }
+
+    if (op === "eq") return a === b;
+    if (op === "neq") return a !== b;
+
+    if (typeof a === "string" && typeof b === "string") {
+        if (op === "lt") return a < b;
+        if (op === "lte") return a <= b;
+        if (op === "gt") return a > b;
+        if (op === "gte") return a >= b;
+    }
+
+    if (typeof a === "number" && typeof b === "number") {
+        if (op === "lt") return a < b;
+        if (op === "lte") return a <= b;
+        if (op === "gt") return a > b;
+        if (op === "gte") return a >= b;
+    }
+
+    if (typeof a === "bigint" && typeof b === "bigint") {
+        if (op === "lt") return a < b;
+        if (op === "lte") return a <= b;
+        if (op === "gt") return a > b;
+        if (op === "gte") return a >= b;
+    }
+
+    return "unknown";
 }

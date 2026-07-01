@@ -241,31 +241,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         const accessor = dataClient.collection(path);
 
-        // Convert filterValues to PostgREST where clause
-        const whereMap: Record<string, string> = {};
-        if (filterValues) {
-            Object.entries(filterValues).forEach(([key, value]) => {
-                if (value && Array.isArray(value)) {
-                    const conditions: [WhereFilterOp, unknown][] = Array.isArray(value[0])
-                        ? (value as [WhereFilterOp, unknown][])
-                        : [value as [WhereFilterOp, unknown]];
-
-                    const [op, val] = conditions[0] || [];
-                    if (op) {
-                        const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                        let stringVal: string;
-                        if (Array.isArray(val)) {
-                            stringVal = `(${val.join(",")})`;
-                        } else {
-                            stringVal = String(val);
-                        }
-                        whereMap[key] = `${postgrestOp}.${stringVal}`;
-                    }
-                }
-            });
-        }
-        const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
+        // filterValues is already FilterValues — pass directly to the accessor
+        const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
         const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
 
         let unsubscribe: (() => void) | undefined;

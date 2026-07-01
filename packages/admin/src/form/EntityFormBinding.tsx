@@ -254,7 +254,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         try {
             const accessor = dataClient.collection(path);
             const { data } = await accessor.find({
-                where: { [name]: `eq.${value}` },
+                where: { [name]: ["==", value] },
                 limit: 2
             });
             const otherEntities = entityId ? data.filter(e => e.id !== entityId) : data;

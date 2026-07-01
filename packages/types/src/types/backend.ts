@@ -325,6 +325,11 @@ export interface CollectionRegistryInterface {
      * Get all registered collections
      */
     getCollections(): EntityCollection[];
+
+    /**
+     * Get the currently registered global callbacks, if any.
+     */
+    getGlobalCallbacks(): any | undefined;
 }
 
 // =============================================================================

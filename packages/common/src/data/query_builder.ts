@@ -1,4 +1,4 @@
-import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, FilterOperator, LogicalCondition, WhereValue, FilterCondition } from "@rebasepro/types";
+import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, WhereFilterOp, LogicalCondition, WhereValue, FilterCondition } from "@rebasepro/types";
 
 export function or(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
     return { type: "or",
@@ -10,7 +10,7 @@ export function and(...conditions: (FilterCondition | LogicalCondition)[]): Logi
 conditions };
 }
 
-export function cond(column: string, operator: FilterOperator, value: unknown): FilterCondition {
+export function cond(column: string, operator: WhereFilterOp, value: unknown): FilterCondition {
     return { column,
 operator,
 value };
@@ -26,9 +26,9 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * @example
      * client.collection('users').where('age', '>=', 18).find()
      */
-    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): this;
+    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
-    where(columnOrCondition: string | LogicalCondition, operator?: FilterOperator, value?: unknown): this {
+    where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         // Handle LogicalCondition signature
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
             this.params.logical = columnOrCondition as LogicalCondition;
@@ -40,18 +40,18 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
         }
 
         const column = columnOrCondition as string;
-        const condition: [FilterOperator, unknown] = [operator!, value];
+        const condition: [WhereFilterOp, unknown] = [operator!, value];
         const existing = this.params.where[column];
 
         if (existing === undefined) {
             this.params.where[column] = condition;
         } else if (Array.isArray(existing) && existing.length > 0 && Array.isArray(existing[0])) {
-            (this.params.where[column] as [FilterOperator, unknown][]).push(condition);
+            (this.params.where[column] as [WhereFilterOp, unknown][]).push(condition);
         } else {
             // Convert existing single tuple/value into array of tuples
-            let firstCondition: [FilterOperator, unknown];
+            let firstCondition: [WhereFilterOp, unknown];
             if (Array.isArray(existing) && existing.length === 2 && typeof existing[0] === "string") {
-                firstCondition = existing as [FilterOperator, unknown];
+                firstCondition = existing as [WhereFilterOp, unknown];
             } else {
                 firstCondition = ["==", existing];
             }
@@ -66,8 +66,8 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * @example
      * client.collection('users').orderBy('createdAt', 'desc').find()
      */
-    orderBy(column: keyof M & string, ascending: "asc" | "desc" = "asc"): this {
-        this.params.orderBy = `${column}:${ascending}`;
+    orderBy(column: keyof M & string, direction: "asc" | "desc" = "asc"): this {
+        this.params.orderBy = `${column}:${direction}`;
         return this;
     }
 

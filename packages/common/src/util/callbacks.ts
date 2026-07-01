@@ -1,4 +1,11 @@
-import { EntityCallbacks, Properties } from "@rebasepro/types";
+import { EntityCallbacks, Properties, RebaseCallContext } from "@rebasepro/types";
+
+/**
+ * Context passed to entity lifecycle callbacks.
+ * @group Models
+ */
+export type EntityCallbackContext = RebaseCallContext;
+
 
 /**
  * Helper function to recursively check if there are any callbacks in the properties.

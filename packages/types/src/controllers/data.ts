@@ -1,29 +1,5 @@
 import { Entity, EntityValues } from "../types/entities";
-
-/**
- * Parameters for querying a collection.
- * Uses PostgREST-style filter syntax for consistency between
- * the SDK (HTTP) and framework (in-process) contexts.
- *
- * @group Data
- */
-/**
- * A where-clause value for a single field.
- *
- * Supports three syntaxes:
- *  1. **Equality shorthand**: raw JS values — `null`, `"active"`, `42`, `true`
- *  2. **Tuple syntax**: `[operator, value]` — `[">", 18]`, `["in", ["a","b"]]`
- *  3. **PostgREST string**: `"eq.published"`, `"gte.18"`, `"in.(a,b)"`
- *
- * @group Data
- */
-export type WhereFieldValue =
-    | string
-    | number
-    | boolean
-    | null
-    | [WhereFilterOpShort, any]
-    | [WhereFilterOpShort, any][];
+import { WhereFilterOp, FilterValues } from "../types/filter-operators";
 
 export type WhereValue<T> = T | T[] | null;
 
@@ -34,17 +10,15 @@ export interface LogicalCondition {
 
 export interface FilterCondition {
     column: string;
-    operator: FilterOperator;
+    operator: WhereFilterOp;
     value: unknown;
 }
 
-/** Short operator strings accepted in the tuple syntax. */
-export type WhereFilterOpShort =
-    | "==" | "!=" | ">" | ">=" | "<" | "<="
-    | "eq" | "neq" | "gt" | "gte" | "lt" | "lte"
-    | "in" | "nin" | "not-in"
-    | "array-contains" | "array-contains-any" | "cs" | "csa";
-
+/**
+ * Parameters for querying a collection.
+ *
+ * @group Data
+ */
 export interface FindParams {
     /** Maximum number of items to return (default: 20) */
     limit?: number;
@@ -53,30 +27,17 @@ export interface FindParams {
     /** Page number (1-indexed), alternative to offset */
     page?: number;
     /**
-     * Filter object. Supports multiple syntaxes per field:
+     * Filter conditions keyed by field name.
+     * Each value is a `[WhereFilterOp, value]` tuple or an array of tuples
+     * for multiple conditions on the same field.
      *
-     * **Equality shorthand** — raw JS values (null, string, number, boolean):
-     * ```ts
-     * { company_profile_id: null }
-     * { status: "active" }
-     * { age: 18 }
-     * ```
-     *
-     * **Tuple syntax** — `[operator, value]`:
-     * ```ts
+     * @example
+     * { status: ["==", "active"] }
      * { age: [">=", 18] }
      * { role: ["in", ["admin", "editor"]] }
-     * { deleted_at: ["!=", null] }
-     * ```
-     *
-     * **PostgREST string syntax** (original format):
-     * ```ts
-     * { status: "eq.published" }
-     * { age: "gte.18" }
-     * { role: "in.(admin,editor)" }
-     * ```
+     * { age: [[">=", 18], ["<", 65]] }
      */
-    where?: Record<string, WhereFieldValue>;
+    where?: FilterValues<string>;
     /** Logical grouping conditions (AND/OR) */
     logical?: LogicalCondition;
     /**
@@ -106,16 +67,16 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
     };
 }
 
-export type FilterOperator = WhereFilterOpShort;
+
 
 /**
  * Fluent Query Builder Interface supported on both client and server accessors.
  * @group Data
  */
 export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
-    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): this;
+    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
-    orderBy(column: keyof M & string, ascending?: "asc" | "desc"): this;
+    orderBy(column: keyof M & string, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string): this;
@@ -186,9 +147,9 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     count?(params?: FindParams): Promise<number>;
 
     // Fluent Query Builder
-    where<K extends keyof M & string>(column: K, operator: FilterOperator, value: WhereValue<M[K]>): QueryBuilderInterface<M>;
+    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): QueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): QueryBuilderInterface<M>;
-    orderBy(column: keyof M & string, ascending?: "asc" | "desc"): QueryBuilderInterface<M>;
+    orderBy(column: keyof M & string, direction?: "asc" | "desc"): QueryBuilderInterface<M>;
     limit(count: number): QueryBuilderInterface<M>;
     offset(count: number): QueryBuilderInterface<M>;
     search(searchString: string): QueryBuilderInterface<M>;

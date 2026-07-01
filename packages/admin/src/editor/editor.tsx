@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { EditorState, Selection } from "prosemirror-state";
-import { cls, defaultBorderMixin, Separator, useInjectStyles, TextareaAutosize } from "@rebasepro/ui";
+import { cls, defaultBorderMixin, Separator, TextareaAutosize, useInjectStyles } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { EditorBubble, ImageBubble, SlashCommandMenu, TableBubble, type JSONContent } from "./components";
 import { NodeSelector } from "./selectors/node-selector";

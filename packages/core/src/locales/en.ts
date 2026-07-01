@@ -740,9 +740,9 @@ export const en: RebaseTranslations = {
     settings_sample_theme_components: "Sample theme components",
     settings_drag_drop_logo: "Drag and drop your logo here",
     settings_security_rules: "Security rules",
-    settings_security_rules_description: "Rebase uses Firebase security rules to restrict access to data. When creating a new user through Rebase, the custom claim rebaseUser is added to the user in the client project. By adding the following security rules to your project, you ensure Rebase users can access data through Rebase.",
+    settings_security_rules_description: "Rebase uses granular security rules to restrict access to data. When creating a new user through Rebase, custom claims are added to the user. By adding the following security rules to your project, you ensure Rebase users can access data securely.",
     settings_security_rules_add_domain: "Remember to add the domain {{domain}} to your provider allowed domains",
-    settings_security_rules_caption: "This rules restrict access to data to Rebase users only, but does not enforce the permissions at the database level. The permissions are enforced in the frontend though, which will work fine for most projects. If you need to enforce the permissions at the database level, you can modify these security rules yourself to suit your needs. The roles assigned to a user are set as a custom claim in the Firebase auth token, so you can use them in your security rules.",
+    settings_security_rules_caption: "These rules restrict access to data to Rebase users only, but do not enforce the permissions at the database level. The permissions are enforced in the frontend though, which will work fine for most projects. If you need to enforce the permissions at the database level, you can modify these security rules yourself to suit your needs. The roles assigned to a user are set as custom claims in the auth token, so you can use them in your security rules.",
 
     // ─── Studio: SQL Editor ─────────────────────────────────────
     studio_sql_executing_query: "EXECUTING QUERY...",

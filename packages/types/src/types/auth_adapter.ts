@@ -4,8 +4,8 @@
  * Pluggable authentication abstraction for Rebase.
  *
  * An `AuthAdapter` decouples authentication from the database layer,
- * allowing users to bring their own auth system (Clerk, Auth0, Firebase Auth,
- * custom JWT, etc.) while keeping the Rebase admin frontend fully functional.
+ * allowing users to bring their own auth system (Clerk, Auth0, or other
+ * external providers) while keeping the Rebase admin frontend fully functional.
  *
  * @example Built-in auth (default — zero config change)
  * ```ts
@@ -277,7 +277,7 @@ export interface TransformAuthResponseContext {
  * 4. Advertise its capabilities so the frontend can adapt
  *
  * The built-in Rebase auth implements this interface internally.
- * External providers (Clerk, Auth0, Firebase Auth) provide their own adapters.
+ * External providers (Clerk, Auth0, or others) provide their own adapters.
  * Users with custom auth can use `createCustomAuthAdapter()` for a minimal setup.
  *
  * @group Auth
@@ -286,7 +286,7 @@ export interface AuthAdapter {
     /**
      * Unique identifier for this auth adapter.
      *
-     * @example "rebase-builtin", "clerk", "auth0", "firebase", "custom"
+     * @example "rebase-builtin", "clerk", "auth0", "external-provider", "custom"
      */
     readonly id: string;
 
@@ -435,7 +435,7 @@ export interface AuthAdapter {
      * response and returns a (potentially enriched) response.
      *
      * Use cases:
-     * - Inject tokens from external auth systems (Firebase Custom Tokens, etc.)
+     * - Inject tokens from external auth systems (custom provider tokens, etc.)
      * - Add project-specific metadata to the response
      * - Enrich the user object with data from external sources
      *

@@ -7,7 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import { deepEqual as equal } from "fast-equals"
 
 
-const EMPTY_ARRAY: any[] = [];
+const EMPTY_ARRAY: never[] = [];
 const DEFAULT_ENTITY_OPEN_MODE = "split";
 
 import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, getCollectionDataPath, PartialEntityCollection, ViewMode } from "@rebasepro/types";
@@ -215,7 +215,7 @@ const EntityCollectionViewInner = React.memo(
             }, 2400);
         }, [highlightedEntity]);
 
-        const checkInlineEditing = useCallback((entity?: Entity<any>): boolean => {
+        const checkInlineEditing = useCallback((entity?: Entity<M>): boolean => {
             const collection = collectionRef.current;
             if (!canEdit(collection, path, entity ?? null)) {
                 return false;
@@ -1301,25 +1301,8 @@ function EntitiesCount({
 
         let cancelled = false;
 
-        // Convert filterValues to PostgREST where clause
-        const whereMap: Record<string, string> = {};
-        if (filter) {
-            Object.entries(filter).forEach(([key, value]) => {
-                if (value && Array.isArray(value)) {
-                    const [op, val] = value;
-                    const postgrestOp = op === "==" ? "eq" : op === "!=" ? "neq" : op === ">" ? "gt" : op === ">=" ? "gte" : op === "<" ? "lt" : op === "<=" ? "lte" : op === "in" ? "in" : op === "not-in" ? "nin" : op === "array-contains" ? "cs" : op === "array-contains-any" ? "csa" : "eq";
-
-                    let stringVal: string;
-                    if (Array.isArray(val)) {
-                        stringVal = `(${val.join(",")})`;
-                    } else {
-                        stringVal = String(val);
-                    }
-                    whereMap[key] = `${postgrestOp}.${stringVal}`;
-                }
-            });
-        }
-        const whereParams = Object.keys(whereMap).length > 0 ? whereMap : undefined;
+        // filterValues is already FilterValues — pass directly
+        const whereParams = filter && Object.keys(filter).length > 0 ? filter : undefined;
         const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
 
         // Deduplicate inflight count requests (e.g. React StrictMode double-mount)

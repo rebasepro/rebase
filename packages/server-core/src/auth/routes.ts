@@ -30,8 +30,7 @@ export interface AuthModuleConfig {
     /** Default role ID to assign to new users (default: none). Must NOT be "admin". */
     defaultRole?: string;
     /** Optional array of OAuth providers */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    oauthProviders?: OAuthProvider<any>[];
+    oauthProviders?: OAuthProvider<unknown>[];
     /** When true, blocks all self-registration regardless of `allowRegistration`. */
     disableSelfRegistration?: boolean;
     /**

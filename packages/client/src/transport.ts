@@ -1,4 +1,5 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, WhereFieldValue, WhereFilterOpShort } from "@rebasepro/types";
+import { FindParams as TypesFindParams, FindResponse as TypesFindResponse } from "@rebasepro/types";
+import { serializeFilter, serializeLogicalCondition } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
 export interface RebaseClientConfig {
@@ -30,80 +31,6 @@ export class RebaseApiError extends Error {
     }
 }
 
-/**
- * Maps a short operator alias to the PostgREST-style short code.
- */
-const OP_MAP: Record<string, string> = {
-    "==": "eq",
-"!=": "neq",
-    ">": "gt",
-">=": "gte",
-    "<": "lt",
-"<=": "lte",
-    "not-in": "nin",
-    "array-contains": "cs",
-    "array-contains-any": "csa"
-};
-
-/**
- * Normalise a single `WhereFieldValue` into the PostgREST query-string
- * representation the backend expects.
- *
- * Supports:
- *  - `null`          → `"eq.null"`
- *  - `true`/`false`  → `"eq.true"` / `"eq.false"`
- *  - `42`            → `"42"` (plain equality)
- *  - `"active"`      → `"active"` (plain equality, backward-compat)
- *  - `"gte.18"`      → `"gte.18"` (pass-through PostgREST string)
- *  - `[">=", 18]`    → `"gte.18"` (tuple syntax)
- *  - `["in", [1,2]]` → `"in.(1,2)"` (tuple with array value)
- *  - `["!=", null]`  → `"neq.null"`
- */
-function normalizeWhereValue(value: WhereFieldValue): string {
-    // Null → eq.null
-    if (value === null) return "eq.null";
-
-    // Boolean → eq.true / eq.false
-    if (typeof value === "boolean") return `eq.${value}`;
-
-    // Number → plain equality
-    if (typeof value === "number") return String(value);
-
-    // Tuple: [operator, val]
-    if (Array.isArray(value)) {
-        const conditions: [WhereFilterOpShort, any][] = Array.isArray(value[0])
-            ? (value as [WhereFilterOpShort, any][])
-            : [value as [WhereFilterOpShort, any]];
-
-        const [rawOp, val] = conditions[0] || [];
-        if (rawOp) {
-            const op = OP_MAP[rawOp] ?? rawOp;
-            if (val === null) return `${op}.null`;
-            if (Array.isArray(val)) return `${op}.(${val.join(",")})`;
-            return `${op}.${val}`;
-        }
-    }
-
-    // String — pass through (either plain equality value or PostgREST syntax)
-    return String(value);
-}
-
-function serializeLogicalCondition(cond: any): string {
-    if ("type" in cond) {
-        const sub = (cond.conditions ?? []).map(serializeLogicalCondition).join(",");
-        return `${cond.type}(${sub})`;
-    } else {
-        const op = OP_MAP[cond.operator] ?? cond.operator;
-        let formattedValue = cond.value;
-        if (Array.isArray(cond.value)) {
-            formattedValue = `(${cond.value.join(",")})`;
-        } else if (cond.value === null) {
-            formattedValue = "null";
-        }
-        return `${cond.column}.${op}.${formattedValue}`;
-    }
-}
-
 export function buildQueryString(params?: FindParams): string {
     if (!params) return "";
     const parts: string[] = [];
@@ -131,15 +58,14 @@ export function buildQueryString(params?: FindParams): string {
     }
 
     if (params.where) {
-        for (const [field, value] of Object.entries(params.where)) {
-            if (Array.isArray(value) && value.length > 0 && Array.isArray(value[0])) {
-                for (const subVal of value) {
-                    const normalized = normalizeWhereValue(subVal as WhereFieldValue);
-                    parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(normalized)}`);
+        const serialized = serializeFilter(params.where);
+        for (const [field, value] of Object.entries(serialized)) {
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(v)}`);
                 }
             } else {
-                const normalized = normalizeWhereValue(value as WhereFieldValue);
-                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(normalized)}`);
+                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(value)}`);
             }
         }
     }

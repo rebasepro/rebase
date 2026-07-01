@@ -82,6 +82,7 @@ export class MongoDriver implements DataDriver {
     ) {
         if (!collection && !path) return { collection: undefined,
 callbacks: undefined,
+globalCallbacks: undefined,
 propertyCallbacks: undefined };
         const registryCollection = this.registry?.getCollectionByPath(path);
         const resolvedCollection = registryCollection
@@ -90,6 +91,7 @@ propertyCallbacks: undefined };
             : (collection as EntityCollection<M>);
 
         const callbacks = resolvedCollection?.callbacks;
+        const globalCallbacks = this.registry?.getGlobalCallbacks();
         const properties = resolvedCollection?.properties;
         let propertyCallbacks;
         if (properties) {
@@ -98,6 +100,7 @@ propertyCallbacks: undefined };
         return {
             collection: resolvedCollection,
             callbacks,
+            globalCallbacks,
             propertyCallbacks
         };
     }
@@ -125,9 +128,9 @@ propertyCallbacks: undefined };
             collection: collection as EntityCollection
         });
 
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
-        if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = {
                 user: this.user,
                 driver: this,
@@ -137,6 +140,14 @@ propertyCallbacks: undefined };
             } as unknown as RebaseCallContext; // Backend context
             return Promise.all(entities.map(async (entity) => {
                 let fetched = entity;
+                if (globalCallbacks?.afterRead) {
+                    fetched = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as EntityCollection<M>,
+                        path,
+                        entity: fetched,
+                        context: contextForCallback
+                    }) ?? fetched;
+                }
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -220,9 +231,9 @@ propertyCallbacks: undefined };
     }: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
         let entity = await this.entityService.fetchEntity<M>(path, entityId, databaseId);
 
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
-        if (entity && (callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+        if (entity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = {
                 user: this.user,
                 driver: this,
@@ -230,11 +241,19 @@ propertyCallbacks: undefined };
                 client: this.client,
                 storageSource: this.client?.storage
             } as unknown as RebaseCallContext; // Backend context
+            if (globalCallbacks?.afterRead) {
+                entity = await globalCallbacks.afterRead({
+                    collection: resolvedCollection as EntityCollection<M>,
+                    path,
+                    entity: entity as Entity<M>,
+                    context: contextForCallback
+                }) ?? entity;
+            }
             if (callbacks?.afterRead) {
                 entity = await callbacks.afterRead({
                     collection: resolvedCollection as EntityCollection<M>,
                     path,
-                    entity,
+                    entity: entity as Entity<M>,
                     context: contextForCallback
                 }) ?? entity;
             }
@@ -242,7 +261,7 @@ propertyCallbacks: undefined };
                 entity = await propertyCallbacks.afterRead({
                     collection: resolvedCollection as EntityCollection<M>,
                     path,
-                    entity,
+                    entity: entity as Entity<M>,
                     context: contextForCallback
                 }) as Entity<M> ?? entity;
             }
@@ -300,7 +319,7 @@ propertyCallbacks: undefined };
         collection,
         status
     }: SaveEntityProps<M>): Promise<Entity<M>> {
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         let updatedValues = values;
         const contextForCallback = {
@@ -320,7 +339,20 @@ propertyCallbacks: undefined };
             }
         }
 
-        if (callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+        if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+            if (globalCallbacks?.beforeSave) {
+                const result = await globalCallbacks.beforeSave({
+                    collection: resolvedCollection as EntityCollection<M>,
+                    path,
+                    entityId,
+                    values: updatedValues,
+                    previousValues: previousValuesForHistory,
+                    status,
+                    context: contextForCallback
+                });
+                if (result) updatedValues = mergeDeep(updatedValues, result);
+            }
+
             if (callbacks?.beforeSave) {
                 const result = await callbacks.beforeSave({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -366,7 +398,15 @@ propertyCallbacks: undefined };
                 resolvedCollection?.databaseId
             );
 
-            if (savedEntity && (callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+            if (savedEntity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+                if (globalCallbacks?.afterRead) {
+                    savedEntity = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as EntityCollection<M>,
+                        path,
+                        entity: savedEntity,
+                        context: contextForCallback
+                    }) ?? savedEntity;
+                }
                 if (callbacks?.afterRead) {
                     savedEntity = await callbacks.afterRead({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -385,7 +425,18 @@ propertyCallbacks: undefined };
                 }
             }
 
-            if (callbacks?.afterSave || propertyCallbacks?.afterSave) {
+            if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
+                if (globalCallbacks?.afterSave) {
+                    await globalCallbacks.afterSave({
+                        collection: resolvedCollection as EntityCollection<M>,
+                        path,
+                        entityId: savedEntity.id,
+                        values: savedEntity.values,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                }
                 if (callbacks?.afterSave) {
                     await callbacks.afterSave({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -468,7 +519,7 @@ propertyCallbacks: undefined };
         entity,
         collection
     }: DeleteEntityProps<M>): Promise<void> {
-        const { collection: resolvedCollection, callbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, entity.path);
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, entity.path);
 
         const contextForCallback = {
             user: this.user,
@@ -478,8 +529,20 @@ propertyCallbacks: undefined };
             storageSource: this.client?.storage
         } as unknown as RebaseCallContext;
 
-        if (callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
+        if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
             let preventDefault = false;
+            if (globalCallbacks?.beforeDelete) {
+                const result = await globalCallbacks.beforeDelete({
+                    collection: resolvedCollection as EntityCollection<M>,
+                    path: entity.path,
+                    entityId: entity.id,
+                    entity,
+                    context: contextForCallback
+                });
+                if (result === false) {
+                    preventDefault = true;
+                }
+            }
             if (callbacks?.beforeDelete) {
                 const result = await callbacks.beforeDelete({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -511,7 +574,16 @@ propertyCallbacks: undefined };
 
         await this.entityService.deleteEntity(entity.path, entity.id);
 
-        if (callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+        if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+            if (globalCallbacks?.afterDelete) {
+                await globalCallbacks.afterDelete({
+                    collection: resolvedCollection as EntityCollection<M>,
+                    path: entity.path,
+                    entityId: entity.id,
+                    entity,
+                    context: contextForCallback
+                });
+            }
             if (callbacks?.afterDelete) {
                 await callbacks.afterDelete({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -655,9 +727,9 @@ export class AuthenticatedMongoDriver implements DataDriver {
             collection: resolvedCollection
         });
 
-        const { callbacks, propertyCallbacks } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
+        const { callbacks, globalCallbacks, propertyCallbacks } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
-        if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = {
                 user: this.user,
                 driver: this,
@@ -667,6 +739,14 @@ export class AuthenticatedMongoDriver implements DataDriver {
             } as unknown as RebaseCallContext;
             return Promise.all(entities.map(async (entity) => {
                 let fetched = entity;
+                if (globalCallbacks?.afterRead) {
+                    fetched = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as EntityCollection<M>,
+                        path: props.path,
+                        entity: fetched,
+                        context: contextForCallback
+                    }) ?? fetched;
+                }
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
                         collection: resolvedCollection as EntityCollection<M>,

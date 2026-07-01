@@ -7,7 +7,7 @@ export function generateMarkdownForPage(page: string, lang: string): string {
   const t = ui[currentLang];
 
   const tr = (key: string): string => {
-    const val = (t as any)[key] || (ui[defaultLang] as any)[key] || "";
+    const val = (t as Record<string, string>)[key] || (ui[defaultLang] as Record<string, string>)[key] || "";
     return val;
   };
 

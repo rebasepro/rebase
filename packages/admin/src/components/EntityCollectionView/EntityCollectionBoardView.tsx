@@ -281,7 +281,7 @@ parentEntityIds,
         }).catch(e => console.warn("Failed to get total count:", e));
 
         accessor.count({
-            where: { [orderProperty]: "neq.null" }
+            where: { [orderProperty]: ["!=", null] }
         }).then(count => {
             orderedCount = count;
             completed++;

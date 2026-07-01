@@ -1,4 +1,5 @@
-import { defineCollection } from "@rebasepro/common";
+import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
+import { Entity } from "@rebasepro/types";
 import ordersCollection from "./orders";
 import productsCollection from "./products";
 
@@ -9,9 +10,9 @@ interface ProductValues extends Record<string, unknown> {
 }
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
-const getRelationId = (val: any): string | number | undefined => {
+const getRelationId = (val: unknown): string | number | undefined => {
     if (!val) return undefined;
-    if (typeof val === "object" && "id" in val) return val.id;
+    if (typeof val === "object" && val !== null && "id" in val) return (val as { id: string | number }).id;
     if (typeof val === "string" || typeof val === "number") return val;
     return undefined;
 };
@@ -122,12 +123,12 @@ const orderItemsCollection = defineCollection({
 });
 
 // Helper function to recalculate the parent order subtotal & total
-async function updateOrderTotals(orderId: string | number, context: any) {
+async function updateOrderTotals(orderId: string | number, context: EntityCallbackContext) {
     const { data: items } = await context.data.collection("order_items").find({
         where: { order: ["==", orderId] }
     });
 
-    const subtotal = items.reduce((sum: number, item: any) => sum + Number(item.values.line_total ?? 0), 0);
+    const subtotal = items.reduce((sum: number, item: Entity) => sum + Number(item.values.line_total ?? 0), 0);
 
     const order = await context.data.collection("orders").findById(orderId);
     if (order) {

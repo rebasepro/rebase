@@ -42,7 +42,7 @@ import { getValueInPath } from "@rebasepro/utils";
  * @see VirtualTable
  * @group Components
  */
-export const EntityCollectionTable = function EntityCollectionTable<M extends Record<string, unknown> = any, USER extends User = any>
+export const EntityCollectionTable = function EntityCollectionTable<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     ({
         className,
         style,
@@ -113,7 +113,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
     const additionalFieldsMap: Record<string, AdditionalFieldDelegate<M, USER>> = useMemo(() => {
         return (additionalFields
             ? additionalFields
-                .map((aC) => ({ [aC.key]: aC as AdditionalFieldDelegate<M, any> }))
+                .map((aC) => ({ [aC.key]: aC as AdditionalFieldDelegate<M, USER> }))
                 .reduce((a, b) => ({ ...a,
 ...b }), {})
             : {}) as Record<string, AdditionalFieldDelegate<M, USER>>;
@@ -132,9 +132,10 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         isDragging,
         isDraggable,
         frozen
-    }: CellRendererParams<any>) => {
+    }: CellRendererParams<Entity<M>>) => {
 
-        const entity: Entity<M> = rowData;
+        const entity: Entity<M> | undefined = rowData;
+        if (!entity) return null;
 
         const propertyKey = column.key;
 
@@ -192,9 +193,10 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
         isDragging,
         isDraggable,
         frozen
-    }: CellRendererParams<any>) => {
+    }: CellRendererParams<Entity<M>>) => {
 
-        const entity: Entity<M> = rowData;
+        const entity: Entity<M> | undefined = rowData;
+        if (!entity) return null;
 
         const additionalField = additionalFieldsMap[column.key as string];
         const value = additionalField.dependencies
@@ -293,7 +295,7 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
             : collectionColumns) as VirtualTableColumn[]
     ], [idColumn, displayedColumnIds, collectionColumns]);
 
-    const cellRenderer = useCallback((props: CellRendererParams<any>) => {
+    const cellRenderer = useCallback((props: CellRendererParams<Entity<M>>) => {
         const column = props.column;
         const columns = props.columns;
         const columnKey = column.key;
@@ -302,13 +304,13 @@ export const EntityCollectionTable = function EntityCollectionTable<M extends Re
             if (props.columnIndex === 0) {
                 if (tableRowActionsBuilder)
                     return tableRowActionsBuilder({
-                        entity: props.rowData,
+                        entity: props.rowData!,
                         size,
                         width: column.width,
                         frozen: column.frozen
                     });
                 else
-                    return <EntityCollectionRowActions entity={props.rowData}
+                    return <EntityCollectionRowActions entity={props.rowData!}
                         width={column.width}
                         frozen={column.frozen}
                         isSelected={false}

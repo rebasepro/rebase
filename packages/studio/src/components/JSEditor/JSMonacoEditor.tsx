@@ -49,10 +49,10 @@ interface FindResponse<M extends Record<string, any> = any> {
     };
 }
 
-type FilterOperator = "=" | "!=" | ">" | ">=" | "<" | "<=" | "in" | "not-in" | "array-contains" | "array-contains-any" | "is" | "is_not" | "like" | "ilike";
+type WhereFilterOp = "<" | "<=" | "==" | "!=" | ">=" | ">" | "in" | "not-in" | "array-contains" | "array-contains-any";
 
 interface QueryBuilder<M extends Record<string, any> = any> {
-    where(column: keyof M & string, operator: FilterOperator, value: any): QueryBuilder<M>;
+    where(column: keyof M & string, operator: WhereFilterOp, value: any): QueryBuilder<M>;
     orderBy(column: keyof M & string, direction?: "asc" | "desc"): QueryBuilder<M>;
     limit(count: number): QueryBuilder<M>;
     offset(count: number): QueryBuilder<M>;
@@ -68,7 +68,7 @@ interface CollectionClient<M extends Record<string, any> = any> {
     create(data: Partial<M>, id?: string | number): Promise<Entity<M>>;
     update(id: string | number, data: Partial<M>): Promise<Entity<M>>;
     delete(id: string | number): Promise<void>;
-    where(column: keyof M & string, operator: FilterOperator, value: any): QueryBuilder<M>;
+    where(column: keyof M & string, operator: WhereFilterOp, value: any): QueryBuilder<M>;
     orderBy(column: keyof M & string, direction?: "asc" | "desc"): QueryBuilder<M>;
     limit(count: number): QueryBuilder<M>;
     offset(count: number): QueryBuilder<M>;

@@ -1,6 +1,6 @@
 ---
 interface Props {
-  icon: any;
+  icon: (_props: Record<string, unknown>) => unknown;
   title: string;
   description: string;
   link?: {

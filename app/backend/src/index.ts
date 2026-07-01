@@ -27,7 +27,7 @@ const app = new Hono<HonoEnv>();
 const isProduction = env.NODE_ENV === "production";
 
 const allowedOrigins = isProduction
-    ? (env.CORS_ORIGINS || env.FRONTEND_URL || "").split(",").map(s => s.trim()).filter(Boolean)
+    ? (env.CORS_ORIGINS || env.FRONTEND_URL || "").split(",").map((s: string) => s.trim()).filter(Boolean)
     : [];
 
 app.use("/*", cors({
@@ -122,11 +122,6 @@ pass: env.SMTP_PASS! }
         csrf: isProduction
             ? { origin: allowedOrigins }
             : undefined // dev defaults are applied by server-core
-        // PII masking lives in per-collection `EntityCallbacks.afterRead`
-        // (see app/config/collections/{users,customers,authors,orders}.ts).
-        // Driver-level callbacks run on ALL read paths — REST, realtime, and
-        // server-side `rebase.data` — so redaction can't be bypassed. A
-        // REST-only `hooks.data.afterRead` here would leak via the other two.
     });
 
     // ─── Health check ─────────────────────────────────────────────

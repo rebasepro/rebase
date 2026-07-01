@@ -1,11 +1,11 @@
 import { Hono } from "hono";
-import { AuthAdapter, DataDriver, Entity, EntityCollection, FetchCollectionProps, DataHooks, BackendHookContext, RestFetchService, getCollectionDataPath } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, Entity, EntityCollection, RestFetchService, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
-import { logger } from "../../utils/logger";
+
 
 
 /**
@@ -16,31 +16,21 @@ export class RestApiGenerator {
     private collections: EntityCollection[];
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
-    private dataHooks?: DataHooks;
+
     private authAdapter?: AuthAdapter;
 
     constructor(
         collections: EntityCollection[],
         driver: DataDriver,
-        dataHooks?: DataHooks,
         authAdapter?: AuthAdapter
     ) {
         this.collections = collections;
         this.driver = driver;
-        this.dataHooks = dataHooks;
         this.authAdapter = authAdapter;
         this.router = new Hono<HonoEnv>();
     }
 
-    /** Build a BackendHookContext from a Hono context */
-    private buildHookContext(c: { get: (key: string) => unknown }, method: BackendHookContext["method"]): BackendHookContext {
-        const user = c.get("user") as { userId: string; roles?: string[] } | undefined;
-        return {
-            requestUser: user ? { userId: user.userId,
-roles: user.roles ?? [] } : undefined,
-            method
-        };
-    }
+
 
     /**
      * Generate REST routes using existing DataDriver
@@ -124,7 +114,7 @@ roles: user.roles ?? [] } : undefined,
 
             const driver = this.getScopedDriver(c);
             const fetchService = this.getFetchService(driver);
-            const hookCtx = this.buildHookContext(c, "GET");
+
 
             // Use include-aware path when available
             if (fetchService) {
@@ -132,7 +122,7 @@ roles: user.roles ?? [] } : undefined,
                 let entities = await fetchService.fetchCollectionForRest(
                     collectionPath,
                     {
-                        filter: queryOptions.where as FetchCollectionProps["filter"],
+                        filter: queryOptions.where,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
                         orderBy: queryOptions.orderBy?.[0]?.field,
@@ -143,7 +133,7 @@ roles: user.roles ?? [] } : undefined,
                     queryOptions.include
                 );
 
-                entities = await this.applyAfterReadBatch(collection.slug, entities, hookCtx);
+
 
                 const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
@@ -161,7 +151,7 @@ roles: user.roles ?? [] } : undefined,
             // Fallback path
             let entities = await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
 
-            entities = await this.applyAfterReadBatch(collection.slug, entities, hookCtx);
+
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
@@ -184,7 +174,7 @@ roles: user.roles ?? [] } : undefined,
             const queryOptions = parseQueryOptions(queryDict);
             const driver = this.getScopedDriver(c);
             const fetchService = this.getFetchService(driver);
-            const hookCtx = this.buildHookContext(c, "GET");
+
 
             // Use include-aware path when available
             if (fetchService) {
@@ -199,10 +189,7 @@ roles: user.roles ?? [] } : undefined,
                     throw ApiError.notFound("Entity not found");
                 }
 
-                entity = await this.applyAfterRead(collection.slug, entity, hookCtx);
-                if (!entity) {
-                    throw ApiError.notFound("Entity not found");
-                }
+
 
                 return c.json(entity);
             }
@@ -214,10 +201,7 @@ roles: user.roles ?? [] } : undefined,
                 throw ApiError.notFound("Entity not found");
             }
 
-            entity = await this.applyAfterRead(collection.slug, entity, hookCtx);
-            if (!entity) {
-                throw ApiError.notFound("Entity not found");
-            }
+
 
             return c.json(entity);
         });
@@ -228,13 +212,11 @@ roles: user.roles ?? [] } : undefined,
                 this.enforceApiKeyPermission(c, collection.slug);
                 const driver = this.getScopedDriver(c);
                 const path = collection.slug;
-                const hookCtx = this.buildHookContext(c, "POST");
+
 
                 let body = await c.req.json().catch(() => ({}));
 
-                if (this.dataHooks?.beforeSave) {
-                    body = await this.dataHooks.beforeSave(path, body, undefined, hookCtx);
-                }
+
 
                 const isAuth = collection.auth;
                 const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
@@ -263,11 +245,7 @@ values: entity.values as Record<string, unknown> },
 
                     const response = this.formatResponse(entity) as Record<string, unknown>;
 
-                    if (this.dataHooks?.afterSave) {
-                        Promise.resolve(this.dataHooks.afterSave(path, response, hookCtx)).catch(err => {
-                            logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
-                        });
-                    }
+
 
                     return c.json({
                         ...response,
@@ -285,11 +263,7 @@ values: entity.values as Record<string, unknown> },
 
                 const response = this.formatResponse(entity);
 
-                if (this.dataHooks?.afterSave) {
-                    Promise.resolve(this.dataHooks.afterSave(path, response as Record<string, unknown>, hookCtx)).catch(err => {
-                        logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
-                    });
-                }
+
 
                 return c.json(response, 201);
             } catch (error) {
@@ -315,7 +289,7 @@ values: entity.values as Record<string, unknown> },
                 this.enforceApiKeyPermission(c, collection.slug);
                 const id = c.req.param("id");
                 const driver = this.getScopedDriver(c);
-                const hookCtx = this.buildHookContext(c, "PUT");
+
 
                 const existingEntity = await driver.fetchEntity({
                     path: getCollectionDataPath(collection),
@@ -329,9 +303,7 @@ values: entity.values as Record<string, unknown> },
 
                 let body = await c.req.json().catch(() => ({}));
 
-                if (this.dataHooks?.beforeSave) {
-                    body = await this.dataHooks.beforeSave(collection.slug, body, String(id), hookCtx);
-                }
+
 
                 const entity = await driver.saveEntity({
                     path: getCollectionDataPath(collection),
@@ -343,11 +315,7 @@ values: entity.values as Record<string, unknown> },
 
                 const response = this.formatResponse(entity);
 
-                if (this.dataHooks?.afterSave) {
-                    Promise.resolve(this.dataHooks.afterSave(collection.slug, response as Record<string, unknown>, hookCtx)).catch(err => {
-                        logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
-                    });
-                }
+
 
                 return c.json(response);
             } catch (error) {
@@ -371,7 +339,7 @@ values: entity.values as Record<string, unknown> },
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
             const driver = this.getScopedDriver(c);
-            const hookCtx = this.buildHookContext(c, "DELETE");
+
 
             const existingEntity = await driver.fetchEntity({
                 path: getCollectionDataPath(collection),
@@ -383,20 +351,14 @@ values: entity.values as Record<string, unknown> },
                 throw ApiError.notFound("Entity not found");
             }
 
-            if (this.dataHooks?.beforeDelete) {
-                await this.dataHooks.beforeDelete(collection.slug, String(id), hookCtx);
-            }
+
 
             await driver.deleteEntity({
                 entity: existingEntity,
                 collection: resolvedCollection
             });
 
-            if (this.dataHooks?.afterDelete) {
-                Promise.resolve(this.dataHooks.afterDelete(collection.slug, String(id), hookCtx)).catch(err => {
-                    logger.error("[BackendHooks] data.afterDelete error", { error: err instanceof Error ? err.message : err });
-                });
-            }
+
 
             return new Response(null, { status: 204 });
         });
@@ -464,7 +426,7 @@ entityId };
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
-            const hookCtx = this.buildHookContext(c, "GET");
+
 
             if (parsed.entityId === "count") {
                 // GET /parent/:parentId/child/count — count child entities
@@ -474,7 +436,7 @@ entityId };
 
                 const total = driver.countEntities ? await driver.countEntities({
                     path: parsed.collectionPath,
-                    filter: queryOptions.where as FetchCollectionProps["filter"],
+                    filter: queryOptions.where,
                     searchString
                 }) : 0;
 
@@ -487,11 +449,7 @@ entityId };
                 });
                 if (!entity) throw ApiError.notFound("Entity not found");
 
-                const flatResult = this.flattenEntity(entity);
-                const hookResult = await this.applyAfterRead(c.req.param("parent"), flatResult, hookCtx);
-                if (!hookResult) throw ApiError.notFound("Entity not found");
-
-                return c.json(hookResult);
+                return c.json(this.flattenEntity(entity));
             } else {
                 // GET /parent/:parentId/child — list entities
                 const queryDict = c.req.queries();
@@ -499,19 +457,18 @@ entityId };
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
                 const entities = await driver.fetchCollection({
                     path: parsed.collectionPath,
-                    filter: queryOptions.where as FetchCollectionProps["filter"],
+                    filter: queryOptions.where,
                     limit: queryOptions.limit,
                     orderBy: queryOptions.orderBy?.[0]?.field,
                     order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
                     searchString
                 });
 
-                let flatEntities = entities.map(e => this.flattenEntity(e));
-                flatEntities = await this.applyAfterReadBatch(c.req.param("parent"), flatEntities, hookCtx);
+                const flatEntities = entities.map(e => this.flattenEntity(e));
 
                 const total = driver.countEntities ? await driver.countEntities({
                     path: parsed.collectionPath,
-                    filter: queryOptions.where as FetchCollectionProps["filter"],
+                    filter: queryOptions.where,
                     searchString
                 }) : flatEntities.length;
 
@@ -536,14 +493,12 @@ entityId };
             if (!parsed || parsed.entityId) return next();
 
             const driver = this.getScopedDriver(c);
-            const hookCtx = this.buildHookContext(c, "POST");
+
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
             let body = await c.req.json().catch(() => ({}));
 
-            if (this.dataHooks?.beforeSave) {
-                body = await this.dataHooks.beforeSave(parsed.collectionPath, body, undefined, hookCtx);
-            }
+
 
             const entity = await driver.saveEntity({
                 path: parsed.collectionPath,
@@ -553,11 +508,7 @@ entityId };
 
             const response = this.formatResponse(entity);
 
-            if (this.dataHooks?.afterSave) {
-                Promise.resolve(this.dataHooks.afterSave(parsed.collectionPath, response as Record<string, unknown>, hookCtx)).catch(err => {
-                    logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
-                });
-            }
+
 
             return c.json(response, 201);
         });
@@ -571,15 +522,13 @@ entityId };
             if (!parsed || !parsed.entityId) return next();
 
             const driver = this.getScopedDriver(c);
-            const hookCtx = this.buildHookContext(c, "PUT");
+
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
             let body = await c.req.json().catch(() => ({}));
 
-            if (this.dataHooks?.beforeSave) {
-                body = await this.dataHooks.beforeSave(parsed.collectionPath, body, parsed.entityId, hookCtx);
-            }
+
 
             const entity = await driver.saveEntity({
                 path: parsed.collectionPath,
@@ -590,11 +539,7 @@ entityId };
 
             const response = this.formatResponse(entity);
 
-            if (this.dataHooks?.afterSave) {
-                Promise.resolve(this.dataHooks.afterSave(parsed.collectionPath, response as Record<string, unknown>, hookCtx)).catch(err => {
-                    logger.error("[BackendHooks] data.afterSave error", { error: err instanceof Error ? err.message : err });
-                });
-            }
+
 
             return c.json(response);
         });
@@ -608,7 +553,7 @@ entityId };
             if (!parsed || !parsed.entityId) return next();
 
             const driver = this.getScopedDriver(c);
-            const hookCtx = this.buildHookContext(c, "DELETE");
+
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
@@ -619,17 +564,11 @@ entityId };
 
             if (!existingEntity) throw ApiError.notFound("Entity not found");
 
-            if (this.dataHooks?.beforeDelete) {
-                await this.dataHooks.beforeDelete(parsed.collectionPath, parsed.entityId, hookCtx);
-            }
+
 
             await driver.deleteEntity({ entity: existingEntity });
 
-            if (this.dataHooks?.afterDelete) {
-                Promise.resolve(this.dataHooks.afterDelete(parsed.collectionPath, parsed.entityId, hookCtx)).catch(err => {
-                    logger.error("[BackendHooks] data.afterDelete error", { error: err instanceof Error ? err.message : err });
-                });
-            }
+
 
             return new Response(null, { status: 204 });
         });
@@ -688,7 +627,7 @@ entityId };
         const entities = await driver.fetchCollection({
             path: getCollectionDataPath(collection),
             collection,
-            filter: queryOptions.where as FetchCollectionProps["filter"],
+            filter: queryOptions.where,
             limit: queryOptions.limit,
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
@@ -707,7 +646,7 @@ entityId };
         return driver.countEntities ? await driver.countEntities({
             path: getCollectionDataPath(collection),
             collection,
-            filter: queryOptions.where as FetchCollectionProps["filter"],
+            filter: queryOptions.where,
             searchString
         }) : 0;
     }
@@ -725,23 +664,5 @@ entityId };
         return entity ? this.flattenEntity(entity) : null;
     }
 
-    /**
-     * Apply data.afterRead hook to a single entity.
-     * Returns the transformed entity, or null to filter it out.
-     */
-    private async applyAfterRead(slug: string, entity: Record<string, unknown>, ctx: BackendHookContext): Promise<Record<string, unknown> | null> {
-        if (!this.dataHooks?.afterRead) return entity;
-        return this.dataHooks.afterRead(slug, entity, ctx);
-    }
 
-    /**
-     * Apply data.afterRead hook to an array of entities, filtering out nulls.
-     */
-    private async applyAfterReadBatch(slug: string, entities: Record<string, unknown>[], ctx: BackendHookContext): Promise<Record<string, unknown>[]> {
-        if (!this.dataHooks?.afterRead) return entities;
-        const results = await Promise.all(
-            entities.map(e => this.applyAfterRead(slug, e, ctx))
-        );
-        return results.filter((e): e is Record<string, unknown> => e !== null);
-    }
 }

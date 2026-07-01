@@ -323,7 +323,7 @@ export interface StringProperty extends BaseProperty {
      * This property is used to indicate that the string is a user ID, and
      * it will be rendered as a user picker.
      * Note that the user ID needs to be the one used in your authentication
-     * provider, e.g. Firebase Auth.
+     * provider (e.g. the ID in your `users` table).
      * You can also use a property builder to specify the user path dynamically
      * based on other values of the entity.
      */

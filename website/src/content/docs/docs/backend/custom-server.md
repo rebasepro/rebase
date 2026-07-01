@@ -118,8 +118,8 @@ async function startServer() {
                 entity: req.body
             });
             res.status(201).json({ success: true, data: result });
-        } catch (error: any) {
-            res.status(500).json({ error: error.message });
+        } catch (error) {
+            res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
         }
     });
 
@@ -128,8 +128,8 @@ async function startServer() {
         try {
             const countResult = await db.select().from(...); // Perform standard Drizzle operations
             res.json(countResult);
-        } catch (error: any) {
-            res.status(500).json({ error: error.message });
+        } catch (error) {
+            res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
         }
     });
 

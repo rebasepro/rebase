@@ -651,9 +651,10 @@ roles: activeAuth.roles })}, true)`);
 ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
 
                 const callbacks = resolvedCollection?.callbacks;
+                const globalCallbacks = this.registry?.getGlobalCallbacks();
                 const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
                     const contextForCallback = {
                         user: { uid: activeAuth.userId,
 roles: activeAuth.roles },
@@ -663,6 +664,16 @@ roles: activeAuth.roles },
 
                     return await Promise.all(fetchedEntities.map(async (entity) => {
                         let processedEntity = entity;
+                        // 1. Global callbacks first
+                        if (globalCallbacks?.afterRead) {
+                            processedEntity = await globalCallbacks.afterRead({
+                                collection: resolvedCollection,
+                                path: notifyPath,
+                                entity: processedEntity,
+                                context: contextForCallback
+                            }) ?? processedEntity;
+                        }
+                        // 2. Collection callbacks second
                         if (callbacks?.afterRead) {
                             processedEntity = await callbacks.afterRead({
                                 collection: resolvedCollection,
@@ -671,6 +682,7 @@ roles: activeAuth.roles },
                                 context: contextForCallback
                             }) ?? processedEntity;
                         }
+                        // 3. Property callbacks third
                         if (propertyCallbacks?.afterRead) {
                             processedEntity = await propertyCallbacks.afterRead({
                                 collection: resolvedCollection,
@@ -797,9 +809,10 @@ roles: activeAuth.roles })}, true)`);
 ...registryCollection } as EntityCollection : registryCollection as EntityCollection;
 
                     const callbacks = resolvedCollection?.callbacks;
+                    const globalCallbacks = this.registry?.getGlobalCallbacks();
                     const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                    if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                    if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
                         const contextForCallback = {
                             user: { uid: activeAuth.userId,
 roles: activeAuth.roles },
@@ -807,6 +820,16 @@ roles: activeAuth.roles },
                             data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                         } as unknown as RebaseCallContext;
 
+                        // 1. Global callbacks first
+                        if (globalCallbacks?.afterRead) {
+                            processedEntity = await globalCallbacks.afterRead({
+                                collection: resolvedCollection,
+                                path: notifyPath,
+                                entity: processedEntity,
+                                context: contextForCallback
+                            }) ?? processedEntity;
+                        }
+                        // 2. Collection callbacks second
                         if (callbacks?.afterRead) {
                             processedEntity = await callbacks.afterRead({
                                 collection: resolvedCollection,
@@ -815,6 +838,7 @@ roles: activeAuth.roles },
                                 context: contextForCallback
                             }) ?? processedEntity;
                         }
+                        // 3. Property callbacks third
                         if (propertyCallbacks?.afterRead) {
                             processedEntity = await propertyCallbacks.afterRead({
                                 collection: resolvedCollection,

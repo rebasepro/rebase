@@ -190,7 +190,7 @@ export interface AuthHooks {
      * response and returns a (potentially enriched) response.
      *
      * Use cases:
-     * - Inject tokens from external auth systems (Firebase Custom Tokens, etc.)
+     * - Inject tokens from external auth systems (custom provider tokens, etc.)
      * - Add project-specific metadata to the response
      * - Enrich the user object with data from external sources
      *

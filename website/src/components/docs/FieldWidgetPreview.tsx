@@ -288,7 +288,7 @@ function SelectPreview() {
                 };
                 const item = map[val];
                 return item
-                    ? <Chip colorScheme={item.color as any} size="small">{item.label}</Chip>
+                    ? <Chip colorScheme={item.color as "blueDark" | "pinkLight" | "orangeLight"} size="small">{item.label}</Chip>
                     : val;
             }}
             fullWidth

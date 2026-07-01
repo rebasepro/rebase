@@ -6,128 +6,12 @@ import {
     FindResponse,
     Entity,
     EntityValues,
-    FilterValues,
     WhereFilterOp,
-    WhereFieldValue,
-    WhereFilterOpShort,
     LogicalCondition,
     WhereValue
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
-
-/**
- * Convert where-clause filter object to the internal DataDriver FilterValues format.
- *
- * Supports multiple value formats:
- * - PostgREST string: { status: "eq.published", age: "gte.18" }
- * - Equality shorthand: { company_profile_id: null, status: "active", age: 18 }
- * - Tuple syntax: { age: [">=", 18], role: ["in", ["admin", "editor"]] }
- *
- * Internal:  { status: ["==", "published"], age: [">=", 18] }
- */
-function convertWhereToFilter(where?: Record<string, WhereFieldValue>): FilterValues<string> | undefined {
-    if (!where) return undefined;
-
-    const operatorMap: Record<string, WhereFilterOp> = {
-        "eq": "==",
-        "neq": "!=",
-        "gt": ">",
-        "gte": ">=",
-        "lt": "<",
-        "lte": "<=",
-        "in": "in",
-        "nin": "not-in",
-        "not-in": "not-in",
-        "cs": "array-contains",
-        "csa": "array-contains-any",
-        "==": "==",
-"!=": "!=",
-        ">": ">",
-">=": ">=",
-        "<": "<",
-"<=": "<=",
-        "array-contains": "array-contains",
-        "array-contains-any": "array-contains-any"
-    };
-
-    const filter: FilterValues<string> = {};
-
-    for (const [field, rawValue] of Object.entries(where)) {
-        // Handle null → equality
-        if (rawValue === null) {
-            filter[field] = ["==", null];
-            continue;
-        }
-
-        // Handle boolean → equality
-        if (typeof rawValue === "boolean") {
-            filter[field] = ["==", rawValue];
-            continue;
-        }
-
-        // Handle number → equality
-        if (typeof rawValue === "number") {
-            filter[field] = ["==", rawValue];
-            continue;
-        }
-
-        // Handle tuple or array of tuples
-        if (Array.isArray(rawValue)) {
-            const conditions: [WhereFilterOpShort, unknown][] = Array.isArray(rawValue[0])
-                ? (rawValue as [WhereFilterOpShort, unknown][])
-                : [rawValue as [WhereFilterOpShort, unknown]];
-
-            const mappedConditions: [WhereFilterOp, unknown][] = conditions.map(([rawOp, val]) => {
-                const mappedOp = operatorMap[rawOp] ?? "==";
-                return [mappedOp, val];
-            });
-
-            filter[field] = Array.isArray(rawValue[0]) ? mappedConditions : mappedConditions[0];
-            continue;
-        }
-
-        // Handle PostgREST string format: "op.value"
-        if (typeof rawValue === "string") {
-            const dotIndex = rawValue.indexOf(".");
-            if (dotIndex === -1) {
-                // Plain string equality
-                filter[field] = ["==", rawValue];
-                continue;
-            }
-
-            const op = rawValue.substring(0, dotIndex);
-            let value: unknown = rawValue.substring(dotIndex + 1);
-
-            // Parse list values like "(admin,editor)"
-            if (typeof value === "string" && value.startsWith("(") && value.endsWith(")")) {
-                value = value.slice(1, -1).split(",").map((v: string) => v.trim());
-            }
-
-            // Parse null string
-            if (value === "null") {
-                value = null;
-            }
-            // Parse boolean strings
-            else if (value === "true") {
-                value = true;
-            } else if (value === "false") {
-                value = false;
-            }
-            // Try to parse numbers
-            else if (typeof value === "string" && !isNaN(Number(value)) && value.trim() !== "") {
-                value = Number(value);
-            }
-
-            const mappedOp = operatorMap[op];
-            if (mappedOp) {
-                filter[field] = [mappedOp, value];
-            }
-        }
-    }
-
-    return Object.keys(filter).length > 0 ? filter : undefined;
-}
 
 /**
  * Parse an orderBy string like "created_at:desc" into [field, direction].
@@ -151,7 +35,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 path: slug,
                 limit: params?.limit,
                 offset: params?.offset,
-                filter: convertWhereToFilter(params?.where),
+                filter: params?.where,
                 orderBy: orderParsed?.[0],
                 order: orderParsed?.[1],
                 searchString: params?.searchString
@@ -210,7 +94,7 @@ values: {} as Record<string, unknown> }
             ? async (params?: FindParams): Promise<number> => {
                 return driver.countEntities!({
                     path: slug,
-                    filter: convertWhereToFilter(params?.where)
+                    filter: params?.where
                 });
             }
             : undefined,
@@ -224,7 +108,7 @@ values: {} as Record<string, unknown> }
                     path: slug,
                     limit: params?.limit,
                     offset: params?.offset,
-                    filter: convertWhereToFilter(params?.where),
+                    filter: params?.where,
                     orderBy: orderParsed?.[0],
                     order: orderParsed?.[1],
                     searchString: params?.searchString,
@@ -254,7 +138,7 @@ values: {} as Record<string, unknown> }
             } : undefined,
 
         // Fluent Query Builder
-        where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOpShort, value?: unknown) {
+        where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
             if (typeof columnOrCondition === "object") {
                 return builder.where(columnOrCondition);

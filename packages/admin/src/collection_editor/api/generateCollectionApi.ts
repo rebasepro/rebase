@@ -55,8 +55,9 @@ export const DEFAULT_COLLECTION_GENERATION_ENDPOINT = "https://api.rebase.pro/co
  */
 export interface BuildCollectionGenerationCallbackProps {
     /**
-     * Function to get the auth token (e.g., from Firebase Auth)
-     * This is typically `authController.getAuthToken` from `@rebasepro/client-firebase`
+     * Function to get the auth token.
+     * This is typically `authController.getAuthToken` from `@rebasepro/client`
+     * (or `@rebasepro/client-firebase` if using Firebase).
      */
     getAuthToken: () => Promise<string>;
 

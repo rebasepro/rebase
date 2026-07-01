@@ -117,8 +117,9 @@ const translatePath = useTranslatedPath(lang);
         if (cta) {
             cta.addEventListener("click", () => {
                 localStorage.setItem("rb_manifesto_banner_dismissed", "true");
-                if (typeof (window as any).trackConversion === "function") {
-                    (window as any).trackConversion("manifesto-banner-text", "cta_click");
+                const win = window as Window & { trackConversion?: (exp: string, val: string) => void };
+                if (typeof win.trackConversion === "function") {
+                    win.trackConversion("manifesto-banner-text", "cta_click");
                 }
             });
         }

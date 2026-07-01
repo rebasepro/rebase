@@ -8,63 +8,96 @@
  */
 
 // =============================================================================
-// Abstract Interfaces (for database abstraction)
+// Core Initialization
+// =============================================================================
+export {
+    initializeRebaseBackend,
+    isAuthAdapter,
+    isDatabaseAdapter
+} from "./init";
+export type {
+    RebaseBackendConfig,
+    RebaseBackendInstance,
+    RebaseAuthConfig
+} from "./init";
+
+// =============================================================================
+// Server-side singleton (import { rebase } from "@rebasepro/server-core")
+// =============================================================================
+export { rebase } from "./singleton";
+
+// =============================================================================
+// DB Abstractions (for database driver implementations)
 // =============================================================================
 export * from "./db/interfaces";
-export * from "./auth/interfaces";
 
-// Core functionality
-export * from "./init";
-
-// Server-side singleton (import { rebase } from "@rebasepro/server-core")
-export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
-
-// Services
-export * from "./services/driver-registry";
-
-// API types (HonoEnv, ApiConfig, etc.)
-export * from "./api/types";
-
-// API Generation
-export * from "./api";
-
-// Types
-export * from "./types";
-export * from "./types/index";
-
-// Auth module
+// =============================================================================
+// Auth
+// =============================================================================
 export * from "./auth";
 
-// Email module
+// =============================================================================
+// API Layer
+// =============================================================================
+export * from "./api";
+
+// =============================================================================
+// Email
+// =============================================================================
 export * from "./email";
 
-// Storage module
+// =============================================================================
+// Storage
+// =============================================================================
 export * from "./storage";
 
-export * from "./utils/logging";
-export * from "./utils/logger";
-export * from "./utils/request-logger";
-export * from "./utils/request-id";
-export * from "./utils/sql";
+// =============================================================================
+// Entity History
+// =============================================================================
+export { createHistoryRoutes } from "./history";
 
-// Entity history
-export * from "./history";
-
+// =============================================================================
 // Custom Functions (auto-discovered Hono routes)
-export * from "./functions";
+// =============================================================================
+export { loadFunctionsFromDirectory, createFunctionRoutes, defineFunction } from "./functions";
+export type { LoadedFunction, RebaseFunctionContext } from "./functions";
 
+// =============================================================================
 // Cron Jobs (auto-discovered scheduled tasks)
-export * from "./cron";
+// =============================================================================
+export { loadCronJobsFromDirectory, CronScheduler, validateCronExpression, createCronRoutes, createCronStore } from "./cron";
+export type { LoadedCronJob, CronStore } from "./cron";
 
+// =============================================================================
+// SQL Helpers (for RLS policies)
+// =============================================================================
+export { authUid, authRoles, authJwt } from "./utils/sql";
 
-// SPA serving helper
-export * from "./serve-spa";
+// =============================================================================
+// Logger
+// =============================================================================
+export { logger } from "./utils/logger";
+export type { Logger } from "./utils/logger";
 
-// Dev-mode port resolution (retry on EADDRINUSE)
-export * from "./utils/dev-port";
-
-// Environment validation
+// =============================================================================
+// Environment Validation
+// =============================================================================
 export { loadEnv } from "./env";
 export type { RebaseEnv } from "./env";
-export { z } from "zod";
 
+// =============================================================================
+// Server-core specific types (subscription types)
+// =============================================================================
+export * from "./types";
+
+// =============================================================================
+// Driver Registry
+// =============================================================================
+export * from "./services/driver-registry";
+
+// =============================================================================
+// Internal plumbing exported for the official app/backend
+// =============================================================================
+export { cleanupDevPortFile, listenWithPortRetry } from "./utils/dev-port";
+export { serveSPA } from "./serve-spa";
+export { z } from "zod";

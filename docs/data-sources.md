@@ -130,10 +130,10 @@ Authentication has important interactions with multi-data-source setups:
 - **Direct data sources bypass Rebase auth entirely.** A Firestore (`direct`)
   collection is reached straight from the client, so the Rebase JWT, RLS, and
   API keys never apply — security is governed by the external backend's own
-  rules and token (e.g. Firebase Auth + Firestore Security Rules).
+  rules and token (e.g. external auth provider + native security rules).
 - **Overriding auth completely.** Pass an `AuthAdapter` as `auth` to
   `initializeRebaseBackend` to fully replace the built-in system (Clerk, Auth0,
-  Firebase Auth, …). It controls `verifyRequest` and optionally
+  external providers, …). It controls `verifyRequest` and optionally
   `userManagement`. This is the recommended way to unify identity across a
   server backend and a direct source — the same adapter can mint the external
   token. Per-request data-source routing works identically under an adapter.

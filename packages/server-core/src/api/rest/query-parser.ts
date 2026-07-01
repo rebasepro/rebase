@@ -1,24 +1,6 @@
-import type { VectorSearchParams, LogicalCondition, FilterCondition } from "@rebasepro/types";
+import type { VectorSearchParams, LogicalCondition, FilterCondition, WhereFilterOp } from "@rebasepro/types";
+import { toCanonicalOp } from "@rebasepro/types";
 import { QueryOptions } from "../types";
-
-/**
- * Map PostgREST-style operators to Rebase WhereFilterOp
- */
-export function mapOperator(op: string): string | null {
-    switch (op) {
-        case "eq": return "==";
-        case "neq": return "!=";
-        case "gt": return ">";
-        case "gte": return ">=";
-        case "lt": return "<";
-        case "lte": return "<=";
-        case "in": return "in";
-        case "nin": return "not-in";
-        case "cs": return "array-contains";
-        case "csa": return "array-contains-any";
-        default: return null;
-    }
-}
 
 function getLastValue(val: unknown): unknown {
     if (Array.isArray(val)) {
@@ -60,7 +42,7 @@ value: true };
         valStr = rest;
     }
 
-    const rebaseOp = (mapOperator(op) || "==") as FilterCondition["operator"];
+    const rebaseOp = (toCanonicalOp(op) ?? "==") as FilterCondition["operator"];
     let parsedVal: unknown = valStr;
     if (valStr === "true") parsedVal = true;
     else if (valStr === "false") parsedVal = false;
@@ -158,7 +140,7 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
         if (reservedQueryKeys.includes(key)) continue;
 
         const rawValues = Array.isArray(rawValue) ? rawValue : [rawValue];
-        const conditions: [string, unknown][] = [];
+        const conditions: [WhereFilterOp, unknown][] = [];
 
         for (const value of rawValues) {
             if (typeof value === "string") {
@@ -166,7 +148,7 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
                 if (parts.length >= 2) {
                     const op = parts[0];
                     const val = parts.slice(1).join(".");
-                    const rebaseOp = mapOperator(op);
+                    const rebaseOp = toCanonicalOp(op);
 
                     if (rebaseOp) {
                         let parsedVal: string | number | boolean | null | (string | number | boolean | null)[] = val;

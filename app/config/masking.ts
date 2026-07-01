@@ -1,11 +1,10 @@
 /**
  * PII masking helpers shared by collection `afterRead` callbacks.
  *
- * Masking lives in per-collection {@link EntityCallbacks.afterRead} (driver
- * level) rather than a REST-only `BackendHooks.data.afterRead`, so redaction
- * is enforced on **every** read path — REST, realtime/WebSocket, and
- * server-side `rebase.data` — and cannot be bypassed. See each collection
- * under `app/config/collections/*` for how these are applied.
+ * Masking lives in per-collection {@link EntityCallbacks.afterRead},
+ * which runs on **every** read path — REST, realtime/WebSocket, and
+ * server-side `rebase.data`. See each collection under
+ * `app/config/collections/*` for how these are applied.
  */
 
 /** `john.doe@acme.com` → `j***@acme.com`. */

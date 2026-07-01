@@ -1,5 +1,6 @@
 import {
     ArrayProperty,
+    EntityCallbacks,
     EngineProperties,
     EntityCollection,
     getDataSourceCapabilities,
@@ -32,6 +33,28 @@ export class CollectionRegistry {
      * capabilities). Empty by default.
      */
     private dataSources: DataSourceRegistry = {};
+
+    /**
+     * Global lifecycle callbacks applied to every collection.
+     * Runs on all data paths (REST, WebSocket, `rebase.data`).
+     * Execution order: global → collection → property callbacks.
+     */
+    private _globalCallbacks?: EntityCallbacks;
+
+    /**
+     * Set global lifecycle callbacks that apply to every collection.
+     * Typically called once during backend initialization.
+     */
+    setGlobalCallbacks(callbacks: EntityCallbacks): void {
+        this._globalCallbacks = callbacks;
+    }
+
+    /**
+     * Get the currently registered global callbacks, if any.
+     */
+    getGlobalCallbacks(): EntityCallbacks | undefined {
+        return this._globalCallbacks;
+    }
 
     // Normalized runtime layer (used by Data Grid / UI)
     private collectionsByTableName = new Map<string, EntityCollection>();

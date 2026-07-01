@@ -5,7 +5,7 @@ description: Guide for setting up and using Rebase Authentication, roles, Row-Le
 
 # Rebase Authentication
 
-Rebase ships a complete, built-in authentication system with JWT sessions, OAuth, MFA/TOTP, API keys, Row-Level Security, and lifecycle hooks — or you can plug in an external provider (Clerk, Auth0, Firebase Auth) via the `AuthAdapter` interface.
+Rebase ships a complete, built-in authentication system with JWT sessions, OAuth, MFA/TOTP, API keys, Row-Level Security, and lifecycle hooks — or you can plug in an external auth system (e.g., Clerk, Auth0, or custom identity providers) via the `AuthAdapter` interface.
 
 > **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first. The auth system is configured inside `initializeRebaseBackend()` which is covered there.
 
@@ -33,7 +33,7 @@ Rebase ships a complete, built-in authentication system with JWT sessions, OAuth
 
 Authentication is configured via the `auth` property of `initializeRebaseBackend()`. It accepts **either** a `RebaseAuthConfig` object (built-in auth) or an `AuthAdapter` (external auth).
 
-> **Auth & multiple data sources.** The built-in auth system (users, sessions, API keys) is bootstrapped on the **default** data source — the auth collection must live there (the backend warns at boot otherwise). **RLS only protects Postgres**: server collections on engines without row-level security (e.g. MongoDB) still require authentication but enforce authorization at the app layer (the backend warns for these). **Direct data sources (e.g. Firestore) bypass Rebase auth entirely** — they're governed by the external backend's own rules/token; use an `AuthAdapter` (e.g. Firebase Auth) to unify identity. See the **rebase-collections** skill for the data-source model.
+> **Auth & multiple data sources.** The built-in auth system (users, sessions, API keys) is bootstrapped on the **default** data source — the auth collection must live there (the backend warns at boot otherwise). **RLS only protects Postgres**: server collections on engines without row-level security (e.g. MongoDB) still require authentication but enforce authorization at the app layer (the backend warns for these). **Direct data sources (e.g. Firestore) bypass Rebase auth entirely** — they're governed by the external backend's own rules/token; use an `AuthAdapter` to unify identity. See the **rebase-collections** skill for the data-source model.
 
 ### RebaseAuthConfig
 
@@ -47,7 +47,7 @@ Authentication is configured via the `auth` property of `initializeRebaseBackend
 | `allowRegistration` | `boolean` | `false` | Enable self-service registration via `POST /auth/register`. |
 | `serviceKey` | `string` | — | Static secret for server-to-server auth. Must be ≥ 32 characters. Requests with `Authorization: Bearer <serviceKey>` get admin access. |
 | `defaultRole` | `string` | — | Role ID assigned to new users (except the first user, who always gets `"admin"`). **Must NOT be `"admin"`** — throws a security error at startup. |
-| `providers` | `OAuthProvider<any>[]` | `[]` | Custom OAuth providers (use alongside the shorthand configs below). |
+| `providers` | `OAuthProvider<unknown>[]` | `[]` | **Canonical** OAuth provider array. Use `create*Provider` factories or pass custom providers. Named shorthand fields below are merged into this array at startup. |
 | `hooks` | `AuthHooks` | — | [Lifecycle hooks](#auth-lifecycle-hooks) to customize passwords, credentials, and auth events. |
 | `email` | `EmailConfig` | — | [Email configuration](#email-configuration) for password resets, verification, and welcome emails. |
 | `google` | `{ clientId, clientSecret? }` | — | Google OAuth shorthand. |
@@ -351,14 +351,14 @@ hooks: {
 }
 ```
 
-### Example: Firebase Custom Token Bridge
+### Example: External Token Bridge (e.g. custom auth system)
 
 ```typescript
 import admin from "firebase-admin";
 
 hooks: {
   transformAuthResponse: async (response, context) => {
-    // Generate a Firebase Custom Token for the authenticated user
+    // Generate a custom provider token for the authenticated user
     const firebaseToken = await admin.auth().createCustomToken(context.userId);
     return {
       ...response,
@@ -371,7 +371,7 @@ hooks: {
 }
 ```
 
-The frontend can then call `signInWithCustomToken(firebaseToken)` immediately after login.
+The frontend can then call `signInWithCustomToken(providerToken)` immediately after login.
 
 ---
 
@@ -664,7 +664,7 @@ All login/register/OAuth endpoints return:
 }
 ```
 
-> **TIP:** Use the `transformAuthResponse` hook to inject additional tokens (e.g., Firebase Custom Tokens) or metadata into this response. See [Auth Lifecycle Hooks](#auth-lifecycle-hooks).
+> **TIP:** Use the `transformAuthResponse` hook to inject additional tokens (e.g., external system tokens) or metadata into this response. See [Auth Lifecycle Hooks](#auth-lifecycle-hooks).
 
 ### Error Response Format
 
@@ -932,7 +932,7 @@ const myLimiter = createRateLimiter({
 
 ## Custom Auth Adapters
 
-For external auth systems (Clerk, Auth0, Firebase Auth, or custom JWT), use the `AuthAdapter` interface or the `createCustomAuthAdapter()` helper.
+For external auth systems (Clerk, Auth0, custom providers, or custom JWT), use the `AuthAdapter` interface or the `createCustomAuthAdapter()` helper.
 
 ### AuthAdapter Interface
 

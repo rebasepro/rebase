@@ -16,12 +16,15 @@ import { Container, Markdown, Typography } from "@rebasepro/ui";
 export function BlogEntryPreview({ modifiedValues }: EntityCustomViewParams) {
 
     const storage = useStorageSource();
-    const values = modifiedValues as Record<string, any> | undefined;
+    const values = modifiedValues as Record<string, unknown> | undefined;
+    const title = values?.title as string | undefined;
+    const content = values?.content as Array<{ type: string; value: string } | null> | undefined;
 
     const [headerUrl, setHeaderUrl] = useState<string | undefined>();
     useEffect(() => {
-        if (values?.hero_image) {
-            storage.getSignedUrl(values.hero_image)
+        const heroImage = values?.hero_image;
+        if (typeof heroImage === "string") {
+            storage.getSignedUrl(heroImage)
                 .then((res) => setHeaderUrl(res.url ?? undefined));
         }
     }, [storage, values?.hero_image]);
@@ -40,15 +43,15 @@ export function BlogEntryPreview({ modifiedValues }: EntityCustomViewParams) {
             <Container className={"mb-16"}>
 
                 <Container maxWidth={"6xl"}>
-                    {values?.title && <Typography variant={"h3"} className="mt-10 mb-8 mx-6">
-                        {values.title}
+                    {title && <Typography variant={"h3"} className="mt-10 mb-8 mx-6">
+                        {title}
                     </Typography>}
                 </Container>
 
-                {values?.content && values.content
-                    .filter((e: any) => !!e)
+                {content && Array.isArray(content) && content
+                    .filter((e): e is { type: string; value: string } => !!e)
                     .map(
-                        (entry: any, index: number) => {
+                        (entry, index) => {
                             if (entry.type === "text")
                                 return <Text key={`preview_text_${index}`}
                                              markdownText={entry.value}/>;

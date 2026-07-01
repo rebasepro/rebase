@@ -1,11 +1,11 @@
 ---
 name: rebase-storage
-description: Guide for setting up and using file storage in Rebase. Use this skill when the user needs to configure S3, GCS/Firebase Storage, or local file storage, handle file uploads, TUS resumable uploads, image transformations, multi-backend frontend storage sources, or integrate the media manager.
+description: Guide for setting up and using file storage in Rebase. Use this skill when the user needs to configure S3, Google Cloud Storage (GCS), or local file storage, handle file uploads, TUS resumable uploads, image transformations, multi-backend frontend storage sources, or integrate the media manager.
 ---
 
 # Rebase Storage
 
-Rebase provides built-in file storage with support for local filesystem, S3-compatible services, and GCS/Firebase Storage, TUS v1.0.0 resumable uploads, on-the-fly image transformation, a multi-backend registry, and frontend storage sources.
+Rebase provides built-in file storage with support for local filesystem, S3-compatible services, and Google Cloud Storage (GCS), TUS v1.0.0 resumable uploads, on-the-fly image transformation, a multi-backend registry, and frontend storage sources.
 
 > **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first before using this skill. Storage requires a running Rebase backend with `initializeRebaseBackend()`.
 
@@ -131,9 +131,8 @@ The S3 controller:
 - Supports `s3://` and `gs://` URL schemes in key parameters for backward compatibility
 - Flattens nested metadata to string values (S3 requirement)
 
-### GCS / Firebase Storage
-
-Native Google Cloud Storage support via the `@google-cloud/storage` SDK. Also works with Firebase Storage buckets (which are GCS buckets under the hood). This is the preferred approach for GCS — no S3 interop layer needed.
+### Google Cloud Storage (GCS)
+Native Google Cloud Storage support via the `@google-cloud/storage` SDK. This is the preferred approach for GCS — no S3 interop layer needed. (Also works with Firebase Storage buckets, which are GCS buckets under the hood).
 
 ```typescript
 const backend = await initializeRebaseBackend({
@@ -192,7 +191,7 @@ The `StorageRegistry` interface:
 
 ### Custom Storage Providers
 
-GCS/Firebase Storage is now built-in (see [GCS / Firebase Storage](#gcs--firebase-storage)). Implement the `StorageController` interface for other unsupported providers (Azure Blob, etc.):
+GCS is now built-in (see [Google Cloud Storage (GCS)](#google-cloud-storage-gcs)). Implement the `StorageController` interface for other unsupported providers (Azure Blob, etc.):
 
 ```typescript
 interface StorageController {
@@ -744,8 +743,8 @@ const productsCollection: PostgresCollection = {
             name: "Product Image",
             type: "string",
             storage: {
-                storageSource: "firebase",              // routes to the named backend
-                storagePath: "products/images/{entityId}",
+                storageSource: "external-source",
+                storagePath: "products/{entityId}",
                 acceptedFiles: ["image/*"],
                 maxSize: 5 * 1024 * 1024, // 5MB
             }
@@ -785,16 +784,16 @@ The `<Rebase>` component accepts a `storageSources` prop to register client-side
 
 ```tsx
 import type { RebaseStorageSource } from "@rebasepro/core";
-import { firebaseStorageSource } from "./my-firebase-storage";
+import { myExternalStorageSource } from "./my-external-storage";
 
 <Rebase
     client={rebaseClient}
     storageSources={[
         {
-            key: "firebase",
-            engine: "firebase",
+            key: "external",
+            engine: "external",
             transport: "direct",
-            source: firebaseStorageSource,
+            source: myExternalStorageSource,
         },
         {
             key: "media",
@@ -829,11 +828,11 @@ function MyUploadComponent() {
     const storageSources = useStorageSources();
 
     // Get a specific source
-    const firebaseSource = storageSources.find(s => s.key === "firebase");
+    const externalSource = storageSources.find(s => s.key === "external");
 
     // Use it for direct uploads
-    if (firebaseSource?.source) {
-        await firebaseSource.source.putObject({ file, key: "photos/image.jpg" });
+    if (externalSource?.source) {
+        await externalSource.source.putObject({ file, key: "photos/image.jpg" });
     }
 }
 ```
@@ -843,7 +842,7 @@ function MyUploadComponent() {
 | Transport | Description | Use Case |
 |-----------|-------------|----------|
 | `"server"` | File operations are proxied through the Rebase backend REST API | S3, GCS, or local backends managed by the server |
-| `"direct"` | File operations go directly from the client to the storage provider | Firebase Storage, client-side GCS with Firebase Auth, or any provider with client-side SDKs |
+| `"direct"` | File operations go directly from the client to the storage provider | External cloud storage, or any provider with client-side SDKs |
 
 > **IMPORTANT FOR AGENTS:** Direct transport sources must provide a `source` property implementing the `StorageSource` interface. Server transport sources use the built-in SDK transport and only need `key` and `engine`.
 

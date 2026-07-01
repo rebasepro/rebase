@@ -1,4 +1,5 @@
 import { PolicyExpression, SecurityRule, policy } from "@rebasepro/types";
+import { sqlToPolicy } from "./sqlToPolicy";
 
 /**
  * The normalized `USING` / `WITH CHECK` conditions for a single security rule,
@@ -32,7 +33,7 @@ export function securityRuleToConditions(rule: SecurityRule): RuleConditions {
 
 function baseUsing(rule: SecurityRule): PolicyExpression | null {
     if (rule.condition) return rule.condition;
-    if (rule.using != null) return policy.raw(rule.using);
+    if (rule.using != null) return sqlToPolicy(rule.using);
     if (rule.access === "public") return policy.true();
     if (rule.ownerField) return policy.compare(policy.field(rule.ownerField), "eq", policy.authUid());
     return null;
@@ -40,7 +41,7 @@ function baseUsing(rule: SecurityRule): PolicyExpression | null {
 
 function baseWithCheck(rule: SecurityRule): PolicyExpression | null {
     if (rule.check) return rule.check;
-    if (rule.withCheck != null) return policy.raw(rule.withCheck);
+    if (rule.withCheck != null) return sqlToPolicy(rule.withCheck);
     // No explicit WITH CHECK → fall back to the USING condition, matching
     // PostgreSQL's own default behavior.
     return baseUsing(rule);
@@ -53,7 +54,14 @@ function baseWithCheck(rule: SecurityRule): PolicyExpression | null {
  * sides.
  */
 function withRoles(base: PolicyExpression | null, rule: SecurityRule): PolicyExpression | null {
-    if (!rule.roles || rule.roles.length === 0) return base;
+    if (!rule.roles || rule.roles.length === 0) return base ?? policy.true();
     const rolesExpr = policy.rolesOverlap(rule.roles);
+    if (rule.mode === "restrictive") {
+        // Restrictive rule: applies ONLY if user has the roles.
+        // If user DOES NOT have the roles, they are NOT restricted (passes).
+        // If user HAS the roles, they must pass the base condition.
+        // Logical equivalent: NOT(roles) OR base
+        return base ? policy.or(policy.not(rolesExpr), base) : policy.not(rolesExpr);
+    }
     return base ? policy.and(base, rolesExpr) : rolesExpr;
 }

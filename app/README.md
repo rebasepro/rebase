@@ -148,7 +148,7 @@ The application uses PostgreSQL with Drizzle ORM for:
 
 ## 🔐 Authentication
 
-Currently configured with Firebase Authentication, but can be easily adapted to other auth providers.
+Currently configured with built-in authentication, but can be easily adapted to other auth providers.
 
 ## 🎯 Development Tips
 

@@ -133,6 +133,7 @@ export class PostgresBackendDriver implements DataDriver {
         if (!collection && !path) return {
             collection: undefined,
             callbacks: undefined,
+            globalCallbacks: undefined,
             propertyCallbacks: undefined
         };
         const registryCollection = this.registry?.getCollectionByPath(path);
@@ -144,6 +145,7 @@ export class PostgresBackendDriver implements DataDriver {
             : collection as EntityCollection<M>;
 
         const callbacks = resolvedCollection?.callbacks;
+        const globalCallbacks = this.registry?.getGlobalCallbacks();
         const properties = resolvedCollection?.properties;
         let propertyCallbacks;
         if (properties) {
@@ -152,6 +154,7 @@ export class PostgresBackendDriver implements DataDriver {
         return {
             collection: resolvedCollection,
             callbacks,
+            globalCallbacks,
             propertyCallbacks
         };
     }
@@ -184,13 +187,24 @@ export class PostgresBackendDriver implements DataDriver {
         const {
             collection: resolvedCollection,
             callbacks,
+            globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
 
-        if (callbacks?.afterRead || propertyCallbacks?.afterRead) {
+        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = this.buildCallContext();
             return Promise.all(entities.map(async (entity) => {
                 let fetched = entity;
+                // 1. Global callbacks first
+                if (globalCallbacks?.afterRead) {
+                    fetched = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as unknown as EntityCollection,
+                        path,
+                        entity: fetched as unknown as Entity<Record<string, unknown>>,
+                        context: contextForCallback
+                    }) as unknown as Entity<M>;
+                }
+                // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -199,13 +213,14 @@ export class PostgresBackendDriver implements DataDriver {
                         context: contextForCallback
                     }) ?? fetched;
                 }
+                // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as unknown as EntityCollection,
                         path,
-                        entity: fetched,
+                        entity: fetched as unknown as Entity<Record<string, unknown>>,
                         context: contextForCallback
-                    }) as Entity<M> ?? fetched;
+                    }) as unknown as Entity<M>;
                 }
                 return fetched;
             }));
@@ -293,26 +308,38 @@ export class PostgresBackendDriver implements DataDriver {
         const {
             collection: resolvedCollection,
             callbacks,
+            globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
 
-        if (entity && (callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+        if (entity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = this.buildCallContext();
+            // 1. Global callbacks first
+            if (globalCallbacks?.afterRead) {
+                entity = await globalCallbacks.afterRead({
+                    collection: resolvedCollection as unknown as EntityCollection,
+                    path,
+                    entity: entity as unknown as Entity<Record<string, unknown>>,
+                    context: contextForCallback
+                }) as unknown as Entity<M>;
+            }
+            // 2. Collection callbacks second
             if (callbacks?.afterRead) {
                 entity = await callbacks.afterRead({
                     collection: resolvedCollection as EntityCollection<M>,
                     path,
-                    entity,
+                    entity: entity!,
                     context: contextForCallback
-                }) ?? entity;
+                });
             }
+            // 3. Property callbacks third
             if (propertyCallbacks?.afterRead) {
                 entity = await propertyCallbacks.afterRead({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as unknown as EntityCollection,
                     path,
-                    entity,
+                    entity: entity as unknown as Entity<Record<string, unknown>>,
                     context: contextForCallback
-                }) as Entity<M> ?? entity;
+                }) as unknown as Entity<M>;
             }
         }
 
@@ -375,6 +402,7 @@ export class PostgresBackendDriver implements DataDriver {
         const {
             collection: resolvedCollection,
             callbacks,
+            globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
 
@@ -390,7 +418,22 @@ export class PostgresBackendDriver implements DataDriver {
             }
         }
 
-        if (callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+        if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+            // 1. Global callbacks first
+            if (globalCallbacks?.beforeSave) {
+                const result = await globalCallbacks.beforeSave({
+                    collection: resolvedCollection as unknown as EntityCollection,
+                    path,
+                    entityId,
+                    values: updatedValues,
+                    previousValues: previousValuesForHistory,
+                    status,
+                    context: contextForCallback
+                });
+                if (result) updatedValues = mergeDeep(updatedValues, result);
+            }
+
+            // 2. Collection callbacks second
             if (callbacks?.beforeSave) {
                 const result = await callbacks.beforeSave({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -404,9 +447,10 @@ export class PostgresBackendDriver implements DataDriver {
                 if (result) updatedValues = mergeDeep(updatedValues, result);
             }
 
+            // 3. Property callbacks third
             if (propertyCallbacks?.beforeSave) {
                 const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as unknown as EntityCollection,
                     path,
                     entityId,
                     values: updatedValues,
@@ -438,7 +482,17 @@ export class PostgresBackendDriver implements DataDriver {
                 resolvedCollection?.databaseId
             );
 
-            if (savedEntity && (callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+            if (savedEntity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+                // 1. Global callbacks first
+                if (globalCallbacks?.afterRead) {
+                    savedEntity = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as unknown as EntityCollection,
+                        path,
+                        entity: savedEntity as unknown as Entity<Record<string, unknown>>,
+                        context: contextForCallback
+                    }) as unknown as Entity<M>;
+                }
+                // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     savedEntity = await callbacks.afterRead({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -447,17 +501,31 @@ export class PostgresBackendDriver implements DataDriver {
                         context: contextForCallback
                     }) ?? savedEntity;
                 }
+                // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     savedEntity = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as unknown as EntityCollection,
                         path,
-                        entity: savedEntity,
+                        entity: savedEntity as unknown as Entity<Record<string, unknown>>,
                         context: contextForCallback
-                    }) as Entity<M> ?? savedEntity;
+                    }) as unknown as Entity<M>;
                 }
             }
 
-            if (callbacks?.afterSave || propertyCallbacks?.afterSave) {
+            if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
+                // 1. Global callbacks first
+                if (globalCallbacks?.afterSave) {
+                    await globalCallbacks.afterSave({
+                        collection: resolvedCollection as unknown as EntityCollection,
+                        path,
+                        entityId: savedEntity.id,
+                        values: savedEntity.values,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                }
+                // 2. Collection callbacks second
                 if (callbacks?.afterSave) {
                     await callbacks.afterSave({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -469,9 +537,10 @@ export class PostgresBackendDriver implements DataDriver {
                         context: contextForCallback
                     });
                 }
+                // 3. Property callbacks third
                 if (propertyCallbacks?.afterSave) {
                     await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as unknown as EntityCollection,
                         path,
                         entityId: savedEntity.id,
                         values: savedEntity.values,
@@ -513,7 +582,20 @@ export class PostgresBackendDriver implements DataDriver {
 
             return savedEntity;
         } catch (error) {
-            if (callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+            if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+                // 1. Global callbacks first
+                if (globalCallbacks?.afterSaveError) {
+                    await globalCallbacks.afterSaveError({
+                        collection: resolvedCollection as unknown as EntityCollection,
+                        path,
+                        entityId: entityId || "unknown",
+                        values: updatedValues,
+                        previousValues: undefined,
+                        status,
+                        context: contextForCallback
+                    });
+                }
+                // 2. Collection callbacks second
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
                         collection: resolvedCollection as EntityCollection<M>,
@@ -525,9 +607,10 @@ export class PostgresBackendDriver implements DataDriver {
                         context: contextForCallback
                     });
                 }
+                // 3. Property callbacks third
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as unknown as EntityCollection,
                         path,
                         entityId: entityId || "unknown",
                         values: updatedValues,
@@ -550,13 +633,28 @@ export class PostgresBackendDriver implements DataDriver {
         const {
             collection: resolvedCollection,
             callbacks,
+            globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, entity.path);
 
         const contextForCallback = this.buildCallContext();
 
-        if (callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
+        if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
             let preventDefault = false;
+            // 1. Global callbacks first
+            if (globalCallbacks?.beforeDelete) {
+                const result = await globalCallbacks.beforeDelete({
+                    collection: resolvedCollection as unknown as EntityCollection,
+                    path: entity.path,
+                    entityId: entity.id,
+                    entity,
+                    context: contextForCallback
+                });
+                if (result === false) {
+                    preventDefault = true;
+                }
+            }
+            // 2. Collection callbacks second
             if (callbacks?.beforeDelete) {
                 const result = await callbacks.beforeDelete({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -569,9 +667,10 @@ export class PostgresBackendDriver implements DataDriver {
                     preventDefault = true;
                 }
             }
+            // 3. Property callbacks third
             if (propertyCallbacks?.beforeDelete) {
                 const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as unknown as EntityCollection,
                     path: entity.path,
                     entityId: entity.id,
                     entity,
@@ -592,7 +691,18 @@ export class PostgresBackendDriver implements DataDriver {
             entity.databaseId || resolvedCollection?.databaseId
         );
 
-        if (callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+        if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+            // 1. Global callbacks first
+            if (globalCallbacks?.afterDelete) {
+                await globalCallbacks.afterDelete({
+                    collection: resolvedCollection as unknown as EntityCollection,
+                    path: entity.path,
+                    entityId: entity.id,
+                    entity,
+                    context: contextForCallback
+                });
+            }
+            // 2. Collection callbacks second
             if (callbacks?.afterDelete) {
                 await callbacks.afterDelete({
                     collection: resolvedCollection as EntityCollection<M>,
@@ -602,9 +712,10 @@ export class PostgresBackendDriver implements DataDriver {
                     context: contextForCallback
                 });
             }
+            // 3. Property callbacks third
             if (propertyCallbacks?.afterDelete) {
                 await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as unknown as EntityCollection,
                     path: entity.path,
                     entityId: entity.id,
                     entity,
