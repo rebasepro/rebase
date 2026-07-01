@@ -123,7 +123,7 @@ jobs:
             exit 1
           fi
 
-      # ── Version bump (working tree only — no commit to main) ──
+      # ── Version bump ──────────────────────────────────────────
       - name: Bump versions
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -178,12 +178,20 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Tag and push
+      - name: Commit version bump, tag, and push
         if: ${{ !inputs.dry_run }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+
+          # Commit the version bumps back to main
+          git add -A
+          git commit -m "chore: bump version to $VERSION [skip ci]"
+
+          # Create the release tag on the version-bump commit
           git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin "v$VERSION"
+
+          # Push both the commit and the tag
+          git push origin main --follow-tags
 
       # ── GitHub Release ──────────────────────────────────────
       - name: Create GitHub Release (with CHANGELOG notes)
