@@ -74,7 +74,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | Package | Role | Used By |
 |---------|------|---------|
 | `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
-| `@rebasepro/backend` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
+| `@rebasepro/server-core` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
 | `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/core` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
@@ -82,9 +82,9 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/studio` | Collection editor, SQL console, JS console, RLS editor, storage browser | Frontend |
 | `@rebasepro/cli` | CLI for schema generation, DB migrations, SDK generation | Dev tooling |
 | `@rebasepro/formex` | Lightweight React form state management | Frontend |
-| `@rebasepro/data_enhancement` | AI-powered field autocompletion plugin | Frontend |
-| `@rebasepro/data_import_export` | CSV/JSON/Excel import and export | Frontend |
-| `@rebasepro/schema_inference` | Auto-detect schema from existing database data | Backend/CLI |
+| `@rebasepro/plugin-data-enhancement` | AI-powered field autocompletion plugin | Frontend |
+| `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel import and export | Frontend |
+| `@rebasepro/schema-inference` | Auto-detect schema from existing database data | Backend/CLI |
 
 ## Data Flow
 

@@ -24,7 +24,7 @@ export type {
 // =============================================================================
 // Server-side singleton (import { rebase } from "@rebasepro/server-core")
 // =============================================================================
-export { rebase } from "./singleton";
+export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 
 // =============================================================================
 // DB Abstractions (for database driver implementations)

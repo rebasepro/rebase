@@ -74,7 +74,7 @@ Wie Treiber werden auch Speicher-Backends in einer Registrierung erfasst. Sie k�
 | Paket | Rolle | Verwendet von |
 |-------|-------|---------------|
 | `@rebasepro/types` | TypeScript-Schnittstellen für Sammlungen, Eigenschaften, Entitäten, Plugins | Alles |
-| `@rebasepro/backend` | Backend-Serverinitialisierung, REST-API, Auth, Speicher, WebSocket | Backend |
+| `@rebasepro/server-core` | Backend-Serverinitialisierung, REST-API, Auth, Speicher, WebSocket | Backend |
 | `@rebasepro/client` | Client-SDK — HTTP-Transport, WebSocket, Auth | Frontend |
 | `@rebasepro/core` | React-Framework — Scaffold, Controller, Formulare, Routen, Hooks | Frontend |
 | `@rebasepro/ui` | Eigenständige UI-Komponentenbibliothek (Tailwind v4 + Radix) | Frontend |
@@ -82,9 +82,9 @@ Wie Treiber werden auch Speicher-Backends in einer Registrierung erfasst. Sie k�
 | `@rebasepro/studio` | Sammlungseditor, SQL-Konsole, JS-Konsole, RLS-Editor, Speicherbrowser | Frontend |
 | `@rebasepro/cli` | CLI für Schema-Generierung, DB-Migrationen, SDK-Generierung | Entwicklertools |
 | `@rebasepro/formex` | Leichtes React-Formularstatusmanagement | Frontend |
-| `@rebasepro/data_enhancement` | KI-gestütztes Plugin zur automatischen Feldvervollständigung | Frontend |
-| `@rebasepro/data_import_export` | CSV/JSON/Excel-Import und -Export | Frontend |
-| `@rebasepro/schema_inference` | Automatische Schemaerkennung aus vorhandenen Datenbankdaten | Backend/CLI |
+| `@rebasepro/plugin-data-enhancement` | KI-gestütztes Plugin zur automatischen Feldvervollständigung | Frontend |
+| `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel-Import und -Export | Frontend |
+| `@rebasepro/schema-inference` | Automatische Schemaerkennung aus vorhandenen Datenbankdaten | Backend/CLI |
 
 ## Datenfluss
 
