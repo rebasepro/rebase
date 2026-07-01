@@ -1,4 +1,4 @@
-import { CollectionWithRelations, EntityCollection, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { EntityCollection, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
@@ -89,7 +89,7 @@ name: evaluated } as EntityCollection;
 
                 try {
                     // Look for an owning relation on the target that points back to this collection
-                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (((targetCollection as CollectionWithRelations).relations) || []) : [];
+                    const targetRelations = getDataSourceCapabilities(targetCollection.engine).supportsRelations ? (targetCollection.relations || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.direction === "owning" &&
                             targetRel.cardinality === "one" &&
@@ -135,7 +135,7 @@ name: evaluated } as EntityCollection;
                     // `cardinality: "many" + direction: "owning"` is sufficient to identify owning M2M.
 
                     // 1. Check the explicit relations[] array
-                    const targetRelations = getDataSourceCapabilities(targetCollection.driver).supportsRelations ? (((targetCollection as CollectionWithRelations).relations) || []) : [];
+                    const targetRelations = getDataSourceCapabilities(targetCollection.engine).supportsRelations ? (targetCollection.relations || []) : [];
                     for (const targetRel of targetRelations) {
                         if (targetRel.cardinality === "many" &&
                             (targetRel.direction === "owning" || !targetRel.direction) &&
@@ -206,8 +206,7 @@ export function resolveCollectionRelations(
     const cached = _resolvedRelationsCache.get(collection);
     if (cached) return cached;
 
-    if (!getDataSourceCapabilities(collection.driver).supportsRelations) return {};
-    const relCollection = collection as CollectionWithRelations;
+    if (!getDataSourceCapabilities(collection.engine).supportsRelations) return {};
     const relations: Record<string, Relation> = {};
 
     // Track which explicit relationName values have been registered so that
@@ -217,8 +216,8 @@ export function resolveCollectionRelations(
 
     // 1. Process explicit relations from the `relations` field.
     //    Each relation is stored once under its canonical relationName key.
-    if (relCollection.relations) {
-        relCollection.relations.forEach((relation: Relation) => {
+    if (collection.relations) {
+        collection.relations.forEach((relation: Relation) => {
             try {
                 const normalizedRelation = sanitizeRelation(relation, collection);
                 const relationKey = normalizedRelation.relationName;
@@ -306,8 +305,8 @@ export function resolvePropertyRelation({
 }
 
 export function getTableName(collection: EntityCollection): string {
-    if (getDataSourceCapabilities(collection.driver).supportsRelations) {
-        return (collection as CollectionWithRelations).table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
+    if (getDataSourceCapabilities(collection.engine).supportsRelations) {
+        return collection.table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
     }
     return toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
 }

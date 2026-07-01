@@ -1,8 +1,8 @@
-import { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
 
-const productsCollection: PostgresCollection = {
+const productsCollection = defineCollection({
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -270,7 +270,7 @@ hideFromCollection: true }
             sort: ["rating", "desc"]
         }
     ]
-};
+});
 
 productsCollection.securityRules = [
     {

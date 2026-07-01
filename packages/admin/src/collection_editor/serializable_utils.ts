@@ -9,44 +9,44 @@
  */
 
 import type {
-    EntityCollection,
-    Property,
-    StringProperty,
-    NumberProperty,
+    ArrayProperty,
+    BaseUIConfig,
+    BinaryProperty,
     BooleanProperty,
     DateProperty,
+    EntityCollection,
     GeopointProperty,
+    MapProperty,
+    NumberProperty,
+    Properties,
+    Property,
     ReferenceProperty,
     RelationProperty,
-    ArrayProperty,
-    MapProperty,
-    VectorProperty,
-    BinaryProperty,
-    Properties,
     StorageConfig,
-    BaseUIConfig,
+    StringProperty,
+    VectorProperty,
 } from "@rebasepro/types";
 
 import type {
-    SerializableCollection,
-    SerializableProperty,
-    SerializableProperties,
-    SerializableStorageConfig,
-    SerializableBaseUIConfig,
+    SerializableArrayProperty,
     SerializableBaseProperty,
-    SerializableStringProperty,
-    SerializableNumberProperty,
+    SerializableBaseUIConfig,
+    SerializableBinaryProperty,
     SerializableBooleanProperty,
+    SerializableCollection,
     SerializableDateProperty,
+    SerializableDateValidation,
     SerializableGeopointProperty,
+    SerializableMapProperty,
+    SerializableNumberProperty,
+    SerializableProperties,
+    SerializableProperty,
     SerializableReferenceProperty,
     SerializableRelationProperty,
-    SerializableArrayProperty,
-    SerializableMapProperty,
-    SerializableVectorProperty,
-    SerializableBinaryProperty,
+    SerializableStorageConfig,
+    SerializableStringProperty,
     SerializableStringValidation,
-    SerializableDateValidation,
+    SerializableVectorProperty,
 } from "./serializable_types";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -407,7 +407,8 @@ export function toSerializableCollection(collection: EntityCollection): Serializ
     if (collection.singularName) result.singularName = collection.singularName;
     if (collection.description) result.description = collection.description;
     if (collection.group) result.group = collection.group;
-    if (collection.driver) result.driver = collection.driver;
+    if (collection.engine) result.engine = collection.engine;
+    if (collection.dataSource) result.dataSource = collection.dataSource;
     if (collection.databaseId) result.databaseId = collection.databaseId;
     if (collection.titleProperty) result.titleProperty = collection.titleProperty as string;
     if (collection.ownerId) result.ownerId = collection.ownerId;

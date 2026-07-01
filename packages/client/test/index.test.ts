@@ -1,5 +1,9 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { createRebaseClient as _createRebaseClient, CreateRebaseClientResult, CreateRebaseClientOptions } from "../src/index";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import {
+    createRebaseClient as _createRebaseClient,
+    CreateRebaseClientOptions,
+    CreateRebaseClientResult
+} from "../src/index";
 import { createMemoryStorage } from "../src/auth";
 import { CollectionClient } from "../src/collection";
 
@@ -196,6 +200,24 @@ meta: { total: 0 } }),
                 const urlArg = (mockFetch.mock.calls[0] as any)[0];
                 expect(urlArg.toString()).toContain("/api/data/company_members");
                 expect(urlArg.toString()).not.toContain("companyMembers");
+            });
+
+            it("uses options.collections mapping if provided", () => {
+                const client = createRebaseClient({
+                    baseUrl: "https://api.example.com",
+                    collections: {
+                        companyMembers: "company-members",
+                        orderItems: "order-items"
+                    }
+                });
+
+                const companyMembers = client.data.companyMembers;
+                const companyMembersColl = client.data.collection("company-members");
+                expect(companyMembers).toBe(companyMembersColl);
+
+                const orderItems = client.data.orderItems;
+                const orderItemsColl = client.data.collection("order-items");
+                expect(orderItems).toBe(orderItemsColl);
             });
         });
     });

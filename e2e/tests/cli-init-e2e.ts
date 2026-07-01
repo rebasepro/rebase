@@ -253,8 +253,8 @@ function modifyDockerfilesForTarballs(projectPath: string) {
         if (!fs.existsSync(df)) continue;
         let content = fs.readFileSync(df, "utf-8");
         content = content.replace(
-            "COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./",
-            "COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./\nCOPY tarballs ./tarballs"
+            /COPY package\.json pnpm-lock\.yaml pnpm-workspace\.yaml[^\n]*\.\//,
+            "$&\nCOPY tarballs ./tarballs"
         );
         fs.writeFileSync(df, content, "utf-8");
         console.log(`✏️ Modified Dockerfile: ${df}`);
@@ -410,7 +410,7 @@ async function startPgContainer(): Promise<PgContainer> {
         throw new Error(`Failed to parse host port from docker port output: ${portOutput}`);
     }
     const port = parseInt(portMatch[1], 10);
-    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public`;
+    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public&sslmode=disable`;
 
     console.log(`Container started on port ${port}. Waiting for database readiness...`);
 
@@ -696,10 +696,10 @@ timeout: 90000 });
 
             // Verify cards
             console.log("Verifying admin dashboard cards...");
-            const rolesCard = page.locator("text=Roles").last();
-            await rolesCard.waitFor({ state: "visible",
+            const usersCard = page.locator("text=Users").last();
+            await usersCard.waitFor({ state: "visible",
 timeout: 15000 });
-            console.log("Confirmed: 'Roles' card is visible on dashboard.");
+            console.log("Confirmed: 'Users' card is visible on dashboard.");
 
             const booksCard = page.locator("text=Books").last();
             await booksCard.waitFor({ state: "visible",
@@ -787,8 +787,48 @@ timeout: 10000 });
         });
         console.log("Docker containers built successfully.");
 
-        // Start Docker Compose services
-        console.log("Starting Docker Compose services...");
+        // Start only the DB first so we can run migrations before the backend auto-creates internal tables
+        console.log("Starting Docker DB service...");
+        await execa("docker", ["compose", "up", "-d", "db"], {
+            cwd: projectPath,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+
+        // Wait for DB to be healthy
+        console.log("Waiting for Docker DB to be healthy...");
+        for (let i = 0; i < 30; i++) {
+            try {
+                await execa("docker", ["compose", "exec", "db", "pg_isready", "-U", "rebase", "-d", "rebase"], {
+                    cwd: projectPath,
+                    env: cleanEnv
+                });
+                console.log("Docker DB is ready.");
+                break;
+            } catch {
+                if (i === 29) throw new Error("Docker DB did not become ready in time");
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+
+        // Run database migrations BEFORE starting the backend
+        console.log("Running migrations on Docker DB from the host...");
+        await execa("node", [
+            cliBin,
+            "db",
+            "migrate"
+        ], {
+            cwd: projectPath,
+            stdio: "inherit",
+            env: {
+                ...cleanEnv,
+                DATABASE_URL: "postgresql://rebase:changeme@localhost:5433/rebase?options=-c%20search_path=public&sslmode=disable"
+            }
+        });
+        console.log("Migrations applied inside Docker.");
+
+        // Now start all services (backend + frontend)
+        console.log("Starting all Docker Compose services...");
         await execa("docker", ["compose", "up", "-d"], {
             cwd: projectPath,
             stdio: "inherit",
@@ -796,24 +836,8 @@ timeout: 10000 });
         });
 
         try {
-            console.log("Waiting 20s for Docker services to start and stabilize...");
-            await new Promise(resolve => setTimeout(resolve, 20000));
-
-            // Run database migrations from the host targeting the Docker DB
-            console.log("Running migrations on Docker DB from the host...");
-            await execa("node", [
-                cliBin,
-                "db",
-                "migrate"
-            ], {
-                cwd: projectPath,
-                stdio: "inherit",
-                env: {
-                    ...cleanEnv,
-                    DATABASE_URL: "postgresql://rebase:changeme@localhost:5433/rebase?options=-c%20search_path=public"
-                }
-            });
-            console.log("Migrations applied inside Docker.");
+            console.log("Waiting 15s for backend to start and stabilize...");
+            await new Promise(resolve => setTimeout(resolve, 15000));
 
             // Check health endpoint
             console.log("Checking Docker backend health endpoint...");

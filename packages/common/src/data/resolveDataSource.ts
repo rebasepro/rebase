@@ -14,8 +14,8 @@ import {
 export interface DataSourceResolvable {
     /** Preferred routing key. */
     dataSource?: string;
-    /** Legacy engine hint / fallback routing key. */
-    driver?: string;
+    /** Engine type discriminant (set on variant collection types). */
+    engine?: string;
     /** Within-engine instance. */
     databaseId?: string;
 }
@@ -41,13 +41,13 @@ export function createDataSourceRegistry(definitions?: DataSourceDefinition[]): 
  * editor's capability lookups.
  *
  * Resolution order:
- * 1. The routing **key** is `collection.dataSource`, else the legacy
- *    `collection.driver`, else {@link DEFAULT_DATA_SOURCE_KEY}.
+ * 1. The routing **key** is `collection.dataSource`, else
+ *    {@link DEFAULT_DATA_SOURCE_KEY}.
  * 2. If a definition is registered for that key, it provides `engine`,
  *    `transport`, and `databaseId`.
- * 3. Otherwise values are synthesized for backward compatibility: `engine`
- *    from the legacy `driver` (or the key, or `"postgres"`), `transport`
- *    defaults to `"server"`, and `databaseId` from the collection.
+ * 3. Otherwise values are synthesized: `engine` from `collection.engine`
+ *    (or the key, or `"postgres"`), `transport` defaults to `"server"`,
+ *    and `databaseId` from the collection.
  *
  * `capabilities` are always derived from the resolved `engine`, so two
  * data sources sharing an engine share capabilities.
@@ -59,11 +59,11 @@ export function resolveDataSource(
     collection: DataSourceResolvable | undefined,
     registry?: DataSourceRegistry
 ): ResolvedDataSource {
-    const key = collection?.dataSource ?? collection?.driver ?? DEFAULT_DATA_SOURCE_KEY;
+    const key = collection?.dataSource ?? DEFAULT_DATA_SOURCE_KEY;
     const def = registry?.[key];
 
     const engine = def?.engine
-        ?? collection?.driver
+        ?? collection?.engine
         ?? (key !== DEFAULT_DATA_SOURCE_KEY ? key : "postgres");
 
     const transport = def?.transport ?? "server";

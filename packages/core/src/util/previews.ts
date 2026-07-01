@@ -41,7 +41,7 @@ function isStorageProperty(property: Property | undefined): boolean {
     // Array whose inner element has storage config or image URL
     if (property.type === "array" && property.of && !Array.isArray(property.of)) {
         const inner = property.of;
-        if (inner.type === "string" && (inner.storage || inner.url === "image")) return true;
+        if (inner.type === "string" && (inner.storage || inner.ui?.url === "image")) return true;
     }
     return false;
 }

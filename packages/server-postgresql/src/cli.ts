@@ -18,7 +18,36 @@ const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
 
 
+async function loadEnv(): Promise<void> {
+    try {
+        const dotenv = await import("dotenv");
+        const envPaths = [
+            process.env.DOTENV_CONFIG_PATH,
+            path.resolve(process.cwd(), ".env"),
+            path.resolve(process.cwd(), "../.env"),
+            path.resolve(process.cwd(), "../../.env")
+        ].filter(Boolean) as string[];
+
+        for (const p of envPaths) {
+            if (fs.existsSync(p)) {
+                const parsed = dotenv.config({ path: p });
+                if (parsed.parsed) {
+                    for (const [key, val] of Object.entries(parsed.parsed)) {
+                        if (process.env[key] === undefined) {
+                            process.env[key] = val;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    } catch {
+        // ignore
+    }
+}
+
 export async function runPluginCommand(args: string[]) {
+    await loadEnv();
     const domain = args[0]; // "db" or "schema"
     const subcommand = args[1];
 
@@ -126,16 +155,23 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             logger.info("");
             logger.info(chalk.gray("  Step 2/3: Pushing schema to database with Atlas..."));
             logger.info("");
+            const databaseUrl = process.env.DATABASE_URL;
+            if (databaseUrl) {
+                await ensureAuthSchemaAndFunctions(databaseUrl);
+            }
             await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
             logger.info("");
             
-            const databaseUrl = process.env.DATABASE_URL;
             if (databaseUrl) {
                 await applyPolicies(databaseUrl);
             } else {
                 logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
         } else if (subcommand === "migrate") {
+            const databaseUrl = process.env.DATABASE_URL;
+            if (databaseUrl) {
+                await ensureAuthSchemaAndFunctions(databaseUrl);
+            }
             const extraArgs = argsList._.filter(arg => arg !== "migrate");
             await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
         }
@@ -143,6 +179,39 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         logger.info("");
         logger.info(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
         logger.info("");
+    }
+}
+
+async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> {
+    try {
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            await client.query(`
+                CREATE SCHEMA IF NOT EXISTS auth;
+                CREATE SCHEMA IF NOT EXISTS rebase;
+
+                CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+                    SELECT NULLIF(current_setting('app.user_id', true), '');
+                $$ LANGUAGE sql STABLE;
+
+                CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
+                    SELECT COALESCE(
+                        NULLIF(current_setting('app.jwt', true), ''),
+                        '{}'
+                    )::jsonb;
+                $$ LANGUAGE sql STABLE;
+
+                CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
+                    SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
+                $$ LANGUAGE sql STABLE;
+            `);
+        } finally {
+            await client.end();
+        }
+    } catch (err) {
+        logger.warn(chalk.yellow(`  ⚠️  Failed to bootstrap auth schema and helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
@@ -426,6 +495,9 @@ async function runAtlas(domain: "schema" | "migrate", args: string[], collection
             atlasArgs.push("--dev-url", devDatabaseUrl);
         } else if (args.includes("apply") || args.includes("status")) {
             atlasArgs.push("--url", databaseUrl, "--revisions-schema", "rebase");
+            if (args.includes("apply")) {
+                atlasArgs.push("--allow-dirty");
+            }
         }
     }
 

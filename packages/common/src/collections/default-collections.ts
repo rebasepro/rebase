@@ -1,4 +1,4 @@
-import type { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "../util/builders";
 
 /**
  * Default users collection.
@@ -7,7 +7,7 @@ import type { PostgresCollection } from "@rebasepro/types";
  * Slug-based dedup (Map keyed by slug, last-write-wins) lets developers
  * override by defining their own collection with `slug: "users"`.
  */
-export const defaultUsersCollection: PostgresCollection = {
+export const defaultUsersCollection = defineCollection({
     name: "Users",
     singularName: "User",
     slug: "users",
@@ -120,4 +120,4 @@ disabled: { hidden: true } }
     },
     listProperties: ["displayName", "email", "roles", "createdAt"],
     propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
-};
+});

@@ -496,7 +496,7 @@ message: "No file to delete" });
      * GET /sources — list all registered storage backends.
      * The client can bootstrap its StorageSourceRegistry from this endpoint.
      */
-    router.get("/sources", readAuthMiddleware, (c) => {
+    router.get("/sources", (c) => {
         const byKey = new Map<string, { key: string; engine: string; transport: "server" | "direct"; label?: string }>();
 
         // 1. Server-backed sources derived from the registry (source of truth

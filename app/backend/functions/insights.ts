@@ -1,7 +1,9 @@
 import { Hono } from "hono";
-import { rebase } from "@rebasepro/server-core";
+import { rebase, requireAuth } from "@rebasepro/server-core";
 
 const app = new Hono();
+
+app.use("/*", requireAuth);
 
 /**
  * GET /api/functions/insights/home

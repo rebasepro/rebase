@@ -15,6 +15,7 @@ export interface ApiKeyMasked {
     name: string;
     key_prefix: string;
     permissions: ApiKeyPermission[];
+    admin: boolean;
     rate_limit: number | null;
     created_by: string;
     created_at: string;

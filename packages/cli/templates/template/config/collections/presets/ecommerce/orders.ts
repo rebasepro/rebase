@@ -47,7 +47,9 @@ color: "red" }
         notes: {
             name: "Notes",
             type: "string",
-            multiline: true
+            ui: {
+                multiline: true
+            }
         },
         createdAt: {
             name: "Created At",

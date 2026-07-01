@@ -1,7 +1,7 @@
-import { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import customersCollection from "./customers";
 
-const ticketsCollection: PostgresCollection = {
+const ticketsCollection = defineCollection({
     name: "Tickets",
     singularName: "Ticket",
     slug: "tickets",
@@ -196,7 +196,7 @@ hideFromCollection: true }
             }
         }
     ]
-};
+});
 
 ticketsCollection.securityRules = [
     {

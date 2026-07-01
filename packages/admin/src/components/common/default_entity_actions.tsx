@@ -1,13 +1,18 @@
 import { CopyIcon, iconSize, KeyRoundIcon, PencilIcon, Trash2Icon } from "@rebasepro/ui";
 import type { EntityAction, User, UserCreationResult } from "@rebasepro/types";
-import { ConfirmationDialog, useSnackbarController, useTranslation, useRebaseClient, useAuthController } from "@rebasepro/core";
+import {
+    ConfirmationDialog,
+    useAuthController,
+    useRebaseClient,
+    useSnackbarController,
+    useTranslation
+} from "@rebasepro/core";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../EntityCollectionView/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
 import React, { useState } from "react";
-
 
 export const editEntityAction: EntityAction = {
     icon: <PencilIcon size={iconSize.smallest}/>,
@@ -55,6 +60,9 @@ export const editEntityAction: EntityAction = {
                     entityId: entity.id
                 }
             );
+        if (!context?.urlController) {
+            throw new Error("INTERNAL: editEntityAction: urlController is undefined");
+        }
         navigateToEntity({
             openEntityMode,
             collection,
@@ -62,7 +70,7 @@ export const editEntityAction: EntityAction = {
             path: newFullIdPath,
             sideEntityController,
             onClose: () => unhighlightEntity?.(entity),
-            navigation: context?.urlController!,
+            navigation: context.urlController,
             selectedTab: defaultSelectedView
         });
 
@@ -98,6 +106,9 @@ export const copyEntityAction: EntityAction = {
         });
 
         const usedPath = path ?? collection?.slug ?? entity.path;
+        if (!context?.urlController) {
+            throw new Error("INTERNAL: copyEntityAction: urlController is undefined");
+        }
         navigateToEntity({
             openEntityMode,
             collection,
@@ -106,7 +117,7 @@ export const copyEntityAction: EntityAction = {
             copy: true,
             sideEntityController,
             onClose: () => unhighlightEntity?.(entity),
-            navigation: context?.urlController!
+            navigation: context.urlController
         });
 
         return Promise.resolve(undefined);

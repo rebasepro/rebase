@@ -185,7 +185,7 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Vector Search
 
-If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector cosine distance operations compiled directly in the database query.
+If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector distance operations compiled directly in the database query.
 
 ```bash
 GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
@@ -197,7 +197,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 |-----------|------|-------------|
 | `vector_search` | `string` | The name of the vector property to query against. |
 | `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
-| `vector_distance` | `string` | The distance metric to evaluate. Supported value: `cosine` (compiles to Postgres `embedding <=> query_vector`). |
+| `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
 
 ## Relation Inclusion

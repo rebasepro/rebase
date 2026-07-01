@@ -1,7 +1,7 @@
-import { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import productsCollection from "./products";
 
-const productLocalesCollection: PostgresCollection = {
+const productLocalesCollection = defineCollection({
     name: "Product Locales",
     singularName: "Product Locale",
     slug: "product_locales",
@@ -43,7 +43,7 @@ const productLocalesCollection: PostgresCollection = {
             ui: { markdown: true }
         }
     }
-};
+});
 
 
 productLocalesCollection.securityRules = [

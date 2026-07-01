@@ -1,7 +1,7 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionWithRelations, EntityCollection, Properties, Property, Relation, RelationProperty, Vector, BinaryProperty } from "@rebasepro/types";
+import { EntityCollection, Properties, Property, Relation, RelationProperty, Vector, BinaryProperty } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -551,7 +551,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                     relationDef = findRelation(resolvedRelations, propertyKey);
                 }
                 if (!relationDef) {
-                    relationDef = (collection as CollectionWithRelations).relations?.find((rel: Relation) => rel.relationName === (property as RelationProperty).relationName);
+                    relationDef = collection.relations?.find((rel: Relation) => rel.relationName === (property as RelationProperty).relationName);
                 }
 
                 if (!relationDef) {

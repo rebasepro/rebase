@@ -1,7 +1,7 @@
-import { EntityCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import postsCollection from "./posts";
 
-const tagsCollection: EntityCollection = {
+const tagsCollection = defineCollection({
     name: "Tags",
     singularName: "Tag",
     slug: "tags",
@@ -36,7 +36,7 @@ const tagsCollection: EntityCollection = {
             inverseRelationName: "tags"
         }
     ]
-};
+});
 
 
 tagsCollection.securityRules = [

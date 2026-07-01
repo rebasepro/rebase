@@ -7,9 +7,17 @@ import {
     EntityCollection,
     EnumValueConfig,
     EnumValues,
+    FirebaseCollection,
+    FirebaseProperties,
     GeopointProperty,
+    InferEntityType,
     MapProperty,
-    NumberProperty, Properties,
+    MongoDBCollection,
+    MongoProperties,
+    NumberProperty,
+    PostgresCollection,
+    PostgresProperties,
+    Properties,
     Property,
     ReferenceProperty,
     StringProperty,
@@ -29,6 +37,75 @@ export function buildCollection<
     (
         collection: EntityCollection<M, USER>
     ): EntityCollection<M, USER> {
+    return collection;
+}
+
+// ── defineCollection ─────────────────────────────────────────────────────
+// A smarter builder that uses `const` type-parameter inference (TS 5.0+)
+// to capture literal property types automatically. This gives you
+// autocomplete on `titleProperty`, `sort`, `propertiesOrder`, `fixedFilter`,
+// callbacks, etc. — without writing `as const` or passing manual generics.
+
+/**
+ * Define a PostgreSQL-backed collection with full type inference.
+ *
+ * The `const P` generic captures literal property types from your
+ * `properties` object, which enables autocomplete on `titleProperty`,
+ * `sort`, `propertiesOrder`, `fixedFilter`, and entity callbacks.
+ *
+ * @example
+ * ```ts
+ * const products = defineCollection({
+ *     name: "Products",
+ *     slug: "products",
+ *     table: "products",
+ *     properties: {
+ *         name: { name: "Name", type: "string", validation: { required: true } },
+ *         price: { name: "Price", type: "number" },
+ *     },
+ *     titleProperty: "name",  // ✅ autocomplete: "name" | "price"
+ *     sort: ["price", "asc"], // ✅ autocomplete on first element
+ * });
+ * ```
+ *
+ * @group Builder
+ */
+export function defineCollection<
+    const P extends PostgresProperties,
+    USER extends User = User
+>(
+    collection: Omit<PostgresCollection<InferEntityType<P>, USER>, "properties"> & { properties: P }
+): PostgresCollection<InferEntityType<P>, USER> & { properties: P };
+
+/**
+ * Define a Firestore-backed collection with full type inference.
+ * @group Builder
+ */
+export function defineCollection<
+    const P extends FirebaseProperties,
+    USER extends User = User
+>(
+    collection: Omit<FirebaseCollection<InferEntityType<P>, USER>, "properties"> & { properties: P }
+): FirebaseCollection<InferEntityType<P>, USER> & { properties: P };
+
+/**
+ * Define a MongoDB-backed collection with full type inference.
+ * @group Builder
+ */
+export function defineCollection<
+    const P extends MongoProperties,
+    USER extends User = User
+>(
+    collection: Omit<MongoDBCollection<InferEntityType<P>, USER>, "properties"> & { properties: P }
+): MongoDBCollection<InferEntityType<P>, USER> & { properties: P };
+
+/**
+ * Implementation — delegates to the correct overload at the type level.
+ * At runtime this is a plain identity function.
+ */
+export function defineCollection(
+    collection: EntityCollection
+): EntityCollection {
     return collection;
 }
 

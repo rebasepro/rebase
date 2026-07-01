@@ -11,7 +11,7 @@
 
 | Symbol | Replacement | Internal usage | Action needed before removal |
 |--------|-------------|----------------|------------------------------|
-| `CollectionWithRelations` | `EntityCollection` directly — `table`, `relations`, and `securityRules` are now on `BaseEntityCollection`. | ~15 call sites in `@rebasepro/common` (`CollectionRegistry.ts`, `permissions.ts`, `relations.ts`, `resolutions.ts`) and `@rebasepro/server-postgresql` (`PostgresCollectionRegistry.ts`, `data-transformer.ts`). | Migrate all internal consumers to use `EntityCollection` with capability guards, then remove. |
+| `CollectionWithRelations` | ✅ **Removed.** All ~15 internal call sites migrated to use `EntityCollection` directly. `table`, `relations`, and `securityRules` are on `BaseEntityCollection`. |
 
 ### Not yet deprecated but should be reviewed
 

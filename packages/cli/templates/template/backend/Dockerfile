@@ -14,12 +14,12 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
 # Native dependencies for bcrypt, pg, etc.
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ curl ca-certificates
 
 WORKDIR /app
 
 # Copy workspace root files first (cache-friendly layer)
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 
 # Copy workspace packages
 COPY backend ./backend
@@ -41,6 +41,7 @@ FROM node:22-alpine AS runtime
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
+ENV CI=true
 
 RUN corepack enable
 
@@ -50,7 +51,7 @@ RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
 WORKDIR /app
 
 # Copy only production artifacts
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/.npmrc ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/config ./config

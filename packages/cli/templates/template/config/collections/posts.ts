@@ -24,7 +24,9 @@ const postsCollection: EntityCollection = {
         content: {
             name: "Content",
             type: "string",
-            markdown: true
+            ui: {
+                markdown: true
+            }
         },
         status: {
             name: "Status",

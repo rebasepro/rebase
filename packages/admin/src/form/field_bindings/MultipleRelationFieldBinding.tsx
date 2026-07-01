@@ -1,15 +1,14 @@
 import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
-import { getCollectionDataPath } from "@rebasepro/types";
+import { Entity, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
 import React, { useCallback } from "react";
-import { Entity, getDataSourceCapabilities } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, resolveRelationProperty } from "@rebasepro/common";
 
-import { useTranslation, ErrorView } from "@rebasepro/core";
+import { ErrorView, useTranslation } from "@rebasepro/core";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { RelationPreview } from "../../preview";
 
@@ -42,7 +41,7 @@ export function MultipleRelationFieldBinding({
     }
 
     const parentCollection = context.collection;
-    const capabilities = parentCollection ? getDataSourceCapabilities(parentCollection.driver) : undefined;
+    const capabilities = parentCollection ? getDataSourceCapabilities(parentCollection.engine) : undefined;
     if (!parentCollection || !capabilities?.supportsRelations || !("relations" in parentCollection) || !parentCollection.relations) {
         throw Error("RelationFieldBinding expected a collection with relations support");
     }

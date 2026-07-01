@@ -101,6 +101,6 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
 
     it("stamps the resolved engine for capabilities (dataSource-only collection)", () => {
         const { registry } = buildRouted();
-        expect(registry.get("events")?.driver).toBe("firestore");
+        expect(registry.get("events")?.engine).toBe("firestore");
     });
 });

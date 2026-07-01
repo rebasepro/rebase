@@ -273,7 +273,9 @@ export const generatePostgresDdl = async (
             if (("enum" in prop) && (prop.type === "string" || prop.type === "number") && prop.enum) {
                 const enumDbName = `${collectionTable}_${resolveColumnName(propName, prop)}`;
                 const values = Array.isArray(prop.enum)
-                    ? prop.enum.map(v => String(v.id ?? v))
+                    ? (prop.enum as (string | number | { id: string | number })[]).map((v: string | number | { id: string | number }) =>
+                        String(typeof v === "object" && v !== null && "id" in v ? v.id : v)
+                    )
                     : Object.keys(prop.enum);
                 if (values.length > 0) {
                     ddl += `CREATE TYPE "${schema}"."${enumDbName}" AS ENUM (${values.map(v => `'${v}'`).join(", ")});\n`;
@@ -421,7 +423,7 @@ export const generatePostgresDdl = async (
                         colDef += " PRIMARY KEY";
                     }
 
-                    if ("isId" in prop && prop.isId !== "manual" && prop.isId !== true) {
+                    if ("isId" in prop && prop.isId !== "manual" && prop.isId !== true && prop.isId !== "increment") {
                         if (prop.isId === "uuid") {
                             colDef += " DEFAULT gen_random_uuid()";
                         } else if (prop.isId === "cuid") {

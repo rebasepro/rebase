@@ -11,17 +11,17 @@ describe("resolveDataSource", () => {
         expect(r.capabilities.supportsRelations).toBe(true);
     });
 
-    it("treats legacy `driver` as both engine and routing key (back-compat)", () => {
-        const r = resolveDataSource({ driver: "firestore" });
-        expect(r.key).toBe("firestore");
+    it("uses engine to derive capabilities when no dataSource or definition", () => {
+        const r = resolveDataSource({ engine: "firestore" });
+        expect(r.key).toBe("(default)");
         expect(r.engine).toBe("firestore");
         // No registry → transport defaults to server (engine still firestore).
         expect(r.transport).toBe("server");
         expect(r.capabilities.supportsSubcollections).toBe(true);
     });
 
-    it("prefers `dataSource` over legacy `driver` for the routing key", () => {
-        const r = resolveDataSource({ dataSource: "analytics", driver: "firestore" });
+    it("prefers dataSource over engine for the routing key", () => {
+        const r = resolveDataSource({ dataSource: "analytics", engine: "firestore" });
         expect(r.key).toBe("analytics");
     });
 
@@ -84,9 +84,9 @@ describe("resolveDataSource", () => {
         expect(r.engine).toBe("postgres");
     });
 
-    it("passes through the collection databaseId without a registry", () => {
-        const r = resolveDataSource({ driver: "postgres", databaseId: "tenant_42" });
-        expect(r.key).toBe("postgres");
+    it("passes through the collection databaseId with engine and no registry", () => {
+        const r = resolveDataSource({ engine: "postgres", databaseId: "tenant_42" });
+        expect(r.key).toBe("(default)");
         expect(r.engine).toBe("postgres");
         expect(r.databaseId).toBe("tenant_42");
     });
@@ -98,9 +98,9 @@ describe("resolveDataSource", () => {
         expect(r.transport).toBe("server");
     });
 
-    it("an explicit driver but no dataSource and no registry keys by driver", () => {
-        const r = resolveDataSource({ driver: "mongodb" });
-        expect(r.key).toBe("mongodb");
+    it("an explicit engine but no dataSource and no registry keys by engine", () => {
+        const r = resolveDataSource({ engine: "mongodb" });
+        expect(r.key).toBe("(default)");
         expect(r.engine).toBe("mongodb");
         expect(r.capabilities.supportsDocumentAdmin).toBe(true);
     });

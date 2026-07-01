@@ -24,6 +24,7 @@
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
+        "@rebasepro/types": "workspace:*",
         "concurrently": "^8.2.2",
         "typescript": "^5.9.2"
     },
@@ -33,7 +34,8 @@
     "pnpm": {
         "onlyBuiltDependencies": [
             "esbuild",
-            "sharp"
+            "sharp",
+            "@ariga/atlas"
         ]
     }
 }

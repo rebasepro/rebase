@@ -927,9 +927,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const functionsRouter = new Hono<HonoEnv>();
             functionsRouter.onError(errorHandler);
 
-            // Custom functions follow the same auth policy as data routes.
-            // Per-route auth can be further refined inside individual functions.
-            const functionsRequireAuth = resolveRequireAuth(config.auth);
+            // Custom functions do NOT require authentication at the global level by default.
+            // This allows custom functions to define public endpoints (like webhooks).
+            // Per-route auth can be further refined inside individual functions using `requireAuth`.
+            const functionsRequireAuth = false;
 
             // Use adapter middleware when available, fallback to built-in
             if (authAdapter) {

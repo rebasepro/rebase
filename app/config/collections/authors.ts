@@ -1,7 +1,7 @@
-import { EntityCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import postsCollection from "./posts";
 
-const authorsCollection: EntityCollection = {
+const authorsCollection = defineCollection({
     name: "Authors",
     singularName: "Author",
     slug: "authors",
@@ -104,7 +104,7 @@ const authorsCollection: EntityCollection = {
         "email",
         "asc"
     ]
-};
+});
 
 
 authorsCollection.securityRules = [

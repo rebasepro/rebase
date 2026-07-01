@@ -74,6 +74,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@ariga/atlas": "^1.2.2",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/sdk-generator": "workspace:*",
     "@rebasepro/server-core": "workspace:*",
@@ -90,7 +91,6 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@ariga/atlas": "^1.2.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",

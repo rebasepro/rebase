@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test("Full E2E: Sign in and view dashboard", async ({ page }) => {
   // Fail on any console error
@@ -19,11 +19,8 @@ test("Full E2E: Sign in and view dashboard", async ({ page }) => {
       const headers = await req.allHeaders();
       console.log(`[API RESPONSE] ${req.method()} ${response.url()} -> Status ${response.status()}`);
       console.log(`[API REQUEST HEADERS]`, JSON.stringify(headers));
-      
+
       if (response.status() >= 400) {
-        if (response.url().includes("/api/storage/sources") && response.status() === 401) {
-          return;
-        }
         throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
       }
     }

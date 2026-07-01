@@ -1,6 +1,12 @@
-import { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import ordersCollection from "./orders";
 import productsCollection from "./products";
+
+interface ProductValues extends Record<string, unknown> {
+    name: string;
+    sku: string;
+    price: number;
+}
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
 const getRelationId = (val: any): string | number | undefined => {
@@ -10,7 +16,7 @@ const getRelationId = (val: any): string | number | undefined => {
     return undefined;
 };
 
-const orderItemsCollection: PostgresCollection = {
+const orderItemsCollection = defineCollection({
     name: "Order Items",
     singularName: "Order Item",
     slug: "order_items",
@@ -83,7 +89,7 @@ const orderItemsCollection: PostgresCollection = {
             const productId = getRelationId(values.product);
             // 1. Resolve and snapshot product info if missing
             if (productId && (!values.product_name || !values.sku || values.unit_price === undefined)) {
-                const product = await context.data.collection("products").findById(productId);
+                const product = await context.data.collection<ProductValues>("products").findById(productId);
                 if (product) {
                     values.product_name = values.product_name || product.values.name;
                     values.sku = values.sku || product.values.sku;
@@ -113,7 +119,7 @@ const orderItemsCollection: PostgresCollection = {
             }
         }
     }
-};
+});
 
 // Helper function to recalculate the parent order subtotal & total
 async function updateOrderTotals(orderId: string | number, context: any) {

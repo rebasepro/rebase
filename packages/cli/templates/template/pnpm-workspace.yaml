@@ -7,5 +7,7 @@ blockExoticSubdeps: false
 minimumReleaseAge: 0
 allowBuilds:
   esbuild: true
+  sharp: true
+  "@ariga/atlas": true
   "{{PROJECT_NAME}}-config": true
 

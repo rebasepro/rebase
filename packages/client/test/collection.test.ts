@@ -1,5 +1,5 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { createCollectionClient, CollectionClient } from "../src/collection";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { createCollectionClient } from "../src/collection";
 import { Transport } from "../src/transport";
 import { RebaseWebSocketClient } from "../src/websocket";
 import { Entity } from "@rebasepro/types";
@@ -381,6 +381,55 @@ values: { title: "B" } }
             });
         });
 
+        it("listen callback asynchronously fetches real count from count endpoint", async () => {
+            let capturedCallback: Function;
+            const mockWs = {
+                listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
+                    capturedCallback = cb;
+                    return () => {};
+                }),
+                listenEntity: jest.fn().mockReturnValue(() => {})
+            } as unknown as RebaseWebSocketClient;
+
+            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            client.count = jest.fn().mockResolvedValue(100);
+
+            const onUpdate = jest.fn();
+            client.listen!({ limit: 10, offset: 5 }, onUpdate);
+
+            const entities: Entity[] = [
+                { id: "1", path: "posts", values: { title: "A" } },
+                { id: "2", path: "posts", values: { title: "B" } }
+            ];
+
+            // Trigger first synchronous update (heuristic meta)
+            capturedCallback!(entities);
+
+            expect(onUpdate).toHaveBeenLastCalledWith({
+                data: entities,
+                meta: {
+                    total: 2,
+                    limit: 10,
+                    offset: 5,
+                    hasMore: false
+                }
+            });
+
+            // Wait for count promise to resolve
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            expect(client.count).toHaveBeenCalledWith({ limit: 10, offset: 5 });
+            expect(onUpdate).toHaveBeenLastCalledWith({
+                data: entities,
+                meta: {
+                    total: 100,
+                    limit: 10,
+                    offset: 5,
+                    hasMore: true
+                }
+            });
+        });
+
         it("listenById passes correct parameters to ws.listenEntity", () => {
             const unsubFn = jest.fn();
             const mockWs = {
@@ -614,21 +663,21 @@ mockWs };
         const { client, mockWs } = createClientWithWs();
         client.listen!({ where: { count: "gt.5" } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.count).toEqual([">", 5]);
+        expect(filter.count).toEqual([">", "5"]);
     });
 
     it("parses gte operator", () => {
         const { client, mockWs } = createClientWithWs();
         client.listen!({ where: { count: "gte.10" } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.count).toEqual([">=", 10]);
+        expect(filter.count).toEqual([">=", "10"]);
     });
 
     it("parses lt and lte operators", () => {
         const { client, mockWs } = createClientWithWs();
         client.listen!({ where: { count: "lt.3" } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
-        expect(filter.count).toEqual(["<", 3]);
+        expect(filter.count).toEqual(["<", "3"]);
     });
 
     it("parses neq operator", () => {

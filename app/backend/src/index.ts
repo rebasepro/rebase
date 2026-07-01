@@ -6,14 +6,14 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
-    initializeRebaseBackend,
-    serveSPA,
-    HonoEnv,
-    listenWithPortRetry,
     cleanupDevPortFile,
-    logger
+    HonoEnv,
+    initializeRebaseBackend,
+    listenWithPortRetry,
+    logger,
+    serveSPA
 } from "@rebasepro/server-core";
-import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
 import usersCollection from "../../config/collections/users.js";
@@ -125,7 +125,7 @@ pass: env.SMTP_PASS! }
             : undefined, // dev defaults are applied by server-core
         hooks: {
             data: {
-                afterRead(slug, entity) {
+                afterRead(slug: string, entity: Record<string, unknown>) {
                     const maskEmail = (email: string): string => {
                         const [local, domain] = email.split("@");
                         if (local && domain) {

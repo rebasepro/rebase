@@ -226,7 +226,7 @@ export interface RebaseData {
      * const accessor = data.collection("products");
      * await accessor.find({ limit: 10 });
      */
-    collection(slug: string): CollectionAccessor;
+    collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): CollectionAccessor<M>;
 
     /**
      * Dynamic collection accessor.

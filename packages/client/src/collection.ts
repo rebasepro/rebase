@@ -6,9 +6,9 @@ import {
     FilterOperator,
     FilterValues,
     FindResponse,
+    LogicalCondition,
     WhereFieldValue,
     WhereFilterOp,
-    LogicalCondition,
     WhereValue
 } from "@rebasepro/types";
 
@@ -40,7 +40,7 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
         "array-contains-any": "array-contains-any"
     };
 
-    const parseSingle = (rawValue: any, fieldKey: string): [WhereFilterOp, unknown] => {
+    const parseSingle = (rawValue: any, _fieldKey: string): [WhereFilterOp, unknown] => {
         if (rawValue === null) return ["==", null];
         if (typeof rawValue === "boolean") return ["==", rawValue];
         if (typeof rawValue === "number") return ["==", rawValue];
@@ -55,62 +55,26 @@ function parseWhereFilter(where?: Record<string, WhereFieldValue>): FilterValues
         if (dotIndex > 0) {
             const opStr = value.substring(0, dotIndex);
             const valStr = value.substring(dotIndex + 1);
-            let op: WhereFilterOp = "==";
-            let val: string | number | boolean | null | string[] = valStr;
-
-            switch (opStr) {
-                case "eq":
-                    op = "==";
-                    break;
-                case "neq":
-                    op = "!=";
-                    break;
-                case "gt":
-                    op = ">";
-                    break;
-                case "gte":
-                    op = ">=";
-                    break;
-                case "lt":
-                    op = "<";
-                    break;
-                case "lte":
-                    op = "<=";
-                    break;
-                case "in":
-                    op = "in";
+            if (opStr in OP_TO_FILTER) {
+                const op = OP_TO_FILTER[opStr];
+                let val: string | number | boolean | null | string[] = valStr;
+                if (op === "in" || op === "not-in" || op === "array-contains-any") {
                     val = valStr.startsWith("(") && valStr.endsWith(")")
                         ? valStr.slice(1, -1).split(",").map(v => v.trim())
                         : valStr.split(",");
-                    break;
-                case "nin":
-                    op = "not-in";
-                    val = valStr.startsWith("(") && valStr.endsWith(")")
-                        ? valStr.slice(1, -1).split(",").map(v => v.trim())
-                        : valStr.split(",");
-                    break;
-                case "cs":
-                    op = "array-contains";
-                    break;
-                case "csa":
-                    op = "array-contains-any";
-                    val = valStr.startsWith("(") && valStr.endsWith(")")
-                        ? valStr.slice(1, -1).split(",").map(v => v.trim())
-                        : valStr.split(",");
-                    break;
-                default:
-                    op = "==";
-                    val = value;
+                }
+                if (val === "true") val = true;
+                else if (val === "false") val = false;
+                else if (val === "null") val = null;
+                return [op, val];
             }
-            if (val === "true") val = true;
-            else if (val === "false") val = false;
-            else if (val === "null") val = null;
-            else if (typeof val === "string" && /^[0-9]+(\.[0-9]+)?$/.test(val) && fieldKey !== "id" && !fieldKey.endsWith("_id")) val = Number(val);
-
-            return [op, val];
-        } else {
-            return ["==", value];
         }
+
+        let val: any = value;
+        if (val === "true") val = true;
+        else if (val === "false") val = false;
+        else if (val === "null") val = null;
+        return ["==", val];
     };
 
     for (const [key, rawValue] of Object.entries(where)) {
@@ -253,7 +217,9 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
     if (ws) {
         client.listen = (params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
-            return ws.listenCollection(
+            let active = true;
+            let lastUpdateId = 0;
+            const unsub = ws.listenCollection(
                 {
                     path: slug,
                     filter: parseWhereFilter(params?.where),
@@ -264,19 +230,49 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     searchString: params?.searchString
                 },
                 (entities: Entity[]) => {
+                    const currentUpdateId = ++lastUpdateId;
                     const requestedLimit = params?.limit || 20;
+                    const offset = params?.offset || 0;
+
+                    // Immediately fire update with heuristic metadata
                     onUpdate({
                         data: entities as Entity<M>[],
                         meta: {
                             total: entities.length,
                             limit: requestedLimit,
-                            offset: params?.offset || 0,
+                            offset,
                             hasMore: entities.length >= requestedLimit
                         }
                     });
+
+                    // Asynchronously fetch the actual count from the server to get accurate total/hasMore
+                    if (client.count) {
+                        client.count(params)
+                            .then((total) => {
+                                if (active && currentUpdateId === lastUpdateId) {
+                                    onUpdate({
+                                        data: entities as Entity<M>[],
+                                        meta: {
+                                            total,
+                                            limit: requestedLimit,
+                                            offset,
+                                            hasMore: offset + entities.length < total
+                                        }
+                                    });
+                                }
+                            })
+                            .catch(() => {
+                                // Silent fallback on count error
+                            });
+                    }
                 },
                 onError
             );
+
+            return () => {
+                active = false;
+                unsub();
+            };
         };
 
         client.listenById = (id: string | number, onUpdate: (data: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {

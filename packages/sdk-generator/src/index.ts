@@ -51,13 +51,13 @@ export function generateSDK(
 
 2. Initialize with your generated types:
    \`\`\`typescript
-   import { createRebaseClient } from '@rebasepro/client';
-   import type { Database } from './database.types';
+    import { createRebaseClient } from '@rebasepro/client';
+    import { Database, collectionsDictionary } from './database.types';
 
-   const rebase = createRebaseClient<Database>({
-       baseUrl: 'http://localhost:3001',
-       // token: '...', // User token if not using auth module
-   });
+    const rebase = createRebaseClient<Database>({
+        baseUrl: 'http://localhost:3001',
+        collections: collectionsDictionary,
+    });
 
    // Both syntax styles are fully typed!
    const { data: users } = await rebase.data.users.find();

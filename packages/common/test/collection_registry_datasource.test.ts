@@ -2,7 +2,7 @@ import { EntityCollection } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { createDataSourceRegistry } from "../src/data/resolveDataSource";
 
-describe("CollectionRegistry — data source engine stamping", () => {
+describe("CollectionRegistry — data source resolution stamping", () => {
 
     const firestoreColl: EntityCollection = {
         id: "events",
@@ -22,7 +22,7 @@ describe("CollectionRegistry — data source engine stamping", () => {
         properties: { title: { type: "string" } }
     } as EntityCollection;
 
-    it("stamps the resolved engine onto a dataSource-only collection (normalized layer)", () => {
+    it("stamps both dataSource and engine from a registered definition", () => {
         const registry = new CollectionRegistry(
             [firestoreColl],
             createDataSourceRegistry([
@@ -30,25 +30,32 @@ describe("CollectionRegistry — data source engine stamping", () => {
             ])
         );
         const normalized = registry.get("events");
-        expect(normalized?.driver).toBe("firestore");
-        // Raw layer keeps the author's original fields (no driver invented).
-        expect(registry.getRaw("events")?.driver).toBeUndefined();
+        expect(normalized?.dataSource).toBe("analytics");
+        expect(normalized?.engine).toBe("firestore");
+        // Raw layer keeps the author's original fields.
+        expect(registry.getRaw("events")?.engine).toBeUndefined();
     });
 
-    it("leaves plain default collections untouched (driver stays undefined)", () => {
+    it("stamps default dataSource and engine on plain collections", () => {
         const registry = new CollectionRegistry(
             [plainColl],
             createDataSourceRegistry([{ key: "(default)", engine: "postgres", transport: "server" }])
         );
-        expect(registry.get("products")?.driver).toBeUndefined();
+        const normalized = registry.get("products");
+        expect(normalized?.dataSource).toBe("(default)");
+        expect(normalized?.engine).toBe("postgres");
+        // Raw layer has no dataSource or engine.
+        expect(registry.getRaw("products")?.dataSource).toBeUndefined();
+        expect(registry.getRaw("products")?.engine).toBeUndefined();
     });
 
-    it("does not override an explicit driver", () => {
-        const coll = { ...firestoreColl, driver: "mongodb" } as EntityCollection;
+    it("does not override an explicit engine", () => {
+        const coll = { ...firestoreColl, engine: "mongodb" } as EntityCollection;
         const registry = new CollectionRegistry(
             [coll],
             createDataSourceRegistry([{ key: "analytics", engine: "firestore", transport: "direct" }])
         );
-        expect(registry.get("events")?.driver).toBe("mongodb");
+        expect(registry.get("events")?.engine).toBe("mongodb");
+        expect(registry.get("events")?.dataSource).toBe("analytics");
     });
 });

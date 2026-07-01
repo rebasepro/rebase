@@ -76,17 +76,18 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     dataSource?: string;
 
     /**
-     * The engine backing this collection (`"postgres"`, `"firestore"`,
-     * `"mongodb"`, or a custom id). Drives editor capabilities (relations vs
-     * subcollections, RLS, column types).
+     * The database engine backing this collection (`"postgres"`, `"firestore"`,
+     * `"mongodb"`, or a custom id).
      *
-     * @deprecated Prefer {@link dataSource} for routing. `driver` is retained
-     * as an engine hint and for backward compatibility: when `dataSource` is
-     * omitted it also acts as the data-source key.
+     * On concrete collection types ({@link PostgresCollection},
+     * {@link FirebaseCollection}, {@link MongoDBCollection}) this is a literal
+     * discriminant. On the base type it is optional and gets stamped
+     * automatically during collection normalization from the registered
+     * {@link DataSourceDefinition}.
      *
-     * If not specified, `"postgres"` is assumed.
+     * Prefer setting {@link dataSource} and letting the engine be resolved.
      */
-    driver?: string;
+    engine?: string;
 
     /**
      * Which database within the engine.
@@ -299,8 +300,8 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * Can the elements in this collection be edited inline in the collection
-     * view. If this flag is set to false but `permissions.edit` is `true`, entities
-     * can still be edited in the side panel
+     * view. Even when inline editing is disabled, entities can still be
+     * edited in the side panel (subject to `securityRules`).
      */
     inlineEditing?: boolean;
 
@@ -499,10 +500,10 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
     properties: PostgresProperties;
 
     /**
-     * The driver for this collection. For Postgres collections this
+     * The database engine for this collection. For Postgres collections this
      * can be omitted (Postgres is the default) or set to `"postgres"`.
      */
-    driver?: "postgres" | undefined;
+    engine?: "postgres" | undefined;
 
     /**
      * The PostgreSQL table name for this collection.
@@ -552,9 +553,9 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
 export interface FirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
     extends BaseEntityCollection<M, USER> {
     /**
-     * The driver for this collection. Must be set to `"firestore"`.
+     * The database engine for this collection. Must be set to `"firestore"`.
      */
-    driver: "firestore";
+    engine: "firestore";
 
     /**
      * Set of properties that compose an entity.
@@ -573,7 +574,7 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
      *     slug: "fs_customer",        // URL: /c/fs_customer
      *     path: "customer",           // Firestore path: customer
      *     name: "Customers (Firestore)",
-     *     driver: "firestore",
+     *     engine: "firestore",
      *     properties: { ... }
      * };
      * ```
@@ -600,9 +601,9 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
     extends BaseEntityCollection<M, USER> {
 
     /**
-     * The driver for this collection. Must be set to `"mongodb"`.
+     * The database engine for this collection. Must be set to `"mongodb"`.
      */
-    driver: "mongodb";
+    engine: "mongodb";
 
     /**
      * Set of properties that compose an entity.
@@ -621,7 +622,7 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
      *     slug: "mongo_customer",      // URL: /c/mongo_customer
      *     path: "customer",            // MongoDB collection: customer
      *     name: "Customers (MongoDB)",
-     *     driver: "mongodb",
+     *     engine: "mongodb",
      *     properties: { ... }
      * };
      * ```
@@ -644,31 +645,22 @@ export type EntityCollection<M extends Record<string, unknown> = Record<string, 
 
 // ── Capability intersection types ─────────────────────────────────────
 // Use these after a `getDataSourceCapabilities()` guard to safely access
-// driver-specific fields without coupling to a concrete driver type.
-
-/**
- * An EntityCollection that supports SQL-style relations (e.g. Postgres).
- * @deprecated Use `EntityCollection` directly — `table`, `relations`, and `securityRules` are now on `BaseEntityCollection`.
- */
-export type CollectionWithRelations<M extends Record<string, unknown> = Record<string, unknown>> =
-    EntityCollection<M> & { table?: string; relations?: Relation[]; securityRules?: SecurityRule[] };
+// engine-specific fields without coupling to a concrete engine type.
 
 /** An EntityCollection that supports subcollections (e.g. Firestore). */
 export type CollectionWithSubcollections<M extends Record<string, unknown> = Record<string, unknown>> =
     EntityCollection<M> & { subcollections?: () => EntityCollection<Record<string, unknown>>[] };
 
 
-// ── Type guards ───────────────────────────────────────────────────────
-
 /**
  * Type guard for PostgreSQL collections.
- * Returns true if the collection uses the Postgres driver (or the default driver).
+ * Returns true if the collection uses the Postgres engine (or the default engine).
  * @group Models
  */
 export function isPostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
     collection: EntityCollection<M, USER>
 ): collection is PostgresCollection<M, USER> {
-    return !collection.driver || collection.driver === "postgres";
+    return !collection.engine || collection.engine === "postgres";
 }
 
 /**
@@ -678,7 +670,7 @@ export function isPostgresCollection<M extends Record<string, unknown> = Record<
 export function isFirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
     collection: EntityCollection<M, USER>
 ): collection is FirebaseCollection<M, USER> {
-    return collection.driver === "firestore";
+    return collection.engine === "firestore";
 }
 
 /**
@@ -688,7 +680,7 @@ export function isFirebaseCollection<M extends Record<string, unknown> = Record<
 export function isMongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
     collection: EntityCollection<M, USER>
 ): collection is MongoDBCollection<M, USER> {
-    return collection.driver === "mongodb";
+    return collection.engine === "mongodb";
 }
 
 /**

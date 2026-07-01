@@ -12,33 +12,22 @@
  */
 
 import type {
-    DataType,
-    EnumValues,
-    PropertyValidationSchema,
-    NumberPropertyValidationSchema,
     ArrayPropertyValidationSchema,
-    PropertyConditions,
-    ImageResize,
-    FileType,
-    ColorKey,
-    ColorScheme,
-} from "@rebasepro/types";
-
-import type {
-    ViewMode,
     CollectionSize,
-    SecurityRule,
-    FilterValues,
+    EnumValues,
+    FileType,
     FilterPreset,
-    WhereFilterOp,
-    KanbanConfig,
-    SecurityOperation,
-    NavigationGroupMapping,
-} from "@rebasepro/types";
-
-import type {
-    OnAction,
+    FilterValues,
+    ImageResize,
     JoinStep,
+    KanbanConfig,
+    NavigationGroupMapping,
+    NumberPropertyValidationSchema,
+    OnAction,
+    PropertyConditions,
+    PropertyValidationSchema,
+    SecurityRule,
+    ViewMode,
 } from "@rebasepro/types";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -388,7 +377,8 @@ export interface SerializableCollection {
     icon?: string;
 
     group?: string;
-    driver?: string;
+    engine?: string;
+    dataSource?: string;
     databaseId?: string;
 
     properties: SerializableProperties;

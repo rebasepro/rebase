@@ -1,7 +1,6 @@
 import {
     ArrayProperty,
     AuthController,
-    CollectionWithRelations,
     CollectionWithSubcollections,
     EntityCollection,
     EnumValueConfig,
@@ -347,11 +346,11 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         return collection.childCollections() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.driver).supportsSubcollections && (collection as CollectionWithSubcollections).subcollections) {
+    if (getDataSourceCapabilities(collection.engine).supportsSubcollections && (collection as CollectionWithSubcollections).subcollections) {
         return (collection as CollectionWithSubcollections).subcollections!() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.driver).supportsRelations) {
+    if (getDataSourceCapabilities(collection.engine).supportsRelations) {
         const resolvedRelations = resolveCollectionRelations(collection);
         const manyRelations = Object.values(resolvedRelations).filter((r: Relation) => r.cardinality === "many");
 

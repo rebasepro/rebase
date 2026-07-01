@@ -1,16 +1,13 @@
 import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
-import { getCollectionDataPath } from "@rebasepro/types";
+import { Entity, getCollectionDataPath, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import React, { useCallback } from "react";
-import { Entity, EntityRelation, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EntityPreviewContainer } from "../../components/EntityPreview";
-import { IconForView } from "@rebasepro/core";
+import { ErrorView, IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
-import { getRelationFrom, resolveRelationProperty, normalizeToEntityRelation } from "@rebasepro/common";
-
-import { ErrorView } from "@rebasepro/core";
+import { getRelationFrom, normalizeToEntityRelation, resolveRelationProperty } from "@rebasepro/common";
 import { cls } from "@rebasepro/ui";
 import { RelationPreview } from "../../preview";
 import { RelationSelector } from "../../components/RelationSelector";
@@ -23,7 +20,7 @@ export function RelationFieldBinding(props: FieldProps<RelationProperty>) {
         throw Error("RelationFieldBinding expected a property containing a relation");
     }
     const collection = context.collection;
-    const capabilities = collection ? getDataSourceCapabilities(collection.driver) : undefined;
+    const capabilities = collection ? getDataSourceCapabilities(collection.engine) : undefined;
     if (!collection || !capabilities?.supportsRelations || !("relations" in collection) || !collection.relations) {
         throw Error("RelationFieldBinding expected a collection with relations support");
     }

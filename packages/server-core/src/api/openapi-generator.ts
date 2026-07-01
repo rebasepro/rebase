@@ -491,9 +491,9 @@ function convertPropertyToSchema(property: Property): Record<string, unknown> {
             }
 
             if (sp.email) base.format = "email";
-            if (sp.url) base.format = "uri";
+            if (sp.ui?.url) base.format = "uri";
             if (sp.storage) base.format = "uri";
-            if (sp.markdown) base.description = (base.description || "") + " (Markdown)";
+            if (sp.ui?.markdown) base.description = (base.description || "") + " (Markdown)";
 
             return base;
         }

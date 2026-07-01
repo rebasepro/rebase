@@ -1,5 +1,5 @@
 import { CollectionRegistry } from "@rebasepro/common";
-import { type CollectionWithRelations, type EntityCollection, type Relation, getDataSourceCapabilities } from "@rebasepro/types";
+import { type EntityCollection, type Relation, getDataSourceCapabilities } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { CollectionRegistryInterface } from "../interfaces";
@@ -40,11 +40,11 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
     }
 
     /**
-     * Finds collections assigned to a specific driver that do not have a registered table.
+     * Finds collections assigned to a specific data source that do not have a registered table.
      */
-    getCollectionsWithoutTables(driverId = "(default)"): EntityCollection[] {
+    getCollectionsWithoutTables(dataSourceKey = "(default)"): EntityCollection[] {
         const collections = this.getCollections().filter(
-            c => c.driver === driverId || (!c.driver && driverId === "(default)")
+            c => c.dataSource === dataSourceKey || (!c.dataSource && dataSourceKey === "(default)")
         );
         return collections.filter(c => !this.tables.has(getTableName(c)));
     }
@@ -95,8 +95,8 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
         const collection = this.getCollectionByPath(collectionPath);
-        if (!collection || !getDataSourceCapabilities(collection.driver).supportsRelations || !(collection as CollectionWithRelations).relations) return [];
-        return (collection as CollectionWithRelations).relations!.map((r: Relation) => r.relationName || r.localKey || "").filter(Boolean);
+        if (!collection || !getDataSourceCapabilities(collection.engine).supportsRelations || !collection.relations) return [];
+        return collection.relations!.map((r: Relation) => r.relationName || r.localKey || "").filter(Boolean);
     }
 
 }

@@ -25,7 +25,9 @@ const categoriesCollection: EntityCollection = {
         description: {
             name: "Description",
             type: "string",
-            multiline: true
+            ui: {
+                multiline: true
+            }
         },
         icon: {
             name: "Icon",

@@ -1,7 +1,7 @@
-import type { EntityCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import { resetPasswordAction } from "@rebasepro/admin";
 
-const usersCollection: EntityCollection = {
+const usersCollection = defineCollection({
     name: "Users",
     singularName: "User",
     slug: "users",
@@ -121,6 +121,6 @@ disabled: { hidden: true } }
             withCheck: "auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']"
         }
     ]
-};
+});
 
 export default usersCollection;

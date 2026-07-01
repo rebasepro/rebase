@@ -13,6 +13,7 @@
     },
     "dependencies": {
         "@rebasepro/admin": "workspace:*",
+        "@rebasepro/common": "workspace:*",
         "@rebasepro/types": "workspace:*"
     },
     "devDependencies": {

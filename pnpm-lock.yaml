@@ -118,6 +118,9 @@ importers:
       '@rebasepro/admin':
         specifier: workspace:*
         version: link:../../packages/admin
+      '@rebasepro/common':
+        specifier: workspace:*
+        version: link:../../packages/common
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -1400,6 +1403,9 @@ importers:
 
   packages/server-postgresql:
     dependencies:
+      '@ariga/atlas':
+        specifier: ^1.2.2
+        version: 1.2.2
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
@@ -1443,9 +1449,6 @@ importers:
         specifier: '>=8.21.0'
         version: 8.21.0
     devDependencies:
-      '@ariga/atlas':
-        specifier: ^1.2.2
-        version: 1.2.2
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0

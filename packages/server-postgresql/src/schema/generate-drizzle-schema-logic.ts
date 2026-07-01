@@ -617,7 +617,9 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                 const enumVarName = getEnumVarName(collectionPath, propName);
                 const enumDbName = `${collectionPath}_${resolveColumnName(propName, prop)}`;
                 const values = Array.isArray(prop.enum)
-                    ? prop.enum.map(v => String(v.id ?? v))
+                    ? (prop.enum as (string | number | { id: string | number })[]).map((v: string | number | { id: string | number }) =>
+                        String(typeof v === "object" && v !== null && "id" in v ? v.id : v)
+                    )
                     : Object.keys(prop.enum);
                 if (values.length > 0) {
                     schemaContent += `export const ${enumVarName} = pgEnum(\"${enumDbName}\", [${values.map(v => `'${v}'`).join(", ")}]);\n`;

@@ -1,31 +1,50 @@
-
-import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
-import { useNavigationStateController, useCollectionRegistryController, useUrlController } from "../../_cms_internals";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ConfirmationDialog, ErrorView, useAuthController, useCustomizationController, useSnackbarController } from "@rebasepro/core";
+import {
+    ConfirmationDialog,
+    ErrorView,
+    UnsavedChangesDialog,
+    useAuthController,
+    useCustomizationController,
+    useUnsavedChangesDialog
+} from "@rebasepro/core";
+import {
+    getInferenceType,
+    ImportSaveInProgress,
+    useCollectionRegistryController,
+    useImportConfig,
+    useNavigationStateController,
+    useUrlController
+} from "../../_cms_internals";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
-import { CircularProgressCenter } from "@rebasepro/ui";
 import {
     ArrowLeftIcon,
     Button,
     CheckIcon,
+    CircularProgressCenter,
     cls,
     coolIconKeys,
     defaultBorderMixin,
     Dialog,
-    DialogActions,
-    DialogContent,
     DialogTitle,
     IconButton,
     LoadingButton,
     Tab,
-    Tabs,
-    Typography
+    Tabs
 } from "@rebasepro/ui";
-import { EngineProperties, Entity, EntityCollection, MapProperty, Properties, Property, PropertyConfig, User, getDataSourceCapabilities } from "@rebasepro/types";
-import type { PostgresCollection } from "@rebasepro/types";
-import { getSubcollections, isPropertyBuilder, removeInitialAndTrailingSlashes, getTableName } from "@rebasepro/common";
+import {
+    EngineProperties,
+    Entity,
+    EntityCollection,
+    getDataSourceCapabilities,
+    MapProperty,
+    Properties,
+    Property,
+    PropertyConfig,
+    TableMetadata,
+    User
+} from "@rebasepro/types";
+import { getSubcollections, getTableName, isPropertyBuilder, removeInitialAndTrailingSlashes } from "@rebasepro/common";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
 import { DisplaySettingsForm } from "./DisplaySettingsForm";
@@ -33,7 +52,6 @@ import { CollectionPropertiesEditorForm } from "./CollectionPropertiesEditorForm
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionEditorWelcomeView } from "./CollectionEditorWelcomeView";
 import { CollectionInference } from "../../types/collection_inference";
-import { getInferenceType, ImportSaveInProgress, useImportConfig } from "../../_cms_internals";
 import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
 import { CollectionEditorImportMapping } from "./import/CollectionEditorImportMapping";
 import { CollectionEditorImportDataPreview } from "./import/CollectionEditorImportDataPreview";
@@ -42,10 +60,9 @@ import { Formex, FormexController, useCreateFormex } from "@rebasepro/formex";
 import { getFullIdPath } from "./util";
 import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { AIModifiedPathsProvider, useAIModifiedPaths } from "./AIModifiedPathsContext";
-import { CollectionOperation, CollectionGenerationCallback } from "../../api/generateCollectionApi";
+import { CollectionGenerationCallback, CollectionOperation } from "../../api/generateCollectionApi";
 import { CollectionRLSTab } from "./CollectionRLSTab";
 import { buildCollectionFromTableMetadata } from "../../pgColumnToProperty";
-import { TableMetadata } from "@rebasepro/types";
 import { mergeDeep, randomString, removeUndefined } from "@rebasepro/utils";
 import type { CollectionEditorExtensionProps, CollectionEditorTab } from "../../extensibility_types";
 
@@ -697,7 +714,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                             {(!visibleTabs || visibleTabs.includes("properties")) && <Tab value={"properties"}>
                                 Properties
                             </Tab>}
-                            {(!visibleTabs || visibleTabs.includes("rls")) && getDataSourceCapabilities(values.driver).supportsRLS && <Tab value={"rls"}>
+                            {(!visibleTabs || visibleTabs.includes("rls")) && getDataSourceCapabilities(values.engine).supportsRLS && <Tab value={"rls"}>
                                 RLS
                             </Tab>}
                         </Tabs>
@@ -807,7 +824,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                             <DisplaySettingsForm expandKanban={expandKanban} standalone={standalone}/>
                         }
 
-                        {currentView === "rls" && getDataSourceCapabilities(values.driver).supportsRLS &&
+                        {currentView === "rls" && getDataSourceCapabilities(values.engine).supportsRLS &&
                             <CollectionRLSTab/>
                         }
 

@@ -1,4 +1,4 @@
-import { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 
@@ -10,7 +10,7 @@ const getRelationId = (val: any): string | number | undefined => {
     return undefined;
 };
 
-const ordersCollection: PostgresCollection = {
+const ordersCollection = defineCollection({
     name: "Orders",
     singularName: "Order",
     slug: "orders",
@@ -280,7 +280,7 @@ const ordersCollection: PostgresCollection = {
             }
         }
     ]
-};
+});
 
 // Helper function to update customer lifetime value and total orders count
 async function updateCustomerMetrics(customerId: string | number, context: any) {

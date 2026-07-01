@@ -1,4 +1,4 @@
-import { CollectionWithRelations, Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
+import { Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
 
 /**
  * Minimal auth context for permission checking.
@@ -150,7 +150,7 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
     entity: Entity<M> | null,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): boolean {
-    const securityRules = getDataSourceCapabilities(collection.driver).supportsRLS ? (collection as CollectionWithRelations).securityRules : undefined;
+    const securityRules = getDataSourceCapabilities(collection.engine).supportsRLS ? collection.securityRules : undefined;
     if (!securityRules || securityRules.length === 0) {
         return true;
     }

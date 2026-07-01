@@ -17,14 +17,16 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 
 # Copy workspace root files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 
 # Copy workspace packages
 COPY frontend ./frontend
 COPY config ./config
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (skip scripts to avoid @ariga/atlas binary download,
+# which is a backend-only dependency that may fail on certain platforms)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm rebuild esbuild
 
 # Build config first, then frontend
 RUN pnpm --filter "*-config" run build

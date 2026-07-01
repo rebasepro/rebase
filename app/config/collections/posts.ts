@@ -1,8 +1,8 @@
-import { PostgresCollection } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/common";
 import authorsCollection from "./authors";
 import tagsCollection from "./tags";
 
-const postsCollection: PostgresCollection = {
+const postsCollection = defineCollection({
     name: "Blog posts",
     singularName: "Blog post",
     slug: "posts",
@@ -201,7 +201,7 @@ const postsCollection: PostgresCollection = {
             return values;
         }
     }
-};
+});
 
 postsCollection.securityRules = [
     {

@@ -21,7 +21,9 @@ const productsCollection: EntityCollection = {
         description: {
             name: "Description",
             type: "string",
-            markdown: true
+            ui: {
+                markdown: true
+            }
         },
         price: {
             name: "Price",

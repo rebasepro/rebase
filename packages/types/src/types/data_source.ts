@@ -211,13 +211,13 @@ const CAPABILITIES_REGISTRY: Record<string, DataSourceCapabilities> = {
 };
 
 /**
- * Look up capabilities for a given driver key.
- * If `driver` is undefined or not found, returns `DEFAULT_CAPABILITIES`.
+ * Look up capabilities for a given engine key.
+ * If `engine` is undefined or not found, returns `DEFAULT_CAPABILITIES`.
  * @group Models
  */
-export function getDataSourceCapabilities(driver?: string): DataSourceCapabilities {
-    if (!driver) return POSTGRES_CAPABILITIES; // postgres is the default driver
-    return CAPABILITIES_REGISTRY[driver] ?? DEFAULT_CAPABILITIES;
+export function getDataSourceCapabilities(engine?: string): DataSourceCapabilities {
+    if (!engine) return POSTGRES_CAPABILITIES; // postgres is the default engine
+    return CAPABILITIES_REGISTRY[engine] ?? DEFAULT_CAPABILITIES;
 }
 
 /**

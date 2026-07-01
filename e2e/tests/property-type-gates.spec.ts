@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -35,8 +35,14 @@ test.describe("Property Type Gates E2E", () => {
 
     // Perform standard demo login
     await page.goto("/");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: /Sign in with email/i }).click();
+    const checkbox = page.getByRole("checkbox");
+    await checkbox.waitFor({ state: "visible" });
+    await checkbox.check();
+
+    const signInWithEmail = page.getByRole("button", { name: /Sign in with email/i });
+    await expect(signInWithEmail).toBeEnabled({ timeout: 5000 });
+    await signInWithEmail.click();
+
     const signInButton = page.locator("button", { hasText: /^Sign in$/i }).first();
     await expect(signInButton).toBeVisible();
     await Promise.all([
@@ -61,9 +67,7 @@ test.describe("Property Type Gates E2E", () => {
     const nameInput = page.getByLabel("Name", { exact: true });
     await expect(nameInput).toBeVisible();
     await page.waitForTimeout(500); // Wait for transitions/animations to finish
-    await nameInput.click();
-    await nameInput.fill("");
-    await nameInput.pressSequentially("E2E Property Gate Test", { delay: 50 });
+    await nameInput.fill("E2E Property Gate Test");
     await expect(nameInput).toHaveValue("E2E Property Gate Test", { timeout: 5000 });
 
     // 4. Click Next to go to Properties tab
@@ -83,29 +87,34 @@ test.describe("Property Type Gates E2E", () => {
     await expect(page.getByText("Reference (as string)")).not.toBeVisible();
 
     // 7. Verify that 'Reference' IS available and click it
-    const referenceOption = page.getByText("Reference", { exact: true }).first();
+    const referenceOption = page.getByRole("button", { name: /Reference The value refers to/i }).first();
     await expect(referenceOption).toBeVisible({ timeout: 5000 });
     await referenceOption.click();
 
     // Verify the reference property editor appears (wait for property settings to render)
     await expect(page.getByPlaceholder("Field name")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Target collection").first()).toBeVisible({ timeout: 10000 });
 
     // Fill in the property name to ensure we can proceed
     const propertyTitleInput = page.getByPlaceholder("Field name");
     await page.waitForTimeout(500); // Wait for dialog animations & hydration
-    await propertyTitleInput.click();
-    await propertyTitleInput.fill("");
-    await propertyTitleInput.pressSequentially("Test Reference", { delay: 50 });
+    await propertyTitleInput.fill("Test Reference");
     await expect(propertyTitleInput).toHaveValue("Test Reference", { timeout: 5000 });
 
     // Fill ID field explicitly
     const idInput = page.getByLabel("ID", { exact: true });
     await expect(idInput).toBeVisible();
     await page.waitForTimeout(200);
-    await idInput.click();
-    await idInput.fill("");
-    await idInput.pressSequentially("test_reference", { delay: 50 });
+    await idInput.fill("test_reference");
     await expect(idInput).toHaveValue("test_reference", { timeout: 5000 });
+
+    // Select a target collection to satisfy validation
+    const targetSelect = page.getByRole("combobox", { name: "Target collection" });
+    await expect(targetSelect).toBeVisible();
+    await targetSelect.click();
+    const usersOption = page.getByRole("option", { name: "USERS" }).first();
+    await expect(usersOption).toBeVisible();
+    await usersOption.click();
 
     await page.waitForTimeout(500); // Wait for deferred state updates
 

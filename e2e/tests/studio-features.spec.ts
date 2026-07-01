@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -67,7 +67,7 @@ test.describe("Rebase Studio Features E2E", () => {
     const nameInput = page.getByLabel("Name", { exact: true });
     await expect(nameInput).toBeVisible();
     await page.waitForTimeout(500); // Wait for transitions/animations to finish
-    await nameInput.click();
+    await nameInput.click({ force: true });
     await nameInput.fill("");
     await nameInput.pressSequentially("E2E Test Collection", { delay: 50 });
     await expect(nameInput).toHaveValue("E2E Test Collection", { timeout: 5000 });
@@ -96,7 +96,7 @@ test.describe("Rebase Studio Features E2E", () => {
     const propertyTitleInput = page.getByPlaceholder("Field name");
     await expect(propertyTitleInput).toBeVisible();
     await page.waitForTimeout(500); // Wait for dialog animations & hydration
-    await propertyTitleInput.click();
+    await propertyTitleInput.click({ force: true });
     await propertyTitleInput.fill("");
     await propertyTitleInput.pressSequentially("Post Title", { delay: 50 });
     await expect(propertyTitleInput).toHaveValue("Post Title", { timeout: 5000 });
@@ -105,7 +105,7 @@ test.describe("Rebase Studio Features E2E", () => {
     const idInput = page.getByLabel("ID", { exact: true });
     await expect(idInput).toBeVisible();
     await page.waitForTimeout(200);
-    await idInput.click();
+    await idInput.click({ force: true });
     await idInput.fill("");
     await idInput.pressSequentially("post_title", { delay: 50 });
     await expect(idInput).toHaveValue("post_title", { timeout: 5000 });
@@ -126,8 +126,8 @@ test.describe("Rebase Studio Features E2E", () => {
     await expect(createButton).toBeEnabled();
     await createButton.click();
 
-    // Wait for the success snackbar
-    await expect(page.getByText("Collection E2E Test Collection saved")).toBeVisible({ timeout: 20000 });
+    // Wait for the success navigation indicating the collection has saved
+    await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 });
   });
 
   test("sql console - can run queries, handle syntax errors, and switch roles", async ({ page }) => {

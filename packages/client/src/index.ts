@@ -3,12 +3,19 @@ import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createApiKeys, CreateApiKeysOptions } from "./api-keys";
-import { createCollectionClient, CollectionClient } from "./collection";
+import { CollectionClient, createCollectionClient } from "./collection";
 import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
-import { RebaseClient, RebaseData, StorageSource, StorageSourceDefinition, StorageSourceRegistry, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import {
+    DEFAULT_STORAGE_SOURCE_KEY,
+    RebaseClient,
+    RebaseData,
+    StorageSource,
+    StorageSourceDefinition,
+    StorageSourceRegistry
+} from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 export * from "./transport";
@@ -38,6 +45,13 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      * {@link DEFAULT_STORAGE_SOURCE_KEY}.
      */
     storageSources?: StorageSourceDefinition[];
+    /**
+     * Maps camelCase property names / safe identifiers to the actual
+     * collection slugs on the server (e.g. `{ companyMembers: "company-members" }`).
+     * If provided, the data layer proxy will resolve property accessors to their
+     * correct slugs via this map before falling back to automatic snake_casing.
+     */
+    collections?: Record<string, string>;
 }
 
 // ─── Typed Data Proxy ────────────────────────────────────────────────────────
@@ -245,6 +259,9 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             }
             if (typeof prop === "symbol") return undefined;
             if (typeof prop === "string" && prop !== "then" && prop !== "toJSON" && prop !== "$$typeof") {
+                if (options.collections && prop in options.collections) {
+                    return collection(options.collections[prop]);
+                }
                 // Convert camelCase property names to snake_case slugs.
                 // e.g. `companyMembers` → `company_members`
                 const slug = toSnakeCase(prop);

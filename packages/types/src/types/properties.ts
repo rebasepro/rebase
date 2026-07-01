@@ -204,10 +204,9 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     validation?: PropertyValidationSchema;
 
-    /**
-     * This value will be set by default for new entities.
-     */
-    defaultValue?: unknown;
+    // NOTE: `defaultValue` is intentionally NOT on BaseProperty.
+    // Each concrete property type (StringProperty, NumberProperty, etc.)
+    // defines its own typed `defaultValue` for compile-time safety.
 
     /**
      * Use this to define dynamic properties that change based on certain conditions
@@ -277,6 +276,10 @@ export interface StringProperty extends BaseProperty {
     ui?: StringUIConfig;
     type: "string";
     /**
+     * Default value for new entities. Must be a string.
+     */
+    defaultValue?: string;
+    /**
      * Optional database column type. If not set, it defaults to `varchar` or `uuid` depending on `isId` configuration.
      * Use `text` for strings with unbound length, `char` for fixed-length strings, or `varchar` for variable-length strings with a limit.
      */
@@ -343,6 +346,10 @@ export interface NumberProperty extends BaseProperty {
     ui?: NumberUIConfig;
     type: "number";
     /**
+     * Default value for new entities. Must be a number.
+     */
+    defaultValue?: number;
+    /**
      * Optional database column type. Allows specifying exact database numeric types.
      * If not provided, integer fields (where validation.integer is true or isId is true) default to `integer`, others to `numeric`.
      */
@@ -378,6 +385,10 @@ export interface BooleanProperty extends BaseProperty {
     ui?: BaseUIConfig;
     type: "boolean";
     /**
+     * Default value for new entities. Must be a boolean.
+     */
+    defaultValue?: boolean;
+    /**
      * Rules for validating this property
      */
     validation?: PropertyValidationSchema;
@@ -393,6 +404,10 @@ export interface VectorUIConfig extends BaseUIConfig {
 export interface VectorProperty extends BaseProperty {
     ui?: VectorUIConfig;
     type: "vector";
+    /**
+     * Default value for new entities.
+     */
+    defaultValue?: Vector;
     dimensions: number;
     validation?: PropertyValidationSchema;
 }
@@ -402,6 +417,10 @@ export interface VectorProperty extends BaseProperty {
  */
 export interface BinaryProperty extends BaseProperty {
     type: "binary";
+    /**
+     * Default value for new entities. Must be a base64-encoded string.
+     */
+    defaultValue?: string;
     validation?: PropertyValidationSchema;
 }
 
@@ -418,6 +437,10 @@ export interface DateUIConfig extends BaseUIConfig {
 export interface DateProperty extends BaseProperty {
     ui?: DateUIConfig;
     type: "date";
+    /**
+     * Default value for new entities. Must be a Date.
+     */
+    defaultValue?: Date;
     /**
      * Optional database column type. If not set, defaults to `timestamp` with timezone.
      */
@@ -452,6 +475,10 @@ export interface GeopointProperty extends BaseProperty {
     ui?: BaseUIConfig;
     type: "geopoint";
     /**
+     * Default value for new entities. Must be a GeoPoint.
+     */
+    defaultValue?: GeoPoint;
+    /**
      * Rules for validating this property
      */
     validation?: PropertyValidationSchema;
@@ -483,6 +510,10 @@ export interface ReferenceUIConfig extends BaseUIConfig {
 export interface ReferenceProperty extends BaseProperty {
     ui?: ReferenceUIConfig;
     type: "reference";
+    /**
+     * Default value for new entities. Must be an EntityReference.
+     */
+    defaultValue?: EntityReference;
     /**
      * Marks this field as a Primary Key / Unique Identifier.
      * Framework behavior: Auto-maps to `collection.primaryKeys` internally if not explicitly set.
@@ -543,6 +574,10 @@ export interface RelationUIConfig extends BaseUIConfig {
 export interface RelationProperty extends BaseProperty {
     ui?: RelationUIConfig;
     type: "relation";
+    /**
+     * Default value for new entities. Must be an EntityRelation or array of EntityRelation.
+     */
+    defaultValue?: EntityRelation | EntityRelation[];
     /**
      * Marks this field as a Primary Key / Unique Identifier.
      * Framework behavior: Auto-maps to `collection.primaryKeys` internally if not explicitly set.
@@ -683,6 +718,10 @@ export interface ArrayProperty extends BaseProperty {
     ui?: ArrayUIConfig;
     type: "array";
     /**
+     * Default value for new entities. Must be an array.
+     */
+    defaultValue?: unknown[];
+    /**
      * Optional database column type. By default, maps to a native Postgres array
      * (e.g. `text[]`, `integer[]`/`numeric[]`, `boolean[]`) if the element type
      * is a primitive, otherwise defaults to `jsonb`.
@@ -762,6 +801,10 @@ export interface MapUIConfig extends BaseUIConfig {
 export interface MapProperty extends BaseProperty {
     ui?: MapUIConfig;
     type: "map";
+    /**
+     * Default value for new entities. Must be a record/object.
+     */
+    defaultValue?: Record<string, unknown>;
     /**
      * Optional database column type. Defaults to `jsonb`.
      */
