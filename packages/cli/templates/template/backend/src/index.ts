@@ -91,7 +91,6 @@ relations },
             google: env.GOOGLE_CLIENT_ID
                 ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
-            seedDefaultRoles: true,
             allowRegistration: env.ALLOW_REGISTRATION,
             email: env.SMTP_HOST
                 ? {

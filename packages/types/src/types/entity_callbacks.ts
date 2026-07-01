@@ -4,9 +4,28 @@ import type { User } from "../users";
 import type { RebaseCallContext } from "../rebase_context";
 
 /**
- * This interface defines all the callbacks that can be used when an entity
- * is being created, updated or deleted.
+ * Per-collection lifecycle callbacks, invoked when an entity is read, created,
+ * updated or deleted. Defined on a collection via its `callbacks` field.
  * Useful for adding your own logic or blocking the execution of the operation.
+ *
+ * ## Layer & scope
+ *
+ * These run **inside the DataDriver**, so they fire on **every** data path —
+ * REST API, realtime / WebSocket subscriptions, and server-side `rebase.data`.
+ * This is the correct home for security-critical logic like PII redaction or
+ * row filtering, because no read path bypasses it.
+ *
+ * They run **before** the REST-boundary {@link DataHooks}. Execution order for
+ * a REST read is:
+ *
+ *   DataDriver → `EntityCallbacks` (all paths) → {@link DataHooks} (REST only)
+ *
+ * | Read path                       | `EntityCallbacks` | {@link DataHooks} |
+ * | ------------------------------- | :---------------: | :---------------: |
+ * | REST API (`GET /:slug`)         |        ✅         |        ✅         |
+ * | Realtime / WebSocket            |        ✅         |        ❌         |
+ * | Server-side `rebase.data.*`     |        ✅         |        ❌         |
+ *
  * @group Models
  */
 export type EntityCallbacks<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {

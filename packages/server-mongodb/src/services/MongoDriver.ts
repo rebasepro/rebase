@@ -707,7 +707,7 @@ roles: this.user.roles ?? [] };
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const entity = await this.delegate.fetchEntity(props);
         if (entity) {
-            const authorized = checkOperation(resolvedCollection as EntityCollection, { user: this.user }, entity as Entity, "select");
+            const authorized = checkOperation(resolvedCollection as EntityCollection, { user: this.user }, entity as Entity, "select", { onUnknown: "deny" });
             if (!authorized) {
                 return undefined;
             }
@@ -735,14 +735,14 @@ roles: this.user.roles ?? [] };
             const existing = await this.delegate.fetchEntity({ path: props.path,
 entityId: props.entityId,
 collection: resolvedCollection });
-            if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "update")) {
+            if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "update", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
             const tempEntity = { id: props.entityId || "new",
 path: props.path,
 values: props.values } as Entity;
-            if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, tempEntity, "insert")) {
+            if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, tempEntity, "insert", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         }
@@ -753,7 +753,7 @@ values: props.values } as Entity;
         });
 
         // After save / withCheck rules verification
-        if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, saved as Entity, props.status === "existing" ? "update" : "insert")) {
+        if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, saved as Entity, props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -766,7 +766,7 @@ values: props.values } as Entity;
         const existing = await this.delegate.fetchEntity({ path: props.entity.path,
 entityId: props.entity.id,
 collection: resolvedCollection });
-        if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "delete")) {
+        if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "delete", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 

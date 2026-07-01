@@ -59,7 +59,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         driver: driverProp,
         dataSources: dataSourcesProp,
         storageSources: storageSourcesProp,
-        drivers: driversProp,
+
         data: dataProp,
         databaseAdmin,
         plugins: pluginsProp,
@@ -97,16 +97,9 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const clientAuthController = useAuthSubscription(authControllerProp ? undefined : client?.auth);
     const authController = authControllerProp ?? clientAuthController;
 
-    // Normalize `dataSources` (+ the deprecated `drivers` shorthand) into a
-    // flat list of data sources carrying an optional client-side driver.
     const normalizedDataSources = useMemo(() => {
-        const list: (DataSourceDefinition & { driver?: DataDriver })[] = [];
-        for (const ds of dataSourcesProp ?? []) list.push(ds);
-        for (const [key, driver] of Object.entries(driversProp ?? {})) {
-            list.push({ key, engine: key, transport: "direct", driver });
-        }
-        return list;
-    }, [dataSourcesProp, driversProp]);
+        return dataSourcesProp ?? [];
+    }, [dataSourcesProp]);
 
     // Build the data-source context: the declared registry plus a RebaseData
     // per direct/custom source (those carrying a client-side driver). Server-

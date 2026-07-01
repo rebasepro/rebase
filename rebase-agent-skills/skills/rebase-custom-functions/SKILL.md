@@ -118,6 +118,27 @@ app.get("/", async (c) => {
 export default app;
 ```
 
+### Reserved Identity Values in `c.get("user")`
+
+The `user` object set by the auth middleware uses reserved values for system identities:
+
+| Auth Method | `user.userId` | `user.roles` |
+|---|---|---|
+| JWT (end-user) | Real user ID | User's assigned roles |
+| Service Key | `"service"` | `["admin"]` |
+| API Key (default) | `"api-key:{id}"` | `["service"]` |
+| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` |
+| Anonymous | `"anon"` | `["anon"]` |
+
+> **TIP:** Use these to differentiate internal vs. external callers in your custom functions:
+> ```typescript
+> app.get("/sensitive-data", async (c) => {
+>     const user = c.get("user");
+>     const isInternal = user?.userId === "service" || user?.roles?.includes("admin");
+>     // Return full or masked data based on identity
+> });
+> ```
+
 ## Invoking Functions from the Frontend
 
 > **CRITICAL FOR AGENTS**: When calling custom backend functions from the frontend, **ALWAYS** use `client.functions.invoke()`. **NEVER** use raw `fetch()`, manually construct URLs, or manually extract auth tokens from `localStorage`. The SDK handles all of this automatically.

@@ -76,7 +76,7 @@ export function ContentHomePage({
     // Content mode shows collections, CMS custom views, and admin entries — but not Studio dev views.
     const rawNavigationEntries = useMemo(() => {
         if (adminModeController.mode === "studio") {
-            return unFilteredNavigationEntries.filter(e => e.type === "view" || e.type === "admin");
+            return unFilteredNavigationEntries.filter(e => (e.type === "view" && studioViewSlugs.has(e.slug)) || e.type === "admin");
         }
         return unFilteredNavigationEntries.filter(e => e.type !== "view" || !studioViewSlugs.has(e.slug));
     }, [unFilteredNavigationEntries, adminModeController.mode, studioViewSlugs]);

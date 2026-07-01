@@ -10,6 +10,7 @@ import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
 import type { EntityCustomView, FormViewConfig } from "./entity_views";
 import type { EntityAction } from "./entity_actions";
+import type { PolicyExpression } from "./policy";
 import type { ComponentRef } from "./component_ref";
 import type { CollectionComponentOverrideMap } from "./component_overrides";
 
@@ -643,15 +644,6 @@ export type EntityCollection<M extends Record<string, unknown> = Record<string, 
     | FirebaseCollection<M, USER>
     | MongoDBCollection<M, USER>;
 
-// ── Capability intersection types ─────────────────────────────────────
-// Use these after a `getDataSourceCapabilities()` guard to safely access
-// engine-specific fields without coupling to a concrete engine type.
-
-/** An EntityCollection that supports subcollections (e.g. Firestore). */
-export type CollectionWithSubcollections<M extends Record<string, unknown> = Record<string, unknown>> =
-    EntityCollection<M> & { subcollections?: () => EntityCollection<Record<string, unknown>>[] };
-
-
 /**
  * Type guard for PostgreSQL collections.
  * Returns true if the collection uses the Postgres engine (or the default engine).
@@ -698,6 +690,22 @@ export function getCollectionDataPath<M extends Record<string, unknown> = Record
         return collection.path;
     }
     return collection.slug;
+}
+
+/**
+ * Reads a collection's driver-declared subcollections thunk (the `subcollections`
+ * field) independent of engine identity, so engine-agnostic code doesn't have to
+ * type-guard against a specific driver. Returns `undefined` when the collection
+ * declares none.
+ *
+ * Pair with `getDataSourceCapabilities(engine).supportsSubcollections` to decide
+ * whether the engine honours subcollections at all before reading them.
+ * @group Models
+ */
+export function getDeclaredSubcollections<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
+    collection: EntityCollection<M, USER>
+): (() => EntityCollection<Record<string, unknown>>[]) | undefined {
+    return (collection as FirebaseCollection<M, USER>).subcollections;
 }
 
 
@@ -1016,13 +1024,26 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  * operation. Permissive rules are OR'd together (any one passing is enough).
  * Restrictive rules are AND'd (all must pass). This mirrors Supabase behavior.
  *
- * **Mutual exclusivity:** `ownerField`, `access`, and raw SQL (`using`/`withCheck`)
- * cannot be combined. The type system enforces this — attempting to set
- * conflicting fields will produce a compile-time error.
+ * **Mutual exclusivity:** `ownerField`, `access`, structured `condition`, and
+ * raw SQL (`using`/`withCheck`) cannot be combined. The type system enforces
+ * this — attempting to set conflicting fields will produce a compile-time
+ * error.
+ *
+ * **Which form to reach for:** prefer the structured {@link StructuredSecurityRule}
+ * (`condition`/`check`) or the shortcuts (`ownerField`, `access`, `roles`). These
+ * are engine-agnostic and evaluated identically by the database and the admin UI,
+ * so the UI never shows an action the database will reject. Raw SQL
+ * ({@link RawSQLSecurityRule}) keeps full PostgreSQL power but is Postgres-only
+ * and server-authoritative (the UI cannot evaluate arbitrary SQL locally).
  *
  * @group Models
  */
-export type SecurityRule = OwnerSecurityRule | PublicSecurityRule | RawSQLSecurityRule | RolesOnlySecurityRule;
+export type SecurityRule =
+    | OwnerSecurityRule
+    | PublicSecurityRule
+    | StructuredSecurityRule
+    | RawSQLSecurityRule
+    | RolesOnlySecurityRule;
 
 /**
  * Shared fields for all SecurityRule variants.
@@ -1092,11 +1113,16 @@ export interface SecurityRuleBase {
      * application roles managed by Rebase, stored in the `rebase.user_roles`
      * table, and injected into each transaction via `auth.roles()`.
      *
-     * Generates a condition like:
-     *   `auth.roles() ~ '<role1>|<role2>'`
+     * Generates a safe array-overlap condition — the user passes if they hold
+     * *any* of the listed roles:
+     *   `string_to_array(auth.roles(), ',') && ARRAY['<role1>', '<role2>']`
      *
-     * Can be combined with `ownerField`, `access`, or raw `using`/`withCheck`.
-     * When combined, the role check is AND'd with the other condition.
+     * (Note: this is a true set intersection, NOT a regex/substring match, so
+     * a role named `admin` never matches `nonadmin` or `superadmin`.)
+     *
+     * Can be combined with `ownerField`, `access`, `condition`, or raw
+     * `using`/`withCheck`. When combined, the role check is AND'd with the
+     * other condition.
      *
      * @example
      * // Only admins can delete
@@ -1151,6 +1177,8 @@ export interface OwnerSecurityRule extends SecurityRuleBase {
     access?: never;
     using?: never;
     withCheck?: never;
+    condition?: never;
+    check?: never;
 }
 
 /**
@@ -1175,12 +1203,61 @@ export interface PublicSecurityRule extends SecurityRuleBase {
     ownerField?: never;
     using?: never;
     withCheck?: never;
+    condition?: never;
+    check?: never;
+}
+
+/**
+ * Security rule expressed as a structured, engine-agnostic
+ * {@link PolicyExpression}. This is the **recommended** way to write a
+ * non-trivial condition: it compiles to PostgreSQL `USING`/`WITH CHECK` SQL
+ * *and* is evaluated identically by the admin UI, so the UI can never show an
+ * action the database will reject.
+ *
+ * Cannot be combined with `ownerField`, `access`, or raw `using`/`withCheck`.
+ *
+ * @example
+ * // Owner, or any user holding the `moderator` role
+ * {
+ *   operation: "update",
+ *   condition: policy.or(
+ *       policy.compare(policy.field("user_id"), "eq", policy.authUid()),
+ *       policy.rolesOverlap(["moderator"])
+ *   )
+ * }
+ *
+ * @group Models
+ */
+export interface StructuredSecurityRule extends SecurityRuleBase {
+    /**
+     * Structured condition for the `USING` clause — which *existing* rows are
+     * visible / can be modified / deleted (SELECT, UPDATE, DELETE).
+     */
+    condition: PolicyExpression;
+
+    /**
+     * Structured condition for the `WITH CHECK` clause — which *new/updated*
+     * row values are allowed (INSERT, UPDATE). Defaults to `condition` when
+     * omitted, mirroring PostgreSQL's own behavior.
+     */
+    check?: PolicyExpression;
+
+    ownerField?: never;
+    access?: never;
+    using?: never;
+    withCheck?: never;
 }
 
 /**
  * Security rule using raw SQL expressions for full PostgreSQL RLS power.
  *
- * Cannot be combined with `ownerField` or `access`.
+ * **Postgres-only and server-authoritative.** Arbitrary SQL cannot be
+ * evaluated by the admin UI, so a rule using this form is treated as *unknown*
+ * client-side (never silently allowed) and its effect on visible actions is
+ * reflected from the server. For conditions that should also drive the UI
+ * precisely, prefer the structured {@link StructuredSecurityRule}.
+ *
+ * Cannot be combined with `ownerField`, `access`, or structured `condition`.
  *
  * You can reference columns via `{column_name}` which will be resolved to
  * `table.column_name` in the generated Drizzle code.
@@ -1218,6 +1295,8 @@ export interface RawSQLSecurityRule extends SecurityRuleBase {
 
     ownerField?: never;
     access?: never;
+    condition?: never;
+    check?: never;
 }
 
 /**
@@ -1238,6 +1317,8 @@ export interface RolesOnlySecurityRule extends SecurityRuleBase {
     access?: never;
     using?: never;
     withCheck?: never;
+    condition?: never;
+    check?: never;
 }
 
 /**

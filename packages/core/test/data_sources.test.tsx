@@ -83,32 +83,10 @@ describe("<Rebase> data source wiring", () => {
         expect(captured.sources!.sources["reporting"]).toBeUndefined();
     });
 
-    it("treats the deprecated `drivers` map as a direct source shorthand", () => {
-        const captured = renderWithProbe({
-            drivers: { firestore: mockDriver("firestore") }
-        });
-        expect(captured.sources!.registry["firestore"]).toMatchObject({
-            key: "firestore",
-            transport: "direct"
-        });
-        expect(captured.sources!.sources["firestore"]).toBeDefined();
-    });
-
     it("provides an empty data-source config when none is given", () => {
         const captured = renderWithProbe({});
         expect(captured.sources!.registry).toEqual({});
         expect(captured.sources!.sources).toEqual({});
-    });
-
-    it("merges `dataSources` and the deprecated `drivers` map", () => {
-        const captured = renderWithProbe({
-            dataSources: [{ key: "analytics", engine: "firestore", transport: "direct", driver: mockDriver("fs") }],
-            drivers: { legacy: mockDriver("legacy") }
-        });
-        expect(captured.sources!.registry["analytics"]).toBeDefined();
-        expect(captured.sources!.registry["legacy"]).toMatchObject({ transport: "direct" });
-        expect(captured.sources!.sources["analytics"]).toBeDefined();
-        expect(captured.sources!.sources["legacy"]).toBeDefined();
     });
 
     it("falls back to a registered '(default)' direct source when no client/data/driver", () => {

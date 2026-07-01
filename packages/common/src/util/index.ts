@@ -4,6 +4,7 @@ export * from "./entities";
 export * from "./enums";
 export * from "./paths";
 export * from "./resolutions";
+export * from "./policy";
 export * from "./permissions";
 export * from "./references";
 export * from "./navigation_from_path";

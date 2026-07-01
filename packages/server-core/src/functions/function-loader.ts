@@ -24,6 +24,10 @@ export async function loadFunctionsFromDirectory(
     directory: string
 ): Promise<LoadedFunction[]> {
     const functions: LoadedFunction[] = [];
+    // Aggregate problem files so a broken function surfaces as one loud
+    // summary line, not just a warning buried per-file. We still don't throw:
+    // a single malformed function must not crash server boot.
+    const problems: string[] = [];
 
     if (!fs.existsSync(directory)) {
         return functions;
@@ -51,6 +55,7 @@ export async function loadFunctionsFromDirectory(
 
                 if (!exported) {
                     logger.warn(`[functions] ${file}: no default export. Skipping.`);
+                    problems.push(`${file} (no default export)`);
                     continue;
                 }
 
@@ -86,14 +91,25 @@ app: result as Hono });
                     `  export type: ${exportType}${exported?.constructor?.name ? ` (${exported.constructor.name})` : ""}\n` +
                     `  prototype methods: ${keys}\n` +
                     "  Hint: ensure the function exports a Hono app created with the same hono version as the server.\n" +
+                    "  Author with `defineFunction(...)` from @rebasepro/server-core for a typed, checked contract.\n" +
                     "  The loader checks for .fetch() and .routes — any Hono-compatible app will work."
                 );
+                problems.push(`${file} (not a Hono app or factory)`);
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
                 logger.error(`[functions] Failed to load ${file}: ${message}`);
+                problems.push(`${file} (threw: ${message})`);
             }
         }
+    }
+
+    if (problems.length > 0) {
+        logger.warn(
+            `[functions] ${problems.length} function file(s) were skipped and will NOT be served:\n` +
+            problems.map((p) => `  - ${p}`).join("\n") + "\n" +
+            "  Fix these or author them with `defineFunction(...)` for a typed, compile-checked contract."
+        );
     }
 
     return functions;

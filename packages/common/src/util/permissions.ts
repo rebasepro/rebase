@@ -1,4 +1,6 @@
-import { Entity, EntityCollection, getDataSourceCapabilities, SecurityRule, User } from "@rebasepro/types";
+import { Entity, EntityCollection, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { securityRuleToConditions } from "./policy/securityRuleToConditions";
+import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
 
 /**
  * Minimal auth context for permission checking.
@@ -9,195 +11,120 @@ export interface AuthContext<USER extends User = User> {
     user: USER | null;
 }
 
-function evaluateAST<USER extends User, M extends Record<string, unknown>>(sqlString: string, auth: AuthContext<USER>, entity: Entity<M> | null): boolean {
-    // This is a client-side SQL evaluator used *only* for optimistic UI updates.
-    // It parses basic AND / OR statements to evaluate RLS without backend roundtrips.
-    if (!entity) return true;
+/**
+ * How to resolve a policy result that cannot be decided client-side (a raw-SQL
+ * escape-hatch rule, or a row-column reference with no row in hand).
+ *
+ * - `"allow"` (default): optimistic — used for admin-UI gating, where Postgres
+ *   remains the authoritative gate and hiding a working action is worse than
+ *   showing one the server may reject.
+ * - `"deny"`: fail-closed — used by real enforcement callers (e.g. a driver
+ *   applying policies in-process), so an undecidable rule never silently allows.
+ */
+export type UnknownResolution = "allow" | "deny";
 
-    // 1. Clean outer parentheses
-    let cleanedSQL = sqlString.trim();
-    while (cleanedSQL.startsWith("(") && cleanedSQL.endsWith(")")) {
-        let openCount = 0;
-        let isEnclosing = true;
-        for (let i = 0; i < cleanedSQL.length - 1; i++) {
-            if (cleanedSQL[i] === "(") openCount++;
-            else if (cleanedSQL[i] === ")") openCount--;
-            if (openCount === 0) {
-                isEnclosing = false;
-                break;
-            }
-        }
-        if (isEnclosing) {
-            cleanedSQL = cleanedSQL.substring(1, cleanedSQL.length - 1).trim();
-        } else {
-            break;
-        }
-    }
-
-    // 2. Split top-level OR / AND
-    const splitByTopLevel = (str: string, delimiter: string) => {
-        const parts: string[] = [];
-        let current = "";
-        let openCount = 0;
-        let i = 0;
-        while (i < str.length) {
-            if (str[i] === "(") openCount++;
-            else if (str[i] === ")") openCount--;
-
-            if (openCount === 0 && str.substring(i).toUpperCase().startsWith(delimiter)) {
-                parts.push(current);
-                current = "";
-                i += delimiter.length;
-            } else {
-                current += str[i];
-                i++;
-            }
-        }
-        parts.push(current);
-        return parts;
-    };
-
-    const orParts = splitByTopLevel(cleanedSQL, " OR ");
-    if (orParts.length > 1) {
-        return orParts.some(part => evaluateAST(part, auth, entity));
-    }
-
-    const andParts = splitByTopLevel(cleanedSQL, " AND ");
-    if (andParts.length > 1) {
-        return andParts.every(part => evaluateAST(part, auth, entity));
-    }
-
-    const upperSQL = cleanedSQL.toUpperCase();
-
-    // 3. Fallback for unparseable complex queries
-    if (upperSQL.includes(" IN ") || upperSQL.includes(" EXISTS ")) {
-        return true;
-    }
-
-    // 4. Role array checks
-    // Pattern: `string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']`
-    const roleIntersectMatch = cleanedSQL.match(/string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\[(.*?)\]/i);
-    if (roleIntersectMatch && roleIntersectMatch[1]) {
-        const requiredRoles = roleIntersectMatch[1].split(",").map(r => r.trim().replace(/'/g, ""));
-        const userRoles = auth.user?.roles || [];
-        return requiredRoles.some(r => userRoles.includes(r));
-    }
-
-    // Pattern: `string_to_array(auth.roles(), ',') @> ARRAY['admin']`
-    const roleContainMatch = cleanedSQL.match(/string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\[(.*?)\]/i);
-    if (roleContainMatch && roleContainMatch[1]) {
-        const requiredRoles = roleContainMatch[1].split(",").map(r => r.trim().replace(/'/g, ""));
-        const userRoles = auth.user?.roles || [];
-        return requiredRoles.every(r => userRoles.includes(r));
-    }
-
-    // 5. Existing ID patterns
-    const pattern1 = new RegExp("^\\{?([a-zA-Z0-9_]+)\\}?\\s*=\\s*(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))");
-    const pattern2 = new RegExp("^(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))\\s*=\\s*\\{?([a-zA-Z0-9_]+)\\}?");
-
-    const match1 = cleanedSQL.match(pattern1);
-    if (match1 && match1[1]) {
-        return entity.values[match1[1]] === auth.user?.uid;
-    }
-
-    const match2 = cleanedSQL.match(pattern2);
-    if (match2 && match2[1]) {
-        return entity.values[match2[1]] === auth.user?.uid;
-    }
-
-    // 6. Simple equality
-    // Pattern: `field = 'value'` or `{field} != 'value'`
-    const simpleEqualityMatch = cleanedSQL.match(/^\{?([\w_]+)\}?\s*(=|!=)\s*'([^']+)'$/i);
-    if (simpleEqualityMatch) {
-        const field = simpleEqualityMatch[1];
-        const operator = simpleEqualityMatch[2];
-        const value = simpleEqualityMatch[3];
-        const entityValue = entity.values[field];
-        if (operator === "=") return entityValue === value;
-        if (operator === "!=") return entityValue !== value;
-    }
-
-    return true; // Optimistic fallback for anything else
+export interface CheckOperationOptions {
+    onUnknown?: UnknownResolution;
 }
 
-function evaluateRule<USER extends User, M extends Record<string, unknown>>(rule: SecurityRule, auth: AuthContext<USER>, entity: Entity<M> | null): boolean {
-
-    if (rule.access === "public") return true;
-
-    if (rule.ownerField) {
-        if (!entity) {
-            // null entity: optimistic — we can't evaluate ownership without data
-            // Fall through to SQL checks below (if any). If none, will return true.
-        } else {
-            // Entity present: strictly check ownership. Fail immediately if mismatch.
-            if (entity.values[rule.ownerField] !== auth.user?.uid) return false;
-        }
-    }
-
-    // In PostgreSQL RLS, USING and WITH CHECK have distinct semantics:
-    // USING applies to existing rows (SELECT/UPDATE/DELETE read phase)
-    // WITH CHECK applies to new/modified values (INSERT/UPDATE write phase)
-    // Both must pass. We evaluate both independently.
-    if (rule.using && !evaluateAST(rule.using, auth, entity)) return false;
-    if (rule.withCheck && !evaluateAST(rule.withCheck, auth, entity)) return false;
-
+/** Combine clause results with AND under three-valued (Kleene) logic. */
+function kleeneAnd(values: TriState[]): TriState {
+    if (values.some(v => v === false)) return false;
+    if (values.some(v => v === "unknown")) return "unknown";
     return true;
 }
 
+/** The operations a rule covers, mirroring the Postgres generator's resolution. */
+function ruleOperations(rule: SecurityRule): SecurityOperation[] {
+    return rule.operations && rule.operations.length > 0
+        ? rule.operations
+        : [rule.operation ?? "all"];
+}
+
+function ruleApplies(rule: SecurityRule, targetOperation: SecurityOperation): boolean {
+    const ops = ruleOperations(rule);
+    return ops.includes(targetOperation) || ops.includes("all");
+}
+
+/**
+ * Evaluate a single rule for one operation, returning a tri-state.
+ *
+ * A `null` clause (the rule contributes no condition for a required clause)
+ * denies — matching Postgres, which emits `USING (false)` / `WITH CHECK (false)`
+ * in that case. USING applies to SELECT/UPDATE/DELETE; WITH CHECK to
+ * INSERT/UPDATE; both must pass for UPDATE.
+ */
+function evaluateRuleForOperation(rule: SecurityRule, ctx: PolicyEvalContext, targetOperation: SecurityOperation): TriState {
+    const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
+    const clause = (expr: typeof usingExpr): TriState => expr === null ? false : evaluatePolicy(expr, ctx);
+
+    const needsUsing = targetOperation !== "insert";
+    const needsWithCheck = targetOperation === "insert" || targetOperation === "update";
+
+    const results: TriState[] = [];
+    if (needsUsing) results.push(clause(usingExpr));
+    if (needsWithCheck) results.push(clause(withCheckExpr));
+    return kleeneAnd(results);
+}
+
+function resolveTriState(value: TriState, onUnknown: UnknownResolution): boolean {
+    if (value === "unknown") return onUnknown === "allow";
+    return value;
+}
+
+/**
+ * Decide whether an operation is permitted for a user on a (possibly null) row,
+ * by evaluating the collection's security rules with the shared policy model —
+ * the same model compiled to Postgres RLS DDL, so the decision matches database
+ * enforcement for every non-raw rule.
+ *
+ * @param options.onUnknown how to treat rules that cannot be decided
+ *   client-side (raw SQL, or row predicates with no row). Defaults to `"allow"`
+ *   for optimistic UI gating; enforcement callers should pass `"deny"`.
+ */
 export function checkOperation<M extends Record<string, unknown>, USER extends User>(
     collection: EntityCollection<M>,
     authContext: AuthContext<USER>,
     entity: Entity<M> | null,
-    targetOperation: "select" | "insert" | "update" | "delete"
+    targetOperation: SecurityOperation,
+    options?: CheckOperationOptions
 ): boolean {
+    const onUnknown = options?.onUnknown ?? "allow";
     const securityRules = getDataSourceCapabilities(collection.engine).supportsRLS ? collection.securityRules : undefined;
     if (!securityRules || securityRules.length === 0) {
         return true;
     }
 
-    const applicableRules = securityRules.filter((r: SecurityRule) =>
-        r.operation === targetOperation ||
-        r.operation === "all" ||
-        r.operations?.includes(targetOperation) ||
-        r.operations?.includes("all")
-    );
-
+    const applicableRules = securityRules.filter((r: SecurityRule) => ruleApplies(r, targetOperation));
     if (applicableRules.length === 0) return false;
 
-    const userRoleIds = authContext.user?.roles ?? [];
-    const userRoles = [...userRoleIds, "public"];
-    const roleApplicableRules = applicableRules.filter((rule: SecurityRule) => {
-        if (!rule.roles || rule.roles.length === 0) return true;
-        return rule.roles.some((r: string) => userRoles.includes(r));
-    });
-
-    if (roleApplicableRules.length === 0) return false;
+    const ctx: PolicyEvalContext = {
+        uid: authContext.user?.uid,
+        roles: authContext.user?.roles ?? [],
+        entity
+    };
 
     let grantedByPermissive = false;
     let deniedByRestrictive = false;
+    let hasPermissive = false;
 
-    for (const rule of roleApplicableRules) {
+    for (const rule of applicableRules) {
         const mode = rule.mode || "permissive";
-        const passed = evaluateRule(rule, authContext, entity);
+        const passed = resolveTriState(evaluateRuleForOperation(rule, ctx, targetOperation), onUnknown);
 
-        if (mode === "restrictive" && !passed) {
-            deniedByRestrictive = true;
-            break;
-        }
-
-        if (mode === "permissive" && passed) {
-            grantedByPermissive = true;
+        if (mode === "restrictive") {
+            if (!passed) {
+                deniedByRestrictive = true;
+                break;
+            }
+        } else {
+            hasPermissive = true;
+            if (passed) grantedByPermissive = true;
         }
     }
 
     if (deniedByRestrictive) return false;
-
-    const hasPermissive = roleApplicableRules.some((r: SecurityRule) => (r.mode || "permissive") === "permissive");
-    if (hasPermissive) {
-        return grantedByPermissive;
-    } else {
-        return false;
-    }
+    return hasPermissive ? grantedByPermissive : false;
 }
 
 export function canReadCollection<M extends Record<string, unknown>, USER extends User>

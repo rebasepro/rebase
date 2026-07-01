@@ -1,6 +1,6 @@
 import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/entity-helpers";
-import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
 import { logger } from "@rebasepro/server-core";
@@ -308,62 +308,9 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
 };
 
 /**
- * Resolves a raw SQL string, replacing `{column_name}` with `${table.column_name}`.
- * The result is wrapped in a Drizzle sql`` template literal.
+ * Wraps a compiled SQL clause in a Drizzle `sql\`...\`` template literal.
  */
-const resolveRawSql = (expression: string): string => {
-    // Replace {column_name} with column_name directly (so Drizzle-kit can parse it as a static string)
-    const resolved = expression.replace(/\{(\w+)\}/g, (_, col) => col);
-    return `sql\`${resolved}\``;
-};
-
-/**
- * Wraps a SQL clause with a role check using AND.
- * Generates: `(<clause>) AND (string_to_array(auth.roles(), ',') && ARRAY['<role1>','<role2>'])`
- */
-const wrapWithRoleCheck = (clause: string, roles: string[]): string => {
-    const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
-    const roleCondition = `string_to_array(auth.roles(), ',') && ${rolesArrayString}`;
-    return `sql\`(${unwrapSql(clause)}) AND (${roleCondition})\``;
-};
-
-/**
- * Extracts the inner expression from a `sql\`...\`` wrapper.
- */
-const unwrapSql = (sqlExpr: string): string => {
-    const match = sqlExpr.match(/^sql`(.*)`$/s);
-    return match ? match[1] : sqlExpr;
-};
-
-/**
- * Builds the USING clause for a policy based on shortcuts or raw SQL.
- */
-const buildUsingClause = (rule: SecurityRule, collection: EntityCollection): string | null => {
-    if (rule.using) {
-        return resolveRawSql(rule.using);
-    }
-    if (rule.access === "public") {
-        return "sql`true`";
-    }
-    if (rule.ownerField) {
-        const prop = collection.properties?.[rule.ownerField];
-        const colName = resolveColumnName(rule.ownerField, prop);
-        return `sql\`${colName} = auth.uid()\``;
-    }
-    return null;
-};
-
-/**
- * Builds the WITH CHECK clause for a policy based on shortcuts or raw SQL.
- * Falls back to the USING clause if not explicitly provided.
- */
-const buildWithCheckClause = (rule: SecurityRule, collection: EntityCollection): string | null => {
-    if (rule.withCheck) {
-        return resolveRawSql(rule.withCheck);
-    }
-    // For insert/update/all, fall back to using clause if withCheck not specified
-    return buildUsingClause(rule, collection);
-};
+const wrapSql = (clause: string): string => `sql\`${clause}\``;
 
 /**
  * Generates a deterministic hash based on the rule configuration.
@@ -378,7 +325,9 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
         rol: rule.roles?.slice().sort(),
         pg: rule.pgRoles?.slice().sort(),
         u: rule.using,
-        w: rule.withCheck
+        w: rule.withCheck,
+        c: rule.condition,
+        ch: rule.check
     });
     return createHash("sha1").update(data).digest("hex").substring(0, 7);
 };
@@ -417,7 +366,6 @@ const generatePolicyCode = (collection: EntityCollection, rule: SecurityRule, in
  */
 const generateSinglePolicyCode = (collection: EntityCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
     const mode = rule.mode ?? "permissive";
-    const roles = rule.roles ? [...rule.roles].sort() : undefined;
 
     // Determine which clauses this operation needs:
     // SELECT, DELETE → USING only
@@ -426,26 +374,13 @@ const generateSinglePolicyCode = (collection: EntityCollection, rule: SecurityRu
     const needsUsing = operation !== "insert";
     const needsWithCheck = operation !== "select" && operation !== "delete";
 
-    let usingClause = needsUsing ? buildUsingClause(rule, collection) : null;
-    let withCheckClause = needsWithCheck ? buildWithCheckClause(rule, collection) : null;
+    // Desugar the rule (access / ownerField / roles / structured condition / raw
+    // SQL) into the shared PolicyExpression model, then compile to SQL — the same
+    // normalization the DDL generator and the client-side evaluator use.
+    const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
 
-    // If roles are specified, wrap existing clauses with role check,
-    // or generate a roles-only clause.
-    if (roles && roles.length > 0) {
-        if (usingClause) {
-            usingClause = wrapWithRoleCheck(usingClause, roles);
-        } else if (needsUsing) {
-            // Roles-only rule (e.g. { operation: "select", roles: ["admin"] })
-            const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
-            usingClause = `sql\`string_to_array(auth.roles(), ',') && ${rolesArrayString}\``;
-        }
-        if (withCheckClause) {
-            withCheckClause = wrapWithRoleCheck(withCheckClause, roles);
-        } else if (needsWithCheck) {
-            const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
-            withCheckClause = `sql\`string_to_array(auth.roles(), ',') && ${rolesArrayString}\``;
-        }
-    }
+    let usingClause = needsUsing && usingExpr ? wrapSql(policyToPostgres(usingExpr, collection)) : null;
+    let withCheckClause = needsWithCheck && withCheckExpr ? wrapSql(policyToPostgres(withCheckExpr, collection)) : null;
 
     // Fallback: if we still have no clauses, deny all (safety net)
     if (!usingClause && needsUsing) {

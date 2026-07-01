@@ -909,6 +909,30 @@ All callbacks receive a `context` property of type `RebaseCallContext<USER>`. Th
 | `context.storageSource` | `StorageSource` | File storage operations |
 | `context.user` | `USER \| undefined` | Authenticated user (set by backend in server-side callbacks) |
 
+### Reserved `context.user` Values
+
+The `context.user` object is populated by the auth middleware. In server-side callbacks, it contains one of these reserved identities:
+
+| Caller | `context.user.uid` | `context.user.roles` |
+|---|---|---|
+| JWT-authenticated end-user | Real user ID (e.g. `"abc123"`) | Their assigned roles (e.g. `["viewer"]`) |
+| Server-side `rebase.data` (cron jobs, custom functions) | `"service"` | `["admin"]` |
+| API key (default) | `"api-key:{id}"` | `["service"]` |
+| API key (admin) | `"api-key:{id}"` | `["admin", "service"]` |
+| Anonymous (no auth, `requireAuth: false`) | `"anon"` | `["anon"]` |
+| Anonymous REST (no token) | `undefined` | N/A — `context.user` is not set; only the DataDriver is scoped |
+
+> **IMPORTANT FOR AGENTS:** `rebase.data` calls (used in cron jobs, afterSave side-effects, custom functions) go through the full middleware pipeline with the service key, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
+>
+> ```typescript
+> afterRead: async ({ entity, context }) => {
+>     // Server-side reads (cron jobs, admin) see real values
+>     if (context.user?.roles?.includes("admin")) return entity;
+>     // End-user reads get masked values
+>     return { ...entity, values: { ...entity.values, email: "***@***.***" } };
+> }
+> ```
+
 > **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sideEntityController`, etc.). Entity callbacks always receive `RebaseCallContext`.
 
 ### Callback Example

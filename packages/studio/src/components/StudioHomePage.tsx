@@ -1,7 +1,6 @@
 import type { HomePageSection, PluginGenericProps } from "@rebasepro/types";
-import React, { useEffect } from "react";
-import { Card, cls, Container, Typography } from "@rebasepro/ui";
-import { ArrowRightIcon, iconSize } from "@rebasepro/ui";
+import React, { useEffect, useMemo, useState } from "react";
+import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/core";
 import { useNavigate } from "react-router-dom";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/core";
@@ -19,16 +18,12 @@ interface StudioTool {
 
 interface StudioSection {
     label: string;
-    dotColor: string;
-    iconColor: string;
     tools: StudioTool[];
 }
 
 const SECTIONS: StudioSection[] = [
     {
         label: "Database",
-        dotColor: "bg-emerald-400",
-        iconColor: "text-emerald-400",
         tools: [
             { path: "/schema",
 name: "Collections",
@@ -58,8 +53,6 @@ icon: "Activity" }
     },
     {
         label: "Compute",
-        dotColor: "bg-blue-400",
-        iconColor: "text-blue-400",
         tools: [
             { path: "/js",
 name: "JS Console",
@@ -73,8 +66,6 @@ icon: "Clock" }
     },
     {
         label: "API",
-        dotColor: "bg-violet-400",
-        iconColor: "text-violet-400",
         tools: [
             { path: "/api",
 name: "API Explorer",
@@ -84,8 +75,6 @@ icon: "BookOpen" }
     },
     {
         label: "Storage",
-        dotColor: "bg-amber-400",
-        iconColor: "text-amber-400",
         tools: [
             { path: "/storage",
 name: "Storage",
@@ -95,8 +84,6 @@ icon: "HardDrive" }
     },
     {
         label: "Access Control",
-        dotColor: "bg-rose-400",
-        iconColor: "text-rose-400",
         tools: [
             { path: "/users",
 name: "Users",
@@ -115,6 +102,38 @@ icon: "KeyRound" }
 ];
 
 /* ═══════════════════════════════════════════════════════════════ */
+
+const COLLAPSED_STORAGE_KEY = "rebase-studio-home-collapsed";
+
+function useStudioCollapsedGroups(groupNames: string[]) {
+    const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+        try {
+            const stored = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+            return stored ? new Set(JSON.parse(stored)) : new Set<string>();
+        } catch {
+            return new Set<string>();
+        }
+    });
+
+    const isGroupCollapsed = (name: string) => collapsed.has(name);
+
+    const toggleGroupCollapsed = (name: string) => {
+        setCollapsed(prev => {
+            const next = new Set(prev);
+            if (next.has(name)) {
+                next.delete(name);
+            } else {
+                next.add(name);
+            }
+            try {
+                localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...next]));
+            } catch { /* noop */ }
+            return next;
+        });
+    };
+
+    return { isGroupCollapsed, toggleGroupCollapsed };
+}
 
 export function StudioHomePage({
     additionalActions,
@@ -143,8 +162,20 @@ export function StudioHomePage({
 
     const pluginActions = useSlot("home.actions", sectionProps);
 
+    const filteredSections = useMemo(
+        () => SECTIONS.filter(s => !hiddenGroups?.includes(s.label)),
+        [hiddenGroups]
+    );
+
+    const groupNames = useMemo(
+        () => filteredSections.map(s => s.label),
+        [filteredSections]
+    );
+
+    const { isGroupCollapsed, toggleGroupCollapsed } = useStudioCollapsedGroups(groupNames);
+
     return (
-        <div ref={containerRef} className="py-2 overflow-auto h-full w-full">
+        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
             <Container maxWidth="6xl">
                 <div className="mb-4 flex flex-col gap-2">
                     <SchemaDriftBanner />
@@ -160,77 +191,95 @@ export function StudioHomePage({
                 {additionalChildrenStart}
 
                 {/* ── Tool sections ── */}
-                <div className="flex flex-col gap-8 pt-2">
-                    {SECTIONS.map((section) => (
-                        <section key={section.label} aria-label={section.label}>
-                            {/* Section header */}
-                            <Typography
-                                variant="caption"
-                                component="h2"
-                                color="secondary"
-                                className="py-2 font-medium uppercase text-sm text-surface-600 dark:text-surface-400"
-                            >
-                                {section.label}
-                            </Typography>
+                {filteredSections.map((section) => {
+                    const sectionCollapsed = isGroupCollapsed(section.label);
 
-                            {/* Card grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                                {section.tools.map((tool) => (
-                                    <Card
-                                        key={tool.path}
-                                        onClick={() => {
-                                            navigate(tool.path);
-                                            context.analyticsController?.onAnalyticsEvent?.(
-                                                "home_navigate_to_view",
-                                                { path: tool.path }
-                                            );
-                                        }}
+                    return (
+                        <div key={section.label} className="my-10">
+                            <ExpandablePanel
+                                invisible
+                                expanded={!sectionCollapsed}
+                                onExpandedChange={(open) => {
+                                    if (open !== !sectionCollapsed) {
+                                        toggleGroupCollapsed(section.label);
+                                    }
+                                }}
+                                className="mt-6"
+                                titleClassName={cls(
+                                    "min-h-0 p-0 border-none",
+                                    "rounded flex items-center justify-between w-full",
+                                    "hover:bg-transparent",
+                                    "cursor-pointer select-none",
+                                    sectionCollapsed && "bg-surface-100 dark:bg-surface-900/50"
+                                )}
+                                innerClassName="mt-4 pt-0"
+                                title={
+                                    <Typography
+                                        variant="caption"
+                                        component="h2"
+                                        color="secondary"
                                         className={cls(
-                                            "h-full px-4 py-2.5 cursor-pointer transition-all duration-200 ease-in-out",
-                                            "hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5"
+                                            "px-4 py-1 rounded",
+                                            "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
                                         )}
                                     >
-                                        <div className="flex flex-col items-start h-full">
-                                            <div className="grow w-full">
-                                                {/* Icon */}
-                                                <div className={cls("h-6 flex items-center", section.iconColor)}>
-                                                    <IconForView
-                                                        collectionOrView={{ slug: tool.path,
-name: tool.name,
-icon: tool.icon }}
-                                                        size="small"
-                                                    />
+                                        {section.label}
+                                    </Typography>
+                                }
+                            >
+                                <div className="mt-4 pt-0">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {section.tools.map((tool) => (
+                                            <Card
+                                                key={tool.path}
+                                                onClick={() => {
+                                                    navigate(tool.path);
+                                                    context.analyticsController?.onAnalyticsEvent?.(
+                                                        "home_navigate_to_view",
+                                                        { path: tool.path }
+                                                    );
+                                                }}
+                                                className={cls(
+                                                    "group h-full p-4 cursor-pointer transition-colors duration-150 ease-in-out",
+                                                    "hover:bg-primary/5 dark:hover:bg-primary/5"
+                                                )}
+                                            >
+                                                <div className="flex flex-col h-full">
+                                                    {/* Header: icon + title */}
+                                                    <div className="flex items-center w-full justify-between mb-1">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500 transition-colors duration-150 group-hover:text-primary dark:group-hover:text-primary">
+                                                                <IconForView
+                                                                    collectionOrView={{ slug: tool.path, name: tool.name, icon: tool.icon }}
+                                                                    size="small"
+                                                                />
+                                                            </div>
+                                                            <Typography variant="subtitle1" component="h2">
+                                                                {tool.name}
+                                                            </Typography>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Description indented to align with title */}
+                                                    <div className="pl-8">
+                                                        {tool.description && (
+                                                            <Typography variant="caption" color="secondary" component="div">
+                                                                {tool.description}
+                                                            </Typography>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Spacer */}
+                                                    <div className="grow"/>
                                                 </div>
-
-                                                {/* Title */}
-                                                <Typography
-                                                    gutterBottom
-                                                    variant="subtitle1"
-                                                    className="mt-1 font-semibold"
-                                                    component="h2"
-                                                >
-                                                    {tool.name}
-                                                </Typography>
-
-                                                {/* Description */}
-                                                <Typography variant="caption" color="secondary" component="div">
-                                                    {tool.description}
-                                                </Typography>
-                                            </div>
-
-                                            {/* Arrow */}
-                                            <div style={{ alignSelf: "flex-end" }}>
-                                                <div className="p-2">
-                                                    <ArrowRightIcon className="text-primary" size={iconSize.small}/>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                ))}
-                            </div>
-                        </section>
-                    ))}
-                </div>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            </ExpandablePanel>
+                        </div>
+                    );
+                })}
 
                 {/* ── SDK Quick Start ── */}
                 <div className="mt-10 mb-6">
@@ -239,7 +288,10 @@ icon: tool.icon }}
                             variant="caption"
                             component="h2"
                             color="secondary"
-                            className="py-2 font-medium uppercase text-sm text-surface-600 dark:text-surface-400"
+                            className={cls(
+                                "px-4 py-1 rounded",
+                                "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
+                            )}
                         >
                             Quick Start
                         </Typography>
@@ -285,7 +337,10 @@ icon: tool.icon }}
                             variant="caption"
                             component="h2"
                             color="secondary"
-                            className="p-4 py-2 rounded font-medium uppercase text-sm text-surface-600 dark:text-surface-400"
+                            className={cls(
+                                "px-4 py-1 rounded",
+                                "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
+                            )}
                         >
                             {s.title}
                         </Typography>

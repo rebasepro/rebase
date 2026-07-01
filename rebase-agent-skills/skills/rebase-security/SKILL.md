@@ -136,6 +136,14 @@ export async function scopeDataDriver(
 | Anonymous (`requireAuth: false`) | `"anon"` | `["anon"]` | RLS with anonymous identity |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
+> **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing DataHooks or Entity Callbacks, developers should use these identities to gate behavior:
+> - `uid: "service"` + `roles: ["admin"]` — Server-side `rebase.data` calls (cron jobs, custom functions using `rebase.data`, webhooks). These go through the full middleware pipeline authenticated with the service key.
+> - `uid: "anon"` + `roles: ["anon"]` — Unauthenticated requests when `requireAuth: false`. **Note:** for anonymous REST requests, `context.user` in Entity Callbacks may be `undefined`; only the DataDriver is scoped with the anon identity. For WebSocket connections, a full `User` object with `uid: "anon"` is provided.
+> - `uid: "api-key:{id}"` + `roles: ["service"]` (or `["admin", "service"]`) — API key requests.
+> - Real user IDs and roles for JWT-authenticated requests.
+>
+> **Key insight:** `rebase.data` (the server-side singleton) is NOT a raw admin driver — it round-trips through the REST API using the service key, so all DataHooks and Entity Callbacks fire with `uid: "service"`, `roles: ["admin"]`. This means callbacks can distinguish server-internal reads from end-user reads by checking `context.user?.roles?.includes("admin")`.
+
 ---
 
 ## Layer 2: API Key Permission Guard
@@ -602,5 +610,6 @@ Use this checklist when setting up security for a Rebase project:
 - **REST API Generator**: `packages/server-core/src/api/rest/api-generator.ts` — DataHooks integration
 - **Backend Hooks Types**: `packages/types/src/types/backend_hooks.ts` — `DataHooks`, `BackendHooks` interfaces
 - **Backend Init**: `packages/server-core/src/init.ts` — `hooks` config property
+- **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anon"`, `"api-key:{id}"` are system-assigned identities in `context.user` / `ctx.requestUser`
 - **Entity Callbacks**: See `rebase-collections` skill → Entity Callbacks section
 - **Auth Configuration**: See `rebase-auth` skill → Server-Side Configuration section

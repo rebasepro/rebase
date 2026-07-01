@@ -26,8 +26,7 @@ export interface MarkdownEditorConfig {
 }
 
 export type RichTextEditorTextSize = "sm" | "base" | "lg";
-/** @deprecated Use `RichTextEditorTextSize` instead. */
-export type RebaseEditorTextSize = RichTextEditorTextSize;
+
 
 export type RichTextEditorProps = {
   content?: JSONContent | string,
@@ -43,8 +42,7 @@ export type RichTextEditorProps = {
   disabled?: boolean;
   markdownConfig?: MarkdownEditorConfig;
 };
-/** @deprecated Use `RichTextEditorProps` instead. */
-export type RebaseEditorProps = RichTextEditorProps;
+
 
 const proseClasses = {
   "sm": "prose-sm",
@@ -324,8 +322,7 @@ view }), [state, view])}>
     </div>
   );
 };
-/** @deprecated Use `RichTextEditor` instead. */
-export const RebaseEditor = RichTextEditor;
+
 
 const cssStyles = `
 .ProseMirror {

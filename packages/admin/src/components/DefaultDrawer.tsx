@@ -178,7 +178,7 @@ function CMSNavigationContent() {
     // Studio mode shows Studio dev views + admin entries (Users/Roles).
     // Content mode shows collections, CMS custom views, and admin entries — but not Studio dev views.
     const filteredEntries = adminModeController.mode === "studio"
-        ? allNavigationEntries.filter(e => e.type === "view" || e.type === "admin")
+        ? allNavigationEntries.filter(e => (e.type === "view" && studioViewSlugs.has(e.slug)) || e.type === "admin")
         : allNavigationEntries.filter(e => e.type !== "view" || !studioViewSlugs.has(e.slug));
 
     // Derive groups from the filtered entries, preserving the order from topLevelNavigation.groups

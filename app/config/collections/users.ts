@@ -1,5 +1,6 @@
 import { defineCollection } from "@rebasepro/common";
 import { resetPasswordAction } from "@rebasepro/admin";
+import { maskEmail, maskName, maskValues } from "../masking";
 
 const usersCollection = defineCollection({
     name: "Users",
@@ -108,6 +109,17 @@ disabled: { hidden: true } }
     },
     listProperties: ["displayName", "email", "roles", "createdAt"],
     propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"],
+    // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
+    callbacks: {
+        afterRead: ({ entity }) => ({
+            ...entity,
+            values: maskValues(entity.values, {
+                email: maskEmail,
+                displayName: maskName,
+                photoURL: null
+            })
+        })
+    },
     securityRules: [
         {
             name: "users_read_policy",

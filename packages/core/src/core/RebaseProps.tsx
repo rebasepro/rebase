@@ -141,19 +141,7 @@ export type RebaseProps<USER extends User> = {
      */
     dataSources?: RebaseDataSource[];
 
-    /**
-     * Map of direct/custom data drivers, keyed by data-source key.
-     *
-     * @deprecated Use {@link dataSources} instead. This is a shorthand kept for
-     * backward compatibility — each entry is treated as
-     * `{ key, engine: key, transport: "direct", driver }`.
-     *
-     * @example
-     * ```tsx
-     * <Rebase client={rebaseClient} drivers={{ firestore: firestoreDriver }}>
-     * ```
-     */
-    drivers?: Record<string, DataDriver>;
+
 
     /**
      * Optional override for AuthController if not using `client`

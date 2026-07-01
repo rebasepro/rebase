@@ -1,7 +1,6 @@
 import {
     ArrayProperty,
     AuthController,
-    CollectionWithSubcollections,
     EntityCollection,
     EnumValueConfig,
     EnumValues,
@@ -11,7 +10,8 @@ import {
     Relation,
     RelationProperty,
     StringProperty,
-    getDataSourceCapabilities
+    getDataSourceCapabilities,
+    getDeclaredSubcollections
 } from "@rebasepro/types";
 
 type PropertyConfig = { property: unknown; [key: string]: unknown };
@@ -346,8 +346,9 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
         return collection.childCollections() ?? [];
     }
 
-    if (getDataSourceCapabilities(collection.engine).supportsSubcollections && (collection as CollectionWithSubcollections).subcollections) {
-        return (collection as CollectionWithSubcollections).subcollections!() ?? [];
+    const declaredSubcollections = getDeclaredSubcollections(collection);
+    if (getDataSourceCapabilities(collection.engine).supportsSubcollections && declaredSubcollections) {
+        return declaredSubcollections() ?? [];
     }
 
     if (getDataSourceCapabilities(collection.engine).supportsRelations) {

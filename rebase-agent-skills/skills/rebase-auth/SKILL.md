@@ -857,6 +857,21 @@ Requests with the `serviceKey` bypass RLS — they receive admin-level access wi
 
 API keys use a service identity for RLS scoping: `uid: "api-key:{id}"`, `roles: ["service"]` (or `["admin", "service"]` when `admin: true`). They do not inherit the `created_by` user's identity.
 
+### Reserved System Identities
+
+The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (Entity Callbacks / DataHooks) and `c.get("user")` (custom functions):
+
+| Auth Method | `userId` | `roles` | When It Occurs |
+|---|---|---|---|
+| JWT (end-user) | Real user ID (e.g. `"abc123"`) | User's assigned roles (e.g. `["viewer"]`) | Normal authenticated requests |
+| Service Key | `"service"` | `["admin"]` | Server-side `rebase.data` calls, cron jobs, or any request with `Authorization: Bearer <serviceKey>` |
+| API Key (default) | `"api-key:{id}"` | `["service"]` | Machine-to-machine API key requests |
+| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | Admin API key requests |
+| Anonymous | `"anon"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
+| No token + `requireAuth: true` | — | — | **Rejected (401)** |
+
+> **IMPORTANT FOR AGENTS:** Server-side `rebase.data` (the singleton used in cron jobs, custom functions, and webhooks) is built with `createRebaseClient({ token: serviceKey })`. It round-trips through the REST API, so all middleware, DataHooks, and Entity Callbacks fire with `userId: "service"`, `roles: ["admin"]`. This lets developers distinguish server-internal reads from end-user reads in callbacks.
+
 ---
 
 ## Rate Limiting
@@ -1241,6 +1256,8 @@ When a request includes `Authorization: Bearer <serviceKey>`:
 - Comparison is done with constant-time comparison to prevent timing attacks.
 - Must be ≥ 32 characters (validated at startup).
 
+> **TIP:** In Entity Callbacks and DataHooks, server-side `rebase.data` calls appear as `userId: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your callback logic.
+
 ### Token Rotation
 
 Refresh tokens are rotated on every use:
@@ -1281,3 +1298,4 @@ All auth endpoints validate input with Zod schemas:
 - Source: `packages/types/src/types/auth_adapter.ts` — `AuthAdapter` interface
 - Source: `packages/server-core/src/auth/rls-scope.ts` — RLS scoping
 - Source: `packages/server-core/src/email/types.ts` — Email configuration
+- **Reserved Identities**: `"service"` / `"anon"` / `"api-key:{id}"` — see [Row-Level Security > Reserved System Identities](#reserved-system-identities)

@@ -13,11 +13,31 @@ export interface BackendHookContext {
 
 
 /**
- * Hooks for intercepting collection entity data at the REST API boundary.
+ * REST-boundary interceptors for collection entity data.
  *
- * These run **after** per-collection `EntityCallbacks` (which execute inside
- * the DataDriver) and provide a single cross-cutting interception point for
- * ALL collections flowing through the REST API.
+ * ## Layer & scope — read before using for security
+ *
+ * These hooks run **only at the REST/HTTP boundary**, and **after** the
+ * per-collection {@link EntityCallbacks} that execute inside the DataDriver.
+ * Execution order for a REST read is:
+ *
+ *   DataDriver → {@link EntityCallbacks} (all paths) → `DataHooks` (REST only)
+ *
+ * Read-path coverage differs from `EntityCallbacks`:
+ *
+ * | Read path                       | {@link EntityCallbacks} | `DataHooks` |
+ * | ------------------------------- | :---------------------: | :---------: |
+ * | REST API (`GET /:slug`)         |           ✅            |     ✅      |
+ * | Realtime / WebSocket            |           ✅            |     ❌      |
+ * | Server-side `rebase.data.*`     |           ✅            |     ❌      |
+ *
+ * **Do not enforce security-critical redaction here.** Because `DataHooks`
+ * are REST-only, PII masking or row filtering placed here is **bypassed** by
+ * realtime subscriptions and by any server code calling `rebase.data` (which
+ * runs with admin privileges / no RLS). For redaction that must hold on every
+ * read path, use {@link EntityCallbacks} on the collection (driver level) or
+ * column-level RLS. Use `DataHooks` for REST-only cross-cutting concerns:
+ * audit logging of HTTP requests, response envelope enrichment, etc.
  *
  * Every callback receives the collection `slug` so you can target specific
  * collections or apply logic globally.
@@ -26,11 +46,15 @@ export interface BackendHookContext {
  */
 export interface DataHooks {
     /**
-     * Transform an entity after it's read from the database,
+     * Transform an entity after it's read from the database via REST,
      * before it's returned to the client.
      *
      * Runs for both list (GET /:slug) and single (GET /:slug/:id) fetches.
      * Return the modified entity, or `null` to filter it out.
+     *
+     * ⚠️ REST-only: this does NOT run for realtime or `rebase.data` reads.
+     * For redaction that must hold on every read path, use
+     * {@link EntityCallbacks.afterRead} instead.
      *
      * @param slug - The collection slug (e.g. "orders", "products")
      * @param entity - The flattened entity object (id + values merged)
@@ -81,26 +105,26 @@ export interface DataHooks {
 }
 
 /**
- * Backend-level hooks for intercepting data at the API boundary.
+ * Backend-level hooks for intercepting data at the **REST API boundary**.
  *
  * These hooks run server-side after database operations complete and before
- * API responses are sent.
+ * REST API responses are sent — they do **not** fire for realtime or
+ * server-side `rebase.data` reads. See {@link DataHooks} for the full
+ * read-path coverage table.
  *
- * `data` hooks complement per-collection `EntityCallbacks`. Entity callbacks
- * run inside the DataDriver (close to the DB); data hooks run at the HTTP
- * boundary (close to the client). Use data hooks for cross-cutting concerns
- * like audit logging, response enrichment, or field masking.
+ * `data` hooks complement per-collection {@link EntityCallbacks}. Entity
+ * callbacks run inside the DataDriver (close to the DB, on every read path);
+ * data hooks run at the HTTP boundary (close to the client, REST only). Use
+ * data hooks for REST-only cross-cutting concerns like audit logging of HTTP
+ * requests or response envelope enrichment — **not** for security-critical
+ * redaction, which belongs in {@link EntityCallbacks} so it can't be bypassed.
  *
- * @example
+ * @example REST-only audit logging (safe use of a data hook)
  * ```typescript
  * const hooks: BackendHooks = {
  *     data: {
- *         afterRead(slug, entity, ctx) {
- *             // Mask PII for non-admin users across all collections
- *             if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
- *                 return { ...entity, email: "***" };
- *             }
- *             return entity;
+ *         afterSave(slug, entity, ctx) {
+ *             console.log(`[audit] ${ctx.requestUser?.userId} wrote ${slug}/${entity.id}`);
  *         }
  *     }
  * };

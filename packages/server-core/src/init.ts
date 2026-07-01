@@ -105,6 +105,14 @@ export interface RebaseAuthConfig {
     slack?: { clientId: string; clientSecret: string };
     spotify?: { clientId: string; clientSecret: string };
     defaultRole?: string;
+    /**
+     * Additional OAuth providers beyond the named ones above (`google`,
+     * `github`, etc.). This is the canonical extension point for any
+     * provider not already covered by a named field — including the
+     * twelve above, each of which can also be constructed and passed
+     * here via its `create*Provider` factory (e.g. `createGoogleProvider`
+     * from `@rebasepro/server-core`).
+     */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     providers?: OAuthProvider<any>[];
     /**
@@ -131,8 +139,6 @@ export interface RebaseAuthConfig {
      * Requires email to be configured.
      */
     magicLink?: boolean;
-
-    [key: string]: unknown;
 }
 
 export interface RebaseBackendConfig {

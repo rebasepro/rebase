@@ -1,4 +1,4 @@
-import { EntityCollection, SecurityRule, SecurityOperation, AuthCollectionConfig, isPostgresCollection } from "@rebasepro/types";
+import { EntityCollection, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollection, policy } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
 
 /**
@@ -37,7 +37,14 @@ import { getTableName } from "@rebasepro/common";
  * control of an auth collection's write authorization, set
  * `disableDefaultAuthPolicies: true` on the collection.
  */
-const ADMIN_WRITE_EXPR = "auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']";
+// Expressed structurally (not as raw SQL) so the admin UI can evaluate it
+// exactly — the framework's most security-critical policy must be reflected
+// precisely, not left as an un-evaluable raw clause. Compiles to
+// `auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`.
+const ADMIN_WRITE_EXPR: PolicyExpression = policy.or(
+    policy.not(policy.authenticated()),
+    policy.rolesOverlap(["admin"])
+);
 
 /** Write operations that must be admin-gated by default on auth collections. */
 const DEFAULT_GUARDED_OPS: SecurityOperation[] = ["insert", "update", "delete"];
@@ -73,8 +80,8 @@ export function getEffectiveSecurityRules(collection: EntityCollection): Securit
         name: `${tableName}_require_admin_write`,
         mode: "restrictive",
         operations: [...DEFAULT_GUARDED_OPS],
-        using: ADMIN_WRITE_EXPR,
-        withCheck: ADMIN_WRITE_EXPR
+        condition: ADMIN_WRITE_EXPR,
+        check: ADMIN_WRITE_EXPR
     };
 
     // Permissive grant: a restrictive policy alone denies everything, so this
@@ -82,8 +89,8 @@ export function getEffectiveSecurityRules(collection: EntityCollection): Securit
     const allowAdminWrite: SecurityRule = {
         name: `${tableName}_default_admin_write`,
         operations: [...DEFAULT_GUARDED_OPS],
-        using: ADMIN_WRITE_EXPR,
-        withCheck: ADMIN_WRITE_EXPR
+        condition: ADMIN_WRITE_EXPR,
+        check: ADMIN_WRITE_EXPR
     };
 
     return [...explicit, allowAdminWrite, requireAdminGate];

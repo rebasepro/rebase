@@ -1,9 +1,9 @@
 import {
     ArrayProperty,
-    CollectionWithSubcollections,
     EngineProperties,
     EntityCollection,
     getDataSourceCapabilities,
+    getDeclaredSubcollections,
     NumberProperty,
     Properties,
     Property,
@@ -254,9 +254,11 @@ export class CollectionRegistry {
 
         // Populate childCollections from driver-specific fields
         if (!result.childCollections) {
-            if (getDataSourceCapabilities(result.engine).supportsSubcollections && (result as CollectionWithSubcollections).subcollections) {
-                result.childCollections = (result as CollectionWithSubcollections).subcollections;
-            } else if (getDataSourceCapabilities(result.engine).supportsRelations && relResult.relations) {
+            const capabilities = getDataSourceCapabilities(result.engine);
+            const declaredSubcollections = getDeclaredSubcollections(result);
+            if (capabilities.supportsSubcollections && declaredSubcollections) {
+                result.childCollections = declaredSubcollections;
+            } else if (capabilities.supportsRelations && relResult.relations) {
                 const manyRelations = relResult.relations.filter((r: Relation) => r.cardinality === "many");
                 if (manyRelations.length > 0) {
                     result.childCollections = () => manyRelations.map((r: Relation) => {

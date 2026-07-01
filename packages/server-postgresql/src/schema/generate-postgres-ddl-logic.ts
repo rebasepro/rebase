@@ -1,5 +1,5 @@
 import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
-import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
 import { getEffectiveSecurityRules } from "./auth-default-policies";
@@ -44,36 +44,6 @@ const isIdProperty = (propName: string, prop: Property, collection: EntityCollec
     return !hasExplicitId && propName === "id";
 };
 
-const resolveRawSql = (expression: string): string => {
-    return expression.replace(/\{(\w+)\}/g, (_, col) => col);
-};
-
-const unwrapSql = (sqlExpr: string): string => {
-    return sqlExpr;
-};
-
-const buildUsingClause = (rule: SecurityRule, collection: EntityCollection): string | null => {
-    if (rule.using) {
-        return resolveRawSql(rule.using);
-    }
-    if (rule.access === "public") {
-        return "true";
-    }
-    if (rule.ownerField) {
-        const prop = collection.properties?.[rule.ownerField];
-        const colName = resolveColumnName(rule.ownerField, prop);
-        return `${colName} = auth.uid()`;
-    }
-    return null;
-};
-
-const buildWithCheckClause = (rule: SecurityRule, collection: EntityCollection): string | null => {
-    if (rule.withCheck) {
-        return resolveRawSql(rule.withCheck);
-    }
-    return buildUsingClause(rule, collection);
-};
-
 const getPolicyNameHash = (rule: SecurityRule): string => {
     const data = JSON.stringify({
         a: rule.access,
@@ -84,7 +54,9 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
         rol: rule.roles?.slice().sort(),
         pg: rule.pgRoles?.slice().sort(),
         u: rule.using,
-        w: rule.withCheck
+        w: rule.withCheck,
+        c: rule.condition,
+        ch: rule.check
     });
     return createHash("sha1").update(data).digest("hex").substring(0, 7);
 };
@@ -111,29 +83,18 @@ const generateSinglePolicyDdl = (collection: EntityCollection, rule: SecurityRul
     const tableName = getTableName(collection);
     const mode = (rule.mode ?? "permissive").toUpperCase();
     const operationUpper = operation.toUpperCase();
-    const roles = rule.roles ? [...rule.roles].sort() : undefined;
     const pgRoles = rule.pgRoles ? [...rule.pgRoles].sort() : ["public"];
 
     const needsUsing = operation !== "insert";
     const needsWithCheck = operation !== "select" && operation !== "delete";
 
-    let usingClause = needsUsing ? buildUsingClause(rule, collection) : null;
-    let withCheckClause = needsWithCheck ? buildWithCheckClause(rule, collection) : null;
+    // Desugar the rule (access / ownerField / roles / structured condition / raw
+    // SQL) into the shared PolicyExpression model, then compile to SQL. This is
+    // the same normalization the client-side evaluator uses, so DDL and UI agree.
+    const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
 
-    if (roles && roles.length > 0) {
-        const rolesArrayString = `ARRAY[${roles.map(r => `'${r}'`).join(",")}]`;
-        const roleCondition = `string_to_array(auth.roles(), ',') && ${rolesArrayString}`;
-        if (usingClause) {
-            usingClause = `(${usingClause}) AND (${roleCondition})`;
-        } else if (needsUsing) {
-            usingClause = roleCondition;
-        }
-        if (withCheckClause) {
-            withCheckClause = `(${withCheckClause}) AND (${roleCondition})`;
-        } else if (needsWithCheck) {
-            withCheckClause = roleCondition;
-        }
-    }
+    let usingClause = needsUsing && usingExpr ? policyToPostgres(usingExpr, collection) : null;
+    let withCheckClause = needsWithCheck && withCheckExpr ? policyToPostgres(withCheckExpr, collection) : null;
 
     if (!usingClause && needsUsing) {
         usingClause = "false";
