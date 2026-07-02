@@ -1,6 +1,6 @@
 {
     "name": "rebase-app-config",
-    "version": "0.2.2",
+    "version": "0.8.0",
     "description": "Shared collections and config for Rebase app",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
