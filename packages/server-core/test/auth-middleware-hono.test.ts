@@ -64,8 +64,14 @@ accessExpiresIn: "1h" });
             expect(body.error.code).toBe("UNAUTHORIZED");
         });
 
-        it("accepts token via query parameter", async () => {
-            const app = createApp();
+        it("accepts token via query parameter (with queryTokenAuth)", async () => {
+            const { queryTokenAuth } = await import("../src/auth/middleware");
+            const app = new Hono<HonoEnv>();
+            app.use("/protected/*", queryTokenAuth, requireAuth);
+            app.get("/protected/resource", (c: Context<HonoEnv>) => {
+                const user = c.get("user");
+                return c.json({ user });
+            });
             const token = generateAccessToken("user-2", ["editor"]);
             const res = await app.request(`/protected/resource?token=${token}`);
             expect(res.status).toBe(200);
@@ -74,7 +80,13 @@ accessExpiresIn: "1h" });
         });
 
         it("prefers Bearer token over query parameter", async () => {
-            const app = createApp();
+            const { queryTokenAuth } = await import("../src/auth/middleware");
+            const app = new Hono<HonoEnv>();
+            app.use("/protected/*", queryTokenAuth, requireAuth);
+            app.get("/protected/resource", (c: Context<HonoEnv>) => {
+                const user = c.get("user");
+                return c.json({ user });
+            });
             const bearerToken = generateAccessToken("bearer-user", ["admin"]);
             const queryToken = generateAccessToken("query-user", ["viewer"]);
             const res = await app.request(`/protected/resource?token=${queryToken}`, {

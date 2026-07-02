@@ -50,6 +50,57 @@ export interface EffectiveRoleController {
 
 
 /**
+ * Props for the main {@link Rebase} component.
+ *
+ * ## Resolution & Precedence
+ *
+ * Several prop families overlap intentionally. The rules below describe
+ * which value wins when more than one is supplied.
+ *
+ * ### Data (default source)
+ *
+ * First match wins:
+ * 1. `data` prop (used as-is)
+ * 2. `driver` prop (wrapped via `buildRebaseData`)
+ * 3. `client.data`
+ * 4. `dataSources` entry keyed `DEFAULT_DATA_SOURCE_KEY` (`"(default)"`),
+ *    else the **first** registered source (`Object.values(...)[0]` —
+ *    ⚠️ object-order-dependent; prefer an explicit `"(default)"` key).
+ * 5. **Throw** — at least one data source is required.
+ *
+ * Named `dataSources` entries with a `driver` are additionally registered
+ * as routed non-default sources, independent of the default resolution.
+ *
+ * ### Auth
+ *
+ * - `authController` prop → completely disables the `client.auth`
+ *   subscription (not a merge). The recommended pattern is to pass both
+ *   `client` and an `authController` built from that client via
+ *   `useRebaseAuthController({ client })`.
+ * - Otherwise, `client.auth` is subscribed to via `useAuthSubscription`.
+ *
+ * ### Storage (default source)
+ *
+ * Default: `storageSource` prop ?? `client.storage`.
+ *
+ * Named sources are merged in priority order (later entries with the same
+ * key overwrite earlier ones):
+ * 1. Backend-discovered remote definitions (`client.fetchStorageSources()`,
+ *    fetched after auth/login-skip).
+ * 2. Client `storageRegistry` entries.
+ * 3. `storageSources` prop entries (live `direct` instances; `server`-
+ *    transport keys are materialized via `client.createStorageSource`).
+ * 4. Default storage (keyed `DEFAULT_STORAGE_SOURCE_KEY`) as fallback.
+ *
+ * ## Decision Ladder
+ *
+ * | Scenario | Props to use |
+ * |---|---|
+ * | Standard app | `client` (+ `authController` built from it) |
+ * | Multi-backend data | add `dataSources` |
+ * | Multi-backend storage | add `storageSources` |
+ * | Fully headless / custom | `data` or `driver` + `storageSource` |
+ *
  * @group Models
  */
 export type RebaseProps<USER extends User> = {
@@ -93,19 +144,28 @@ export type RebaseProps<USER extends User> = {
 
     /**
      * Unified RebaseClient for data, auth, and storage.
+     *
+     * `client.data` is used as the default data source unless overridden by
+     * `data`, `driver`, or a `dataSources` entry keyed `"(default)"`.
+     * `client.auth` is subscribed unless `authController` is provided.
+     * `client.storage` is used unless `storageSource` is provided.
      */
     client?: RebaseClient;
 
     /**
-     * Optional override for RebaseData if not using `client`
+     * Explicit default data source. Takes the **highest** priority in the
+     * data resolution ladder — when set, `driver`, `client.data`, and
+     * `dataSources` defaults are all ignored for the default source.
      */
     data?: RebaseData;
 
     /**
-     * Optional override for DataDriver if not using `client`.
+     * Convenience prop — the driver is wrapped via `buildRebaseData`
+     * internally and used as the default data source.
      *
-     * This sets the **default** data driver — it handles every collection
-     * that does not match an entry in {@link drivers}.
+     * **Ignored** when {@link data} is provided. Overrides `client.data`
+     * as the default data source. Collections routed to a named
+     * {@link dataSources} entry are unaffected.
      */
     driver?: DataDriver;
 
@@ -136,15 +196,24 @@ export type RebaseProps<USER extends User> = {
      */
     dataSources?: RebaseDataSource[];
 
-
-
     /**
-     * Optional override for AuthController if not using `client`
+     * Custom auth controller. When provided, the `client.auth` subscription
+     * is **completely disabled** (not merged).
+     *
+     * The recommended pattern is to pass both `client` and an
+     * `authController` built from that client:
+     * ```tsx
+     * const authController = useRebaseAuthController({ client });
+     * <Rebase client={client} authController={authController} />
+     * ```
+     * This lets the `authController` own the auth lifecycle while `client`
+     * still provides data and storage.
      */
     authController?: AuthController<USER>;
 
     /**
-     * Optional override for StorageSource if not using `client`
+     * Default storage source. Overrides `client.storage` when provided.
+     * Named sources in {@link storageSources} are unaffected.
      */
     storageSource?: StorageSource;
 

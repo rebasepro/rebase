@@ -88,6 +88,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Frontend Setup", slug: "docs/frontend" },
+                        { label: "Extending Rebase", slug: "docs/frontend/extending" },
                         { label: "Component Overrides (Swizzling)", slug: "docs/frontend/component-overrides" },
                         { label: "Authentication & Login", slug: "docs/frontend/authentication" },
                         { label: "Storage & File Uploads", slug: "docs/frontend/storage" },
@@ -96,6 +97,7 @@ export default defineConfig({
                         { label: "Entity Views", slug: "docs/frontend/entity-views" },
                         { label: "Entity Actions", slug: "docs/frontend/entity-actions" },
                         { label: "Additional Columns", slug: "docs/frontend/additional-columns" },
+                        { label: "Slots", slug: "docs/frontend/slots" },
                         { label: "Data Import & Export", slug: "docs/frontend/data-import-export" },
                         { label: "Plugins", slug: "docs/plugins" },
                         { label: "Hooks Reference", slug: "docs/hooks" }

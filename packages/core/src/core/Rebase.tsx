@@ -77,6 +77,18 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
 
     const plugins = pluginsProp;
 
+    // ── Dev-mode prop conflict warnings (fire once per mount) ────────
+    const warnedRef = useRef(false);
+    if (!warnedRef.current) {
+        if (dataProp && driverProp) {
+            console.warn(
+                "[Rebase] Both `data` and `driver` props are set. " +
+                "The `driver` prop is ignored because `data` takes precedence."
+            );
+        }
+        warnedRef.current = true;
+    }
+
     // Validate plugin key uniqueness
     if (plugins) {
         const keys = plugins.map((p) => p.key);
@@ -253,8 +265,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
 
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
         const ws = client?.ws;
-        if (ws && typeof (ws as Record<string, unknown>).executeSql === "function") {
-            const wsAdmin = ws as import("@rebasepro/types").DatabaseAdmin;
+        if (ws && typeof (ws as unknown as Record<string, unknown>).executeSql === "function") {
+            const wsAdmin = ws as unknown as import("@rebasepro/types").DatabaseAdmin;
             return {
                 executeSql: wsAdmin.executeSql!.bind(wsAdmin),
                 fetchAvailableDatabases: wsAdmin.fetchAvailableDatabases?.bind(wsAdmin),

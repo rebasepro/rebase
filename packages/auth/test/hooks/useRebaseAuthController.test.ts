@@ -109,8 +109,9 @@ describe("useRebaseAuthController hook", () => {
             email: "stored@rebase.pro",
             displayName: "Stored User",
             photoURL: null,
-            providerId: "custom",
+            providerId: "password",
             isAnonymous: false,
+            emailVerified: undefined,
             roles: [],
             metadata: undefined
         });
