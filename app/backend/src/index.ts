@@ -9,6 +9,7 @@ import {
     cleanupDevPortFile,
     HonoEnv,
     initializeRebaseBackend,
+    installShutdownHandlers,
     listenWithPortRetry,
     logger,
     serveSPA
@@ -156,39 +157,10 @@ pass: env.SMTP_PASS! }
     }
 
     // ─── Graceful Shutdown ───────────────────────────────────────────────
-    let isShuttingDown = false;
-    const gracefulShutdown = async (signal: string) => {
-        if (isShuttingDown) return;
-        isShuttingDown = true;
-
-        logger.info(`Received ${signal}, waiting for HTTP connections to drain...`);
-
-        // Fallback force exit (must be set before any awaits)
-        const forceTimer = setTimeout(() => {
-            logger.error("Shutdown timed out after 15 seconds. Forcefully exiting.");
-            process.exit(1);
-        }, 15000);
-        forceTimer.unref();
-
-        try {
-            // backend.shutdown() already calls server.close() internally
-            // and drains in-flight requests — do NOT call server.close() separately
-            // or the second close() will deadlock (callback never fires on an
-            // already-closing server).
-            await backend.shutdown();
-            logger.info("HTTP server closed. Closing database pool...");
-            await postgresResources.pool.end();
-            clearTimeout(forceTimer);
-            logger.info("Graceful shutdown complete.");
-            process.exit(0);
-        } catch (shutdownErr) {
-            logger.error("Error during shutdown cleanup:", { error: shutdownErr instanceof Error ? shutdownErr : new Error(String(shutdownErr)) });
-            process.exit(1);
-        }
-    };
-
-    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+    // Drains HTTP, stops crons, tears down realtime, then closes the pool.
+    installShutdownHandlers(backend, {
+        onCleanup: () => postgresResources.pool.end()
+    });
 }
 
 startServer().catch(err => {

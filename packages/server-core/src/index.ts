@@ -101,3 +101,9 @@ export * from "./services/driver-registry";
 export { cleanupDevPortFile, listenWithPortRetry } from "./utils/dev-port";
 export { serveSPA } from "./serve-spa";
 
+// =============================================================================
+// Graceful shutdown
+// =============================================================================
+export { installShutdownHandlers } from "./init/shutdown";
+export type { ShutdownHandlerOptions } from "./init/shutdown";
+

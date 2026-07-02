@@ -7,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
     initializeRebaseBackend,
+    installShutdownHandlers,
     serveSPA,
     HonoEnv,
     listenWithPortRetry,
@@ -163,17 +164,11 @@ pass: env.SMTP_PASS! }
     }
 
     // ─── Graceful Shutdown ───────────────────────────────────────────────
-    // Uses the framework's built-in shutdown() which drains connections,
-    // stops the cron scheduler, and force-exits after 15s timeout.
-    const gracefulShutdown = async (signal: string) => {
-        logger.info(`Received ${signal}, shutting down...`);
-        await backend.shutdown();
-        await pool.end();
-        logger.info("Database pool closed");
-        process.exit(0);
-    };
-    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+    // Drains HTTP, stops crons, tears down realtime, then closes the pool.
+    // Guards against double signals and force-exits if shutdown hangs.
+    installShutdownHandlers(backend, {
+        onCleanup: () => pool.end()
+    });
 }
 
 startServer().catch(err => {

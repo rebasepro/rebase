@@ -178,6 +178,17 @@ async function startServer() {
 startServer();
 ```
 
+> **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, guards against repeated signals, and force-exits if shutdown hangs:
+>
+> ```ts
+> import { installShutdownHandlers } from "@rebasepro/server-core";
+>
+> const backend = await initializeRebaseBackend({ ... });
+> installShutdownHandlers(backend, { onCleanup: () => pool.end() });
+> ```
+>
+> Do **not** combine it with your own `server.close()` — `backend.shutdown()` already closes the server, and a second close deadlocks. The manual handler shown in the example above is only for fully custom setups that bypass `initializeRebaseBackend`.
+
 ---
 
 ## Key Backend Concepts
