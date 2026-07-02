@@ -212,7 +212,7 @@ values: {} as Record<string, unknown> }
  * @example
  * const data = buildRebaseData(driver);
  * await data.products.create({ name: "Camera", price: 299 });
- * const { data: items } = await data.products.find({ where: { status: "eq.published" } });
+ * const { data: items } = await data.products.find({ where: { status: ["==", "published"] } });
  */
 export function buildRebaseData(driver: DataDriver): RebaseData {
     const cache = new Map<string, CollectionAccessor>();

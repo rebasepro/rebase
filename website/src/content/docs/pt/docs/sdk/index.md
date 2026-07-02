@@ -54,7 +54,7 @@ const { data, meta } = await client.data.products.find();
 
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
-    where: { active: true, price: [">=", 100] },
+    where: { active: ["==", true], price: [">=", 100] },
     orderBy: ["created_at", "desc"],
     limit: 25,
     offset: 0
@@ -222,7 +222,7 @@ Subscreva as alterações da coleção via WebSocket:
 ```typescript
 // Subscrever todos os produtos ativos
 const unsubscribe = client.data.products.listen(
-    { where: { active: true }, limit: 50 },
+    { where: { active: ["==", true] }, limit: 50 },
     (response) => {
         console.log("Products updated:", response.data);
     }
@@ -298,7 +298,7 @@ await client.storage.deleteFile("products/image.jpg");
 Chame endpoints de servidor personalizados (Cloud Functions, rotas personalizadas, etc.):
 
 ```typescript
-const result = await client.call<{ summary: string }>("generate-summary", {
+const result = await client.call<{ summary: string }>("functions/generate-summary", {
     articleId: 42
 });
 ```

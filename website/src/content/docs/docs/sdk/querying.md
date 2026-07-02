@@ -29,7 +29,7 @@ const { data, meta } = await client.data.products.find();
 
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
-    where: { active: true, price: [">=", 100] },
+    where: { active: ["==", true], price: [">=", 100] },
     orderBy: ["created_at", "desc"],
     limit: 25,
     offset: 0
@@ -84,7 +84,7 @@ const total = await client.data.products.count();
 
 // With filters
 const activeCount = await client.data.products.count({
-    where: { active: true }
+    where: { active: ["==", true] }
 });
 ```
 
@@ -131,28 +131,27 @@ const { data } = await client.data.products
 
 ### Where Clause Syntaxes
 
-The `where` parameter in `find()` supports three formats:
+The `where` parameter in `find()` supports two formats:
 
 ```typescript
-// 1. Equality shorthand — raw JS values
-await client.data.products.find({
-    where: { status: "active", featured: true }
-});
-
-// 2. Tuple syntax — [operator, value]
+// 1. Tuple syntax — [operator, value] (recommended)
 await client.data.products.find({
     where: {
+        status: ["==", "active"],
+        featured: ["==", true],
         price: [">=", 100],
         category: ["in", ["electronics", "gadgets"]],
         deleted_at: ["!=", null]
     }
 });
 
-// 3. PostgREST string syntax
+// 2. Pre-serialized PostgREST string syntax (advanced)
 await client.data.products.find({
     where: { status: "eq.published", price: "gte.100" }
 });
 ```
+
+> **Note:** Pre-serialized PostgREST strings (format 2) are an escape hatch for passing filter values that are already in wire format. Prefer tuple syntax for type safety and readability.
 
 ## Pagination
 
@@ -289,9 +288,9 @@ const result = await client.functions.invoke<{ status: string }>(
     { method: "POST", path: "status/check" }
 );
 
-// Legacy shorthand via client.call()
+// Shorthand via client.call()
 const result = await client.call<{ summary: string }>(
-    "generate-summary",
+    "functions/generate-summary",
     { articleId: 42 }
 );
 ```

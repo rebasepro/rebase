@@ -16,7 +16,7 @@ Use `listen()` to subscribe to a collection query. The callback fires whenever t
 
 ```typescript
 const unsubscribe = client.data.products.listen(
-    { where: { active: true }, limit: 50 },
+    { where: { active: ["==", true] }, limit: 50 },
     (response) => {
         console.log("Products updated:", response.data);
         console.log("Total:", response.meta.total);
@@ -67,7 +67,7 @@ If the count query **fails**, no second emission occurs. The first emission's `e
 
 ```typescript
 client.data.products.listen(
-    { where: { active: true }, limit: 50 },
+    { where: { active: ["==", true] }, limit: 50 },
     (response) => {
         if (response.meta.estimated) {
             // First-paint: render immediately, total/hasMore may change
@@ -148,7 +148,7 @@ In React, use `useEffect` cleanup:
 ```tsx
 useEffect(() => {
     const unsubscribe = client.data.products.listen(
-        { where: { active: true } },
+        { where: { active: ["==", true] } },
         (response) => setProducts(response.data)
     );
     return () => unsubscribe();

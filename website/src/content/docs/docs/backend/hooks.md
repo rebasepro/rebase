@@ -1,42 +1,44 @@
 ---
 title: Global Backend Hooks
 sidebar_label: Global Hooks
-description: Intercept database operations, user management, and roles globally at the server API boundary.
+description: Apply cross-cutting lifecycle callbacks to every collection at the server level using EntityCallbacks.
 ---
 
 ## Overview
 
-While **[Entity Callbacks](/docs/collections/callbacks)** run on the database adapter layer scoped to individual collections, **Global Backend Hooks** run at the HTTP API boundary. They allow you to define cross-cutting logic that applies globally across all collections or admin endpoints.
+Rebase provides two levels of entity lifecycle callbacks — both use the same `EntityCallbacks` type from `@rebasepro/types`:
 
-Use global backend hooks for:
-- **Global PII masking**: Filtering out or redacting sensitive user information for specific roles.
-- **Unified audit logging**: Writing log entries for all creations, updates, or deletions across all collections.
-- **Global validation rules**: Restricting certain HTTP methods or operations under custom context rules.
-- **User lifecycle side-effects**: Sending custom welcome emails or syncing external identity providers when users are saved or deleted.
+- **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
+- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.data`).
+
+Use global callbacks for:
+- **PII masking** — redact sensitive fields for non-admin callers across all collections.
+- **Unified audit logging** — log every create, update, or delete in one place.
+- **Cross-cutting validation** — enforce invariants that span multiple collections.
+
+:::note
+**Execution order**: global callbacks → collection callbacks → property callbacks.
+:::
+
+---
 
 ## Configuration
 
-Configure hooks in `initializeRebaseBackend` by providing the `hooks` property of type `BackendHooks`:
+Pass the `callbacks` key to `initializeRebaseBackend`:
 
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server-core";
 
 const instance = await initializeRebaseBackend({
-    app,
-    server,
-    // ... basic config
-    hooks: {
-        users: {
-            afterRead: (user, context) => {
-                // Return user or null to filter it out
-                return user;
-            }
+    // ... other config
+    callbacks: {
+        afterRead({ entity, context }) {
+            // Runs after every entity read, across all collections
+            return entity;
         },
-        data: {
-            afterRead: (slug, entity, context) => {
-                // Apply global data transformations
-                return entity;
-            }
+        beforeSave({ values, context }) {
+            // Runs before every entity save
+            return values;
         }
     }
 });
@@ -44,79 +46,45 @@ const instance = await initializeRebaseBackend({
 
 ---
 
-## Hook Context
-
-Every boundary hook receives a `BackendHookContext` detailing the request environment:
+## `EntityCallbacks` Type
 
 ```typescript
-interface BackendHookContext {
-    /** The authenticated user payload, or undefined if public */
-    requestUser?: {
-        userId: string;
-        roles: string[];
-    };
-    
-    /** The HTTP method triggering the hook */
-    method: "GET" | "POST" | "PUT" | "DELETE";
-}
-```
+import type { EntityCallbacks } from "@rebasepro/types";
 
----
-
-## User Hooks (`users`)
-
-Intercept user account operations at the `/api/admin` boundary.
-
-| Hook | Signature | Description |
-|------|-----------|-------------|
-| `afterRead` | `(user, context) => user \| null` | Transform user record before returning. Returning `null` hides it. |
-| `beforeSave` | `(data, context) => data` | Modify user fields (email, roles, name) before database insert/update. Throw to reject. |
-| `afterSave` | `(user, context) => void` | Post-save hook for side effects. |
-| `beforeDelete` | `(userId, context) => void` | Intercept delete operations. Throw to prevent. |
-| `afterDelete` | `(userId, context) => void` | Post-delete side effects hook. |
-
-### Example: Sync User to CRM on signup
-
-```typescript
-const hooks: BackendHooks = {
-    users: {
-        afterSave: async (user, context) => {
-            if (context.method === "POST") {
-                // New user signed up - sync to HubSpot/Salesforce
-                await syncToCRM(user.email, user.displayName);
-            }
-        },
-        beforeDelete: async (userId, context) => {
-            // Prevent deleting protected system accounts
-            if (userId === "system-admin-uuid") {
-                throw new Error("Cannot delete system admin account!");
-            }
-        }
-    }
+type EntityCallbacks = {
+    afterRead?(props):   Entity;          // Transform entity before returning to caller
+    beforeSave?(props):  Partial<Values>; // Modify values before writing to DB
+    afterSave?(props):   void;            // Side-effects after successful save
+    afterSaveError?(props): void;         // Side-effects after a failed save
+    beforeDelete?(props): boolean | void; // Return false or throw to block deletion
+    afterDelete?(props): void;            // Side-effects after successful deletion
 };
 ```
 
----
-
-## Role Hooks (`roles`)
-
-Intercept role definitions fetched by the admin panel.
-
-| Hook | Signature | Description |
-|------|-----------|-------------|
-| `afterRead` | `(role, context) => role \| null` | Modify or hide role properties dynamically. |
+All callbacks may return a `Promise` (async) or a plain value (sync).
 
 ---
 
-## Data Boundary Hooks (`data`)
+## Callback Props
 
-These hooks intersect **ALL** collection entities flowing through the REST API routes. 
+Each callback receives a single props object. Common fields:
 
-### Execution Priorities & Boundaries
+| Field | Type | Present in |
+|-------|------|------------|
+| `collection` | `ResolvedCollection` | All callbacks |
+| `path` | `string` | All callbacks |
+| `entity` | `Entity` | `afterRead`, `beforeDelete`, `afterDelete` |
+| `entityId` | `string` | `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `previousValues` | `EntityValues` (optional) | `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing"` | `afterSave`, `afterSaveError` |
+| `context` | `RebaseCallContext` | All callbacks |
 
-It is critical to distinguish between **Entity Callbacks** and **Global Backend Hooks**:
-1. **Database Adapter Boundary (Entity Callbacks)**: Callbacks defined on individual collections (e.g., `beforeSave`, `beforeDelete`) execute *inside* the Postgres driver's transactional block, under the subscriber's specific RLS parameters (`app.user_id`, `app.user_roles`). They are designed for database integrity, field defaults, and transaction-bound validations.
-2. **HTTP API Boundary (Global Hooks)**: Global hooks execute at the Hono router boundary *outside* the Postgres transaction scope. 
+`context.user` contains the authenticated user (`uid`, `roles`, etc.), or is `undefined` for public requests.
+
+---
+
+## Execution Pipeline
 
 ```
 [Client Request]
@@ -125,72 +93,100 @@ It is critical to distinguish between **Entity Callbacks** and **Global Backend 
  [Hono Router]
        │
  ┌─────┴───────────────────────────────────────────────────────┐
- │ 1. Global Hook: data.beforeSave (HTTP Boundary - Blocking)  │
+ │ 1. Global Callback: beforeSave (Blocking)                   │
+ │ 2. Collection Callback: beforeSave (Blocking)               │
  └─────┬───────────────────────────────────────────────────────┘
        │
  [Database Driver]
  ┌─────┴───────────────────────────────────────────────────────┐
- │ 2. Start PostgreSQL Transaction                             │
- │ 3. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
- │ 4. Entity Callback: beforeSave (Tx Boundary - Blocking)     │
+ │ 3. Start PostgreSQL Transaction                             │
+ │ 4. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
  │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
- │ 6. Entity Callback: afterSave (Tx Boundary - Blocking)      │
- │ 7. Commit Transaction                                       │
+ │ 6. Commit Transaction                                       │
  └─────┬───────────────────────────────────────────────────────┘
        │
  ┌─────┴───────────────────────────────────────────────────────┐
- │ 8. Global Hook: data.afterSave (HTTP Boundary - Deferred)   │
+ │ 7. Global Callback: afterSave                               │
+ │ 8. Collection Callback: afterSave                           │
  └─────┬───────────────────────────────────────────────────────┘
        │
        ▼
 [Client Response]
 ```
 
-### Blocking vs. Asynchronous Hook Semantics
+---
 
-- **Blocking Hooks (`beforeSave`, `beforeDelete`)**: Executed sequentially and synchronously prior to running database operations. If any hook throws an error, the pipeline is immediately halted, aborting the transaction and returning a `400 Bad Request` or `403 Forbidden` response to the client.
-- **Asynchronous Hooks (`afterSave`, `afterDelete`)**: Executed after the database transaction has committed. To keep HTTP response times low, these hooks are handled via deferred promises. They execute in the background without holding up the HTTP response to the client.
+## Blocking vs. Async Semantics
 
-These run **after** the per-collection `EntityCallbacks`.
+- **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 error response. The database write never happens.
+- **`afterRead`** — blocking. The returned entity (or transformed entity) is what the caller receives.
+- **`afterSave`, `afterDelete`, `afterSaveError`** — run after the transaction commits. They do not block the HTTP response.
 
-| Hook | Signature | Description |
-|------|-----------|-------------|
-| `afterRead` | `(slug, entity, context) => entity \| null` | Modify or redact fields before sending to client. Return `null` to exclude the record. |
-| `beforeSave` | `(slug, values, entityId, context) => values` | Perform global checks or inject values before saving. Throw to abort. |
-| `afterSave` | `(slug, entity, context) => void` | Run post-save tasks (e.g. syncing search indexes). |
-| `beforeDelete` | `(slug, entityId, context) => void` | Run validation before deletion. Throw to block. |
-| `afterDelete` | `(slug, entityId, context) => void` | Post-deletion cleanup. |
+---
 
-### Example: Global PII Masking and Global Audit Logging
+## Examples
+
+### PII Masking
+
+Redact email addresses for non-admin callers across every collection:
 
 ```typescript
-import { BackendHooks } from "@rebasepro/types";
+import { initializeRebaseBackend } from "@rebasepro/server-core";
 
-const hooks: BackendHooks = {
-    data: {
-        // Redact email addresses for non-admin requests
-        afterRead: (slug, entity, context) => {
-            const isAdmin = context.requestUser?.roles.includes("admin");
-            
-            if (!isAdmin && entity.email) {
+const instance = await initializeRebaseBackend({
+    // ... other config
+    callbacks: {
+        afterRead({ entity, context }) {
+            const isAdmin = context.user?.roles?.includes("admin");
+            if (!isAdmin && entity.values.email) {
                 return {
                     ...entity,
-                    email: "********" // Mask email
+                    values: {
+                        ...entity.values,
+                        email: "********"
+                    }
                 };
             }
             return entity;
-        },
-        
-        // Log all deletion actions globally
-        afterDelete: async (slug, entityId, context) => {
-            console.log(`[AUDIT] User ${context.requestUser?.userId} deleted ${slug}/${entityId}`);
-            await writeToAuditLogs({
-                action: "delete",
-                collection: slug,
-                entityId,
-                userId: context.requestUser?.userId
-            });
         }
     }
-};
+});
 ```
+
+### Global Audit Logging
+
+Log all deletions across every collection:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server-core";
+
+const instance = await initializeRebaseBackend({
+    // ... other config
+    callbacks: {
+        afterDelete({ collection, entityId, context }) {
+            console.log(
+                `[AUDIT] User ${context.user?.uid} deleted ${collection.slug}/${entityId}`
+            );
+        }
+    }
+});
+```
+
+### Collection-Specific Logic
+
+Global callbacks fire for all collections. To scope logic to a single collection, check `collection.slug` or `path`:
+
+```typescript
+callbacks: {
+    beforeSave({ collection, values, context }) {
+        if (collection.slug === "orders") {
+            if (!values.total || values.total <= 0) {
+                throw new Error("Order total must be positive");
+            }
+        }
+        return values;
+    }
+}
+```
+
+For callbacks that only apply to a single collection, prefer [per-collection callbacks](/docs/collections/callbacks) instead.

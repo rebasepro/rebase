@@ -63,7 +63,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 | Export | Description |
 |--------|-------------|
 | `CronJobDefinition` | Cron job configuration type |
-| `BackendHooks` | Server-side hooks for intercepting admin data |
+| `EntityCallbacks` | Lifecycle callbacks for entity CRUD operations |
 | `PluginConfig` | Plugin system types |
 | `WebSocketMessage` | WebSocket protocol message types |
 | `Locale` | Localization types |

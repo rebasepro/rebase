@@ -93,7 +93,7 @@ const { data } = await client.data.products
 
 // Real-time subscription
 const unsubscribe = client.data.products.listen(
-    { where: { active: true } },
+    { where: { active: ["==", true] } },
     (response) => console.log("Updated:", response.data)
 );
 ```

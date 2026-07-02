@@ -7,7 +7,7 @@ import type { RebaseCallContext } from "../rebase_context";
  * Lifecycle callbacks for entity CRUD operations.
  *
  * Register per-collection on the collection's `callbacks` field, or globally
- * via `initBackend({ callbacks })`. Fires on **every** data path — REST API,
+ * via `initializeRebaseBackend({ callbacks })`. Fires on **every** data path — REST API,
  * WebSocket / realtime subscriptions, and server-side `rebase.data`.
  *
  * When both global and per-collection callbacks are registered, execution
@@ -32,7 +32,7 @@ export type EntityCallbacks<M extends Record<string, unknown> = Record<string, u
     /**
      * Callback used before saving, you need to return the values that will get
      * saved. If you throw an error in this method the process stops, and an
-     * error snackbar gets displayed.
+     * HTTP error response is returned to the client.
      * This runs after schema validation.
      *
      * @param props
@@ -58,7 +58,7 @@ export type EntityCallbacks<M extends Record<string, unknown> = Record<string, u
     /**
      * Callback used before the entity is deleted.
      * If you throw an error in this method the process stops, and an
-     * error snackbar gets displayed.
+     * HTTP error response is returned to the client.
      *
      * @param props
      */

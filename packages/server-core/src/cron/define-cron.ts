@@ -15,8 +15,13 @@ import type { CronJobDefinition } from "@rebasepro/types";
  *     name: "Nightly cleanup",
  *     schedule: "0 3 * * *",
  *     async handler({ client, log }) {
- *         const deleted = await client.data.sessions.delete({ where: { expired: true } });
- *         log(`Deleted ${deleted} expired sessions`);
+ *         const { data: expired } = await client.data.sessions.find({
+ *             where: { expired: ["==", true] },
+ *         });
+ *         for (const session of expired) {
+ *             await client.data.sessions.delete(session.id);
+ *         }
+ *         log(`Deleted ${expired.length} expired sessions`);
  *     },
  * });
  * ```

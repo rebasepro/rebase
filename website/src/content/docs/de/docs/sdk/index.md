@@ -54,7 +54,7 @@ const { data, meta } = await client.data.products.find();
 
 // Mit Paginierung, Filterung und Sortierung
 const { data, meta } = await client.data.products.find({
-    where: { active: true, price: [">=", 100] },
+    where: { active: ["==", true], price: [">=", 100] },
     orderBy: ["created_at", "desc"],
     limit: 25,
     offset: 0
@@ -222,7 +222,7 @@ Abonnieren Sie Sammlungsänderungen über WebSocket:
 ```typescript
 // Alle aktiven Produkte abonnieren
 const unsubscribe = client.data.products.listen(
-    { where: { active: true }, limit: 50 },
+    { where: { active: ["==", true] }, limit: 50 },
     (response) => {
         console.log("Products updated:", response.data);
     }
@@ -298,7 +298,7 @@ await client.storage.deleteFile("products/image.jpg");
 Rufen Sie benutzerdefinierte Server-Endpunkte auf (Cloud Functions, benutzerdefinierte Routen usw.):
 
 ```typescript
-const result = await client.call<{ summary: string }>("generate-summary", {
+const result = await client.call<{ summary: string }>("functions/generate-summary", {
     articleId: 42
 });
 ```

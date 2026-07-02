@@ -7,7 +7,7 @@ import { RebaseDataContext } from "../../contexts/RebaseDataContext";
  *
  * ```ts
  * const data = useData();
- * const { data: products } = await data.products.find({ where: { status: "eq.published" } });
+ * const { data: products } = await data.products.find({ where: { status: ["==", "published"] } });
  * await data.products.create({ name: "Camera", price: 299 });
  * ```
  *

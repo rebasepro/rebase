@@ -209,7 +209,7 @@ export type RebaseData<DB = unknown> = {
              * Access any collection by its slug as a property.
              *
              * @example
-             * data.products.find({ where: { status: "eq.published" } })
+             * data.products.find({ where: { status: ["==", "published"] } })
              */
             [collectionSlug: string]: CollectionAccessor | ((slug: string) => CollectionAccessor);
         }
