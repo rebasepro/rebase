@@ -236,7 +236,7 @@ afterSave: async ({ values, context }) => {
     const { data: activeJobs } = await context.data.jobs.find({
         where: { status: "published" },
         limit: 10,
-        orderBy: "created_at:desc"
+        orderBy: ["created_at", "desc"]
     });
 
     // PostgREST-style operators

@@ -1,8 +1,9 @@
 /**
  * @rebasepro/auth
  *
- * Custom JWT authentication adapter for the Rebase backend.
- * This package provides backend-specific auth hooks and API utilities.
+ * React authentication controller for Rebase frontends.
+ * Provides the `useRebaseAuthController` hook and API utilities
+ * for communicating with a Rebase backend's JWT auth endpoints.
  *
  * For the generic LoginView and RebaseAuth components, see @rebasepro/core.
  */
@@ -20,5 +21,5 @@ export type {
 
 export { useRebaseAuthController } from "./hooks/useRebaseAuthController";
 // API utilities
-export { setApiUrl, getApiUrl, fetchAuthConfig, AuthApiError } from "./api";
-export type { AuthConfigResponse } from "./api";
+export { fetchAuthConfig, clearAuthConfigCache, createAuthConfigCache, AuthApiError } from "./api";
+export type { AuthConfigResponse, AuthConfigCache } from "./api";

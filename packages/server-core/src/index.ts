@@ -100,4 +100,4 @@ export * from "./services/driver-registry";
 // =============================================================================
 export { cleanupDevPortFile, listenWithPortRetry } from "./utils/dev-port";
 export { serveSPA } from "./serve-spa";
-export { z } from "zod";
+

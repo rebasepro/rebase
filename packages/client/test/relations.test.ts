@@ -60,7 +60,7 @@ describe("buildQueryString — include", () => {
         const qs = buildQueryString({ limit: 10,
 offset: 0,
 include: ["author", "tags"],
-orderBy: "created_at:desc" });
+orderBy: ["created_at", "desc"] });
         expect(qs).toContain("limit=10"); expect(qs).toContain("offset=0");
         expect(qs).toContain("include=author%2Ctags"); expect(qs).toContain("orderBy=created_at%3Adesc");
     });
@@ -131,7 +131,7 @@ describe("find() — include passthrough", () => {
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ limit: 5,
 offset: 10,
-orderBy: "title:asc",
+orderBy: ["title", "asc"],
 include: ["author"],
 where: { status: "eq.published" } });
         const p = mockRequest.mock.calls[0][0] as string;
@@ -634,7 +634,7 @@ listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
 listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
-        c.listen!({ orderBy: "title:desc" }, jest.fn());
+        c.listen!({ orderBy: ["title", "desc"] }, jest.fn());
         const args = mockWs.listenCollection.mock.calls[0][0];
         expect(args.orderBy).toBe("title"); expect(args.order).toBe("desc");
     });
@@ -1082,7 +1082,7 @@ describe("buildQueryString — encoding edge cases", () => {
         expect(qs).toContain("user.name=eq.alice");
     });
     it("orderBy with colon is encoded", () => {
-        const qs = buildQueryString({ orderBy: "created_at:desc" });
+        const qs = buildQueryString({ orderBy: ["created_at", "desc"] });
         expect(qs).toBe("?orderBy=created_at%3Adesc");
     });
     it("include with dots in relation name", () => {

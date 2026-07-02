@@ -8,16 +8,16 @@ import {
 } from "../storage";
 import { logger } from "../utils/logger";
 
-export function initializeStorage(
+export async function initializeStorage(
     storageConfig: BackendStorageConfig | StorageController | Record<string, BackendStorageConfig | StorageController> | undefined,
     isProduction: boolean
-): { storageRegistry?: StorageRegistry; storageController?: StorageController } {
+): Promise<{ storageRegistry?: StorageRegistry; storageController?: StorageController }> {
     if (!storageConfig) return {};
 
     logger.info("Configuring storage");
     const controllers: Record<string, StorageController> = {};
 
-    const toController = (entry: BackendStorageConfig | StorageController, label: string): StorageController => {
+    const toController = async (entry: BackendStorageConfig | StorageController, label: string): Promise<StorageController> => {
         if (typeof (entry as StorageController).putObject === "function") {
             return entry as StorageController;
         }
@@ -27,14 +27,14 @@ export function initializeStorage(
                 "Files will be lost on container restart. " +
                 "Configure S3-compatible storage or a custom StorageController.");
         }
-        return createStorageController(conf);
+        return await createStorageController(conf);
     };
 
     if (
         typeof storageConfig === "object" &&
         ("type" in storageConfig || typeof (storageConfig as StorageController).putObject === "function")
     ) {
-        controllers[DEFAULT_STORAGE_ID] = toController(
+        controllers[DEFAULT_STORAGE_ID] = await toController(
             storageConfig as BackendStorageConfig | StorageController,
             DEFAULT_STORAGE_ID
         );
@@ -42,7 +42,7 @@ export function initializeStorage(
         for (const [storageId, entry] of Object.entries(
             storageConfig as Record<string, BackendStorageConfig | StorageController>
         )) {
-            controllers[storageId] = toController(entry, storageId);
+            controllers[storageId] = await toController(entry, storageId);
         }
     }
 

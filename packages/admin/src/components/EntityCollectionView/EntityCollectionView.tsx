@@ -1,20 +1,19 @@
-
-import type { AdditionalFieldDelegate, EntityCollection } from "@rebasepro/types";
-import type { EntityAction, Property } from "@rebasepro/types";
+import type { AdditionalFieldDelegate, EntityAction, EntityCollection, Property } from "@rebasepro/types";
+import {
+    CollectionSize,
+    Entity,
+    EntityReference,
+    EntityTableController,
+    FilterValues,
+    getCollectionDataPath,
+    PartialEntityCollection,
+    ViewMode
+} from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { deepEqual as equal } from "fast-equals"
-
-
-const EMPTY_ARRAY: never[] = [];
-const DEFAULT_ENTITY_OPEN_MODE = "split";
-
-import { CollectionSize, Entity, EntityReference, EntityTableController, FilterValues, getCollectionDataPath, PartialEntityCollection, ViewMode } from "@rebasepro/types";
-import {
-    EntityCollectionRowActions,
-    EntityCollectionTable
-} from "../EntityCollectionTable";
+import { EntityCollectionRowActions, EntityCollectionTable } from "../EntityCollectionTable";
 import { CollectionTableToolbar } from "../EntityCollectionTable/internal/CollectionTableToolbar";
 import { getSubcollections } from "@rebasepro/common";
 import { useCollectionInlineEditor } from "./hooks/useCollectionInlineEditor";
@@ -24,47 +23,63 @@ import { resolveEntityAction } from "../../util/resolutions";
 import { getPropertyInPath } from "../../util/property_utils";
 import { ReferencePreview } from "../../preview";
 import {
+    CollectionComponentOverrideProvider,
+    OnColumnResizeParams,
+    useAnalyticsController,
     useAuthController,
+    useColumnIds,
+    useComponentOverride,
     useCustomizationController,
     useData,
     useDataTableController,
     useLargeLayout,
     usePermissions,
-    useTranslation,
+    useScrollRestoration,
     useSlot,
-    IconForView,
-    useComponentOverride,
-    CollectionComponentOverrideProvider
+    useTranslation,
+    useUserConfigurationPersistence
 } from "@rebasepro/core";
-import { useUserConfigurationPersistence } from "@rebasepro/core";
 import { EntityCollectionViewActions } from "./EntityCollectionViewActions";
 import { EntityCollectionCardView } from "./EntityCollectionCardView";
 import { EntityCollectionListView } from "./EntityCollectionListView";
 import { SplitListView } from "./SplitListView";
 import { EntityCollectionBoardView } from "./EntityCollectionBoardView";
-import { ViewModeToggle, KanbanPropertyOption } from "./ViewModeToggle";
-import { Button, cls, focusedDisabled, IconButton, Markdown, Popover, Skeleton, TextField, Tooltip, Typography, VirtualTableColumn, iconSize } from "@rebasepro/ui";
-import { ArrowRightToLineIcon, ErrorBoundary, PlusIcon, SearchIcon } from "@rebasepro/ui";
-import { setIn } from "@rebasepro/formex";
-import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
+import { KanbanPropertyOption, ViewModeToggle } from "./ViewModeToggle";
 import {
-    copyEntityAction,
-    deleteEntityAction,
-    editEntityAction
-} from "../common/default_entity_actions";
-import { OnCellValueChange, OnColumnResizeParams, UniqueFieldValidator } from "@rebasepro/core";
-import { useColumnIds } from "@rebasepro/core";
+    ArrowRightToLineIcon,
+    Button,
+    cls,
+    ErrorBoundary,
+    focusedDisabled,
+    IconButton,
+    iconSize,
+    PlusIcon,
+    Popover,
+    SearchIcon,
+    TextField,
+    Tooltip,
+    Typography,
+    VirtualTableColumn
+} from "@rebasepro/ui";
+import { getSubcollectionColumnId } from "../EntityCollectionTable/internal/common";
+import { copyEntityAction, deleteEntityAction, editEntityAction } from "../common/default_entity_actions";
 import { PopupFormField } from "../EntityCollectionTable/internal/popup_field/PopupFormField";
 import { GetPropertyForProps } from "../EntityCollectionTable/EntityCollectionTableProps";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
-import { useAnalyticsController } from "@rebasepro/core";
 import { useSelectionController } from "./useSelectionController";
 import { EntityCollectionViewStartActions } from "./EntityCollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
-import { useScrollRestoration } from "@rebasepro/core";
 import { mergeDeep } from "@rebasepro/utils";
-import { useCollectionRegistryController, useUrlController, useSideEntityController, useCMSContext } from "../../index";
-import { useBreadcrumbsController } from "../../index";
+import {
+    useBreadcrumbsController,
+    useCMSContext,
+    useCollectionRegistryController,
+    useSideEntityController,
+    useUrlController
+} from "../../index";
+
+const EMPTY_ARRAY: never[] = [];
+const DEFAULT_ENTITY_OPEN_MODE = "split";
 
 function getOpenEntityMode(
     viewMode: ViewMode,
@@ -1303,7 +1318,7 @@ function EntitiesCount({
 
         // filterValues is already FilterValues — pass directly
         const whereParams = filter && Object.keys(filter).length > 0 ? filter : undefined;
-        const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
+        const orderByParams: [string, "asc" | "desc"] | undefined = sortByProperty ? [String(sortByProperty), currentSort] : undefined;
 
         // Deduplicate inflight count requests (e.g. React StrictMode double-mount)
         const cacheKey = `${path}|${filterKey}|${sortByProperty ?? ""}|${currentSort ?? ""}`;

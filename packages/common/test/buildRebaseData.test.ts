@@ -149,7 +149,7 @@ price: "gte.100" }
             });
             const data = buildRebaseData(driver);
 
-            await data.products.find({ orderBy: "created_at:desc" });
+            await data.products.find({ orderBy: ["created_at", "desc"] });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({

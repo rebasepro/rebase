@@ -1,5 +1,5 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { createTransport, buildQueryString, RebaseApiError } from "../src/transport";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { buildQueryString, createTransport, RebaseApiError } from "../src/transport";
 
 /**
  * A minimal mock shape that satisfies the `fetch` signature used by `createTransport`.
@@ -29,7 +29,7 @@ offset: 20 })).toBe("?limit=10&offset=20");
     });
 
     it("serializes orderBy parameter", () => {
-        expect(buildQueryString({ orderBy: "createdAt:desc" })).toBe("?orderBy=createdAt%3Adesc");
+        expect(buildQueryString({ orderBy: ["createdAt", "desc"] })).toBe("?orderBy=createdAt%3Adesc");
     });
 
     it("serializes include array", () => {

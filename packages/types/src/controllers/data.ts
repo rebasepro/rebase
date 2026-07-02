@@ -1,5 +1,5 @@
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FilterValues } from "../types/filter-operators";
+import { WhereFilterOp, FilterValues, OrderByTuple } from "../types/filter-operators";
 
 export type WhereValue<T> = T | T[] | null;
 
@@ -41,10 +41,10 @@ export interface FindParams {
     /** Logical grouping conditions (AND/OR) */
     logical?: LogicalCondition;
     /**
-     * Sort order. Format: "field:direction".
-     * @example "created_at:desc", "name:asc"
+     * Sort order as a `[field, direction]` tuple.
+     * @example orderBy: ["created_at", "desc"]
      */
-    orderBy?: string;
+    orderBy?: OrderByTuple;
     /** Relations to include in the response */
     include?: string[];
     /** Full-text search string */

@@ -2,30 +2,47 @@
  * S3-compatible storage controller (works with AWS S3 and MinIO)
  */
 
+import type { S3Client as S3ClientType, } from "@aws-sdk/client-s3";
+import { DEFAULT_MAX_FILE_SIZE, S3StorageConfig, StorageController } from "./types";
 import {
-    S3Client,
-    PutObjectCommand,
-    GetObjectCommand,
-    DeleteObjectCommand,
-    ListObjectsV2Command,
-    HeadObjectCommand,
-    _Object,
-    CommonPrefix
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import {
-    StorageController,
-    S3StorageConfig,
-    DEFAULT_MAX_FILE_SIZE
-} from "./types";
-import {
-    UploadFileProps,
-    UploadFileResult,
     DownloadConfig,
     DownloadMetadata,
     StorageListResult,
-    StorageReference
+    StorageReference,
+    UploadFileProps,
+    UploadFileResult
 } from "@rebasepro/types";
+
+let _s3Module: typeof import("@aws-sdk/client-s3") | undefined;
+let _presignerModule: typeof import("@aws-sdk/s3-request-presigner") | undefined;
+
+async function loadS3() {
+    if (!_s3Module) {
+        try {
+            _s3Module = await import("@aws-sdk/client-s3");
+        } catch {
+            throw new Error(
+                "@aws-sdk/client-s3 is required for S3 storage. " +
+                "Install it: pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner"
+            );
+        }
+    }
+    return _s3Module;
+}
+
+async function loadPresigner() {
+    if (!_presignerModule) {
+        try {
+            _presignerModule = await import("@aws-sdk/s3-request-presigner");
+        } catch {
+            throw new Error(
+                "@aws-sdk/s3-request-presigner is required for S3 storage. " +
+                "Install it: pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner"
+            );
+        }
+    }
+    return _presignerModule;
+}
 
 /**
  * S3-compatible storage implementation
@@ -33,19 +50,29 @@ import {
  */
 export class S3StorageController implements StorageController {
     private config: S3StorageConfig;
-    private client: S3Client;
+    private _client: S3ClientType | undefined;
 
     constructor(config: S3StorageConfig) {
         this.config = config;
-        this.client = new S3Client({
-            region: config.region || "us-east-1",
-            endpoint: config.endpoint,
-            forcePathStyle: config.forcePathStyle ?? !!config.endpoint, // Auto-enable for custom endpoints (MinIO)
-            credentials: {
-                accessKeyId: config.accessKeyId,
-                secretAccessKey: config.secretAccessKey
-            }
-        });
+    }
+
+    /**
+     * Lazily create and cache the S3 client on first use
+     */
+    private async getClient(): Promise<S3ClientType> {
+        if (!this._client) {
+            const s3 = await loadS3();
+            this._client = new s3.S3Client({
+                region: this.config.region || "us-east-1",
+                endpoint: this.config.endpoint,
+                forcePathStyle: this.config.forcePathStyle ?? !!this.config.endpoint, // Auto-enable for custom endpoints (MinIO)
+                credentials: {
+                    accessKeyId: this.config.accessKeyId,
+                    secretAccessKey: this.config.secretAccessKey
+                }
+            });
+        }
+        return this._client;
     }
 
     getType(): "s3" {
@@ -92,7 +119,10 @@ export class S3StorageController implements StorageController {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        const command = new PutObjectCommand({
+        const s3 = await loadS3();
+        const client = await this.getClient();
+
+        const command = new s3.PutObjectCommand({
             Bucket: usedBucket,
             Key: key,
             Body: buffer,
@@ -100,7 +130,7 @@ export class S3StorageController implements StorageController {
             Metadata: metadata ? this.flattenMetadata(metadata) : undefined
         });
 
-        await this.client.send(command);
+        await client.send(command);
 
         return {
             key,
@@ -141,22 +171,26 @@ export class S3StorageController implements StorageController {
         }
 
         try {
+            const s3 = await loadS3();
+            const presigner = await loadPresigner();
+            const client = await this.getClient();
+
             // First check if the object exists and get metadata
-            const headCommand = new HeadObjectCommand({
+            const headCommand = new s3.HeadObjectCommand({
                 Bucket: resolvedBucket,
                 Key: resolvedPath
             });
 
-            const headResult = await this.client.send(headCommand);
+            const headResult = await client.send(headCommand);
 
             // Generate a signed URL
-            const getCommand = new GetObjectCommand({
+            const getCommand = new s3.GetObjectCommand({
                 Bucket: resolvedBucket,
                 Key: resolvedPath
             });
 
             const expiresIn = this.config.signedUrlExpiration ?? 3600;
-            const url = await getSignedUrl(this.client, getCommand, { expiresIn });
+            const url = await presigner.getSignedUrl(client, getCommand, { expiresIn });
 
             const metadata: DownloadMetadata = {
                 bucket: resolvedBucket,
@@ -200,12 +234,15 @@ export class S3StorageController implements StorageController {
         }
 
         try {
-            const command = new GetObjectCommand({
+            const s3 = await loadS3();
+            const client = await this.getClient();
+
+            const command = new s3.GetObjectCommand({
                 Bucket: resolvedBucket,
                 Key: resolvedPath
             });
 
-            const response = await this.client.send(command);
+            const response = await client.send(command);
 
             if (!response.Body) {
                 return null;
@@ -248,12 +285,15 @@ export class S3StorageController implements StorageController {
             }
         }
 
-        const command = new DeleteObjectCommand({
+        const s3 = await loadS3();
+        const client = await this.getClient();
+
+        const command = new s3.DeleteObjectCommand({
             Bucket: resolvedBucket,
             Key: resolvedPath
         });
 
-        await this.client.send(command);
+        await client.send(command);
     }
 
     async listObjects(prefix: string, options?: {
@@ -263,7 +303,10 @@ export class S3StorageController implements StorageController {
     }): Promise<StorageListResult> {
         const resolvedBucket = this.getBucket(options?.bucket);
 
-        const command = new ListObjectsV2Command({
+        const s3 = await loadS3();
+        const client = await this.getClient();
+
+        const command = new s3.ListObjectsV2Command({
             Bucket: resolvedBucket,
             Prefix: prefix || undefined,
             MaxKeys: options?.maxResults ?? 1000,
@@ -271,7 +314,7 @@ export class S3StorageController implements StorageController {
             Delimiter: "/" // This gives us folder-like behavior
         });
 
-        const response = await this.client.send(command);
+        const response = await client.send(command);
 
         const items: StorageReference[] = (response.Contents || []).map(obj => ({
             bucket: resolvedBucket,

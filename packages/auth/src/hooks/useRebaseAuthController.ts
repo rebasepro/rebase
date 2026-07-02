@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useState, useRef } from "react";
-import type { User, AuthTokens } from "@rebasepro/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AuthTokens, User } from "@rebasepro/types";
 import * as authApi from "../api";
 import { AuthConfigResponse } from "../api";
-import {
-    RebaseAuthController,
-    RebaseAuthControllerProps
-} from "../types";
+import { RebaseAuthController, RebaseAuthControllerProps } from "../types";
 
 const STORAGE_KEY = "rebase_react_auth";
 
@@ -95,6 +92,7 @@ export function useRebaseAuthController(
     props: RebaseAuthControllerProps = {}
 ): RebaseAuthController {
     const { client, apiUrl, onSignOut, defineRolesFor } = props;
+    const resolvedApiUrl = client?.baseUrl || apiUrl || "";
 
     const [user, setUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState(false);
@@ -112,14 +110,9 @@ export function useRebaseAuthController(
     const refreshPromiseRef = useRef<Promise<AuthTokens | null> | null>(null);
     // Track if component is mounted
     const isMountedRef = useRef(true);
+    const authConfigCacheRef = useRef(authApi.createAuthConfigCache());
 
-    // Configure API URL on mount
-    useEffect(() => {
-        const url = client?.baseUrl || apiUrl;
-        if (url) {
-            authApi.setApiUrl(url);
-        }
-    }, [client, client?.baseUrl, apiUrl]);
+
 
     const clearError = useCallback(() => {
         setAuthProviderError(null);
@@ -168,7 +161,7 @@ export function useRebaseAuthController(
 
 
             try {
-                const response = await authApi.refreshAccessToken(currentTokens.refreshToken);
+                const response = await authApi.refreshAccessToken(resolvedApiUrl, currentTokens.refreshToken);
                 const newTokens = response.tokens;
 
                 // Update tokens immediately
@@ -336,7 +329,7 @@ roles: customRoles };
         setAuthProviderError(null);
 
         try {
-            const response = await authApi.login(email, password);
+            const response = await authApi.login(resolvedApiUrl, email, password);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
@@ -352,7 +345,7 @@ roles: customRoles };
         setAuthProviderError(null);
 
         try {
-            const response = await authApi.register(email, password, displayName);
+            const response = await authApi.register(resolvedApiUrl, email, password, displayName);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
@@ -370,7 +363,7 @@ roles: customRoles };
         setAuthProviderError(null);
 
         try {
-            const response = await authApi.googleLogin(payload);
+            const response = await authApi.googleLogin(resolvedApiUrl, payload);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
@@ -386,7 +379,7 @@ roles: customRoles };
         setAuthProviderError(null);
 
         try {
-            const response = await authApi.oauthLogin(providerId, payload);
+            const response = await authApi.oauthLogin(resolvedApiUrl, providerId, payload);
             await handleAuthSuccess(response.user, response.tokens);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
@@ -400,7 +393,7 @@ roles: customRoles };
     const signOut = useCallback(async () => {
         try {
             if (tokensRef.current) {
-                await authApi.logout(tokensRef.current.refreshToken);
+                await authApi.logout(resolvedApiUrl, tokensRef.current.refreshToken);
             }
         } catch (error) {
             console.error("Logout error:", error);
@@ -421,7 +414,7 @@ roles: customRoles };
         setAuthProviderError(null);
 
         try {
-            await authApi.forgotPassword(email);
+            await authApi.forgotPassword(resolvedApiUrl, email);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
             throw error;
@@ -436,7 +429,7 @@ roles: customRoles };
         setAuthProviderError(null);
 
         try {
-            await authApi.resetPassword(token, password);
+            await authApi.resetPassword(resolvedApiUrl, token, password);
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
             throw error;
@@ -454,7 +447,7 @@ roles: customRoles };
             if (!tokensRef.current) {
                 throw new Error("User is not logged in");
             }
-            await authApi.changePassword(tokensRef.current.accessToken, oldPassword, newPassword);
+            await authApi.changePassword(resolvedApiUrl, tokensRef.current.accessToken, oldPassword, newPassword);
             // After password change, user needs to log in again (all sessions invalidated)
             clearSessionAndSignOut();
         } catch (error: unknown) {
@@ -474,7 +467,7 @@ roles: customRoles };
             if (!tokensRef.current) {
                 throw new Error("User is not logged in");
             }
-            const response = await authApi.updateProfile(tokensRef.current.accessToken, displayName, photoURL);
+            const response = await authApi.updateProfile(resolvedApiUrl, tokensRef.current.accessToken, displayName, photoURL);
 
             // Update local user state
             let convertedUser = normalizeUser(response.user);
@@ -508,7 +501,7 @@ roles: customRoles };
             if (!tokensRef.current) {
                 throw new Error("User is not logged in");
             }
-            const response = await authApi.fetchSessions(tokensRef.current.accessToken, tokensRef.current.refreshToken);
+            const response = await authApi.fetchSessions(resolvedApiUrl, tokensRef.current.accessToken, tokensRef.current.refreshToken);
             return response.sessions;
         } catch (error: unknown) {
             setAuthProviderError(error as Error);
@@ -522,7 +515,7 @@ roles: customRoles };
             if (!tokensRef.current) {
                 throw new Error("User is not logged in");
             }
-            await authApi.revokeSession(tokensRef.current.accessToken, sessionId);
+            await authApi.revokeSession(resolvedApiUrl, tokensRef.current.accessToken, sessionId);
             // If the revoked session is the current one, the next API request will fail with 401
             // and trigger an auto-logout. Otherwise, it just removes it from the DB.
         } catch (error: unknown) {
@@ -539,7 +532,7 @@ roles: customRoles };
 
             // Fetch auth config (needsSetup, registrationEnabled, etc.)
             try {
-                const config = await authApi.fetchAuthConfig();
+                const config = await authApi.fetchAuthConfig(resolvedApiUrl, authConfigCacheRef.current);
                 if (isMountedRef.current) {
                     setAuthConfig(config);
                 }
@@ -606,7 +599,7 @@ roles: customRoles };
                 // Fetch fresh user data from the server
                 let userToSet: User;
                 try {
-                    const meResponse = await authApi.getCurrentUser(newTokens.accessToken);
+                    const meResponse = await authApi.getCurrentUser(resolvedApiUrl, newTokens.accessToken);
 
                     if (!isMountedRef.current) return;
 
@@ -691,8 +684,8 @@ roles: customRoles };
 
     // Get currently configured API URL
     const getApiUrl = useCallback(() => {
-        return authApi.getApiUrl();
-    }, []);
+        return resolvedApiUrl;
+    }, [resolvedApiUrl]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -710,7 +703,7 @@ roles: customRoles };
             if (!tokensRef.current) {
                 throw new Error("User is not logged in");
             }
-            await authApi.revokeAllSessions(tokensRef.current.accessToken);
+            await authApi.revokeAllSessions(resolvedApiUrl, tokensRef.current.accessToken);
             clearSessionAndSignOut();
         } catch (error: unknown) {
             setAuthProviderError(error as Error);

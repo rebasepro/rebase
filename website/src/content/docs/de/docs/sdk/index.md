@@ -55,7 +55,7 @@ const { data, meta } = await client.data.products.find();
 // Mit Paginierung, Filterung und Sortierung
 const { data, meta } = await client.data.products.find({
     where: { active: true, price: [">=", 100] },
-    orderBy: "created_at:desc",
+    orderBy: ["created_at", "desc"],
     limit: 25,
     offset: 0
 });

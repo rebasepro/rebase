@@ -66,7 +66,7 @@ Pass `FindParams` as the first argument to filter the subscription:
 const unsubscribe = client.data.products.listen(
   {
     where: { status: "published" },
-    orderBy: "created_at:desc",
+    orderBy: ["created_at", "desc"],
     limit: 50,
   },
   (response) => {

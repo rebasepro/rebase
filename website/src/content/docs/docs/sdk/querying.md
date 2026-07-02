@@ -28,7 +28,7 @@ const { data, meta } = await client.data.products.find();
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
     where: { active: true, price: [">=", 100] },
-    orderBy: "created_at:desc",
+    orderBy: ["created_at", "desc"],
     limit: 25,
     offset: 0
 });
@@ -171,9 +171,9 @@ const page = await client.data.products.find({ page: 2, limit: 20 });
 ## Sorting
 
 ```typescript
-// Sort by field (format: "field:direction")
+// Sort by field (format: ["field", "direction"])
 const { data } = await client.data.products.find({
-    orderBy: "created_at:desc"
+    orderBy: ["created_at", "desc"]
 });
 
 // Fluent style

@@ -5,7 +5,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Custom JWT authentication adapter for the Rebase backend",
+  "description": "Custom JWT authentication controller for Rebase frontends (React)",
   "main": "./dist/index.umd.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",

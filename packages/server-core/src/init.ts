@@ -669,7 +669,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     // 3. Initialize Storage
-    const { storageRegistry, storageController } = initializeStorage(config.storage, isProduction);
+    const { storageRegistry, storageController } = await initializeStorage(config.storage, isProduction);
 
     // basePath already resolved above
 

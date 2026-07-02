@@ -24,7 +24,9 @@ const CONSUMER_EXTERNALS = [
     "fsevents",
     "ws",
     "ts-morph",
-    "sharp"
+    "sharp",
+    "nodemailer",
+    "google-auth-library"
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;

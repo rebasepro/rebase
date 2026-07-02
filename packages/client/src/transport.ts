@@ -1,5 +1,5 @@
 import { FindParams as TypesFindParams, FindResponse as TypesFindResponse } from "@rebasepro/types";
-import { serializeFilter, serializeLogicalCondition } from "@rebasepro/common";
+import { serializeFilter, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
 export interface RebaseClientConfig {
@@ -40,7 +40,8 @@ export function buildQueryString(params?: FindParams): string {
     if (params.page != null) parts.push(`page=${params.page}`);
 
     if (params.orderBy) {
-        parts.push(`orderBy=${encodeURIComponent(params.orderBy)}`);
+        const wire = serializeOrderBy(params.orderBy);
+        if (wire) parts.push(`orderBy=${encodeURIComponent(wire)}`);
     }
 
     if (params.searchString) {

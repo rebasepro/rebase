@@ -1,24 +1,5 @@
 import type { AuthResponse, RefreshResponse } from "./types";
-import type { User, DeviceSession } from "@rebasepro/types";
-
-/**
- * Default API URL - can be overridden in hook props
- */
-let baseApiUrl = "";
-
-/**
- * Configure the API base URL
- */
-export function setApiUrl(url: string): void {
-    baseApiUrl = url;
-}
-
-/**
- * Get the current API URL
- */
-export function getApiUrl(): string {
-    return baseApiUrl;
-}
+import type { DeviceSession, User } from "@rebasepro/types";
 
 class AuthApiError extends Error {
     code: string;
@@ -74,11 +55,12 @@ async function fetchWithHandling(input: RequestInfo | URL, init?: RequestInit): 
  * Register a new user with email/password
  */
 export async function register(
+    apiUrl: string,
     email: string,
     password: string,
     displayName?: string
 ): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/register`, {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email,
@@ -92,8 +74,8 @@ displayName })
 /**
  * Login with email/password
  */
-export async function login(email: string, password: string): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/login`, {
+export async function login(apiUrl: string, email: string, password: string): Promise<AuthResponse> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email,
@@ -119,8 +101,8 @@ export type GoogleLoginPayload =
  * - `{ accessToken }` — Access-token flow (popup)
  * - `{ code, redirectUri }` — Authorization code flow (most secure)
  */
-export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/google`, {
+export async function googleLogin(apiUrl: string, payload: GoogleLoginPayload): Promise<AuthResponse> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -132,8 +114,8 @@ export async function googleLogin(payload: GoogleLoginPayload): Promise<AuthResp
 /**
  * Login with LinkedIn OAuth code
  */
-export async function linkedinLogin(code: string, redirectUri: string): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/linkedin`, {
+export async function linkedinLogin(apiUrl: string, code: string, redirectUri: string): Promise<AuthResponse> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/linkedin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code,
@@ -147,8 +129,8 @@ redirectUri })
  * Generic OAuth login — works with any provider registered on the backend.
  * The `providerId` is used to build the endpoint: `/api/auth/{providerId}`.
  */
-export async function oauthLogin(providerId: string, payload: Record<string, unknown>): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/${providerId}`, {
+export async function oauthLogin(apiUrl: string, providerId: string, payload: Record<string, unknown>): Promise<AuthResponse> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/${providerId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -160,8 +142,8 @@ export async function oauthLogin(providerId: string, payload: Record<string, unk
 /**
  * Refresh access token using refresh token
  */
-export async function refreshAccessToken(refreshToken: string): Promise<RefreshResponse> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/refresh`, {
+export async function refreshAccessToken(apiUrl: string, refreshToken: string): Promise<RefreshResponse> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken })
@@ -173,8 +155,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<RefreshR
 /**
  * Logout and invalidate refresh token
  */
-export async function logout(refreshToken?: string): Promise<void> {
-    await fetchWithHandling(`${baseApiUrl}/api/auth/logout`, {
+export async function logout(apiUrl: string, refreshToken?: string): Promise<void> {
+    await fetchWithHandling(`${apiUrl}/api/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken })
@@ -184,8 +166,8 @@ export async function logout(refreshToken?: string): Promise<void> {
 /**
  * Get current user info
  */
-export async function getCurrentUser(accessToken: string): Promise<{ user: User }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/me`, {
+export async function getCurrentUser(apiUrl: string, accessToken: string): Promise<{ user: User }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/me`, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -199,8 +181,8 @@ export async function getCurrentUser(accessToken: string): Promise<{ user: User 
 /**
  * Request password reset email
  */
-export async function forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/forgot-password`, {
+export async function forgotPassword(apiUrl: string, email: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -212,8 +194,8 @@ export async function forgotPassword(email: string): Promise<{ success: boolean;
 /**
  * Reset password using token from email
  */
-export async function resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/reset-password`, {
+export async function resetPassword(apiUrl: string, token: string, password: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token,
@@ -227,11 +209,12 @@ password })
  * Change password for authenticated user
  */
 export async function changePassword(
+    apiUrl: string,
     accessToken: string,
     oldPassword: string,
     newPassword: string
 ): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/change-password`, {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/change-password`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -247,8 +230,8 @@ newPassword })
 /**
  * Send email verification link
  */
-export async function sendVerificationEmail(accessToken: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/send-verification`, {
+export async function sendVerificationEmail(apiUrl: string, accessToken: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/send-verification`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -262,8 +245,8 @@ export async function sendVerificationEmail(accessToken: string): Promise<{ succ
 /**
  * Verify email address using token
  */
-export async function verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
+export async function verifyEmail(apiUrl: string, token: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
     });
@@ -275,11 +258,12 @@ export async function verifyEmail(token: string): Promise<{ success: boolean; me
  * Update current user profile
  */
 export async function updateProfile(
+    apiUrl: string,
     accessToken: string,
     displayName?: string,
     photoURL?: string
 ): Promise<{ user: User }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/me`, {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/me`, {
         method: "PATCH",
         headers: {
             "Content-Type": "application/json",
@@ -295,7 +279,7 @@ photoURL })
 /**
  * Fetch active sessions for current user
  */
-export async function fetchSessions(accessToken: string, currentRefreshToken?: string): Promise<{ sessions: DeviceSession[] }> {
+export async function fetchSessions(apiUrl: string, accessToken: string, currentRefreshToken?: string): Promise<{ sessions: DeviceSession[] }> {
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${accessToken}`
@@ -304,7 +288,7 @@ export async function fetchSessions(accessToken: string, currentRefreshToken?: s
         headers["X-Refresh-Token"] = currentRefreshToken;
     }
 
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/sessions`, {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/sessions`, {
         method: "GET",
         headers
     });
@@ -315,8 +299,8 @@ export async function fetchSessions(accessToken: string, currentRefreshToken?: s
 /**
  * Revoke a specific session
  */
-export async function revokeSession(accessToken: string, sessionId: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/sessions/${sessionId}`, {
+export async function revokeSession(apiUrl: string, accessToken: string, sessionId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/sessions/${sessionId}`, {
         method: "DELETE",
         headers: {
             "Content-Type": "application/json",
@@ -330,8 +314,8 @@ export async function revokeSession(accessToken: string, sessionId: string): Pro
 /**
  * Revoke all sessions for current user
  */
-export async function revokeAllSessions(accessToken: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${baseApiUrl}/api/auth/sessions`, {
+export async function revokeAllSessions(apiUrl: string, accessToken: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetchWithHandling(`${apiUrl}/api/auth/sessions`, {
         method: "DELETE",
         headers: {
             "Content-Type": "application/json",
@@ -361,17 +345,21 @@ export interface AuthConfigResponse {
 }
 
 /**
- * Inflight promise for `fetchAuthConfig` — ensures concurrent callers
- * (e.g. React StrictMode double-mount) reuse the same network request.
+ * Cache container for `fetchAuthConfig` — holds both the inflight promise
+ * (to deduplicate concurrent calls) and the cached result.
  */
-let authConfigInflight: Promise<AuthConfigResponse> | null = null;
+export interface AuthConfigCache {
+    cached: AuthConfigResponse | null;
+    inflight: Promise<AuthConfigResponse> | null;
+}
 
 /**
- * Cached result of the last successful `fetchAuthConfig` call.
- * Auth config is static for the lifetime of the app session, so
- * repeat calls (e.g. from effect re-runs) return instantly.
+ * Create a fresh `AuthConfigCache` instance.
+ * Callers own the cache object and pass it into `fetchAuthConfig` / `clearAuthConfigCache`.
  */
-let authConfigCached: AuthConfigResponse | null = null;
+export function createAuthConfigCache(): AuthConfigCache {
+    return { cached: null, inflight: null };
+}
 
 /**
  * Fetch auth configuration / status from the backend
@@ -381,17 +369,17 @@ let authConfigCached: AuthConfigResponse | null = null;
  * Concurrent calls are deduplicated: only one network request is made
  * and all callers share the same promise.
  */
-export async function fetchAuthConfig(): Promise<AuthConfigResponse> {
-    if (authConfigCached) {
-        return authConfigCached;
+export async function fetchAuthConfig(apiUrl: string, cache: AuthConfigCache): Promise<AuthConfigResponse> {
+    if (cache.cached) {
+        return cache.cached;
     }
 
-    if (authConfigInflight) {
-        return authConfigInflight;
+    if (cache.inflight) {
+        return cache.inflight;
     }
 
-    authConfigInflight = (async () => {
-        const response = await fetchWithHandling(`${baseApiUrl}/api/auth/config`, {
+    cache.inflight = (async () => {
+        const response = await fetchWithHandling(`${apiUrl}/api/auth/config`, {
             method: "GET",
             headers: { "Content-Type": "application/json" }
         });
@@ -399,22 +387,20 @@ export async function fetchAuthConfig(): Promise<AuthConfigResponse> {
     })();
 
     try {
-        const result = await authConfigInflight;
-        authConfigCached = result;
+        const result = await cache.inflight;
+        cache.cached = result;
         return result;
     } finally {
-        authConfigInflight = null;
+        cache.inflight = null;
     }
 }
 
 /**
  * Clear the cached auth config (e.g. on logout or for testing).
  */
-export function clearAuthConfigCache(): void {
-    authConfigCached = null;
-    authConfigInflight = null;
+export function clearAuthConfigCache(cache: AuthConfigCache): void {
+    cache.cached = null;
+    cache.inflight = null;
 }
 
 export { AuthApiError };
-
-

@@ -27,6 +27,21 @@
  */
 
 /**
+ * Canonical sort representation: `[fieldName, direction]`.
+ *
+ * Used in `FindParams.orderBy`, `collection.sort`, and `FilterPreset.sort`.
+ * The colon-string form (`"field:direction"`) exists only at the HTTP wire
+ * boundary, handled by `serializeOrderBy` / `deserializeOrderBy` in
+ * `@rebasepro/common`.
+ *
+ * Design note: the natural extension for multi-column sort is
+ * `OrderByTuple[]` — not implemented yet (server consumes only the first).
+ *
+ * @group Models
+ */
+export type OrderByTuple<Key extends string = string> = [Key, "asc" | "desc"];
+
+/**
  * Canonical filter operators supported across all database backends.
  * Each DB driver translates these to its native query format.
  *
@@ -101,7 +116,7 @@ export interface FilterPreset<Key extends string = string> {
     /**
      * Optional sort override to apply alongside the filter values.
      */
-    sort?: [Key, "asc" | "desc"];
+    sort?: OrderByTuple<Key>;
 }
 
 /**

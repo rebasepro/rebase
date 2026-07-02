@@ -3,7 +3,6 @@ import { RebaseWebSocketClient } from "./websocket";
 import {
     CollectionAccessor,
     Entity,
-    FilterValues,
     FindResponse,
     LogicalCondition,
     WhereFilterOp,
@@ -11,7 +10,6 @@ import {
 } from "@rebasepro/types";
 
 import { QueryBuilder } from "./query_builder";
-
 
 /**
  * Wrap a flat row (returned by the REST API as `{ id, ...fields }`) into
@@ -151,8 +149,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     filter: params?.where,
                     limit: params?.limit,
                     startAfter: params?.offset ? String(params.offset) : undefined,
-                    orderBy: params?.orderBy?.split(":")[0],
-                    order: params?.orderBy?.split(":")[1] as "asc" | "desc",
+                    orderBy: params?.orderBy?.[0],
+                    order: params?.orderBy?.[1],
                     searchString: params?.searchString
                 },
                 (entities: Entity[]) => {

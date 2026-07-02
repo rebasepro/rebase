@@ -60,7 +60,7 @@ describe("createCollectionClient", () => {
 
             const client = createCollectionClient(transport, "items");
             const result = await client.count({
-                orderBy: "created_at:desc"
+                orderBy: ["created_at", "desc"]
             });
 
             const calledUrl = (transport.request as ReturnType<typeof jest.fn>).mock.calls[0][0] as string;

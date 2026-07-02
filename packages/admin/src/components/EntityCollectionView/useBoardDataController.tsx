@@ -1,6 +1,6 @@
 import type { EntityCollection } from "@rebasepro/types";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, FilterValues } from "@rebasepro/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useData, useRebaseContext } from "@rebasepro/core";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -244,7 +244,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             [currentColumnProperty]: ["==", column]
         };
 
-        const orderByParam = currentOrderProperty ? `${currentOrderProperty}:asc` : undefined;
+        const orderByParam: [string, "asc" | "desc"] | undefined = currentOrderProperty ? [currentOrderProperty, "asc"] : undefined;
 
         // Mark column as loading
         setColumnData(prev => ({

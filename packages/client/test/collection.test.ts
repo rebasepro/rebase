@@ -148,7 +148,7 @@ meta: {} });
 meta: {} });
 
             await client.find({ limit: 5,
-orderBy: "title:asc" });
+orderBy: ["title", "asc"] });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts?limit=5&orderBy=title%3Aasc", { method: "GET" });
         });
     });
@@ -331,7 +331,7 @@ title: "Updated" });
             const onError = jest.fn();
 
             const result = client.listen!({ limit: 10,
-orderBy: "title:desc" }, onUpdate, onError);
+orderBy: ["title", "desc"] }, onUpdate, onError);
 
             expect(mockWs.listenCollection).toHaveBeenCalledWith(
                 expect.objectContaining({

@@ -1,7 +1,9 @@
-import type { VectorSearchParams, LogicalCondition, FilterCondition, WhereFilterOp } from "@rebasepro/types";
+import type { FilterCondition, LogicalCondition, VectorSearchParams, WhereFilterOp } from "@rebasepro/types";
 import { toCanonicalOp } from "@rebasepro/types";
-export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
+import { deserializeOrderBy } from "@rebasepro/common";
 import { QueryOptions } from "../types";
+
+export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
 
 function getLastValue(val: unknown): unknown {
     if (Array.isArray(val)) {
@@ -210,14 +212,15 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
         } catch {
             // Try simple format: "field:direction"
             if (typeof orderByVal === "string") {
-                const [field, direction] = orderByVal.split(":");
-                const dir = (direction === "desc" ? "desc" : "asc") as "asc" | "desc";
-                options.orderBy = [
-                    {
-                        field,
-                        direction: dir
-                    }
-                ];
+                const parsed = deserializeOrderBy(orderByVal);
+                if (parsed) {
+                    options.orderBy = [
+                        {
+                            field: parsed[0],
+                            direction: parsed[1]
+                        }
+                    ];
+                }
             }
         }
     }

@@ -175,7 +175,7 @@ status: ["==", "active"] }
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    orderBy: "createdAt:asc"
+                    orderBy: ["createdAt", "asc"]
                 })
             );
         });
@@ -188,7 +188,7 @@ status: ["==", "active"] }
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    orderBy: "updatedAt:desc"
+                    orderBy: ["updatedAt", "desc"]
                 })
             );
         });
@@ -201,7 +201,7 @@ status: ["==", "active"] }
 
             expect(collection.find).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    orderBy: "name:asc"
+                    orderBy: ["name", "asc"]
                 })
             );
         });
@@ -288,7 +288,7 @@ status: ["==", "active"] }
             expect(collection.find).toHaveBeenCalledWith({
                 where: { status: ["==", "active"],
 age: [">=", 18] },
-                orderBy: "createdAt:desc",
+                orderBy: ["createdAt", "desc"],
                 limit: 10,
                 offset: 20,
                 searchString: "keyword",

@@ -1,7 +1,22 @@
-import { OAuth2Client } from "google-auth-library/build/src/index.js";
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
 import { logger } from "../utils/logger";
+
+let _googleAuth: typeof import("google-auth-library/build/src/index.js") | undefined;
+
+async function loadGoogleAuth() {
+    if (!_googleAuth) {
+        try {
+            _googleAuth = await import("google-auth-library/build/src/index.js");
+        } catch {
+            throw new Error(
+                "google-auth-library is required for Google OAuth. " +
+                "Install it: pnpm add google-auth-library"
+            );
+        }
+    }
+    return _googleAuth;
+}
 
 export interface GoogleUserInfo {
     googleId: string;
@@ -53,7 +68,15 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 }> {
     const clientId = typeof config === "string" ? config : config.clientId;
     const clientSecret = typeof config === "string" ? undefined : config.clientSecret;
-    const googleClient = new OAuth2Client(clientId, clientSecret);
+    let googleClient: InstanceType<typeof import("google-auth-library/build/src/index.js").OAuth2Client> | undefined;
+
+    async function getClient() {
+        if (!googleClient) {
+            const { OAuth2Client } = await loadGoogleAuth();
+            googleClient = new OAuth2Client(clientId, clientSecret);
+        }
+        return googleClient;
+    }
 
     return {
         id: "google",
@@ -75,7 +98,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
             try {
                 // Path 1: verify an ID token (One Tap / renderButton)
                 if (payload.idToken) {
-                    const ticket = await googleClient.verifyIdToken({
+                    const client = await getClient();
+                    const ticket = await client.verifyIdToken({
                         idToken: payload.idToken,
                         audience: clientId
                     });
@@ -164,7 +188,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 
                     // Prefer verifying the ID token (cryptographic verification)
                     if (tokenData.id_token) {
-                        const ticket = await googleClient.verifyIdToken({
+                        const client = await getClient();
+                        const ticket = await client.verifyIdToken({
                             idToken: tokenData.id_token,
                             audience: clientId
                         });

@@ -1,29 +1,18 @@
 import {
-    DataDriver,
-    RebaseData,
     CollectionAccessor,
-    FindParams,
-    FindResponse,
+    DataDriver,
     Entity,
     EntityValues,
-    WhereFilterOp,
+    FindParams,
+    FindResponse,
     LogicalCondition,
+    RebaseData,
+    WhereFilterOp,
     WhereValue
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { deserializeFilter } from "./filter-dialect";
-
-/**
- * Parse an orderBy string like "created_at:desc" into [field, direction].
- */
-function parseOrderBy(orderBy?: string): [string, "asc" | "desc"] | undefined {
-    if (!orderBy) return undefined;
-    const parts = orderBy.split(":");
-    const field = parts[0];
-    const direction = (parts[1] as "asc" | "desc") || "asc";
-    return [field, direction];
-}
 
 /**
  * Convert a flat REST record (e.g. from RestFetchService) to Entity<M> format.
@@ -43,7 +32,6 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
-            const orderParsed = parseOrderBy(params?.orderBy);
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
             const filter = params?.where ? deserializeFilter(params.where as any) : undefined;
             const limit = params?.limit ?? 20;
@@ -58,8 +46,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         filter,
                         limit: params?.limit,
                         offset: params?.offset,
-                        orderBy: orderParsed?.[0],
-                        order: orderParsed?.[1],
+                        orderBy: params?.orderBy?.[0],
+                        order: params?.orderBy?.[1],
                         searchString: params?.searchString
                     },
                     params.include
@@ -82,8 +70,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 limit: params?.limit,
                 offset: params?.offset,
                 filter,
-                orderBy: orderParsed?.[0],
-                order: orderParsed?.[1],
+                orderBy: params?.orderBy?.[0],
+                order: params?.orderBy?.[1],
                 searchString: params?.searchString
             });
 
@@ -150,7 +138,6 @@ values: {} as Record<string, unknown> }
 
         listen: driver.listenCollection
             ? (params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
-                const orderParsed = parseOrderBy(params?.orderBy);
                 const limit = params?.limit ?? 20;
                 const offset = params?.offset ?? 0;
                 return driver.listenCollection!<M>({
@@ -158,8 +145,8 @@ values: {} as Record<string, unknown> }
                     limit: params?.limit,
                     offset: params?.offset,
                     filter: params?.where,
-                    orderBy: orderParsed?.[0],
-                    order: orderParsed?.[1],
+                    orderBy: params?.orderBy?.[0],
+                    order: params?.orderBy?.[1],
                     searchString: params?.searchString,
                     onUpdate: (entities) => {
                         onUpdate({

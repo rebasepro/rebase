@@ -1,6 +1,22 @@
-import { createTransport, Transporter } from "nodemailer";
-import { EmailService, EmailSendOptions, EmailConfig } from "./types";
+import type { Transporter } from "nodemailer";
+import { EmailConfig, EmailSendOptions, EmailService } from "./types";
 import { logger } from "../utils/logger";
+
+let _nodemailer: typeof import("nodemailer") | undefined;
+
+async function loadNodemailer() {
+    if (!_nodemailer) {
+        try {
+            _nodemailer = await import("nodemailer");
+        } catch {
+            throw new Error(
+                "nodemailer is required for SMTP email. " +
+                "Install it: pnpm add nodemailer"
+            );
+        }
+    }
+    return _nodemailer;
+}
 
 /**
  * Safely parse a hostname from a URL string
@@ -20,17 +36,28 @@ function getHostname(urlStr: string): string | undefined {
 export class SMTPEmailService implements EmailService {
     private transporter: Transporter | null = null;
     private config: EmailConfig;
+    private _initialized = false;
 
     constructor(config: EmailConfig) {
         this.config = config;
+    }
 
-        if (config.smtp) {
-            let smtpName = config.smtp.name;
+    /**
+     * Lazily initialize the SMTP transporter on first use
+     */
+    private async ensureTransporter(): Promise<void> {
+        if (this._initialized) return;
+        this._initialized = true;
+
+        if (this.config.smtp) {
+            const nodemailer = await loadNodemailer();
+
+            let smtpName = this.config.smtp.name;
             if (!smtpName) {
                 const urlsToTry = [
                     process.env.FRONTEND_URL,
-                    config.resetPasswordUrl,
-                    config.verifyEmailUrl
+                    this.config.resetPasswordUrl,
+                    this.config.verifyEmailUrl
                 ];
                 for (const urlStr of urlsToTry) {
                     if (urlStr) {
@@ -43,14 +70,14 @@ export class SMTPEmailService implements EmailService {
                 }
             }
 
-            this.transporter = createTransport({
+            this.transporter = nodemailer.createTransport({
                 name: smtpName,
-                host: config.smtp.host,
-                port: config.smtp.port,
-                secure: config.smtp.secure ?? (config.smtp.port === 465),
-                auth: config.smtp.auth ? {
-                    user: config.smtp.auth.user,
-                    pass: config.smtp.auth.pass
+                host: this.config.smtp.host,
+                port: this.config.smtp.port,
+                secure: this.config.smtp.secure ?? (this.config.smtp.port === 465),
+                auth: this.config.smtp.auth ? {
+                    user: this.config.smtp.auth.user,
+                    pass: this.config.smtp.auth.pass
                 } : undefined
             });
         }
@@ -60,7 +87,7 @@ export class SMTPEmailService implements EmailService {
      * Check if the email service is properly configured
      */
     isConfigured(): boolean {
-        return !!(this.transporter || this.config.sendEmail);
+        return !!(this.config.smtp || this.config.sendEmail);
     }
 
     /**
@@ -74,6 +101,8 @@ export class SMTPEmailService implements EmailService {
         }
 
         // Use SMTP transporter
+        await this.ensureTransporter();
+
         if (!this.transporter) {
             throw new Error("Email service not configured. Provide SMTP config or sendEmail function.");
         }
@@ -100,6 +129,8 @@ export class SMTPEmailService implements EmailService {
      * Verify SMTP connection (useful for startup checks)
      */
     async verifyConnection(): Promise<boolean> {
+        await this.ensureTransporter();
+
         if (!this.transporter) {
             return !!this.config.sendEmail;
         }

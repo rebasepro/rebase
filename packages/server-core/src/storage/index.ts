@@ -25,8 +25,6 @@ export { TusHandler } from "./tus-handler";
 
 import { BackendStorageConfig, StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
-import { S3StorageController } from "./S3StorageController";
-import { GCSStorageController } from "./GCSStorageController";
 
 /**
  * Create a storage controller from a config object.
@@ -34,14 +32,18 @@ import { GCSStorageController } from "./GCSStorageController";
  * For custom providers, implement `StorageController` directly instead
  * of going through this factory.
  */
-export function createStorageController(config: BackendStorageConfig): StorageController {
+export async function createStorageController(config: BackendStorageConfig): Promise<StorageController> {
     switch (config.type) {
         case "local":
             return new LocalStorageController(config);
-        case "s3":
+        case "s3": {
+            const { S3StorageController } = await import("./S3StorageController");
             return new S3StorageController(config);
-        case "gcs":
+        }
+        case "gcs": {
+            const { GCSStorageController } = await import("./GCSStorageController");
             return new GCSStorageController(config);
+        }
         default:
             throw new Error(
                 `Unknown storage type: ${(config as Record<string, unknown>).type}. ` +

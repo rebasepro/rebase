@@ -33,7 +33,7 @@ The `listen()` method accepts the same `FindParams` as `find()` — you can filt
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: "pending" },
-        orderBy: "created_at:desc",
+        orderBy: ["created_at", "desc"],
         limit: 20
     },
     (response) => {

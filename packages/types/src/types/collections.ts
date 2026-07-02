@@ -13,7 +13,7 @@ import type { EntityAction } from "./entity_actions";
 import type { PolicyExpression } from "./policy";
 import type { ComponentRef } from "./component_ref";
 import type { CollectionComponentOverrideMap } from "./component_overrides";
-import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
+import type { WhereFilterOp, FilterValues, FilterPreset, OrderByTuple } from "./filter-operators";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -63,7 +63,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * The data source this collection belongs to — the routing key shared by
      * the frontend router and the backend driver registry. It points at a
      * {@link DataSourceDefinition} registered on `<Rebase dataSources>` (front)
-     * and `initRebase({ dataSources })` (back).
+     * and `initializeRebaseBackend({ dataSources })` (back).
      *
      * If not specified, the default data source `"(default)"` is used, which
      * for a standard Rebase app is the server-mediated Postgres backend.
@@ -286,7 +286,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * applied in the collection.
      * e.g. `sort: ["order", "asc"]`
      */
-    readonly sort?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"];
+    readonly sort?: OrderByTuple<Extract<keyof M, string> | (string & {})>;
 
     /**
      * You can add additional fields to the collection view by implementing

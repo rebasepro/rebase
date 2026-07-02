@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { QueryBuilder } from "../src/query_builder";
 import { CollectionClient } from "../src/collection";
 import { FindParams } from "@rebasepro/types";
@@ -150,19 +150,19 @@ describe("QueryBuilder", () => {
         it("sets default ascending order", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.orderBy("createdAt");
-            expect(getParams(qb).orderBy).toEqual("createdAt:asc");
+            expect(getParams(qb).orderBy).toEqual(["createdAt", "asc"]);
         });
 
         it("sets descending order", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.orderBy("createdAt", "desc");
-            expect(getParams(qb).orderBy).toEqual("createdAt:desc");
+            expect(getParams(qb).orderBy).toEqual(["createdAt", "desc"]);
         });
 
         it("allows overriding orderBy with a second call", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.orderBy("name", "asc").orderBy("date", "desc");
-            expect(getParams(qb).orderBy).toEqual("date:desc");
+            expect(getParams(qb).orderBy).toEqual(["date", "desc"]);
         });
     });
 
@@ -249,7 +249,7 @@ describe("QueryBuilder", () => {
                 age: [">=", 18],
                 status: ["==", "active"]
             });
-            expect(params.orderBy).toBe("name:asc");
+            expect(params.orderBy).toEqual(["name", "asc"]);
             expect(params.limit).toBe(25);
             expect(params.offset).toBe(50);
             expect(params.searchString).toBe("keyword");

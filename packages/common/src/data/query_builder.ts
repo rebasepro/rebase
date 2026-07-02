@@ -1,4 +1,13 @@
-import { FindParams, Entity, FindResponse, CollectionAccessor, QueryBuilderInterface, WhereFilterOp, LogicalCondition, WhereValue, FilterCondition } from "@rebasepro/types";
+import {
+    CollectionAccessor,
+    FilterCondition,
+    FindParams,
+    FindResponse,
+    LogicalCondition,
+    QueryBuilderInterface,
+    WhereFilterOp,
+    WhereValue
+} from "@rebasepro/types";
 
 export function or(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
     return { type: "or",
@@ -67,7 +76,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * client.collection('users').orderBy('createdAt', 'desc').find()
      */
     orderBy(column: keyof M & string, direction: "asc" | "desc" = "asc"): this {
-        this.params.orderBy = `${column}:${direction}`;
+        this.params.orderBy = [column, direction];
         return this;
     }
 

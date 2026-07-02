@@ -5,4 +5,5 @@ export * from "./data/buildRoutedRebaseData";
 export * from "./data/resolveDataSource";
 export * from "./data/query_builder";
 export * from "./data/filter-dialect";
+export * from "./data/sort-dialect";
 export * from "./table-classification";
