@@ -749,7 +749,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                     onSubmit={formController.handleSubmit}
                     className="flex-grow flex flex-col min-h-0 relative">
 
-                    <div className="flex-grow flex flex-col min-h-0 no-scrollbar relative w-full h-full bg-surface-50 dark:bg-surface-800">
+                    <div className="flex-grow flex flex-col min-h-0 relative w-full h-full bg-surface-50 dark:bg-surface-800">
 
                         {currentView === "loading" &&
                             <CircularProgressCenter/>}

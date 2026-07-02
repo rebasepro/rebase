@@ -420,9 +420,9 @@ export function CollectionPropertiesEditorForm({
     };
 
     const body = (
-        <div className={"grid grid-cols-12 h-full bg-surface-50 dark:bg-surface-800"}>
+        <div className={"grid grid-cols-12 h-full min-h-0 bg-surface-50 dark:bg-surface-800"}>
             <div className={cls(
-                "col-span-12 lg:col-span-5 h-full flex flex-col bg-surface-50 dark:bg-surface-800",
+                "col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col bg-surface-50 dark:bg-surface-800",
                 !asDialog && "border-r " + defaultBorderMixin
             )}>
                 {/* Sidebar Header */}
@@ -467,7 +467,7 @@ export function CollectionPropertiesEditorForm({
                 </div>
 
                 {/* Sidebar Content */}
-                <div className="flex-grow overflow-y-auto p-3 no-scrollbar space-y-3 bg-surface-50 dark:bg-surface-800">
+                <div className="flex-grow overflow-y-auto p-3 space-y-3 bg-surface-50 dark:bg-surface-800">
                     {owner && (
                         <div className="px-1 py-0.5">
                             <Typography variant="body2" color="secondary">

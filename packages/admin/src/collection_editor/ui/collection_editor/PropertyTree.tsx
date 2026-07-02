@@ -287,7 +287,7 @@ export function PropertyTreeEntry({
                             selected={selected}/>}
                 </div>
 
-                <div className="absolute top-1/2 -translate-y-1/2 right-3 flex flex-row items-center gap-1">
+                <div className="absolute top-1/2 -translate-y-1/2 right-2 flex flex-row items-center gap-1">
                     {isAIModified && <AIModifiedIndicator/>}
                     {isPropertyInferred && <>
                         <Tooltip title={"Inferred property"} asChild={true}>

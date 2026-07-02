@@ -47,38 +47,48 @@ export function PropertyFieldPreview({
         >
             <PropertyConfigBadge propertyConfig={propertyConfig} size="small"/>
 
-            <div className="flex-1 flex flex-col min-w-0 pr-8">
+            <div className="flex-1 flex flex-col min-w-0 mr-16">
                 {includeName &&
                     <ErrorBoundary>
-                        <div className="flex items-center gap-2">
-                            <Typography variant="body2" component="span">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Typography variant="body2" component="span" className="truncate font-medium">
                                 {property.name || propertyKey || "\u00a0"}
                             </Typography>
-                            {property.name && propertyKey && property.name !== propertyKey && (
-                                <Typography variant="caption" component="span" color="secondary" className="font-mono">
-                                    {propertyKey}
+                            {propertyConfig?.name && (
+                                <Typography
+                                    variant={"caption"}
+                                    component="span"
+                                    className="text-text-secondary dark:text-text-secondary-dark shrink-0">
+                                    {propertyConfig.name}
                                 </Typography>
                             )}
                         </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                            {propertyKey && (
+                                <Typography variant="caption" component="span" color="secondary" className="font-mono truncate">
+                                    {propertyKey}
+                                </Typography>
+                            )}
+                            <ErrorBoundary>
+                                <Typography variant="caption" component="span" className="shrink-0 text-text-disabled dark:text-text-disabled-dark font-mono">
+                                    · {"columnType" in property ? (property as { columnType?: string }).columnType ?? property.type : property.type}
+                                </Typography>
+                            </ErrorBoundary>
+                        </div>
                     </ErrorBoundary>}
 
-                <div className="flex flex-row items-center gap-2 mt-0.5">
-                    <ErrorBoundary>
-                        <Typography
-                            variant={"caption"}
-                            component="span"
-                            className="text-text-secondary dark:text-text-secondary-dark font-medium">
-                            {propertyConfig?.name}
-                        </Typography>
-                    </ErrorBoundary>
-                </div>
+                {!includeName &&
+                    <div className="flex flex-row items-center gap-2">
+                        <ErrorBoundary>
+                            <Typography
+                                variant={"caption"}
+                                component="span"
+                                className="text-text-secondary dark:text-text-secondary-dark font-medium">
+                                {propertyConfig?.name}
+                            </Typography>
+                        </ErrorBoundary>
+                    </div>}
             </div>
-
-            <ErrorBoundary>
-                <Typography variant="caption" component="span" className="ml-auto shrink-0 text-text-disabled dark:text-text-disabled-dark font-mono bg-surface-100 dark:bg-surface-900 px-1.5 py-0.5 rounded mr-8">
-                    {"columnType" in property ? (property as { columnType?: string }).columnType ?? property.type : property.type}
-                </Typography>
-            </ErrorBoundary>
 
             {includeEditButton && <Typography variant={"button"}>EDIT</Typography>}
         </div>
@@ -120,35 +130,34 @@ export function NonEditablePropertyPreview({
                 <MinusCircleIcon className={"text-surface-accent-400 absolute -right-2 -top-2 bg-surface-50 dark:bg-surface-900 rounded-full"} size={iconSize.small}/>
             </div>
 
-            <div className="flex-1 flex flex-col min-w-0 pr-8">
-                <Typography variant="label" component="span" className="grow pr-2">
-                    {property?.name ? property.name : name}
-                </Typography>
-
-                <div className="flex flex-row items-center gap-2 mt-0.5">
-                    {propertyConfig && <Typography variant={"caption"} component="span" className="text-text-secondary dark:text-text-secondary-dark font-medium">
+            <div className="flex-1 flex flex-col min-w-0 mr-16">
+                <div className="flex items-center gap-2 min-w-0">
+                    <Typography variant="label" component="span" className="truncate">
+                        {property?.name ? property.name : name}
+                    </Typography>
+                    {propertyConfig && <Typography variant={"caption"} component="span" className="text-text-secondary dark:text-text-secondary-dark shrink-0">
                         {propertyConfig?.name}
                     </Typography>}
+                </div>
+
+                <div className="flex flex-row items-center gap-1.5 mt-0.5 min-w-0">
+                    <Typography variant="caption" component="span" color="secondary" className="font-mono truncate">
+                        {name}
+                    </Typography>
 
                     {property && isPropertyBuilder(property) && <ErrorBoundary>
                         <Typography variant="caption" component="span" className="text-text-disabled dark:text-text-disabled-dark">
-                            Defined in code
+                            · Defined in code
                         </Typography>
                     </ErrorBoundary>}
 
                     {!property && <ErrorBoundary>
                         <Typography variant="caption" component="span" className="text-text-disabled dark:text-text-disabled-dark">
-                            Additional field
+                            · Additional field
                         </Typography>
                     </ErrorBoundary>}
                 </div>
             </div>
-
-            {property && !isPropertyBuilder(property) && <ErrorBoundary>
-                <Typography variant="caption" component="span" className="ml-auto shrink-0 text-text-disabled dark:text-text-disabled-dark font-mono bg-surface-100 dark:bg-surface-900 px-1.5 py-0.5 rounded mr-8">
-                    {"columnType" in property ? (property as { columnType?: string }).columnType ?? property.type : property.type}
-                </Typography>
-            </ErrorBoundary>}
         </div>
         </div>
     )
