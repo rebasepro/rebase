@@ -163,6 +163,11 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
  * In the SDK this is backed by HTTP transport (typed, generated per-project).
  * In the framework this is backed by a Proxy + in-process database driver (dynamic).
  *
+ * When the `DB` generic is supplied (e.g. from `createRebaseClient<Database>`),
+ * each key in `DB` is mapped to a typed `CollectionAccessor`. When `DB` is
+ * `unknown` (the default), the type falls back to a dynamic index signature
+ * for runtime-only access.
+ *
  * @example
  * // SDK
  * const client = createRebaseClient({ baseUrl: "..." });
@@ -177,7 +182,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
  *
  * @group Data
  */
-export interface RebaseData {
+export type RebaseData<DB = unknown> = {
     /**
      * Get a collection accessor by slug.
      * Alternative to dynamic property access for cases where
@@ -188,13 +193,17 @@ export interface RebaseData {
      * await accessor.find({ limit: 10 });
      */
     collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): CollectionAccessor<M>;
-
-    /**
-     * Dynamic collection accessor.
-     * Access any collection by its slug as a property.
-     *
-     * @example
-     * data.products.find({ where: { status: "eq.published" } })
-     */
-    [collectionSlug: string]: CollectionAccessor | ((slug: string) => CollectionAccessor);
-}
+} & (
+    DB extends Record<string, unknown>
+        ? { [K in keyof DB]: CollectionAccessor<DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>> }
+        : {
+            /**
+             * Dynamic collection accessor.
+             * Access any collection by its slug as a property.
+             *
+             * @example
+             * data.products.find({ where: { status: "eq.published" } })
+             */
+            [collectionSlug: string]: CollectionAccessor | ((slug: string) => CollectionAccessor);
+        }
+);

@@ -81,7 +81,7 @@ type TypedDataLayer<DB> = {
  * capabilities populated and the `data` layer narrowed to provide
  * typed collection accessors when a `DB` schema generic is supplied.
  */
-export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient, "data"> & {
+export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data"> & {
     setToken: (token: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;

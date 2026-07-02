@@ -1,4 +1,5 @@
-import { AuthResponse, RefreshResponse, Session, UserInfo } from "./types";
+import type { AuthResponse, RefreshResponse } from "./types";
+import type { User, DeviceSession } from "@rebasepro/types";
 
 /**
  * Default API URL - can be overridden in hook props
@@ -183,7 +184,7 @@ export async function logout(refreshToken?: string): Promise<void> {
 /**
  * Get current user info
  */
-export async function getCurrentUser(accessToken: string): Promise<{ user: UserInfo }> {
+export async function getCurrentUser(accessToken: string): Promise<{ user: User }> {
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/me`, {
         method: "GET",
         headers: {
@@ -192,7 +193,7 @@ export async function getCurrentUser(accessToken: string): Promise<{ user: UserI
         }
     });
 
-    return handleResponse<{ user: UserInfo }>(response);
+    return handleResponse<{ user: User }>(response);
 }
 
 /**
@@ -277,7 +278,7 @@ export async function updateProfile(
     accessToken: string,
     displayName?: string,
     photoURL?: string
-): Promise<{ user: UserInfo }> {
+): Promise<{ user: User }> {
     const response = await fetchWithHandling(`${baseApiUrl}/api/auth/me`, {
         method: "PATCH",
         headers: {
@@ -288,13 +289,13 @@ export async function updateProfile(
 photoURL })
     });
 
-    return handleResponse<{ user: UserInfo }>(response);
+    return handleResponse<{ user: User }>(response);
 }
 
 /**
  * Fetch active sessions for current user
  */
-export async function fetchSessions(accessToken: string, currentRefreshToken?: string): Promise<{ sessions: Session[] }> {
+export async function fetchSessions(accessToken: string, currentRefreshToken?: string): Promise<{ sessions: DeviceSession[] }> {
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${accessToken}`
@@ -308,7 +309,7 @@ export async function fetchSessions(accessToken: string, currentRefreshToken?: s
         headers
     });
 
-    return handleResponse<{ sessions: Session[] }>(response);
+    return handleResponse<{ sessions: DeviceSession[] }>(response);
 }
 
 /**

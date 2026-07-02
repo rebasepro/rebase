@@ -204,19 +204,18 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * If you are specifying your collection as code, the order is the same as the
      * one you define in `properties`. Additional columns are added at the
      * end of the list, if the order is not specified.
+     *
      * You can use this prop to hide some properties from the table view.
      * Note that if you set this prop, other ways to hide fields, like
      * `hidden` in the property definition, will be ignored.
      * `propertiesOrder` has precedence over `hidden`.
-     *     - For properties use the property key.
-     *     - For additional fields use the field key.
-     *     - If you have subcollections, you get a column for each subcollection,
-     *       with the path (or alias) as the subcollection, prefixed with
-     *       `subcollection:`. e.g. `subcollection:orders`.
-     * You can use this prop to hide some properties from the table view.
-     * Note that if you set this prop, other ways to hide fields, like
-     * `hidden` in the property definition,will be ignored.
-     * `propertiesOrder` has precedence over `hidden`.
+     *
+     * Supported entry formats:
+     *     - For properties, use the property key.
+     *     - For additional fields, use the field key.
+     *     - Child collections (Firestore subcollections, or Postgres relations
+     *       with `many` cardinality) each get a column with id
+     *       `subcollection:<slug>`, e.g. `subcollection:orders`.
      */
     propertiesOrder?: (Extract<keyof M, string> | (string & {}) | string | `subcollection:${string}`)[];
 

@@ -13,13 +13,48 @@ import type { StorageSourceDefinition } from "../types/storage_source";
 export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED";
 
 /**
- * Standard session interface representing an authenticated state
+ * Standard session interface representing an authenticated state.
+ *
+ * There is exactly one canonical definition of this type (here in
+ * `@rebasepro/types`). The `@rebasepro/client` package re-exports it.
  */
 export interface RebaseSession {
     accessToken: string;
     refreshToken: string;
     expiresAt: number;
     user: User;
+}
+
+/**
+ * Access and refresh token pair returned by authentication endpoints.
+ *
+ * Replaces the former `RebaseTokens` (client) and `AuthTokens` (auth) types,
+ * which had identical shapes.
+ *
+ * @group Auth
+ */
+export interface AuthTokens {
+    accessToken: string;
+    refreshToken: string;
+    /** Unix timestamp (ms) when the access token expires. */
+    accessTokenExpiresAt: number;
+}
+
+/**
+ * A device-level session entry as returned by `GET /auth/sessions`.
+ *
+ * Represents one refresh-token / device pair. Not to be confused with
+ * {@link RebaseSession}, which is the client-side representation of the
+ * *current* authenticated state (user + tokens).
+ *
+ * @group Auth
+ */
+export interface DeviceSession {
+    id: string;
+    userAgent?: string;
+    ipAddress?: string;
+    createdAt: string;
+    isCurrentSession?: boolean;
 }
 
 /**
@@ -36,6 +71,13 @@ export interface AuthClient {
      * Get the currently active session
      */
     getSession(): RebaseSession | null;
+
+    /**
+     * Get the current user's active sessions
+     */
+    getSessions?: () => Promise<DeviceSession[]>;
+    revokeSession?: (sessionId: string) => Promise<void>;
+    revokeAllSessions?: () => Promise<void>;
 
     /**
      * Sign out the current user and clear local session
@@ -56,7 +98,14 @@ export interface AuthClient {
 // ─── Admin API ───────────────────────────────────────────────────────────────
 
 /**
- * User record as returned by the Admin API.
+ * User record as returned by the Admin API (`GET /admin/users`, etc.).
+ *
+ * This is a dedicated DTO for admin operations and differs from {@link User}:
+ * - `roles` is required (always an array), vs optional on `User`
+ * - Includes audit timestamps (`createdAt`, `updatedAt`) as ISO strings
+ * - `email` is non-nullable (admin users always have an email)
+ *
+ * @see User — the canonical client-facing user type
  * @group Admin
  */
 export interface AdminUser {
@@ -64,6 +113,9 @@ export interface AdminUser {
     email: string;
     displayName: string | null;
     photoURL: string | null;
+    // NOTE: This field is named `provider` on the wire (admin-users-route.ts)
+    // while the canonical `User` type uses `providerId`. Renaming would be a
+    // wire-format breaking change — tracked for a future minor.
     provider: string;
     roles: string[];
     metadata?: Record<string, any>;
@@ -139,6 +191,35 @@ export interface FunctionsAPI {
     invoke<T = unknown>(name: string, payload?: unknown, options?: FunctionInvokeOptions): Promise<T>;
 }
 
+// ─── HistoryConfig ───────────────────────────────────────────────────────────
+
+/**
+ * Configuration for entity history / audit-log tracking.
+ *
+ * - `true` — enable history with default settings
+ * - `{ retention?: number }` — enable with optional retention period in days
+ */
+export type HistoryConfig = boolean | { retention?: number };
+
+// ─── RebaseWebSocket ─────────────────────────────────────────────────────────
+
+/**
+ * Minimal WebSocket client contract exposed on {@link RebaseClient}.
+ *
+ * The full implementation (`RebaseWebSocketClient` in `@rebasepro/client`)
+ * adds subscription helpers, CRUD-over-WS, SQL execution, etc.
+ */
+export interface RebaseWebSocket {
+    /** Disconnect the WebSocket and stop reconnecting. */
+    disconnect(): void;
+    /** Send an authentication token to the server. */
+    authenticate(token: string): Promise<void>;
+    /** Set a function that lazily resolves the auth token for auto-authentication. */
+    setAuthTokenGetter(getter: () => Promise<string | null>): void;
+    /** Listen for connection lifecycle events. */
+    on(event: "connect" | "disconnect" | "reconnect" | "error", cb: (...args: unknown[]) => void): () => void;
+}
+
 // ─── RebaseClient ────────────────────────────────────────────────────────────
 
 /**
@@ -153,7 +234,7 @@ export interface FunctionsAPI {
  */
 export interface RebaseClient<DB = unknown> {
     /** Unified Data access layer */
-    data: RebaseData;
+    data: RebaseData<DB>;
 
     /** Unified Authentication layer */
     auth: AuthClient;
@@ -205,7 +286,7 @@ export interface RebaseClient<DB = unknown> {
     baseUrl?: string;
 
     /** WebSocket client for realtime subscriptions */
-    ws?: unknown;
+    ws?: RebaseWebSocket;
 
     /** Set the auth token for subsequent requests */
     setToken?(token: string | null): void;

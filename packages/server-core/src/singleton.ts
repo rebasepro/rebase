@@ -38,9 +38,19 @@ export function _resetRebaseMock(): void {
  * Initialized automatically during server startup. Provides access to all
  * app-scoped services: **data**, **auth**, **storage**, and **email**.
  *
- * `rebase.data` runs with **admin privileges** (no RLS). For user-scoped
- * queries inside request handlers, continue using the handler's context
- * or the RLS-scoped driver.
+ * **Data plane** (`rebase.data`):
+ * Backed by the native DataDriver — calls go directly to the database without
+ * JSON serialization, HTTP dispatch, or middleware overhead. The driver is
+ * scoped as `{ uid: "service", roles: ["admin"] }` so RLS policies see an
+ * admin identity. No `REBASE_SERVICE_KEY` is required for data access.
+ *
+ * **Control plane** (`rebase.auth`, `rebase.admin`, `rebase.storage`, etc.):
+ * Routes through the Hono app's internal request handler. An internal per-boot
+ * credential is generated automatically when `REBASE_SERVICE_KEY` is not set,
+ * so control-plane calls always authenticate.
+ *
+ * For user-scoped queries inside request handlers, continue using the
+ * handler's context or the RLS-scoped driver.
  *
  * @example
  * ```typescript

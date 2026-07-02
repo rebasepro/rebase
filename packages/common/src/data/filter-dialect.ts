@@ -5,6 +5,13 @@
  * PostgREST-style dot-syntax strings (`eq.active`, `gt.18`, `in.(a,b)`).
  * Everything else speaks `FilterValues` exclusively.
  *
+ * Wire-format values are always strings — the wire format carries no type
+ * metadata, so type coercion is the responsibility of the server-side data
+ * driver which has access to the collection schema.
+ *
+ * Commas inside list values are backslash-escaped (`\,`), and literal
+ * backslashes are escaped as `\\`.
+ *
  * @module
  */
 
@@ -20,70 +27,119 @@ import {
 } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
-// Value coercion (querystring → typed JS values)
+// Value stringification
 // ---------------------------------------------------------------------------
 
 /**
- * Coerce a raw querystring value to its natural JS type.
- * - `"true"` / `"false"` → boolean
- * - `"null"` → null
- * - Numeric strings → number
- * - Everything else → string (unchanged)
- */
-function coerceValue(raw: string): unknown {
-    if (raw === "true") return true;
-    if (raw === "false") return false;
-    if (raw === "null") return null;
-    if (raw !== "" && !isNaN(Number(raw))) return Number(raw);
-    return raw;
-}
-
-/**
  * Serialize a JS value to its querystring representation.
+ * `null` is serialized as the literal string `"null"`.
  */
 function stringifyValue(value: unknown): string {
     if (value === null) return "null";
-    if (typeof value === "boolean") return String(value);
     return String(value);
 }
+
+// ---------------------------------------------------------------------------
+// Comma escaping for list values
+// ---------------------------------------------------------------------------
+
+/**
+ * Escape a single list item for the wire format.
+ * `\` → `\\`, `,` → `\,`
+ */
+function escapeListItem(value: string): string {
+    return value.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
+}
+
+/**
+ * Unescape a single list item from the wire format.
+ * `\\` → `\`, `\,` → `,`
+ */
+function unescapeListItem(value: string): string {
+    let result = "";
+    for (let i = 0; i < value.length; i++) {
+        if (value[i] === "\\" && i + 1 < value.length) {
+            result += value[i + 1];
+            i++; // skip next char
+        } else {
+            result += value[i];
+        }
+    }
+    return result;
+}
+
+/**
+ * Split a parenthesized list string on unescaped commas.
+ * Input is the content between `(` and `)`.
+ *
+ * @example
+ * splitListItems("admin,editor")          // ["admin", "editor"]
+ * splitListItems("hello\\, world,foo")    // ["hello, world", "foo"]
+ */
+function splitListItems(inner: string): string[] {
+    const items: string[] = [];
+    let current = "";
+    for (let i = 0; i < inner.length; i++) {
+        if (inner[i] === "\\" && i + 1 < inner.length) {
+            // Escaped character — consume both chars
+            current += inner[i] + inner[i + 1];
+            i++;
+        } else if (inner[i] === ",") {
+            items.push(unescapeListItem(current));
+            current = "";
+        } else {
+            current += inner[i];
+        }
+    }
+    items.push(unescapeListItem(current));
+    return items;
+}
+
+// ---------------------------------------------------------------------------
+// Typed operator map lookups (no `as any`)
+// ---------------------------------------------------------------------------
+
+const REST_OP_LOOKUP = REST_TO_CANONICAL as Readonly<Record<string, WhereFilterOp | undefined>>;
+const CANONICAL_OP_LOOKUP = CANONICAL_TO_REST as Readonly<Record<string, RestFilterOp | undefined>>;
 
 // ---------------------------------------------------------------------------
 // Serialize: FilterValues → REST querystring
 // ---------------------------------------------------------------------------
 
 /**
- * Serialize a single condition tuple to a PostgREST dot-string.
+ * Serialize a single canonical condition tuple to a PostgREST dot-string.
+ *
+ * Throws `TypeError` if the input is not a valid `[WhereFilterOp, unknown]` tuple.
  *
  * @example
  * serializeTuple(["==", "active"])           // "eq.active"
  * serializeTuple(["in", ["admin","editor"]]) // "in.(admin,editor)"
  * serializeTuple([">=", 18])                 // "gte.18"
  */
-function serializeTuple(tuple: [WhereFilterOp, unknown] | unknown): string {
-    // If it's already a string, it might be a PostgREST string (with dot)
-    // or a raw value (without dot). In both cases, existing tests expect
-    // them to be passed through or treated as simple equality if no dot.
-    if (typeof tuple === "string") {
-        if (tuple.includes(".")) {
-            const dotIndex = tuple.indexOf(".");
-            const prefix = tuple.substring(0, dotIndex);
-            if ((REST_TO_CANONICAL as any)[prefix]) {
-                return tuple;
-            }
-        }
-        return tuple;
+function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
+    if (!Array.isArray(tuple) || tuple.length !== 2) {
+        throw new TypeError(
+            `serializeTuple: expected a [WhereFilterOp, value] tuple, got ${JSON.stringify(tuple)}`
+        );
     }
 
-    // If it's NOT a canonical tuple [WhereFilterOp, value], treat as equality.
-    if (!Array.isArray(tuple) || tuple.length !== 2 || typeof tuple[0] !== "string" || !(CANONICAL_TO_REST as any)[tuple[0]]) {
-        return `eq.${stringifyValue(tuple)}`;
+    const [op, value] = tuple;
+
+    if (typeof op !== "string") {
+        throw new TypeError(
+            `serializeTuple: operator must be a string, got ${typeof op}`
+        );
     }
 
-    const [op, value] = tuple as [WhereFilterOp, unknown];
-    const restOp = CANONICAL_TO_REST[op];
+    const restOp = CANONICAL_OP_LOOKUP[op];
+    if (!restOp) {
+        throw new TypeError(
+            `serializeTuple: unknown operator "${op}". Valid operators: ${Object.keys(CANONICAL_TO_REST).join(", ")}`
+        );
+    }
 
     if (Array.isArray(value)) {
-        const items = value.map(stringifyValue).join(",");
+        const items = value.map(v => escapeListItem(stringifyValue(v))).join(",");
         return `${restOp}.(${items})`;
     }
 
@@ -91,8 +147,11 @@ function serializeTuple(tuple: [WhereFilterOp, unknown] | unknown): string {
 }
 
 /**
- * Convert `FilterValues` to a PostgREST-style querystring record.
+ * Convert `FilterValues` (or `WireFilterValues`) to a PostgREST-style
+ * querystring record.
  *
+ * - Canonical `[WhereFilterOp, value]` tuples are serialized strictly.
+ * - Pre-serialized PostgREST strings (e.g. `"eq.published"`) are passed through.
  * - Single conditions produce a string value.
  * - Multiple conditions on the same field produce a string array (repeated params).
  *
@@ -102,22 +161,34 @@ function serializeTuple(tuple: [WhereFilterOp, unknown] | unknown): string {
  *
  * serializeFilter({ age: [[">=", 18], ["<", 65]] })
  * // → { age: ["gte.18", "lt.65"] }
+ *
+ * // Pre-serialized strings pass through unchanged:
+ * serializeFilter({ status: "eq.published" })
+ * // → { status: "eq.published" }
  */
 export function serializeFilter(
-    filter: FilterValues<string> | Record<string, any>
+    filter: FilterValues<string> | Record<string, unknown>
 ): Record<string, string | string[]> {
     const result: Record<string, string | string[]> = {};
 
     for (const [field, condition] of Object.entries(filter)) {
         if (condition === undefined) continue;
 
+        // Pre-serialized PostgREST string — pass through unchanged.
+        // This supports WireFilterValues where values may already be
+        // serialized dot-strings like "eq.active" or raw strings like "true".
+        if (typeof condition === "string") {
+            result[field] = condition;
+            continue;
+        }
+
         // Multiple conditions on the same field: array of tuples
         // We detect this by checking if the first element is also an array.
         if (Array.isArray(condition) && condition.length > 0 && Array.isArray(condition[0])) {
-            result[field] = (condition as any[]).map(serializeTuple);
+            result[field] = (condition as [WhereFilterOp, unknown][]).map(serializeTuple);
         } else {
-            // Single condition (could be a tuple, a raw value, or an already-serialized string)
-            result[field] = serializeTuple(condition);
+            // Single condition — must be a [WhereFilterOp, value] tuple
+            result[field] = serializeTuple(condition as [WhereFilterOp, unknown]);
         }
     }
 
@@ -131,21 +202,28 @@ export function serializeFilter(
 /**
  * Parse a single PostgREST dot-string into a `[WhereFilterOp, unknown]` tuple.
  *
- * If the string doesn't match a known operator prefix, falls back to
+ * All values are returned as strings — the wire format carries no type
+ * metadata, so coercion is the data driver's responsibility.
+ *
+ * If the string doesn't match a known operator prefix, it falls back to
  * `["==", originalString]` (treating the whole string as an equality value).
+ * This intentional defense handles values like `"user@host.com"` or
+ * `"1.2.3"` that happen to contain dots.
  */
 function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
     const dotIndex = raw.indexOf(".");
     if (dotIndex === -1) {
-        // No dot → equality on the raw value (coerced)
-        return ["==", coerceValue(raw)];
+        // No dot → equality on the raw value (kept as string)
+        return ["==", raw];
     }
 
     const prefix = raw.substring(0, dotIndex);
     const rest = raw.substring(dotIndex + 1);
 
-    // Check if the prefix is a known REST operator
-    const canonicalOp = (REST_TO_CANONICAL as Record<string, WhereFilterOp | undefined>)[prefix];
+    // Check if the prefix is a known REST operator.
+    // This is the key defense against values like "eq.something" or "gt.foo"
+    // being misinterpreted — only known REST short-codes are treated as operators.
+    const canonicalOp = REST_OP_LOOKUP[prefix];
     if (!canonicalOp) {
         // Not a known operator (e.g., email "user@host.com" or version "1.2.3")
         // Treat the entire string as an equality value
@@ -154,11 +232,11 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
 
     // Parse list values: "(admin,editor)" → ["admin", "editor"]
     if (rest.startsWith("(") && rest.endsWith(")")) {
-        const items = rest.slice(1, -1).split(",").map(s => coerceValue(s.trim()));
+        const items = splitListItems(rest.slice(1, -1));
         return [canonicalOp, items];
     }
 
-    return [canonicalOp, coerceValue(rest)];
+    return [canonicalOp, rest];
 }
 
 /**
@@ -172,10 +250,10 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
  * // → { status: ["==", "active"] }
  *
  * deserializeFilter({ age: ["gte.18", "lt.65"] })
- * // → { age: [[">=", 18], ["<", 65]] }
+ * // → { age: [[">=", "18"], ["<", "65"]] }
  */
 export function deserializeFilter(
-    query: Record<string, any>
+    query: Record<string, unknown>
 ): FilterValues<string> {
     const result: FilterValues<string> = {};
 
@@ -244,9 +322,9 @@ export function serializeLogicalCondition(
     }
 
     // FilterCondition
-    const restOp = (CANONICAL_TO_REST as any)[cond.operator] || "eq";
+    const restOp = CANONICAL_OP_LOOKUP[cond.operator] ?? "eq";
     if (Array.isArray(cond.value)) {
-        const items = cond.value.map(stringifyValue).join(",");
+        const items = cond.value.map(v => escapeListItem(stringifyValue(v))).join(",");
         return `${cond.column}.${restOp}.(${items})`;
     }
     return `${cond.column}.${restOp}.${stringifyValue(cond.value)}`;
@@ -300,19 +378,19 @@ export function deserializeLogicalCondition(
 
     const secondDot = rest.indexOf(".");
     if (secondDot === -1) {
-        // "column.value" — treat as equality
-        return { column, operator: "==", value: coerceValue(rest) };
+        // "column.value" — treat as equality (value kept as string)
+        return { column, operator: "==", value: rest };
     }
 
     const opStr = rest.substring(0, secondDot);
-    let valueStr = rest.substring(secondDot + 1);
+    const valueStr = rest.substring(secondDot + 1);
     const operator = toCanonicalOp(opStr) ?? "==";
 
-    // Parse list values
+    // Parse list values with escape-aware splitting
     if (valueStr.startsWith("(") && valueStr.endsWith(")")) {
-        const items = valueStr.slice(1, -1).split(",").map(s => coerceValue(s.trim()));
+        const items = splitListItems(valueStr.slice(1, -1));
         return { column, operator, value: items };
     }
 
-    return { column, operator, value: coerceValue(valueStr) };
+    return { column, operator, value: valueStr };
 }

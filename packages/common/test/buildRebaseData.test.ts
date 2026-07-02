@@ -118,7 +118,7 @@ price: "gte.100" }
                 expect.objectContaining({
                     filter: {
                         status: ["==", "published"],
-                        price: [">=", 100]
+                        price: [">=", "100"]
                     }
                 })
             );
@@ -166,17 +166,25 @@ price: "gte.100" }
                 values: {}
             }));
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(entities)
+                fetchCollection: jest.fn().mockResolvedValue(entities),
+                // When countEntities is available, hasMore is based on
+                // total vs offset+fetched. 100 > 0+20 → hasMore=true.
+                countEntities: jest.fn().mockResolvedValue(100)
             });
             const data = buildRebaseData(driver);
 
             const result = await data.products.find({ limit: 20 });
             expect(result.meta.hasMore).toBe(true);
+            expect(result.meta.total).toBe(100);
 
             const partial = entities.slice(0, 5);
             (driver.fetchCollection as jest.Mock).mockResolvedValue(partial);
+            // 5 returned, total still 100 → offset 0 + 5 < 100 → hasMore=true
+            // but typically the driver returns fewer when near the end
+            (driver.countEntities as jest.Mock).mockResolvedValue(5);
             const result2 = await data.products.find({ limit: 20 });
             expect(result2.meta.hasMore).toBe(false);
+            expect(result2.meta.total).toBe(5);
         });
     });
 

@@ -1,4 +1,11 @@
-import { AuthController, User } from "@rebasepro/types";
+import { AuthController, User, AuthTokens, DeviceSession } from "@rebasepro/types";
+
+/** @deprecated Use `User` from `@rebasepro/types` instead. */
+export type UserInfo = User;
+/** @deprecated Use `DeviceSession` from `@rebasepro/types` instead. */
+export type Session = DeviceSession;
+// Re-export canonical types for backward compatibility
+export type { AuthTokens, DeviceSession };
 
 /**
  * Auth controller that extends the base AuthController
@@ -32,7 +39,7 @@ export type RebaseAuthController = AuthController & {
     /** Update user profile */
     updateProfile: (displayName?: string, photoURL?: string) => Promise<User>;
     /** Fetch active sessions */
-    fetchSessions: () => Promise<Session[]>;
+    fetchSessions: () => Promise<DeviceSession[]>;
     /** Revoke a session */
     revokeSession: (sessionId: string) => Promise<void>;
     /** Revoke all active sessions */
@@ -68,33 +75,10 @@ export interface RebaseAuthControllerProps {
 }
 
 /**
- * Auth tokens returned from the backend
- */
-export interface AuthTokens {
-    accessToken: string;
-    refreshToken: string;
-    /** Unix timestamp (ms) when the access token expires */
-    accessTokenExpiresAt: number;
-}
-
-/**
- * User info from the backend
- */
-export interface UserInfo {
-    uid: string;
-    email: string;
-    displayName?: string | null;
-    photoURL?: string | null;
-    emailVerified?: boolean;
-    roles?: string[];
-    metadata?: Record<string, unknown>;
-}
-
-/**
  * Auth response from backend login/register endpoints
  */
 export interface AuthResponse {
-    user: UserInfo;
+    user: User;
     tokens: AuthTokens;
 }
 
@@ -103,15 +87,4 @@ export interface AuthResponse {
  */
 export interface RefreshResponse {
     tokens: AuthTokens;
-}
-
-/**
- * Session info from the backend
- */
-export interface Session {
-    id: string;
-    userAgent?: string;
-    ipAddress?: string;
-    createdAt: string;
-    isCurrentSession?: boolean;
 }

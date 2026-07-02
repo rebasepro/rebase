@@ -1,8 +1,8 @@
-import { buildCollection, buildProperty } from "@rebasepro/common";
+import { defineCollection } from "@rebasepro/common";
 
 // This is a demo collection with many of the available properties
-export const demoCollection = buildCollection({
-    driver: "firestore",
+export const demoCollection = defineCollection({
+    engine: "firestore",
     slug: "demo",
     name: "Demo collection",
     description: "This is a demo collection with many of the **available properties**",
@@ -18,17 +18,18 @@ export const demoCollection = buildCollection({
         },
 
         // simple boolean
-        available: buildProperty({
+        available: {
             type: "boolean",
             name: "Available"
-        }),
+        },
 
         // you can define this property dynamically, and modify it based on the values of other properties
         price: {
             type: "number",
             name: "Price",
             description: "Price with range validation",
-            dynamicProps: ({ values }: { values: any }) => ({
+            dynamicProps: ({ values }: { values: Record<string, unknown> }) => ({
+                type: "number" as const,
                 validation: {
                     requiredMessage: "You must set a price between 0 and 1000",
                     min: 0,
@@ -45,14 +46,14 @@ export const demoCollection = buildCollection({
         description: {
             type: "string",
             name: "Description",
-            multiline: true,
+            ui: { multiline: true },
         },
 
         // markdown
         text: {
             type: "string",
             name: "Blog text",
-            markdown: true,
+            ui: { markdown: true },
         },
 
         // array of strings
@@ -69,7 +70,7 @@ export const demoCollection = buildCollection({
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            url: true,
+            ui: { url: true },
             validation: {
                 required: true,
                 requiredMessage: "The amazon link is required",
@@ -220,7 +221,7 @@ export const demoCollection = buildCollection({
                     text: {
                         type: "string",
                         name: "Text",
-                        markdown: true
+                        ui: { markdown: true }
                     },
                     products: {
                         name: "Products",

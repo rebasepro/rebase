@@ -17,6 +17,8 @@ import { mountMfaRoutes } from "./mfa-routes";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
+import type { Context } from "hono";
+import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -46,16 +48,47 @@ export interface AuthModuleConfig {
     isBootstrapCompleted?: () => Promise<boolean>;
     /** Enable magic link (passwordless email) login. Requires email service. */
     enableMagicLink?: boolean;
+    /**
+     * Opt-in httpOnly cookie mode for refresh tokens.
+     *
+     * When set, the refresh token is delivered as an `httpOnly`, `Secure`,
+     * `SameSite` cookie instead of in the JSON response body. This
+     * prevents XSS from stealing the long-lived refresh token.
+     *
+     * The access token remains in the JSON body so the client can use it
+     * in `Authorization: Bearer` headers for API calls.
+     *
+     * **Requires** `credentials: "include"` on client-side fetch calls to
+     * auth endpoints, and CORS must allow credentials (no `origin: "*"`).
+     */
+    cookieAuth?: CookieAuthConfig;
+}
+
+/**
+ * Configuration for httpOnly refresh-token cookies.
+ */
+export interface CookieAuthConfig {
+    /** Cookie name (default: "__rb_refresh"). */
+    cookieName?: string;
+    /** Cookie domain. Omit to use the current domain. */
+    domain?: string;
+    /** Cookie path (default: "/"). */
+    path?: string;
+    /** SameSite attribute (default: "Lax"). */
+    sameSite?: "Strict" | "Lax" | "None";
+    /** Force the Secure flag. Defaults to `true` when SameSite is "None", otherwise auto-detected from the request protocol. */
+    secure?: boolean;
 }
 
 /**
  * Helper to build standard auth response output
  */
 function buildAuthResponse(
-    user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; metadata?: Record<string, unknown> | null },
+    user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; isAnonymous?: boolean; metadata?: Record<string, unknown> | null },
     roleIds: string[],
     accessToken: string,
-    refreshToken: string
+    refreshToken: string,
+    providerId: string
 ): AuthResponsePayload {
     return {
         user: {
@@ -63,6 +96,9 @@ function buildAuthResponse(
             email: user.email,
             displayName: user.displayName ?? null,
             photoURL: user.photoUrl ?? null,
+            providerId,
+            isAnonymous: user.isAnonymous ?? false,
+            emailVerified: user.emailVerified ?? false,
             roles: roleIds,
             metadata: user.metadata ?? {}
         },
@@ -143,7 +179,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         newPassword: z.string().min(1, "New password is required").max(128)
     });
     const refreshSchema = z.object({
-        refreshToken: z.string().min(1, "Refresh token is required")
+        // When cookieAuth is enabled the refresh token arrives via cookie, so
+        // the body field becomes optional.
+        refreshToken: config.cookieAuth
+            ? z.string().optional()
+            : z.string().min(1, "Refresh token is required")
     });
     const logoutSchema = z.object({
         refreshToken: z.string().optional()
@@ -317,8 +357,9 @@ displayName: user.displayName });
             });
         }
 
-        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken);
-        const finalResponse = await applyTransformHook(authResponse, "register", c.req.raw, user.id);
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "password");
+        const transformedResponse = await applyTransformHook(authResponse, "register", c.req.raw, user.id);
+        const finalResponse = redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth);
         return c.json(finalResponse, 201);
     });
 
@@ -383,8 +424,9 @@ displayName: user.displayName });
             email
         });
 
-        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken);
-        const finalResponse = await applyTransformHook(authResponse, "login", c.req.raw, user.id);
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "password");
+        const transformedResponse = await applyTransformHook(authResponse, "login", c.req.raw, user.id);
+        const finalResponse = redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth);
         return c.json(finalResponse);
     });
 
@@ -478,8 +520,9 @@ displayName: user.displayName });
                     c.req.header("x-forwarded-for") || "unknown"
                 );
 
-                const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken);
-                const finalResponse = await applyTransformHook(authResponse, "oauth", c.req.raw, user.id);
+                const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, provider.id);
+                const transformedResponse = await applyTransformHook(authResponse, "oauth", c.req.raw, user.id);
+                const finalResponse = redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth);
                 return c.json(finalResponse);
             });
         }
@@ -710,17 +753,26 @@ message: "Email verified successfully" });
      * Refresh access token using refresh token
      */
     router.post("/refresh", async (c) => {
-        const { refreshToken } = parseBody(refreshSchema, await c.req.json());
+        const body = await c.req.json();
+        const parsed = parseBody(refreshSchema, body);
+        const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
+
+        if (!refreshToken) {
+            throw ApiError.badRequest("Refresh token is required", "INVALID_INPUT");
+        }
 
         const tokenHash = hashRefreshToken(refreshToken);
         const storedToken = await authRepo.findRefreshTokenByHash(tokenHash);
 
         if (!storedToken) {
+            // When cookie mode is active, clear the stale cookie
+            clearRefreshCookie(c, config.cookieAuth);
             throw ApiError.unauthorized("Invalid refresh token", "INVALID_TOKEN");
         }
 
         if (new Date() > storedToken.expiresAt) {
             await authRepo.deleteRefreshToken(tokenHash);
+            clearRefreshCookie(c, config.cookieAuth);
             throw ApiError.unauthorized("Refresh token expired", "TOKEN_EXPIRED");
         }
 
@@ -763,7 +815,8 @@ aal: "aal1" };
                 accessTokenExpiresAt: getAccessTokenExpiry()
             }
         };
-        const finalResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.userId);
+        const transformedResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.userId);
+        const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
         return c.json(finalResponse);
     });
 

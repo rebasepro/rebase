@@ -1,4 +1,4 @@
-import { buildCollection, buildProperty } from "@rebasepro/common";
+import { defineCollection } from "@rebasepro/common";
 
 /**
  * Product categories enum matching the Rebase demo data.
@@ -43,8 +43,8 @@ const categories = {
  * Locale subcollection for product translations.
  * Each product can have localized content stored as subcollections.
  */
-const localeCollection = buildCollection({
-    driver: "firestore",
+const localeCollection = defineCollection({
+    engine: "firestore",
     slug: "locales",
     name: "Locales",
     singularName: "Locale",
@@ -56,7 +56,7 @@ const localeCollection = buildCollection({
         description: {
             type: "string",
             name: "Description",
-            multiline: true
+            ui: { multiline: true }
         }
     }
 });
@@ -72,8 +72,8 @@ const localeCollection = buildCollection({
  * - Nested map for publisher info
  * - Locale subcollections for i18n
  */
-export const productsCollection = buildCollection({
-    driver: "firestore",
+export const productsCollection = defineCollection({
+    engine: "firestore",
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -111,11 +111,11 @@ export const productsCollection = buildCollection({
             },
             description: "This field allows uploading multiple images at once"
         },
-        available: buildProperty({
+        available: {
             type: "boolean",
             name: "Available",
             description: "Is this product available in the website"
-        }),
+        },
         price: {
             type: "number",
             name: "Price",
@@ -125,7 +125,8 @@ export const productsCollection = buildCollection({
                 min: 0,
                 max: 10000
             },
-            dynamicProps: ({ values }: { values: any }) => ({
+            dynamicProps: ({ values }: { values: Record<string, unknown> }) => ({
+                type: "number" as const,
                 disabled: !values.available ? {
                     clearOnDisabled: true,
                     disabledMessage: "You can only set the price on available items"
@@ -143,11 +144,11 @@ export const productsCollection = buildCollection({
                 required: true
             }
         },
-        public: buildProperty({
+        public: {
             type: "boolean",
             name: "Public",
             description: "Should this product be visible in the website"
-        }),
+        },
         brand: {
             type: "string",
             name: "Brand",
@@ -158,12 +159,12 @@ export const productsCollection = buildCollection({
         description: {
             type: "string",
             name: "Description",
-            markdown: true
+            ui: { markdown: true }
         },
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            url: true
+            ui: { url: true }
         },
         related_products: {
             type: "array",

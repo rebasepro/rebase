@@ -1,4 +1,4 @@
-import { requireAuth, optionalAuth, extractUserFromToken, requireAdmin } from "../src/auth/middleware";
+import { requireAuth, optionalAuth, extractUserFromToken, requireAdmin, queryTokenAuth } from "../src/auth/middleware";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 
 // ── Minimal Hono-context mock ────────────────────────────────────────────
@@ -80,7 +80,7 @@ describe("Auth Middleware", () => {
             expect(getStatus()).toBe(401);
             expect(getBody()).toEqual({
                 error: {
-                    message: "Authorization header or token query parameter missing or invalid",
+                    message: "Authorization header missing or invalid",
                     code: "UNAUTHORIZED"
                 }
             });
@@ -136,17 +136,45 @@ describe("Auth Middleware", () => {
             expect(nextFn).not.toHaveBeenCalled();
         });
 
+        it("should NOT accept token from query parameter by default", async () => {
+            const token = generateAccessToken("user-123", ["viewer"]);
+            const { c, getStatus } = createMockContext({ queryToken: token });
+
+            await requireAuth(c, nextFn);
+
+            expect(getStatus()).toBe(401);
+            expect(nextFn).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("queryTokenAuth", () => {
         it("should accept token from query parameter", async () => {
             const token = generateAccessToken("user-123", ["viewer"]);
             const { c, getUser } = createMockContext({ queryToken: token });
 
-            await requireAuth(c, nextFn);
+            await queryTokenAuth(c, nextFn);
 
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
                 userId: "user-123",
                 roles: ["viewer"],
                 aal: "aal1"
+            });
+        });
+
+        it("should return 401 for missing query token when followed by requireAuth", async () => {
+            const { c, getStatus, getBody } = createMockContext();
+
+            await queryTokenAuth(c, async () => {
+                await requireAuth(c, nextFn);
+            });
+
+            expect(getStatus()).toBe(401);
+            expect(getBody()).toEqual({
+                error: {
+                    message: "Authorization header missing or invalid",
+                    code: "UNAUTHORIZED"
+                }
             });
         });
     });

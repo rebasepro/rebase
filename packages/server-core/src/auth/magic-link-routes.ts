@@ -28,10 +28,11 @@ export function mountMagicLinkRoutes(deps: {
     ops: ResolvedAuthHooks;
     parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
     buildAuthResponse: (
-        user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; metadata?: Record<string, unknown> | null },
+        user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; isAnonymous?: boolean; metadata?: Record<string, unknown> | null },
         roleIds: string[],
         accessToken: string,
-        refreshToken: string
+        refreshToken: string,
+        providerId: string
     ) => unknown;
     createSessionAndTokens: (userId: string, userAgent: string, ipAddress: string) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
     applyTransformHook: (
@@ -160,7 +161,7 @@ export function mountMagicLinkRoutes(deps: {
             });
         }
 
-        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken) as AuthResponsePayload;
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "magic-link") as AuthResponsePayload;
         const finalResponse = await applyTransformHook(authResponse, "magic-link", c.req.raw, user.id);
         return c.json(finalResponse);
     });

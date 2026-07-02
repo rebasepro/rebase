@@ -12,6 +12,7 @@ export type {
     RebaseAuthController,
     RebaseAuthControllerProps,
     AuthTokens,
+    DeviceSession,
     UserInfo,
     AuthResponse,
     RefreshResponse

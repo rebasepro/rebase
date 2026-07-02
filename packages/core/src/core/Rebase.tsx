@@ -68,7 +68,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         propertyConfigs,
         entityViews,
         entityActions,
-        apiKey,
 
         effectiveRoleController,
         apiUrl,

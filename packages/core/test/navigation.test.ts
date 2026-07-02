@@ -1,9 +1,10 @@
+// TODO(2026-07-02): stale since FireCMS fork — re-enable or delete.
+// Missing test_site_config fixture and broken imports; kept ignored in jest config.
 
 import { expect, it } from "@jest/globals";
 import { siteConfig } from "./test_site_config";
-import { EntityCollection } from "../src/types";
-import { buildCollection, buildProperty, getCollectionBySlugWithin, resolveCollectionPathIds } from "../src";
-import { getNavigationEntriesFromPath } from "../src/util/navigation_from_path";
+import { EntityCollection } from "@rebasepro/types";
+import { buildCollection, buildProperty, getCollectionBySlugWithin, resolveCollectionPathIds, getNavigationEntriesFromPath } from "@rebasepro/common";
 
 const collections = siteConfig.collections as EntityCollection[];
 

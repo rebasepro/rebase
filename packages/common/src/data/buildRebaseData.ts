@@ -25,6 +25,18 @@ function parseOrderBy(orderBy?: string): [string, "asc" | "desc"] | undefined {
     return [field, direction];
 }
 
+/**
+ * Convert a flat REST record (e.g. from RestFetchService) to Entity<M> format.
+ * Mirrors the client SDK's rowToEntity conversion.
+ */
+function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Entity<M> {
+    return {
+        id: row.id as string | number,
+        path: slug,
+        values: row as EntityValues<M>
+    };
+}
+
 function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
     driver: DataDriver,
     slug: string
@@ -34,7 +46,37 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             const orderParsed = parseOrderBy(params?.orderBy);
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
             const filter = params?.where ? deserializeFilter(params.where as any) : undefined;
-            
+            const limit = params?.limit ?? 20;
+            const offset = params?.offset ?? 0;
+
+            // Use the RestFetchService for include-aware queries when available
+            const fetchService = driver.restFetchService;
+            if (fetchService && params?.include && params.include.length > 0) {
+                const entities = await fetchService.fetchCollectionForRest(
+                    slug,
+                    {
+                        filter,
+                        limit: params?.limit,
+                        offset: params?.offset,
+                        orderBy: orderParsed?.[0],
+                        order: orderParsed?.[1],
+                        searchString: params?.searchString
+                    },
+                    params.include
+                );
+                // Compute real total when countEntities is available
+                let total = entities.length + offset;
+                let hasMore = entities.length >= limit;
+                if (driver.countEntities) {
+                    total = await driver.countEntities({ path: slug, filter });
+                    hasMore = offset + entities.length < total;
+                }
+                return {
+                    data: entities.map((row) => rowToEntity<M>(row, slug)),
+                    meta: { total, limit, offset, hasMore }
+                };
+            }
+
             const entities = await driver.fetchCollection<M>({
                 path: slug,
                 limit: params?.limit,
@@ -44,16 +86,18 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 order: orderParsed?.[1],
                 searchString: params?.searchString
             });
-            const limit = params?.limit ?? 20;
-            const offset = params?.offset ?? 0;
+
+            // Compute real total when countEntities is available
+            let total = entities.length + offset;
+            let hasMore = entities.length >= limit;
+            if (driver.countEntities) {
+                total = await driver.countEntities({ path: slug, filter });
+                hasMore = offset + entities.length < total;
+            }
+
             return {
                 data: entities,
-                meta: {
-                    total: entities.length,
-                    limit,
-                    offset,
-                    hasMore: entities.length >= limit
-                }
+                meta: { total, limit, offset, hasMore }
             };
         },
 

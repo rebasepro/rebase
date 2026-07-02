@@ -12,7 +12,7 @@ Rebase is a **code-first** framework for building admin panels. Unlike tradition
 const rebase = createRebaseClient(config);
 \`\`\`
 
-- Auto-generated REST & GraphQL APIs
+- Auto-generated REST APIs
 - Schema-aware AI completions built in
 - Custom React views and field widgets
 

@@ -183,11 +183,15 @@ When an external request passes the service key via the Authorization header (`A
 2. Grants admin-level access, setting `c.get("user")` with:
    ```json
    {
-     "userId": "service",
+     "uid": "service",
      "roles": ["admin"]
    }
    ```
 3. Injects an admin-privileged `DataDriver` into `c.get("driver")` that bypasses Row-Level Security.
+
+### Internal Self-Authentication
+
+If you haven't configured a `REBASE_SERVICE_KEY`, Rebase generates a random **internal per-boot key**. The `rebase` singleton uses this key automatically when calling the server's own control-plane APIs (like `rebase.auth` or `rebase.storage`). This means your server-side logic can always perform administrative tasks even without a manually configured service key.
 
 ## Accessing the Database & Services
 
@@ -254,9 +258,8 @@ export default app;
 
 ### RLS-Scoped Driver vs. Rebase Singleton
 
-| Feature | `c.get("driver")` | `rebase` Singleton |
-|---------|--------------------|-------------------|
 | **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
+| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.data`) |
 | **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
 | **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.data.jobs.find`) |
 

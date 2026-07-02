@@ -28,12 +28,12 @@ export { createBitbucketProvider } from "./bitbucket-oauth";
 export { createSlackProvider } from "./slack-oauth";
 export { createSpotifyProvider } from "./spotify-oauth";
 
-export { requireAuth, requireAdmin, optionalAuth, extractUserFromToken, createAuthMiddleware } from "./middleware";
+export { requireAuth, requireAdmin, optionalAuth, extractUserFromToken, createAuthMiddleware, queryTokenAuth } from "./middleware";
 export type { AuthMiddlewareOptions, AuthResult } from "./middleware";
 
 
 export { createAuthRoutes } from "./routes";
-export type { AuthModuleConfig } from "./routes";
+export type { AuthModuleConfig, CookieAuthConfig } from "./routes";
 
 export { mountMagicLinkRoutes } from "./magic-link-routes";
 

@@ -1,4 +1,4 @@
-import { buildCollection } from "@rebasepro/common";
+import { defineCollection } from "@rebasepro/common";
 
 /**
  * Blog collection – mirrors the Rebase demo `blog` Firestore collection.
@@ -12,8 +12,8 @@ import { buildCollection } from "@rebasepro/common";
  * - Tags array
  * - Initial filter showing only published entries by default
  */
-export const blogCollection = buildCollection({
-    driver: "firestore",
+export const blogCollection = defineCollection({
+    engine: "firestore",
     slug: "blog",
     name: "Blog",
     singularName: "Blog entry",
@@ -21,7 +21,7 @@ export const blogCollection = buildCollection({
     group: "Content",
     description: "A collection of blog entries",
     defaultSize: "l",
-    filter: {
+    defaultFilter: {
         status: ["==", "published"]
     },
     properties: {
@@ -53,12 +53,12 @@ export const blogCollection = buildCollection({
                     text: {
                         type: "string",
                         name: "Text",
-                        markdown: true
+                        ui: { markdown: true }
                     },
                     quote: {
                         type: "string",
                         name: "Quote",
-                        multiline: true
+                        ui: { multiline: true }
                     },
                     images: {
                         name: "Images",

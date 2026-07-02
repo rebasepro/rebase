@@ -1,5 +1,8 @@
+// TODO(2026-07-02): stale since FireCMS fork — re-enable or delete.
+// `resolveCollection` no longer exists; kept ignored in jest config.
 import { describe, test } from "@jest/globals";
-import { buildCollection, buildProperty, resolveCollection } from "../src/util";
+import { buildCollection, buildProperty } from "@rebasepro/common";
+import { resolveCollection } from "../src/util"; // NOTE: broken — resolveCollection is not exported
 import { AuthController } from "@rebasepro/types";
 import * as util from "util";
 

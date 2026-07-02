@@ -4,6 +4,14 @@ title: Changelog
 ---
 # Changelog
 
+## [Unreleased]
+
+### Removed
+
+- **Legacy `RebaseApiServer` and GraphQL** — Removed the unmounted `RebaseApiServer` class and the auto-generated GraphQL endpoint (`/api/graphql`). The `graphql` and `@hono/graphql-server` packages are no longer dependencies of `@rebasepro/server-core`. The documented `initializeRebaseBackend()` initialization path is unaffected. If you were instantiating `RebaseApiServer` directly, migrate to `initializeRebaseBackend()`.
+
+---
+
 ## [0.6.1] - 2026-06-23
 
 ### Fixes

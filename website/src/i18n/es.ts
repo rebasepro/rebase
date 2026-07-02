@@ -24,7 +24,7 @@ export const es = {
     "Olvídate de montar vistas de tablas, formularios y filtros a mano. Conecta tu Postgres y obtén un panel de administración completo y editable — al instante.",
   "howitworks.step2.title": "APIs escritas a mano",
   "howitworks.step2.desc":
-    "Deja de escribir endpoints CRUD, serializadores y middleware de validación. Rebase expone APIs REST, GraphQL y WebSocket con tipado fuerte directamente desde tu esquema — cero código pegamento.",
+    "Deja de escribir endpoints CRUD, serializadores y middleware de validación. Rebase expone APIs REST y WebSocket con tipado fuerte directamente desde tu esquema — cero código pegamento.",
   "howitworks.step3.title": "Auth y permisos frágiles",
   "howitworks.step3.desc":
     "Olvídate de montar JWT a mano y de repartir controles de acceso por todo el código. Define seguridad a nivel de fila y permisos por rol directamente en tu esquema TypeScript — auditable, versionable, blindado.",
@@ -78,10 +78,10 @@ export const es = {
   "features.import.badge": "Operaciones masivas",
   "features.import.desc":
     "CSV, JSON o Excel — mapeo automático de campos al importar, exportación en un clic.",
-  "features.api.title": "REST y GraphQL al instante",
+  "features.api.title": "REST API al instante",
   "features.api.badge": "Autogenerado",
   "features.api.desc":
-    "Tu esquema genera APIs REST y GraphQL seguras — autogeneradas, sin boilerplate.",
+    "Tu esquema genera APIs REST seguras — autogeneradas, sin boilerplate.",
   "features.sdk.title": "SDK TypeScript",
   "features.sdk.badge": "Type-safe",
   "features.sdk.desc":
@@ -148,18 +148,17 @@ export const es = {
   "power.title":
     'Una colección.<br/><span class="text-primary subtle-shimmer">Todo generado.</span>',
   "power.subtitle":
-    "Define tu modelo de datos una vez en TypeScript. Rebase crea automáticamente tu interfaz de administración, formularios, esquema de base de datos, APIs REST y GraphQL, y tipos de TypeScript.",
+    "Define tu modelo de datos una vez en TypeScript. Rebase crea automáticamente tu interfaz de administración, formularios, esquema de base de datos, APIs REST, y tipos de TypeScript.",
   "power.badge": "El código es la fuente de verdad",
   "power.appcode": "Código de la app",
   "power.generates": "→ genera todo lo siguiente",
   "power.mobile.generates":
-    "→ genera Vistas de Admin · formularios · esquema de BD · API REST · GraphQL · SDK Tipado",
+    "→ genera Vistas de Admin · formularios · esquema de BD · API REST · SDK Tipado",
   "power.label.admin": "Vistas de Admin",
   "power.label.form": "Formulario de Entidad",
   "power.label.db": "Esquema de BD",
   "power.label.sdk": "SDK Tipado",
   "power.label.rest": "API REST",
-  "power.label.graphql": "GraphQL",
   "nav.product": "Producto",
   "nav.features": "Funcionalidades",
   "nav.features.desc": "Todo lo que puede hacer Rebase, de un vistazo.",
@@ -170,7 +169,7 @@ export const es = {
   "nav.editing.desc":
     "Editor estilo Notion, tableros Kanban, edición en línea.",
   "nav.backend": "Backend y APIs",
-  "nav.backend.desc": "Servidor Hono, REST, GraphQL, WebSockets.",
+  "nav.backend.desc": "Servidor Hono, REST, WebSockets.",
   "nav.ai": "IA y Agentes",
   "nav.ai.desc":
     "Servidor MCP, autocompletado con IA, consultas en lenguaje natural.",
@@ -204,7 +203,7 @@ export const es = {
   "roadmap.now.badge": "Disponible",
   "roadmap.now.item1": "Introspección de Postgres y auto-CMS",
   "roadmap.now.item2": "SDK isomórfico de TypeScript",
-  "roadmap.now.item3": "APIs REST y GraphQL instantáneas",
+  "roadmap.now.item3": "APIs REST instantáneas",
   "roadmap.now.item4": "Seguridad a nivel de fila (RLS)",
   "roadmap.now.item5": "Suscripciones WebSocket en tiempo real",
   "roadmap.now.item6": "Vistas de Tabla, Lista, Kanban y Galería",
@@ -446,7 +445,7 @@ export const es = {
   "about.join.github": "Contribuir en GitHub",
   "about.join.discord": "Únete a nuestro Discord",
   "index.meta.title": "Rebase — Panel admin, APIs y SDK generados desde tu esquema Postgres",
-  "index.meta.description": "Define tu esquema una vez en TypeScript. Rebase genera un panel admin listo para producción, APIs REST y GraphQL, un SDK tipado y sincronización en tiempo real — desde tu Postgres existente. Open-source, autoalojado.",
+  "index.meta.description": "Define tu esquema una vez en TypeScript. Rebase genera un panel admin listo para producción, APIs REST, un SDK tipado y sincronización en tiempo real — desde tu Postgres existente. Open-source, autoalojado.",
   "mosaic.badge": "Flexibilidad Infinita",
   "mosaic.title": "Un framework visual para cualquier caso de uso.",
   "mosaic.subtitle": "Desde e-commerce y gestión de activos hasta builders visuales y edición de código en vivo. La UI schema-driven de Rebase se adapta a cualquier dashboard o editor.",

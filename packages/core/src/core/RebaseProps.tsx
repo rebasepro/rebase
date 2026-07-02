@@ -73,11 +73,6 @@ export type RebaseProps<USER extends User> = {
     baseCollectionPath?: string;
 
     /**
-     * If you have a custom API key, you can use it here.
-     */
-    apiKey?: string;
-
-    /**
      * Base URL for the backend API (e.g. "http://localhost:3001").
      * When provided, this is available via `useApiConfig()` to any hook
      * in the tree, reducing repetitive `apiUrl` threading.

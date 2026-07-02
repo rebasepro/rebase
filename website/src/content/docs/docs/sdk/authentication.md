@@ -239,15 +239,17 @@ const client = createRebaseClient({
 ## User Object Shape
 
 ```typescript
-interface RebaseUser {
+// Canonical type — import from @rebasepro/types
+interface User {
     uid: string;
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
-    emailVerified?: boolean;
-    roles?: string[];          // text[] from the users table
     providerId: string;
     isAnonymous: boolean;
+    emailVerified?: boolean;
+    roles?: string[];          // text[] from the users table
+    metadata?: Record<string, unknown>;
 }
 ```
 

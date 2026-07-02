@@ -10,7 +10,7 @@ pnpm add @rebasepro/server-core
 
 ## What This Package Does
 
-This is the central orchestrator for any Rebase backend. It provides the framework-level plumbing — HTTP routing (Hono), authentication middleware, storage, email, cron jobs, custom functions, and the REST/GraphQL API generator — without being coupled to any specific database. Database implementations are plugged in via driver packages like `@rebasepro/server-postgresql` or `@rebasepro/server-mongodb`.
+This is the central orchestrator for any Rebase backend. It provides the framework-level plumbing — HTTP routing (Hono), authentication middleware, storage, email, cron jobs, custom functions, and the REST API generator — without being coupled to any specific database. Database implementations are plugged in via driver packages like `@rebasepro/server-postgresql` or `@rebasepro/server-mongodb`.
 
 ## Key Exports
 

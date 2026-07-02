@@ -1,32 +1,13 @@
 import { RebaseApiError, Transport } from "./transport";
-import { AuthChangeEvent } from "@rebasepro/types";
+import type { AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
 
+// Re-export canonical types so `import { RebaseSession } from "@rebasepro/client"` keeps working
+export type { RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
 
-export interface RebaseUser {
-    uid: string;
-    email: string | null;
-    displayName: string | null;
-    photoURL: string | null;
-    emailVerified?: boolean;
-    roles?: string[];
-    providerId: string;
-    isAnonymous: boolean;
-}
-
-export interface RebaseTokens {
-    accessToken: string;
-    refreshToken: string;
-    accessTokenExpiresAt: number;
-}
-
-export interface RebaseSession {
-    accessToken: string;
-    refreshToken: string;
-    expiresAt: number;
-    user: RebaseUser;
-}
-
-export type { AuthChangeEvent };
+/** @deprecated Use `User` from `@rebasepro/types` instead. */
+export type RebaseUser = User;
+/** @deprecated Use `AuthTokens` from `@rebasepro/types` instead. */
+export type RebaseTokens = AuthTokens;
 
 
 export interface AuthConfig {
@@ -70,6 +51,12 @@ export interface CreateAuthOptions {
     authPath?: string;
     autoRefresh?: boolean;
     persistSession?: boolean;
+    /**
+     * Authentication flow mode.
+     * - 'json' (default): Tokens are sent/received in JSON bodies. Refresh token is stored in local storage.
+     * - 'cookie': Refresh token is sent/received via httpOnly cookies. Access token remains in memory.
+     */
+    authFlowMode?: "json" | "cookie";
 }
 
 export function createAuth(transport: Transport, options?: CreateAuthOptions) {
@@ -78,6 +65,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const authPath = opts.authPath || "/auth";
     const autoRefresh = opts.autoRefresh !== false;
     const persistSession = opts.persistSession !== false;
+    const authFlowMode = opts.authFlowMode || "json";
 
     const STORAGE_KEY = "rebase_auth";
     const REFRESH_BUFFER_MS = 120000;
@@ -110,7 +98,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     }
 
     function saveSession(session: RebaseSession) {
-        if (!persistSession) return;
+        if (!persistSession || authFlowMode === "cookie") return;
         try {
             storage.setItem(STORAGE_KEY, JSON.stringify(session));
         } catch (e) { /* ignore */ }
@@ -150,12 +138,24 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         }, delay);
     }
 
-    function handleAuthResponse(data: { tokens: RebaseTokens, user: RebaseUser }, event?: AuthChangeEvent): RebaseSession {
+    function handleAuthResponse(data: { tokens: AuthTokens, user: Record<string, unknown> }, event?: AuthChangeEvent): RebaseSession {
+        const rawUser = data.user;
+        const user: User = {
+            uid: rawUser.uid as string,
+            email: (rawUser.email as string | null) ?? null,
+            displayName: (rawUser.displayName as string | null) ?? null,
+            photoURL: (rawUser.photoURL as string | null) ?? null,
+            providerId: (rawUser.providerId as string | undefined) ?? "password",
+            isAnonymous: (rawUser.isAnonymous as boolean | undefined) ?? false,
+            emailVerified: rawUser.emailVerified as boolean | undefined,
+            roles: rawUser.roles as string[] | undefined,
+            metadata: rawUser.metadata as Record<string, unknown> | undefined,
+        };
         const session: RebaseSession = {
             accessToken: data.tokens.accessToken,
-            refreshToken: data.tokens.refreshToken,
+            refreshToken: data.tokens.refreshToken || (currentSession?.refreshToken) || "",
             expiresAt: data.tokens.accessTokenExpiresAt,
-            user: data.user
+            user
         };
         currentSession = session;
         saveSession(session);
@@ -171,8 +171,9 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email,
-password })
-        });
+password }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
@@ -189,8 +190,9 @@ password };
         const res = await fetchFn(authUrl("/register"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+            body: JSON.stringify(payload),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
@@ -214,8 +216,9 @@ refreshToken: session.refreshToken };
         const res = await fetchFn(authUrl("/google"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+            body: JSON.stringify(payload),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const responseBody = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, responseBody, res.statusText);
         const session = handleAuthResponse(responseBody, "SIGNED_IN");
@@ -230,8 +233,9 @@ refreshToken: session.refreshToken };
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ code,
-redirectUri })
-        });
+redirectUri }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
@@ -249,8 +253,9 @@ refreshToken: session.refreshToken };
         const res = await fetchFn(authUrl(`/${providerId}`), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+            body: JSON.stringify(payload),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
@@ -316,12 +321,13 @@ redirectUri });
     async function signOut() {
         const fetchFn = getFetch();
         try {
-            if (currentSession?.refreshToken) {
+            if (authFlowMode === "cookie" || currentSession?.refreshToken) {
                 await fetchFn(authUrl("/logout"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ refreshToken: currentSession.refreshToken })
-                });
+                    body: JSON.stringify({ refreshToken: currentSession?.refreshToken }),
+                    credentials: authFlowMode === "cookie" ? "include" : undefined
+                } as RequestInit);
             }
         } catch (e) { /* ignore */ }
         currentSession = null;
@@ -335,22 +341,23 @@ redirectUri });
     }
 
     async function refreshSession() {
-        if (!currentSession?.refreshToken) {
+        if (authFlowMode !== "cookie" && !currentSession?.refreshToken) {
             throw new Error("No active session to refresh");
         }
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken: currentSession.refreshToken })
-        });
+            body: JSON.stringify({ refreshToken: currentSession?.refreshToken }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session: RebaseSession = {
             accessToken: body.tokens.accessToken,
-            refreshToken: body.tokens.refreshToken,
+            refreshToken: body.tokens.refreshToken || currentSession?.refreshToken || "",
             expiresAt: body.tokens.accessTokenExpiresAt,
-            user: currentSession.user
+            user: currentSession?.user ?? { uid: "", email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false }
         };
         currentSession = session;
         saveSession(session);
@@ -361,12 +368,12 @@ redirectUri });
     }
 
     async function getUser() {
-        const data = await transport.request<{ user: RebaseUser }>(authPath + "/me", { method: "GET" });
+        const data = await transport.request<{ user: User }>(authPath + "/me", { method: "GET" });
         return data.user;
     }
 
     async function updateUser(updates: { displayName?: string, photoURL?: string }) {
-        const data = await transport.request<{ user: RebaseUser }>(authPath + "/me", {
+        const data = await transport.request<{ user: User }>(authPath + "/me", {
             method: "PATCH",
             body: JSON.stringify(updates)
         });
@@ -446,8 +453,9 @@ newPassword })
         const res = await fetchFn(authUrl("/magic-link/verify"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token })
-        });
+            body: JSON.stringify({ token }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
         const session = handleAuthResponse(body, "SIGNED_IN");
@@ -456,8 +464,8 @@ accessToken: session.accessToken,
 refreshToken: session.refreshToken };
     }
 
-    async function getSessions() {
-        const data = await transport.request<{ sessions: Record<string, unknown>[] }>(authPath + "/sessions", { method: "GET" });
+    async function getSessions(): Promise<DeviceSession[]> {
+        const data = await transport.request<{ sessions: DeviceSession[] }>(authPath + "/sessions", { method: "GET" });
         return data.sessions;
     }
 
@@ -504,12 +512,12 @@ refreshToken: session.refreshToken };
 
     if (persistSession) {
         const stored = loadStoredSession();
-        if (stored && stored.accessToken && stored.refreshToken) {
+        if (stored && stored.accessToken) {
             if (stored.expiresAt > Date.now()) {
                 currentSession = stored;
                 transport.setToken(stored.accessToken);
                 scheduleRefresh(stored.expiresAt);
-            } else if (stored.refreshToken) {
+            } else if (authFlowMode === "cookie" || stored.refreshToken) {
                 currentSession = stored;
                 refreshSession().catch(() => {
                     currentSession = null;
@@ -517,6 +525,11 @@ refreshToken: session.refreshToken };
                     transport.setToken(null);
                 });
             }
+        } else if (authFlowMode === "cookie") {
+            // Silent refresh on boot to pick up httpOnly session
+            refreshSession().catch(() => {
+                // Ignore failure on boot (no session)
+            });
         }
     }
 

@@ -94,7 +94,7 @@ Rebase enforces a strict **fail-closed security posture** during database connec
 
 If the database is unreachable during boot (e.g., PostgreSQL is starting or network routes are severed):
 - The server does **not** crash or enter a restart loop. Instead, the bootstrapper transitions the backend into a **degraded status mode**.
-- The HTTP server starts successfully to preserve health check endpoints, but all REST, GraphQL, and WebSocket controllers are immediately locked.
+- The HTTP server starts successfully to preserve health check endpoints, but all REST and WebSocket controllers are immediately locked.
 - Any client attempting to read or write data gets a uniform `503 Service Unavailable` response:
   ```json
   {

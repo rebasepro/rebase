@@ -231,8 +231,15 @@ auth: {
 
 Clients authenticate with the `Authorization: Bearer <service-key>` header. 
 
+### Internal Per-Boot Key
+
+If `REBASE_SERVICE_KEY` is not provided in your configuration, Rebase automatically generates a random **internal per-boot key**. 
+
+This key is never logged and never leaves the process. It is used by the `rebase` singleton to authenticate against the server's own control-plane APIs (auth, storage, etc.). This ensures that administrative tasks (like sending a welcome email or generating a storage URL) always function out-of-the-box in development and production without requiring manual key management.
+
 ### Timing-Attack Protection & Key Requirements
-To prevent timing attacks, Rebase validates the service key using constant-time string comparison (`safeCompare`). The service key **must be at least 32 characters long**; if a key shorter than 32 characters is configured, Rebase will throw a configuration error on startup and fail-closed.
+
+To prevent timing attacks, Rebase validates both the user-configured service key and the internal key using constant-time string comparison (`safeCompare`). The user-configured service key **must be at least 32 characters long**; if a key shorter than 32 characters is configured, Rebase will throw a configuration error on startup and fail-closed.
 
 
 ## Custom Auth Adapters

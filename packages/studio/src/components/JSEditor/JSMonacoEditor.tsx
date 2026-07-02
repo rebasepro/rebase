@@ -78,34 +78,35 @@ interface CollectionClient<M extends Record<string, any> = any> {
     count?(params?: FindParams): Promise<number>;
 }
 
-interface RebaseUser {
+interface User {
     uid: string;
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
-    emailVerified?: boolean;
-    roles?: string[];
     providerId: string;
     isAnonymous: boolean;
+    emailVerified?: boolean;
+    roles?: string[];
+    metadata?: Record<string, unknown>;
 }
 
 interface RebaseSession {
     accessToken: string;
     refreshToken: string;
     expiresAt: number;
-    user: RebaseUser;
+    user: User;
 }
 
 type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED';
 
 interface RebaseAuth {
-    signInWithEmail(email: string, password: string): Promise<{ user: RebaseUser; accessToken: string; refreshToken: string }>;
-    signUp(email: string, password: string, displayName?: string): Promise<{ user: RebaseUser; accessToken: string; refreshToken: string }>;
-    signInWithGoogle(idToken: string): Promise<{ user: RebaseUser; accessToken: string; refreshToken: string }>;
+    signInWithEmail(email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string }>;
+    signUp(email: string, password: string, displayName?: string): Promise<{ user: User; accessToken: string; refreshToken: string }>;
+    signInWithGoogle(idToken: string): Promise<{ user: User; accessToken: string; refreshToken: string }>;
     signOut(): Promise<void>;
     refreshSession(): Promise<RebaseSession>;
-    getUser(): Promise<RebaseUser>;
-    updateUser(updates: { displayName?: string; photoURL?: string }): Promise<RebaseUser>;
+    getUser(): Promise<User>;
+    updateUser(updates: { displayName?: string; photoURL?: string }): Promise<User>;
     resetPasswordForEmail(email: string): Promise<{ success: boolean; message: string }>;
     resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }>;
     changePassword(oldPassword: string, newPassword: string): Promise<{ success: boolean; message: string }>;

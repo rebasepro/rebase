@@ -1,12 +1,8 @@
 import {
-    AdditionalFieldDelegate,
     ArrayProperty,
     BooleanProperty,
     DateProperty,
-    EntityCallbacks,
     EntityCollection,
-    EnumValueConfig,
-    EnumValues,
     FirebaseCollection,
     FirebaseProperties,
     GeopointProperty,
@@ -17,7 +13,6 @@ import {
     NumberProperty,
     PostgresCollection,
     PostgresProperties,
-    Properties,
     Property,
     ReferenceProperty,
     StringProperty,
@@ -26,9 +21,12 @@ import {
 
 
 /**
- * Identity function we use to defeat the type system of Typescript and build
- * collection views with all its properties
- * @param collection
+ * @deprecated Use {@link defineCollection} instead — it infers property
+ * types automatically (autocomplete on `titleProperty`, `sort`,
+ * `propertiesOrder`, callbacks) without manual generics.
+ * `buildCollection` is kept for FireCMS migration compatibility and will
+ * be removed before 1.0.
+ *
  * @group Builder
  */
 export function buildCollection<
@@ -110,9 +108,11 @@ export function defineCollection(
 }
 
 /**
- * Identity function we use to defeat the type system of Typescript and preserve
- * the property keys.
- * @param property
+ * @deprecated Use plain typed property objects with {@link defineCollection}
+ * instead — `defineCollection` infers property types automatically, making
+ * this wrapper unnecessary. `buildProperty` is kept for FireCMS migration
+ * compatibility and will be removed before 1.0.
+ *
  * @group Builder
  */
 export function buildProperty<T, P extends Property = Property>(
@@ -130,77 +130,3 @@ export function buildProperty<T, P extends Property = Property>(
     // SAFETY: Identity function — P is a subtype of the conditional return type by definition
     return property as unknown as ReturnType<typeof buildProperty<T, P>>;
 }
-
-/**
- * Identity function we use to defeat the type system of Typescript and preserve
- * the properties keys.
- * @param properties
- * @group Builder
- */
-export function buildProperties<M extends Record<string, unknown>>(
-    properties: Properties
-): Properties {
-    return properties;
-}
-
-/**
- * Identity function we use to defeat the type system of Typescript and preserve
- * the properties keys.
- * @param propertiesOrBuilder
- * @group Builder
- */
-export function buildPropertiesOrBuilder<M extends Record<string, unknown>>(
-    propertiesOrBuilder: Properties
-): Properties {
-    return propertiesOrBuilder;
-}
-
-/**
- * Identity function we use to defeat the type system of Typescript and preserve
- * the properties keys.
- * @param enumValues
- * @group Builder
- */
-export function buildEnum(
-    enumValues: EnumValues
-): EnumValues {
-    return enumValues;
-}
-
-/**
- * Identity function we use to defeat the type system of Typescript and preserve
- * the properties keys.
- * @param enumValueConfig
- * @group Builder
- */
-export function buildEnumValueConfig(
-    enumValueConfig: EnumValueConfig
-): EnumValueConfig {
-    return enumValueConfig;
-}
-
-/**
- * Identity function we use to defeat the type system of Typescript and preserve
- * the properties keys.
- * @param callbacks
- * @group Builder
- */
-export function buildEntityCallbacks<M extends Record<string, unknown> = Record<string, unknown>>(
-    callbacks: EntityCallbacks<M>
-): EntityCallbacks<M> {
-    return callbacks;
-}
-
-/**
- * Identity function we use to defeat the type system of Typescript and build
- * additional field delegates views with all its properties
- * @param additionalFieldDelegate
- * @group Builder
- */
-export function buildAdditionalFieldDelegate<M extends Record<string, unknown>, USER extends User = User>(
-    additionalFieldDelegate: AdditionalFieldDelegate<M, USER>
-): AdditionalFieldDelegate<M, USER> {
-    return additionalFieldDelegate;
-}
-
-

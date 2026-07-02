@@ -1,11 +1,18 @@
 
 /**
- * This interface represents a user.
- * It has some of the same fields as a Firebase User.
- * Note that in the default implementation, we simply take the Firebase user
- * and use it as a Rebase user, so that means that even if they are not mapped
- * in this interface, it contains all the methods of the former, such as `delete`,
- * `getIdToken`, etc.
+ * The canonical representation of an authenticated user in the Rebase ecosystem.
+ *
+ * Used by {@link AuthController}, collections, callbacks, and both the
+ * `@rebasepro/client` and `@rebasepro/auth` packages. All other user types
+ * (`RebaseUser`, `UserInfo`) are deprecated aliases of this type.
+ *
+ * **Backend-managed fields** (`uid`, `email`, `roles`, `metadata`, `createdAt`)
+ * are populated by the server. **Client-visible fields** (`displayName`,
+ * `photoURL`, `providerId`, `isAnonymous`, `emailVerified`) may be set during
+ * authentication or profile updates.
+ *
+ * @see AdminUser — the admin-API DTO, which adds audit fields (`createdAt`,
+ * `updatedAt`) and required `roles`.
  *
  * @group Models
  */
@@ -27,16 +34,22 @@ export type User = {
      */
     readonly photoURL: string | null;
     /**
-     * The provider used to authenticate the user.
+     * The provider used to authenticate the user (e.g. `"password"`,
+     * `"google"`, `"github"`).
      */
     readonly providerId: string;
     /**
-     *
+     * Whether the user is anonymous (created via anonymous sign-in).
      */
     readonly isAnonymous: boolean;
 
     /**
-     * Role IDs assigned to this user (e.g. ["admin", "editor"]).
+     * Whether the user's email address has been verified.
+     */
+    readonly emailVerified?: boolean;
+
+    /**
+     * Role IDs assigned to this user (e.g. `["admin", "editor"]`).
      */
     roles?: string[];
 

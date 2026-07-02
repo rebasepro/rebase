@@ -228,7 +228,7 @@ export function DeveloperPlayground() {
                             {/* API inspector side */}
                             <div className="lg:col-span-5 bg-[#09090b] flex flex-col">
                                 <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Generated REST/GraphQL Endpoint</span>
+                                    <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Generated REST Endpoint</span>
                                     <span className="text-[8px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">Instant API</span>
                                 </div>
                                 <div className="flex-1 min-h-[320px]">

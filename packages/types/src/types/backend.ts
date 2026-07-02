@@ -1,6 +1,7 @@
 import type { Entity } from "./entities";
 import type { EntityCollection, FilterValues, WhereFilterOp } from "./collections";
 import type { AuthAdapter } from "./auth_adapter";
+import type { HistoryConfig } from "../controllers/client";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -697,7 +698,7 @@ export interface BackendBootstrapper {
      * Initialize history tables / services if this driver supports them.
      * Return undefined if history is not supported by this backend.
      */
-    initializeHistory?(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: unknown } | undefined>;
+    initializeHistory?(config: HistoryConfig, driverResult: InitializedDriver): Promise<{ historyService: unknown } | undefined>;
 
     /**
      * Create a realtime provider for this driver.

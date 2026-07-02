@@ -22,7 +22,7 @@ export const de = {
     "Schluss mit manuellen Tabellen-Views, Formularlayouts und Filterlogik. Verbinde dein Postgres und bekomm ein vollständiges, editierbares Admin-Panel — sofort.",
   "howitworks.step2.title": "Handgeschriebene API-Layer",
   "howitworks.step2.desc":
-    "Hör auf, CRUD-Endpoints, Serializer und Validation-Middleware zu schreiben. Rebase liefert type-safe REST-, GraphQL- und WebSocket-APIs direkt aus deinem Schema — null Glue Code.",
+    "Hör auf, CRUD-Endpoints, Serializer und Validation-Middleware zu schreiben. Rebase liefert type-safe REST- und WebSocket-APIs direkt aus deinem Schema — null Glue Code.",
   "howitworks.step3.title": "Fragile Auth & Permissions",
   "howitworks.step3.desc":
     "Vergiss selbstgebautes JWT-Gebastel und verstreute Access-Checks. Definiere Row-Level Security und rollenbasierte Permissions direkt in deinem TypeScript-Schema — auditierbar, versioniert, bombensicher.",
@@ -72,10 +72,10 @@ export const de = {
   "features.import.badge": "Bulk-Ops",
   "features.import.desc":
     "CSV, JSON oder Excel — automatisches Feld-Mapping beim Import, Ein-Klick-Export raus.",
-  "features.api.title": "Sofort REST & GraphQL",
+  "features.api.title": "Sofort REST API",
   "features.api.badge": "Auto-Gen",
   "features.api.desc":
-    "Dein Schema generiert sichere REST- & GraphQL-APIs — auto-generiert, null Boilerplate.",
+    "Dein Schema generiert sichere REST-APIs — auto-generiert, null Boilerplate.",
   "features.sdk.title": "TypeScript SDK",
   "features.sdk.badge": "Type-safe",
   "features.sdk.desc":
@@ -146,18 +146,17 @@ export const de = {
   "power.title":
     'Eine Collection.<br/><span class="text-primary subtle-shimmer">Alles generiert.</span>',
   "power.subtitle":
-    "Definier dein Datenmodell einmal in TypeScript. Rebase erstellt automatisch Admin-UI, Formulare, DB-Schema, REST &amp; GraphQL APIs und TypeScript-Typen.",
+    "Definier dein Datenmodell einmal in TypeScript. Rebase erstellt automatisch Admin-UI, Formulare, DB-Schema, REST APIs und TypeScript-Typen.",
   "power.badge": "Code as Truth",
   "power.appcode": "App Code",
   "power.generates": "→ generiert all das Folgende",
   "power.mobile.generates":
-    "→ generiert Admin-Views · Formulare · DB-Schema · REST API · GraphQL · Typed SDK",
+    "→ generiert Admin-Views · Formulare · DB-Schema · REST API · Typed SDK",
   "power.label.admin": "Admin-Views",
   "power.label.form": "Entity-Formular",
   "power.label.db": "DB-Schema",
   "power.label.sdk": "Typed SDK",
   "power.label.rest": "REST API",
-  "power.label.graphql": "GraphQL",
   "nav.product": "Produkt",
   "nav.features": "Features",
   "nav.features.desc": "Alles, was Rebase kann — auf einen Blick.",
@@ -166,7 +165,7 @@ export const de = {
   "nav.editing": "Editing",
   "nav.editing.desc": "Notion-Style-Editor, Kanban-Boards, Inline Editing.",
   "nav.backend": "Backend & APIs",
-  "nav.backend.desc": "Hono-Server, REST, GraphQL, WebSockets.",
+  "nav.backend.desc": "Hono-Server, REST, WebSockets.",
   "nav.ai": "KI & Agents",
   "nav.ai.desc": "MCP-Server, KI-Autofill, Natural-Language-Queries.",
   "nav.developers": "Developers",
@@ -197,7 +196,7 @@ export const de = {
   "roadmap.now.badge": "Verfügbar",
   "roadmap.now.item1": "Postgres-Introspection & Auto-CMS",
   "roadmap.now.item2": "Isomorphes TypeScript SDK",
-  "roadmap.now.item3": "Instant REST & GraphQL APIs",
+  "roadmap.now.item3": "Instant REST APIs",
   "roadmap.now.item4": "Row-Level Security (RLS)",
   "roadmap.now.item5": "Echtzeit-WebSocket-Subscriptions",
   "roadmap.now.item6": "Table-, List-, Kanban- & Gallery-Views",
@@ -440,7 +439,7 @@ export const de = {
   "about.join.github": "Auf GitHub beitragen",
   "about.join.discord": "Unserem Discord beitreten",
   "index.meta.title": "Rebase — Admin-Panel, APIs & SDK generiert aus deinem Postgres-Schema",
-  "index.meta.description": "Definier dein Schema einmal in TypeScript. Rebase generiert ein production-ready Admin-Panel, REST- & GraphQL-APIs, ein typed SDK und Echtzeit-Sync — aus deinem bestehenden Postgres. Open-source, self-hosted.",
+  "index.meta.description": "Definier dein Schema einmal in TypeScript. Rebase generiert ein production-ready Admin-Panel, REST-APIs, ein typed SDK und Echtzeit-Sync — aus deinem bestehenden Postgres. Open-source, self-hosted.",
   "mosaic.badge": "Grenzenlose Flexibilität",
   "mosaic.title": "Ein visuelles Framework für jeden Use Case.",
   "mosaic.subtitle": "Von E-Commerce und Asset-Management bis zu Visual Builders und Live-Code-Editing. Die schema-driven UI von Rebase skaliert für jedes Dashboard und jeden Editor.",

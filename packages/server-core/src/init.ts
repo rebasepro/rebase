@@ -8,13 +8,15 @@ import {
     EntityCallbacks,
     EntityCollection,
     HealthCheckResult,
+    HistoryConfig,
     InitializedDriver,
     isPostgresCollection,
     isSQLAdmin,
     RealtimeProvider,
     SecurityRule
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildRebaseData, buildRoutedRebaseData } from "@rebasepro/common";
+import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
@@ -24,6 +26,7 @@ import { Server } from "http";
 import { RestApiGenerator } from "./api/rest/api-generator";
 import { createAuthMiddleware } from "./auth/middleware";
 import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
+import { scopeDataDriver } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
 import { Hono } from "hono";
@@ -162,6 +165,20 @@ export interface RebaseAuthConfig {
      * Requires email to be configured.
      */
     magicLink?: boolean;
+    /**
+     * Opt-in httpOnly cookie mode for refresh tokens.
+     *
+     * When set, the refresh token is delivered as an `httpOnly`, `Secure`,
+     * `SameSite` cookie instead of in the JSON response body. This
+     * prevents XSS from stealing the long-lived refresh token.
+     *
+     * The access token remains in the JSON body so the client can use it
+     * in `Authorization: Bearer` headers for API calls.
+     *
+     * **Requires** `credentials: "include"` on client-side fetch calls to
+     * auth endpoints, and CORS must allow credentials (no `origin: "*"`).
+     */
+    cookieAuth?: import("./auth").CookieAuthConfig;
 }
 
 export interface RebaseBackendConfig {
@@ -233,7 +250,13 @@ export interface RebaseBackendConfig {
      */
     storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
 
-    history?: unknown;
+    /**
+     * Entity history / audit-log configuration.
+     *
+     * - `true` — enable history with default settings
+     * - `{ retention?: number }` — enable with optional retention period (days)
+     */
+    history?: HistoryConfig;
     /**
      * Default security rules applied to any collection that does not define
      * its own `securityRules`. Opt-in — if not set, collections without
@@ -336,7 +359,7 @@ export interface RebaseBackendInstance {
     realtimeServices: Record<string, RealtimeProvider>;
     realtimeService: RealtimeProvider;
     auth?: BootstrappedAuth;
-    history?: unknown;
+    history?: { historyService: import("./history/history-routes").HistoryService };
     storageRegistry?: StorageRegistry;
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
@@ -622,11 +645,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    let historyConfigResult: Record<string, unknown> | undefined = undefined;
+    let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
     if (config.history) {
         if (defaultBootstrapper.initializeHistory) {
             logger.info("Bootstrapping entity history via driver protocol");
-            historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult);
+            historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult) as { historyService: import("./history/history-routes").HistoryService } | undefined;
 
             // Inject the historyService into the driver so saveEntity/deleteEntity can record history.
             // The driver was created during initializeDriver() (before history was initialized),
@@ -707,8 +730,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 serviceKey,
                 authHooks: safeAuthConfig.hooks,
                 collectionAuthConfig,
-                enableMagicLink: safeAuthConfig.magicLink ?? false
+                enableMagicLink: safeAuthConfig.magicLink ?? false,
+                cookieAuth: safeAuthConfig.cookieAuth
             });
+
+            if (safeAuthConfig.cookieAuth) {
+                if (!isProduction && !process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
+                    logger.warn(
+                        "[Auth] Cookie authentication (cookieAuth) is enabled, but no CORS restrictions are detected. " +
+                        "Browser-based clients will require credentials: 'include' and the server MUST NOT use " +
+                        "Access-Control-Allow-Origin: '*'. Ensure CORS_ORIGINS is set to your frontend URL."
+                    );
+                }
+            }
         }
 
         // ── Mount auth & admin routes via the adapter ────────────────────
@@ -729,6 +763,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // ─── Internal per-process credential ───────────────────────────────────
+    // When the user hasn't configured a REBASE_SERVICE_KEY, generate a random
+    // per-boot key so the singleton's control-plane APIs (auth, admin, storage,
+    // functions) can still authenticate against the server's own middleware.
+    // This key never leaves the process and is never logged.
+    const internalServiceKey = serviceKey || randomBytes(48).toString("base64");
+    if (!serviceKey) {
+        logger.info("No REBASE_SERVICE_KEY configured. Generated internal per-boot key for singleton control-plane APIs.");
+    }
+
+    // Update the auth adapter's service key to include the internal key
+    // so that the singleton's control-plane requests are recognized.
+    if (authAdapter && !authAdapter.serviceKey) {
+        authAdapter.serviceKey = internalServiceKey;
+    }
+
     // ─── API Key Store Bootstrap ──────────────────────────────────────────
     let apiKeyStore: ApiKeyStore | undefined;
     const apiKeyStoreResult = createApiKeyStore(defaultDriver);
@@ -740,7 +790,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Mount API key admin routes
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
-            serviceKey
+            serviceKey: internalServiceKey
         });
         config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
         logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
@@ -851,7 +901,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 driver: defaultDriver,
                 resolveDriver,
                 requireAuth: dataRequireAuth,
-                serviceKey,
+                serviceKey: internalServiceKey,
                 apiKeyStore
             }));
         }
@@ -865,7 +915,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // that /:slug/:entityId/history is matched by the dedicated handler first.
         if (historyConfigResult && historyConfigResult.historyService) {
             const historyRoutes = createHistoryRoutes({
-                historyService: historyConfigResult.historyService as import("./history/history-routes").HistoryService,
+                historyService: historyConfigResult.historyService,
                 registry: collectionRegistry,
                 driver: defaultDriver
             });
@@ -893,18 +943,53 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     await mountOpenApiDocs(config.app, basePath, config.enableSwagger, activeCollections, resolveRequireAuth(config.auth));
 
     // ─── Server-side singleton ────────────────────────────────────────────
-    // Build the admin-level RebaseClient and expose it as the `rebase` singleton.
-    // This client bypasses the network and uses Hono's internal request handler.
-    // websocketUrl is explicitly empty to prevent opening a WebSocket connection.
+    // Build the RebaseClient for control-plane APIs (auth, admin, storage,
+    // functions, cron). These still route through the Hono app because they
+    // genuinely need route dispatch + middleware.
+    // `rebase.data` is replaced below with a native driver-backed data plane.
     const serverClient = createRebaseClient({
         baseUrl: "http://localhost",
         apiPath: basePath,
         websocketUrl: "",
-        token: serviceKey,
+        token: internalServiceKey,
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
             return await config.app.request(input as string | Request | URL, init);
         }
     });
+
+    // ─── Native data plane ────────────────────────────────────────────────
+    // Replace the HTTP-transport data layer with a driver-backed RebaseData.
+    // This eliminates JSON serialize → Hono dispatch → auth → deserialize for
+    // every rebase.data call. RLS semantics are preserved: the driver is scoped
+    // once as { uid: "service", roles: ["admin"] }, matching the identity the
+    // service-key HTTP path produced.
+    const serviceIdentity = { uid: "service", roles: ["admin"] as string[] };
+
+    const scopedDefaultDriver = await scopeDataDriver(defaultDriver, serviceIdentity);
+    const defaultData = buildRebaseData(scopedDefaultDriver);
+
+    // Multi-engine: scope and wrap each non-default delegate so
+    // rebase.data on a non-default-engine collection reaches the correct driver.
+    const dataSourcesByKey: Record<string, import("@rebasepro/types").RebaseData> = {};
+    for (const driverKey of driverRegistry.list()) {
+        if (driverKey === DEFAULT_DRIVER_ID) continue;
+        const delegate = driverRegistry.get(driverKey);
+        if (!delegate) continue;
+        const scopedDelegate = await scopeDataDriver(delegate, serviceIdentity);
+        dataSourcesByKey[driverKey] = buildRebaseData(scopedDelegate);
+    }
+
+    const serverData = buildRoutedRebaseData({
+        defaultData,
+        sources: dataSourcesByKey,
+        resolveKey: (slugOrPath: string) => keyForCollectionPath(slugOrPath)
+    });
+
+    // Overwrite the HTTP-transport data proxy with the native driver-backed one.
+    // The rest of the client (auth, admin, cron, functions, storage) keeps using
+    // the HTTP transport, which is fine — they are low-frequency control-plane ops.
+    Object.assign(serverClient, { data: serverData });
+    logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
 
     // Attach email service to the server client when configured.
     // The email service may come from the auth bootstrapper or from the auth config directly.
@@ -986,7 +1071,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 functionsRouter.use("/*", createAuthMiddleware({
                     driver: defaultDriver,
                     requireAuth: functionsRequireAuth,
-                    serviceKey,
+                    serviceKey: internalServiceKey,
                     apiKeyStore
                 }));
             }

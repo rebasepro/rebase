@@ -29,6 +29,7 @@ import type {
     RealtimeProvider,
     BootstrappedAuth
 } from "./backend";
+import type { HistoryConfig } from "../controllers/client";
 
 /**
  * A `DatabaseAdapter` provides data persistence for Rebase.
@@ -75,7 +76,7 @@ export interface DatabaseAdapter {
      * Return `undefined` if the database does not support history.
      */
     initializeHistory?(
-        config: unknown,
+        config: HistoryConfig,
         driverResult: InitializedDriver,
     ): Promise<{ historyService: unknown } | undefined>;
 

@@ -63,27 +63,34 @@ export interface AuthMiddlewareOptions {
 }
 
 /**
- * Hono middleware that requires a valid JWT token
- * Returns 401 if token is missing or invalid
+ * Hono middleware that requires a valid JWT token via Authorization header.
+ * Returns 401 if token is missing or invalid.
+ *
+ * **Security:** Tokens are only accepted via the `Authorization: Bearer`
+ * header. Query-string tokens (`?token=`) are intentionally NOT accepted
+ * here because URLs leak into access logs, proxies, Referer headers, and
+ * browser history. Use {@link queryTokenAuth} on routes that legitimately
+ * need query-string tokens (e.g. storage file serving for `<img src>`).
  */
 export const requireAuth: MiddlewareHandler<HonoEnv> = async (
     c,
     next
 ) => {
     const authHeader = c.req.header("authorization");
-    const queryToken = c.req.query("token");
     const hasBearer = authHeader && authHeader.startsWith("Bearer ");
 
-    if (!hasBearer && !queryToken) {
+    if (!hasBearer) {
+        // Skip 401 if a prior middleware (e.g. queryTokenAuth) already set the user.
+        if (c.get("user")) return next();
         return c.json({
             error: {
-                message: "Authorization header or token query parameter missing or invalid",
+                message: "Authorization header missing or invalid",
                 code: "UNAUTHORIZED"
             }
         }, 401);
     }
 
-    const token = hasBearer ? authHeader!.substring(7) : queryToken!;
+    const token = authHeader!.substring(7);
     const payload = verifyAccessToken(token);
 
     if (!payload) {
@@ -115,19 +122,20 @@ export function createRequireAuth(options?: { serviceKey?: string }): Middleware
     const key = options.serviceKey;
     return async (c, next) => {
         const authHeader = c.req.header("authorization");
-        const queryToken = c.req.query("token");
         const hasBearer = authHeader && authHeader.startsWith("Bearer ");
 
-        if (!hasBearer && !queryToken) {
+        if (!hasBearer) {
+            // Skip 401 if a prior middleware already set the user.
+            if (c.get("user")) return next();
             return c.json({
                 error: {
-                    message: "Authorization header or token query parameter missing or invalid",
+                    message: "Authorization header missing or invalid",
                     code: "UNAUTHORIZED"
                 }
             }, 401);
         }
 
-        const token = hasBearer ? authHeader!.substring(7) : queryToken!;
+        const token = authHeader!.substring(7);
 
         // Check service key first (constant-time comparison)
         if (safeCompare(token, key)) {
@@ -190,19 +198,24 @@ export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
 
 
 /**
- * Middleware that optionally extracts user from JWT
- * Does not return 401 if token is missing - allows anonymous access
+ * Middleware that optionally extracts user from JWT via Authorization header.
+ * Does not return 401 if token is missing — allows anonymous access.
+ *
+ * Query-string tokens are NOT accepted here. Use {@link queryTokenAuth}
+ * on routes that need them.
  */
 export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
     c,
     next
 ) => {
+    // Skip if a prior middleware (e.g. queryTokenAuth) already set the user.
+    if (c.get("user")) return next();
+
     const authHeader = c.req.header("authorization");
-    const queryToken = c.req.query("token");
     const hasBearer = authHeader && authHeader.startsWith("Bearer ");
 
-    if (hasBearer || queryToken) {
-        const token = hasBearer ? authHeader!.substring(7) : queryToken!;
+    if (hasBearer) {
+        const token = authHeader!.substring(7);
         const payload = verifyAccessToken(token);
         if (payload) {
             c.set("user", payload);
@@ -283,11 +296,10 @@ code: "UNAUTHORIZED" } }, 401);
         } else {
             // Default JWT path (with optional service key support)
             const authHeader = c.req.header("authorization");
-            const queryToken = c.req.query("token");
             const hasBearer = authHeader && authHeader.startsWith("Bearer ");
 
-            if (hasBearer || queryToken) {
-                const token = hasBearer ? authHeader!.substring(7) : queryToken!;
+            if (hasBearer) {
+                const token = authHeader!.substring(7);
 
                 // ── Service Key check ──────────────────────────────────
                 // Check BEFORE JWT verification. Service keys are static
@@ -367,3 +379,41 @@ code: "UNAUTHORIZED" } }, 401);
         return next();
     };
 }
+
+/**
+ * Middleware that authenticates via a `?token=` query parameter.
+ *
+ * **Use sparingly.** Tokens in URLs leak into access logs, proxy logs,
+ * Referer headers, and browser history. This middleware exists solely for
+ * routes where the consumer cannot set HTTP headers — e.g. `<img src>`,
+ * `<a href>` for file downloads, or similar browser-native requests.
+ *
+ * Apply it **before** `requireAuth` or `optionalAuth` on the specific
+ * route that needs it. Those middlewares will see the user context this
+ * middleware sets and skip their own 401 check.
+ *
+ * @example
+ * ```ts
+ * router.get("/file/*", queryTokenAuth, readAuthMiddleware, handler);
+ * ```
+ */
+export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
+    // Only activate when no Authorization header is present and a query token exists.
+    const authHeader = c.req.header("authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        // Authorization header takes precedence — let downstream middleware handle it.
+        return next();
+    }
+
+    const queryToken = c.req.query("token");
+    if (queryToken) {
+        const payload = verifyAccessToken(queryToken);
+        if (payload) {
+            c.set("user", payload);
+        }
+        // If the token is invalid, we don't reject here — let the downstream
+        // requireAuth / optionalAuth middleware decide the enforcement policy.
+    }
+
+    return next();
+};

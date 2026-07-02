@@ -15,6 +15,7 @@ import {
     DatabaseAdmin,
     type DataDriver,
     EntityCollection,
+    type HistoryConfig,
     InitializedDriver,
     RealtimeProvider
 } from "@rebasepro/types";
@@ -332,16 +333,15 @@ emailService,
 authRepository };
         },
 
-        async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: HistoryService } | undefined> {
-            const historyConfig = config as { retention?: number } | boolean | undefined;
-            if (!historyConfig) return undefined;
+        async initializeHistory(config: HistoryConfig, driverResult: InitializedDriver): Promise<{ historyService: HistoryService } | undefined> {
+            if (!config) return undefined;
 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
 
             await ensureHistoryTableExists(db);
 
-            const retention = typeof historyConfig === "object" && historyConfig !== null ? (historyConfig as { retention?: number }).retention : undefined;
+            const retention = typeof config === "object" ? config.retention : undefined;
             const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined);
 
             return { historyService };

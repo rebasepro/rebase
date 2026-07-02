@@ -151,7 +151,7 @@ Define your collections in TypeScript and get a production-ready API server.
 ## Features
 - **Hono & Drizzle Engine**: Built on lightweight Hono server and Drizzle ORM.
 - **REST API**: Full CRUD endpoints with pagination, filtering, sorting, and relations.
-- **GraphQL API**: Automatic GraphQL endpoint mapping your schema structures.
+
 - **WebSocket Realtime**: Live data subscriptions, broadcast channels, and presence tracking.
 - **Auto-generated Documentation**: Instant OpenAPI/Swagger docs for all routes.
 `;
@@ -265,7 +265,7 @@ A developer-first BaaS and admin dashboard framework built on TypeScript and Rea
 Rebase combines an auto-generated admin panel, lightweight backend APIs, and a client SDK into a unified developer platform.
 
 ## Key Components
-- **Lightweight API Engine**: Hono-based REST, GraphQL, and WebSocket server.
+- **Lightweight API Engine**: Hono-based REST and WebSocket server.
 - **Visual Studio**: Spreadsheet editor and visual schema manager syncing back to code.
 - **TypeScript Client SDK**: Isomorphic library for type-safe queries, auth, and storage.
 - **React UI Kit**: Reusable widgets and layout components to build custom admin dashboards.

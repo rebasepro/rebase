@@ -4,6 +4,7 @@ import type {
     InitializedDriver,
     BootstrappedAuth,
     DatabaseAdmin,
+    HistoryConfig,
     RealtimeProvider,
     DataDriver,
     EntityCollection
@@ -37,10 +38,7 @@ interface AuthInitConfig {
     email?: import("@rebasepro/server-core").EmailConfig;
 }
 
-/** Shape of the history config passed to `initializeHistory`. */
-interface HistoryInitConfig {
-    retention?: number;
-}
+
 
 export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): BackendBootstrapper {
     // Cached admin object, set during getAdmin() and used by initializeWebsockets
@@ -112,9 +110,8 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             };
         },
 
-        async initializeHistory(config: unknown, driverResult: InitializedDriver): Promise<{ historyService: unknown } | undefined> {
-            const historyConfig = config as HistoryInitConfig | undefined;
-            if (!historyConfig) return undefined;
+        async initializeHistory(config: HistoryConfig, driverResult: InitializedDriver): Promise<{ historyService: unknown } | undefined> {
+            if (!config) return undefined;
 
             const internals = driverResult.internals as MongoDriverInternals;
             const db = internals.db;
@@ -124,7 +121,7 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
 
             const { MongoHistoryService } = await import("./services/MongoHistoryService");
 
-            const retention = typeof historyConfig === "object" && historyConfig !== null ? historyConfig.retention : undefined;
+            const retention = typeof config === "object" ? config.retention : undefined;
             const historyService = new MongoHistoryService(db, retention ? { ttlDays: retention } : undefined);
 
             return { historyService };

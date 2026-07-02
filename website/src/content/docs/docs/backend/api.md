@@ -1,7 +1,7 @@
 ---
-title: REST & GraphQL API
-sidebar_label: REST & GraphQL API
-description: Auto-generated REST and GraphQL API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+title: REST API
+sidebar_label: REST API
+description: Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
 ---
 
 ## Overview
@@ -9,7 +9,6 @@ description: Auto-generated REST and GraphQL API endpoints for every collection,
 Rebase automatically generates a complete API from your collection definitions:
 
 - **REST API** — CRUD endpoints for every collection at `/api/data/:slug`
-- **GraphQL API** — Auto-generated schema at `/api/graphql`
 - **OpenAPI spec** — Machine-readable spec at `/api/docs`
 - **Swagger UI** — Interactive API explorer at `/api/swagger` (dev mode only)
 
@@ -251,41 +250,6 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 2. **Deferred Hooks (`afterSave`, `afterDelete`)**
    These hooks execute asynchronously after the database transaction has successfully committed. They use deferred promises (fire-and-forget), meaning they run in the background and do not block the client's HTTP response. Ideal for sending webhooks, triggering push notifications, or queuing external tasks.
 
-## GraphQL API
-
-A GraphQL endpoint is automatically generated at `/api/graphql`. The schema is compiled dynamically on startup from your collections configuration.
-
-```graphql
-query {
-    products(limit: 10, orderBy: "price:desc") {
-        id
-        name
-        price
-        category {
-            id
-            name
-        }
-    }
-}
-```
-
-### Type Mapping
-
-TypeScript collection property types map to GraphQL types as follows:
-
-| Property Type | GraphQL Type |
-|---------------|--------------|
-| `string` / `binary` / `date` | `GraphQLString` |
-| `number` | `GraphQLFloat` (or `GraphQLInt` if `integer` validation is set) |
-| `boolean` | `GraphQLBoolean` |
-| `array` | `GraphQLList(GraphQLString)` |
-| `vector` | `GraphQLList(GraphQLFloat)` |
-
-### RLS Integration
-
-GraphQL resolvers access the database using `context.driver` (a Postgres driver scoped dynamically by Hono's authentication middleware). Because resolver calls use the transaction-local session state populated with `app.user_id` and `app.user_roles`, all GraphQL queries and mutations automatically enforce Row-Level Security (RLS) constraints.
-
-In development mode, an interactive GraphiQL IDE is available at `/api/graphiql`.
 
 ## OpenAPI / Swagger
 

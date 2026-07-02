@@ -1,6 +1,12 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { createAuth, createMemoryStorage, createCookieStorage, RebaseSession, RebaseUser, AuthChangeEvent } from "../src/auth";
+import { createAuth, createMemoryStorage, createCookieStorage, RebaseSession, AuthChangeEvent } from "../src/auth";
+import type { RebaseSession as TypesRebaseSession, User } from "@rebasepro/types";
 import { Transport, RebaseApiError } from "../src/transport";
+
+// Compile-time assertions: RebaseSession from client and types are the same type
+const _assertSameType1: TypesRebaseSession = {} as RebaseSession;
+const _assertSameType2: RebaseSession = {} as TypesRebaseSession;
+void _assertSameType1; void _assertSameType2;
 
 /** Minimal mock Response shape used by auth methods that call fetch directly. */
 interface MockResponse {
@@ -30,7 +36,7 @@ mockRequest,
 mockFetch: fetchFn as MockFetch };
 }
 
-const mockUser: RebaseUser = {
+const mockUser: User = {
     uid: "usr_1",
     email: "test@example.com",
     displayName: "Test User",

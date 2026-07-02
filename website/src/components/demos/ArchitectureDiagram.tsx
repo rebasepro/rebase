@@ -237,7 +237,6 @@ export function ArchitectureDiagram() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {([
                                 ["REST", "CRUD, filters, sort, pagination, eager-loading"],
-                                ["GraphQL", "Schema + GraphiQL IDE"],
                                 ["WebSocket", "Subs, broadcast, presence"],
                                 ["OpenAPI", "3.0 spec + Swagger UI"],
                             ] as const).map(([title, desc]) => (

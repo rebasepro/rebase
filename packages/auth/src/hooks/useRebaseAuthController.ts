@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState, useRef } from "react";
-import { User } from "@rebasepro/types";
+import type { User, AuthTokens } from "@rebasepro/types";
 import * as authApi from "../api";
 import { AuthConfigResponse } from "../api";
 import {
     RebaseAuthController,
-    RebaseAuthControllerProps,
-    AuthTokens,
-    UserInfo
+    RebaseAuthControllerProps
 } from "../types";
 
 const STORAGE_KEY = "rebase_react_auth";
@@ -15,18 +13,21 @@ const STORAGE_KEY = "rebase_react_auth";
 const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 
 /**
- * Convert UserInfo from API to Rebase User type
+ * Normalize a raw user object from the server into the canonical User shape.
+ * Handles the transition period where stored sessions or server responses
+ * may lack `providerId` / `isAnonymous` (added in this release).
  */
-function convertToUser(userInfo: UserInfo): User {
+function normalizeUser(raw: User): User {
     return {
-        uid: userInfo.uid,
-        email: userInfo.email,
-        displayName: userInfo.displayName || null,
-        photoURL: userInfo.photoURL || null,
-        providerId: "custom",
-        isAnonymous: false,
-        roles: userInfo.roles || [],
-        metadata: userInfo.metadata
+        uid: raw.uid,
+        email: raw.email ?? null,
+        displayName: raw.displayName ?? null,
+        photoURL: raw.photoURL ?? null,
+        providerId: raw.providerId ?? "password",
+        isAnonymous: raw.isAnonymous ?? false,
+        emailVerified: raw.emailVerified,
+        roles: raw.roles ?? [],
+        metadata: raw.metadata,
     };
 }
 
@@ -35,13 +36,13 @@ function convertToUser(userInfo: UserInfo): User {
  */
 interface StoredAuthData {
     tokens: AuthTokens;
-    user: UserInfo;
+    user: User;
 }
 
 /**
  * Save auth data to localStorage
  */
-function saveAuthToStorage(tokens: AuthTokens, user: UserInfo): void {
+function saveAuthToStorage(tokens: AuthTokens, user: User): void {
     try {
         const data: StoredAuthData = { tokens,
 user };
@@ -306,23 +307,23 @@ export function useRebaseAuthController(
     }, [client, getAuthToken, refreshAccessToken, clearSessionAndSignOut]);
 
     // Handle successful authentication
-    const handleAuthSuccess = useCallback(async (userInfo: UserInfo, tokens: AuthTokens) => {
+    const handleAuthSuccess = useCallback(async (userFromServer: User, tokens: AuthTokens) => {
         tokensRef.current = tokens;
-        let convertedUser = convertToUser(userInfo);
+        let normalizedUser = normalizeUser(userFromServer);
 
         // Apply custom roles if defineRolesFor provided
         if (defineRolesFor) {
-            const customRoles = await defineRolesFor(convertedUser);
+            const customRoles = await defineRolesFor(normalizedUser);
             if (customRoles) {
-                convertedUser = { ...convertedUser,
+                normalizedUser = { ...normalizedUser,
 roles: customRoles };
             }
         }
 
         // Save to localStorage for persistence
-        saveAuthToStorage(tokens, userInfo);
+        saveAuthToStorage(tokens, userFromServer);
 
-        setUser(convertedUser);
+        setUser(normalizedUser);
         setAuthError(null);
         setAuthProviderError(null);
         setLoginSkipped(false);
@@ -476,7 +477,7 @@ roles: customRoles };
             const response = await authApi.updateProfile(tokensRef.current.accessToken, displayName, photoURL);
 
             // Update local user state
-            let convertedUser = convertToUser(response.user);
+            let convertedUser = normalizeUser(response.user);
             if (defineRolesFor) {
                 const customRoles = await defineRolesFor(convertedUser);
                 if (customRoles) {
@@ -572,7 +573,7 @@ roles: customRoles };
                 // Token is still valid - use it directly
                 tokensRef.current = stored.tokens;
 
-                let userToSet = convertToUser(stored.user);
+                let userToSet = normalizeUser(stored.user);
                 if (defineRolesFor) {
                     const customRoles = await defineRolesFor(userToSet);
                     if (customRoles) {
@@ -614,7 +615,7 @@ roles: customRoles };
                     // Update stored data with fresh user info
                     saveAuthToStorage(newTokens, freshUserInfo);
 
-                    userToSet = convertToUser(freshUserInfo);
+                    userToSet = normalizeUser(freshUserInfo);
 
                     if (defineRolesFor) {
                         const customRoles = await defineRolesFor(userToSet);
@@ -630,7 +631,7 @@ roles: customRoles };
                         clearSessionAndSignOut();
                         return;
                     }
-                    userToSet = convertToUser(stored.user);
+                    userToSet = normalizeUser(stored.user);
                 }
 
                 if (!isMountedRef.current) return;

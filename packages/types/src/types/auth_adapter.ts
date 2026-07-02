@@ -237,6 +237,9 @@ export interface AuthResponsePayload {
         email: string;
         displayName: string | null;
         photoURL: string | null;
+        providerId?: string;
+        isAnonymous?: boolean;
+        emailVerified?: boolean;
         roles: string[];
         metadata: Record<string, unknown>;
     };
