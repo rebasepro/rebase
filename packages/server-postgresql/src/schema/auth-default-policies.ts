@@ -66,7 +66,7 @@ function isAuthCollection(collection: EntityCollection): boolean {
  * `disableDefaultAuthPolicies`, are returned unchanged.
  */
 export function getEffectiveSecurityRules(collection: EntityCollection): SecurityRule[] {
-    const explicit = (isPostgresCollection(collection) ? collection.securityRules : undefined) ?? [];
+    const explicit = [...((isPostgresCollection(collection) ? collection.securityRules : undefined) ?? [])];
 
     if (!isAuthCollection(collection) || collection.disableDefaultAuthPolicies) {
         return explicit;

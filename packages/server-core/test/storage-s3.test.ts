@@ -40,8 +40,12 @@ describe("S3StorageController", () => {
         controller = new S3StorageController(defaultConfig);
     });
 
-    describe("constructor", () => {
-        it("should initialize S3 client with credentials", () => {
+    describe("client initialization", () => {
+        // The S3 client is created lazily on first use, not in the constructor.
+        it("should initialize S3 client with credentials on first use", async () => {
+            mockSend.mockResolvedValueOnce({});
+            await controller.deleteObject("uploads/test.txt");
+
             expect(S3Client).toHaveBeenCalledWith(expect.objectContaining({
                 region: "us-east-1",
                 credentials: {
@@ -51,13 +55,15 @@ describe("S3StorageController", () => {
             }));
         });
 
-        it("should initialize with endpoint for S3-compatible services", () => {
+        it("should initialize with endpoint for S3-compatible services", async () => {
             vi.clearAllMocks();
-            new S3StorageController({
+            const minioController = new S3StorageController({
                 ...defaultConfig,
                 endpoint: "https://minio.example.com",
                 forcePathStyle: true
             });
+            mockSend.mockResolvedValueOnce({});
+            await minioController.deleteObject("uploads/test.txt");
 
             expect(S3Client).toHaveBeenCalledWith(expect.objectContaining({
                 endpoint: "https://minio.example.com",

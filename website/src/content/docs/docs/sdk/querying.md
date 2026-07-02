@@ -17,6 +17,8 @@ client.data.users           // → slug "users"
 client.data.collection("blog_posts")
 ```
 
+> **Strict mode (generated SDK):** When you pass the generated `collectionsDictionary` to `createRebaseClient`, the data proxy validates property accesses at access time. A typo like `client.data.prodcuts` will throw immediately with a helpful error and a nearest-match suggestion instead of producing a confusing 404 later. Use `client.data.collection("slug")` to bypass validation for dynamic or runtime-determined slugs.
+
 ## CRUD Operations
 
 ### Find (List)

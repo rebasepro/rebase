@@ -1,4 +1,5 @@
 import { createTransport, RebaseClientConfig } from "./transport";
+import { RebaseClientError } from "./errors";
 import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
@@ -30,6 +31,7 @@ export * from "./storage";
 export * from "./storage-registry";
 export * from "./reviver";
 export * from "./functions";
+export * from "./errors";
 export type { Entity, FindResponse } from "@rebasepro/types";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
@@ -241,6 +243,60 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         });
     }
 
+    /**
+     * Suggest the closest known collection key for a mistyped accessor.
+     * Uses edit-distance-1 and prefix matching — no external dependency.
+     */
+    function suggestCollection(prop: string, knownKeys: string[]): string | undefined {
+        // Prefix match (e.g. "prod" → "products")
+        const prefixMatch = knownKeys.find(k => k.startsWith(prop) || prop.startsWith(k));
+        if (prefixMatch) return prefixMatch;
+
+        // Edit-distance-1: deletions, insertions, substitutions, transpositions
+        for (const key of knownKeys) {
+            if (Math.abs(key.length - prop.length) > 1) continue;
+            let diffs = 0;
+            const longer = key.length >= prop.length ? key : prop;
+            const shorter = key.length >= prop.length ? prop : key;
+            if (longer.length === shorter.length) {
+                // Same length: allow 1 substitution or 1 transposition
+                for (let i = 0; i < longer.length; i++) {
+                    if (longer[i] !== shorter[i]) {
+                        // Check for transposition
+                        if (
+                            i + 1 < longer.length &&
+                            longer[i] === shorter[i + 1] &&
+                            longer[i + 1] === shorter[i]
+                        ) {
+                            diffs++;
+                            i++; // skip next char (already accounted for)
+                            if (diffs > 1) break;
+                            continue;
+                        }
+                        diffs++;
+                    }
+                    if (diffs > 1) break;
+                }
+            } else {
+                // Length differs by 1: allow 1 insertion/deletion
+                let li = 0;
+                let si = 0;
+                while (li < longer.length) {
+                    if (si < shorter.length && longer[li] === shorter[si]) {
+                        si++;
+                    } else {
+                        diffs++;
+                    }
+                    li++;
+                    if (diffs > 1) break;
+                }
+            }
+            if (diffs <= 1) return key;
+        }
+
+        return undefined;
+    }
+
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
 
     function collection(slug: string): CollectionClient<Record<string, unknown>> {
@@ -259,10 +315,21 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             }
             if (typeof prop === "symbol") return undefined;
             if (typeof prop === "string" && prop !== "then" && prop !== "toJSON" && prop !== "$$typeof") {
-                if (options.collections && prop in options.collections) {
-                    return collection(options.collections[prop]);
+                if (options.collections) {
+                    if (prop in options.collections) {
+                        return collection(options.collections[prop]);
+                    }
+                    // Strict mode: the developer supplied a typed dictionary,
+                    // so we know the full set of valid accessors.
+                    const knownKeys = Object.keys(options.collections);
+                    const suggestion = suggestCollection(prop, knownKeys);
+                    const knownList = knownKeys.join(", ");
+                    let msg = `Unknown collection accessor "${prop}". Known collections: ${knownList}.`;
+                    if (suggestion) msg += ` Did you mean "${suggestion}"?`;
+                    msg += ` Use data.collection("<slug>") for dynamic slugs.`;
+                    throw new RebaseClientError(msg);
                 }
-                // Convert camelCase property names to snake_case slugs.
+                // Untyped fallback: convert camelCase property names to snake_case slugs.
                 // e.g. `companyMembers` → `company_members`
                 const slug = toSnakeCase(prop);
                 return collection(slug);

@@ -35,7 +35,7 @@ function kleeneAnd(values: TriState[]): TriState {
 }
 
 /** The operations a rule covers, mirroring the Postgres generator's resolution. */
-function ruleOperations(rule: SecurityRule): SecurityOperation[] {
+function ruleOperations(rule: SecurityRule): readonly SecurityOperation[] {
     return rule.operations && rule.operations.length > 0
         ? rule.operations
         : [rule.operation ?? "all"];

@@ -80,6 +80,6 @@ function quoteLiteral(value: string | number | boolean | null): string {
 }
 
 /** Sorted, single-quoted `ARRAY['a','b']` — matches the generators' output. */
-function rolesArraySql(roles: string[]): string {
+function rolesArraySql(roles: readonly string[]): string {
     return `ARRAY[${[...roles].sort().map(r => `'${r}'`).join(",")}]`;
 }

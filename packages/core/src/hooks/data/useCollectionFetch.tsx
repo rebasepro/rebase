@@ -89,7 +89,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
     const sortByProperty = sortBy ? sortBy[0] : undefined;
     const currentSort = sortBy ? sortBy[1] : undefined;
     // Map to PostgREST format for orderBy
-    const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
+    const orderByParams: [string, "asc" | "desc"] | undefined = sortBy ? [String(sortBy[0]), sortBy[1]] : undefined;
 
     // filterValues is already FilterValues — pass directly
     const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;

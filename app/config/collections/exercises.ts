@@ -285,17 +285,16 @@ hideFromCollection: true }
                 category: ["==", "cardio"]
             }
         }
+    ],
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
     ]
 });
-
-exercisesCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default exercisesCollection;

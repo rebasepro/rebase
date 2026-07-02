@@ -1,23 +1,16 @@
 import * as authApi from "../src/api";
 
+const API_URL = "https://api.test.rebase.pro";
+
 describe("auth API client", () => {
     const originalFetch = global.fetch;
 
     beforeEach(() => {
-        authApi.setApiUrl("https://api.test.rebase.pro");
-        authApi.clearAuthConfigCache();
         global.fetch = jest.fn();
     });
 
     afterEach(() => {
         global.fetch = originalFetch;
-    });
-
-    describe("API URL configuration", () => {
-        it("should allow setting and getting the API URL", () => {
-            authApi.setApiUrl("https://auth.custom.com");
-            expect(authApi.getApiUrl()).toBe("https://auth.custom.com");
-        });
     });
 
     describe("API responses and network handling", () => {
@@ -38,7 +31,7 @@ accessTokenExpiresAt: 1234567890 }
                 json: async () => mockResponse
             });
 
-            const result = await authApi.register("test@rebase.pro", "password123", "Test User");
+            const result = await authApi.register(API_URL, "test@rebase.pro", "password123", "Test User");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/register", {
                 method: "POST",
@@ -67,7 +60,7 @@ accessTokenExpiresAt: 1234567890 }
                 json: async () => mockResponse
             });
 
-            const result = await authApi.login("test@rebase.pro", "password123");
+            const result = await authApi.login(API_URL, "test@rebase.pro", "password123");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/login", {
                 method: "POST",
@@ -96,7 +89,7 @@ accessTokenExpiresAt: 1234567890 }
             });
 
             const payload = { idToken: "google_id_token" };
-            const result = await authApi.googleLogin(payload);
+            const result = await authApi.googleLogin(API_URL, payload);
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/google", {
                 method: "POST",
@@ -119,7 +112,7 @@ accessTokenExpiresAt: 1234567890 }
                 json: async () => mockResponse
             });
 
-            const result = await authApi.refreshAccessToken("old_refresh_token");
+            const result = await authApi.refreshAccessToken(API_URL, "old_refresh_token");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/refresh", {
                 method: "POST",
@@ -136,7 +129,7 @@ accessTokenExpiresAt: 1234567890 }
                 json: async () => ({})
             });
 
-            await authApi.logout("refresh_token_123");
+            await authApi.logout(API_URL, "refresh_token_123");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/logout", {
                 method: "POST",
@@ -159,7 +152,7 @@ accessTokenExpiresAt: 1234567890 }
                 json: async () => mockErrorResponse
             });
 
-            await expect(authApi.login("test@rebase.pro", "wrongpass")).rejects.toThrow(
+            await expect(authApi.login(API_URL, "test@rebase.pro", "wrongpass")).rejects.toThrow(
                 new authApi.AuthApiError("Invalid credentials", "INVALID_CREDENTIALS")
             );
         });
@@ -173,7 +166,7 @@ accessTokenExpiresAt: 1234567890 }
                 }
             });
 
-            await expect(authApi.login("test@rebase.pro", "password")).rejects.toThrow(
+            await expect(authApi.login(API_URL, "test@rebase.pro", "password")).rejects.toThrow(
                 new authApi.AuthApiError("Server returned non-JSON response (status: 200)", "PARSE_ERROR")
             );
         });
@@ -181,7 +174,7 @@ accessTokenExpiresAt: 1234567890 }
         it("should throw AuthApiError with NETWORK_ERROR on failed connection", async () => {
             (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
-            await expect(authApi.login("test@rebase.pro", "password")).rejects.toThrow(
+            await expect(authApi.login(API_URL, "test@rebase.pro", "password")).rejects.toThrow(
                 new authApi.AuthApiError(
                     "Failed to connect to the backend server. The backend might be down or failed to initialize (e.g., database connection timeout).",
                     "NETWORK_ERROR"
@@ -198,7 +191,7 @@ accessTokenExpiresAt: 1234567890 }
                 json: async () => ({})
             });
 
-            await authApi.linkedinLogin("code123", "http://redirect");
+            await authApi.linkedinLogin(API_URL, "code123", "http://redirect");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/linkedin", {
                 method: "POST",
@@ -215,7 +208,7 @@ redirectUri: "http://redirect" })
                 json: async () => ({})
             });
 
-            await authApi.oauthLogin("github", { code: "github_code" });
+            await authApi.oauthLogin(API_URL, "github", { code: "github_code" });
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/github", {
                 method: "POST",
@@ -231,7 +224,7 @@ redirectUri: "http://redirect" })
                 json: async () => ({ user: { uid: "1" } })
             });
 
-            const result = await authApi.getCurrentUser("accessTokenSecret");
+            const result = await authApi.getCurrentUser(API_URL, "accessTokenSecret");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/me", {
                 method: "GET",
@@ -250,7 +243,7 @@ redirectUri: "http://redirect" })
                 json: async () => ({ success: true })
             });
 
-            await authApi.forgotPassword("user@rebase.pro");
+            await authApi.forgotPassword(API_URL, "user@rebase.pro");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/forgot-password", {
                 method: "POST",
@@ -266,7 +259,7 @@ redirectUri: "http://redirect" })
                 json: async () => ({ success: true })
             });
 
-            await authApi.resetPassword("reset_token", "new_password");
+            await authApi.resetPassword(API_URL, "reset_token", "new_password");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/reset-password", {
                 method: "POST",
@@ -283,7 +276,7 @@ password: "new_password" })
                 json: async () => ({ success: true })
             });
 
-            await authApi.changePassword("tok", "old", "new");
+            await authApi.changePassword(API_URL, "tok", "old", "new");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/change-password", {
                 method: "POST",
@@ -303,7 +296,7 @@ newPassword: "new" })
                 json: async () => ({ success: true })
             });
 
-            await authApi.sendVerificationEmail("tok");
+            await authApi.sendVerificationEmail(API_URL, "tok");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/send-verification", {
                 method: "POST",
@@ -321,7 +314,7 @@ newPassword: "new" })
                 json: async () => ({ success: true })
             });
 
-            await authApi.verifyEmail("verify_token");
+            await authApi.verifyEmail(API_URL, "verify_token");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/verify-email?token=verify_token", {
                 method: "GET",
@@ -336,7 +329,7 @@ newPassword: "new" })
                 json: async () => ({ user: { uid: "1" } })
             });
 
-            await authApi.updateProfile("tok", "New Name", "http://photo");
+            await authApi.updateProfile(API_URL, "tok", "New Name", "http://photo");
 
             expect(global.fetch).toHaveBeenCalledWith("https://api.test.rebase.pro/api/auth/me", {
                 method: "PATCH",
@@ -356,7 +349,7 @@ photoURL: "http://photo" })
                 json: async () => ({ success: true })
             });
 
-            await authApi.fetchSessions("tok", "refTok");
+            await authApi.fetchSessions(API_URL, "tok", "refTok");
             expect(global.fetch).toHaveBeenLastCalledWith("https://api.test.rebase.pro/api/auth/sessions", {
                 method: "GET",
                 headers: {
@@ -366,7 +359,7 @@ photoURL: "http://photo" })
                 }
             });
 
-            await authApi.revokeSession("tok", "session123");
+            await authApi.revokeSession(API_URL, "tok", "session123");
             expect(global.fetch).toHaveBeenLastCalledWith("https://api.test.rebase.pro/api/auth/sessions/session123", {
                 method: "DELETE",
                 headers: {
@@ -375,7 +368,7 @@ photoURL: "http://photo" })
                 }
             });
 
-            await authApi.revokeAllSessions("tok");
+            await authApi.revokeAllSessions(API_URL, "tok");
             expect(global.fetch).toHaveBeenLastCalledWith("https://api.test.rebase.pro/api/auth/sessions", {
                 method: "DELETE",
                 headers: {
@@ -388,6 +381,7 @@ photoURL: "http://photo" })
 
     describe("AuthConfig caching behavior", () => {
         it("should cache successful auth config fetches and reuse in-flight promises", async () => {
+            const cache = authApi.createAuthConfigCache();
             const configResponse = {
                 needsSetup: false,
                 registrationEnabled: true,
@@ -401,8 +395,8 @@ photoURL: "http://photo" })
             });
 
             // Call fetchAuthConfig multiple times concurrently
-            const promise1 = authApi.fetchAuthConfig();
-            const promise2 = authApi.fetchAuthConfig();
+            const promise1 = authApi.fetchAuthConfig(API_URL, cache);
+            const promise2 = authApi.fetchAuthConfig(API_URL, cache);
 
             const result1 = await promise1;
             const result2 = await promise2;
@@ -416,18 +410,18 @@ photoURL: "http://photo" })
             expect(global.fetch).toHaveBeenCalledTimes(1);
 
             // Calling it again (after resolves) should return the cached response immediately
-            const result3 = await authApi.fetchAuthConfig();
+            const result3 = await authApi.fetchAuthConfig(API_URL, cache);
             expect(result3).toEqual(configResponse);
             expect(global.fetch).toHaveBeenCalledTimes(1);
 
             // Clear cache and call again - should make a second network request
-            authApi.clearAuthConfigCache();
+            authApi.clearAuthConfigCache(cache);
             (global.fetch as jest.Mock).mockResolvedValueOnce({
                 ok: true,
                 status: 200,
                 json: async () => configResponse
             });
-            const result4 = await authApi.fetchAuthConfig();
+            const result4 = await authApi.fetchAuthConfig(API_URL, cache);
             expect(result4).toEqual(configResponse);
             expect(global.fetch).toHaveBeenCalledTimes(2);
         });

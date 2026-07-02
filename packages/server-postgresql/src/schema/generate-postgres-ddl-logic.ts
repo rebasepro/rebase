@@ -63,7 +63,7 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
 
 const generatePolicyDdl = (collection: EntityCollection, rule: SecurityRule): string => {
     const tableName = getTableName(collection);
-    const ops: SecurityOperation[] = rule.operations && rule.operations.length > 0
+    const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
         : [rule.operation ?? "all"];
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseData, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -13,6 +13,9 @@ export type RebaseDataSource = DataSourceDefinition & {
     /**
      * The client-side driver for this source. Required for `direct`/`custom`
      * transports; omit for `server` transport (handled by the `client`).
+     *
+     * When `transport` is not stated it is inferred from this field:
+     * driver present → `"direct"`, absent → `"server"`.
      */
     driver?: DataDriver;
 };
@@ -52,30 +55,30 @@ export interface EffectiveRoleController {
 /**
  * Props for the main {@link Rebase} component.
  *
- * ## Resolution & Precedence
+ * ## Data
  *
- * Several prop families overlap intentionally. The rules below describe
- * which value wins when more than one is supplied.
+ * Everything is a data source, and there is one list: {@link dataSources}.
+ * The **default** source (serving every collection without a `dataSource`
+ * key) resolves with three rules:
  *
- * ### Data (default source)
+ * 1. A `dataSources` entry keyed `"(default)"` (`DEFAULT_DATA_SOURCE_KEY`)
+ *    *with a driver* is the default source.
+ * 2. Otherwise `client.data` is the default.
+ * 3. Otherwise, if exactly one source is registered, it is the default.
+ *    Zero sources, or several without a `"(default)"` key, **throw**.
  *
- * First match wins:
- * 1. `data` prop (used as-is)
- * 2. `driver` prop (wrapped via `buildRebaseData`)
- * 3. `client.data`
- * 4. `dataSources` entry keyed `DEFAULT_DATA_SOURCE_KEY` (`"(default)"`),
- *    else the **first** registered source (`Object.values(...)[0]` —
- *    ⚠️ object-order-dependent; prefer an explicit `"(default)"` key).
- * 5. **Throw** — at least one data source is required.
+ * A `"(default)"` entry *without* a driver never provides data — it only
+ * declares the default source's `engine`/`label` (capabilities) when the
+ * client is the default.
  *
- * Named `dataSources` entries with a `driver` are additionally registered
- * as routed non-default sources, independent of the default resolution.
+ * All other `dataSources` entries are routed non-default sources:
+ * collections opt in via `collection.dataSource`.
  *
  * ### Auth
  *
  * - `authController` prop → completely disables the `client.auth`
- *   subscription (not a merge). The recommended pattern is to pass both
- *   `client` and an `authController` built from that client via
+ *   subscription (an override, not a merge). The recommended pattern is to
+ *   pass both `client` and an `authController` built from that client via
  *   `useRebaseAuthController({ client })`.
  * - Otherwise, `client.auth` is subscribed to via `useAuthSubscription`.
  *
@@ -99,7 +102,7 @@ export interface EffectiveRoleController {
  * | Standard app | `client` (+ `authController` built from it) |
  * | Multi-backend data | add `dataSources` |
  * | Multi-backend storage | add `storageSources` |
- * | Fully headless / custom | `data` or `driver` + `storageSource` |
+ * | Fully headless / custom | `dataSources` with a `"(default)"`-keyed driver entry + `storageSource` |
  *
  * @group Models
  */
@@ -145,37 +148,27 @@ export type RebaseProps<USER extends User> = {
     /**
      * Unified RebaseClient for data, auth, and storage.
      *
-     * `client.data` is used as the default data source unless overridden by
-     * `data`, `driver`, or a `dataSources` entry keyed `"(default)"`.
+     * `client.data` is the default data source unless a {@link dataSources}
+     * entry keyed `"(default)"` carries a driver.
      * `client.auth` is subscribed unless `authController` is provided.
      * `client.storage` is used unless `storageSource` is provided.
      */
     client?: RebaseClient;
 
     /**
-     * Explicit default data source. Takes the **highest** priority in the
-     * data resolution ladder — when set, `driver`, `client.data`, and
-     * `dataSources` defaults are all ignored for the default source.
-     */
-    data?: RebaseData;
-
-    /**
-     * Convenience prop — the driver is wrapped via `buildRebaseData`
-     * internally and used as the default data source.
-     *
-     * **Ignored** when {@link data} is provided. Overrides `client.data`
-     * as the default data source. Collections routed to a named
-     * {@link dataSources} entry are unaffected.
-     */
-    driver?: DataDriver;
-
-    /**
-     * Additional data sources beyond the default `client`/`driver`/`data`.
+     * The data sources of the app. Each entry pairs a
+     * {@link DataSourceDefinition} (key, engine, transport) with an optional
+     * client-side {@link DataDriver}.
      *
      * Register the **direct** (e.g. Firestore, talking straight to its backend)
      * and **custom** sources here. Server-mediated sources (Postgres, MongoDB,
      * …) do *not* need an entry — they ride the `client` and are routed by the
      * Rebase backend.
+     *
+     * An entry keyed `"(default)"` with a driver **replaces** `client.data`
+     * as the default data source (this is how a fully client-side app, e.g.
+     * Firestore-only, is wired). Without a driver, a `"(default)"` entry just
+     * declares the default source's engine/capabilities.
      *
      * Collections are routed automatically by their `dataSource` key (resolved
      * by collection path against the registry), so routing works transparently
@@ -188,7 +181,7 @@ export type RebaseProps<USER extends User> = {
      * <Rebase
      *     client={rebaseClient}
      *     dataSources={[
-     *         { key: "analytics", engine: "firestore", transport: "direct", driver: firestoreDriver }
+     *         { key: "analytics", engine: "firestore", driver: firestoreDriver }
      *     ]}
      * >
      * // Collections opt in with `{ ..., dataSource: "analytics" }`.

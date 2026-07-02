@@ -30,7 +30,7 @@ export const DataSourcesContext = React.createContext<DataSourcesContextValue>(E
 
 /**
  * Access the data-source configuration provided to `<Rebase>` via the
- * `dataSources` (or legacy `drivers`) prop.
+ * `dataSources` prop.
  * @internal
  */
 export const useDataSources = (): DataSourcesContextValue => React.useContext(DataSourcesContext);

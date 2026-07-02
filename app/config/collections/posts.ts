@@ -200,17 +200,16 @@ const postsCollection = defineCollection({
             }
             return values;
         }
-    }
+    },
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["public"],
+            using: "true"
+        }
+    ]
 });
-
-postsCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["public"],
-        using: "true"
-    }
-];
 
 export default postsCollection;

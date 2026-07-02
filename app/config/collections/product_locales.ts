@@ -42,18 +42,17 @@ const productLocalesCollection = defineCollection({
             type: "string",
             ui: { markdown: true }
         }
-    }
+    },
+    securityRules: [
+        {
+            name: "product_locales_public_access",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
+    ]
 });
 
-
-productLocalesCollection.securityRules = [
-    {
-        name: "product_locales_public_access",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default productLocalesCollection;

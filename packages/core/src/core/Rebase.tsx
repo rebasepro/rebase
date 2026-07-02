@@ -56,11 +56,9 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         client,
         authController: authControllerProp,
         storageSource: storageSourceProp,
-        driver: driverProp,
         dataSources: dataSourcesProp,
         storageSources: storageSourcesProp,
 
-        data: dataProp,
         databaseAdmin,
         plugins: pluginsProp,
         slots: directSlots = [],
@@ -76,18 +74,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     } = props;
 
     const plugins = pluginsProp;
-
-    // ── Dev-mode prop conflict warnings (fire once per mount) ────────
-    const warnedRef = useRef(false);
-    if (!warnedRef.current) {
-        if (dataProp && driverProp) {
-            console.warn(
-                "[Rebase] Both `data` and `driver` props are set. " +
-                "The `driver` prop is ignored because `data` takes precedence."
-            );
-        }
-        warnedRef.current = true;
-    }
 
     // Validate plugin key uniqueness
     if (plugins) {
@@ -116,26 +102,35 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     // per direct/custom source (those carrying a client-side driver). Server-
     // mediated sources have no entry — they ride the default client.
     //
-    // Shallow-compared against the previous build (keys + driver instances) so
-    // inline `dataSources` literals don't rebuild RebaseData instances every
-    // render and thrash data-fetch effects that key off the data identity.
+    // Shallow-compared against the previous build (key/engine/transport +
+    // driver instances) so inline `dataSources` literals don't rebuild
+    // RebaseData instances every render and thrash data-fetch effects that
+    // key off the data identity.
     const dataSourcesRef = useRef<{
-        sig: { key: string; driver?: DataDriver }[];
+        sig: { key: string; engine: string; transport?: string; driver?: DataDriver }[];
         value: DataSourcesContextValue;
     } | null>(null);
     const dataSourcesValue = useMemo<DataSourcesContextValue>(() => {
-        const sig = normalizedDataSources.map((d) => ({ key: d.key, driver: d.driver }));
+        const sig = normalizedDataSources.map((d) => ({ key: d.key, engine: d.engine, transport: d.transport, driver: d.driver }));
         const prev = dataSourcesRef.current;
         if (prev
             && prev.sig.length === sig.length
-            && sig.every((s, i) => prev.sig[i].key === s.key && prev.sig[i].driver === s.driver)) {
+            && sig.every((s, i) => prev.sig[i].key === s.key
+                && prev.sig[i].engine === s.engine
+                && prev.sig[i].transport === s.transport
+                && prev.sig[i].driver === s.driver)) {
             return prev.value;
         }
         const registry: Record<string, DataSourceDefinition> = {};
         const sources: Record<string, RebaseData> = {};
         for (const ds of normalizedDataSources) {
             const { driver, ...definition } = ds;
-            registry[ds.key] = definition;
+            // Materialize the inferred transport so downstream consumers
+            // (routing, editor capabilities) always see a concrete value.
+            registry[ds.key] = {
+                ...definition,
+                transport: ds.transport ?? (driver ? "direct" : "server")
+            };
             if (driver) sources[ds.key] = buildRebaseData(driver);
         }
         const value: DataSourcesContextValue = { registry, sources };
@@ -143,19 +138,25 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         return value;
     }, [normalizedDataSources]);
 
-    // Data fallback logic. The resolved value is the *default* data source,
-    // serving every collection not routed to a registered direct/custom source.
+    // Default data source — serves every collection not routed to a
+    // registered direct/custom source. Resolution:
+    //   1. A "(default)"-keyed data source with a driver.
+    //   2. `client.data`.
+    //   3. The sole registered source, when it is the only candidate.
     const resolvedData = useMemo(() => {
-        if (dataProp) return dataProp;
-        if (driverProp) return buildRebaseData(driverProp);
+        const registeredDefault = dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY];
+        if (registeredDefault) return registeredDefault;
         if (client?.data) return client.data;
-        // No explicit default — fall back to a registered default-keyed source
-        // (e.g. a single direct driver registered as "(default)").
-        const defaultSource = dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY]
-            ?? Object.values(dataSourcesValue.sources)[0];
-        if (defaultSource) return defaultSource;
-        throw new Error("Rebase requires either `client`, `data`, `driver`, or `dataSources` to be provided");
-    }, [dataProp, driverProp, client, dataSourcesValue]);
+        const built = Object.values(dataSourcesValue.sources);
+        if (built.length === 1) return built[0];
+        if (built.length > 1) {
+            throw new Error(
+                "[Rebase] Several data sources are registered but none is the default. " +
+                "Pass a `client`, or key one `dataSources` entry \"(default)\"."
+            );
+        }
+        throw new Error("Rebase requires either `client` or a `dataSources` entry with a driver to be provided");
+    }, [client, dataSourcesValue]);
 
     // Storage fallback logic
     const resolvedStorage = storageSourceProp ?? client?.storage;
@@ -258,9 +259,11 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const resolvedDatabaseAdmin = useMemo(() => {
         if (databaseAdmin) return databaseAdmin;
 
-        // 1. DataDriver exposes `.admin` capability object
-        if (driverProp?.admin) {
-            return driverProp.admin;
+        // 1. The default source's DataDriver exposes `.admin` capability object
+        const defaultDriver = normalizedDataSources.find((d) => d.key === DEFAULT_DATA_SOURCE_KEY && d.driver)?.driver
+            ?? (!client && normalizedDataSources.length === 1 ? normalizedDataSources[0].driver : undefined);
+        if (defaultDriver?.admin) {
+            return defaultDriver.admin;
         }
 
         // 2. Auto-derive from the client's WebSocket connection (Rebase backend)
@@ -284,7 +287,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         }
 
         return undefined;
-    }, [databaseAdmin, client, driverProp]);
+    }, [databaseAdmin, client, normalizedDataSources]);
 
     if (!resolvedStorage && typeof console !== "undefined") {
         console.warn(

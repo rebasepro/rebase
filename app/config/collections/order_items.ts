@@ -119,7 +119,16 @@ const orderItemsCollection = defineCollection({
                 await updateOrderTotals(orderId, context);
             }
         }
-    }
+    },
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
+    ]
 });
 
 // Helper function to recalculate the parent order subtotal & total
@@ -143,15 +152,5 @@ async function updateOrderTotals(orderId: string | number, context: EntityCallba
         });
     }
 }
-
-orderItemsCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default orderItemsCollection;

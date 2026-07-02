@@ -269,17 +269,17 @@ hideFromCollection: true }
             },
             sort: ["rating", "desc"]
         }
+    ],
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
     ]
 });
 
-productsCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default productsCollection;

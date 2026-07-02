@@ -159,13 +159,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     const offset = params?.offset || 0;
 
                     // Immediately fire update with heuristic metadata
+                    const estimatedTotal = entities.length;
+                    const estimatedHasMore = entities.length >= requestedLimit;
                     onUpdate({
                         data: entities as Entity<M>[],
                         meta: {
-                            total: entities.length,
+                            total: estimatedTotal,
                             limit: requestedLimit,
                             offset,
-                            hasMore: entities.length >= requestedLimit
+                            hasMore: estimatedHasMore,
+                            estimated: true
                         }
                     });
 
@@ -174,19 +177,26 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                         client.count(params)
                             .then((total) => {
                                 if (active && currentUpdateId === lastUpdateId) {
+                                    const authoritativeHasMore = offset + entities.length < total;
+
+                                    // Dedupe: skip if the estimate was already correct
+                                    if (total === estimatedTotal && authoritativeHasMore === estimatedHasMore) {
+                                        return;
+                                    }
+
                                     onUpdate({
                                         data: entities as Entity<M>[],
                                         meta: {
                                             total,
                                             limit: requestedLimit,
                                             offset,
-                                            hasMore: offset + entities.length < total
+                                            hasMore: authoritativeHasMore
                                         }
                                     });
                                 }
                             })
                             .catch(() => {
-                                // Silent fallback on count error
+                                // Count failed — estimated meta stands; not a subscription error
                             });
                     }
                 },

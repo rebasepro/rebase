@@ -102,9 +102,11 @@ export interface DataSourceDefinition {
     engine: string;
 
     /**
-     * How the frontend reaches this source. Defaults to `"server"`.
+     * How the frontend reaches this source. Optional — when omitted it is
+     * inferred: `"direct"` if the definition carries a client-side driver,
+     * `"server"` otherwise.
      */
-    transport: DataSourceTransport;
+    transport?: DataSourceTransport;
 
     /**
      * The physical database/schema/Firestore-database within the engine.

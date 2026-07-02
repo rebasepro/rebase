@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import { Rebase } from "../src/core/Rebase";
 import { useDataSources } from "../src/contexts/DataSourcesContext";
 import { useData } from "../src/hooks/data/useData";
-import type { DataDriver, RebaseData } from "@rebasepro/types";
+import type { DataDriver, RebaseClient, RebaseData } from "@rebasepro/types";
 
 // Minimal driver — only needs to be a valid object; methods aren't invoked here.
 function mockDriver(key: string): DataDriver {
@@ -25,7 +25,9 @@ const mockAuthController: any = {
     getAuthToken: jest.fn().mockResolvedValue("t")
 };
 
-const defaultData = { collection: () => ({}) } as unknown as RebaseData;
+const clientData = { collection: () => ({}) } as unknown as RebaseData;
+// Minimal client — auth is never subscribed because an authController is passed.
+const mockClient = { data: clientData, auth: {} } as unknown as RebaseClient;
 
 describe("<Rebase> data source wiring", () => {
 
@@ -39,7 +41,7 @@ describe("<Rebase> data source wiring", () => {
         render(
             <Rebase
                 authController={mockAuthController}
-                data={defaultData}
+                client={mockClient}
                 storageSource={{} as any}
                 {...props}>
                 <Probe/>
@@ -67,12 +69,43 @@ describe("<Rebase> data source wiring", () => {
         expect(typeof captured.sources!.sources["analytics"].collection).toBe("function");
     });
 
-    it("uses the explicit default (data prop) for the default RebaseData context", () => {
+    it("infers transport when omitted: driver → direct, no driver → server", () => {
         const captured = renderWithProbe({
-            dataSources: [{ key: "analytics", engine: "firestore", transport: "direct", driver: mockDriver("fs") }]
+            dataSources: [
+                { key: "analytics", engine: "firestore", driver: mockDriver("fs") },
+                { key: "reporting", engine: "postgres" }
+            ]
+        });
+        expect(captured.sources!.registry["analytics"].transport).toBe("direct");
+        expect(captured.sources!.registry["reporting"].transport).toBe("server");
+    });
+
+    it("uses client.data as the default source when no '(default)' driver entry exists", () => {
+        const captured = renderWithProbe({
+            dataSources: [{ key: "analytics", engine: "firestore", driver: mockDriver("fs") }]
         });
         // At the core level (no navigation layer), useData() is the default source.
-        expect(captured.data).toBe(defaultData);
+        expect(captured.data).toBe(clientData);
+    });
+
+    it("lets a '(default)' entry with a driver override client.data", () => {
+        const captured = renderWithProbe({
+            dataSources: [{ key: "(default)", engine: "firestore", driver: mockDriver("fs") }]
+        });
+        expect(captured.data).toBe(captured.sources!.sources["(default)"]);
+        expect(captured.data).not.toBe(clientData);
+    });
+
+    it("treats a '(default)' entry without a driver as definition-only (client.data stays default)", () => {
+        const captured = renderWithProbe({
+            dataSources: [{ key: "(default)", engine: "mongodb" }]
+        });
+        expect(captured.sources!.registry["(default)"]).toMatchObject({
+            engine: "mongodb",
+            transport: "server"
+        });
+        expect(captured.sources!.sources["(default)"]).toBeUndefined();
+        expect(captured.data).toBe(clientData);
     });
 
     it("does not build a RebaseData for server sources (no driver)", () => {
@@ -89,8 +122,8 @@ describe("<Rebase> data source wiring", () => {
         expect(captured.sources!.sources).toEqual({});
     });
 
-    it("falls back to a registered '(default)' direct source when no client/data/driver", () => {
-        const def = mockDriver("default-direct");
+    it("uses the sole registered source as the default when there is no client", () => {
+        const def = mockDriver("firestore");
         const captured: { data?: RebaseData; sources?: ReturnType<typeof useDataSources> } = {};
         function Probe() {
             captured.data = useData();
@@ -101,12 +134,33 @@ describe("<Rebase> data source wiring", () => {
             <Rebase
                 authController={mockAuthController}
                 storageSource={{} as any}
-                dataSources={[{ key: "(default)", engine: "postgres", transport: "direct", driver: def }]}>
+                dataSources={[{ key: "main", engine: "firestore", driver: def }]}>
                 <Probe/>
             </Rebase>
         );
-        // useData() resolves to the built RebaseData for the "(default)" source.
-        expect(captured.data).toBe(captured.sources!.sources["(default)"]);
+        expect(captured.data).toBe(captured.sources!.sources["main"]);
+    });
+
+    it("throws when several sources are registered without a client or a '(default)' key", () => {
+        const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+        function Probe() {
+            useData();
+            return null;
+        }
+        expect(() =>
+            render(
+                <Rebase
+                    authController={mockAuthController}
+                    storageSource={{} as any}
+                    dataSources={[
+                        { key: "a", engine: "firestore", driver: mockDriver("a") },
+                        { key: "b", engine: "firestore", driver: mockDriver("b") }
+                    ]}>
+                    <Probe/>
+                </Rebase>
+            )
+        ).toThrow(/none is the default/i);
+        spy.mockRestore();
     });
 
     it("keeps the data-source context referentially stable across re-renders", () => {
@@ -124,7 +178,7 @@ describe("<Rebase> data source wiring", () => {
             return (
                 <Rebase
                     authController={mockAuthController}
-                    data={defaultData}
+                    client={mockClient}
                     storageSource={{} as any}
                     dataSources={[{ key: "analytics", engine: "firestore", transport: "direct", driver: fs }]}>
                     <Probe/>

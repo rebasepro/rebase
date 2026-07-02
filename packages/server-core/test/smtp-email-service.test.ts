@@ -22,8 +22,8 @@ describe("SMTPEmailService", () => {
         mockCreateTransport.mockClear();
     });
 
-    it("should create transport with explicit name", () => {
-        new SMTPEmailService({
+    it("should create transport with explicit name", async () => {
+        const service = new SMTPEmailService({
             from: "test@example.com",
             smtp: {
                 host: "smtp.example.com",
@@ -31,6 +31,8 @@ describe("SMTPEmailService", () => {
                 name: "explicit-hostname"
             }
         });
+        // The transporter is created lazily on first use
+        await service.verifyConnection();
 
         expect(mockCreateTransport).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -41,18 +43,19 @@ describe("SMTPEmailService", () => {
         );
     });
 
-    it("should infer name from FRONTEND_URL if smtp.name is undefined", () => {
+    it("should infer name from FRONTEND_URL if smtp.name is undefined", async () => {
         const originalFrontendUrl = process.env.FRONTEND_URL;
         process.env.FRONTEND_URL = "https://frontend-url.com/some-path";
 
         try {
-            new SMTPEmailService({
+            const service = new SMTPEmailService({
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
                     port: 587
                 }
             });
+            await service.verifyConnection();
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -64,12 +67,12 @@ describe("SMTPEmailService", () => {
         }
     });
 
-    it("should infer name from resetPasswordUrl if FRONTEND_URL and smtp.name are undefined", () => {
+    it("should infer name from resetPasswordUrl if FRONTEND_URL and smtp.name are undefined", async () => {
         const originalFrontendUrl = process.env.FRONTEND_URL;
         delete process.env.FRONTEND_URL;
 
         try {
-            new SMTPEmailService({
+            const service = new SMTPEmailService({
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
@@ -77,6 +80,7 @@ describe("SMTPEmailService", () => {
                 },
                 resetPasswordUrl: "http://reset-password-url.org"
             });
+            await service.verifyConnection();
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -88,12 +92,12 @@ describe("SMTPEmailService", () => {
         }
     });
 
-    it("should infer name from verifyEmailUrl if FRONTEND_URL, resetPasswordUrl and smtp.name are undefined", () => {
+    it("should infer name from verifyEmailUrl if FRONTEND_URL, resetPasswordUrl and smtp.name are undefined", async () => {
         const originalFrontendUrl = process.env.FRONTEND_URL;
         delete process.env.FRONTEND_URL;
 
         try {
-            new SMTPEmailService({
+            const service = new SMTPEmailService({
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
@@ -101,6 +105,7 @@ describe("SMTPEmailService", () => {
                 },
                 verifyEmailUrl: "verify-email-url.net/auth"
             });
+            await service.verifyConnection();
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -112,18 +117,19 @@ describe("SMTPEmailService", () => {
         }
     });
 
-    it("should leave name undefined if no URLs are provided", () => {
+    it("should leave name undefined if no URLs are provided", async () => {
         const originalFrontendUrl = process.env.FRONTEND_URL;
         delete process.env.FRONTEND_URL;
 
         try {
-            new SMTPEmailService({
+            const service = new SMTPEmailService({
                 from: "test@example.com",
                 smtp: {
                     host: "smtp.example.com",
                     port: 587
                 }
             });
+            await service.verifyConnection();
 
             expect(mockCreateTransport).toHaveBeenCalledWith(
                 expect.objectContaining({

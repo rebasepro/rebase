@@ -26,7 +26,7 @@ import {
     SideEntityProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { Entity, PropertyConfig, RebaseContext } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY, Entity, PropertyConfig, RebaseContext } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";
@@ -220,7 +220,12 @@ export function RebaseFirebaseApp({
                                     authController={authController}
                                     userConfigPersistence={userConfigPersistence}
                         dateTimeFormat={dateTimeFormat}
-                        driver={firestoreDelegate}
+                        dataSources={[{
+                            key: DEFAULT_DATA_SOURCE_KEY,
+                            engine: "firestore",
+                            transport: "direct",
+                            driver: firestoreDelegate
+                        }]}
                         storageSource={storageSource}
                         entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
                         locale={locale}

@@ -1318,7 +1318,7 @@ function EntitiesCount({
 
         // filterValues is already FilterValues — pass directly
         const whereParams = filter && Object.keys(filter).length > 0 ? filter : undefined;
-        const orderByParams: [string, "asc" | "desc"] | undefined = sortByProperty ? [String(sortByProperty), currentSort] : undefined;
+        const orderByParams: [string, "asc" | "desc"] | undefined = sortByProperty && currentSort ? [String(sortByProperty), currentSort] : undefined;
 
         // Deduplicate inflight count requests (e.g. React StrictMode double-mount)
         const cacheKey = `${path}|${filterKey}|${sortByProperty ?? ""}|${currentSort ?? ""}`;

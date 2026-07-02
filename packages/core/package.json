@@ -65,6 +65,7 @@
     "fuse.js": "^7.4.2",
     "i18next": "^26.3.1",
     "lucide-react": "1.18.0",
+    "magic-string": "^0.30.0",
     "notistack": "^3.0.2",
     "react-i18next": "^17.0.8"
   },
@@ -72,7 +73,8 @@
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0",
     "react-router": "^7.0.0",
-    "react-router-dom": "^7.0.0"
+    "react-router-dom": "^7.0.0",
+    "typescript": ">=5.0.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",

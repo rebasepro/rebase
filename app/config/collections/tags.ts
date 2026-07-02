@@ -35,18 +35,17 @@ const tagsCollection = defineCollection({
             direction: "inverse",
             inverseRelationName: "tags"
         }
+    ],
+    securityRules: [
+        {
+            name: "tags_public_access",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
     ]
 });
 
-
-tagsCollection.securityRules = [
-    {
-        name: "tags_public_access",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default tagsCollection;

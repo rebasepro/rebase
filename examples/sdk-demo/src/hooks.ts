@@ -50,9 +50,11 @@ signOut };
 }
 
 // ===== Collection Hook =====
+type FindParams = NonNullable<Parameters<ReturnType<typeof client.data.collection>["find"]>[0]>;
+
 export function useCollection(
   slug: string,
-  options?: { limit?: number; page?: number; orderBy?: string; where?: Record<string, string> }
+  options?: { limit?: number; page?: number; orderBy?: FindParams["orderBy"]; where?: FindParams["where"] }
 ) {
   const [data, setData] = useState<any[]>([]);
   const [meta, setMeta] = useState({ total: 0,

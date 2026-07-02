@@ -345,7 +345,7 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
 const generatePolicyCode = (collection: EntityCollection, rule: SecurityRule, index: number): string => {
     const tableName = getTableName(collection);
     // Resolve operations: operations[] takes precedence over operation (singular)
-    const ops: SecurityOperation[] = rule.operations && rule.operations.length > 0
+    const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
         : [rule.operation ?? "all"];
 

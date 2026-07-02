@@ -96,9 +96,17 @@ export type FilterCombinationValidProps = {
 };
 
 /**
- * Internal driver interface for communicating with the data layer.
- * This is NOT the public API — use `RebaseData` / `context.data` instead.
- * @internal
+ * The integration SPI for plugging a data backend into Rebase.
+ *
+ * Implement this interface to connect a custom backend (or use a built-in
+ * driver such as the Firestore one) and register it on
+ * `<Rebase dataSources>`. Rebase wraps drivers via `buildRebaseData` and
+ * routes collections to them by their `dataSource` key.
+ *
+ * For *consuming* data in application code, use `RebaseData` /
+ * `context.data` instead — this interface is only for providing it.
+ *
+ * @group Datasource
  */
 export interface DataDriver {
 

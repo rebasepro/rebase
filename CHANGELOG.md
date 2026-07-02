@@ -1,6 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking
+
+- **Unified `<Rebase>` data props** — Removed the `data` and `driver` props. There are now exactly two ways to provide data: `client` (server transport) and `dataSources` (everything else). A `dataSources` entry keyed `"(default)"` with a `driver` replaces `client.data` as the default source — this is how a fully client-side app (e.g. Firestore-only via `RebaseFirebaseApp`) is wired. Migration: `driver={x}` → `dataSources={[{ key: "(default)", engine: "firestore", driver: x }]}`; `data={x}` had no known users (custom backends implement `DataDriver`, now the documented integration SPI).
+- **Deterministic default-source resolution** — The default data source resolves as: `"(default)"`-keyed entry with driver → `client.data` → the sole registered source. Several sources without an explicit default now throw instead of silently picking the first object entry (order-dependent).
+
+### Features & Improvements
+
+- **Inferred data-source transport** — `DataSourceDefinition.transport` is now optional: entries with a client-side `driver` default to `"direct"`, entries without to `"server"`. A `"(default)"`-keyed entry without a driver can be used to declare the default source's engine/capabilities while the client keeps serving the data.
+
+- **Honest Realtime Meta** — Added `FindResponse.meta.estimated` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
+
 ## [0.8.0] - 2026-07-01
+
+### Changed
+
+- **Strict collection accessors** — When a `collections` dictionary is passed to `createRebaseClient`, unknown property accessors on `client.data` now throw immediately with a nearest-match suggestion instead of silently producing a 404 later. Use `data.collection("slug")` for dynamic slugs.
 
 ### Cleanup
 
@@ -12,6 +29,7 @@
 ### Features & Improvements
 
 - **Unified Policy & Filter Engine** — Replaced ad-hoc permission checks with a centralized `evaluatePolicy` system and `Policy` type. This system translates high-level security rules into both frontend conditions (for UI gating) and backend-specific filters (Postgres RLS, Firestore security rules). Includes `policyToPostgres` and `securityRuleToConditions` utilities, ensuring the admin UI matches database enforcement by construction.
+- **`defineCron` authoring helper** — Typed identity wrapper for cron job files (parity with `defineFunction`). Demo app now ships a working cron job (`refresh-product-stats`).
 - **Multi-Backend Storage Sources** — Introduced a first-class `StorageSource` system allowing a single project to use multiple storage backends (S3, GCS, Local, Firebase) simultaneously. Added `GCSStorageController` for native Google Cloud Storage support with TUS resumable uploads. Managed via `StorageSourcesContext` and `StorageRegistry`, enabling complex multi-cloud storage architectures.
 - **Custom Backend Functions** — New `defineFunction()` API for creating type-safe, discoverable backend endpoints. Functions are automatically mounted, type-checked, and can be invoked directly from the client SDK with full type safety. Includes a new `invoke_function` MCP tool for interacting with custom endpoints from AI agents.
 - **Property Schema Consolidation** — Refactored the property system to unify how database-level schemas, UI configurations, and validation rules are defined. Removed overlapping property types and introduced a more robust `PropertyConfig` system that handles complex relations and references consistently across all data drivers (Postgres, MongoDB, Firestore).

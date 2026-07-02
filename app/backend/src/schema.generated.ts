@@ -171,6 +171,12 @@ export const products = pgTable("products", {
     pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
 ])).enableRLS();
 
+export const repro = pgTable("repro", {
+    id: uuid("id").primaryKey().defaultRandom()
+}, (table) => ([
+    pgPolicy("test_policy", { as: "permissive", for: "all", to: ["authenticated"], using: sql`true`, withCheck: sql`true` }),
+])).enableRLS();
+
 export const tags = pgTable("tags", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
     name: varchar("name").notNull()
@@ -210,16 +216,16 @@ export const users = rebaseSchema.table("users", {
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`auth.uid() IS NULL OR id = auth.uid()::uuid OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_write_policy_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_write_policy_update", { as: "permissive", for: "update", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']`, withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_write_policy_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']`, withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_require_admin_write_insert", { as: "restrictive", for: "insert", to: ["public"], withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_require_admin_write_update", { as: "restrictive", for: "update", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']`, withCheck: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("users_require_admin_write_delete", { as: "restrictive", for: "delete", to: ["public"], using: sql`auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
+    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`(auth.uid() IS NULL) OR (id = auth.uid()) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_write_policy_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_write_policy_update", { as: "permissive", for: "update", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_write_policy_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_require_admin_write_insert", { as: "restrictive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_require_admin_write_update", { as: "restrictive", for: "update", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_require_admin_write_delete", { as: "restrictive", for: "delete", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
 ])).enableRLS();
 
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
@@ -298,7 +304,7 @@ export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
     })
 }));
 
-export const tables = { authors, customers, exercises, orderItems, orders, posts, postsTags, productLocales, products, tags, tickets, users };
+export const tables = { authors, customers, exercises, orderItems, orders, posts, postsTags, productLocales, products, repro, tags, tickets, users };
 export const enums = { exercisesDifficulty, exercisesCategory, exercisesStatus, ordersStatus, ordersPayment_status, ordersCurrency, postsStatus, productsCategory, productsStatus, ticketsStatus, ticketsPriority, ticketsCategory };
 export const relations = { authorsRelations, customersRelations, orderItemsRelations, ordersRelations, postsRelations, postsTagsRelations, productLocalesRelations, productsRelations, tagsRelations, ticketsRelations };
 

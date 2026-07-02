@@ -155,7 +155,8 @@ values: {} as Record<string, unknown> }
                                 total: entities.length,
                                 limit,
                                 offset,
-                                hasMore: entities.length >= limit
+                                hasMore: entities.length >= limit,
+                                estimated: true
                             }
                         });
                     },

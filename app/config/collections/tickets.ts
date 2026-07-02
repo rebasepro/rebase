@@ -195,17 +195,16 @@ hideFromCollection: true }
                 assigned_to: ["==", null]
             }
         }
+    ],
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
     ]
 });
-
-ticketsCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default ticketsCollection;

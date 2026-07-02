@@ -430,7 +430,7 @@ export interface SerializableCollection {
     // ── SQL / Postgres-specific ───────────────────────────────────────
     table?: string;
     schema?: string;
-    securityRules?: SecurityRule[];
+    securityRules?: readonly SecurityRule[];
 
     // ── Owner ─────────────────────────────────────────────────────────
     ownerId?: string;

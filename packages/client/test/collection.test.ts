@@ -376,7 +376,8 @@ values: { title: "B" } }
                     total: 2,
                     limit: 20,
                     offset: 0,
-                    hasMore: false
+                    hasMore: false,
+                    estimated: true
                 })
             });
         });
@@ -411,7 +412,8 @@ values: { title: "B" } }
                     total: 2,
                     limit: 10,
                     offset: 5,
-                    hasMore: false
+                    hasMore: false,
+                    estimated: true
                 }
             });
 
@@ -419,6 +421,8 @@ values: { title: "B" } }
             await new Promise(resolve => setTimeout(resolve, 0));
 
             expect(client.count).toHaveBeenCalledWith({ limit: 10, offset: 5 });
+            // Second emission has authoritative meta (no estimated flag)
+            expect(onUpdate).toHaveBeenCalledTimes(2);
             expect(onUpdate).toHaveBeenLastCalledWith({
                 data: entities,
                 meta: {
@@ -428,6 +432,93 @@ values: { title: "B" } }
                     hasMore: true
                 }
             });
+        });
+
+        it("listen deduplicates when count matches the heuristic estimate", async () => {
+            let capturedCallback: Function;
+            const mockWs = {
+                listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
+                    capturedCallback = cb;
+                    return () => {};
+                }),
+                listenEntity: jest.fn().mockReturnValue(() => {})
+            } as unknown as RebaseWebSocketClient;
+
+            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            // Return a count that matches the heuristic: 2 entities, limit 20 → heuristic total=2, hasMore=false
+            // Authoritative: count=2, hasMore=(0 + 2 < 2)=false → same as heuristic
+            client.count = jest.fn().mockResolvedValue(2);
+
+            const onUpdate = jest.fn();
+            client.listen!(undefined, onUpdate);
+
+            const entities: Entity[] = [
+                { id: "1", path: "posts", values: { title: "A" } },
+                { id: "2", path: "posts", values: { title: "B" } }
+            ];
+
+            capturedCallback!(entities);
+
+            // First emission with estimated flag
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+            expect(onUpdate).toHaveBeenCalledWith({
+                data: entities,
+                meta: {
+                    total: 2,
+                    limit: 20,
+                    offset: 0,
+                    hasMore: false,
+                    estimated: true
+                }
+            });
+
+            // Wait for count promise to resolve
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            // No second emission — count matched the heuristic
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+        });
+
+        it("listen keeps estimated flag standing when count rejects", async () => {
+            let capturedCallback: Function;
+            const mockWs = {
+                listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
+                    capturedCallback = cb;
+                    return () => {};
+                }),
+                listenEntity: jest.fn().mockReturnValue(() => {})
+            } as unknown as RebaseWebSocketClient;
+
+            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            client.count = jest.fn().mockRejectedValue(new Error("Network error"));
+
+            const onUpdate = jest.fn();
+            client.listen!(undefined, onUpdate);
+
+            const entities: Entity[] = [
+                { id: "1", path: "posts", values: { title: "A" } }
+            ];
+
+            capturedCallback!(entities);
+
+            // First emission with estimated flag
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+            expect(onUpdate).toHaveBeenCalledWith({
+                data: entities,
+                meta: {
+                    total: 1,
+                    limit: 20,
+                    offset: 0,
+                    hasMore: false,
+                    estimated: true
+                }
+            });
+
+            // Wait for count rejection to settle
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            // No second emission, no unhandled rejection
+            expect(onUpdate).toHaveBeenCalledTimes(1);
         });
 
         it("listenById passes correct parameters to ws.listenEntity", () => {

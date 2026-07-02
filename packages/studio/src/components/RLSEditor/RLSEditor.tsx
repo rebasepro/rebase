@@ -389,34 +389,21 @@ status: "live" };
 
         // Merge code-based policies
         if (activeCollection && isPostgresCollection(activeCollection) && activeCollection.securityRules) {
-            activeCollection.securityRules.forEach((rule: { name?: string, mode?: string, operation?: string, roles?: string[], using?: string, withCheck?: string }) => {
+            activeCollection.securityRules.forEach((rule) => {
                 const ruleName = rule.name;
                 if (!ruleName) return;
 
-                if (policiesMap[ruleName]) {
-                    // It exists in Postgres, but we have a code definition (potentially edited)
-                    policiesMap[ruleName] = {
-                        policyname: ruleName,
-                        tablename: activeTableData.tableName,
-                        permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
-                        cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                        roles: rule.roles || ["public"],
-                        qual: rule.using || null,
-                        with_check: rule.withCheck || null,
-                        status: "both"
-                    };
-                } else {
-                    policiesMap[ruleName] = {
-                        policyname: ruleName,
-                        tablename: activeTableData.tableName,
-                        permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
-                        cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                        roles: rule.roles || ["public"],
-                        qual: rule.using || null,
-                        with_check: rule.withCheck || null,
-                        status: "code_only"
-                    };
-                }
+                policiesMap[ruleName] = {
+                    policyname: ruleName,
+                    tablename: activeTableData.tableName,
+                    permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
+                    cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
+                    roles: [...(rule.roles ?? ["public"])],
+                    qual: rule.using || null,
+                    with_check: rule.withCheck || null,
+                    // "both" = defined in code and live in Postgres (potentially edited)
+                    status: policiesMap[ruleName] ? "both" : "code_only"
+                };
             });
         }
 

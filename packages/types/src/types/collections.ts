@@ -457,7 +457,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * Security rules for this collection (Row Level Security).
      * When defined, the backend enforces access control policies.
      */
-    securityRules?: SecurityRule[];
+    securityRules?: readonly SecurityRule[];
 
     /**
      * Collection-scoped component overrides. These take precedence over
@@ -539,7 +539,7 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
      * - `auth.roles()` — comma-separated app role IDs
      * - `auth.jwt()`   — full JWT claims as JSONB
      */
-    securityRules?: SecurityRule[];
+    securityRules?: readonly SecurityRule[];
 }
 
 /**
@@ -1040,7 +1040,7 @@ export interface SecurityRuleBase {
      * // Equivalent to operation: "all"
      * { operations: ["all"], ownerField: "user_id" }
      */
-    operations?: SecurityOperation[];
+    operations?: readonly SecurityOperation[];
 
     /**
      * Whether this policy is `"permissive"` (default) or `"restrictive"`.
@@ -1083,7 +1083,7 @@ export interface SecurityRuleBase {
      * // Admins have unfiltered read access to all rows
      * { operation: "select", roles: ["admin"], using: "true" }
      */
-    roles?: string[];
+    roles?: readonly string[];
 
     // ── Advanced: native PostgreSQL role targeting ───────────────────────
 
@@ -1108,7 +1108,7 @@ export interface SecurityRuleBase {
      * // Only apply this policy when connected as `app_role`
      * { operation: "select", access: "public", pgRoles: ["app_role"] }
      */
-    pgRoles?: string[];
+    pgRoles?: readonly string[];
 }
 
 /**

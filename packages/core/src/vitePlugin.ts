@@ -1,5 +1,7 @@
 
 import path from "path";
+import ts from "typescript";
+import MagicString from "magic-string";
 
 export interface RebaseCollectionsPluginOptions {
     /**
@@ -15,26 +17,89 @@ export interface RebaseCollectionsPluginOptions {
  * the transform plugin replaces it with a `LazyComponentRef` object so the
  * component is loaded lazily and never evaluated by the backend.
  */
-const LAZY_COMPONENT_KEYS = ["Field", "Preview", "Builder"];
+const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder"]);
 
 /**
- * Regex that matches `Key: "relative/path"` or `Key: 'relative/path'`
- * for each key listed in LAZY_COMPONENT_KEYS.
- *
- * It captures:
- *   $1 — everything before the quote (e.g. `Field: `)
- *   $2 — the quote character (' or ")
- *   $3 — the path (must start with ./ or ../)
- *
- * The lookbehind-free pattern avoids issues with older runtimes.
+ * Walk a TypeScript AST node tree, invoking `visitor` for every node.
  */
-function buildTransformRegex(): RegExp {
-    const keys = LAZY_COMPONENT_KEYS.join("|");
-    // Match property key, colon, optional whitespace, then a string starting with a dot-path
-    return new RegExp(
-        `((?:${keys})\\s*:\\s*)(['"])(\\.\\.?\\/[^'"]+)\\2`,
-        "g"
+function walkAST(node: ts.Node, visitor: (n: ts.Node) => void): void {
+    visitor(node);
+    node.forEachChild(child => walkAST(child, visitor));
+}
+
+/**
+ * Return the property name text of a `PropertyAssignment` if the name is
+ * a plain identifier or a string literal.  Returns `undefined` for computed
+ * property names or other exotic forms.
+ */
+function getPropertyName(node: ts.PropertyAssignment): string | undefined {
+    const { name } = node;
+    if (ts.isIdentifier(name)) return name.text;
+    if (ts.isStringLiteral(name)) return name.text;
+    return undefined;
+}
+
+/**
+ * Perform the AST-based transform on `code`.
+ *
+ * Parses the source with the TypeScript compiler API, walks the tree for
+ * `PropertyAssignment` nodes whose name matches one of `LAZY_COMPONENT_KEYS`
+ * and whose initializer is a string literal starting with `./` or `../`.
+ *
+ * Each match is rewritten in-place via `magic-string` so that source-maps
+ * remain correct.
+ *
+ * @returns `{ code, map }` if at least one replacement was made; `null` otherwise.
+ */
+export function transformCollectionSource(
+    code: string,
+    id: string
+): { code: string; map: ReturnType<MagicString["generateMap"]> } | null {
+    // Use TSX kind to handle both .ts and .tsx files uniformly.
+    const sourceFile = ts.createSourceFile(
+        id,
+        code,
+        ts.ScriptTarget.Latest,
+        /* setParentNodes */ true,
+        ts.ScriptKind.TSX
     );
+
+    const ms = new MagicString(code);
+    let replaced = false;
+
+    walkAST(sourceFile, (node) => {
+        // Only look at PropertyAssignment nodes (key: value in object literals)
+        if (!ts.isPropertyAssignment(node)) return;
+
+        // Check the property name matches one of the lazy component keys
+        const propName = getPropertyName(node);
+        if (!propName || !LAZY_COMPONENT_KEYS.has(propName)) return;
+
+        // Check the initializer is a string literal
+        const init = node.initializer;
+        if (!ts.isStringLiteral(init)) return;
+
+        // Only transform dot-relative paths
+        const importPath = init.text;
+        if (!importPath.startsWith("./") && !importPath.startsWith("../")) return;
+
+        // Preserve the original quote character from the source
+        const initStart = init.getStart(sourceFile);
+        const quoteChar = code.charAt(initStart);
+
+        const replacement =
+            `{ __rebaseLazy: true, load: () => import(${quoteChar}${importPath}${quoteChar}) }`;
+
+        ms.overwrite(initStart, init.getEnd(), replacement);
+        replaced = true;
+    });
+
+    if (!replaced) return null;
+
+    return {
+        code: ms.toString(),
+        map: ms.generateMap({ hires: true })
+    };
 }
 
 /**
@@ -53,7 +118,6 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
     const resolvedVirtualModuleId = "\0" + virtualModuleId;
 
     let resolvedCollectionsDir: string;
-    const transformRegex = buildTransformRegex();
 
     return {
         name: "rebase-collections-plugin",
@@ -111,23 +175,7 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
             if (!id.startsWith(resolvedCollectionsDir)) return null;
             if (!/\.tsx?$/.test(id)) return null;
 
-            // Reset the regex state (global flag means lastIndex persists)
-            transformRegex.lastIndex = 0;
-
-            if (!transformRegex.test(code)) return null;
-
-            // Reset again after the test consumed the regex
-            transformRegex.lastIndex = 0;
-
-            const transformed = code.replace(
-                transformRegex,
-                (_match, prefix: string, quote: string, importPath: string) => {
-                    return `${prefix}{ __rebaseLazy: true, load: () => import(${quote}${importPath}${quote}) }`;
-                }
-            );
-
-            return { code: transformed,
-map: null };
+            return transformCollectionSource(code, id);
         }
     };
 }

@@ -18,13 +18,13 @@ Cron jobs follow the same **file-based discovery** pattern as custom functions: 
 
 ## Defining a Cron Job
 
-Create a file in your `backend/crons/` directory that default-exports a `CronJobDefinition`:
+Create a file in your `backend/crons/` directory that default-exports a cron definition. Use the `defineCron` helper from `@rebasepro/server-core` for type inference and autocomplete:
 
 ```typescript
 // backend/crons/health-check.ts
-import type { CronJobDefinition } from "@rebasepro/types";
+import { defineCron } from "@rebasepro/server-core";
 
-const job: CronJobDefinition = {
+export default defineCron({
     schedule: "*/5 * * * *",     // every 5 minutes
     name: "System Health Check",
     description: "Monitors uptime and memory usage",
@@ -43,12 +43,15 @@ const job: CronJobDefinition = {
             heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
         };
     },
-};
-
-export default job;
+});
 ```
 
+:::note
+`defineCron` is an identity function — it returns the same object you pass in. A plain default-exported `CronJobDefinition` object works identically; `defineCron` simply provides compile-time type checking and editor autocomplete.
+:::
+
 The **filename** (without extension) becomes the job's unique ID — e.g., `health-check`.
+
 
 ## Configuration
 
@@ -148,9 +151,9 @@ The `ctx.client` parameter provides direct, server-side access to all Rebase ser
 
 ```typescript
 // backend/crons/expire-users.ts
-import type { CronJobDefinition } from "@rebasepro/types";
+import { defineCron } from "@rebasepro/server-core";
 
-const job: CronJobDefinition = {
+export default defineCron({
     schedule: "0 0 * * *", // Daily at midnight
     name: "Expire Inactive Accounts",
     
@@ -183,9 +186,7 @@ const job: CronJobDefinition = {
             }
         }
     }
-};
-
-export default job;
+});
 ```
 
 :::tip

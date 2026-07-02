@@ -143,17 +143,17 @@ hideFromCollection: true }
                 avatar: null
             })
         })
-    }
+    },
+    securityRules: [
+        {
+            name: "test_policy",
+            mode: "permissive",
+            operation: "all",
+            pgRoles: ["authenticated"],
+            using: "true"
+        }
+    ]
 });
 
-customersCollection.securityRules = [
-    {
-        name: "test_policy",
-        mode: "permissive",
-        operation: "all",
-        pgRoles: ["authenticated"],
-        using: "true"
-    }
-];
 
 export default customersCollection;

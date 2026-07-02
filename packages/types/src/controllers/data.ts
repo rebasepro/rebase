@@ -64,6 +64,13 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
         limit: number;
         offset: number;
         hasMore: boolean;
+        /**
+         * `true` when `total` and `hasMore` are heuristic estimates
+         * (e.g. realtime first-paint). A follow-up emission with
+         * authoritative meta may follow. When absent or `false`,
+         * the values are authoritative.
+         */
+        estimated?: boolean;
     };
 }
 

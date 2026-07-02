@@ -141,8 +141,8 @@ describe("useRebaseAuthController hook", () => {
             await Promise.resolve(); // Resolves restoreAuth
         });
 
-        expect(authApi.refreshAccessToken).toHaveBeenCalledWith("refresh_token_123");
-        expect(authApi.getCurrentUser).toHaveBeenCalledWith("new_access_token");
+        expect(authApi.refreshAccessToken).toHaveBeenCalledWith("https://api.test.rebase.pro", "refresh_token_123");
+        expect(authApi.getCurrentUser).toHaveBeenCalledWith("https://api.test.rebase.pro", "new_access_token");
 
         expect(result.current.initialLoading).toBe(false);
         expect(result.current.user?.displayName).toBe("Test User"); // Updated user from getCurrentUser mock
@@ -191,7 +191,7 @@ describe("useRebaseAuthController hook", () => {
             await result.current.emailPasswordLogin("test@rebase.pro", "password123");
         });
 
-        expect(authApi.login).toHaveBeenCalledWith("test@rebase.pro", "password123");
+        expect(authApi.login).toHaveBeenCalledWith("https://api.test.rebase.pro", "test@rebase.pro", "password123");
         expect(result.current.user?.email).toBe("test@rebase.pro");
         expect(result.current.user?.displayName).toBe("Test User");
 
@@ -231,7 +231,7 @@ describe("useRebaseAuthController hook", () => {
             await result.current.signOut();
         });
 
-        expect(authApi.logout).toHaveBeenCalledWith("refresh_token_123");
+        expect(authApi.logout).toHaveBeenCalledWith("https://api.test.rebase.pro", "refresh_token_123");
         expect(result.current.user).toBeNull();
         expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
@@ -274,7 +274,7 @@ describe("useRebaseAuthController hook", () => {
             await result.current.updateProfile("Updated Name", "http://new-photo");
         });
 
-        expect(authApi.updateProfile).toHaveBeenCalledWith("access_token_123", "Updated Name", "http://new-photo");
+        expect(authApi.updateProfile).toHaveBeenCalledWith("https://api.test.rebase.pro", "access_token_123", "Updated Name", "http://new-photo");
         expect(result.current.user?.displayName).toBe("Updated Name");
         expect(result.current.user?.photoURL).toBe("http://new-photo");
 

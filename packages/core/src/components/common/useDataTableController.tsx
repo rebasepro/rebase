@@ -243,7 +243,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         // filterValues is already FilterValues — pass directly to the accessor
         const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
-        const orderByParams = sortByProperty ? `${String(sortByProperty)}:${currentSort}` : undefined;
+        const orderByParams: [string, "asc" | "desc"] | undefined = sortBy ? [String(sortBy[0]), sortBy[1]] : undefined;
 
         let unsubscribe: (() => void) | undefined;
 

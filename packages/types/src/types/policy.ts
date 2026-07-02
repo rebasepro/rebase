@@ -42,13 +42,13 @@ export interface FalsePolicyExpression {
 /** Logical AND — every operand must pass. @group Models */
 export interface AndPolicyExpression {
     kind: "and";
-    operands: PolicyExpression[];
+    operands: readonly PolicyExpression[];
 }
 
 /** Logical OR — at least one operand must pass. @group Models */
 export interface OrPolicyExpression {
     kind: "or";
-    operands: PolicyExpression[];
+    operands: readonly PolicyExpression[];
 }
 
 /** Logical negation. @group Models */
@@ -78,7 +78,7 @@ export interface ComparePolicyExpression {
  */
 export interface RolesOverlapPolicyExpression {
     kind: "rolesOverlap";
-    roles: string[];
+    roles: readonly string[];
 }
 
 /**
@@ -88,7 +88,7 @@ export interface RolesOverlapPolicyExpression {
  */
 export interface RolesContainPolicyExpression {
     kind: "rolesContain";
-    roles: string[];
+    roles: readonly string[];
 }
 
 /**
@@ -157,13 +157,13 @@ export interface AuthRolesPolicyOperand {
 export const policy = {
     true: (): TruePolicyExpression => ({ kind: "true" }),
     false: (): FalsePolicyExpression => ({ kind: "false" }),
-    and: (...operands: PolicyExpression[]): AndPolicyExpression => ({ kind: "and", operands }),
-    or: (...operands: PolicyExpression[]): OrPolicyExpression => ({ kind: "or", operands }),
+    and: (...operands: readonly PolicyExpression[]): AndPolicyExpression => ({ kind: "and", operands: operands as PolicyExpression[] }),
+    or: (...operands: readonly PolicyExpression[]): OrPolicyExpression => ({ kind: "or", operands: operands as PolicyExpression[] }),
     not: (operand: PolicyExpression): NotPolicyExpression => ({ kind: "not", operand }),
     compare: (left: PolicyOperand, op: PolicyCompareOperator, right: PolicyOperand): ComparePolicyExpression =>
         ({ kind: "compare", op, left, right }),
-    rolesOverlap: (roles: string[]): RolesOverlapPolicyExpression => ({ kind: "rolesOverlap", roles }),
-    rolesContain: (roles: string[]): RolesContainPolicyExpression => ({ kind: "rolesContain", roles }),
+    rolesOverlap: (roles: readonly string[]): RolesOverlapPolicyExpression => ({ kind: "rolesOverlap", roles: roles as string[] }),
+    rolesContain: (roles: readonly string[]): RolesContainPolicyExpression => ({ kind: "rolesContain", roles: roles as string[] }),
     authenticated: (): AuthenticatedPolicyExpression => ({ kind: "authenticated" }),
     raw: (sql: string): RawPolicyExpression => ({ kind: "raw", sql }),
     field: (name: string): FieldPolicyOperand => ({ kind: "field", name }),

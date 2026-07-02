@@ -55,6 +55,33 @@ listen(
 ): () => void   // returns unsubscribe function
 ```
 
+### Two-Phase Meta
+
+When `listen()` fires, it emits updates in up to two phases:
+
+1. **Immediate (estimated):** The first callback fires instantly with the entities and heuristic pagination metadata (`total` = number of returned entities, `hasMore` = whether the count equals the requested limit). This emission carries `meta.estimated: true`.
+
+2. **Authoritative (optional):** An async count query runs in the background. If the authoritative `total` or `hasMore` differs from the estimate, a second callback fires with corrected metadata and **no** `estimated` flag. If the values match, the second emission is skipped entirely — your callback fires only once.
+
+If the count query **fails**, no second emission occurs. The first emission's `estimated: true` flag remains as the signal that the metadata is heuristic. This is not treated as a subscription error.
+
+```typescript
+client.data.products.listen(
+    { where: { active: true }, limit: 50 },
+    (response) => {
+        if (response.meta.estimated) {
+            // First-paint: render immediately, total/hasMore may change
+            renderProducts(response.data, { loading: true });
+        } else {
+            // Authoritative: safe to render final pagination controls
+            renderProducts(response.data, { loading: false });
+        }
+    }
+);
+```
+
+> **Tip:** If you don't need to distinguish between estimated and authoritative metadata, you can ignore the `estimated` flag — both emissions carry the same `data` array.
+
 ## Subscribing to a Single Entity
 
 Use `listenById()` to watch a specific record by its ID:
