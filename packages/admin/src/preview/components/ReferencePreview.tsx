@@ -1,25 +1,25 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 import * as React from "react";
 
-import { Entity, EntityReference } from "@rebasepro/types";
+import { Snapshot, SnapshotReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useEntityFetch, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useSnapshotFetch, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
-import { EntityPreview, EntityPreviewContainer } from "../../components/EntityPreview";
+import { SnapshotPreview, SnapshotPreviewContainer } from "../../components/SnapshotPreview";
 import { useCollectionRegistryController } from "../../index";
-import { getEntityTitlePropertyKey } from "../../util/previews";
+import { getSnapshotTitlePropertyKey } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 
 export type ReferencePreviewProps = {
     disabled?: boolean;
-    reference: EntityReference,
+    reference: SnapshotReference,
     size?: PreviewSize;
     previewProperties?: string[];
     onClick?: (e: React.SyntheticEvent) => void;
     hover?: boolean;
-    includeEntityLink?: boolean;
+    includeSnapshotLink?: boolean;
     includeId?: boolean;
     textOnly?: boolean;
 };
@@ -29,17 +29,17 @@ export type ReferencePreviewProps = {
  */
 export const ReferencePreview = function ReferencePreview(props: ReferencePreviewProps) {
     const reference = props.reference;
-    if (!(typeof reference === "object" && "isEntityReference" in reference && reference.isEntityReference())) {
+    if (!(typeof reference === "object" && "isSnapshotReference" in reference && reference.isSnapshotReference())) {
         console.warn("Reference preview received value of type", typeof reference);
         if (props.textOnly) {
             return <span>{String(reference)}</span>;
         }
-        return <EntityPreviewContainer
+        return <SnapshotPreviewContainer
             onClick={props.onClick}
             size={props.size ?? "medium"}>
             <ErrorView error={"Unexpected value. Click to edit"}
                 tooltip={JSON.stringify(reference)}/>
-        </EntityPreviewContainer>;
+        </SnapshotPreviewContainer>;
     }
     return <ErrorBoundary>
         <ReferencePreviewInternal {...props}/>
@@ -55,12 +55,12 @@ function ReferencePreviewInternalInner({
     size,
     hover,
     onClick,
-    includeEntityLink = true,
+    includeSnapshotLink = true,
     includeId = true,
     textOnly,
     collection
-}: ReferencePreviewProps & { collection?: EntityCollection }) {
-    const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
+}: ReferencePreviewProps & { collection?: SnapshotCollection }) {
+    const ResolvedMissingReference = useComponentOverride("Snapshot.MissingReference", DefaultMissingReference);
 
     if (!collection) {
         if (ResolvedMissingReference !== DefaultMissingReference) {
@@ -69,12 +69,12 @@ function ReferencePreviewInternalInner({
             if (textOnly) {
                 return <span>{reference.path}</span>;
             }
-            return <EntityPreviewContainer
+            return <SnapshotPreviewContainer
                 onClick={onClick}
                 size={size ?? "medium"}>
                 <ErrorView error={"Unexpected reference value. Click to edit"}
                     tooltip={reference.pathWithId}/>
-            </EntityPreviewContainer>;
+            </SnapshotPreviewContainer>;
         }
     }
 
@@ -84,7 +84,7 @@ function ReferencePreviewInternalInner({
         previewProperties={previewProperties}
         size={size}
         disabled={disabled}
-        includeEntityLink={includeEntityLink}
+        includeSnapshotLink={includeSnapshotLink}
         includeId={includeId}
         onClick={onClick}
         textOnly={textOnly}
@@ -118,40 +118,40 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     previewProperties,
     size,
     disabled,
-    includeEntityLink,
+    includeSnapshotLink,
     includeId,
     onClick,
     hover,
     textOnly
 }: ReferencePreviewProps & {
-    collection: EntityCollection<M>
+    collection: SnapshotCollection<M>
 }) {
 
-    const ResolvedEntityPreview = useComponentOverride("Entity.Preview", EntityPreview);
+    const ResolvedSnapshotPreview = useComponentOverride("Snapshot.Preview", SnapshotPreview);
     const customizationController = useCustomizationController();
 
     const {
-        entity,
+        snapshot,
         dataLoading,
         dataLoadingError
-    } = useEntityFetch({
+    } = useSnapshotFetch({
         path: reference.path,
-        entityId: reference.id,
+        snapshotId: reference.id,
         collection,
         useCache: true
     });
 
-    if (entity) {
-        referencesCache.set(reference.pathWithId, entity);
+    if (snapshot) {
+        referencesCache.set(reference.pathWithId, snapshot);
     }
 
-    const usedEntity = entity ?? referencesCache.get(reference.pathWithId);
+    const usedSnapshot = snapshot ?? referencesCache.get(reference.pathWithId);
 
     let body: React.ReactNode;
 
     if (!reference) {
         body = <ErrorView error={"Reference not set"}/>;
-    } else if (usedEntity && !usedEntity.values) {
+    } else if (usedSnapshot && !usedSnapshot.values) {
         body = <ErrorView error={"Reference does not exist"}
             tooltip={reference.path}/>;
     }
@@ -161,57 +161,57 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         }
 
         return (
-            <EntityPreviewContainer onClick={disabled ? undefined : onClick}
+            <SnapshotPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
                 {body}
-            </EntityPreviewContainer>
+            </SnapshotPreviewContainer>
         );
     }
 
-    if (dataLoading && !usedEntity) {
+    if (dataLoading && !usedSnapshot) {
         if (textOnly) {
             return <Skeleton className="inline-block w-20 h-4" />;
         }
         return (
-            <EntityPreviewContainer onClick={disabled ? undefined : onClick}
+            <SnapshotPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
                 <Skeleton/>
-            </EntityPreviewContainer>
+            </SnapshotPreviewContainer>
         );
     }
 
-    if (!usedEntity) {
+    if (!usedSnapshot) {
         if (textOnly) {
             return <span>{reference.id}</span>;
         }
         return (
-            <EntityPreviewContainer onClick={disabled ? undefined : onClick}
+            <SnapshotPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <ErrorView error={"Entity not found"}/>
-            </EntityPreviewContainer>
+                <ErrorView error={"Snapshot not found"}/>
+            </SnapshotPreviewContainer>
         );
     }
 
     if (textOnly) {
-        const titleProperty = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
-        const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
+        const titleProperty = getSnapshotTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const titleValue = titleProperty ? getValueInPath(usedSnapshot.values, titleProperty) : undefined;
         const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(reference.id);
         return <span className="truncate">{displayValue}</span>;
     }
 
-    return <ResolvedEntityPreview size={size}
+    return <ResolvedSnapshotPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}
-        entity={usedEntity}
+        snapshot={usedSnapshot}
         collection={collection}
         onClick={onClick}
-        includeEntityLink={includeEntityLink}
+        includeSnapshotLink={includeSnapshotLink}
         includeId={includeId}
         hover={hover}/>;
 
 }
 
-const referencesCache = new Map<string, Entity<any>>();
+const referencesCache = new Map<string, Snapshot<any>>();

@@ -1,5 +1,5 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
+import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseClient, RebaseContext, SnapshotLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, SnapshotCustomView, SnapshotAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -172,7 +172,7 @@ export type RebaseProps<USER extends User> = {
      *
      * Collections are routed automatically by their `dataSource` key (resolved
      * by collection path against the registry), so routing works transparently
-     * for list/entity views, references, the board view, import/export, and
+     * for list/snapshot views, references, the board view, import/export, and
      * programmatic `context.data` access — no per-collection wiring.
      *
      * @example
@@ -250,10 +250,10 @@ export type RebaseProps<USER extends User> = {
     onAnalyticsEvent?: (event: AnalyticsEvent, data?: object) => void;
 
     /**
-     * Optional link builder you can add to generate a button in your entity forms.
+     * Optional link builder you can add to generate a button in your snapshot forms.
      * The function must return a URL that gets opened when the button is clicked
      */
-    entityLinkBuilder?: EntityLinkBuilder;
+    snapshotLinkBuilder?: SnapshotLinkBuilder;
 
 
     /**
@@ -272,14 +272,14 @@ export type RebaseProps<USER extends User> = {
     propertyConfigs?: Record<string, PropertyConfig>;
 
     /**
-     * Entity Views
+     * Snapshot Views
      */
-    entityViews?: EntityCustomView[];
+    snapshotViews?: SnapshotCustomView[];
 
     /**
-     * Entity Actions
+     * Snapshot Actions
      */
-    entityActions?: EntityAction[];
+    snapshotActions?: SnapshotAction[];
 
     /**
      * Controller to simulate different roles when dev mode is active.
@@ -306,7 +306,7 @@ export type RebaseProps<USER extends User> = {
      *     client={client}
      *     components={{
      *         "Shell.AppBar": { Component: MyCustomAppBar },
-     *         "Entity.FormActions": {
+     *         "Snapshot.FormActions": {
      *             Component: MyFormActions,
      *             wrap: true
      *         }

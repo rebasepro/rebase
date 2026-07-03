@@ -10,7 +10,7 @@ import {
     getPropertiesWithPropertiesOrder,
     getDefaultPropertiesOrder
 } from "../../src/util/property_utils";
-import type { Property, EntityCollection, Properties, MapProperty } from "@rebasepro/types";
+import type { Property, SnapshotCollection, Properties, MapProperty } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
 // isReferenceProperty
@@ -282,7 +282,7 @@ describe("getDefaultPropertiesOrder", () => {
             propertiesOrder: ["status", "title"],
             properties: { title: {},
 body: {} }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["status", "title"]);
     });
@@ -292,7 +292,7 @@ body: {} }
             properties: { title: {},
 body: {} },
             additionalFields: [{ key: "computed" }]
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["title", "body", "computed"]);
     });
@@ -301,7 +301,7 @@ body: {} },
         const collection = {
             properties: { x: {},
 y: {} }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         expect(getDefaultPropertiesOrder(collection)).toEqual(["x", "y"]);
     });

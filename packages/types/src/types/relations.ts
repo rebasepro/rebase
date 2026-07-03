@@ -1,4 +1,4 @@
-import type { EntityCollection } from "./collections";
+import type { SnapshotCollection } from "./collections";
 
 /**
  * @group Models
@@ -20,7 +20,7 @@ export interface Relation {
     /**
      * The final collection you want to retrieve records from.
      */
-    target: (() => EntityCollection) | any;
+    target: (() => SnapshotCollection) | any;
 
     /**
      * The nature of the relationship, determining if one or many records are returned.
@@ -50,7 +50,7 @@ export interface Relation {
     localKey?: string;
 
     /**
-     * Column on the TARGET table that stores the foreign key to this entity.
+     * Column on the TARGET table that stores the foreign key to this snapshot.
      * Required when `direction` is "inverse".
      * @example "post_id"
      */
@@ -282,7 +282,7 @@ export interface Relation {
      */
     onDelete?: OnAction;
 
-    overrides?: Partial<EntityCollection>;
+    overrides?: Partial<SnapshotCollection>;
 
     validation?: {
         required?: boolean;

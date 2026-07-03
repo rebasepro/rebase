@@ -1266,7 +1266,7 @@ Deterministic 32-bit hash of a string. Returns a positive integer.
 
 ```tsx
 import { hashString } from "@rebasepro/ui";
-hashString("my-entity-id"); // e.g. 1234567
+hashString("my-snapshot-id"); // e.g. 1234567
 ```
 
 ### Chip Color Utilities

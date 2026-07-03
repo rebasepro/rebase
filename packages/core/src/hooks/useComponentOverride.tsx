@@ -15,7 +15,7 @@ import { ComponentOverrideContext } from "../contexts/ComponentOverrideContext";
  * - **Wrap** (`wrap: true`): The override component wraps the default.
  *   The default is passed as `OriginalComponent` in props.
  *
- * @param name - The overridable component name (e.g. `"Entity.Form"`)
+ * @param name - The overridable component name (e.g. `"Snapshot.Form"`)
  * @param DefaultComponent - The built-in default component
  * @returns The resolved component — either the default, a full replacement, or a wrapper
  *
@@ -23,8 +23,8 @@ import { ComponentOverrideContext } from "../contexts/ComponentOverrideContext";
  * ```tsx
  * import { useComponentOverride } from "@rebasepro/core";
  *
- * function EntityFormWrapper(props: EntityFormProps) {
- *     const ResolvedForm = useComponentOverride("Entity.Form", DefaultEntityForm);
+ * function SnapshotFormWrapper(props: SnapshotFormProps) {
+ *     const ResolvedForm = useComponentOverride("Snapshot.Form", DefaultSnapshotForm);
  *     return <ResolvedForm {...props} />;
  * }
  * ```

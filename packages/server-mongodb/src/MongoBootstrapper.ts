@@ -7,7 +7,7 @@ import type {
     HistoryConfig,
     RealtimeProvider,
     DataDriver,
-    EntityCollection
+    SnapshotCollection
 } from "@rebasepro/types";
 import { MongoDriver } from "./services/MongoDriver";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
@@ -30,7 +30,7 @@ export interface MongoDriverInternals {
 
 /** Shape of the config object passed to `initializeDriver` by the coordinator. */
 interface DriverInitConfig {
-    collections?: EntityCollection[];
+    collections?: SnapshotCollection[];
 }
 
 /** Shape of the auth config passed to `initializeAuth`. */

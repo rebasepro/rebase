@@ -12,7 +12,7 @@ import { RebaseWebSocketClient } from "./websocket";
 import {
     DEFAULT_STORAGE_SOURCE_KEY,
     RebaseClient,
-    RebaseData,
+    RebaseSdkData,
     StorageSource,
     StorageSourceDefinition,
     StorageSourceRegistry
@@ -26,13 +26,14 @@ export * from "./cron";
 export * from "./api-keys";
 export * from "./collection";
 export * from "./query_builder";
+export * from "./sdk_query_builder";
 export * from "./websocket";
 export * from "./storage";
 export * from "./storage-registry";
 export * from "./reviver";
 export * from "./functions";
 export * from "./errors";
-export type { Entity, FindResponse } from "@rebasepro/types";
+export type { FindResult, SDKCollectionClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
@@ -74,7 +75,7 @@ type TypedDataLayer<DB> = {
     [K in keyof DB]: CollectionClient<
         DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
     >;
-} & RebaseData;
+} & RebaseSdkData;
 
 /**
  * The return type of `createRebaseClient<DB>()`.

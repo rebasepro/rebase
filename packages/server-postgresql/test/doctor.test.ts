@@ -1,4 +1,4 @@
-import { EntityCollection, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
+import { SnapshotCollection, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { checkCollectionsVsSchema, getExpectedColumnType } from "../src/schema/doctor";
 import * as fs from "fs";
@@ -19,7 +19,7 @@ describe("Rebase Schema Doctor", () => {
         };
 
         it("should detect missing schema file", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -34,7 +34,7 @@ describe("Rebase Schema Doctor", () => {
         });
 
         it("should pass when schema matches collections", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -58,14 +58,14 @@ describe("Rebase Schema Doctor", () => {
         });
 
         it("should detect stale schema when collections have changed", async () => {
-            const originalCollections: EntityCollection[] = [{
+            const originalCollections: SnapshotCollection[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
                 properties: { name: { type: "string" } }
             }];
 
-            const updatedCollections: EntityCollection[] = [{
+            const updatedCollections: SnapshotCollection[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",

@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { EntityRelation, Relation } from "@rebasepro/types";
+import { SnapshotRelation, Relation } from "@rebasepro/types";
 import { Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { RelationSelector } from "../../RelationSelector";
 
 interface RelationFilterFieldProps {
     name: string,
-    value?: [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null];
-    setValue: (value?: [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null]) => void;
+    value?: [VirtualTableWhereFilterOp, SnapshotRelation | SnapshotRelation[] | null];
+    setValue: (value?: [VirtualTableWhereFilterOp, SnapshotRelation | SnapshotRelation[] | null]) => void;
     relation: Relation; // relation config provided externally
     hidden: boolean;
     setHidden: (value: boolean) => void;
@@ -45,15 +45,15 @@ export function RelationFilterField({
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(fieldOperation);
-    const [internalValue, setInternalValue] = useState<EntityRelation | EntityRelation[] | undefined | null>(fieldValue);
+    const [internalValue, setInternalValue] = useState<SnapshotRelation | SnapshotRelation[] | undefined | null>(fieldValue);
 
-    function updateFilter(op: VirtualTableWhereFilterOp, val?: EntityRelation | EntityRelation[] | null) {
+    function updateFilter(op: VirtualTableWhereFilterOp, val?: SnapshotRelation | SnapshotRelation[] | null) {
 
         const prevOpIsArray = multipleSelectOperations.includes(operation);
         const newOpIsArray = multipleSelectOperations.includes(op);
         let newValue = val;
         if (prevOpIsArray !== newOpIsArray) {
-            newValue = newOpIsArray ? (newValue instanceof EntityRelation ? [newValue] : []) : undefined;
+            newValue = newOpIsArray ? (newValue instanceof SnapshotRelation ? [newValue] : []) : undefined;
         }
 
         setOperation(op);
@@ -73,11 +73,11 @@ export function RelationFilterField({
 
     const relationSelectorValue = useMemo(() => {
         if (internalValue === null || internalValue === undefined) return undefined;
-        if (Array.isArray(internalValue)) return internalValue.map(ref => new EntityRelation(ref.id, ref.path));
-        return new EntityRelation(internalValue.id, internalValue.path);
+        if (Array.isArray(internalValue)) return internalValue.map(ref => new SnapshotRelation(ref.id, ref.path));
+        return new SnapshotRelation(internalValue.id, internalValue.path);
     }, [internalValue]);
 
-    const handleRelationSelectorChange = (newVal?: EntityRelation | EntityRelation[] | null) => {
+    const handleRelationSelectorChange = (newVal?: SnapshotRelation | SnapshotRelation[] | null) => {
         if (newVal === null) {
             updateFilter(operation, null);
             return;

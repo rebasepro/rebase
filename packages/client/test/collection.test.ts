@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createCollectionClient } from "../src/collection";
 import { Transport } from "../src/transport";
 import { RebaseWebSocketClient } from "../src/websocket";
-import { Entity } from "@rebasepro/types";
+
 
 /** Shape of the mock "posts" model used across tests. */
 interface PostModel {
@@ -58,7 +58,7 @@ describe("createCollectionClient", () => {
     // find
     // -----------------------------------------------------------------------
     describe("find", () => {
-        it("calls GET /data/slug with correct query parameters and wraps into Entity", async () => {
+        it("calls GET /data/slug with correct query parameters and returns flat rows", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: 1,
 title: "Hello" }],
@@ -72,9 +72,7 @@ offset: 20 });
 
             expect(result).toEqual({
                 data: [{ id: 1,
-path: "posts",
-values: { id: 1,
-title: "Hello" } }],
+title: "Hello" }],
                 meta: { total: 1,
 limit: 10,
 offset: 20,
@@ -105,7 +103,7 @@ meta: {} });
             expect(result.data).toEqual([]);
         });
 
-        it("wraps multiple rows into correct Entity shape", async () => {
+        it("returns multiple rows as flat objects", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({
                 data: [
@@ -122,15 +120,11 @@ status: "draft" }
             const result = await client.find();
             expect(result.data).toHaveLength(2);
             expect(result.data[0]).toEqual({ id: "a",
-path: "posts",
-values: { id: "a",
 title: "First",
-status: "published" } });
+status: "published" });
             expect(result.data[1]).toEqual({ id: "b",
-path: "posts",
-values: { id: "b",
 title: "Second",
-status: "draft" } });
+status: "draft" });
         });
 
         it("passes where filter parameters correctly", async () => {
@@ -157,16 +151,14 @@ orderBy: ["title", "asc"] });
     // findById
     // -----------------------------------------------------------------------
     describe("findById", () => {
-        it("calls GET /data/slug/id and wraps into Entity", async () => {
+        it("calls GET /data/slug/id and returns flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "123",
 title: "Test" });
 
             const result = await client.findById("123");
             expect(result).toEqual({ id: "123",
-path: "posts",
-values: { id: "123",
-title: "Test" } });
+title: "Test" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/123", { method: "GET" });
         });
 
@@ -201,7 +193,7 @@ title: "Numeric" });
     // create
     // -----------------------------------------------------------------------
     describe("create", () => {
-        it("calls POST /data/slug with JSON body and wraps response into Entity", async () => {
+        it("calls POST /data/slug with JSON body and returns flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 1,
 title: "New" });
@@ -210,9 +202,7 @@ title: "New" });
             const result = await client.create(input);
 
             expect(result).toEqual({ id: 1,
-path: "posts",
-values: { id: 1,
-title: "New" } });
+title: "New" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST",
 body: JSON.stringify(input) });
         });
@@ -226,9 +216,7 @@ title: "Custom" });
             const result = await client.create(input, "custom-id");
 
             expect(result).toEqual({ id: "custom-id",
-path: "posts",
-values: { id: "custom-id",
-title: "Custom" } });
+title: "Custom" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts", {
                 method: "POST",
                 body: JSON.stringify({ title: "Custom",
@@ -251,7 +239,7 @@ title: "T" });
     // update
     // -----------------------------------------------------------------------
     describe("update", () => {
-        it("calls PUT /data/slug/id with JSON body and wraps response into Entity", async () => {
+        it("calls PUT /data/slug/id with JSON body and returns flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 1,
 title: "Updated" });
@@ -260,9 +248,7 @@ title: "Updated" });
             const result = await client.update(1, patch);
 
             expect(result).toEqual({ id: 1,
-path: "posts",
-values: { id: 1,
-title: "Updated" } });
+title: "Updated" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PUT",
 body: JSON.stringify(patch) });
         });
@@ -311,7 +297,7 @@ title: "Updated" });
         it("exposes listen/listenById when websocket is provided", () => {
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -323,7 +309,7 @@ title: "Updated" });
             const unsubFn = jest.fn();
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(unsubFn),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -346,21 +332,21 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             expect(result).toBeDefined();
         });
 
-        it("listen callback transforms entities into the expected format", () => {
+        it("listen callback transforms snapshots into the expected format", () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
                     capturedCallback = cb;
                     return () => {};
                 }),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const entities: Entity[] = [
+            const snapshots: Snapshot[] = [
                 { id: "1",
 path: "posts",
 values: { title: "A" } },
@@ -368,10 +354,10 @@ values: { title: "A" } },
 path: "posts",
 values: { title: "B" } }
             ];
-            capturedCallback!(entities);
+            capturedCallback!(snapshots);
 
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entities,
+                data: snapshots,
                 meta: expect.objectContaining({
                     total: 2,
                     limit: 20,
@@ -389,7 +375,7 @@ values: { title: "B" } }
                     capturedCallback = cb;
                     return () => {};
                 }),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -398,16 +384,16 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!({ limit: 10, offset: 5 }, onUpdate);
 
-            const entities: Entity[] = [
+            const snapshots: Snapshot[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
             // Trigger first synchronous update (heuristic meta)
-            capturedCallback!(entities);
+            capturedCallback!(snapshots);
 
             expect(onUpdate).toHaveBeenLastCalledWith({
-                data: entities,
+                data: snapshots,
                 meta: {
                     total: 2,
                     limit: 10,
@@ -424,7 +410,7 @@ values: { title: "B" } }
             // Second emission has authoritative meta (no estimated flag)
             expect(onUpdate).toHaveBeenCalledTimes(2);
             expect(onUpdate).toHaveBeenLastCalledWith({
-                data: entities,
+                data: snapshots,
                 meta: {
                     total: 100,
                     limit: 10,
@@ -441,28 +427,28 @@ values: { title: "B" } }
                     capturedCallback = cb;
                     return () => {};
                 }),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            // Return a count that matches the heuristic: 2 entities, limit 20 → heuristic total=2, hasMore=false
+            // Return a count that matches the heuristic: 2 snapshots, limit 20 → heuristic total=2, hasMore=false
             // Authoritative: count=2, hasMore=(0 + 2 < 2)=false → same as heuristic
             client.count = jest.fn().mockResolvedValue(2);
 
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const entities: Entity[] = [
+            const snapshots: Snapshot[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
-            capturedCallback!(entities);
+            capturedCallback!(snapshots);
 
             // First emission with estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entities,
+                data: snapshots,
                 meta: {
                     total: 2,
                     limit: 20,
@@ -486,7 +472,7 @@ values: { title: "B" } }
                     capturedCallback = cb;
                     return () => {};
                 }),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -495,16 +481,16 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const entities: Entity[] = [
+            const snapshots: Snapshot[] = [
                 { id: "1", path: "posts", values: { title: "A" } }
             ];
 
-            capturedCallback!(entities);
+            capturedCallback!(snapshots);
 
             // First emission with estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entities,
+                data: snapshots,
                 meta: {
                     total: 1,
                     limit: 20,
@@ -521,11 +507,11 @@ values: { title: "B" } }
             expect(onUpdate).toHaveBeenCalledTimes(1);
         });
 
-        it("listenById passes correct parameters to ws.listenEntity", () => {
+        it("listenById passes correct parameters to ws.listenOne", () => {
             const unsubFn = jest.fn();
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockReturnValue(unsubFn)
+                listenOne: jest.fn().mockReturnValue(unsubFn)
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -533,19 +519,19 @@ values: { title: "B" } }
 
             client.listenById!("abc", onUpdate);
 
-            expect(mockWs.listenEntity).toHaveBeenCalledWith(
+            expect(mockWs.listenOne).toHaveBeenCalledWith(
                 { path: "posts",
-entityId: "abc" },
+id: "abc" },
                 expect.any(Function),
                 undefined
             );
         });
 
-        it("listenById callback passes entity or undefined", () => {
+        it("listenById callback passes snapshot or undefined", () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockImplementation((_props, cb: Function) => {
+                listenOne: jest.fn().mockImplementation((_props, cb: Function) => {
                     capturedCallback = cb;
                     return () => {};
                 })
@@ -555,14 +541,14 @@ entityId: "abc" },
             const onUpdate = jest.fn();
             client.listenById!("abc", onUpdate);
 
-            // Entity exists
-            const entity: Entity = { id: "abc",
+            // Snapshot exists
+            const snapshot: Snapshot = { id: "abc",
 path: "posts",
 values: { title: "Test" } };
-            capturedCallback!(entity);
-            expect(onUpdate).toHaveBeenCalledWith(entity);
+            capturedCallback!(snapshot);
+            expect(onUpdate).toHaveBeenCalledWith(snapshot);
 
-            // Entity deleted / null
+            // Snapshot deleted / null
             onUpdate.mockClear();
             capturedCallback!(null);
             expect(onUpdate).toHaveBeenCalledWith(undefined);
@@ -571,7 +557,7 @@ values: { title: "Test" } };
         it("listen parses where filter parameters", () => {
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
-                listenEntity: jest.fn().mockReturnValue(() => {})
+                listenOne: jest.fn().mockReturnValue(() => {})
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
@@ -663,54 +649,53 @@ meta: {} });
     });
 
     // -----------------------------------------------------------------------
-    // Regression: id fields must stay in values
+    // Regression: id and fields at top level of flat row
     // -----------------------------------------------------------------------
-    describe("id preservation in values (regression)", () => {
-        it("find keeps id inside entity values", async () => {
+    describe("id preservation in flat row (regression)", () => {
+        it("find keeps id at top level of flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: "abc",
 title: "Test" }],
 meta: {} });
 
             const result = await client.find();
-            expect(result.data[0].values).toHaveProperty("id", "abc");
-            expect(result.data[0].id).toBe("abc");
+            expect(result.data[0]).toHaveProperty("id", "abc");
+            expect(result.data[0]).toHaveProperty("title", "Test");
         });
 
-        it("findById keeps id inside entity values", async () => {
+        it("findById keeps id at top level of flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 42,
 title: "Test" });
 
             const result = await client.findById(42);
-            expect(result!.values).toHaveProperty("id", 42);
             expect(result!.id).toBe(42);
+            expect(result!).toHaveProperty("title", "Test");
         });
 
-        it("create keeps id inside entity values", async () => {
+        it("create keeps id at top level of flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "new-id",
 title: "Created" });
 
             const result = await client.create({ title: "Created" });
-            expect(result.values).toHaveProperty("id", "new-id");
             expect(result.id).toBe("new-id");
+            expect(result).toHaveProperty("title", "Created");
         });
 
-        it("update keeps id inside entity values", async () => {
+        it("update keeps id and all fields at top level of flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "existing",
 title: "Updated",
 status: "published" });
 
             const result = await client.update("existing", { title: "Updated" });
-            expect(result.values).toHaveProperty("id", "existing");
-            expect(result.values).toHaveProperty("title", "Updated");
-            expect(result.values).toHaveProperty("status", "published");
             expect(result.id).toBe("existing");
+            expect(result).toHaveProperty("title", "Updated");
+            expect(result).toHaveProperty("status", "published");
         });
 
-        it("preserves all fields from server response in values", async () => {
+        it("preserves all fields from server response in flat row", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 1,
 title: "Full",
@@ -719,11 +704,26 @@ tags: ["a", "b"],
 extra_field: "kept" });
 
             const result = await client.findById(1);
-            expect(result!.values).toEqual({ id: 1,
+            expect(result).toEqual({ id: 1,
 title: "Full",
 status: "draft",
 tags: ["a", "b"],
 extra_field: "kept" });
+        });
+
+        it("never leaks the CMS Snapshot wrapper (no path / values fields)", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValueOnce({ data: [{ id: "1",
+title: "Flat" }],
+meta: { total: 1 } });
+
+            const { data } = await client.find();
+            const row = data[0] as Record<string, unknown>;
+            // The SDK surface returns plain rows — the Snapshot view-model
+            // (`{ id, path, values }`) must not bleed through.
+            expect(row).not.toHaveProperty("path");
+            expect(row).not.toHaveProperty("values");
+            expect(row.title).toBe("Flat");
         });
     });
 });
@@ -744,7 +744,7 @@ describe("FilterValues passthrough", () => {
     function createClientWithWs() {
         const mockWs = {
             listenCollection: jest.fn().mockReturnValue(() => {}),
-            listenEntity: jest.fn().mockReturnValue(() => {})
+            listenOne: jest.fn().mockReturnValue(() => {})
         } as unknown as RebaseWebSocketClient;
         return { client: createCollectionClient<PostModel>(transport, "posts", mockWs),
 mockWs };

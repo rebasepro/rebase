@@ -1,6 +1,6 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 import { useEffect, useState, useMemo } from "react";
-import { Entity, FilterValues, User } from "@rebasepro/types";
+import { Snapshot, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 /**
@@ -14,12 +14,12 @@ export interface CollectionFetchProps<M extends Record<string, any>> {
     path: string;
 
     /**
-     * collection of the entity displayed by this collection
+     * collection of the snapshot displayed by this collection
      */
-    collection: EntityCollection<M>
+    collection: SnapshotCollection<M>
 
     /**
-     * Number of entities to fetch
+     * Number of snapshots to fetch
      */
     itemCount?: number;
 
@@ -53,7 +53,7 @@ export interface CollectionFetchProps<M extends Record<string, any>> {
  * @group Hooks and utilities
  */
 export interface CollectionFetchResult<M extends Record<string, any>> {
-    data: Entity<M>[];
+    data: Snapshot<M>[];
     dataLoading: boolean;
     noMoreToLoad: boolean;
     dataLoadingError?: Error;
@@ -94,7 +94,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
     // filterValues is already FilterValues — pass directly
     const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
 
-    const [data, setData] = useState<Entity<M>[]>([]);
+    const [data, setData] = useState<Snapshot<M>[]>([]);
 
     const [dataLoading, setDataLoading] = useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
@@ -105,11 +105,11 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
 
         setDataLoading(true);
 
-        const onEntitiesUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean; total?: number } }) => {
-            const entities = res.data;
+        const onSnapshotsUpdate = async (res: { data: Snapshot<M>[], meta: { hasMore: boolean; total?: number } }) => {
+            const snapshots = res.data;
             setDataLoading(false);
             setDataLoadingError(undefined);
-            setData(entities.map(e => ({
+            setData(snapshots.map(e => ({
                 ...e
             })));
             setNoMoreToLoad(!res.meta.hasMore);
@@ -145,7 +145,7 @@ export function useCollectionFetch<M extends Record<string, any>, USER extends U
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
+            }, (res) => onSnapshotsUpdate({ data: res.data as Snapshot<M>[],
 meta: res.meta }), onError);
         } else {
             accessor.find({
@@ -157,7 +157,7 @@ meta: res.meta }), onError);
                 searchString,
                 include: includeParams
             })
-                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
+                .then((res) => onSnapshotsUpdate({ data: res.data as Snapshot<M>[],
 meta: res.meta }))
                 .catch(onError);
             return () => {

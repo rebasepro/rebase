@@ -153,7 +153,7 @@ describe("find() — one-to-one relation response", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
-    it("preserves relation object in values", async () => {
+    it("preserves relation object in row", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
@@ -164,11 +164,11 @@ name: "Alice",
 email: "a@b.com" } }
         ]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].id).toBe(1); expect(r.data[0].path).toBe("posts");
-        expect(r.data[0].values.author).toEqual({ id: 5,
+        expect(r.data[0].id).toBe(1);
+        expect(r.data[0].author).toEqual({ id: 5,
 name: "Alice",
 email: "a@b.com" });
-        expect(r.data[0].values.title).toBe("Hello"); expect(r.data[0].values.author_id).toBe(5);
+        expect(r.data[0].title).toBe("Hello"); expect(r.data[0].author_id).toBe(5);
     });
     it("null relation", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -176,14 +176,14 @@ email: "a@b.com" });
 title: "Solo",
 author: null }]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].values.author).toBeNull();
+        expect(r.data[0].author).toBeNull();
     });
     it("missing relation field entirely", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "Minimal" }]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].values.author).toBeUndefined();
+        expect(r.data[0].author).toBeUndefined();
     });
     it("relation with nested objects preserved", async () => {
         const c = createCollectionClient<any>(transport, "posts");
@@ -196,7 +196,7 @@ address: { city: "NYC",
 zip: "10001" } } }
         ]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].values.author.address).toEqual({ city: "NYC",
+        expect(r.data[0].author.address).toEqual({ city: "NYC",
 zip: "10001" });
     });
     it("relation with date strings preserved", async () => {
@@ -208,7 +208,7 @@ author: { id: 5,
 created_at: "2024-01-15T10:30:00Z" } }
         ]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].values.author.created_at).toBe("2024-01-15T10:30:00Z");
+        expect(r.data[0].author.created_at).toBe("2024-01-15T10:30:00Z");
     });
     it("relation with all extra fields preserved", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -222,7 +222,7 @@ bio: "dev",
 avatar: "url",
 count: 42 } }
         ]));
-        const a = (await c.find({ include: ["author"] })).data[0].values.author;
+        const a = (await c.find({ include: ["author"] })).data[0].author;
         expect(a.bio).toBe("dev"); expect(a.avatar).toBe("url"); expect(a.count).toBe(42);
     });
 });
@@ -234,7 +234,7 @@ describe("find() — one-to-many relation response", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
-    it("preserves array of related entities", async () => {
+    it("preserves array of related snapshots", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
@@ -244,8 +244,8 @@ name: "ts" }, { id: 20,
 name: "js" }] }
         ]));
         const r = await c.find({ include: ["tags"] });
-        expect(r.data[0].values.tags).toHaveLength(2);
-        expect(r.data[0].values.tags[0]).toEqual({ id: 10,
+        expect(r.data[0].tags).toHaveLength(2);
+        expect(r.data[0].tags[0]).toEqual({ id: 10,
 name: "ts" });
     });
     it("empty array", async () => {
@@ -253,7 +253,7 @@ name: "ts" });
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "P",
 tags: [] }]));
-        expect((await c.find({ include: ["tags"] })).data[0].values.tags).toEqual([]);
+        expect((await c.find({ include: ["tags"] })).data[0].tags).toEqual([]);
     });
     it("large array (50 items)", async () => {
         const tags = Array.from({ length: 50 }, (_, i) => ({ id: i + 1,
@@ -263,8 +263,8 @@ name: `tag-${i + 1}` }));
 title: "Many",
 tags }]));
         const r = await c.find({ include: ["tags"] });
-        expect(r.data[0].values.tags).toHaveLength(50);
-        expect(r.data[0].values.tags[49]).toEqual({ id: 50,
+        expect(r.data[0].tags).toHaveLength(50);
+        expect(r.data[0].tags[49]).toEqual({ id: 50,
 name: "tag-50" });
     });
 });
@@ -290,10 +290,10 @@ category: { id: 3,
 name: "Tech" }
         }]));
         const p = (await c.find({ include: ["author", "tags", "category"] })).data[0];
-        expect(p.values.author).toEqual({ id: 5,
+        expect(p.author).toEqual({ id: 5,
 name: "Bob" });
-        expect(p.values.tags).toHaveLength(2);
-        expect(p.values.category).toEqual({ id: 3,
+        expect(p.tags).toHaveLength(2);
+        expect(p.category).toEqual({ id: 3,
 name: "Tech" });
     });
     it("mixed states: some have relations, some don't", async () => {
@@ -313,13 +313,13 @@ tags: [] },
 title: "Bare" }
         ]));
         const r = await c.find({ include: ["author", "tags"] });
-        expect(r.data[0].values.author).toEqual({ id: 5,
+        expect(r.data[0].author).toEqual({ id: 5,
 name: "A" });
-        expect(r.data[0].values.tags).toHaveLength(1);
-        expect(r.data[1].values.author).toBeNull();
-        expect(r.data[1].values.tags).toEqual([]);
-        expect(r.data[2].values.author).toBeUndefined();
-        expect(r.data[2].values.tags).toBeUndefined();
+        expect(r.data[0].tags).toHaveLength(1);
+        expect(r.data[1].author).toBeNull();
+        expect(r.data[1].tags).toEqual([]);
+        expect(r.data[2].author).toBeUndefined();
+        expect(r.data[2].tags).toBeUndefined();
     });
     it("relation objects not confused with regular map fields", async () => {
         const c = createCollectionClient<any>(transport, "posts");
@@ -332,9 +332,9 @@ author: { id: 5,
 name: "A" } }
         ]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].values.metadata).toEqual({ views: 100,
+        expect(r.data[0].metadata).toEqual({ views: 100,
 likes: 50 });
-        expect(r.data[0].values.author).toEqual({ id: 5,
+        expect(r.data[0].author).toEqual({ id: 5,
 name: "A" });
     });
 });
@@ -355,7 +355,7 @@ author: { id: "uuid-2",
 name: "A" } }
         ]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].id).toBe("uuid-1"); expect(r.data[0].values.author.id).toBe("uuid-2");
+        expect(r.data[0].id).toBe("uuid-1"); expect(r.data[0].author.id).toBe("uuid-2");
     });
     it("numeric IDs", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -364,7 +364,7 @@ title: "P",
 author: { id: 7,
 name: "A" } }]));
         const r = await c.find({ include: ["author"] });
-        expect(r.data[0].id).toBe(42); expect(r.data[0].values.author.id).toBe(7);
+        expect(r.data[0].id).toBe(42); expect(r.data[0].author.id).toBe(7);
     });
     it("zero ID", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -382,16 +382,14 @@ describe("find() — without include", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
-    it("wraps entities correctly", async () => {
+    it("returns flat rows correctly", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "Plain",
 author_id: 5 }]));
         expect((await c.find()).data[0]).toEqual({ id: 1,
-path: "posts",
-values: { id: 1,
 title: "Plain",
-author_id: 5 } });
+author_id: 5 });
     });
     it("handles undefined data gracefully", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -420,7 +418,7 @@ title: "Hi",
 author: { id: 5,
 name: "A" } });
         const r = await c.findById(1);
-        expect(r!.values.author).toEqual({ id: 5,
+        expect(r!.author).toEqual({ id: 5,
 name: "A" });
     });
     it("preserves array relation in values", async () => {
@@ -431,14 +429,14 @@ tags: [{ id: 1,
 name: "r" }, { id: 2,
 name: "v" }] });
         const r = await c.findById("abc");
-        expect(r!.id).toBe("abc"); expect(r!.values.tags).toHaveLength(2);
+        expect(r!.id).toBe("abc"); expect(r!.tags).toHaveLength(2);
     });
     it("null relation", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "S",
 author: null });
-        expect((await c.findById(1))!.values.author).toBeNull();
+        expect((await c.findById(1))!.author).toBeNull();
     });
     it("returns undefined for null backend response", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -478,7 +476,7 @@ author: { id: 5,
 name: "A" } });
         const r = await c.create({ title: "New",
 author_id: 5 });
-        expect(r.values.author_id).toBe(5); expect(r.values.author).toEqual({ id: 5,
+        expect(r.author_id).toBe(5); expect(r.author).toEqual({ id: 5,
 name: "A" });
         expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "POST",
 body: JSON.stringify({ title: "New",
@@ -499,7 +497,7 @@ author_id: 10,
 author: { id: 10,
 name: "B" } });
         const r = await c.update(1, { author_id: 10 });
-        expect(r.values.author_id).toBe(10); expect(r.values.author).toEqual({ id: 10,
+        expect(r.author_id).toBe(10); expect(r.author).toEqual({ id: 10,
 name: "B" });
     });
     it("update encodes special chars in ID", async () => {
@@ -545,7 +543,7 @@ name: "A" } }]));
         const r = await c.where("status", "==", "published").include("author").limit(5).find();
         const p = mockRequest.mock.calls[0][0] as string;
         expect(p).toContain("include=author"); expect(p).toContain("limit=5"); expect(p).toContain("status=eq.published");
-        expect(r.data[0].values.author).toEqual({ id: 5,
+        expect(r.data[0].author).toEqual({ id: 5,
 name: "A" });
     });
     it("second include() overrides first", async () => {
@@ -612,7 +610,7 @@ describe("listen() — include", () => {
     });
     it("BUG: include dropped in WS subscription", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
+listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ include: ["author"],
@@ -623,7 +621,7 @@ limit: 10 }, jest.fn());
     });
     it("listen passes searchString to WS", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
+listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ searchString: "hello" }, jest.fn());
@@ -631,7 +629,7 @@ listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
     });
     it("listen parses orderBy correctly", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
+listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ orderBy: ["title", "desc"] }, jest.fn());
@@ -641,7 +639,7 @@ listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
     it("listen returns unsubscribe function", () => {
         const unsub = jest.fn();
         const mockWs = { listenCollection: jest.fn().mockReturnValue(unsub),
-listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
+listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         const unsubResult = c.listen!({}, jest.fn());
@@ -650,17 +648,17 @@ listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
     });
     it("listenById passes correct args", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
+listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listenById!("abc", jest.fn());
-        expect(mockWs.listenEntity).toHaveBeenCalledWith({ path: "posts",
-entityId: "abc" }, expect.any(Function), undefined);
+        expect(mockWs.listenOne).toHaveBeenCalledWith({ path: "posts",
+id: "abc" }, expect.any(Function), undefined);
     });
     it("listenById converts null to undefined", () => {
         let cb: any;
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenEntity: jest.fn().mockImplementation((_, c) => { cb = c; return () => {}; }) } as any;
+listenOne: jest.fn().mockImplementation((_, c) => { cb = c; return () => {}; }) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         const onUpdate = jest.fn();
@@ -694,7 +692,7 @@ hasMore: true }
         ));
         const r = await c.include("author").limit(2).offset(0).find();
         expect(r.data).toHaveLength(2); expect(r.meta.hasMore).toBe(true);
-        expect(r.data[0].values.author).toEqual({ id: 5,
+        expect(r.data[0].author).toEqual({ id: 5,
 name: "X" });
     });
     it("page 2", async () => {
@@ -712,9 +710,9 @@ offset: 2,
 hasMore: true }
         ));
         const r = await c.include("author").limit(2).offset(2).find();
-        expect(r.data[0].values.author).toEqual({ id: 7,
+        expect(r.data[0].author).toEqual({ id: 7,
 name: "Z" });
-        expect(r.data[1].values.author).toBeNull();
+        expect(r.data[1].author).toBeNull();
     });
 });
 
@@ -743,10 +741,10 @@ websocketUrl: "" });
         const r = await client.data.posts.include("author", "tags").find();
         expect((fetchMock.mock.calls[0][0] as string)).toContain("include=author%2Ctags");
         expect(r.data).toHaveLength(1);
-        expect(r.data[0].values.title).toBe("E2E");
-        expect(r.data[0].values.author).toEqual({ id: 10,
+        expect(r.data[0].title).toBe("E2E");
+        expect(r.data[0].author).toEqual({ id: 10,
 name: "Full" });
-        expect(r.data[0].values.tags).toHaveLength(2);
+        expect(r.data[0].tags).toHaveLength(2);
     });
     it("collection caching: same slug returns same instance", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
@@ -765,7 +763,7 @@ name: "Full" });
 describe("FilterValues passthrough via listen", () => {
     function setup() {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
-listenEntity: jest.fn().mockReturnValue(() => {}) } as any;
+listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         return { client: createCollectionClient<any>(transport, "posts", mockWs),
 mockWs };
@@ -800,11 +798,12 @@ describe("Collection slug handling", () => {
         await c.find();
         expect(mockRequest).toHaveBeenCalledWith("/data/my_collection", { method: "GET" });
     });
-    it("slug appears in entity path", async () => {
+    it("slug appears in request path", async () => {
         const c = createCollectionClient<any>(transport, "orders");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 total: 100 }]));
-        expect((await c.find()).data[0].path).toBe("orders");
+        await c.find();
+        expect(mockRequest).toHaveBeenCalledWith("/data/orders", { method: "GET" });
     });
     it("different slugs create independent paths", async () => {
         const c1 = createCollectionClient<any>(transport, "posts");
@@ -847,19 +846,19 @@ describe("QueryBuilder operator mapping", () => {
 });
 
 // ==========================================================================
-// 17. CMS Entity Relation shape — the __type: "relation" format
-//     Backend's drizzleResultToEntity wraps relations as:
+// 17. CMS Snapshot Relation shape — the __type: "relation" format
+//     Backend's drizzleResultToSnapshot wraps relations as:
 //     { __type: "relation", id, path, data: { id, path, values } }
 //     But REST path (drizzleResultToRestRow) returns flat:
 //     { id, name, email, ... }
 //     The client SDK consumes the REST format. These tests verify
-//     both formats are handled by rowToEntity.
+//     both formats are handled by rowToSnapshot.
 // ==========================================================================
 describe("CMS relation shape — __type: 'relation' format", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
-    it("REST format (flat object) preserved in values", async () => {
+    it("REST format (flat object) preserved in row", async () => {
         // This is what drizzleResultToRestRow returns via the REST API
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
@@ -871,16 +870,16 @@ email: "a@b.com" }
         }]));
         const r = await c.find({ include: ["author"] });
         // REST format: flat object with id, no __type, no path, no data wrapper
-        expect(r.data[0].values.author).toEqual({ id: "5",
+        expect(r.data[0].author).toEqual({ id: "5",
 name: "Alice",
 email: "a@b.com" });
-        expect(r.data[0].values.author.__type).toBeUndefined();
-        expect(r.data[0].values.author.path).toBeUndefined();
+        expect(r.data[0].author.__type).toBeUndefined();
+        expect(r.data[0].author.path).toBeUndefined();
     });
 
-    it("CMS entity format (__type:relation) also preserved as-is (passthrough)", async () => {
+    it("CMS snapshot format (__type:relation) also preserved as-is (passthrough)", async () => {
         // If the backend somehow returns CMS-format relations through REST,
-        // rowToEntity should still preserve them in values
+        // rowToSnapshot should still preserve them in values
         const c = createCollectionClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,
@@ -897,8 +896,8 @@ email: "a@b.com" } }
         }]));
         const r = await c.find({ include: ["author"] });
         // The SDK doesn't transform — it passes through whatever shape the backend sends
-        expect(r.data[0].values.author.__type).toBe("relation");
-        expect(r.data[0].values.author.data.values.name).toBe("Alice");
+        expect(r.data[0].author.__type).toBe("relation");
+        expect(r.data[0].author.data.values.name).toBe("Alice");
     });
 
     it("REST format: many-relation returns array of flat objects", async () => {
@@ -916,9 +915,9 @@ slug: "javascript" }
             ]
         }]));
         const r = await c.find({ include: ["tags"] });
-        expect(r.data[0].values.tags[0].id).toBe("10");
-        expect(r.data[0].values.tags[0].name).toBe("ts");
-        expect(r.data[0].values.tags[0].__type).toBeUndefined();
+        expect(r.data[0].tags[0].id).toBe("10");
+        expect(r.data[0].tags[0].name).toBe("ts");
+        expect(r.data[0].tags[0].__type).toBeUndefined();
     });
 
     it("CMS format: many-relation with __type:relation objects", async () => {
@@ -942,8 +941,8 @@ values: { name: "js" } } }
             ]
         }]));
         const r = await c.find({ include: ["tags"] });
-        expect(r.data[0].values.tags[0].__type).toBe("relation");
-        expect(r.data[0].values.tags[0].data.values.name).toBe("ts");
+        expect(r.data[0].tags[0].__type).toBe("relation");
+        expect(r.data[0].tags[0].data.values.name).toBe("ts");
     });
 
     it("REST format: id is always stringified by backend", async () => {
@@ -956,7 +955,7 @@ title: "Post",
 name: "Alice" }
         }]));
         const r = await c.find({ include: ["author"] });
-        expect(typeof r.data[0].values.author.id).toBe("string");
+        expect(typeof r.data[0].author.id).toBe("string");
     });
 });
 
@@ -1036,9 +1035,9 @@ name: "y" }] }]));
             c.find({ include: ["tags"] })
         ]);
 
-        expect(r1.data[0].values.author).toEqual({ id: 5,
+        expect(r1.data[0].author).toEqual({ id: 5,
 name: "X" });
-        expect(r2.data[0].values.tags).toHaveLength(1);
+        expect(r2.data[0].tags).toHaveLength(1);
         expect(mockRequest).toHaveBeenCalledTimes(2);
     });
 });
@@ -1104,9 +1103,9 @@ describe("buildQueryString — encoding edge cases", () => {
 });
 
 // ==========================================================================
-// 23. rowToEntity — edge cases in id extraction
+// 23. Flat row format — field preservation edge cases
 // ==========================================================================
-describe("rowToEntity — id extraction edge cases", () => {
+describe("Flat row format — field preservation edge cases", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
@@ -1124,30 +1123,30 @@ title: "Empty" }]));
         const r = await c.find();
         expect(r.data[0].id).toBe("");
     });
-    it("boolean values preserved in entity values", async () => {
+    it("boolean values preserved in flat row", async () => {
         const c = createCollectionClient<any>(transport, "items");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 active: true,
 deleted: false }]));
         const r = await c.find();
-        expect(r.data[0].values.active).toBe(true);
-        expect(r.data[0].values.deleted).toBe(false);
+        expect(r.data[0].active).toBe(true);
+        expect(r.data[0].deleted).toBe(false);
     });
-    it("null values preserved in entity values", async () => {
+    it("null values preserved in flat row", async () => {
         const c = createCollectionClient<any>(transport, "items");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 description: null,
 count: 0 }]));
         const r = await c.find();
-        expect(r.data[0].values.description).toBeNull();
-        expect(r.data[0].values.count).toBe(0);
+        expect(r.data[0].description).toBeNull();
+        expect(r.data[0].count).toBe(0);
     });
-    it("array values preserved in entity values", async () => {
+    it("array values preserved in flat row", async () => {
         const c = createCollectionClient<any>(transport, "items");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 labels: ["a", "b", "c"] }]));
         const r = await c.find();
-        expect(r.data[0].values.labels).toEqual(["a", "b", "c"]);
+        expect(r.data[0].labels).toEqual(["a", "b", "c"]);
     });
 });
 

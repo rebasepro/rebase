@@ -20,7 +20,7 @@ describe("Property Conditions", () => {
                 previousValues: {},
                 propertyValue: undefined,
                 path: "products",
-                entityId: "123",
+                snapshotId: "123",
                 isNew: false,
                 user: { uid: "user1",
 email: null,
@@ -73,7 +73,7 @@ roles: [] },
 
             const contextExisting: ConditionContext = {
                 ...contextNew,
-                entityId: "123",
+                snapshotId: "123",
                 isNew: false
             };
             expect(evaluateCondition(rule, contextExisting)).toBe(false);
@@ -244,7 +244,7 @@ roles: [] },
             previousValues: {},
             propertyValue: undefined,
             path: "products",
-            entityId: "123",
+            snapshotId: "123",
             isNew: false,
             user: { uid: "user1",
 email: null,
@@ -494,7 +494,7 @@ values: { status: "published" } };
             previousValues: {},
             propertyValue: undefined,
             path: "products",
-            entityId: "123",
+            snapshotId: "123",
             isNew: false,
             user: { uid: "user1",
 email: null,
@@ -536,7 +536,7 @@ roles: ["admin"] },
     });
 
     describe("applyPropertyConditions — defaultValue condition", () => {
-        it("should set defaultValue for new entities", () => {
+        it("should set defaultValue for new snapshots", () => {
             const context: ConditionContext = {
                 values: {},
                 previousValues: {},
@@ -565,13 +565,13 @@ roles: [] },
             expect(result.defaultValue).toBe("draft");
         });
 
-        it("should NOT set defaultValue for existing entities", () => {
+        it("should NOT set defaultValue for existing snapshots", () => {
             const context: ConditionContext = {
                 values: { status: "published" },
                 previousValues: {},
                 propertyValue: undefined,
                 path: "products",
-                entityId: "123",
+                snapshotId: "123",
                 isNew: false,
                 user: { uid: "u1",
 email: null,
@@ -602,7 +602,7 @@ roles: [] },
             previousValues: {},
             propertyValue: undefined,
             path: "products",
-            entityId: "123",
+            snapshotId: "123",
             isNew: false,
             user: { uid: "u1",
 email: null,
@@ -634,7 +634,7 @@ roles: [] },
             previousValues: {},
             propertyValue: undefined,
             path: "products",
-            entityId: "123",
+            snapshotId: "123",
             isNew: false,
             user: { uid: "u1",
 email: null,
@@ -681,7 +681,7 @@ roles: [] },
             previousValues: {},
             propertyValue: undefined,
             path: "users",
-            entityId: "123",
+            snapshotId: "123",
             isNew: false,
             user: { uid: "u1",
 email: null,
@@ -859,7 +859,7 @@ name: "Editor" }]
                 values: { title: "Hello",
 createdAt: now },
                 path: "products",
-                entityId: "123",
+                snapshotId: "123",
                 authController: mockAuthController as AuthController
             });
 
@@ -867,10 +867,10 @@ createdAt: now },
             expect(context.user.uid).toBe("user123");
             expect(context.user.roles).toEqual(["admin", "editor"]);
             expect(context.isNew).toBe(false);
-            expect(context.entityId).toBe("123");
+            expect(context.snapshotId).toBe("123");
         });
 
-        it("should mark isNew as true when no entityId", () => {
+        it("should mark isNew as true when no snapshotId", () => {
             const mockAuthController = {
                 user: null
             };
@@ -881,7 +881,7 @@ createdAt: now },
             });
 
             expect(context.isNew).toBe(true);
-            expect(context.entityId).toBeUndefined();
+            expect(context.snapshotId).toBeUndefined();
         });
 
         it("should handle user with Role object roles", () => {
@@ -899,7 +899,7 @@ name: "Editor" }]
 
             const context = buildConditionContext({
                 path: "products",
-                entityId: "123",
+                snapshotId: "123",
                 authController: mockAuthController as AuthController
             });
 

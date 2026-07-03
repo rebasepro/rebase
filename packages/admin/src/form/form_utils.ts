@@ -1,5 +1,5 @@
-import type { EntityCollection, PropertyConfig } from "@rebasepro/types";
-import type { AuthController, Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import type { SnapshotCollection, PropertyConfig } from "@rebasepro/types";
+import type { AuthController, Snapshot, SnapshotStatus, SnapshotValues } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/formex";
 import { getDefaultValuesFor } from "@rebasepro/common";
@@ -112,22 +112,22 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
     return changes;
 }
 
-export function getInitialEntityValues<M extends Record<string, unknown>>(
+export function getInitialSnapshotValues<M extends Record<string, unknown>>(
     authController: AuthController,
-    collection: EntityCollection,
+    collection: SnapshotCollection,
     path: string,
     status: "new" | "existing" | "copy",
-    entity: Entity<M> | undefined,
+    snapshot: Snapshot<M> | undefined,
     propertyConfigs?: Record<string, PropertyConfig>
-): Partial<EntityValues<M>> {
+): Partial<SnapshotValues<M>> {
     const properties = collection.properties;
-    if ((status === "existing" || status === "copy") && entity) {
-        let values: Partial<EntityValues<M>>;
+    if ((status === "existing" || status === "copy") && snapshot) {
+        let values: Partial<SnapshotValues<M>>;
         if (!collection.alwaysApplyDefaultValues) {
-            values = entity.values ?? getDefaultValuesFor(properties);
+            values = snapshot.values ?? getDefaultValuesFor(properties);
         } else {
             const defaultValues = getDefaultValuesFor(properties);
-            values = mergeDeep(defaultValues, entity.values ?? {});
+            values = mergeDeep(defaultValues, snapshot.values ?? {});
         }
         // When copying, clear ID fields so the database generates new IDs
         if (status === "copy") {
@@ -145,7 +145,7 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
     } else {
         console.error({
             status,
-            entity
+            snapshot
         });
         throw new Error("Form has not been initialised with the correct parameters");
     }

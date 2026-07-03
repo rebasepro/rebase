@@ -1,5 +1,4 @@
-import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
-import { Entity } from "@rebasepro/types";
+import { defineCollection, SnapshotCallbackContext } from "@rebasepro/common";
 import ordersCollection from "./orders";
 import productsCollection from "./products";
 
@@ -92,10 +91,10 @@ const orderItemsCollection = defineCollection({
             if (productId && (!values.product_name || !values.sku || values.unit_price === undefined)) {
                 const product = await context.data.collection<ProductValues>("products").findById(productId);
                 if (product) {
-                    values.product_name = values.product_name || product.values.name;
-                    values.sku = values.sku || product.values.sku;
+                    values.product_name = values.product_name || product.name;
+                    values.sku = values.sku || product.sku;
                     if (values.unit_price === undefined || values.unit_price === null) {
-                        values.unit_price = product.values.price;
+                        values.unit_price = product.price;
                     }
                 }
             }
@@ -113,8 +112,8 @@ const orderItemsCollection = defineCollection({
                 await updateOrderTotals(orderId, context);
             }
         },
-        afterDelete: async ({ entity, context }) => {
-            const orderId = getRelationId(entity.values.order);
+        afterDelete: async ({ row, context }) => {
+            const orderId = getRelationId(row.order);
             if (orderId) {
                 await updateOrderTotals(orderId, context);
             }
@@ -132,18 +131,18 @@ const orderItemsCollection = defineCollection({
 });
 
 // Helper function to recalculate the parent order subtotal & total
-async function updateOrderTotals(orderId: string | number, context: EntityCallbackContext) {
+async function updateOrderTotals(orderId: string | number, context: SnapshotCallbackContext) {
     const { data: items } = await context.data.collection("order_items").find({
         where: { order: ["==", orderId] }
     });
 
-    const subtotal = items.reduce((sum: number, item: Entity) => sum + Number(item.values.line_total ?? 0), 0);
+    const subtotal = items.reduce((sum: number, item) => sum + Number(item.line_total ?? 0), 0);
 
     const order = await context.data.collection("orders").findById(orderId);
     if (order) {
-        const tax = Number(order.values.tax_amount ?? 0);
-        const shipping = Number(order.values.shipping_cost ?? 0);
-        const discount = Number(order.values.discount_amount ?? 0);
+        const tax = Number(order.tax_amount ?? 0);
+        const shipping = Number(order.shipping_cost ?? 0);
+        const discount = Number(order.discount_amount ?? 0);
         const total = subtotal + tax + shipping - discount;
 
         await context.data.collection("orders").update(orderId, {

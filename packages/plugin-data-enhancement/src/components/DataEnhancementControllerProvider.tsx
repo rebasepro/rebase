@@ -12,8 +12,8 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { useUrlController } from "@rebasepro/admin";
-import { DataDriver, Entity, EntityCollection, PluginFormActionProps } from "@rebasepro/types";
-import { enhanceDataAPIStream, fetchEntityPromptSuggestion } from "../api";
+import { DataDriver, Snapshot, SnapshotCollection, PluginFormActionProps } from "@rebasepro/types";
+import { enhanceDataAPIStream, fetchSnapshotPromptSuggestion } from "../api";
 import { getAppendableSuggestion } from "../utils/suggestions";
 import { getSimplifiedProperties } from "../utils/properties";
 import { useEditorAIController } from "../editor/useEditorAIController";
@@ -27,7 +27,7 @@ type DataEnhancementControllerProviderProps = {
 
     getConfigForPath?: (props: {
         path: string,
-        collection: EntityCollection
+        collection: SnapshotCollection
     }) => boolean;
 
     host?: string;
@@ -254,8 +254,8 @@ export function DataEnhancementControllerProvider({
                     apiKey,
                     properties,
                     path: resolvedPath,
-                    entityName: collection.singularName ?? collection.name,
-                    entityDescription: collection.description,
+                    snapshotName: collection.singularName ?? collection.name,
+                    snapshotDescription: collection.description,
 
                     firebaseToken,
                     onUpdate: (suggestions) => {
@@ -298,11 +298,11 @@ export function DataEnhancementControllerProvider({
         properties, host, apiKey, collection, updateSuggestedValues, appendValueDelta, displayNeededSubscriptionSnackbar, snackbarController
     ]);
 
-    const getSamplePrompts = useCallback(async (entityName: string, input?: string) => {
+    const getSamplePrompts = useCallback(async (snapshotName: string, input?: string) => {
         const firebaseToken = await authController.getAuthToken()
-        return fetchEntityPromptSuggestion({
+        return fetchSnapshotPromptSuggestion({
             host,
-            entityName,
+            snapshotName,
             firebaseToken,
             apiKey,
             input

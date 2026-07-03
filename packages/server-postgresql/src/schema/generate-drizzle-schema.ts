@@ -4,7 +4,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generateSchema } from "./generate-drizzle-schema-logic";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { logger } from "@rebasepro/server-core";
 
 
@@ -54,7 +54,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         }
 
         const resolvedPath = path.resolve(collectionsFilePath);
-        let collections: EntityCollection[] = [];
+        let collections: SnapshotCollection[] = [];
         const stats = fs.statSync(resolvedPath);
 
         if (stats.isDirectory()) {

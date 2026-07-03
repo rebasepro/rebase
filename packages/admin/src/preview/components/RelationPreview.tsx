@@ -1,37 +1,37 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 import * as React from "react";
 
-import { Entity, EntityRelation } from "@rebasepro/types";
+import { Snapshot, SnapshotRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useEntityFetch, ErrorView, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useSnapshotFetch, ErrorView, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
-import { EntityPreview, EntityPreviewContainer } from "../../components";
+import { SnapshotPreview, SnapshotPreviewContainer } from "../../components";
 import { useCollectionRegistryController } from "../../index";
-import { getEntityTitlePropertyKey } from "../../util/previews";
+import { getSnapshotTitlePropertyKey } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 
 export type RelationPreviewProps = {
     disabled?: boolean;
-    relation: EntityRelation,
+    relation: SnapshotRelation,
     size?: PreviewSize;
     previewProperties?: string[];
     onClick?: (e: React.SyntheticEvent) => void;
     hover?: boolean;
-    includeEntityLink?: boolean;
+    includeSnapshotLink?: boolean;
     includeId?: boolean;
     textOnly?: boolean;
 };
 
 /**
  * Extract a display name from a plain relation-shaped object that isn't
- * a proper EntityRelation instance. Tries common name fields in the
- * entity's values, then falls back to the id.
+ * a proper SnapshotRelation instance. Tries common name fields in the
+ * snapshot's values, then falls back to the id.
  */
 function extractDisplayFromPlainObject(obj: unknown): string {
     if (!obj || typeof obj !== "object") return "—";
     const record = obj as Record<string, unknown>;
 
-    // Try data.values.{name,title,...} (EntityRelation.data is an Entity with .values)
+    // Try data.values.{name,title,...} (SnapshotRelation.data is a Snapshot with .values)
     const data = record.data;
     if (data && typeof data === "object") {
         const dataRecord = data as Record<string, unknown>;
@@ -63,18 +63,18 @@ function extractDisplayFromPlainObject(obj: unknown): string {
  */
 export const RelationPreview = function RelationPreview(props: RelationPreviewProps) {
     const relation = props.relation;
-    if (!(typeof relation === "object" && "isEntityRelation" in relation && relation.isEntityRelation())) {
+    if (!(typeof relation === "object" && "isSnapshotRelation" in relation && relation.isSnapshotRelation())) {
         console.warn("Relation preview received value of type", typeof relation);
         if (props.textOnly) {
             const display = extractDisplayFromPlainObject(relation);
             return <span className="truncate">{display}</span>;
         }
-        return <EntityPreviewContainer
+        return <SnapshotPreviewContainer
             onClick={props.onClick}
             size={props.size}>
             <ErrorView error={"Unexpected value. Click to edit"}
                 tooltip={JSON.stringify(relation)}/>
-        </EntityPreviewContainer>;
+        </SnapshotPreviewContainer>;
     }
     return <RelationPreviewInternal {...props}/>;
 };
@@ -88,12 +88,12 @@ function RelationPreviewInternalInner({
     size,
     hover,
     onClick,
-    includeEntityLink = true,
+    includeSnapshotLink = true,
     includeId = true,
     textOnly,
     collection
-}: RelationPreviewProps & { collection?: EntityCollection }) {
-    const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
+}: RelationPreviewProps & { collection?: SnapshotCollection }) {
+    const ResolvedMissingReference = useComponentOverride("Snapshot.MissingReference", DefaultMissingReference);
 
     if (!collection) {
         if (ResolvedMissingReference !== DefaultMissingReference) {
@@ -102,9 +102,9 @@ function RelationPreviewInternalInner({
             if (textOnly) {
                 return <span>{relation.path}</span>;
             }
-            return <EntityPreviewContainer size={size}>
+            return <SnapshotPreviewContainer size={size}>
                 <ErrorView error={`Collection not found: ${relation.path}`}/>
-            </EntityPreviewContainer>;
+            </SnapshotPreviewContainer>;
         }
     }
 
@@ -114,7 +114,7 @@ function RelationPreviewInternalInner({
         previewProperties={previewProperties}
         size={size}
         disabled={disabled}
-        includeEntityLink={includeEntityLink}
+        includeSnapshotLink={includeSnapshotLink}
         includeId={includeId}
         onClick={onClick}
         textOnly={textOnly}
@@ -148,41 +148,42 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     previewProperties,
     size,
     disabled,
-    includeEntityLink,
+    includeSnapshotLink,
     includeId,
     onClick,
     hover,
     textOnly
 }: RelationPreviewProps & {
-    collection: EntityCollection<M>
+    collection: SnapshotCollection<M>
 }) {
 
-    const passedEntity = relation.data;
-    const ResolvedEntityPreview = useComponentOverride("Entity.Preview", EntityPreview);
+    // CMS wire format embeds relation data as { id, path, values }
+    const passedSnapshot = relation.data as Snapshot<M> | undefined;
+    const ResolvedSnapshotPreview = useComponentOverride("Snapshot.Preview", SnapshotPreview);
     const customizationController = useCustomizationController();
 
     const {
-        entity,
+        snapshot,
         dataLoading,
         dataLoadingError
-    } = useEntityFetch({
+    } = useSnapshotFetch({
         path: relation.path,
-        entityId: passedEntity ? undefined : relation.id,
+        snapshotId: passedSnapshot ? undefined : relation.id,
         collection,
         useCache: true
     });
 
-    if (entity) {
-        relationsCache.set(relation.pathWithId, entity);
+    if (snapshot) {
+        relationsCache.set(relation.pathWithId, snapshot);
     }
 
-    const usedEntity = passedEntity ?? entity ?? relationsCache.get(relation.pathWithId);
+    const usedSnapshot = passedSnapshot ?? snapshot ?? relationsCache.get(relation.pathWithId);
 
     let body: React.ReactNode;
 
     if (!relation) {
         body = <ErrorView error={"Relation not set"}/>;
-    } else if (usedEntity && !usedEntity.values) {
+    } else if (usedSnapshot && !usedSnapshot.values) {
         body = <ErrorView error={"Relation does not exist"}
             tooltip={relation.path}/>;
     }
@@ -192,57 +193,57 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
             return <span>{relation.id}</span>;
         }
         return (
-            <EntityPreviewContainer onClick={disabled ? undefined : onClick}
+            <SnapshotPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
                 {body}
-            </EntityPreviewContainer>
+            </SnapshotPreviewContainer>
         );
     }
 
-    if (dataLoading && !usedEntity) {
+    if (dataLoading && !usedSnapshot) {
         if (textOnly) {
             return <Skeleton className="inline-block w-20 h-4" />;
         }
         return (
-            <EntityPreviewContainer onClick={disabled ? undefined : onClick}
+            <SnapshotPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
                 <Skeleton/>
-            </EntityPreviewContainer>
+            </SnapshotPreviewContainer>
         );
     }
 
-    if (!usedEntity) {
+    if (!usedSnapshot) {
         if (textOnly) {
             return <span>{relation.id}</span>;
         }
         return (
-            <EntityPreviewContainer onClick={disabled ? undefined : onClick}
+            <SnapshotPreviewContainer onClick={disabled ? undefined : onClick}
                 hover={disabled ? undefined : hover}
                 size={size}>
-                <ErrorView error={"Entity not found"}/>
-            </EntityPreviewContainer>
+                <ErrorView error={"Snapshot not found"}/>
+            </SnapshotPreviewContainer>
         );
     }
 
     if (textOnly) {
-        const titleProperty = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
-        const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
+        const titleProperty = getSnapshotTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const titleValue = titleProperty ? getValueInPath(usedSnapshot.values, titleProperty) : undefined;
         const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(relation.id);
         return <span className="truncate">{displayValue}</span>;
     }
 
-    return <ResolvedEntityPreview size={size}
+    return <ResolvedSnapshotPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}
-        entity={usedEntity}
+        snapshot={usedSnapshot}
         collection={collection}
         onClick={onClick}
-        includeEntityLink={includeEntityLink}
+        includeSnapshotLink={includeSnapshotLink}
         includeId={false}
         hover={hover}/>;
 
 }
 
-const relationsCache = new Map<string, Entity<any>>();
+const relationsCache = new Map<string, Snapshot<any>>();

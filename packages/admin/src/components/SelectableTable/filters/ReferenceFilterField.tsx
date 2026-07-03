@@ -1,8 +1,8 @@
-import { useEntitySelectionDialog } from "../../../hooks/useEntitySelectionDialog";
-import type { EntityCollection } from "@rebasepro/types";
+import { useSnapshotSelectionDialog } from "../../../hooks/useSnapshotSelectionDialog";
+import type { SnapshotCollection } from "@rebasepro/types";
 import React, { useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { Entity, EntityReference } from "@rebasepro/types";
+import { Snapshot, SnapshotReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../../preview";
 import { Button, Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { getReferenceFrom } from "@rebasepro/common";
@@ -60,25 +60,25 @@ export function ReferenceFilterField({
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(fieldOperation);
-    const [internalValue, setInternalValue] = useState<EntityReference | EntityReference[] | undefined | null>(fieldValue as EntityReference | EntityReference[] | undefined | null);
+    const [internalValue, setInternalValue] = useState<SnapshotReference | SnapshotReference[] | undefined | null>(fieldValue as SnapshotReference | SnapshotReference[] | undefined | null);
 
-    const selectedEntityIds = internalValue
+    const selectedSnapshotIds = internalValue
         ? (Array.isArray(internalValue) ? internalValue.map((ref) => {
-            if (!(ref?.isEntityReference && ref?.isEntityReference())) {
+            if (!(ref?.isSnapshotReference && ref?.isSnapshotReference())) {
                 return null;
             }
             return ref.id;
         }).filter(Boolean) as string[] : [internalValue.id])
         : [];
 
-    function updateFilter(op: VirtualTableWhereFilterOp, val?: EntityReference | EntityReference[] | null) {
+    function updateFilter(op: VirtualTableWhereFilterOp, val?: SnapshotReference | SnapshotReference[] | null) {
 
         const prevOpIsArray = multipleSelectOperations.includes(operation);
         const newOpIsArray = multipleSelectOperations.includes(op);
         let newValue = val;
         if (prevOpIsArray !== newOpIsArray) {
             newValue = newOpIsArray
-                ? (newValue && !Array.isArray(newValue) && newValue.isEntityReference?.() ? [newValue] : [])
+                ? (newValue && !Array.isArray(newValue) && newValue.isSnapshotReference?.() ? [newValue] : [])
                 : undefined;
         }
 
@@ -100,27 +100,27 @@ export function ReferenceFilterField({
     }
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: EntityCollection | undefined = useMemo(() => {
+    const collection: SnapshotCollection | undefined = useMemo(() => {
         return path ? collectionRegistryController.getCollection(path) : undefined;
     }, [path]);
 
-    const onSingleEntitySelected = (entity: Entity<Record<string, unknown>>) => {
-        updateFilter(operation, getReferenceFrom(entity));
+    const onSingleSnapshotSelected = (snapshot: Snapshot<Record<string, unknown>>) => {
+        updateFilter(operation, getReferenceFrom(snapshot));
     };
 
-    const onMultipleEntitiesSelected = (entities: Entity<Record<string, unknown>>[]) => {
-        updateFilter(operation, entities.map(e => getReferenceFrom(e)));
+    const onMultipleSnapshotsSelected = (snapshots: Snapshot<Record<string, unknown>>[]) => {
+        updateFilter(operation, snapshots.map(e => getReferenceFrom(e)));
     };
 
     const multiple = multipleSelectOperations.includes(operation);
 
-    const referenceDialogController = useEntitySelectionDialog({
+    const referenceDialogController = useSnapshotSelectionDialog({
         multiselect: multiple,
         path,
         collection,
-        onSingleEntitySelected,
-        onMultipleEntitiesSelected,
-        selectedEntityIds,
+        onSingleSnapshotSelected,
+        onMultipleSnapshotsSelected,
+        selectedSnapshotIds,
         onClose: () => {
             setHidden(false);
         }
@@ -132,7 +132,7 @@ export function ReferenceFilterField({
         referenceDialogController.open();
     };
 
-    const buildEntry = (reference: EntityReference) => {
+    const buildEntry = (reference: SnapshotReference) => {
         return (
             <ReferencePreview
                 disabled={!path}
@@ -142,7 +142,7 @@ export function ReferenceFilterField({
                 reference={reference}
                 hover={true}
                 includeId={includeId}
-                includeEntityLink={false}
+                includeSnapshotLink={false}
             />
         );
     };

@@ -1,12 +1,12 @@
 import {
     DataEnhancementRequest,
     EnhancedDataResult,
-    InputEntity,
+    InputSnapshot,
     InputProperty,
     SamplePromptsResult
 } from "./types/data_enhancement_controller";
-import { EntityValues } from "@rebasepro/types";
-import { flatMapEntityValues } from "./utils/values";
+import { SnapshotValues } from "@rebasepro/types";
+import { flatMapSnapshotValues } from "./utils/values";
 
 // const DEFAULT_SERVER = "http://localhost:5001/rebase-dev-2da42/europe-west3/api"; // Local
 
@@ -14,12 +14,12 @@ const DEFAULT_SERVER = "https://api.rebase.pro";
 
 export async function enhanceDataAPIStream<M extends Record<string, unknown>>(props: {
     apiKey: string,
-    entityId?: string | number,
-    entityName: string,
-    entityDescription?: string,
+    snapshotId?: string | number,
+    snapshotName: string,
+    snapshotDescription?: string,
     propertyKey?: string,
     propertyInstructions?: string;
-    values: EntityValues<M>,
+    values: SnapshotValues<M>,
     path: string,
     properties: Record<string, InputProperty>,
 
@@ -32,20 +32,20 @@ export async function enhanceDataAPIStream<M extends Record<string, unknown>>(pr
     host?: string;
 }) {
 
-    const flatValues = flatMapEntityValues(props.values);
+    const flatValues = flatMapSnapshotValues(props.values);
 
     const properties = props.properties;
 
-    const inputEntity: InputEntity = {
-        entityId: props.entityId,
+    const inputSnapshot: InputSnapshot = {
+        snapshotId: props.snapshotId,
         values: flatValues
     }
 
     const request: DataEnhancementRequest = {
-        inputEntity,
+        inputSnapshot,
         properties,
-        entityName: props.entityName,
-        entityDescription: props.entityDescription,
+        snapshotName: props.snapshotName,
+        snapshotDescription: props.snapshotDescription,
         propertyKey: props.propertyKey,
         propertyInstructions: props.propertyInstructions,
         instructions: props.instructions
@@ -112,9 +112,9 @@ function readChunks(reader: ReadableStreamDefaultReader) {
     };
 }
 
-export async function fetchEntityPromptSuggestion<M extends object>(props: {
+export async function fetchSnapshotPromptSuggestion<M extends object>(props: {
     input?: string,
-    entityName: string,
+    snapshotName: string,
     firebaseToken: string,
     apiKey: string,
     host?: string
@@ -130,14 +130,14 @@ export async function fetchEntityPromptSuggestion<M extends object>(props: {
                 "x-de-api-key": `Basic ${props.apiKey}`
             },
             body: JSON.stringify({
-                entityName: props.entityName,
+                snapshotName: props.snapshotName,
                 input: props.input ?? null
             })
         })
         .then(async (res) => {
             const data = await res.json();
             if (!res.ok) {
-                console.error("fetchEntityPromptSuggestion", data);
+                console.error("fetchSnapshotPromptSuggestion", data);
                 throw Error(data.message);
             }
             return {

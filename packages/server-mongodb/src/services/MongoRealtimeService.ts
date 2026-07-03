@@ -2,28 +2,27 @@
  * MongoDB Realtime Service
  *
  * Implements RealtimeProvider interface using MongoDB Change Streams.
- * Provides real-time subscriptions to collection and entity changes.
+ * Provides real-time subscriptions to collection and row changes.
  */
 
 import { Db, ChangeStream, ChangeStreamDocument, Document, ObjectId } from "mongodb";
 import {
-    Entity,
     FilterValues,
     RealtimeProvider,
     CollectionSubscriptionConfig,
-    EntitySubscriptionConfig,
+    SingleSubscriptionConfig,
     WebSocketMessage,
     User
 } from "@rebasepro/types";
 import { WebSocket } from "ws";
-import { MongoEntityService } from "../db/MongoEntityService";
+import { MongoDataService } from "../db/MongoDataService";
 
 import { MongoDriver } from "./MongoDriver";
 import { logger } from "@rebasepro/server-core";
 
 interface Subscription {
-    type: "collection" | "entity";
-    config: CollectionSubscriptionConfig | EntitySubscriptionConfig;
+    type: "collection" | "single";
+    config: CollectionSubscriptionConfig | SingleSubscriptionConfig;
     changeStream?: ChangeStream;
     callback?: (data: any) => void;
     authContext?: { userId: string; roles: string[] };
@@ -38,11 +37,11 @@ interface Subscription {
 export class MongoRealtimeService implements RealtimeProvider {
     private subscriptions = new Map<string, Subscription>();
     private clients = new Map<string, WebSocket>();
-    private entityService: MongoEntityService;
+    private dataService: MongoDataService;
     private driver?: MongoDriver;
 
     constructor(private db: Db) {
-        this.entityService = new MongoEntityService(db);
+        this.dataService = new MongoDataService(db);
     }
 
     setDataDriver(driver: MongoDriver) {
@@ -62,7 +61,7 @@ export class MongoRealtimeService implements RealtimeProvider {
     subscribeToCollection(
         subscriptionId: string,
         config: CollectionSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
-        callback?: (entities: Entity[]) => void
+        callback?: (rows: Record<string, unknown>[]) => void
     ): void {
         // Clean up existing subscription if any
         this.unsubscribe(subscriptionId);
@@ -135,17 +134,17 @@ export class MongoRealtimeService implements RealtimeProvider {
     private async fetchAndNotifyCollection(
         subscriptionId: string,
         config: CollectionSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
-        callback?: (entities: Entity[]) => void
+        callback?: (rows: Record<string, unknown>[]) => void
     ): Promise<void> {
         try {
-            let entities;
+            let rows;
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
 
             if (config.authContext && this.driver) {
                 const mockUser = { uid: config.authContext.userId,
 roles: config.authContext.roles } as User;
                 const authenticatedDriver = await this.driver.withAuth(mockUser);
-                entities = await authenticatedDriver.fetchCollection({
+                rows = await authenticatedDriver.fetchCollection({
                     path: config.path,
                     collection: registryCollection,
                     filter: config.filter as FilterValues<string> | undefined,
@@ -156,7 +155,7 @@ roles: config.authContext.roles } as User;
                     searchString: config.searchString
                 });
             } else {
-                entities = await this.entityService.fetchCollection(config.path, {
+                rows = await this.dataService.fetchCollection(config.path, {
                     filter: config.filter as FilterValues<string> | undefined,
                     orderBy: config.orderBy,
                     order: config.order,
@@ -168,7 +167,7 @@ roles: config.authContext.roles } as User;
             }
 
             if (callback) {
-                callback(entities);
+                callback(rows);
             }
         } catch (error) {
             logger.error(`Error fetching collection for subscription ${subscriptionId}`, { error: error });
@@ -176,12 +175,12 @@ roles: config.authContext.roles } as User;
     }
 
     /**
-     * Subscribe to single entity changes
+     * Subscribe to single row changes
      */
-    subscribeToEntity(
+    subscribeToOne(
         subscriptionId: string,
-        config: EntitySubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
-        callback?: (entity: Entity | null) => void
+        config: SingleSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
+        callback?: (row: Record<string, unknown> | null) => void
     ): void {
         // Clean up existing subscription if any
         this.unsubscribe(subscriptionId);
@@ -190,14 +189,14 @@ roles: config.authContext.roles } as User;
         const collection = this.db.collection(collectionName);
 
         // Build pipeline to watch specific document
-        const entityId = typeof config.entityId === "string" && ObjectId.isValid(config.entityId)
-            ? new ObjectId(config.entityId)
-            : config.entityId;
+        const id = typeof config.id === "string" && ObjectId.isValid(config.id)
+            ? new ObjectId(config.id)
+            : config.id;
 
         const pipeline: Document[] = [
             {
                 $match: {
-                    "documentKey._id": entityId,
+                    "documentKey._id": id,
                     operationType: { $in: ["insert", "update", "replace", "delete"] }
                 }
             }
@@ -209,7 +208,7 @@ roles: config.authContext.roles } as User;
             });
 
             const subscription: Subscription = {
-                type: "entity",
+                type: "single",
                 config,
                 changeStream,
                 callback,
@@ -219,7 +218,7 @@ roles: config.authContext.roles } as User;
             this.subscriptions.set(subscriptionId, subscription);
 
             // Fetch initial data
-            this.fetchAndNotifyEntity(subscriptionId, config, callback);
+            this.fetchAndNotifyOne(subscriptionId, config, callback);
 
             // Listen for changes
             changeStream.on("change", async (change: ChangeStreamDocument) => {
@@ -228,7 +227,7 @@ roles: config.authContext.roles } as User;
                         callback(null);
                     }
                 } else {
-                    await this.fetchAndNotifyEntity(subscriptionId, config, callback);
+                    await this.fetchAndNotifyOne(subscriptionId, config, callback);
                 }
             });
 
@@ -240,7 +239,7 @@ roles: config.authContext.roles } as User;
             logger.warn("Change streams not available, falling back to polling", { error: error });
 
             const subscription: Subscription = {
-                type: "entity",
+                type: "single",
                 config,
                 callback,
                 authContext: config.authContext
@@ -249,40 +248,40 @@ roles: config.authContext.roles } as User;
             this.subscriptions.set(subscriptionId, subscription);
 
             // Fetch initial data
-            this.fetchAndNotifyEntity(subscriptionId, config, callback);
+            this.fetchAndNotifyOne(subscriptionId, config, callback);
         }
     }
 
     /**
-     * Fetch entity and notify callback
+     * Fetch row and notify callback
      */
-    private async fetchAndNotifyEntity(
+    private async fetchAndNotifyOne(
         subscriptionId: string,
-        config: EntitySubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
-        callback?: (entity: Entity | null) => void
+        config: SingleSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
+        callback?: (row: Record<string, unknown> | null) => void
     ): Promise<void> {
         try {
-            let entity;
+            let row;
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
 
             if (config.authContext && this.driver) {
                 const mockUser = { uid: config.authContext.userId,
 roles: config.authContext.roles } as User;
                 const authenticatedDriver = await this.driver.withAuth(mockUser);
-                entity = await authenticatedDriver.fetchEntity({
+                row = await authenticatedDriver.fetchOne({
                     path: config.path,
-                    entityId: config.entityId,
+                    id: config.id,
                     collection: registryCollection
                 });
             } else {
-                entity = await this.entityService.fetchEntity(config.path, config.entityId);
+                row = await this.dataService.fetchOne(config.path, config.id);
             }
 
             if (callback) {
-                callback(entity || null);
+                callback(row || null);
             }
         } catch (error) {
-            logger.error(`Error fetching entity for subscription ${subscriptionId}`, { error: error });
+            logger.error(`Error fetching row for subscription ${subscriptionId}`, { error: error });
         }
     }
 
@@ -300,22 +299,22 @@ roles: config.authContext.roles } as User;
     }
 
     /**
-     * Notify all relevant subscribers of an entity update
+     * Notify all relevant subscribers of an row update
      * This is called after save/delete operations to push updates
      */
-    async notifyEntityUpdate(
+    async notifyUpdate(
         path: string,
-        entityId: string,
-        entity: Entity | null,
+        id: string,
+        row: Record<string, unknown> | null,
         _databaseId?: string
     ): Promise<void> {
         // Find all subscriptions that might be affected by this update
         for (const [subscriptionId, subscription] of this.subscriptions) {
-            if (subscription.type === "entity") {
-                const config = subscription.config as EntitySubscriptionConfig;
-                if (config.path === path && config.entityId.toString() === entityId) {
+            if (subscription.type === "single") {
+                const config = subscription.config as SingleSubscriptionConfig;
+                if (config.path === path && config.id.toString() === id) {
                     if (subscription.callback) {
-                        subscription.callback(entity);
+                        subscription.callback(row);
                     }
                 }
             } else if (subscription.type === "collection") {
@@ -403,33 +402,33 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                         searchString: message.payload?.searchString,
                         authContext
                     },
-                    (entities) => {
+                    (rows) => {
                         ws.send(JSON.stringify({
                             type: "collection_update",
                             subscriptionId,
-                            entities
+                            rows
                         }));
                     }
                 );
                 break;
             }
-            case "subscribe_entity": {
+            case "subscribe_one": {
                 const subscriptionId = message.payload?.subscriptionId ?? message.subscriptionId;
                 if (!subscriptionId) return;
 
-                this.subscribeToEntity(
+                this.subscribeToOne(
                     subscriptionId,
                     {
                         clientId,
                         path: message.payload?.path,
-                        entityId: message.payload?.entityId,
+                        id: message.payload?.id,
                         authContext
                     },
-                    (entity) => {
+                    (row) => {
                         ws.send(JSON.stringify({
-                            type: "entity_update",
+                            type: "single_update",
                             subscriptionId,
-                            entity
+                            row
                         }));
                     }
                 );

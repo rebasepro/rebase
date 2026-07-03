@@ -1,5 +1,5 @@
 
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import React, { useState, useEffect } from "react";
 
 /**
@@ -61,7 +61,7 @@ interface SecurityRule {
     roles?: string[];
 }
 
-type CollectionWithSecurity = EntityCollection & {
+type CollectionWithSecurity = SnapshotCollection & {
     securityRules?: SecurityRule[];
     id?: string;
     table?: string;

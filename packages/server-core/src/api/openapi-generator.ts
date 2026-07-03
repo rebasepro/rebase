@@ -1,4 +1,4 @@
-import { EntityCollection, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation, VectorProperty } from "@rebasepro/types";
+import { SnapshotCollection, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation, VectorProperty } from "@rebasepro/types";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -17,7 +17,7 @@ export interface OpenApiGeneratorOptions {
 }
 
 export function generateOpenApiSpec(
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     options: OpenApiGeneratorOptions = {}
 ): Record<string, unknown> {
     const basePath = options.basePath ?? "/api";
@@ -120,7 +120,7 @@ description: "Whether more records exist beyond this page" }
 
         const dataPath = `/data/${slug}`;
 
-        // ── GET /data/{slug} — List entities ──────────────────────────
+        // ── GET /data/{slug} — List snapshots ──────────────────────────
         paths[dataPath] = {
             get: {
                 tags: [collection.name],
@@ -180,7 +180,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
                 ],
                 responses: {
                     200: {
-                        description: "Paginated list of entities",
+                        description: "Paginated list of snapshots",
                         content: {
                             "application/json": {
                                 schema: {
@@ -213,7 +213,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
                 },
                 responses: {
                     201: {
-                        description: "Created entity",
+                        description: "Created snapshot",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
@@ -226,8 +226,8 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
         };
 
         // ── GET/PUT/DELETE /data/{slug}/{id} ──────────────────────────
-        const entityPath = `/data/${slug}/{id}`;
-        paths[entityPath] = {
+        const snapshotPath = `/data/${slug}/{id}`;
+        paths[snapshotPath] = {
             get: {
                 tags: [collection.name],
                 summary: `Get ${collection.singularName || collection.name} by ID`,
@@ -237,7 +237,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Entity ID" },
+description: "Snapshot ID" },
                     {
                         name: "include",
                         in: "query",
@@ -248,14 +248,14 @@ description: "Entity ID" },
                 ],
                 responses: {
                     200: {
-                        description: "Entity found",
+                        description: "Snapshot found",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
                     },
-                    404: { description: "Entity not found",
+                    404: { description: "Snapshot not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
@@ -269,7 +269,7 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Entity ID" }
+description: "Snapshot ID" }
                 ],
                 requestBody: {
                     required: true,
@@ -281,14 +281,14 @@ description: "Entity ID" }
                 },
                 responses: {
                     200: {
-                        description: "Updated entity",
+                        description: "Updated snapshot",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
                     },
-                    404: { description: "Entity not found",
+                    404: { description: "Snapshot not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
@@ -302,11 +302,11 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Entity ID" }
+description: "Snapshot ID" }
                 ],
                 responses: {
                     204: { description: "Deleted successfully" },
-                    404: { description: "Entity not found",
+                    404: { description: "Snapshot not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
@@ -395,7 +395,7 @@ schema: { type: "string" } }
  * Build the component schema for a collection (output / read shape).
  * All fields are included (including relation foreign keys).
  */
-function buildCollectionSchema(collection: EntityCollection): Record<string, unknown> {
+function buildCollectionSchema(collection: SnapshotCollection): Record<string, unknown> {
     const properties: Record<string, unknown> = {
         id: { type: "string",
 description: "Unique identifier" }
@@ -423,7 +423,7 @@ description: "Unique identifier" }
 /**
  * Build an input schema (for POST/PUT) — excludes auto-generated fields.
  */
-function buildCollectionInputSchema(collection: EntityCollection): Record<string, unknown> {
+function buildCollectionInputSchema(collection: SnapshotCollection): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
 
@@ -660,7 +660,7 @@ function resolveEnumValues(enumDef: Record<string | number, unknown> | Array<{ i
  * Build PostgREST-style filter parameters for a collection.
  * These are additional query parameters like `?status=eq.active&price=gte.100`.
  */
-function buildFilterParameters(collection: EntityCollection): Array<Record<string, unknown>> {
+function buildFilterParameters(collection: SnapshotCollection): Array<Record<string, unknown>> {
     const params: Array<Record<string, unknown>> = [];
 
     for (const [key, property] of Object.entries(collection.properties)) {

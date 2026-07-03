@@ -11,7 +11,7 @@ export function ArrayOfStringsPreview({
     propertyKey,
     value,
     property: property,
-    // entity,
+    // snapshot,
     size
 }: PropertyPreviewProps<ArrayProperty>) {
 

@@ -4,7 +4,7 @@
  * Generates a purely typed Typescript database definition.
  */
 
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { generateTypedefs } from "./generate-types";
 
 export { generateTypedefs } from "./generate-types";
@@ -25,7 +25,7 @@ export interface GenerateSDKOptions {
 }
 
 export function generateSDK(
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     options: GenerateSDKOptions = {}
 ): GeneratedFile[] {
     const files: GeneratedFile[] = [];
@@ -61,7 +61,10 @@ export function generateSDK(
 
    // Both syntax styles are fully typed!
    const { data: users } = await rebase.data.users.find();
+   console.log(users[0].email); // flat access — no .values wrapper
+
    const { data: posts } = await rebase.data.collection('posts').find();
+   console.log(posts[0].title); // just post.title, not post.values.title
    \`\`\`
 `
         });

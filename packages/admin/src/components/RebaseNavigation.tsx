@@ -16,12 +16,12 @@ import {
 } from "@rebasepro/core";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, EntityCollection, RebasePlugin } from "@rebasepro/types";
+import type { AppView, CollectionEditorOptions, SnapshotCustomView, SnapshotAction, SnapshotCollection, RebasePlugin } from "@rebasepro/types";
 import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/types";
 
 const EMPTY_PLUGINS: RebasePlugin[] = [];
-const EMPTY_COLLECTIONS: EntityCollection[] = [];
+const EMPTY_COLLECTIONS: SnapshotCollection[] = [];
 
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
@@ -31,7 +31,7 @@ import { CollectionRegistryContext } from "../hooks/navigation/contexts/Collecti
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
 import { NavigationStateContext } from "../hooks/navigation/contexts/NavigationStateContext";
 
-import { SideEntityProvider } from "./SideEntityProvider";
+import { SideSnapshotProvider } from "./SideSnapshotProvider";
 
 // Collection editor internals — used when collectionEditor is enabled
 import { useLocalCollectionsConfigController } from "../collection_editor/useLocalCollectionsConfigController";
@@ -49,19 +49,19 @@ export interface RebaseNavigationProps {
 
 /**
  * Navigation layer — builds and provides all CMS navigation controllers:
- * collection registry, URL controller, navigation state, side entity,
+ * collection registry, URL controller, navigation state, side snapshot,
  * and the self-assembling Studio bridge.
  *
  * Also handles the collection editor config controller when enabled.
  *
  * **Independently usable**: Use this when you need CMS navigation
- * (entity tables, side panels) in a custom layout.
+ * (snapshot tables, side panels) in a custom layout.
  *
  * @example
  * ```tsx
  * <RebaseNavigation>
  *   <MyCustomLayout>
- *     <EntityCollectionView ... />
+ *     <SnapshotCollectionView ... />
  *   </MyCustomLayout>
  * </RebaseNavigation>
  * ```
@@ -209,34 +209,34 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         adminMode: adminModeController?.mode
     });
 
-    // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
+    // ── Merge CMS-registered snapshotViews/snapshotActions into the customization controller ──
     // The <Rebase> component builds the customizationController from its own props,
-    // but entity views passed to <RebaseCMS> are stored in the registry and not
+    // but snapshot views passed to <RebaseCMS> are stored in the registry and not
     // automatically merged. We re-provide an enriched controller here so that
-    // downstream consumers (EntityEditView, side panels, etc.) can resolve
-    // string-keyed entity views like "blog_preview".
+    // downstream consumers (SnapshotEditView, side panels, etc.) can resolve
+    // string-keyed snapshot views like "blog_preview".
     const enrichedCustomizationController = useMemo(() => {
-        const cmsEntityViews = (registry.cmsConfig?.entityViews ?? []) as EntityCustomView[];
-        const cmsEntityActions = (registry.cmsConfig?.entityActions ?? []) as EntityAction[];
-        if (cmsEntityViews.length === 0 && cmsEntityActions.length === 0) {
+        const cmsSnapshotViews = (registry.cmsConfig?.snapshotViews ?? []) as SnapshotCustomView[];
+        const cmsSnapshotActions = (registry.cmsConfig?.snapshotActions ?? []) as SnapshotAction[];
+        if (cmsSnapshotViews.length === 0 && cmsSnapshotActions.length === 0) {
             return parentCustomizationController;
         }
         return {
             ...parentCustomizationController,
-            entityViews: [
-                ...(parentCustomizationController.entityViews ?? []),
-                ...cmsEntityViews.filter(v => !(parentCustomizationController.entityViews ?? []).some(ev => ev.key === v.key))
+            snapshotViews: [
+                ...(parentCustomizationController.snapshotViews ?? []),
+                ...cmsSnapshotViews.filter(v => !(parentCustomizationController.snapshotViews ?? []).some(ev => ev.key === v.key))
             ],
-            entityActions: [
-                ...(parentCustomizationController.entityActions ?? []),
-                ...cmsEntityActions.filter(a => !(parentCustomizationController.entityActions ?? []).some(ea => ea.key === a.key))
+            snapshotActions: [
+                ...(parentCustomizationController.snapshotActions ?? []),
+                ...cmsSnapshotActions.filter(a => !(parentCustomizationController.snapshotActions ?? []).some(ea => ea.key === a.key))
             ]
         };
-    }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);
+    }, [parentCustomizationController, registry.cmsConfig?.snapshotViews, registry.cmsConfig?.snapshotActions]);
 
     // ── Inner content with all context providers ──────────────────────
     // Re-provide RebaseDataContext with the routed data so that every CMS
-    // consumer (list/entity views, references, board, import/export, and
+    // consumer (list/snapshot views, references, board, import/export, and
     // `context.data`) is routed to the correct driver by collection path.
     const navigationContent = (
         <RebaseDataContext.Provider value={routedData}>
@@ -245,14 +245,14 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             <CollectionRegistryContext.Provider value={collectionRegistryController}>
                 <UrlContext.Provider value={urlController}>
                     <NavigationStateContext.Provider value={navigationStateController}>
-                        <SideEntityProvider>
+                        <SideSnapshotProvider>
                             <BridgeAutoRegistrar
                                 collectionRegistryController={collectionRegistryController}
                                 urlController={urlController}
                                 navigationStateController={navigationStateController}
                             />
                             {children}
-                        </SideEntityProvider>
+                        </SideSnapshotProvider>
                     </NavigationStateContext.Provider>
                 </UrlContext.Provider>
             </CollectionRegistryContext.Provider>

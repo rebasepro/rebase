@@ -54,7 +54,7 @@ export function App() {
         [dataEnhancementPlugin, insightsPlugin]
     );
 
-    const entityViews = React.useMemo(() => [
+    const snapshotViews = React.useMemo(() => [
         {
             key: "blog_preview",
             name: "Preview",
@@ -83,7 +83,7 @@ export function App() {
             <RebaseCMS
                 collections={collections}
                 collectionEditor={collectionEditor}
-                entityViews={entityViews}
+                snapshotViews={snapshotViews}
                 views={customViews}
             />
             <RebaseStudio/>

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type {
     CollectionRegistryController,
-    SideEntityController,
+    SideSnapshotController,
     UrlController,
     NavigationStateController,
     BreadcrumbEntry,
@@ -22,7 +22,7 @@ export type { BreadcrumbEntry, BreadcrumbsController };
  */
 export interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
-    sideEntityController: SideEntityController;
+    sideSnapshotController: SideSnapshotController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
@@ -35,12 +35,12 @@ const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
     getRawCollection: () => undefined,
     getParentReferencesFromPath: () => [],
     getParentCollectionSlugs: () => [],
-    getParentEntityIds: () => [],
+    getParentSnapshotIds: () => [],
     convertIdsToPaths: () => [],
     initialised: false
 };
 
-const NOOP_SIDE_ENTITY: SideEntityController = {
+const NOOP_SIDE_SNAPSHOT: SideSnapshotController = {
     open: () => {},
     replace: () => {},
     close: () => {}
@@ -71,7 +71,7 @@ const NOOP_BREADCRUMBS: BreadcrumbsController = {
 
 const NOOP_BRIDGE: StudioBridge = {
     collectionRegistry: NOOP_COLLECTION_REGISTRY,
-    sideEntityController: NOOP_SIDE_ENTITY,
+    sideSnapshotController: NOOP_SIDE_SNAPSHOT,
     urlController: NOOP_URL_CONTROLLER,
     navigationState: NOOP_NAVIGATION_STATE,
     breadcrumbs: NOOP_BREADCRUMBS
@@ -89,7 +89,7 @@ export const StudioBridgeContext = createContext<StudioBridge>(NOOP_BRIDGE);
  * ```tsx
  * <StudioBridgeProvider value={{
  *     collectionRegistry: useCollectionRegistryController(),
- *     sideEntityController: useSideEntityController(),
+ *     sideSnapshotController: useSideSnapshotController(),
  *     urlController: useUrlController(),
  *     navigationState: useNavigationStateController(),
  *     breadcrumbs: useBreadcrumbsController(),
@@ -124,9 +124,9 @@ export function useStudioCollectionRegistry(): CollectionRegistryController {
     return useContext(StudioBridgeContext).collectionRegistry;
 }
 
-/** Side entity controller — returns noop if CMS is not present. */
-export function useStudioSideEntityController(): SideEntityController {
-    return useContext(StudioBridgeContext).sideEntityController;
+/** Side snapshot controller — returns noop if CMS is not present. */
+export function useStudioSideSnapshotController(): SideSnapshotController {
+    return useContext(StudioBridgeContext).sideSnapshotController;
 }
 
 /** URL controller — returns noop if CMS is not present. */
@@ -168,11 +168,11 @@ export const StudioBridgeRegistryContext = createContext<StudioBridgeRegistry | 
  * ```tsx
  * <StudioBridgeRegistryProvider>
  *     <CollectionRegistryProvider>   // auto-registers
- *     <SideEntityProvider>           // auto-registers
+ *     <SideSnapshotProvider>           // auto-registers
  *     <UrlProvider>                  // auto-registers
  *         <RebaseStudio />           // consumes bridge
  *     </UrlProvider>
- *     </SideEntityProvider>
+ *     </SideSnapshotProvider>
  *     </CollectionRegistryProvider>
  * </StudioBridgeRegistryProvider>
  * ```

@@ -1,1 +1,1 @@
-export * from "./default_entity_actions";
+export * from "./default_snapshot_actions";

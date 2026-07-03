@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import {
-    getEntitySchema,
+    getSnapshotSchema,
     mapPropertyToZod,
     getZodMapObjectSchema
 } from "../../src/form/validation";
@@ -742,9 +742,9 @@ lng: -74.0 });
 });
 
 // ---------------------------------------------------------------------------
-// getEntitySchema (composite)
+// getSnapshotSchema (composite)
 // ---------------------------------------------------------------------------
-describe("getEntitySchema", () => {
+describe("getSnapshotSchema", () => {
     it("creates a schema from multiple properties and validates", async () => {
         const properties: Properties = {
             title: {
@@ -763,7 +763,7 @@ describe("getEntitySchema", () => {
             } as BooleanProperty
         };
 
-        const schema = getEntitySchema("entity1", properties);
+        const schema = getSnapshotSchema("snapshot1", properties);
 
         const valid = await schema.safeParseAsync({ title: "Hello",
 count: 5,
@@ -776,7 +776,7 @@ active: true });
         expect(invalid.success).toBe(false);
     });
 
-    it("skips auto-generated id fields for new entities", async () => {
+    it("skips auto-generated id fields for new snapshots", async () => {
         const properties: Properties = {
             id: {
                 type: "string",
@@ -789,13 +789,13 @@ active: true });
             } as StringProperty
         };
 
-        // For new entities (entityId undefined), auto-id fields are skipped entirely
-        const schema = getEntitySchema(undefined, properties);
+        // For new snapshots (snapshotId undefined), auto-id fields are skipped entirely
+        const schema = getSnapshotSchema(undefined, properties);
         const result = await schema.safeParseAsync({ title: "Test" });
         expect(result.success).toBe(true);
     });
 
-    it("validates id field for existing entities", async () => {
+    it("validates id field for existing snapshots", async () => {
         const properties: Properties = {
             id: {
                 type: "string",
@@ -808,8 +808,8 @@ active: true });
             } as StringProperty
         };
 
-        // For existing entities, id is required since isId=true
-        const schema = getEntitySchema("existing-entity", properties);
+        // For existing snapshots, id is required since isId=true
+        const schema = getSnapshotSchema("existing-snapshot", properties);
         const result = await schema.safeParseAsync({ id: "",
 title: "Test" });
         expect(result.success).toBe(false);
@@ -821,7 +821,7 @@ title: "Test" });
 name: "Title" } as StringProperty
         };
 
-        const schema = getEntitySchema("e1", properties);
+        const schema = getSnapshotSchema("e1", properties);
         const result = await schema.safeParseAsync({ title: "Hello",
 extra: "world" });
         expect(result.success).toBe(true);

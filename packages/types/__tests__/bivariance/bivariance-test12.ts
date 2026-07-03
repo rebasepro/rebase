@@ -1,18 +1,18 @@
-export type EntityAfterReadProps<M extends Record<string, unknown>> = {
-    collection: EntityCollection<Record<string, unknown>>;
+export type AfterReadProps<M extends Record<string, unknown>> = {
+    collection: SnapshotCollection<Record<string, unknown>>;
 };
 
-export interface EntityCallbacks<M extends Record<string, unknown>> { // changed to interface
-    afterRead?(props: EntityAfterReadProps<M>): M;
+export interface CollectionCallbacks<M extends Record<string, unknown>> { // changed to interface
+    afterRead?(props: AfterReadProps<M>): M;
 }
 
 export interface PostgresCollection<M extends Record<string, unknown>> {
-    readonly callbacks?: EntityCallbacks<M>;
+    readonly callbacks?: CollectionCallbacks<M>;
 }
 
-export type EntityCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
+export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
 
-declare let specificColl: EntityCollection<{ id: string, name: string }>;
-declare let genericColl: EntityCollection;
+declare let specificColl: SnapshotCollection<{ id: string, name: string }>;
+declare let genericColl: SnapshotCollection;
 
 genericColl = specificColl; // Should succeed

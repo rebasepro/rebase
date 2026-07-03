@@ -1,13 +1,13 @@
 import { useCollectionRegistryController } from "../_cms_internals";
 import { useAuthController, useTranslation } from "@rebasepro/core";
-import { EntityCollection, CollectionActionsProps } from "@rebasepro/types";
+import { SnapshotCollection, CollectionActionsProps } from "@rebasepro/types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
 export function EditorCollectionAction({
     path,
-    parentCollectionSlugs, parentEntityIds,
+    parentCollectionSlugs, parentSnapshotIds,
     collection,
     tableController
 }: CollectionActionsProps) {
@@ -37,9 +37,9 @@ export function EditorCollectionAction({
                     id: collection.slug,
                     path,
                     parentCollectionSlugs,
-parentEntityIds,
-                    parentCollection: parentCollection as EntityCollection,
-                    existingEntities: tableController?.data ?? []
+parentSnapshotIds,
+                    parentCollection: parentCollection as SnapshotCollection,
+                    existingSnapshots: tableController?.data ?? []
                 })
                 : undefined}>
             <SettingsIcon/>

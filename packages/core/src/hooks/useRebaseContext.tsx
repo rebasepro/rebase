@@ -1,4 +1,5 @@
 import { AuthController, RebaseContext, User } from "@rebasepro/types";
+import { wrapAsSdkData } from "@rebasepro/common";
 import { useAuthController } from "./useAuthController";
 import { useRebaseClient } from "./useRebaseClient";
 import { useData } from "./data/useData";
@@ -29,7 +30,11 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     const client = useRebaseClient<any>();
 
     const authController = useAuthController<USER, AuthControllerType>();
-    const data = useData();
+    // `context.data` is the flat SDK view — identical in shape to the backend
+    // `context.data` and the frontend SDK client, so callbacks behave the same
+    // everywhere. The admin CMS reads Snapshots via `useData()` directly.
+    const snapshotData = useData();
+    const data = React.useMemo(() => wrapAsSdkData(snapshotData), [snapshotData]);
     const storageSource = useStorageSource();
     const snackbarController = useSnackbarController();
     const userConfigPersistence = useUserConfigurationPersistence();

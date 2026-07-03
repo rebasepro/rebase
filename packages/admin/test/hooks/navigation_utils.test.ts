@@ -9,14 +9,14 @@ import {
     NAVIGATION_DEFAULT_GROUP_NAME,
     NAVIGATION_ADMIN_GROUP_NAME
 } from "../../src/hooks/navigation/utils";
-import type { EntityCollection, AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
+import type { SnapshotCollection, AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
 // getGroup
 // ---------------------------------------------------------------------------
 describe("getGroup", () => {
     it("returns the default group name when no group is set", () => {
-        const collection = {} as EntityCollection;
+        const collection = {} as SnapshotCollection;
         expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
@@ -26,7 +26,7 @@ describe("getGroup", () => {
     });
 
     it("returns the custom group name from a collection", () => {
-        const collection = { group: "E-Commerce" } as unknown as EntityCollection;
+        const collection = { group: "E-Commerce" } as unknown as SnapshotCollection;
         expect(getGroup(collection)).toBe("E-Commerce");
     });
 
@@ -36,17 +36,17 @@ describe("getGroup", () => {
     });
 
     it("trims whitespace from group names", () => {
-        const collection = { group: "  Content  " } as unknown as EntityCollection;
+        const collection = { group: "  Content  " } as unknown as SnapshotCollection;
         expect(getGroup(collection)).toBe("Content");
     });
 
     it("returns default group for empty string group", () => {
-        const collection = { group: "" } as unknown as EntityCollection;
+        const collection = { group: "" } as unknown as SnapshotCollection;
         expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 
     it("returns default group for whitespace-only group", () => {
-        const collection = { group: "   " } as unknown as EntityCollection;
+        const collection = { group: "   " } as unknown as SnapshotCollection;
         expect(getGroup(collection)).toBe(NAVIGATION_DEFAULT_GROUP_NAME);
     });
 });
@@ -55,23 +55,23 @@ describe("getGroup", () => {
 // computeNavigationGroups
 // ---------------------------------------------------------------------------
 describe("computeNavigationGroups", () => {
-    const collection1: EntityCollection = {
+    const collection1: SnapshotCollection = {
         id: "products",
         slug: "products",
         properties: {}
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
-    const collection2: EntityCollection = {
+    const collection2: SnapshotCollection = {
         id: "orders",
         slug: "orders",
         properties: {}
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
-    const collection3: EntityCollection = {
+    const collection3: SnapshotCollection = {
         id: "settings",
         slug: "settings",
         properties: {}
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
     it("puts all collections in default group when no mappings", () => {
         const result = computeNavigationGroups({
@@ -202,23 +202,23 @@ entries: ["products"] }
 // areCollectionsEqual
 // ---------------------------------------------------------------------------
 describe("areCollectionsEqual", () => {
-    const collA: EntityCollection = {
+    const collA: SnapshotCollection = {
         id: "products",
         name: "Products",
         path: "products",
         slug: "products",
         properties: { title: { type: "string",
 name: "Title" } }
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
-    const collB: EntityCollection = {
+    const collB: SnapshotCollection = {
         id: "products",
         name: "Products",
         path: "products",
         slug: "products",
         properties: { title: { type: "string",
 name: "Title" } }
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
     it("considers identical collections equal", () => {
         expect(areCollectionsEqual(collA, collB)).toBe(true);
@@ -226,7 +226,7 @@ name: "Title" } }
 
     it("considers collections with different slugs unequal", () => {
         const different = { ...collA,
-slug: "different" } as unknown as EntityCollection;
+slug: "different" } as unknown as SnapshotCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
@@ -235,7 +235,7 @@ slug: "different" } as unknown as EntityCollection;
             ...collA,
             properties: { body: { type: "string",
 name: "Body" } }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
         expect(areCollectionsEqual(collA, different)).toBe(false);
     });
 
@@ -243,22 +243,22 @@ name: "Body" } }
         const withFn = {
             ...collA,
             onSave: () => {}
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
         expect(areCollectionsEqual(collA, withFn)).toBe(true);
     });
 
     it("handles circular subcollection references via visitedSlugs", () => {
-        const circularA: EntityCollection = {
+        const circularA: SnapshotCollection = {
             id: "self",
             name: "Self",
             path: "self",
             slug: "self",
             properties: {}
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
-        const circularB: EntityCollection = {
+        const circularB: SnapshotCollection = {
             ...circularA
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         // Simulating that we already visited this slug
         expect(areCollectionsEqual(circularA, circularB, ["self"])).toBe(true);
@@ -269,21 +269,21 @@ name: "Body" } }
 // areCollectionListsEqual
 // ---------------------------------------------------------------------------
 describe("areCollectionListsEqual", () => {
-    const col1: EntityCollection = {
+    const col1: SnapshotCollection = {
         id: "a",
         name: "A",
         path: "a",
         slug: "a",
         properties: {}
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
-    const col2: EntityCollection = {
+    const col2: SnapshotCollection = {
         id: "b",
         name: "B",
         path: "b",
         slug: "b",
         properties: {}
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 
     it("returns true for identical lists", () => {
         expect(areCollectionListsEqual([col1, col2], [col1, col2])).toBe(true);
@@ -299,7 +299,7 @@ describe("areCollectionListsEqual", () => {
 
     it("returns false for different collections", () => {
         const col3 = { ...col1,
-slug: "c" } as unknown as EntityCollection;
+slug: "c" } as unknown as SnapshotCollection;
         expect(areCollectionListsEqual([col1], [col3])).toBe(false);
     });
 

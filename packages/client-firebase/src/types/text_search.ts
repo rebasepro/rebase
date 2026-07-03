@@ -1,6 +1,6 @@
 import { User as FirebaseUser } from "@firebase/auth";
 import { FirebaseApp } from "@firebase/app";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 export type FirestoreTextSearchControllerBuilder = (props: {
     firebaseApp: FirebaseApp;
@@ -25,7 +25,7 @@ export type FirestoreTextSearchController = {
     init: (props: {
         path: string,
         databaseId?: string,
-        collection?: EntityCollection
+        collection?: SnapshotCollection
     }) => Promise<boolean>,
     /**
      * Do the search and return a list of ids.
@@ -36,7 +36,7 @@ export type FirestoreTextSearchController = {
         path: string,
         currentUser?: FirebaseUser,
         databaseId?: string,
-        collection?: EntityCollection
+        collection?: SnapshotCollection
     }) => (Promise<readonly string[] | undefined>),
 
 };

@@ -1,12 +1,12 @@
-import { EntityCollection, EntityReference } from "@rebasepro/types";
+import { SnapshotCollection, SnapshotReference } from "@rebasepro/types";
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "./resolutions";
 
 export function getParentReferencesFromPath(props: {
     path: string,
-    collections: EntityCollection[] | undefined,
+    collections: SnapshotCollection[] | undefined,
     currentFullPath?: string,
-}): EntityReference[] {
+}): SnapshotReference[] {
 
     const {
         path,
@@ -17,11 +17,11 @@ export function getParentReferencesFromPath(props: {
     const subpaths = removeInitialAndTrailingSlashes(path).split("/");
     const subpathCombinations = getCollectionPathsCombinations(subpaths);
 
-    const result: EntityReference[] = [];
+    const result: SnapshotReference[] = [];
     for (let i = 0; i < subpathCombinations.length; i++) {
         const subpathCombination = subpathCombinations[i];
 
-        const collection: EntityCollection | undefined = collections && collections.find((entry) => entry.slug === subpathCombination);
+        const collection: SnapshotCollection | undefined = collections && collections.find((entry) => entry.slug === subpathCombination);
 
         // If we find a collection, we add the reference and continue
         if (collection) {
@@ -32,9 +32,9 @@ export function getParentReferencesFromPath(props: {
             const restOfThePath = removeInitialAndTrailingSlashes(removeInitialAndTrailingSlashes(path).replace(subpathCombination, ""));
             const nextSegments = restOfThePath.length > 0 ? restOfThePath.split("/") : [];
             if (nextSegments.length > 0) {
-                const entityId = nextSegments[0];
-                const path = collectionPath + "/" + entityId;
-                result.push(new EntityReference({ id: entityId,
+                const snapshotId = nextSegments[0];
+                const path = collectionPath + "/" + snapshotId;
+                result.push(new SnapshotReference({ id: snapshotId,
 path: collectionPath }));
                 if (nextSegments.length > 1) {
                     const newPath = nextSegments.slice(1).join("/");

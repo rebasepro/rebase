@@ -1,4 +1,4 @@
-import { EntityCollection, DataDriver } from "@rebasepro/types";
+import { SnapshotCollection, DataDriver } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { buildRebaseData } from "../src/data/buildRebaseData";
 import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
@@ -22,9 +22,9 @@ function mockDriver(key: string): DataDriver {
     return {
         key,
         fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(undefined),
-        saveEntity: jest.fn().mockResolvedValue({ id: "x", path: key, values: {} }),
-        deleteEntity: jest.fn().mockResolvedValue(undefined)
+        fetchOne: jest.fn().mockResolvedValue(undefined),
+        save: jest.fn().mockResolvedValue({ id: "x", path: key, values: {} }),
+        delete: jest.fn().mockResolvedValue(undefined)
     } as unknown as DataDriver;
 }
 
@@ -35,15 +35,15 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
     ];
     const dsRegistry = createDataSourceRegistry(definitions);
 
-    const products: EntityCollection = {
+    const products: SnapshotCollection = {
         id: "products", name: "Products", path: "products", slug: "products",
         table: "products", properties: { title: { type: "string" } }
-    } as EntityCollection;
+    } as SnapshotCollection;
 
-    const events: EntityCollection = {
+    const events: SnapshotCollection = {
         id: "events", name: "Events", path: "events", slug: "events",
         dataSource: "analytics", properties: { title: { type: "string" } }
-    } as EntityCollection;
+    } as SnapshotCollection;
 
     function buildRouted() {
         const registry = new CollectionRegistry([products, events], dsRegistry);
@@ -75,11 +75,11 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
         expect(fs.fetchCollection).not.toHaveBeenCalled();
     });
 
-    it("routes by the accessed path (entity sub-path inherits the source)", async () => {
+    it("routes by the accessed path (snapshot sub-path inherits the source)", async () => {
         const { routed, fs } = buildRouted();
         await routed.collection("events/evt1").findById("evt1");
-        expect(fs.fetchEntity).toHaveBeenCalledTimes(1);
-        expect((fs.fetchEntity as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events/evt1", entityId: "evt1" });
+        expect(fs.fetchOne).toHaveBeenCalledTimes(1);
+        expect((fs.fetchOne as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events/evt1", id: "evt1" });
     });
 
     it("reference from a direct form to a default collection still hits the default", async () => {
@@ -87,16 +87,16 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
         // from Postgres — routing follows the target path, not the ancestor.
         const { routed, pg, fs } = buildRouted();
         await routed.collection("products").findById("p1");
-        expect(pg.fetchEntity).toHaveBeenCalledTimes(1);
-        expect(fs.fetchEntity).not.toHaveBeenCalled();
+        expect(pg.fetchOne).toHaveBeenCalledTimes(1);
+        expect(fs.fetchOne).not.toHaveBeenCalled();
     });
 
     it("routes writes on a direct-source collection to its driver", async () => {
         const { routed, pg, fs } = buildRouted();
         await routed.collection("events").create({ title: "launch" });
-        expect(fs.saveEntity).toHaveBeenCalledTimes(1);
-        expect((fs.saveEntity as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events", status: "new" });
-        expect(pg.saveEntity).not.toHaveBeenCalled();
+        expect(fs.save).toHaveBeenCalledTimes(1);
+        expect((fs.save as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events", status: "new" });
+        expect(pg.save).not.toHaveBeenCalled();
     });
 
     it("stamps the resolved engine for capabilities (dataSource-only collection)", () => {

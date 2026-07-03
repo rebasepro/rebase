@@ -1,8 +1,8 @@
-import { useEntitySelectionDialog } from "../hooks/useEntitySelectionDialog";
-import type { EntityCollection } from "@rebasepro/types";
+import { useSnapshotSelectionDialog } from "../hooks/useSnapshotSelectionDialog";
+import type { SnapshotCollection } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 
-import { Entity, EntityReference, FilterValues } from "@rebasepro/types";
+import { Snapshot, SnapshotReference, FilterValues } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { getReferenceFrom } from "@rebasepro/common";
 import { ReferencePreview } from "../preview";
@@ -12,26 +12,26 @@ import { useCollectionRegistryController } from "../index";
 export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
     name?: string,
     multiselect?: boolean,
-    value: EntityReference | EntityReference[] | null,
+    value: SnapshotReference | SnapshotReference[] | null,
     onReferenceSelected?: (params: {
-        reference: EntityReference | null,
-        entity: Entity<M> | null
+        reference: SnapshotReference | null,
+        snapshot: Snapshot<M> | null
     }) => void,
     onMultipleReferenceSelected?: (params: {
-        references: EntityReference[] | null,
-        entities: Entity<M>[] | null
+        references: SnapshotReference[] | null,
+        snapshots: Snapshot<M>[] | null
     }) => void,
     path: string,
     disabled?: boolean,
     previewProperties?: string[];
     /**
-     * Allow selection of entities that pass the given filter only.
+     * Allow selection of snapshots that pass the given filter only.
      */
     fixedFilter?: FilterValues<string>;
     size: PreviewSize;
     className?: string;
     includeId?: boolean;
-    includeEntityLink?: boolean;
+    includeSnapshotLink?: boolean;
 };
 
 /**
@@ -50,45 +50,45 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
     size,
     className,
     includeId,
-    includeEntityLink
+    includeSnapshotLink
 }: ReferenceWidgetProps<M>) {
 
     const collectionRegistryController = useCollectionRegistryController();
 
-    const collection: EntityCollection | undefined = useMemo(() => {
+    const collection: SnapshotCollection | undefined = useMemo(() => {
         return collectionRegistryController.getCollection(path);
     }, [path, collectionRegistryController.getCollection]);
 
-    const onSingleEntitySelected = useCallback((entity: Entity<M> | null) => {
+    const onSingleSnapshotSelected = useCallback((snapshot: Snapshot<M> | null) => {
         if (disabled)
             return;
         if (onReferenceSelected) {
-            const reference = entity ? getReferenceFrom(entity) : null;
+            const reference = snapshot ? getReferenceFrom(snapshot) : null;
             onReferenceSelected?.({
                 reference,
-                entity
+                snapshot
             });
         }
     }, [disabled, onReferenceSelected]);
 
-    const onMultipleEntitiesSelected = useCallback((entities: Entity<M>[]) => {
+    const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<M>[]) => {
         if (disabled)
             return;
         if (onMultipleReferenceSelected) {
-            const references = entities ? entities.map(e => getReferenceFrom(e)) : null;
+            const references = snapshots ? snapshots.map(e => getReferenceFrom(e)) : null;
             onMultipleReferenceSelected({
                 references,
-                entities
+                snapshots
             });
         }
     }, [disabled, onReferenceSelected]);
 
-    const referenceDialogController = useEntitySelectionDialog({
+    const referenceDialogController = useSnapshotSelectionDialog({
         multiselect,
         path,
         collection,
-        onSingleEntitySelected,
-        onMultipleEntitiesSelected,
+        onSingleSnapshotSelected,
+        onMultipleSnapshotsSelected,
         fixedFilter
     }
     );
@@ -96,9 +96,9 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
     const clearValue = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         if (multiselect) {
-            onMultipleEntitiesSelected([]);
+            onMultipleSnapshotsSelected([]);
         } else {
-            onSingleEntitySelected(null);
+            onSingleSnapshotSelected(null);
         }
     }, [onReferenceSelected]);
 
@@ -121,10 +121,10 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
                     previewProperties={previewProperties}
                     size={size}
                     includeId={includeId}
-                    includeEntityLink={includeEntityLink}/>
+                    includeSnapshotLink={includeSnapshotLink}/>
             })}
         </div>
-    } else if (value?.isEntityReference && value?.isEntityReference()) {
+    } else if (value?.isSnapshotReference && value?.isSnapshotReference()) {
         child = <ReferencePreview
             reference={value}
             onClick={onEntryClick}
@@ -132,7 +132,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
             previewProperties={previewProperties}
             size={size}
             includeId={includeId}
-            includeEntityLink={includeEntityLink}/>
+            includeSnapshotLink={includeSnapshotLink}/>
 
     }
     return <div className={cls("text-sm font-medium",

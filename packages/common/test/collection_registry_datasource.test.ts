@@ -1,26 +1,26 @@
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { createDataSourceRegistry } from "../src/data/resolveDataSource";
 
 describe("CollectionRegistry — data source resolution stamping", () => {
 
-    const firestoreColl: EntityCollection = {
+    const firestoreColl: SnapshotCollection = {
         id: "events",
         name: "Events",
         path: "events",
         slug: "events",
         dataSource: "analytics",
         properties: { title: { type: "string" } }
-    } as EntityCollection;
+    } as SnapshotCollection;
 
-    const plainColl: EntityCollection = {
+    const plainColl: SnapshotCollection = {
         id: "products",
         name: "Products",
         path: "products",
         slug: "products",
         table: "products",
         properties: { title: { type: "string" } }
-    } as EntityCollection;
+    } as SnapshotCollection;
 
     it("stamps both dataSource and engine from a registered definition", () => {
         const registry = new CollectionRegistry(
@@ -50,7 +50,7 @@ describe("CollectionRegistry — data source resolution stamping", () => {
     });
 
     it("does not override an explicit engine", () => {
-        const coll = { ...firestoreColl, engine: "mongodb" } as EntityCollection;
+        const coll = { ...firestoreColl, engine: "mongodb" } as SnapshotCollection;
         const registry = new CollectionRegistry(
             [coll],
             createDataSourceRegistry([{ key: "analytics", engine: "firestore", transport: "direct" }])

@@ -32,6 +32,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Authoritative type gate. Resolves @rebasepro/* to SOURCE (not dist), so it
+      # is immune to stale build output, build ordering, and incremental caches —
+      # unlike `pnpm build` (esbuild), which strips types WITHOUT checking them.
+      # This is what stops a type regression from silently merging.
+      - name: Type check
+        run: pnpm run typecheck
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       - name: Build packages
         run: pnpm run build
         env:

@@ -125,7 +125,7 @@ rebase/
 | `@rebasepro/server-postgresql` | PostgreSQL bootstrapper and Drizzle ORM data driver | Backend setup when using PostgreSQL |
 | `@rebasepro/server-mongodb` | MongoDB bootstrapper and data driver | Backend setup when using MongoDB |
 | `@rebasepro/core` | Core framework, types, hooks, and React components | Frontend — React integration, hooks, providers |
-| `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollection`, `EntityCollection`, `RebaseClient`, etc.) | Type imports across all packages |
+| `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollection`, `SnapshotCollection`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
 | `@rebasepro/admin` | CMS frontend application | The Studio admin panel frontend |
 | `@rebasepro/studio` | Admin panel, collection editor, visual schema editor | Studio-specific features and customization |
@@ -434,7 +434,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-
 |----------|------|---------|-------------|
 | `server` | `Server` (Node `http.Server`) | — | **Required.** The HTTP server instance |
 | `app` | `Hono<HonoEnv>` | — | **Required.** The Hono application instance |
-| `collections` | `EntityCollection[]` | `[]` | Inline collection definitions |
+| `collections` | `SnapshotCollection[]` | `[]` | Inline collection definitions |
 | `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty) |
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
 | `database` | `DatabaseAdapter` | — | Database adapter (takes precedence over `bootstrappers`) |
@@ -442,7 +442,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-
 | `dataSources` | `DataSourceDefinition[]` | `[]` | Declared data sources (`key`, `engine`, `transport`). Drives capabilities and the server-vs-direct distinction. Collections on a `direct`/`custom` transport are client-only — the backend skips data routes for them. Server engines need no entry |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
-| `history` | `unknown` | — | Entity history/audit-log configuration |
+| `history` | `unknown` | — | Snapshot history/audit-log configuration |
 | `defaultSecurityRules` | `SecurityRule[]` | — | Default RLS rules for collections without their own |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI spec at `/api/docs` and Swagger UI at `/api/swagger` (dev only) |
 | `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers |
@@ -459,7 +459,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `collection` | `EntityCollection` | `defaultUsersCollection` | The collection used for auth users |
+| `collection` | `SnapshotCollection` | `defaultUsersCollection` | The collection used for auth users |
 | `jwtSecret` | `string` | — | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |

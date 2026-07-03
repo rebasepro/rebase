@@ -1,4 +1,4 @@
-import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchEntityProps, SaveEntityProps, DeleteEntityProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User } from "@rebasepro/types";
+import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -176,53 +176,53 @@ roles: user.roles } }));
                     case "FETCH_COLLECTION": {
                         const request: FetchCollectionProps = payload;
                         const delegate = await getScopedDelegate();
-                        const entities = await delegate.fetchCollection(request);
+                        const rows = await delegate.fetchCollection(request);
                         ws.send(JSON.stringify({ type: "FETCH_COLLECTION_SUCCESS",
-payload: { entities },
+payload: { rows },
 requestId }));
                         break;
                     }
-                    case "FETCH_ENTITY": {
-                        const request: FetchEntityProps = payload;
+                    case "FETCH_ONE": {
+                        const request: FetchOneProps = payload;
                         const delegate = await getScopedDelegate();
-                        const entity = await delegate.fetchEntity(request);
-                        ws.send(JSON.stringify({ type: "FETCH_ENTITY_SUCCESS",
-payload: { entity },
+                        const row = await delegate.fetchOne(request);
+                        ws.send(JSON.stringify({ type: "FETCH_ONE_SUCCESS",
+payload: { row },
 requestId }));
                         break;
                     }
-                    case "SAVE_ENTITY": {
-                        const request: SaveEntityProps = payload;
+                    case "SAVE": {
+                        const request: SaveProps = payload;
                         const delegate = await getScopedDelegate();
-                        const entity = await delegate.saveEntity(request);
-                        ws.send(JSON.stringify({ type: "SAVE_ENTITY_SUCCESS",
-payload: { entity },
+                        const row = await delegate.save(request);
+                        ws.send(JSON.stringify({ type: "SAVE_SUCCESS",
+payload: { row },
 requestId }));
                         break;
                     }
-                    case "DELETE_ENTITY": {
-                        const request: DeleteEntityProps = payload;
+                    case "DELETE": {
+                        const request: DeleteProps = payload;
                         const delegate = await getScopedDelegate();
-                        await delegate.deleteEntity(request);
-                        ws.send(JSON.stringify({ type: "DELETE_ENTITY_SUCCESS",
+                        await delegate.delete(request);
+                        ws.send(JSON.stringify({ type: "DELETE_SUCCESS",
 payload: { success: true },
 requestId }));
                         break;
                     }
                     case "CHECK_UNIQUE_FIELD": {
-                        const { path, name, value, entityId, collection } = payload;
+                        const { path, name, value, id, collection } = payload;
                         const delegate = await getScopedDelegate();
-                        const isUnique = await delegate.checkUniqueField(path, name, value, entityId, collection);
+                        const isUnique = await delegate.checkUniqueField(path, name, value, id, collection);
                         ws.send(JSON.stringify({ type: "CHECK_UNIQUE_FIELD_SUCCESS",
 payload: { isUnique },
 requestId }));
                         break;
                     }
-                    case "COUNT_ENTITIES": {
+                    case "COUNT": {
                         const request: FetchCollectionProps = payload;
                         const delegate = await getScopedDelegate();
-                        const count = await delegate.countEntities!(request);
-                        ws.send(JSON.stringify({ type: "COUNT_ENTITIES_SUCCESS",
+                        const count = await delegate.count!(request);
+                        ws.send(JSON.stringify({ type: "COUNT_SUCCESS",
 payload: { count },
 requestId }));
                         break;
@@ -270,7 +270,7 @@ requestId }));
                         break;
                     }
                     case "subscribe_collection":
-                    case "subscribe_entity":
+                    case "subscribe_one":
                     case "unsubscribe": {
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user ? { userId: session.user.userId,

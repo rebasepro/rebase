@@ -4,11 +4,11 @@ import { BackendCollectionRegistry } from "../collections/BackendCollectionRegis
 import { ApiError, errorHandler } from "../api/errors";
 import { DataDriver } from "@rebasepro/types";
 /**
- * Create Hono routes for entity history.
- * Mounted at `{basePath}/data/:slug/:entityId/history`.
+ * Create Hono routes for snapshot history.
+ * Mounted at `{basePath}/data/:slug/:id/history`.
  */
 export interface HistoryService {
-    fetchHistory(tableName: string, entityId: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
+    fetchHistory(tableName: string, id: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
     fetchHistoryEntry(historyId: string): Promise<Record<string, unknown> | null>;
 }
 
@@ -22,15 +22,15 @@ export function createHistoryRoutes(params: {
     router.onError(errorHandler);
 
     /**
-     * GET /:slug/:entityId/history - List history entries for an entity
+     * GET /:slug/:id/history - List history entries for a snapshot
      *
      * Query params:
      *   limit  (default 20)
      *   offset (default 0)
      */
-    router.get("/:slug/:entityId/history", async (c) => {
+    router.get("/:slug/:id/history", async (c) => {
         const slug = c.req.param("slug");
-        const entityId = c.req.param("entityId");
+        const id = c.req.param("id");
         const parsedLimit = parseInt(c.req.query("limit") ?? "20", 10);
         const parsedOffset = parseInt(c.req.query("offset") ?? "0", 10);
         const limit = Number.isNaN(parsedLimit) ? 20 : parsedLimit;
@@ -51,7 +51,7 @@ export function createHistoryRoutes(params: {
 
         const tableName = collection.slug;
 
-        const result = await historyService.fetchHistory(tableName, entityId, {
+        const result = await historyService.fetchHistory(tableName, id, {
             limit: Math.min(limit, 100),
             offset: Math.max(offset, 0)
         });
@@ -68,13 +68,13 @@ export function createHistoryRoutes(params: {
     });
 
     /**
-     * POST /:slug/:entityId/history/:historyId/revert - Revert entity to a historical version
+     * POST /:slug/:id/history/:historyId/revert - Revert snapshot to a historical version
      *
      * This goes through the normal save path, so it creates its own history entry.
      */
-    router.post("/:slug/:entityId/history/:historyId/revert", async (c) => {
+    router.post("/:slug/:id/history/:historyId/revert", async (c) => {
         const slug = c.req.param("slug");
-        const entityId = c.req.param("entityId");
+        const id = c.req.param("id");
         const historyId = c.req.param("historyId");
 
         const collection = registry.getCollections().find(
@@ -96,10 +96,10 @@ export function createHistoryRoutes(params: {
             throw ApiError.notFound(`History entry '${historyId}' not found`);
         }
 
-        // Verify the history entry belongs to this entity (prevent cross-entity revert)
+        // Verify the history entry belongs to this snapshot (prevent cross-snapshot revert)
         const tableName = collection.slug;
-        if (historyEntry.entity_id !== String(entityId) || historyEntry.table_name !== tableName) {
-            throw ApiError.badRequest("History entry does not belong to this entity");
+        if (historyEntry.snapshot_id !== String(id) || historyEntry.table_name !== tableName) {
+            throw ApiError.badRequest("History entry does not belong to this snapshot");
         }
 
         if (!historyEntry.values) {
@@ -111,16 +111,16 @@ export function createHistoryRoutes(params: {
         const authDriver = c.get("driver") || driver;
         const path = collection.slug;
 
-        const savedEntity = await authDriver.saveEntity({
+        const savedSnapshot = await authDriver.save({
             path,
-            entityId: String(entityId),
+            id: String(id),
             values: historyEntry.values,
             collection,
             status: "existing"
         });
 
         return c.json({
-            data: savedEntity,
+            data: savedSnapshot,
             meta: { reverted_from: historyId }
         });
     });

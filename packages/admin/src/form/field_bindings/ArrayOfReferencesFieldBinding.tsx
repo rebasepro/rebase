@@ -1,9 +1,9 @@
-import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
-import type { EntityCollection } from "@rebasepro/types";
+import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
+import type { SnapshotCollection } from "@rebasepro/types";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
-import { Entity, EntityReference } from "@rebasepro/types";
+import { Snapshot, SnapshotReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../preview";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
@@ -15,7 +15,7 @@ import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typogra
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useCollectionRegistryController } from "../../index";
 
-type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, EntityReference[]>;
+type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, SnapshotReference[]>;
 
 /**
  * This field allows selecting multiple references.
@@ -47,7 +47,7 @@ export function ArrayOfReferencesFieldBinding({
     }
 
     const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
-    const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
+    const selectedSnapshotIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
 
     useClearRestoreValue({
         property,
@@ -56,7 +56,7 @@ export function ArrayOfReferencesFieldBinding({
     });
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: EntityCollection | undefined = useMemo(() => {
+    const collection: SnapshotCollection | undefined = useMemo(() => {
         return ofProperty.path ? collectionRegistryController.getCollection(ofProperty.path) : undefined;
     }, [ofProperty.path]);
 
@@ -64,17 +64,17 @@ export function ArrayOfReferencesFieldBinding({
         throw Error(`Couldn't find the corresponding collection for the path: ${ofProperty.path}`);
     }
 
-    const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
-        const refs = entities.map(e => getReferenceFrom(e));
+    const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<Record<string, unknown>>[]) => {
+        const refs = snapshots.map(e => getReferenceFrom(e));
         setValue(refs);
     }, [setValue]);
 
-    const referenceDialogController = useEntitySelectionDialog({
+    const referenceDialogController = useSnapshotSelectionDialog({
         multiselect: true,
         path: ofProperty.path,
         collection,
-        onMultipleEntitiesSelected,
-        selectedEntityIds,
+        onMultipleSnapshotsSelected,
+        selectedSnapshotIds,
         fixedFilter: ofProperty.fixedFilter
     }
     );
@@ -103,7 +103,7 @@ export function ArrayOfReferencesFieldBinding({
                 hover={!disabled}
                 reference={entryValue}
                 includeId={ofProperty.includeId}
-                includeEntityLink={ofProperty.includeEntityLink}
+                includeSnapshotLink={ofProperty.includeSnapshotLink}
             />
         );
     }, [ofProperty.path, ofProperty.ui?.previewProperties, value]);

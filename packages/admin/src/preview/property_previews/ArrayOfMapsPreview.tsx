@@ -12,7 +12,7 @@ export function ArrayOfMapsPreview({
     value,
     property,
     size
-    // entity
+    // snapshot
 }: PropertyPreviewProps<ArrayProperty>) {
 
     if (Array.isArray(property?.of)) {
@@ -58,7 +58,7 @@ export function ArrayOfMapsPreview({
                                                     propertyKey={key as string}
                                                     value={(v)[key]}
                                                     property={properties[key as string] as Property}
-                                                    // entity={entity}
+                                                    // snapshot={snapshot}
                                                     size={"small"}/>
                                             </ErrorBoundary>
                                         </div>

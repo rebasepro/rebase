@@ -354,7 +354,7 @@ export function CrmDashboardDemo() {
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     // Drawer state (Mock side panel)
-    const [activeSideEntity, setActiveSideEntity] = useState<{
+    const [activeSideSnapshot, setActiveSideSnapshot] = useState<{
         type: "task" | "client" | "new_client";
         id?: string;
     } | null>(null);
@@ -528,21 +528,21 @@ export function CrmDashboardDemo() {
     const handleOpenTask = useCallback((activity: any) => {
         const taskId = activity.values?.metadata?.taskId;
         if (taskId) {
-            setActiveSideEntity({ type: "task", id: taskId });
+            setActiveSideSnapshot({ type: "task", id: taskId });
         }
     }, []);
 
     // Side panel open helpers
     const openTaskDrawer = useCallback((taskId: string) => {
-        setActiveSideEntity({ type: "task", id: taskId });
+        setActiveSideSnapshot({ type: "task", id: taskId });
     }, []);
 
     const openClientDrawer = useCallback((clientId: string) => {
-        setActiveSideEntity({ type: "client", id: clientId });
+        setActiveSideSnapshot({ type: "client", id: clientId });
     }, []);
 
     const openNewClientDrawer = useCallback(() => {
-        setActiveSideEntity({ type: "new_client" });
+        setActiveSideSnapshot({ type: "new_client" });
     }, []);
 
     // Create client simulation
@@ -596,7 +596,7 @@ export function CrmDashboardDemo() {
         setNewClientEmail("");
         setNewClientPhone("");
         setNewClientStage("incoming");
-        setActiveSideEntity(null);
+        setActiveSideSnapshot(null);
     };
 
     // Simulated navigation / pipeline filtering
@@ -924,7 +924,7 @@ export function CrmDashboardDemo() {
                         variant="outlined"
                         color="neutral"
                         className="flex-1"
-                        onClick={() => setActiveSideEntity(null)}
+                        onClick={() => setActiveSideSnapshot(null)}
                     >
                         Cancel
                     </Button>
@@ -1057,30 +1057,30 @@ export function CrmDashboardDemo() {
             {/* Custom Mock Side panel sliding in */}
             <div className={cls(
                 "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white dark:bg-surface-900 border-l border-surface-200 dark:border-surface-700 shadow-2xl z-40 transition-transform duration-300 ease-in-out flex flex-col",
-                activeSideEntity ? "translate-x-0" : "translate-x-full"
+                activeSideSnapshot ? "translate-x-0" : "translate-x-full"
             )}>
                 <div className="p-4 flex items-center justify-between border-b border-surface-200 dark:border-surface-800">
                     <Typography variant="subtitle1" className="font-semibold uppercase tracking-wider text-[10px] color-secondary">
-                        {activeSideEntity?.type === "task" ? "Task Details" : activeSideEntity?.type === "client" ? "Client profile" : "Create Lead"}
+                        {activeSideSnapshot?.type === "task" ? "Task Details" : activeSideSnapshot?.type === "client" ? "Client profile" : "Create Lead"}
                     </Typography>
                     <button
-                        onClick={() => setActiveSideEntity(null)}
+                        onClick={() => setActiveSideSnapshot(null)}
                         className="p-1 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 focus:outline-none"
                     >
                         <X className="h-4 w-4" />
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5 flex flex-col">
-                    {activeSideEntity?.type === "task" && renderDrawerTask(activeSideEntity.id)}
-                    {activeSideEntity?.type === "client" && renderDrawerClient(activeSideEntity.id)}
-                    {activeSideEntity?.type === "new_client" && renderDrawerNewClient()}
+                    {activeSideSnapshot?.type === "task" && renderDrawerTask(activeSideSnapshot.id)}
+                    {activeSideSnapshot?.type === "client" && renderDrawerClient(activeSideSnapshot.id)}
+                    {activeSideSnapshot?.type === "new_client" && renderDrawerNewClient()}
                 </div>
             </div>
 
             {/* Backdrop click to close drawer */}
-            {activeSideEntity && (
+            {activeSideSnapshot && (
                 <div
-                    onClick={() => setActiveSideEntity(null)}
+                    onClick={() => setActiveSideSnapshot(null)}
                     className="fixed inset-0 bg-black/20 dark:bg-black/50 z-30 transition-opacity duration-300"
                 />
             )}

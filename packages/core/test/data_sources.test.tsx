@@ -10,9 +10,9 @@ function mockDriver(key: string): DataDriver {
     return {
         key,
         fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(undefined),
-        saveEntity: jest.fn(),
-        deleteEntity: jest.fn(),
+        fetchOne: jest.fn().mockResolvedValue(undefined),
+        save: jest.fn(),
+        delete: jest.fn(),
         checkUniqueField: jest.fn().mockResolvedValue(true)
     } as unknown as DataDriver;
 }
@@ -50,6 +50,18 @@ describe("<Rebase> data source wiring", () => {
         return captured;
     }
 
+    // `context.data`/`useData()` wraps the flat `client.data` at the CMS boundary
+    // (Snapshot view-model). Assert it delegates to `clientData` rather than being
+    // the same reference.
+    function expectWrapsClientData(data?: RebaseData) {
+        expect(data).toBeDefined();
+        expect(data).not.toBe(clientData);
+        const spy = jest.spyOn(clientData, "collection");
+        data!.collection("widgets");
+        expect(spy).toHaveBeenCalledWith("widgets");
+        spy.mockRestore();
+    }
+
     it("builds the data-source registry and a RebaseData for direct sources", () => {
         const fs = mockDriver("firestore");
         const captured = renderWithProbe({
@@ -85,7 +97,9 @@ describe("<Rebase> data source wiring", () => {
             dataSources: [{ key: "analytics", engine: "firestore", driver: mockDriver("fs") }]
         });
         // At the core level (no navigation layer), useData() is the default source.
-        expect(captured.data).toBe(clientData);
+        // The flat SDK `client.data` is wrapped at the CMS boundary into the
+        // Snapshot view-model, so it delegates to `clientData` rather than being it.
+        expectWrapsClientData(captured.data);
     });
 
     it("lets a '(default)' entry with a driver override client.data", () => {
@@ -105,7 +119,7 @@ describe("<Rebase> data source wiring", () => {
             transport: "server"
         });
         expect(captured.sources!.sources["(default)"]).toBeUndefined();
-        expect(captured.data).toBe(clientData);
+        expectWrapsClientData(captured.data);
     });
 
     it("does not build a RebaseData for server sources (no driver)", () => {

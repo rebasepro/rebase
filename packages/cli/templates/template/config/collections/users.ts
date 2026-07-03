@@ -1,6 +1,6 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 
-const usersCollection: EntityCollection = {
+const usersCollection: SnapshotCollection = {
     name: "Users",
     singularName: "User",
     slug: "users",
@@ -9,7 +9,7 @@ const usersCollection: EntityCollection = {
     schema: "rebase",
     icon: "Users",
     group: "Settings",
-    openEntityMode: "dialog",
+    openSnapshotMode: "dialog",
     disableDefaultActions: ["copy"],
     securityRules: [
         { operation: "select",

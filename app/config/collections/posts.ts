@@ -160,7 +160,7 @@ const postsCollection = defineCollection({
         "created_at",
         "updated_at"
     ],
-    entityViews: [
+    snapshotViews: [
         "blog_preview"
     ],
     filterPresets: [

@@ -63,11 +63,11 @@ type OperatorId = typeof OPERATORS[number]["id"];
 // Context fields
 const CONTEXT_FIELDS = [
     { id: "isNew",
-label: "Is New Entity",
+label: "Is New Snapshot",
 dataType: "boolean",
 color: "#9c27b0" },
-    { id: "entityId",
-label: "Entity ID",
+    { id: "snapshotId",
+label: "Snapshot ID",
 dataType: "string",
 color: "#2196f3" },
     { id: "user.roles",
@@ -202,7 +202,7 @@ function buildEnumFilterRule(
         };
     }
 
-    const fieldVar = config.field.startsWith("user.") || config.field === "isNew" || config.field === "entityId"
+    const fieldVar = config.field.startsWith("user.") || config.field === "isNew" || config.field === "snapshotId"
         ? { var: config.field }
         : { var: `values.${config.field}` };
 

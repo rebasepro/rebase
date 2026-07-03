@@ -5,8 +5,8 @@ import {
     DatabaseAdapter,
     DataDriver,
     DataSourceDefinition,
-    EntityCallbacks,
-    EntityCollection,
+    CollectionCallbacks,
+    SnapshotCollection,
     HealthCheckResult,
     HistoryConfig,
     InitializedDriver,
@@ -15,7 +15,7 @@ import {
     RealtimeProvider,
     SecurityRule
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildRebaseData, buildRoutedRebaseData } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
@@ -75,7 +75,7 @@ export interface RebaseAuthConfig {
      * Or pass your own collection with the required auth fields
      * (email, passwordHash, displayName, etc.).
      */
-    collection?: EntityCollection;
+    collection?: SnapshotCollection;
     jwtSecret?: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
@@ -182,7 +182,7 @@ export interface RebaseAuthConfig {
 }
 
 export interface RebaseBackendConfig {
-    collections?: EntityCollection[];
+    collections?: SnapshotCollection[];
     collectionsDir?: string;
     server: Server;
     app: Hono<HonoEnv>;
@@ -251,7 +251,7 @@ export interface RebaseBackendConfig {
     storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
 
     /**
-     * Entity history / audit-log configuration.
+     * Snapshot history / audit-log configuration.
      *
      * - `true` — enable history with default settings
      * - `{ retention?: number }` — enable with optional retention period (days)
@@ -315,14 +315,14 @@ export interface RebaseBackendConfig {
      * @example
      * ```ts
      * callbacks: {
-     *     afterRead({ entity, collection }) {
-     *         console.log(`Read ${collection.slug}/${entity.id}`);
-     *         return entity;
+     *     afterRead({ snapshot, collection }) {
+     *         console.log(`Read ${collection.slug}/${snapshot.id}`);
+     *         return snapshot;
      *     }
      * }
      * ```
      */
-    callbacks?: EntityCallbacks;
+    callbacks?: CollectionCallbacks;
 }
 
 /**
@@ -648,10 +648,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
     if (config.history) {
         if (defaultBootstrapper.initializeHistory) {
-            logger.info("Bootstrapping entity history via driver protocol");
+            logger.info("Bootstrapping snapshot history via driver protocol");
             historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult) as { historyService: import("./history/history-routes").HistoryService } | undefined;
 
-            // Inject the historyService into the driver so saveEntity/deleteEntity can record history.
+            // Inject the historyService into the driver so save/delete can record history.
             // The driver was created during initializeDriver() (before history was initialized),
             // so we must set it retroactively here.
             if (historyConfigResult?.historyService && defaultDriverResult.internals) {
@@ -662,7 +662,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 }
             }
 
-            logger.info("Entity history initialized");
+            logger.info("Snapshot history initialized");
         } else {
             logger.warn("History requested but default bootstrapper does not support initializeHistory");
         }
@@ -912,7 +912,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         // Mount history routes BEFORE the REST API subcollection catch-all so
-        // that /:slug/:entityId/history is matched by the dedicated handler first.
+        // that /:slug/:id/history is matched by the dedicated handler first.
         if (historyConfigResult && historyConfigResult.historyService) {
             const historyRoutes = createHistoryRoutes({
                 historyService: historyConfigResult.historyService,
@@ -966,17 +966,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const serviceIdentity = { uid: "service", roles: ["admin"] as string[] };
 
     const scopedDefaultDriver = await scopeDataDriver(defaultDriver, serviceIdentity);
-    const defaultData = buildRebaseData(scopedDefaultDriver);
+    const defaultData = buildSdkData(scopedDefaultDriver);
 
     // Multi-engine: scope and wrap each non-default delegate so
     // rebase.data on a non-default-engine collection reaches the correct driver.
-    const dataSourcesByKey: Record<string, import("@rebasepro/types").RebaseData> = {};
+    const dataSourcesByKey: Record<string, import("@rebasepro/types").RebaseSdkData> = {};
     for (const driverKey of driverRegistry.list()) {
         if (driverKey === DEFAULT_DRIVER_ID) continue;
         const delegate = driverRegistry.get(driverKey);
         if (!delegate) continue;
         const scopedDelegate = await scopeDataDriver(delegate, serviceIdentity);
-        dataSourcesByKey[driverKey] = buildRebaseData(scopedDelegate);
+        dataSourcesByKey[driverKey] = buildSdkData(scopedDelegate);
     }
 
     const serverData = buildRoutedRebaseData({
@@ -1032,7 +1032,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     logger.info("Rebase singleton initialized");
 
     // Retroactively inject the server client into the driver so that
-    // entity callbacks receive `context.client` at runtime.
+    // snapshot callbacks receive `context.client` at runtime.
     // The driver is created before the client (which depends on the mounted
     // Hono app), so we set it here, mirroring the historyService injection above.
     if (defaultDriverResult.internals) {

@@ -713,7 +713,7 @@ selected: true }, { name: "Tags" }].map(c => (
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">SearchBar</Typography>
-                            <SearchBar placeholder="Search entities…"/>
+                            <SearchBar placeholder="Search snapshots…"/>
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Skeleton</Typography>
@@ -925,7 +925,7 @@ roles: [] }
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="card-view" title="Card View">
                     <Typography variant="body2" color="secondary" className="mb-4">
-                        Grid of entity cards with thumbnail area, progress bar, status/priority chips, and assignee.
+                        Grid of snapshot cards with thumbnail area, progress bar, status/priority chips, and assignee.
                         Uses <code className="font-mono text-xs">Card</code>, <code className="font-mono text-xs">Chip</code>,{" "}
                         <code className="font-mono text-xs">ToggleButtonGroup</code>, <code className="font-mono text-xs">SearchBar</code>.
                     </Typography>

@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { EntityCollection, isPostgresCollection, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
+import { SnapshotCollection, isPostgresCollection, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/sdk-generator";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
@@ -124,9 +124,9 @@ export function getExpectedColumnType(prop: Property): string | null {
 
 // ── Collection loading ───────────────────────────────────────────────────
 
-export async function loadCollections(collectionsPath: string): Promise<EntityCollection[]> {
+export async function loadCollections(collectionsPath: string): Promise<SnapshotCollection[]> {
     const resolvedPath = path.resolve(collectionsPath);
-    const collections: EntityCollection[] = [];
+    const collections: SnapshotCollection[] = [];
 
     const stats = fs.statSync(resolvedPath);
 
@@ -171,7 +171,7 @@ export async function loadCollections(collectionsPath: string): Promise<EntityCo
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────
 
 export async function checkCollectionsVsSchema(
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     schemaFilePath: string
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];
@@ -230,7 +230,7 @@ issues };
 }
 
 export async function checkCollectionsVsSdk(
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     sdkFilePath: string
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];
@@ -299,7 +299,7 @@ interface DbEnumValue {
 }
 
 export async function checkCollectionsVsDatabase(
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     databaseUrl: string
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];

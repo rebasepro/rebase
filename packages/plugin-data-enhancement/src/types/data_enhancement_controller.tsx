@@ -1,11 +1,11 @@
-import { EntityValues } from "@rebasepro/types";
+import { SnapshotValues } from "@rebasepro/types";
 import { EditorAIController } from "@rebasepro/admin";
 
 export type EnhanceParams<M extends Record<string, unknown>> = {
-    entityId?: string | number;
+    snapshotId?: string | number;
     propertyKey?: string;
     propertyInstructions?: string;
-    values: EntityValues<M>;
+    values: SnapshotValues<M>;
     instructions?: string;
     replaceValues: boolean;
 };
@@ -20,13 +20,13 @@ export type DataEnhancementController = {
     clearSuggestion: (key: string, suggestion: string | number) => void;
     allowReferenceDataSelection: boolean;
     clearAllSuggestions: () => void;
-    getSamplePrompts: (entityName: string, input?: string) => Promise<SamplePromptsResult>;
+    getSamplePrompts: (snapshotName: string, input?: string) => Promise<SamplePromptsResult>;
     loadingSuggestions: string[],
     editorAIController?: EditorAIController;
 }
 
 export type EnhancedDataResult = {
-    entityId?: string | number;
+    snapshotId?: string | number;
     suggestions: {
         [key: string]: string[];
     };
@@ -45,17 +45,17 @@ export type SamplePromptsResult = {
 };
 
 export type DataEnhancementRequest = {
-    entityName: string;
-    entityDescription?: string;
-    inputEntity: InputEntity;
+    snapshotName: string;
+    snapshotDescription?: string;
+    inputSnapshot: InputSnapshot;
     properties: Record<string, InputProperty>;
     propertyKey?: string;
     propertyInstructions?: string,
     instructions?: string;
 };
 
-export type InputEntity = {
-    entityId?: string | number;
+export type InputSnapshot = {
+    snapshotId?: string | number;
     values: Record<string, any>;
 };
 

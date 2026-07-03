@@ -744,7 +744,7 @@ const productsCollection: PostgresCollection = {
             type: "string",
             storage: {
                 storageSource: "external-source",
-                storagePath: "products/{entityId}",
+                storagePath: "products/{snapshotId}",
                 acceptedFiles: ["image/*"],
                 maxSize: 5 * 1024 * 1024, // 5MB
             }
@@ -772,7 +772,7 @@ The `storageSource` field maps to a named backend registered in the `StorageRegi
 | Property | Type | Description |
 |----------|------|-------------|
 | `storageSource` | `string` | Named backend to route uploads to (optional, defaults to `(default)`) |
-| `storagePath` | `string` | Path template for uploaded files. Supports `{entityId}` placeholder |
+| `storagePath` | `string` | Path template for uploaded files. Supports `{snapshotId}` placeholder |
 | `acceptedFiles` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`) |
 | `maxSize` | `number` | Maximum file size in bytes |
 

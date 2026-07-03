@@ -1,6 +1,6 @@
 // Re-export all service classes
-export { EntityFetchService } from "./EntityFetchService";
-export { EntityPersistService } from "./EntityPersistService";
+export { FetchService } from "./FetchService";
+export { PersistService } from "./PersistService";
 export { RelationService } from "./RelationService";
 
 // Re-export helper functions
@@ -10,4 +10,4 @@ export {
     getPrimaryKeys,
     parseIdValues,
     buildCompositeId
-} from "./entity-helpers";
+} from "./collection-helpers";

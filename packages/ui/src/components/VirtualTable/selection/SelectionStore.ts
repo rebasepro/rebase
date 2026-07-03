@@ -2,7 +2,7 @@ import { useSyncExternalStore, useCallback, useRef } from "react";
 
 export interface SelectedCell {
     columnKey: string;
-    rowId: string | number;
+    id: string | number;
     cellRect?: DOMRect;
     width?: number;
     height?: number;
@@ -38,16 +38,16 @@ export type VirtualTableSelectionStore<T extends SelectedCell = SelectedCell> = 
 export function useVirtualTableCellSelected<T extends SelectedCell = SelectedCell>(
     store: VirtualTableSelectionStore<T>,
     columnKey: string,
-    rowId: string | number
+    id: string | number
 ): boolean {
-    const selectorRef = useRef({ columnKey, rowId });
-    selectorRef.current = { columnKey, rowId };
+    const selectorRef = useRef({ columnKey, id });
+    selectorRef.current = { columnKey, id };
 
     const getSnapshot = useCallback(() => {
         const cell = store.getSnapshot();
         if (!cell) return false;
         const s = selectorRef.current;
-        return cell.columnKey === s.columnKey && cell.rowId === s.rowId;
+        return cell.columnKey === s.columnKey && cell.id === s.id;
     }, [store]);
 
     return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);

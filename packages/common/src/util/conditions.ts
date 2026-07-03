@@ -121,7 +121,7 @@ export function buildConditionContext(params: {
     values?: Record<string, unknown>;
     previousValues?: Record<string, unknown>;
     path: string;
-    entityId?: string;
+    snapshotId?: string;
     index?: number;
     authController: AuthController;
 }): ConditionContext {
@@ -130,7 +130,7 @@ export function buildConditionContext(params: {
         values,
         previousValues,
         path,
-        entityId,
+        snapshotId,
         index,
         authController
     } = params;
@@ -144,8 +144,8 @@ export function buildConditionContext(params: {
         previousValues: serializedPreviousValues as Record<string, unknown>,
         propertyValue: propertyKey ? getIn(serializedValues, propertyKey) : undefined,
         path,
-        entityId,
-        isNew: !entityId,
+        snapshotId,
+        isNew: !snapshotId,
         index,
         user: {
             uid: user?.uid ?? "",
@@ -227,7 +227,7 @@ export function applyPropertyConditions(
     // VALUE CONDITIONS
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Apply default value for new entities
+    // Apply default value for new snapshots
     if (context.isNew && conditions.defaultValue !== undefined) {
         result.defaultValue = evaluateCondition(conditions.defaultValue, context) as Property["defaultValue"];
     }

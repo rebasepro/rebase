@@ -8,16 +8,16 @@ describe("usePostgresClientDriver hook", () => {
     beforeEach(() => {
         mockWsClient = {
             fetchCollection: jest.fn().mockResolvedValue([{ id: "1",
-name: "Entity 1" }]),
-            fetchEntity: jest.fn().mockResolvedValue({ id: "1",
-name: "Entity 1" }),
-            saveEntity: jest.fn().mockResolvedValue({ id: "1",
-name: "Saved Entity" }),
-            deleteEntity: jest.fn().mockResolvedValue(undefined),
+name: "Snapshot 1" }]),
+            fetchOne: jest.fn().mockResolvedValue({ id: "1",
+name: "Snapshot 1" }),
+            save: jest.fn().mockResolvedValue({ id: "1",
+name: "Saved Snapshot" }),
+            delete: jest.fn().mockResolvedValue(undefined),
             checkUniqueField: jest.fn().mockResolvedValue(true),
-            countEntities: jest.fn().mockResolvedValue(42),
+            count: jest.fn().mockResolvedValue(42),
             listenCollection: jest.fn(() => jest.fn()),
-            listenEntity: jest.fn(() => jest.fn()),
+            listenOne: jest.fn(() => jest.fn()),
             executeSql: jest.fn().mockResolvedValue([]),
             fetchAvailableDatabases: jest.fn().mockResolvedValue(["db1"]),
             fetchAvailableRoles: jest.fn().mockResolvedValue(["role1"]),
@@ -44,7 +44,7 @@ name: "Saved Entity" }),
         expect(result.current.client).toBe(mockWsClient);
     });
 
-    it("correctly routes fetchCollection, fetchEntity, saveEntity, deleteEntity", async () => {
+    it("correctly routes fetchCollection, fetchOne, save, delete", async () => {
         const { result } = renderHook(() => usePostgresClientDriver({ wsClient: mockWsClient }));
         const driver = result.current;
 
@@ -52,33 +52,35 @@ name: "Saved Entity" }),
         const list = await driver.fetchCollection({ path: "posts" });
         expect(mockWsClient.fetchCollection).toHaveBeenCalledWith({ path: "posts" });
         expect(list).toEqual([{ id: "1",
-name: "Entity 1" }]);
+name: "Snapshot 1" }]);
 
-        // fetchEntity
-        const item = await driver.fetchEntity({ path: "posts",
-entityId: "1" });
-        expect(mockWsClient.fetchEntity).toHaveBeenCalledWith({ path: "posts",
-entityId: "1" });
+        // fetchOne
+        const item = await driver.fetchOne({ path: "posts",
+id: "1" });
+        expect(mockWsClient.fetchOne).toHaveBeenCalledWith({ path: "posts",
+id: "1" });
         expect(item).toEqual({ id: "1",
-name: "Entity 1" });
+name: "Snapshot 1" });
 
-        // saveEntity
-        const saved = await driver.saveEntity({ path: "posts",
+        // save
+        const saved = await driver.save({ path: "posts",
 values: { name: "Test" } });
-        expect(mockWsClient.saveEntity).toHaveBeenCalledWith({
+        expect(mockWsClient.save).toHaveBeenCalledWith({
             path: "posts",
             values: { name: "Test" },
-            entityId: undefined,
+            id: undefined,
             previousValues: undefined,
             status: undefined
         });
         expect(saved).toEqual({ id: "1",
-name: "Saved Entity" });
+name: "Saved Snapshot" });
 
-        // deleteEntity
-        await driver.deleteEntity({ entity: { id: "1",
+        // delete
+        await driver.delete({ row: { id: "1",
+path: "test",
 name: "Test" } });
-        expect(mockWsClient.deleteEntity).toHaveBeenCalledWith({ entity: { id: "1",
+        expect(mockWsClient.delete).toHaveBeenCalledWith({ row: { id: "1",
+path: "test",
 name: "Test" } });
     });
 

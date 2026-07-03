@@ -1,24 +1,30 @@
-import { RebaseData, CollectionAccessor } from "@rebasepro/types";
+import { RebaseData, RebaseSdkData } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
+
+/**
+ * The two data-layer shapes that can be routed: the Snapshot-shaped admin
+ * {@link RebaseData} or the flat SDK {@link RebaseSdkData}. Both expose a
+ * `.collection(slug)` accessor, which is all the router needs.
+ */
+export type RoutableData = RebaseData | RebaseSdkData;
 
 /**
  * Parameters for {@link buildRoutedRebaseData}.
  */
-export interface RoutedRebaseDataParams {
+export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
     /**
      * The default data source. Handles every collection that does not
      * resolve to an entry in `sources` (i.e. server-transport collections,
      * which ride the Rebase client).
      */
-    defaultData: RebaseData;
+    defaultData: T;
 
     /**
-     * Per-data-source {@link RebaseData} instances for direct and custom
-     * transports, keyed by data-source key (e.g. `"analytics"`). Server-
-     * mediated sources are not listed here — they fall through to
-     * `defaultData`.
+     * Per-data-source instances for direct and custom transports, keyed by
+     * data-source key (e.g. `"analytics"`). Server-mediated sources are not
+     * listed here — they fall through to `defaultData`.
      */
-    sources: Record<string, RebaseData>;
+    sources: Record<string, T>;
 
     /**
      * Resolve the data-source key for a given collection slug or path.
@@ -55,11 +61,11 @@ export interface RoutedRebaseDataParams {
  * await data.products.find();        // → default (server / Postgres)
  * await data.events.find();          // → Firestore, if `events.dataSource === "analytics"`
  */
-export function buildRoutedRebaseData({
+export function buildRoutedRebaseData<T extends RoutableData = RebaseData>({
     defaultData,
     sources,
     resolveKey
-}: RoutedRebaseDataParams): RebaseData {
+}: RoutedRebaseDataParams<T>): T {
 
     // Fast path: nothing to route → return the default untouched (preserves
     // referential identity for effect dependencies).
@@ -67,21 +73,21 @@ export function buildRoutedRebaseData({
         return defaultData;
     }
 
-    function resolve(slugOrPath: string): RebaseData {
+    function resolve(slugOrPath: string): T {
         const key = resolveKey(slugOrPath);
         if (key && sources[key]) return sources[key];
         return defaultData;
     }
 
-    function getAccessor(slugOrPath: string): CollectionAccessor {
-        return resolve(slugOrPath).collection(slugOrPath);
+    function getAccessor(slugOrPath: string) {
+        return (resolve(slugOrPath) as RoutableData).collection(slugOrPath);
     }
 
     const target = {
         collection: getAccessor
-    } as RebaseData;
+    } as unknown as T;
 
-    return new Proxy(target, {
+    return new Proxy(target as object, {
         get(_target, prop: string | symbol) {
             if (prop === "collection") return getAccessor;
             // Ignore Symbol properties (e.g. Symbol.toPrimitive, Symbol.iterator)
@@ -93,5 +99,5 @@ export function buildRoutedRebaseData({
             // buildRebaseData so dynamic access routes consistently.
             return getAccessor(toSnakeCase(prop));
         }
-    });
+    }) as T;
 }

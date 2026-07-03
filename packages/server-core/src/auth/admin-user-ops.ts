@@ -79,7 +79,7 @@ export interface AdminUserContext {
  * Result of preparing user values for admin-initiated creation.
  */
 export interface AdminUserPrepareResult {
-    /** Values ready for `driver.saveEntity()`. */
+    /** Values ready for `driver.save()`. */
     values: Record<string, unknown>;
     /** The cleartext password (for returning to admin or sending via email). */
     clearPassword?: string;
@@ -117,7 +117,7 @@ function buildCollectionContext(ctx: AdminUserContext): AuthCollectionContext {
  * 2. Backend-level `AuthHooks.onAdminCreateUser` — global override
  * 3. Built-in default — generate password → hash → normalize email
  *
- * The caller is responsible for persisting (via `driver.saveEntity()`).
+ * The caller is responsible for persisting (via `driver.save()`).
  */
 export async function prepareAdminUserValues(
     body: Record<string, unknown>,
@@ -182,7 +182,7 @@ export async function prepareAdminUserValues(
  * temporary password if email fails or is not configured.
  */
 export async function finalizeAdminUserCreation(
-    entity: { id: string; values: Record<string, unknown> },
+    snapshot: { id: string; values: Record<string, unknown> },
     clearPassword: string | undefined,
     ctx: AdminUserContext
 ): Promise<{
@@ -202,7 +202,7 @@ export async function finalizeAdminUserCreation(
             const tokenHash = hashToken(token);
             const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-            await ctx.authRepo.createPasswordResetToken(entity.id, tokenHash, expiresAt);
+            await ctx.authRepo.createPasswordResetToken(snapshot.id, tokenHash, expiresAt);
 
             const baseUrl = ctx.emailConfig?.resetPasswordUrl || "";
             const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
@@ -210,13 +210,13 @@ export async function finalizeAdminUserCreation(
             const appName = ctx.emailConfig?.appName || "Rebase";
             const templateFn = ctx.emailConfig?.templates?.passwordReset;
             const emailContent = templateFn
-                ? templateFn(setPasswordUrl, { email: entity.values.email as string,
-displayName: entity.values.displayName as string })
-                : getPasswordResetTemplate(setPasswordUrl, { email: entity.values.email as string,
-displayName: entity.values.displayName as string }, appName);
+                ? templateFn(setPasswordUrl, { email: snapshot.values.email as string,
+displayName: snapshot.values.displayName as string })
+                : getPasswordResetTemplate(setPasswordUrl, { email: snapshot.values.email as string,
+displayName: snapshot.values.displayName as string }, appName);
 
             await ctx.emailService!.send({
-                to: entity.values.email as string,
+                to: snapshot.values.email as string,
                 subject: emailContent.subject,
                 html: emailContent.html,
                 text: emailContent.text

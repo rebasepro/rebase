@@ -1,6 +1,6 @@
 export * from "./data/useData";
 export * from "./data/useCollectionFetch";
-export * from "./data/useEntityFetch";
+export * from "./data/useSnapshotFetch";
 export * from "./data/useRelationSelector";
 export * from "./data/save";
 export * from "./data/delete";

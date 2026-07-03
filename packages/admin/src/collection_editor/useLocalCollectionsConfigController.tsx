@@ -1,12 +1,12 @@
 import { CollectionsConfigController, SaveCollectionParams, UpdateCollectionParams, DeleteCollectionParams, SavePropertyParams, DeletePropertyParams, UpdatePropertiesOrderParams } from "./types/config_controller";
-import { EntityCollection, Properties } from "@rebasepro/types";
+import { SnapshotCollection, Properties } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 
 
 import React, { useMemo, useRef } from "react";
 export function useLocalCollectionsConfigController(
     clientOrUrl: any,
-    baseCollections: EntityCollection[] = [],
+    baseCollections: SnapshotCollection[] = [],
     options?: {
         readOnly?: boolean;
         getAuthToken?: () => Promise<string | null>;
@@ -73,7 +73,7 @@ export function useLocalCollectionsConfigController(
         readOnlyReason: "Local collection editing is only available in development mode.",
         collections: parsedCollections,
         getCollection: (id: string) => {
-            const found = parsedCollections.find(c => (c as EntityCollection & { id?: string }).id === id || c.slug === id);
+            const found = parsedCollections.find(c => (c as SnapshotCollection & { id?: string }).id === id || c.slug === id);
             if (found) return found;
             throw Error(`Collection ${id} not found in local mode`);
         },
@@ -109,7 +109,7 @@ collectionData: { propertiesOrder: newPropertiesOrder } });
         },
 
         updatePropertiesOrder: async ({ collection, fullPath, newPropertiesOrder }: UpdatePropertiesOrderParams) => {
-            const collectionId = (collection as EntityCollection & { id?: string }).id || fullPath.split("/").pop();
+            const collectionId = (collection as SnapshotCollection & { id?: string }).id || fullPath.split("/").pop();
             await request("/collection/save", { collectionId,
 collectionData: { propertiesOrder: newPropertiesOrder } });
         },

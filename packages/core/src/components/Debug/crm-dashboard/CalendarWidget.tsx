@@ -15,7 +15,7 @@ import {
 
 /* ── Types ─────────────────────────────────────────────── */
 
-interface TaskEntity {
+interface TaskSnapshot {
     id: string;
     values: {
         title: string;
@@ -30,7 +30,7 @@ interface TaskEntity {
 
 export interface CalendarWidgetProps {
     loading: boolean;
-    tasks: TaskEntity[];
+    tasks: TaskSnapshot[];
     onOpenTask: (taskId: string) => void;
 }
 
@@ -150,7 +150,7 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
 
     /* ── Group tasks by date key ── */
     const tasksByDate = useMemo(() => {
-        const map = new Map<string, TaskEntity[]>();
+        const map = new Map<string, TaskSnapshot[]>();
         for (const task of tasks) {
             if (!task.values?.dueDate) continue;
             const d = new Date(task.values.dueDate);

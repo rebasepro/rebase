@@ -8,25 +8,25 @@ export type AnalyticsController = {
 }
 
 export type AnalyticsEvent =
-    | "entity_click"
-    | "entity_click_from_reference"
+    | "snapshot_click"
+    | "snapshot_click_from_reference"
 
     | "reference_selection_clear"
     | "reference_selection_toggle"
     | "reference_selected_single"
-    | "reference_selection_new_entity"
+    | "reference_selection_new_snapshot"
 
-    | "edit_entity_clicked"
-    | "entity_edited"
-    | "new_entity_click"
-    | "new_entity_saved"
-    | "copy_entity_click"
-    | "entity_copied"
+    | "edit_snapshot_clicked"
+    | "snapshot_edited"
+    | "new_snapshot_click"
+    | "new_snapshot_saved"
+    | "copy_snapshot_click"
+    | "snapshot_copied"
 
     | "single_delete_dialog_open"
     | "multiple_delete_dialog_open"
-    | "single_entity_deleted"
-    | "multiple_entities_deleted"
+    | "single_snapshot_deleted"
+    | "multiple_snapshots_deleted"
 
     | "drawer_navigate_to_home"
     | "drawer_navigate_to_collection"
@@ -48,10 +48,10 @@ export type AnalyticsEvent =
     | "kanban_card_moved"
     | "kanban_column_reorder"
     | "kanban_property_changed"
-    | "kanban_new_entity_in_column"
+    | "kanban_new_snapshot_in_column"
     | "kanban_backfill_order"
 
-    | "card_view_entity_click"
+    | "card_view_snapshot_click"
 
     | "unmapped_event"
     ;

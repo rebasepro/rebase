@@ -147,7 +147,7 @@ interface BlockEntryProps {
     properties: Record<string, Property>;
 
     /**
-     * Additional values related to the state of the form or the entity
+     * Additional values related to the state of the form or the snapshot
      */
     context: FormContext;
 

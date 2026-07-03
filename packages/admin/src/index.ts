@@ -9,36 +9,36 @@ export * from "./routes";
 
 // Components — explicitly listed to avoid conflicts with ./types re-exports
 export {
-    EntityView,
-    EntitySelectionTable,
+    SnapshotView,
+    SnapshotSelectionTable,
     SelectableTable,
     SelectableTableContext,
-    EntityCollectionView,
-    EntityCollectionViewActions,
-    EntityCollectionCardView,
-    EntityCard,
+    SnapshotCollectionView,
+    SnapshotCollectionViewActions,
+    SnapshotCollectionCardView,
+    SnapshotCard,
     useSelectionController,
     PropertyConfigBadge,
     PropertyIdCopyTooltip,
-    EntityCollectionTable,
-    EntityCollectionRowActions,
+    SnapshotCollectionTable,
+    SnapshotCollectionRowActions,
     VirtualTableInput,
     ArrayContainer,
     type ArrayEntryParams,
     ReferenceWidget,
     SearchIconsView,
     FieldCaption,
-    EntityPreview,
+    SnapshotPreview,
     getFieldConfig,
     getFieldId,
     getDefaultFieldConfig,
     getDefaultFieldId,
     DEFAULT_FIELD_CONFIGS,
-    editEntityAction,
-    copyEntityAction,
-    deleteEntityAction,
+    editSnapshotAction,
+    copySnapshotAction,
+    deleteSnapshotAction,
     resetPasswordAction,
-    SideEntityProvider,
+    SideSnapshotProvider,
     Scaffold,
     AppBar,
     Drawer,
@@ -57,8 +57,8 @@ export {
     CollectionPanel
 } from "./components";
 export type {
-    EntityViewProps,
-    EntitySelectionProps,
+    SnapshotViewProps,
+    SnapshotSelectionProps,
     SelectableTableProps,
     CollectionPanelProps
 } from "./components";
@@ -74,9 +74,9 @@ export {
     getCollectionBySlugWithin,
     getCollectionPathsCombinations,
     resolveCollectionPathIds,
-    mergeEntityActions,
-    resolveEntityAction,
-    resolveEntityView,
+    mergeSnapshotActions,
+    resolveSnapshotAction,
+    resolveSnapshotView,
     // Property utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
     isReferenceProperty,
     isRelationProperty,
@@ -88,12 +88,12 @@ export {
     getPropertiesWithPropertiesOrder,
     getDefaultPropertiesOrder,
     // Preview utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
-    getEntityPreviewKeys,
-    getEntityTitlePropertyKey
+    getSnapshotPreviewKeys,
+    getSnapshotTitlePropertyKey
 } from "./util";
 
 // Headless collection view adapters
-// Map entity types to the data-agnostic CollectionView from @rebasepro/ui
+// Map snapshot types to the data-agnostic CollectionView from @rebasepro/ui
 export { mapPropertyToConfig, mapPropertiesToConfigs } from "./util/propertyConfigMapper";
 export { useCollectionDataController, createStaticDataController } from "./util/dataControllerAdapter";
 

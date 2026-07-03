@@ -1,4 +1,4 @@
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 
 describe("generateDrizzleSchema", () => {
@@ -14,7 +14,7 @@ describe("generateDrizzleSchema", () => {
     };
 
     it("should generate a simple table with basic types", async () => {
-        const collections: EntityCollection[] = [
+        const collections: SnapshotCollection[] = [
             {
                 slug: "products",
                 table: "products",
@@ -39,7 +39,7 @@ validation: { required: true } },
     });
 
     it("should generate a one-to-many relation correctly", async () => {
-        const usersCollection: EntityCollection = {
+        const usersCollection: SnapshotCollection = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -47,7 +47,7 @@ validation: { required: true } },
                 name: { type: "string" }
             }
         };
-        const postsCollection: EntityCollection = {
+        const postsCollection: SnapshotCollection = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -76,7 +76,7 @@ relationName: "author" }
     });
 
     it("should generate a many-to-many relation with a junction table", async () => {
-        const postsCollection: EntityCollection = {
+        const postsCollection: SnapshotCollection = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -99,7 +99,7 @@ relationName: "tags" }
                 }
             ]
         };
-        const tagsCollection: EntityCollection = {
+        const tagsCollection: SnapshotCollection = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -124,7 +124,7 @@ relationName: "tags" }
 
         describe("String Property", () => {
             it("should default to varchar if no columnType or isId is specified", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -135,7 +135,7 @@ properties: { t_default: { type: "string" } }
             });
 
             it("should respect explicit columnType overrides", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "texts",
                     table: "texts",
                     name: "Texts",
@@ -157,7 +157,7 @@ columnType: "varchar" }
             });
 
             it("should prioritize isId='uuid' over default varchar", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -169,7 +169,7 @@ isId: "uuid" } }
             });
 
             it("should combine isId=true with columnType overrides", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -182,7 +182,7 @@ columnType: "text" } }
             });
 
             it("should respect validation.unique along with columnType", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -197,7 +197,7 @@ validation: { unique: true } } }
 
         describe("Number Property", () => {
             it("should default to numeric for normal numbers", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -208,7 +208,7 @@ properties: { n_def: { type: "number" } }
             });
 
             it("should default to integer if validation.integer is true", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -220,7 +220,7 @@ validation: { integer: true } } }
             });
 
             it("should default to integer if isId is true", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -232,7 +232,7 @@ isId: true } }
             });
 
             it("should respect exact columnType overrides and replace baseType", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "numbers",
                     table: "numbers",
                     name: "Numbers",
@@ -266,7 +266,7 @@ columnType: "bigserial" }
             });
 
             it("should combine isId='increment' with columnType overrides safely", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -279,7 +279,7 @@ columnType: "bigint" } }
             });
 
             it("should combine validation.unique with columnType override", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -294,7 +294,7 @@ validation: { unique: true } } }
 
         describe("Date Property", () => {
             it("should default to timestamp with timezone", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "dates",
 table: "dates",
 name: "Dates",
@@ -305,7 +305,7 @@ properties: { d_def: { type: "date" } }
             });
 
             it("should respect date and time columnType overrides", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "dates",
                     table: "dates",
                     name: "Dates",
@@ -329,7 +329,7 @@ columnType: "timestamp" }
 
         describe("Map & Array Properties", () => {
             it("should default to jsonb", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "json_data",
 table: "json_data",
 name: "JSON Data",
@@ -344,7 +344,7 @@ properties: {
             });
 
             it("should respect json columnType overrides", async () => {
-                const collections: EntityCollection[] = [{
+                const collections: SnapshotCollection[] = [{
                     slug: "json_data",
                     table: "json_data",
                     name: "JSON Data",
@@ -374,7 +374,7 @@ columnType: "jsonb" }
 
     describe("RLS policy generation", () => {
         it("should generate ownerField policy with USING and WITH CHECK for 'all'", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -400,7 +400,7 @@ ownerField: "user_id" }
         });
 
         it("should generate SELECT policy with only USING clause", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -421,7 +421,7 @@ ownerField: "user_id" }
         });
 
         it("should generate INSERT policy with only WITH CHECK clause", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -442,7 +442,7 @@ ownerField: "user_id" }
         });
 
         it("should generate public access policy", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "articles",
                 table: "articles",
                 name: "Articles",
@@ -459,7 +459,7 @@ access: "public" }
         });
 
         it("should generate roles-only policy", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "admin_data",
                 table: "admin_data",
                 name: "Admin Data",
@@ -475,7 +475,7 @@ roles: ["admin"] }
         });
 
         it("should safely handle complex sub-string roles overlapping like 'view' and 'viewer'", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "finance_data",
                 table: "finance_data",
                 name: "Finance Data",
@@ -493,7 +493,7 @@ roles: ["view"] } // Should not match 'viewer'
         });
 
         it("should securely handle multiple allowed roles", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "multi_role",
                 table: "multi_role",
                 name: "Multi Role",
@@ -509,7 +509,7 @@ roles: ["admin", "editor", "super-admin"] }
         });
 
         it("should combine roles with access: public", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "reports",
                 table: "reports",
                 name: "Reports",
@@ -527,7 +527,7 @@ access: "public" }
         });
 
         it("should combine roles with ownerField", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "docs",
                 table: "docs",
                 name: "Docs",
@@ -550,7 +550,7 @@ ownerField: "user_id" }
         });
 
         it("should generate restrictive policy", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "orders",
                 table: "orders",
                 name: "Orders",
@@ -571,7 +571,7 @@ using: "{is_locked} = false" }
         });
 
         it("should generate raw SQL using clause with column references", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "posts",
                 table: "posts",
                 name: "Posts",
@@ -590,7 +590,7 @@ using: "{published_at} > now() - interval '30 days'" }
         });
 
         it("should generate raw SQL withCheck clause", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "items",
                 table: "items",
                 name: "Items",
@@ -616,7 +616,7 @@ using: "{published_at} > now() - interval '30 days'" }
         });
 
         it("should use custom policy names when provided", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "data",
                 table: "data",
                 name: "Data",
@@ -633,7 +633,7 @@ access: "public" }
         });
 
         it("should generate multiple policies for the same table", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -669,7 +669,7 @@ using: "{is_locked} = false" }
         });
 
         it("should enable RLS on every table even without any security rules", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "public_data",
                 table: "public_data",
                 name: "Public Data",
@@ -684,7 +684,7 @@ using: "{is_locked} = false" }
         });
 
         it("should enable RLS on tables that do have security rules", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "secure_data",
                 table: "secure_data",
                 name: "Secure Data",
@@ -701,7 +701,7 @@ access: "public" }
         });
 
         it("should fall back to deny-all (sql`false`) when no USING clause can be generated", async () => {
-            const collections: EntityCollection[] = [{
+            const collections: SnapshotCollection[] = [{
                 slug: "deny_test",
                 table: "deny_test",
                 name: "Deny Test",
@@ -721,7 +721,7 @@ access: "public" }
 // V2 improvements tests
 describe("generateDrizzleSchema V2 improvements", () => {
     it("should generate role-based security rule", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "admin_data",
             table: "admin_data",
             name: "Admin Data",
@@ -735,7 +735,7 @@ roles: ["admin"] }
         expect(result).toContain("string_to_array(auth.roles(), ',') && ARRAY['admin']");
     });
     it("should generate multiple policies from operations array", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "notes",
             table: "notes",
             name: "Notes",
@@ -757,7 +757,7 @@ ownerField: "user_id" }
         expect(result).toContain('for: "update"');
     });
     it("should auto-generate names with operation suffix for operations array", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -772,7 +772,7 @@ access: "public" }
         expect(result).toContain('for: "delete"');
     });
     it("should not append operation suffix when operations array has single element", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -789,7 +789,7 @@ access: "public" }
         expect(result).not.toContain('pgPolicy("my_policy_select"');
     });
     it("should generate correct clauses per operation in operations array", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "notes",
             table: "notes",
             name: "Notes",
@@ -814,7 +814,7 @@ ownerField: "user_id" }
         expect(insertPolicy).not.toContain("using:");
     });
     it("operations array takes precedence over singular operation", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -833,7 +833,7 @@ access: "public" }
         expect(result).not.toContain('for: "delete"');
     });
     it("should handle roles combined with using true for unfiltered access", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "reports",
             table: "reports",
             name: "Reports",
@@ -849,7 +849,7 @@ using: "true" }
         expect(result).toContain("(true) AND (string_to_array(auth.roles(), ',') && ARRAY['admin'])");
     });
     it("should use pgRoles instead of default 'public' when specified", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "tenant_data",
             table: "tenant_data",
             name: "Tenant Data",
@@ -865,7 +865,7 @@ pgRoles: ["app_role", "service_role"] }
         expect(result).not.toContain('to: ["public"]');
     });
     it("should default to 'public' pgRole when pgRoles is not specified", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "default_data",
             table: "default_data",
             name: "Default Data",
@@ -882,7 +882,7 @@ access: "public" }
 
 describe("generateDrizzleSchema Deterministic Policies", () => {
     it("should generate the same policy name hash for identically configured rules", async () => {
-        const collections1: EntityCollection[] = [{
+        const collections1: SnapshotCollection[] = [{
             slug: "test1",
             table: "test_hash",
             name: "Test",
@@ -893,7 +893,7 @@ roles: ["admin", "user"] }
             ]
         }];
 
-        const collections2: EntityCollection[] = [{
+        const collections2: SnapshotCollection[] = [{
             slug: "test2",
             table: "test_hash", // Same table name
             name: "Test",
@@ -917,7 +917,7 @@ roles: ["admin", "user"] }
     });
 
     it("should generate the exact same SQL output regardless of array order in configuration", async () => {
-        const collectionsUnsorted: EntityCollection[] = [{
+        const collectionsUnsorted: SnapshotCollection[] = [{
             slug: "test_order",
             table: "test_order",
             name: "Test",
@@ -931,7 +931,7 @@ roles: ["admin", "user"] }
             ]
         }];
 
-        const collectionsSorted: EntityCollection[] = [{
+        const collectionsSorted: SnapshotCollection[] = [{
             slug: "test_order",
             table: "test_order",
             name: "Test",
@@ -973,7 +973,7 @@ describe("generateDrizzleSchema ID Generation", () => {
     };
 
     it("should generate a UUID primary key when isId is 'uuid'", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -989,7 +989,7 @@ isId: "uuid" }
     });
 
     it("should generate a serial primary key when isId is 'increment'", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "tickets",
             table: "tickets",
             name: "Tickets",
@@ -1005,7 +1005,7 @@ isId: "increment" }
     });
 
     it("should generate a custom SQL primary key when isId is a sql string", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "events",
             table: "events",
             name: "Events",
@@ -1021,7 +1021,7 @@ isId: "sql`gen_random_uuid()`" }
     });
 
     it("should generate a normal text primary key when isId is simply true", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "users",
             table: "users",
             name: "Users",
@@ -1049,7 +1049,7 @@ describe("generateDrizzleSchema columnName support", () => {
     };
 
     it("should use explicit columnName as the SQL column name instead of deriving from the property key", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "billing",
             table: "company_billing_config",
             name: "Billing",
@@ -1080,7 +1080,7 @@ describe("generateDrizzleSchema columnName support", () => {
     });
 
     it("should fall back to toSnakeCase when columnName is not set (manually-authored collections)", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "products",
             table: "products",
             name: "Products",
@@ -1101,7 +1101,7 @@ describe("generateDrizzleSchema columnName support", () => {
     });
 
     it("should handle mixed properties — some with columnName, some without", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "config",
             table: "app_config",
             name: "Config",
@@ -1130,7 +1130,7 @@ describe("generateDrizzleSchema columnName support", () => {
     });
 
     it("should use columnName for all property types, not just strings", async () => {
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "metrics",
             table: "metrics",
             name: "Metrics",
@@ -1169,7 +1169,7 @@ describe("generateDrizzleSchema columnName support", () => {
 
     it("should reproduce and prevent the medmot bug: digit+letter column names", async () => {
         // This is the exact scenario from the medmot project that caused the production failure
-        const collections: EntityCollection[] = [{
+        const collections: SnapshotCollection[] = [{
             slug: "company_billing_config",
             table: "company_billing_config",
             name: "Company Billing Config",
@@ -1230,7 +1230,7 @@ name: "Company ID" }
     describe("generateDrizzleSchema autoValue date properties", () => {
 
         it("should add .default(sql`now()`) for on_create autoValue", async () => {
-            const collections: EntityCollection[] = [
+            const collections: SnapshotCollection[] = [
                 {
                     slug: "articles",
                     table: "articles",
@@ -1256,7 +1256,7 @@ name: "Company ID" }
         });
 
         it("should add .default(sql`now()`) for on_update autoValue (INSERT default only)", async () => {
-            const collections: EntityCollection[] = [
+            const collections: SnapshotCollection[] = [
                 {
                     slug: "articles",
                     table: "articles",
@@ -1281,7 +1281,7 @@ name: "Company ID" }
         });
 
         it("should not modify date columns without autoValue", async () => {
-            const collections: EntityCollection[] = [
+            const collections: SnapshotCollection[] = [
                 {
                     slug: "events",
                     table: "events",
@@ -1301,7 +1301,7 @@ name: "Company ID" }
         });
 
         it("should handle both on_create and on_update in the same collection", async () => {
-            const collections: EntityCollection[] = [
+            const collections: SnapshotCollection[] = [
                 {
                     slug: "posts",
                     table: "posts",
@@ -1331,7 +1331,7 @@ name: "Company ID" }
         });
 
         it("should handle on_create with date columnType", async () => {
-            const collections: EntityCollection[] = [
+            const collections: SnapshotCollection[] = [
                 {
                     slug: "logs",
                     table: "logs",

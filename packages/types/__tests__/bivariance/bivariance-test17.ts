@@ -2,7 +2,7 @@ import * as React from "react";
 
 export interface AdditionalFieldDelegate<M> {
     // This makes it bivariant!
-    Builder?(props: { entity: M }): React.ReactElement | null;
+    Builder?(props: { snapshot: M }): React.ReactElement | null;
 }
 
 export interface PostgresCollection<M> {

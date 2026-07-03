@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import type { EntityCustomViewParams } from "@rebasepro/types";
+import type { SnapshotCustomViewParams } from "@rebasepro/types";
 import { useStorageSource } from "@rebasepro/core";
 import { Container, Markdown, Typography } from "@rebasepro/ui";
 
@@ -13,7 +13,7 @@ import { Container, Markdown, Typography } from "@rebasepro/ui";
  * download URLs — the same pattern end-users should follow in their
  * own custom views and SDK integrations.
  */
-export function BlogEntryPreview({ modifiedValues }: EntityCustomViewParams) {
+export function BlogEntryPreview({ modifiedValues }: SnapshotCustomViewParams) {
 
     const storage = useStorageSource();
     const values = modifiedValues as Record<string, unknown> | undefined;

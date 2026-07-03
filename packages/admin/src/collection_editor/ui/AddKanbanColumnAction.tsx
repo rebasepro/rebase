@@ -6,7 +6,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { getPropertyInPath } from "../_cms_internals";
-import { EntityCollection, EnumValueConfig, StringProperty } from "@rebasepro/types";
+import { SnapshotCollection, EnumValueConfig, StringProperty } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import {
     Button,
@@ -31,12 +31,12 @@ import { toSnakeCase } from "@rebasepro/utils";
 export function AddKanbanColumnAction({
     collection,
     fullPath,
-    parentCollectionSlugs, parentEntityIds,
+    parentCollectionSlugs, parentSnapshotIds,
     columnProperty
 }: {
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     fullPath: string;
-    parentCollectionSlugs: string[], parentEntityIds: string[];
+    parentCollectionSlugs: string[], parentSnapshotIds: string[];
     columnProperty: string;
 }) {
     const [dialogOpen, setDialogOpen] = useState(false);

@@ -1,19 +1,19 @@
-export type EntityAfterReadProps<M extends Record<string, unknown>> = {
-    collection: EntityCollection<M>;
+export type AfterReadProps<M extends Record<string, unknown>> = {
+    collection: SnapshotCollection<M>;
 };
 
-export type EntityCallbacks<M extends Record<string, unknown>> = {
-    afterRead?: { bivarianceHack(props: EntityAfterReadProps<M>): M }["bivarianceHack"];
+export type CollectionCallbacks<M extends Record<string, unknown>> = {
+    afterRead?: { bivarianceHack(props: AfterReadProps<M>): M }["bivarianceHack"];
 };
 
 export interface PostgresCollection<M extends Record<string, unknown>> {
     titleProperty?: Extract<keyof M, string>;
-    callbacks?: EntityCallbacks<M>;
+    callbacks?: CollectionCallbacks<M>;
 }
 
-export type EntityCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
+export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
 
-let specificColl: EntityCollection<{ id: string, name: string }>;
-declare let genericColl: EntityCollection;
+let specificColl: SnapshotCollection<{ id: string, name: string }>;
+declare let genericColl: SnapshotCollection;
 
 genericColl = specificColl; // Should succeed!

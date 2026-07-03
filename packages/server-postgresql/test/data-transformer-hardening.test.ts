@@ -4,7 +4,7 @@ import {
     normalizeDbValues,
     sanitizeAndConvertDates
 } from "../src/data-transformer";
-import type { EntityCollection, Property, Properties, RelationProperty } from "@rebasepro/types";
+import type { SnapshotCollection, Property, Properties, RelationProperty } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
@@ -12,8 +12,8 @@ import type { EntityCollection, Property, Properties, RelationProperty } from "@
 function makeCollection(
     slug: string,
     properties: Properties,
-    relations?: EntityCollection["relations"]
-): EntityCollection {
+    relations?: SnapshotCollection["relations"]
+): SnapshotCollection {
     return {
         name: slug,
         slug,
@@ -22,7 +22,7 @@ function makeCollection(
         tableName: slug,
         properties,
         relations
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ name: "Title" } as Property,
 name: "Count" } as Property
     };
 
-    it("returns a SerializedEntityData object with scalarData, not raw values", () => {
+    it("returns a SerializedSnapshotData object with scalarData, not raw values", () => {
         const result = serializeDataToServer(
             { title: "Hello",
 count: 5 },
@@ -76,7 +76,7 @@ count: 42 },
         expect(result.scalarData.count).toBe(42);
     });
 
-    it("handles null/undefined entity gracefully", () => {
+    it("handles null/undefined snapshot gracefully", () => {
         const result = serializeDataToServer(null as any, properties);
         // Object.entries(null) yields nothing → empty object
         expect(result.scalarData).toEqual({});
@@ -245,7 +245,7 @@ describe("sanitizeAndConvertDates", () => {
 // ─────────────────────────────────────────────────────────────
 // getColumnMeta — type guard regression (Issue #6)
 // ─────────────────────────────────────────────────────────────
-import { getColumnMeta } from "../src/services/entity-helpers";
+import { getColumnMeta } from "../src/services/collection-helpers";
 
 describe("getColumnMeta type guard", () => {
     it("extracts columnType, dataType, primary from a well-formed column", () => {

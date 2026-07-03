@@ -2,7 +2,7 @@
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useRef, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
-import { EntityCollection, Property } from "@rebasepro/types";
+import { SnapshotCollection, Property } from "@rebasepro/types";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { getFieldConfig } from "../../../components/field_configs";
 import { Button, IconButton, iconSize, Select, SelectItem, Typography, XIcon } from "@rebasepro/ui";
@@ -19,7 +19,7 @@ export function KanbanConfigSection({
 }) {
     const authController = useAuthController();
     const customizationController = useCustomizationController();
-    const { values, setFieldValue } = useFormex<EntityCollection>();
+    const { values, setFieldValue } = useFormex<SnapshotCollection>();
     const panelRef = useRef<HTMLDivElement>(null);
     const [columnPropertyDialogOpen, setColumnPropertyDialogOpen] = useState(false);
 
@@ -133,7 +133,7 @@ block: "center" });
                     ? `Property "${kanbanConfig?.columnProperty}" does not exist or is not an enum string property. Please select a valid property or clear the selection.`
                     : enumStringProperties.length === 0
                         ? "No enum string properties found. Add a string property with enum to use Kanban view."
-                        : "Select a string property with enum values to group entities into columns"
+                        : "Select a string property with enum values to group snapshots into columns"
                 }
             </FieldCaption>
 

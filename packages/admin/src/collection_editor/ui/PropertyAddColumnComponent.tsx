@@ -3,20 +3,20 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { getDefaultPropertiesOrder } from "../_cms_internals";
-import { EntityCollection, EntityTableController } from "@rebasepro/types";
+import { SnapshotCollection, SnapshotTableController } from "@rebasepro/types";
 import { PlusIcon, Tooltip } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
 export function PropertyAddColumnComponent({
     path,
-    parentCollectionSlugs, parentEntityIds,
+    parentCollectionSlugs, parentSnapshotIds,
     collection,
     tableController
 }: {
     path: string,
-    parentCollectionSlugs: string[], parentEntityIds: string[],
-    collection: EntityCollection;
-    tableController: EntityTableController;
+    parentCollectionSlugs: string[], parentSnapshotIds: string[],
+    collection: SnapshotCollection;
+    tableController: SnapshotTableController;
 }) {
 
     const authController = useAuthController();
@@ -35,10 +35,10 @@ export function PropertyAddColumnComponent({
                     collectionEditorController.editProperty({
                         editedCollectionId: collection.slug,
                         parentCollectionSlugs,
-parentEntityIds,
+parentSnapshotIds,
                         currentPropertiesOrder: getDefaultPropertiesOrder(collection),
                         collection,
-                        existingEntities: tableController.data
+                        existingSnapshots: tableController.data
                     });
                 } : undefined}>
                 <PlusIcon/>

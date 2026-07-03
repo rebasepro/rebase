@@ -1,6 +1,6 @@
 import { parseFirst } from "pgsql-ast-parser";
 import { TableInfo } from "../components/SQLEditor/SQLEditor";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 /**
  * A table extracted from a SQL query's FROM/JOIN clauses.
@@ -19,7 +19,7 @@ export interface ResolvedQueryCollection {
     /** SQL alias if present (e.g. "bp") */
     tableAlias?: string;
     /** The matched collection */
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     /** Columns from this table that are present in the result set */
     columns: string[];
     /** The result column name that holds the primary key for this table (e.g. "id", "author_id") */
@@ -77,7 +77,7 @@ import { toSnakeCase } from "@rebasepro/utils";
 export function resolveQueryCollections(
     sqlString: string,
     schemas: Record<string, TableInfo[]>,
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     resultColumns?: string[]
 ): ResolvedQueryCollection[] {
     const tables = extractTablesFromQuery(sqlString);

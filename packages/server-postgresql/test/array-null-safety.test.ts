@@ -4,12 +4,12 @@ import {
     parsePropertyFromServer,
     serializeDataToServer
 } from "../src/data-transformer";
-import type { Property, Properties, EntityCollection } from "@rebasepro/types";
+import type { Property, Properties, SnapshotCollection } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
 // ─────────────────────────────────────────────────────────────
-function makeCollection(slug: string, properties: Properties): EntityCollection {
+function makeCollection(slug: string, properties: Properties): SnapshotCollection {
     return {
         name: slug,
         slug,
@@ -17,7 +17,7 @@ function makeCollection(slug: string, properties: Properties): EntityCollection 
         collectionType: "postgres",
         tableName: slug,
         properties
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -229,9 +229,9 @@ describe("parsePropertyFromServer — array null safety", () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 3. serializeDataToServer — entity with null array fields
+// 3. serializeDataToServer — snapshot with null array fields
 // ─────────────────────────────────────────────────────────────
-describe("serializeDataToServer — entity with null array fields", () => {
+describe("serializeDataToServer — snapshot with null array fields", () => {
     const tagsProperty: Property = {
         type: "array",
         name: "Tags",
@@ -261,7 +261,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     };
 
     // ── Null array field ──
-    it("serializes entity with tags: null — scalarData.tags should be null", () => {
+    it("serializes snapshot with tags: null — scalarData.tags should be null", () => {
         const result = serializeDataToServer(
             { tags: null },
             properties
@@ -270,7 +270,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     });
 
     // ── Undefined array field ──
-    it("serializes entity with tags: undefined — tags value should be undefined in scalarData", () => {
+    it("serializes snapshot with tags: undefined — tags value should be undefined in scalarData", () => {
         const result = serializeDataToServer(
             { tags: undefined },
             properties
@@ -281,7 +281,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     });
 
     // ── Empty array field ──
-    it("serializes entity with tags: [] — scalarData.tags should be []", () => {
+    it("serializes snapshot with tags: [] — scalarData.tags should be []", () => {
         const result = serializeDataToServer(
             { tags: [] },
             properties
@@ -290,7 +290,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     });
 
     // ── Multiple array fields, mixed null / populated ──
-    it("handles entity with multiple array fields, some null, some populated", () => {
+    it("handles snapshot with multiple array fields, some null, some populated", () => {
         const multiProperties: Properties = {
             tags: tagsProperty,
             categories: categoriesProperty
@@ -305,7 +305,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     });
 
     // ── Nested map containing null array ──
-    it("handles entity with nested map containing array field that is null", () => {
+    it("handles snapshot with nested map containing array field that is null", () => {
         const nestedProperties: Properties = {
             metadata: metadataProperty
         };
@@ -319,7 +319,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     });
 
     // ── All array fields null ──
-    it("handles entity with only array fields, all null — scalarData should have all null values", () => {
+    it("handles snapshot with only array fields, all null — scalarData should have all null values", () => {
         const allArrayProperties: Properties = {
             tags: tagsProperty,
             categories: categoriesProperty

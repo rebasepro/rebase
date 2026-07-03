@@ -39,7 +39,7 @@ Authentication is configured via the `auth` property of `initializeRebaseBackend
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `collection` | `EntityCollection` | Built-in users collection | The collection used for auth user storage. Import `defaultUsersCollection` from `@rebasepro/common` or pass a custom collection with required auth fields. |
+| `collection` | `SnapshotCollection` | Built-in users collection | The collection used for auth user storage. Import `defaultUsersCollection` from `@rebasepro/common` or pass a custom collection with required auth fields. |
 | `jwtSecret` | `string` | — | **Required.** Secret for signing JWT access tokens. |
 | `accessExpiresIn` | `string` | `"1h"` | Access token lifetime (e.g. `"15m"`, `"2h"`). |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token lifetime. |
@@ -136,7 +136,7 @@ const membersCollection: PostgresCollection = {
 
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
-      resetPassword: true // Or false to disable, or a custom EntityAction
+      resetPassword: true // Or false to disable, or a custom SnapshotAction
     }
   },
   properties: { ... }
@@ -859,7 +859,7 @@ API keys use a service identity for RLS scoping: `uid: "api-key:{id}"`, `roles: 
 
 ### Reserved System Identities
 
-The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (Entity Callbacks / DataHooks) and `c.get("user")` (custom functions):
+The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (Collection Callbacks / DataHooks) and `c.get("user")` (custom functions):
 
 | Auth Method | `userId` | `roles` | When It Occurs |
 |---|---|---|---|
@@ -870,7 +870,7 @@ The auth middleware assigns these reserved identities automatically. They are vi
 | Anonymous | `"anon"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
-> **IMPORTANT FOR AGENTS:** Server-side `rebase.data` (the singleton used in cron jobs, custom functions, and webhooks) is built with `createRebaseClient({ token: serviceKey })`. It round-trips through the REST API, so all middleware, DataHooks, and Entity Callbacks fire with `userId: "service"`, `roles: ["admin"]`. This lets developers distinguish server-internal reads from end-user reads in callbacks.
+> **IMPORTANT FOR AGENTS:** Server-side `rebase.data` (the singleton used in cron jobs, custom functions, and webhooks) is built with `createRebaseClient({ token: serviceKey })`. It round-trips through the REST API, so all middleware, DataHooks, and Collection Callbacks fire with `userId: "service"`, `roles: ["admin"]`. This lets developers distinguish server-internal reads from end-user reads in callbacks.
 
 ---
 
@@ -1092,7 +1092,7 @@ Admin user and role management is handled via dedicated admin routes (mounted un
 
 ## Backend Hooks
 
-Backend hooks intercept data at the **API boundary** (after DB operations, before API responses). They are separate from auth hooks and collection-level `EntityCallbacks`.
+Backend hooks intercept data at the **API boundary** (after DB operations, before API responses). They are separate from auth hooks and collection-level `CollectionCallbacks`.
 
 ### BackendHooks Interface
 
@@ -1113,15 +1113,15 @@ interface BackendHooks {
 | `beforeDelete` | `(userId, context) => void` | Throw to prevent deletion. |
 | `afterDelete` | `(userId, context) => void` | After user deleted. |
 
-### DataHooks (All Collection Entities)
+### DataHooks (All Collection Snapshots)
 
 | Hook | Signature | Description |
 |---|---|---|
-| `afterRead` | `(slug, entity, context) => entity \| null` | Transform entity after read. Return `null` to filter out. |
-| `beforeSave` | `(slug, values, entityId, context) => values` | Transform before write. Throw to abort. |
-| `afterSave` | `(slug, entity, context) => void` | After entity create/update. Side effects. |
-| `beforeDelete` | `(slug, entityId, context) => void` | Throw to prevent deletion. |
-| `afterDelete` | `(slug, entityId, context) => void` | After entity deleted. |
+| `afterRead` | `(slug, snapshot, context) => snapshot \| null` | Transform snapshot after read. Return `null` to filter out. |
+| `beforeSave` | `(slug, values, snapshotId, context) => values` | Transform before write. Throw to abort. |
+| `afterSave` | `(slug, snapshot, context) => void` | After snapshot create/update. Side effects. |
+| `beforeDelete` | `(slug, snapshotId, context) => void` | Throw to prevent deletion. |
+| `afterDelete` | `(slug, snapshotId, context) => void` | After snapshot deleted. |
 
 ### BackendHookContext
 
@@ -1137,11 +1137,11 @@ interface BackendHookContext {
 ```typescript
 const hooks: BackendHooks = {
   data: {
-    afterRead(slug, entity, ctx) {
-      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
-        return { ...entity, email: "***" };
+    afterRead(slug, snapshot, ctx) {
+      if (!ctx.requestUser?.roles.includes("admin") && snapshot.email) {
+        return { ...snapshot, email: "***" };
       }
-      return entity;
+      return snapshot;
     },
   },
   users: {
@@ -1256,7 +1256,7 @@ When a request includes `Authorization: Bearer <serviceKey>`:
 - Comparison is done with constant-time comparison to prevent timing attacks.
 - Must be ≥ 32 characters (validated at startup).
 
-> **TIP:** In Entity Callbacks and DataHooks, server-side `rebase.data` calls appear as `userId: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your callback logic.
+> **TIP:** In Collection Callbacks and DataHooks, server-side `rebase.data` calls appear as `userId: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your callback logic.
 
 ### Token Rotation
 

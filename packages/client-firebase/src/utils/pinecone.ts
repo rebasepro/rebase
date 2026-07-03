@@ -1,12 +1,12 @@
 import { User as FirebaseUser } from "@firebase/auth";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 const DEFAULT_SERVER = "https://api.rebase.pro";
 
 /**
  * Utility function to perform a text search in an algolia index,
- * returning the ids of the entities.
+ * returning the ids of the snapshots.
  * @param index
  * @param query
  * @group Firebase
@@ -60,7 +60,7 @@ export function buildPineconeSearchController({
 
         const init = (props: {
             path: string,
-            collection?: EntityCollection
+            collection?: SnapshotCollection
         }) => {
             // do nothing
             return Promise.resolve(isPathSupported(props.path));

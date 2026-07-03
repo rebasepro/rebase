@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "@rebasepro/core";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { Button } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -12,11 +12,11 @@ export function KanbanSetupAction({
     collection,
     fullPath,
     parentCollectionSlugs,
-    parentEntityIds
+    parentSnapshotIds
 }: {
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     fullPath: string;
-    parentCollectionSlugs: string[], parentEntityIds: string[];
+    parentCollectionSlugs: string[], parentSnapshotIds: string[];
 }) {
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
@@ -25,7 +25,7 @@ export function KanbanSetupAction({
         collectionEditorController.editCollection({
             id: collection.slug,
             parentCollectionSlugs,
-parentEntityIds,
+parentSnapshotIds,
             initialView: "display",
             expandKanban: true
         });

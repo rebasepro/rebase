@@ -66,7 +66,7 @@ export interface HistoryEntry {
     _id?: ObjectId;
     id: string;
     table_name: string;
-    entity_id: string;
+    snapshot_id: string;
     action: "create" | "update" | "delete";
     changed_fields: string[] | null;
     values: Record<string, unknown> | null;
@@ -77,7 +77,7 @@ export interface HistoryEntry {
 
 export interface RecordHistoryParams {
     tableName: string;
-    entityId: string;
+    id: string;
     action: "create" | "update" | "delete";
     values?: Record<string, unknown> | null;
     previousValues?: Record<string, unknown> | null;
@@ -108,7 +108,7 @@ export class MongoHistoryService {
     async recordHistory(params: RecordHistoryParams): Promise<void> {
         const {
             tableName,
-            entityId,
+            id,
             action,
             values,
             previousValues,
@@ -127,7 +127,7 @@ export class MongoHistoryService {
             const entry: HistoryEntry = {
                 id: new ObjectId().toString(),
                 table_name: tableName,
-                entity_id: String(entityId),
+                snapshot_id: String(id),
                 action,
                 changed_fields: changedFields,
                 values: values || null,
@@ -138,25 +138,25 @@ export class MongoHistoryService {
 
             await this.db.collection("__rebase_history").insertOne(entry);
 
-            // Non-blocking prune for this specific entity
-            this.pruneHistory(String(entityId), tableName).catch(e => {
-                logger.error(`[HistoryService] Failed to prune history for ${tableName}/${entityId}`, { error: e });
+            // Non-blocking prune for this specific row
+            this.pruneHistory(String(id), tableName).catch(e => {
+                logger.error(`[HistoryService] Failed to prune history for ${tableName}/${id}`, { error: e });
             });
         } catch (error) {
-            logger.error(`[HistoryService] Failed to record history for ${tableName}/${entityId}`, { error: error });
+            logger.error(`[HistoryService] Failed to record history for ${tableName}/${id}`, { error: error });
         }
     }
 
-    private async pruneHistory(entityId: string, tableName: string): Promise<void> {
+    private async pruneHistory(id: string, tableName: string): Promise<void> {
         const collection = this.db.collection("__rebase_history");
 
         // 1. Enforce maxEntries
-        const count = await collection.countDocuments({ entity_id: entityId,
+        const count = await collection.countDocuments({ snapshot_id: id,
 table_name: tableName });
         if (count > this.retention.maxEntries) {
             const toDelete = count - this.retention.maxEntries;
             const oldestEntries = await collection
-                .find({ entity_id: entityId,
+                .find({ snapshot_id: id,
 table_name: tableName })
                 .sort({ updated_at: 1 })
                 .limit(toDelete)
@@ -173,7 +173,7 @@ table_name: tableName })
         cutoffDate.setDate(cutoffDate.getDate() - this.retention.ttlDays);
 
         await collection.deleteMany({
-            entity_id: entityId,
+            snapshot_id: id,
             table_name: tableName,
             updated_at: { $lt: cutoffDate }
         });

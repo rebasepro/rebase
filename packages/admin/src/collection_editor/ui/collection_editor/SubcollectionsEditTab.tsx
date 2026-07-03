@@ -4,8 +4,8 @@ import {
     ConfirmationDialog,
     useCustomizationController
 } from "@rebasepro/core";
-import { resolveEntityView } from "../../_cms_internals";
-import { EntityCollection, EntityCustomView, User } from "@rebasepro/types";
+import { resolveSnapshotView } from "../../_cms_internals";
+import { SnapshotCollection, SnapshotCustomView, User } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 import {
     Alert,
@@ -26,7 +26,7 @@ import {
 import { CollectionEditorDialog } from "./CollectionEditorDialog";
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionInference } from "../../types/collection_inference";
-import { EntityCustomViewsSelectDialog } from "./EntityCustomViewsSelectDialog";
+import { SnapshotCustomViewsSelectDialog } from "./SnapshotCustomViewsSelectDialog";
 import { useFormex } from "@rebasepro/formex";
 
 export function SubcollectionsEditTab({
@@ -37,18 +37,18 @@ export function SubcollectionsEditTab({
     getUser,
     parentCollectionSlugs
 }: {
-    collection: EntityCollection,
-    parentCollection?: EntityCollection,
+    collection: SnapshotCollection,
+    parentCollection?: SnapshotCollection,
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
     getUser?: (uid: string) => User | null;
-    parentCollectionSlugs?: string[], parentEntityIds?: string[];
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
 }) {
 
-    const { entityViews: contextEntityViews } = useCustomizationController();
+    const { snapshotViews: contextSnapshotViews } = useCustomizationController();
 
     const [subcollectionToDelete, setSubcollectionToDelete] = React.useState<string | undefined>();
-    const [addEntityViewDialogOpen, setAddEntityViewDialogOpen] = React.useState<boolean>(false);
+    const [addSnapshotViewDialogOpen, setAddSnapshotViewDialogOpen] = React.useState<boolean>(false);
     const [viewToDelete, setViewToDelete] = React.useState<string | undefined>();
 
     const [currentDialog, setCurrentDialog] = React.useState<{
@@ -59,14 +59,14 @@ export function SubcollectionsEditTab({
     const {
         values,
         setFieldValue
-    } = useFormex<EntityCollection>();
+    } = useFormex<SnapshotCollection>();
 
-    const [subcollections, setSubcollections] = React.useState<EntityCollection[]>(getSubcollections(collection) ?? []);
-    const resolvedEntityViews = values.entityViews?.filter(e => typeof e === "string")
-        .map(e => resolveEntityView(e, contextEntityViews))
-        .filter(Boolean) as EntityCustomView[] ?? [];
-    const hardCodedEntityViews = collection.entityViews?.filter(e => typeof e !== "string") as EntityCustomView[] ?? [];
-    const totalEntityViews = resolvedEntityViews.length + hardCodedEntityViews.length;
+    const [subcollections, setSubcollections] = React.useState<SnapshotCollection[]>(getSubcollections(collection) ?? []);
+    const resolvedSnapshotViews = values.snapshotViews?.filter(e => typeof e === "string")
+        .map(e => resolveSnapshotView(e, contextSnapshotViews))
+        .filter(Boolean) as SnapshotCustomView[] ?? [];
+    const hardCodedSnapshotViews = collection.snapshotViews?.filter(e => typeof e !== "string") as SnapshotCustomView[] ?? [];
+    const totalSnapshotViews = resolvedSnapshotViews.length + hardCodedSnapshotViews.length;
 
     return (
         <>
@@ -135,9 +135,9 @@ export function SubcollectionsEditTab({
 
                         {<>
                             <div className={"flex flex-col gap-4 w-full"}>
-                                {totalEntityViews > 0 && <Table>
+                                {totalSnapshotViews > 0 && <Table>
                                     <TableBody>
-                                        {resolvedEntityViews.map((view) => (
+                                        {resolvedSnapshotViews.map((view) => (
                                             <TableRow key={view.key}>
                                                 <TableCell
                                                     align="left">
@@ -162,7 +162,7 @@ export function SubcollectionsEditTab({
                                                 </TableCell>
                                             </TableRow>
                                         ))}
-                                        {hardCodedEntityViews.map((view) => (
+                                        {hardCodedSnapshotViews.map((view) => (
                                             <TableRow key={view.key}>
                                                 <TableCell
                                                     align="left">
@@ -181,12 +181,12 @@ export function SubcollectionsEditTab({
 
                                 <Button
                                     onClick={() => {
-                                        setAddEntityViewDialogOpen(true);
+                                        setAddSnapshotViewDialogOpen(true);
                                     }}
                                     variant="filled"
                                     color="neutral"
                                     startIcon={<PlusIcon/>}>
-                                    Add custom entity view
+                                    Add custom snapshot view
                                 </Button>
                             </div>
 
@@ -217,7 +217,7 @@ export function SubcollectionsEditTab({
             {viewToDelete &&
                 <ConfirmationDialog open={Boolean(viewToDelete)}
                     onAccept={() => {
-                        setFieldValue("entityViews", values.entityViews?.filter(e => e !== viewToDelete));
+                        setFieldValue("snapshotViews", values.snapshotViews?.filter(e => e !== viewToDelete));
                         setViewToDelete(undefined);
                     }}
                     onCancel={() => setViewToDelete(undefined)}
@@ -242,13 +242,13 @@ export function SubcollectionsEditTab({
                     setCurrentDialog(undefined);
                 }}/>
 
-            <EntityCustomViewsSelectDialog
-                open={addEntityViewDialogOpen}
+            <SnapshotCustomViewsSelectDialog
+                open={addSnapshotViewDialogOpen}
                 onClose={(selectedViewKey) => {
                     if (selectedViewKey) {
-                        setFieldValue("entityViews", [...(values.entityViews ?? []), selectedViewKey]);
+                        setFieldValue("snapshotViews", [...(values.snapshotViews ?? []), selectedViewKey]);
                     }
-                    setAddEntityViewDialogOpen(false);
+                    setAddSnapshotViewDialogOpen(false);
                 }}/>
         </>
     );

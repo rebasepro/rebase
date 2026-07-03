@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
 
@@ -7,7 +7,7 @@ export async function mountOpenApiDocs(
     app: Hono<HonoEnv>,
     basePath: string,
     enableSwagger: boolean | undefined,
-    activeCollections: EntityCollection[],
+    activeCollections: SnapshotCollection[],
     requireAuth: boolean
 ): Promise<void> {
     if (enableSwagger === false || activeCollections.length === 0) {

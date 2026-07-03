@@ -1,4 +1,4 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 import React, { createContext } from "react";
 import { CollectionRegistryController } from "@rebasepro/types";
 
@@ -7,12 +7,12 @@ export const CollectionRegistryContext = createContext<CollectionRegistryControl
     getRawCollection: () => undefined,
     getParentReferencesFromPath: () => [],
     getParentCollectionSlugs: () => [],
-    getParentEntityIds: () => [],
+    getParentSnapshotIds: () => [],
     convertIdsToPaths: () => [],
     initialised: false
 });
 
-export function useCollectionRegistryController<DB = Record<string, unknown>, EC extends EntityCollection = EntityCollection>(): CollectionRegistryController<DB, EC> {
+export function useCollectionRegistryController<DB = Record<string, unknown>, EC extends SnapshotCollection = SnapshotCollection>(): CollectionRegistryController<DB, EC> {
     const context = React.useContext(CollectionRegistryContext);
     if (context === undefined) {
         throw new Error("useCollectionRegistryController must be used within a CollectionRegistryContext.Provider");

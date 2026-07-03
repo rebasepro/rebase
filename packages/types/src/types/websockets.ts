@@ -1,5 +1,3 @@
-import { Entity } from "./entities";
-
 export interface WebSocketErrorPayload {
     error?: string | { message: string; code?: string };
     message?: string;
@@ -11,35 +9,35 @@ export interface WebSocketMessage {
     payload?: unknown;
     subscriptionId?: string;
     requestId?: string;
-    entities?: Entity<Record<string, unknown>>[];
-    entity?: Entity<Record<string, unknown>> | null;
+    rows?: Record<string, unknown>[];
+    row?: Record<string, unknown> | null;
     error?: string;
 }
 
 export interface CollectionUpdateMessage extends WebSocketMessage {
     type: "collection_update";
     subscriptionId: string;
-    entities: Entity<Record<string, unknown>>[];
+    rows: Record<string, unknown>[];
 }
 
-export interface EntityUpdateMessage extends WebSocketMessage {
-    type: "entity_update";
+export interface SingleUpdateMessage extends WebSocketMessage {
+    type: "single_update";
     subscriptionId: string;
-    entity: Entity<Record<string, unknown>> | null;
+    row: Record<string, unknown> | null;
 }
 
 /**
  * Lightweight patch message sent to collection subscribers when a single
- * entity is created, updated, or deleted. The client can merge this into
+ * row is created, updated, or deleted. The client can merge this into
  * its cached collection data for near-instant cross-tab updates without
  * waiting for a full collection refetch.
  */
-export interface CollectionEntityPatchMessage extends WebSocketMessage {
-    type: "collection_entity_patch";
+export interface CollectionPatchMessage extends WebSocketMessage {
+    type: "collection_patch";
     subscriptionId: string;
-    entityId: string;
-    /** The updated entity, or null if deleted */
-    entity: Entity<Record<string, unknown>> | null;
+    id: string;
+    /** The updated row, or null if deleted */
+    row: Record<string, unknown> | null;
 }
 
 /**

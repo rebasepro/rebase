@@ -1,15 +1,15 @@
 import { deleteField, DocumentSnapshot } from "@firebase/firestore";
-import { EntityCollection, FirebaseCollection, Properties, Property } from "@rebasepro/types";
+import { SnapshotCollection, FirebaseCollection, Properties, Property } from "@rebasepro/types";
 import { COLLECTION_PATH_SEPARATOR, sortProperties, stripCollectionPath } from "@rebasepro/common";
 
-export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentEntityIds?: string[]): string {
+export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentSnapshotIds?: string[]): string {
     if (!parentCollectionSlugs)
         return stripCollectionPath(idOrPath);
     return [...parentCollectionSlugs.map(stripCollectionPath), stripCollectionPath(idOrPath)].join(COLLECTION_PATH_SEPARATOR);
 }
 
 
-export const docsToCollectionTree = (docs: DocumentSnapshot[]): EntityCollection[] => {
+export const docsToCollectionTree = (docs: DocumentSnapshot[]): SnapshotCollection[] => {
 
     const collectionsMap = docs.map((doc) => {
         const id: string = doc.id;
@@ -34,10 +34,10 @@ export const docsToCollectionTree = (docs: DocumentSnapshot[]): EntityCollection
     return Object.values(collectionsMap);
 }
 
-export const docToCollection = (doc: DocumentSnapshot): EntityCollection => {
+export const docToCollection = (doc: DocumentSnapshot): SnapshotCollection => {
     const data = doc.data();
     if (!data)
-        throw Error("Entity collection has not been persisted correctly");
+        throw Error("Snapshot collection has not been persisted correctly");
     const propertiesOrder = data.propertiesOrder;
     const properties = data.properties as Properties ?? {};
 
@@ -48,7 +48,7 @@ export const docToCollection = (doc: DocumentSnapshot): EntityCollection => {
         ...data,
         properties: sortedProperties,
         slug: data.id ?? data.alias ?? data.slug
-    } as EntityCollection;
+    } as SnapshotCollection;
 }
 
 

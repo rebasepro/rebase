@@ -123,7 +123,7 @@ offset: 10 });
     });
 
     describe("find()", () => {
-        it("should call the list endpoint and return entities", async () => {
+        it("should call the list endpoint and return flat rows", async () => {
             (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({
                 data: [{ id: "1",
 name: "Product A" }],
@@ -141,9 +141,64 @@ hasMore: false }
                 { method: "GET" }
             );
             expect(result.data).toHaveLength(1);
+            // Flat row access — no .values wrapper
             expect(result.data[0].id).toBe("1");
-            expect(result.data[0].path).toBe("products");
+            expect((result.data[0] as Record<string, unknown>).name).toBe("Product A");
+            // No path field — that's CMS leakage
+            expect((result.data[0] as Record<string, unknown>).path).toBeUndefined();
             expect(result.meta.total).toBe(1);
+        });
+    });
+
+    describe("findById()", () => {
+        it("should return a flat row directly", async () => {
+            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: "42", title: "Hello" });
+
+            const client = createCollectionClient(transport, "posts");
+            const result = await client.findById("42");
+
+            expect(transport.request).toHaveBeenCalledWith(
+                "/data/posts/42",
+                { method: "GET" }
+            );
+            expect(result).toBeDefined();
+            expect(result!.id).toBe("42");
+            expect((result as Record<string, unknown>).title).toBe("Hello");
+        });
+
+        it("should return undefined for 404", async () => {
+            const { RebaseApiError } = await import("./transport");
+            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+                new RebaseApiError(404, "Not Found")
+            );
+
+            const client = createCollectionClient(transport, "posts");
+            const result = await client.findById("999");
+            expect(result).toBeUndefined();
+        });
+    });
+
+    describe("create()", () => {
+        it("should return a flat row", async () => {
+            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: "new-1", title: "Created" });
+
+            const client = createCollectionClient(transport, "posts");
+            const result = await client.create({ title: "Created" } as Record<string, unknown>);
+
+            expect(result.id).toBe("new-1");
+            expect((result as Record<string, unknown>).title).toBe("Created");
+        });
+    });
+
+    describe("update()", () => {
+        it("should return a flat row", async () => {
+            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: "1", title: "Updated" });
+
+            const client = createCollectionClient(transport, "posts");
+            const result = await client.update("1", { title: "Updated" } as Record<string, unknown>);
+
+            expect(result.id).toBe("1");
+            expect((result as Record<string, unknown>).title).toBe("Updated");
         });
     });
 
@@ -154,9 +209,9 @@ hasMore: false }
             expect(client.count).toBeDefined();
         });
 
-        it("should pass the accessor.count truthiness check (used by EntitiesCount component)", () => {
+        it("should pass the accessor.count truthiness check (used by SnapshotsCount component)", () => {
             const client = createCollectionClient(transport, "products");
-            // The EntitiesCount component does `if (accessor.count) { ... }`
+            // The SnapshotsCount component does `if (accessor.count) { ... }`
             // This verifies that check would pass
             expect(!!client.count).toBe(true);
         });

@@ -1,14 +1,13 @@
 import {
-    DeleteEntityProps,
-    Entity,
-    EntityCollection,
+    DeleteProps,
+    SnapshotCollection,
     FetchCollectionProps,
-    FetchEntityProps,
-    SaveEntityProps,
+    FetchOneProps,
+    SaveProps,
     WebSocketMessage,
     WebSocketErrorPayload,
     CollectionUpdateMessage,
-    EntityUpdateMessage,
+    SingleUpdateMessage,
     TableMetadata,
     BranchInfo
 } from "@rebasepro/types";
@@ -86,30 +85,30 @@ export class RebaseWebSocketClient {
     private collectionSubscriptions = new Map<string, {
         backendSubscriptionId: string;
         callbacks: Map<string, {
-            onUpdate: (entities: Entity[]) => void;
+            onUpdate: (rows: Record<string, unknown>[]) => void;
             onError?: (error: Error) => void;
         }>;
         props: FetchCollectionProps;
-        latestData?: Entity[]; // Cache the latest data
+        latestData?: Record<string, unknown>[]; // Cache the latest flat rows
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
     }>();
 
-    private entitySubscriptions = new Map<string, {
+    private singleSubscriptions = new Map<string, {
         backendSubscriptionId: string;
         callbacks: Map<string, {
-            onUpdate: (entity: Entity | null) => void;
+            onUpdate: (row: Record<string, unknown> | null) => void;
             onError?: (error: Error) => void;
         }>;
-        props: FetchEntityProps;
-        latestData?: Entity | null; // Cache the latest data
+        props: FetchOneProps;
+        latestData?: Record<string, unknown> | null; // Cache the latest flat row
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
     }>();
 
     // Maps to quickly find subscription by backend subscription ID
     private backendToCollectionKey = new Map<string, string>();
-    private backendToEntityKey = new Map<string, string>();
+    private backendToSnapshotKey = new Map<string, string>();
 
 
     private pendingRequests = new Map<string, {
@@ -380,7 +379,7 @@ export class RebaseWebSocketClient {
     }
 
     /**
-     * Shared logic for re-subscribing a collection or entity subscription
+     * Shared logic for re-subscribing a collection or row subscription
      * after an auth error is resolved by refreshing credentials.
      */
     private resubscribeAfterAuthRefresh(
@@ -388,12 +387,12 @@ export class RebaseWebSocketClient {
         subscription: {
             backendSubscriptionId: string;
             callbacks: Map<string, { onUpdate: (...args: never[]) => void; onError?: (error: Error) => void }>;
-            props: FetchCollectionProps | FetchEntityProps;
+            props: FetchCollectionProps | FetchOneProps;
         },
         subscriptionKey: string,
-        idPrefix: "collection" | "entity",
+        idPrefix: "collection" | "row",
         backendKeyMap: Map<string, string>,
-        messageType: "subscribe_collection" | "subscribe_entity"
+        messageType: "subscribe_collection" | "subscribe_one"
     ): void {
         this.handleAuthFailure().then(refreshed => {
             if (refreshed) {
@@ -470,23 +469,24 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const incomingEntities = (message.entities || []) as Entity[];
+                    const wireSnapshots = (message.rows || []) as unknown as Record<string, unknown>[];
+                    const incomingRows = wireSnapshots;
 
-                    // Structural merge: preserve cached entity references for entities
+                    // Structural merge: preserve cached row references for rows
                     // whose values haven't changed. This prevents downstream React components
                     // from re-rendering (VirtualTableCell uses deepEqual on rowData —
                     // same reference = instant true, avoiding expensive deep comparison).
-                    const entities = this.mergeEntities(collectionSub.latestData, incomingEntities);
+                    const rows = this.mergeRows(collectionSub.latestData, incomingRows);
 
                     // Cache the latest data with optimizations
-                    collectionSub.latestData = entities;
+                    collectionSub.latestData = rows;
                     collectionSub.lastUpdated = Date.now();
                     collectionSub.isInitialDataReceived = true;
 
                     // Notify all callbacks for this subscription
                     collectionSub.callbacks.forEach(callback => {
                         try {
-                            callback.onUpdate(entities);
+                            callback.onUpdate(rows);
                         } catch (error) {
                             console.error("Error in collection subscription callback:", error);
                             if (callback.onError) {
@@ -499,30 +499,31 @@ export class RebaseWebSocketClient {
             }
         }
 
-        // Handle instant entity-level patches for collection subscriptions.
+        // Handle instant row-level patches for collection subscriptions.
         // These arrive before the full refetch and give immediate cross-tab feedback.
-        if (subscriptionId && type === "collection_entity_patch") {
+        if (subscriptionId && type === "collection_patch") {
             const subscriptionKey = this.backendToCollectionKey.get(subscriptionId);
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub && collectionSub.isInitialDataReceived && collectionSub.latestData) {
-                    const patchEntity = message.entity ?? null;
-                    const patchEntityId = (message as unknown as { entityId: string }).entityId;
-                    let updated: Entity[];
+                    const patchWireSnapshot = message.row ?? null;
+                    const patchSnapshotId = (message as unknown as { id: string }).id;
+                    const patchRow = patchWireSnapshot ? (patchWireSnapshot as unknown as Record<string, unknown>) : null;
+                    let updated: Record<string, unknown>[];
 
-                    if (patchEntity === null || patchEntity === undefined) {
-                        // Entity was deleted — remove it from the cached list
-                        updated = collectionSub.latestData.filter(e => String(e.id) !== String(patchEntityId));
+                    if (patchRow === null) {
+                        // Row was deleted — remove it from the cached list
+                        updated = collectionSub.latestData.filter(e => String(e.id) !== String(patchSnapshotId));
                     } else {
-                        // Entity was created or updated — merge into the cached list
-                        const idx = collectionSub.latestData.findIndex(e => String(e.id) === String(patchEntity.id));
+                        // Row was created or updated — merge into the cached list
+                        const idx = collectionSub.latestData.findIndex(e => String(e.id) === String(patchRow.id));
                         if (idx >= 0) {
                             // Update in place (preserve array position)
                             updated = [...collectionSub.latestData];
-                            updated[idx] = patchEntity;
+                            updated[idx] = patchRow;
                         } else {
-                            // New entity — prepend (most recently created entities first)
-                            updated = [patchEntity, ...collectionSub.latestData];
+                            // New row — prepend (most recently created first)
+                            updated = [patchRow, ...collectionSub.latestData];
                         }
                     }
 
@@ -545,24 +546,25 @@ export class RebaseWebSocketClient {
             }
         }
 
-        // Handle subscription updates for entity subscriptions
-        if (subscriptionId && type === "entity_update") {
-            const subscriptionKey = this.backendToEntityKey.get(subscriptionId);
+        // Handle subscription updates for row subscriptions
+        if (subscriptionId && type === "single_update") {
+            const subscriptionKey = this.backendToSnapshotKey.get(subscriptionId);
             if (subscriptionKey) {
-                const entitySub = this.entitySubscriptions.get(subscriptionKey);
-                if (entitySub) {
-                    const entity = message.entity ?? null;
+                const snapshotSub = this.singleSubscriptions.get(subscriptionKey);
+                if (snapshotSub) {
+                    const wireSnapshot = message.row ?? null;
+                    const row = wireSnapshot ? (wireSnapshot as unknown as Record<string, unknown>) : null;
                     // Cache the latest data with optimizations
-                    entitySub.latestData = entity;
-                    entitySub.lastUpdated = Date.now();
-                    entitySub.isInitialDataReceived = true;
+                    snapshotSub.latestData = row;
+                    snapshotSub.lastUpdated = Date.now();
+                    snapshotSub.isInitialDataReceived = true;
 
                     // Notify all callbacks for this subscription
-                    entitySub.callbacks.forEach(callback => {
+                    snapshotSub.callbacks.forEach(callback => {
                         try {
-                            callback.onUpdate(entity);
+                            callback.onUpdate(row);
                         } catch (error) {
-                            console.error("Error in entity subscription callback:", error);
+                            console.error("Error in row subscription callback:", error);
                             if (callback.onError) {
                                 callback.onError(error instanceof Error ? error : new Error(String(error)));
                             }
@@ -602,25 +604,25 @@ export class RebaseWebSocketClient {
                 }
             }
 
-            const entityKey = this.backendToEntityKey.get(subscriptionId);
-            if (entityKey) {
-                const entitySub = this.entitySubscriptions.get(entityKey);
-                if (entitySub) {
+            const snapshotKey = this.backendToSnapshotKey.get(subscriptionId);
+            if (snapshotKey) {
+                const snapshotSub = this.singleSubscriptions.get(snapshotKey);
+                if (snapshotSub) {
                     if (this.isAuthError(message)) {
                         this.resubscribeAfterAuthRefresh(
                             message,
-                            entitySub,
-                            entityKey,
-                            "entity",
-                            this.backendToEntityKey,
-                            "subscribe_entity"
+                            snapshotSub,
+                            snapshotKey,
+                            "row",
+                            this.backendToSnapshotKey,
+                            "subscribe_one"
                         );
                         return;
                     }
 
                     const { errorMessage, errorCode } = extractMessageError(message);
                     const error = new ApiError(errorMessage, errorMessage, errorCode);
-                    entitySub.callbacks.forEach(callback => {
+                    snapshotSub.callbacks.forEach(callback => {
                         if (callback.onError) {
                             callback.onError(error);
                         }
@@ -757,7 +759,7 @@ export class RebaseWebSocketClient {
 
         const expectsResponse = ![
             "subscribe_collection",
-            "subscribe_entity",
+            "subscribe_one",
             "unsubscribe",
             "join_channel",
             "leave_channel",
@@ -802,33 +804,34 @@ export class RebaseWebSocketClient {
     }
 
     // Data source methods
-    async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+    async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
         const response = await this.sendMessage({
             type: "FETCH_COLLECTION",
             payload: props
-        }) as { entities?: Entity<M>[] };
-        return response.entities || [];
+        }) as { rows?: Record<string, unknown>[] };
+        return (response.rows || []);
     }
 
-    async fetchEntity<M extends Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
+    async fetchOne<M extends Record<string, unknown>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         const response = await this.sendMessage({
-            type: "FETCH_ENTITY",
+            type: "FETCH_ONE",
             payload: props
-        }) as { entity?: Entity<M> };
-        return response.entity ?? undefined;
+        }) as { row?: Record<string, unknown> };
+        const wireSnapshot = response.row;
+        return wireSnapshot ?? undefined;
     }
 
-    async saveEntity<M extends Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
+    async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
         const response = await this.sendMessage({
-            type: "SAVE_ENTITY",
+            type: "SAVE",
             payload: props
-        }) as { entity: Entity<M> };
-        return response.entity;
+        }) as { row: Record<string, unknown> };
+        return response.row;
     }
 
-    async deleteEntity<M extends Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void> {
+    async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {
         await this.sendMessage({
-            type: "DELETE_ENTITY",
+            type: "DELETE",
             payload: props
         });
     }
@@ -864,23 +867,23 @@ options }
         return response.database;
     }
 
-    async checkUniqueField(path: string, name: string, value: unknown, entityId?: string, collection?: EntityCollection): Promise<boolean> {
+    async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: SnapshotCollection): Promise<boolean> {
         const response = await this.sendMessage({
             type: "CHECK_UNIQUE_FIELD",
             payload: {
                 path,
                 name,
                 value,
-                entityId,
+                id,
                 collection
             }
         }) as { isUnique: boolean };
         return response.isUnique;
     }
 
-    async countEntities<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
+    async count<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
         const response = await this.sendMessage({
-            type: "COUNT_ENTITIES",
+            type: "COUNT",
             payload: props
         }) as { count: number };
         return response.count;
@@ -1017,52 +1020,50 @@ options }
     }
 
     /**
-     * Merge incoming entities with cached data, preserving cached references
-     * for entities whose values haven't changed. This avoids unnecessary
-     * React re-renders when the server refetches all entities but most
+     * Merge incoming rows with cached data, preserving cached references
+     * for rows whose values haven't changed. This avoids unnecessary
+     * React re-renders when the server refetches all rows but most
      * haven't actually changed.
      */
-    private mergeEntities(cached: Entity[] | undefined, incoming: Entity[]): Entity[] {
+    private mergeRows(cached: Record<string, unknown>[] | undefined, incoming: Record<string, unknown>[]): Record<string, unknown>[] {
         if (!cached || cached.length === 0) return incoming;
 
-        // Build a lookup from cached entities by ID for O(1) access
-        const cachedById = new Map<string | number, Entity>();
-        for (const entity of cached) {
-            cachedById.set(entity.id, entity);
+        // Build a lookup from cached rows by ID for O(1) access
+        const cachedById = new Map<string | number, Record<string, unknown>>();
+        for (const row of cached) {
+            cachedById.set(row.id as string | number, row);
         }
 
-        return incoming.map(incomingEntity => {
-            const cachedEntity = cachedById.get(incomingEntity.id);
-            if (!cachedEntity) return incomingEntity;
+        return incoming.map(incomingRow => {
+            const cachedRow = cachedById.get(incomingRow.id as string | number);
+            if (!cachedRow) return incomingRow;
 
-            if (cachedEntity.path === incomingEntity.path) {
-                const normCached = this.normalizeForComparison(cachedEntity.values) as Record<string, unknown>;
-                const normIncoming = this.normalizeForComparison(incomingEntity.values) as Record<string, unknown>;
+            // Compare flat rows directly (no more path/values nesting)
+            const normCached = this.normalizeForComparison(cachedRow) as Record<string, unknown>;
+            const normIncoming = this.normalizeForComparison(incomingRow) as Record<string, unknown>;
 
-                if (this.deepEqual(normCached, normIncoming)) {
-                    return cachedEntity;
-                } else {
-                    // Deep debug: Why did it fail? Let's check which exact property differs
-                    // so the user can see it in their browser console if flashing still occurs.
-                    const mismatches: Record<string, { cached: unknown, incoming: unknown }> = {};
-                    const allKeys = new Set([...Object.keys(normCached), ...Object.keys(normIncoming)]);
-                    for (const key of allKeys) {
-                        if (!this.deepEqual(normCached[key], normIncoming[key])) {
-                            mismatches[key] = { cached: normCached[key],
+            if (this.deepEqual(normCached, normIncoming)) {
+                return cachedRow;
+            } else {
+                // Deep debug: Why did it fail?
+                const mismatches: Record<string, { cached: unknown, incoming: unknown }> = {};
+                const allKeys = new Set([...Object.keys(normCached), ...Object.keys(normIncoming)]);
+                for (const key of allKeys) {
+                    if (!this.deepEqual(normCached[key], normIncoming[key])) {
+                        mismatches[key] = { cached: normCached[key],
 incoming: normIncoming[key] };
-                        }
                     }
-                    console.debug(`[RebaseWS] Row ${incomingEntity.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
                 }
+                console.debug(`[RebaseWS] Row ${incomingRow.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
             }
-            return incomingEntity;
+            return incomingRow;
         });
     }
 
     // Subscription methods
     listenCollection<M extends Record<string, unknown>>(
         props: FetchCollectionProps<M>,
-        onUpdate: (entities: Entity[]) => void,
+        onUpdate: (rows: Record<string, unknown>[]) => void,
         onError?: (error: Error) => void
     ): () => void {
         const subscriptionKey = this.createCollectionSubscriptionKey(props);
@@ -1074,7 +1075,7 @@ incoming: normIncoming[key] };
         if (existingSubscription) {
             // Reuse existing subscription - just add the new callback
             const callbackMap = existingSubscription.callbacks as Map<string, {
-                onUpdate: (entities: Entity[]) => void;
+                onUpdate: (rows: Record<string, unknown>[]) => void;
                 onError?: (error: Error) => void;
             }>;
             callbackMap.set(callbackId, { onUpdate,
@@ -1112,7 +1113,7 @@ onError });
         // Create new subscription
         const backendSubscriptionId = `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const callbackMap = new Map<string, {
-            onUpdate: (entities: Entity[]) => void;
+            onUpdate: (rows: Record<string, unknown>[]) => void;
             onError?: (error: Error) => void;
         }>();
         callbackMap.set(callbackId, { onUpdate,
@@ -1158,21 +1159,21 @@ onError });
         };
     }
 
-    listenEntity<M extends Record<string, unknown>>(
-        props: FetchEntityProps<M>,
-        onUpdate: (entity: Entity | null) => void,
+    listenOne<M extends Record<string, unknown>>(
+        props: FetchOneProps<M>,
+        onUpdate: (row: Record<string, unknown> | null) => void,
         onError?: (error: Error) => void
     ): () => void {
-        const subscriptionKey = this.createEntitySubscriptionKey(props);
+        const subscriptionKey = this.createSingleSubscriptionKey(props);
         const callbackId = `callback_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
         // Check if we already have a subscription for these exact parameters
-        const existingSubscription = this.entitySubscriptions.get(subscriptionKey);
+        const existingSubscription = this.singleSubscriptions.get(subscriptionKey);
 
         if (existingSubscription) {
             // Reuse existing subscription - just add the new callback
             const callbackMap = existingSubscription.callbacks as Map<string, {
-                onUpdate: (entity: Entity | null) => void;
+                onUpdate: (row: Record<string, unknown> | null) => void;
                 onError?: (error: Error) => void;
             }>;
             callbackMap.set(callbackId, { onUpdate,
@@ -1183,7 +1184,7 @@ onError });
                 try {
                     onUpdate(existingSubscription.latestData);
                 } catch (error) {
-                    console.error("Error in entity subscription callback:", error);
+                    console.error("Error in row subscription callback:", error);
                     if (onError) {
                         onError(error instanceof Error ? error : new Error(String(error)));
                     }
@@ -1195,8 +1196,8 @@ onError });
                 callbackMap.delete(callbackId);
                 if (callbackMap.size === 0) {
                     // No more callbacks, unsubscribe from backend
-                    this.entitySubscriptions.delete(subscriptionKey);
-                    this.backendToEntityKey.delete(existingSubscription.backendSubscriptionId);
+                    this.singleSubscriptions.delete(subscriptionKey);
+                    this.backendToSnapshotKey.delete(existingSubscription.backendSubscriptionId);
                     if (this.isConnected && this.ws) {
                         this.sendMessage({
                             type: "unsubscribe",
@@ -1208,26 +1209,26 @@ onError });
         }
 
         // Create new subscription
-        const backendSubscriptionId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const backendSubscriptionId = `snapshot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const callbackMap = new Map<string, {
-            onUpdate: (entity: Entity | null) => void;
+            onUpdate: (row: Record<string, unknown> | null) => void;
             onError?: (error: Error) => void;
         }>();
         callbackMap.set(callbackId, { onUpdate,
 onError });
 
-        this.entitySubscriptions.set(subscriptionKey, {
+        this.singleSubscriptions.set(subscriptionKey, {
             backendSubscriptionId,
             callbacks: callbackMap,
             props
         });
 
         // Add reverse lookup
-        this.backendToEntityKey.set(backendSubscriptionId, subscriptionKey);
+        this.backendToSnapshotKey.set(backendSubscriptionId, subscriptionKey);
 
         // Send subscription request to backend
         this.sendMessage({
-            type: "subscribe_entity",
+            type: "subscribe_one",
             payload: {
                 ...props,
                 subscriptionId: backendSubscriptionId
@@ -1238,13 +1239,13 @@ onError });
 
         // Return unsubscribe function
         return () => {
-            const subscription = this.entitySubscriptions.get(subscriptionKey);
+            const subscription = this.singleSubscriptions.get(subscriptionKey);
             if (subscription) {
                 const callbacks = subscription.callbacks;
                 callbacks.delete(callbackId);
                 if (callbacks.size === 0) {
-                    this.entitySubscriptions.delete(subscriptionKey);
-                    this.backendToEntityKey.delete(subscription.backendSubscriptionId);
+                    this.singleSubscriptions.delete(subscriptionKey);
+                    this.backendToSnapshotKey.delete(subscription.backendSubscriptionId);
                     if (this.isConnected && this.ws) {
                         this.sendMessage({
                             type: "unsubscribe",
@@ -1262,7 +1263,7 @@ onError });
      * we need to re-register everything to resume receiving updates.
      */
     private resubscribeAll(): void {
-        console.debug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.entitySubscriptions.size} entity(ies)`);
+        console.debug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
 
         // Re-subscribe collection subscriptions
         for (const [key, sub] of this.collectionSubscriptions.entries()) {
@@ -1286,23 +1287,23 @@ onError });
             });
         }
 
-        // Re-subscribe entity subscriptions
-        for (const [key, sub] of this.entitySubscriptions.entries()) {
+        // Re-subscribe row subscriptions
+        for (const [key, sub] of this.singleSubscriptions.entries()) {
             const oldBackendId = sub.backendSubscriptionId;
-            const newBackendId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const newBackendId = `snapshot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             sub.backendSubscriptionId = newBackendId;
 
-            this.backendToEntityKey.delete(oldBackendId);
-            this.backendToEntityKey.set(newBackendId, key);
+            this.backendToSnapshotKey.delete(oldBackendId);
+            this.backendToSnapshotKey.set(newBackendId, key);
 
             this.sendMessage({
-                type: "subscribe_entity",
+                type: "subscribe_one",
                 payload: {
                     ...sub.props,
                     subscriptionId: newBackendId
                 }
             }).catch(error => {
-                console.error("[WS] Failed to re-subscribe entity:", key, error);
+                console.error("[WS] Failed to re-subscribe row:", key, error);
             });
         }
     }
@@ -1331,7 +1332,7 @@ onError });
         });
     }
 
-    private createEntitySubscriptionKey(props: FetchEntityProps): string {
-        return `${props.path}|${props.entityId}`;
+    private createSingleSubscriptionKey(props: FetchOneProps): string {
+        return `${props.path}|${props.id}`;
     }
 }

@@ -72,15 +72,15 @@ b: { nested: true } };
 
     describe("recordHistory", () => {
         it("should record a create action", async () => {
-            const entityId = new ObjectId().toString();
+            const id = new ObjectId().toString();
             await historyService.recordHistory({
                 action: "create",
-                entityId,
+                id,
                 tableName: "users",
                 values: { name: "Alice" }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
             expect(history).toHaveLength(1);
             expect(history[0].action).toBe("create");
             expect(history[0].table_name).toBe("users");
@@ -89,10 +89,10 @@ b: { nested: true } };
         });
 
         it("should record an update action and calculate changed fields", async () => {
-            const entityId = new ObjectId().toString();
+            const id = new ObjectId().toString();
             await historyService.recordHistory({
                 action: "update",
-                entityId,
+                id,
                 tableName: "users",
                 values: { name: "Alice Updated",
 age: 30 },
@@ -100,36 +100,36 @@ age: 30 },
 age: 30 }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
             expect(history).toHaveLength(1);
             expect(history[0].action).toBe("update");
             expect(history[0].changed_fields).toEqual(["name"]);
         });
 
         it("should not record an update if no fields changed", async () => {
-            const entityId = new ObjectId().toString();
+            const id = new ObjectId().toString();
             await historyService.recordHistory({
                 action: "update",
-                entityId,
+                id,
                 tableName: "users",
                 values: { name: "Alice" },
                 previousValues: { name: "Alice" }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
             expect(history).toHaveLength(0); // Because it should abort early
         });
 
         it("should record a delete action", async () => {
-            const entityId = new ObjectId().toString();
+            const id = new ObjectId().toString();
             await historyService.recordHistory({
                 action: "delete",
-                entityId,
+                id,
                 tableName: "users",
                 previousValues: { name: "Alice" }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
             expect(history).toHaveLength(1);
             expect(history[0].action).toBe("delete");
             expect(history[0].previous_values).toEqual({ name: "Alice" });
@@ -143,23 +143,23 @@ age: 30 }
                 ttlDays: 30
             });
 
-            const entityId = new ObjectId().toString();
+            const id = new ObjectId().toString();
 
             // Insert 3 records
             await customHistoryService.recordHistory({ action: "create",
-entityId,
+id,
 tableName: "users",
 values: { a: 1 } });
             // add some delay to ensure order
             await new Promise(r => setTimeout(r, 10));
             await customHistoryService.recordHistory({ action: "update",
-entityId,
+id,
 tableName: "users",
 values: { a: 2 },
 previousValues: { a: 1 } });
             await new Promise(r => setTimeout(r, 10));
             await customHistoryService.recordHistory({ action: "update",
-entityId,
+id,
 tableName: "users",
 values: { a: 3 },
 previousValues: { a: 2 } });
@@ -167,7 +167,7 @@ previousValues: { a: 2 } });
             // Since it fire-and-forgets pruneHistory, we might need to wait slightly
             await new Promise(r => setTimeout(r, 100));
 
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).sort({ updated_at: 1 }).toArray();
 
             // Only the latest 2 should be kept
             expect(history).toHaveLength(2);
@@ -181,7 +181,7 @@ previousValues: { a: 2 } });
                 ttlDays: 1 // 1 day
             });
 
-            const entityId = new ObjectId().toString();
+            const id = new ObjectId().toString();
 
             // Insert manually to mock older date
             const twoDaysAgo = new Date();
@@ -191,7 +191,7 @@ previousValues: { a: 2 } });
                 {
                     _id: new ObjectId(),
                     action: "create",
-                    entity_id: entityId,
+                    snapshot_id: id,
                     table_name: "users",
                     values: { a: 1 },
                     updated_at: twoDaysAgo
@@ -199,7 +199,7 @@ previousValues: { a: 2 } });
                 {
                     _id: new ObjectId(),
                     action: "update",
-                    entity_id: entityId,
+                    snapshot_id: id,
                     table_name: "users",
                     values: { a: 2 },
                     previous_values: { a: 1 },
@@ -209,14 +209,14 @@ previousValues: { a: 2 } });
 
             // Trigger prune by inserting a new one
             await customHistoryService.recordHistory({ action: "update",
-entityId,
+id,
 tableName: "users",
 values: { a: 3 },
 previousValues: { a: 2 } });
 
             await new Promise(r => setTimeout(r, 100));
 
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).sort({ updated_at: 1 }).toArray();
 
             // The record from twoDaysAgo should be deleted
             expect(history).toHaveLength(2);

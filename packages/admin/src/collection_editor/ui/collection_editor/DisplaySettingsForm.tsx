@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { EntityCollection, Property } from "@rebasepro/types";
+import { SnapshotCollection, Property } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -39,7 +39,7 @@ export function DisplaySettingsForm({
         setFieldValue,
         handleChange,
         submitCount
-    } = useFormex<EntityCollection>();
+    } = useFormex<SnapshotCollection>();
 
     const [orderPropertyDialogOpen, setOrderPropertyDialogOpen] = useState(false);
 
@@ -82,8 +82,8 @@ export function DisplaySettingsForm({
                         {/* Layout Mode (Side dialog vs Full screen) */}
                         <LayoutModeSwitch
                             className={"col-span-12"}
-                            value={values.openEntityMode ?? "side_panel"}
-                            onChange={(value) => setFieldValue("openEntityMode", value)}/>
+                            value={values.openSnapshotMode ?? "side_panel"}
+                            onChange={(value) => setFieldValue("openSnapshotMode", value)}/>
 
                         {/* View Mode (Table/Cards/Kanban) */}
                         <ViewModeSwitch
@@ -273,7 +273,7 @@ hideFromCollection: true }
                                 value={values.sideDialogWidth ?? ""}
                                 label={"Side dialog width"}/>
                             <FieldCaption>
-                                Optionally define the width (in pixels) of entities side dialog. Default is 768px
+                                Optionally define the width (in pixels) of snapshots side dialog. Default is 768px
                             </FieldCaption>
                         </div>
 

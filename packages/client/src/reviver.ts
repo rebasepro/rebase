@@ -1,4 +1,4 @@
-import { EntityReference, EntityRelation, GeoPoint, Vector, Entity } from "@rebasepro/types";
+import { SnapshotReference, SnapshotRelation, GeoPoint, Vector } from "@rebasepro/types";
 
 export function rebaseReviver(_key: string, value: unknown): unknown {
     if (value && typeof value === "object" && "__type" in value) {
@@ -13,19 +13,19 @@ export function rebaseReviver(_key: string, value: unknown): unknown {
                 return isNaN(date.getTime()) ? null : date;
             }
             case "reference":
-            case "EntityReference":
-                return new EntityReference({
+            case "SnapshotReference":
+                return new SnapshotReference({
                     id: String(record.id),
                     path: record.path as string,
                     driver: record.driver as string | undefined,
                     databaseId: record.databaseId as string | undefined
                 });
             case "relation":
-            case "EntityRelation":
-                return new EntityRelation(
+            case "SnapshotRelation":
+                return new SnapshotRelation(
                     record.id as string | number,
                     record.path as string,
-                    record.data as Entity | undefined
+                    record.data as Record<string, unknown> | undefined
                 );
             case "GeoPoint":
                 return new GeoPoint(record.latitude as number, record.longitude as number);

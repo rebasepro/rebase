@@ -105,8 +105,8 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
     }
 
     /**
-     * Include related entities in the response.
-     * Relations will be populated with full entity data instead of just IDs.
+     * Include related snapshots in the response.
+     * Relations will be populated with full snapshot data instead of just IDs.
      *
      * @param relations - Relation names to include, or "*" for all.
      * @example

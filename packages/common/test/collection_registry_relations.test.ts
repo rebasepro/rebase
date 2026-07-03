@@ -1,5 +1,5 @@
 import {
-    EntityCollection,
+    SnapshotCollection,
     PostgresCollection,
     RelationProperty,
     MapProperty,

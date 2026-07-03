@@ -1,7 +1,7 @@
 /**
  * PII masking helpers shared by collection `afterRead` callbacks.
  *
- * Masking lives in per-collection {@link EntityCallbacks.afterRead},
+ * Masking lives in per-collection {@link CollectionCallbacks.afterRead},
  * which runs on **every** read path — REST, realtime/WebSocket, and
  * server-side `rebase.data`. See each collection under
  * `app/config/collections/*` for how these are applied.
@@ -39,7 +39,7 @@ export function maskHandle(handle: string): string {
 }
 
 /**
- * Apply a set of field transforms to an entity's `values`, returning a new
+ * Apply a set of field transforms to a snapshot's `values`, returning a new
  * values object of the same shape. String fields are transformed by the
  * matching masker; any field mapped to `null` is cleared to an empty string
  * (used for image/URL fields). Non-string / absent fields are left untouched.

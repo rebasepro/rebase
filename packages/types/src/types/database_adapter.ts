@@ -21,7 +21,7 @@
  */
 
 import type { DataDriver } from "../controllers/data_driver";
-import type { EntityCollection } from "./collections";
+import type { SnapshotCollection } from "./collections";
 import type {
     CollectionRegistryInterface,
     DatabaseAdmin,
@@ -71,7 +71,7 @@ export interface DatabaseAdapter {
     ): Promise<BootstrappedAuth | undefined>;
 
     /**
-     * Initialize entity history tracking.
+     * Initialize snapshot history tracking.
      *
      * Return `undefined` if the database does not support history.
      */
@@ -115,7 +115,7 @@ export interface DatabaseAdapter {
  */
 export interface DatabaseAdapterInitConfig {
     /** Registered collection definitions. */
-    collections: EntityCollection[];
+    collections: SnapshotCollection[];
     /** The shared collection registry to register into. */
     collectionRegistry: CollectionRegistryInterface;
 }

@@ -1,7 +1,7 @@
-import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
+import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
-import { Entity, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
+import { Snapshot, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
@@ -52,19 +52,19 @@ export function MultipleRelationFieldBinding({
             "Property relation is required for MultipleRelationFieldBinding"
         )
 
-    const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
+    const selectedSnapshotIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
     const collection = relation.target();
 
-    const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
-        setValue(entities.map(e => getRelationFrom(e)));
+    const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<Record<string, unknown>>[]) => {
+        setValue(snapshots.map(e => getRelationFrom(e)));
     }, [setValue]);
 
-    const referenceDialogController = useEntitySelectionDialog({
+    const referenceDialogController = useSnapshotSelectionDialog({
         multiselect: true,
         path: getCollectionDataPath(collection),
         collection,
-        onMultipleEntitiesSelected,
-        selectedEntityIds,
+        onMultipleSnapshotsSelected,
+        selectedSnapshotIds,
         fixedFilter: property.fixedFilter
     }
     );
@@ -92,7 +92,7 @@ export function MultipleRelationFieldBinding({
                 hover={!disabled}
                 relation={entryValue}
                 includeId={property.includeId}
-                includeEntityLink={property.includeEntityLink}
+                includeSnapshotLink={property.includeSnapshotLink}
             />
         );
     }, [relation, property.ui?.previewProperties, value]);

@@ -1,8 +1,8 @@
 import {
     ArrayProperty,
-    EntityCallbacks,
+    CollectionCallbacks,
     EngineProperties,
-    EntityCollection,
+    SnapshotCollection,
     getDataSourceCapabilities,
     getDeclaredSubcollections,
     NumberProperty,
@@ -39,40 +39,40 @@ export class CollectionRegistry {
      * Runs on all data paths (REST, WebSocket, `rebase.data`).
      * Execution order: global → collection → property callbacks.
      */
-    private _globalCallbacks?: EntityCallbacks;
+    private _globalCallbacks?: CollectionCallbacks;
 
     /**
      * Set global lifecycle callbacks that apply to every collection.
      * Typically called once during backend initialization.
      */
-    setGlobalCallbacks(callbacks: EntityCallbacks): void {
+    setGlobalCallbacks(callbacks: CollectionCallbacks): void {
         this._globalCallbacks = callbacks;
     }
 
     /**
      * Get the currently registered global callbacks, if any.
      */
-    getGlobalCallbacks(): EntityCallbacks | undefined {
+    getGlobalCallbacks(): CollectionCallbacks | undefined {
         return this._globalCallbacks;
     }
 
     // Normalized runtime layer (used by Data Grid / UI)
-    private collectionsByTableName = new Map<string, EntityCollection>();
-    private collectionsBySlug = new Map<string, EntityCollection>();
-    private rootCollections: EntityCollection[] = [];
-    private cachedCollectionsList: EntityCollection[] | null = null;
+    private collectionsByTableName = new Map<string, SnapshotCollection>();
+    private collectionsBySlug = new Map<string, SnapshotCollection>();
+    private rootCollections: SnapshotCollection[] = [];
+    private cachedCollectionsList: SnapshotCollection[] | null = null;
 
     // Raw configuration layer (used by Collection Editor AST generator)
-    private rawCollectionsByTableName = new Map<string, EntityCollection>();
-    private rawCollectionsBySlug = new Map<string, EntityCollection>();
-    private rawRootCollections: EntityCollection[] = [];
-    private cachedRawCollectionsList: EntityCollection[] | null = null;
+    private rawCollectionsByTableName = new Map<string, SnapshotCollection>();
+    private rawCollectionsBySlug = new Map<string, SnapshotCollection>();
+    private rawRootCollections: SnapshotCollection[] = [];
+    private cachedRawCollectionsList: SnapshotCollection[] | null = null;
 
     // Snapshot of raw input for idempotency check — compared BEFORE normalization
     // to avoid the issue where normalization creates new objects that always fail equality.
     private lastRawInputSnapshot: ReturnType<typeof removeFunctions>[] | null = null;
 
-    constructor(collections?: EntityCollection[], dataSources?: DataSourceRegistry) {
+    constructor(collections?: SnapshotCollection[], dataSources?: DataSourceRegistry) {
         if (dataSources) this.dataSources = dataSources;
         if (collections) {
             this.registerMultiple(collections);
@@ -110,7 +110,7 @@ export class CollectionRegistry {
      * snapshot. Only re-normalizes and re-registers when the raw input actually changed.
      * @param collections
      */
-    registerMultiple(collections: EntityCollection[]): boolean {
+    registerMultiple(collections: SnapshotCollection[]): boolean {
         // Compare raw input BEFORE normalization to detect actual changes.
         // This avoids the old issue where normalization creates new objects
         // that always fail deep-equal even when the source data is identical.
@@ -131,7 +131,7 @@ export class CollectionRegistry {
         const normalizedCollections = collections.map(c => this.normalizeCollection({ ...c }));
 
         // Phase 1: Register all top-level collections first (without recursion).
-        // This ensures that injected entityViews (e.g. History tab) are preserved.
+        // This ensures that injected snapshotViews (e.g. History tab) are preserved.
         // Without this, _registerRecursively could register a relation-target collection
         // (e.g. Tags from Posts.relations) using the raw module object (without injected views)
         // before the top-level Tags collection (with injected views) gets its turn.
@@ -169,7 +169,7 @@ export class CollectionRegistry {
         return true;
     }
 
-    register(collection: EntityCollection, rawCollection?: EntityCollection) {
+    register(collection: SnapshotCollection, rawCollection?: SnapshotCollection) {
         const raw = rawCollection ? deepClone(rawCollection) : deepClone(collection);
 
         this.rootCollections.push(collection);
@@ -178,7 +178,7 @@ export class CollectionRegistry {
         this._registerRecursively(collection, raw);
     }
 
-    private _registerRecursively(collection: EntityCollection, rawCollection: EntityCollection) {
+    private _registerRecursively(collection: SnapshotCollection, rawCollection: SnapshotCollection) {
         if (this.collectionsByTableName.has(getTableName(collection))) {
             return;
         }
@@ -207,11 +207,11 @@ export class CollectionRegistry {
         }
     }
 
-    public normalizeCollection(collection: EntityCollection): EntityCollection {
+    public normalizeCollection(collection: SnapshotCollection): SnapshotCollection {
         // Work on a shallow copy to avoid mutating the caller's reference.
         // This is critical for idempotency (the raw input must not be changed)
         // and for preventing mutation of module-level collection singletons.
-        const result = { ...collection } as EntityCollection;
+        const result = { ...collection } as SnapshotCollection;
 
         // 0. Resolve and stamp `dataSource` and `engine` on the normalized copy.
         //    After this block every normalized collection has both fields set,
@@ -378,7 +378,7 @@ export class CollectionRegistry {
         return newProperty;
     }
 
-    get(path: string): EntityCollection | undefined {
+    get(path: string): SnapshotCollection | undefined {
         // First try slug lookup
         const bySlug = this.collectionsBySlug.get(path);
         if (bySlug) return bySlug;
@@ -398,7 +398,7 @@ export class CollectionRegistry {
      * Gets the pristine, un-normalized collection exactly as it was provided.
      * Useful for the AST editor so it doesn't accidentally serialize injected metadata back to disk.
      */
-    getRaw(path: string): EntityCollection | undefined {
+    getRaw(path: string): SnapshotCollection | undefined {
         const bySlug = this.rawCollectionsBySlug.get(path);
         if (bySlug) return bySlug;
 
@@ -416,7 +416,7 @@ export class CollectionRegistry {
      * Get collection by resolving multi-segment paths through relations
      * e.g., "authors/70/posts" resolves to the posts collection
      */
-    getCollectionByPath(collectionPath: string): EntityCollection | undefined {
+    getCollectionByPath(collectionPath: string): SnapshotCollection | undefined {
         // Handle simple single collection path
         if (!collectionPath.includes("/")) {
             return this.get(collectionPath);
@@ -460,21 +460,21 @@ export class CollectionRegistry {
 
             // If there are more segments, continue navigation
             if (i + 1 < pathSegments.length) {
-                // Skip entity ID segment
+                // Skip snapshot ID segment
             }
         }
 
         return currentCollection;
     }
 
-    getCollections(): EntityCollection[] {
+    getCollections(): SnapshotCollection[] {
         if (!this.cachedCollectionsList) {
             this.cachedCollectionsList = Array.from(this.collectionsByTableName.values());
         }
         return this.cachedCollectionsList;
     }
 
-    getRawCollections(): EntityCollection[] {
+    getRawCollections(): SnapshotCollection[] {
         if (!this.cachedRawCollectionsList) {
             this.cachedRawCollectionsList = Array.from(this.rawCollectionsByTableName.values());
         }
@@ -483,12 +483,12 @@ export class CollectionRegistry {
 
     /**
      * Resolves a multi-segment path like "products/123/locales" and returns
-     * information about the collections and entity IDs along the path
+     * information about the collections and snapshot IDs along the path
      */
     resolvePathToCollections(path: string): {
-        collections: EntityCollection[],
-        entityIds: (string | number)[],
-        finalCollection: EntityCollection
+        collections: SnapshotCollection[],
+        snapshotIds: (string | number)[],
+        finalCollection: SnapshotCollection
     } {
         const pathSegments = path.split("/").filter(p => p);
 
@@ -500,8 +500,8 @@ export class CollectionRegistry {
             throw new Error(`Invalid collection path: ${path}. It must have an odd number of segments.`);
         }
 
-        const collections: EntityCollection[] = [];
-        const entityIds: (string | number)[] = [];
+        const collections: SnapshotCollection[] = [];
+        const snapshotIds: (string | number)[] = [];
 
         // Start with the first collection
         let currentCollection = this.get(pathSegments[0]);
@@ -512,19 +512,19 @@ export class CollectionRegistry {
 
         collections.push(currentCollection);
 
-        // Process the rest of the path in pairs (entityId, subcollectionSlug)
+        // Process the rest of the path in pairs (snapshotId, subcollectionSlug)
         for (let i = 1; i < pathSegments.length; i += 2) {
-            const entityId = pathSegments[i];
-            entityIds.push(entityId);
+            const snapshotId = pathSegments[i];
+            snapshotIds.push(snapshotId);
 
             if (i + 1 < pathSegments.length) {
                 const subcollectionSlug = pathSegments[i + 1];
-                const subcollections: EntityCollection[] | undefined = getSubcollections(currentCollection);
+                const subcollections: SnapshotCollection[] | undefined = getSubcollections(currentCollection);
                 if (!subcollections || subcollections.length === 0) {
                     throw new Error(`No subcollections found for ${currentCollection.slug} in path: ${path}`);
                 }
 
-                const subcollection: EntityCollection | undefined = subcollections.find(c => c.slug === subcollectionSlug);
+                const subcollection: SnapshotCollection | undefined = subcollections.find(c => c.slug === subcollectionSlug);
                 if (!subcollection) {
                     throw new Error(`Subcollection '${subcollectionSlug}' not found in ${currentCollection.slug}`);
                 }
@@ -535,7 +535,7 @@ export class CollectionRegistry {
 
         return {
             collections,
-            entityIds,
+            snapshotIds,
             finalCollection: currentCollection
         };
     }

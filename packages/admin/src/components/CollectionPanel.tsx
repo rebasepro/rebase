@@ -1,6 +1,6 @@
-import type { EntityCollection, ViewMode } from "@rebasepro/types";
+import type { SnapshotCollection, ViewMode } from "@rebasepro/types";
 import React, { useMemo } from "react";
-import { EntityCollectionView } from "./EntityCollectionView/EntityCollectionView";
+import { SnapshotCollectionView } from "./SnapshotCollectionView/SnapshotCollectionView";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { Typography } from "@rebasepro/ui";
 import { useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
@@ -8,9 +8,9 @@ import { useComponentOverride, CollectionComponentOverrideProvider } from "@reba
 /**
  * Props for the {@link CollectionPanel} component.
  *
- * This is a high-level, consumer-friendly wrapper around {@link EntityCollectionView}
+ * This is a high-level, consumer-friendly wrapper around {@link SnapshotCollectionView}
  * designed for embedding collection views inside custom pages (home pages,
- * dashboards, entity detail views, etc.).
+ * dashboards, snapshot detail views, etc.).
  *
  * At minimum, provide the `path` (collection slug). All other props are optional
  * overrides that take precedence over the collection's default configuration.
@@ -42,7 +42,7 @@ export type CollectionPanelProps = {
     sort?: [string, "asc" | "desc"];
 
     /**
-     * Maximum number of entities to display.
+     * Maximum number of snapshots to display.
      */
     limit?: number;
 
@@ -53,9 +53,9 @@ export type CollectionPanelProps = {
     updateUrl?: boolean;
 
     /**
-     * Override the entity open mode when clicking an entity.
+     * Override the snapshot open mode when clicking a snapshot.
      */
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * Additional CSS class name for the container.
@@ -64,14 +64,14 @@ export type CollectionPanelProps = {
 
     /**
      * Any additional collection-level overrides (e.g. `previewProperties`,
-     * `enabledViews`, `entityActions`, `defaultFilter`, etc.).
+     * `enabledViews`, `snapshotActions`, `defaultFilter`, etc.).
      */
-    collectionOverrides?: Partial<EntityCollection>;
+    collectionOverrides?: Partial<SnapshotCollection>;
 };
 
 /**
  * A high-level, reusable wrapper for embedding a Rebase collection view
- * inside custom pages (dashboards, home pages, entity detail views, etc.).
+ * inside custom pages (dashboards, home pages, snapshot detail views, etc.).
  *
  * Usage:
  * ```tsx
@@ -101,8 +101,8 @@ function CollectionPanelInner({
     title,
     updateUrl,
     className
-}: CollectionPanelProps & { mergedCollection: EntityCollection }) {
-    const ResolvedCollectionView = useComponentOverride("Collection.View", EntityCollectionView);
+}: CollectionPanelProps & { mergedCollection: SnapshotCollection }) {
+    const ResolvedCollectionView = useComponentOverride("Collection.View", SnapshotCollectionView);
 
     return (
         <div className={className}>
@@ -129,7 +129,7 @@ export function CollectionPanel(props: CollectionPanelProps) {
         viewMode,
         sort,
         limit,
-        openEntityMode,
+        openSnapshotMode,
         className,
         collectionOverrides
     } = props;
@@ -144,14 +144,14 @@ export function CollectionPanel(props: CollectionPanelProps) {
         if (viewMode) propOverrides.defaultViewMode = viewMode;
         if (sort) propOverrides.sort = sort;
         if (limit) propOverrides.pagination = limit;
-        if (openEntityMode) propOverrides.openEntityMode = openEntityMode;
+        if (openSnapshotMode) propOverrides.openSnapshotMode = openSnapshotMode;
 
         return {
             ...registeredCollection,
             ...(collectionOverrides ?? {}),
             ...propOverrides
-        } as EntityCollection;
-    }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openEntityMode]);
+        } as SnapshotCollection;
+    }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openSnapshotMode]);
 
     if (!mergedCollection) {
         return (

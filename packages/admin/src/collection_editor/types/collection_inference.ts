@@ -1,4 +1,4 @@
-import { EntityCollection, FilterValues } from "@rebasepro/types";
+import { SnapshotCollection, FilterValues } from "@rebasepro/types";
 
 /**
  * This function is used to infer the configuration of a collection given its path.
@@ -14,4 +14,4 @@ export type CollectionInference = (
     databaseId?: string,
     initialFilter?: FilterValues<string>,
     initialSort?: [string, "asc" | "desc"]
-) => Promise<Partial<EntityCollection> | null>;
+) => Promise<Partial<SnapshotCollection> | null>;

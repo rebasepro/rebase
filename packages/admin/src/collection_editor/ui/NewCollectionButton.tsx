@@ -16,7 +16,7 @@ export function NewCollectionButton() {
 
             onClick={() => collectionEditorController.createCollection({
                 parentCollectionSlugs: [],
-                parentEntityIds: [],
+                parentSnapshotIds: [],
                 redirect: true,
                 sourceClick: "new_collection_button"
             })}>

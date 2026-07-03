@@ -24,29 +24,29 @@ import {
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
-import { EntityPreviewData } from "./EntityPreview";
+import { Snapshot, SnapshotRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
+import { SnapshotPreviewData } from "./SnapshotPreview";
 import { useData, useRelationSelector } from "@rebasepro/core";
-import { useSideEntityController } from "../hooks/useSideEntityController";
-import { normalizeToEntityRelation } from "@rebasepro/common";
+import { useSideSnapshotController } from "../hooks/useSideSnapshotController";
+import { normalizeToSnapshotRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";
 
 export interface RelationItem {
     id: string | number;
     label: string;
     description?: string;
-    data?: Entity;
-    relation: EntityRelation;
+    data?: Snapshot;
+    relation: SnapshotRelation;
 }
 
 export interface RelationSelectorProps {
     className?: string;
     name?: string;
     id?: string;
-    value?: EntityRelation | EntityRelation[] | null;
-    /** Callback returning selected EntityRelation(s) */
+    value?: SnapshotRelation | SnapshotRelation[] | null;
+    /** Callback returning selected SnapshotRelation(s) */
 
-    onValueChange?: (updatedValue: EntityRelation | EntityRelation[] | undefined) => void;
+    onValueChange?: (updatedValue: SnapshotRelation | SnapshotRelation[] | undefined) => void;
     placeholder?: React.ReactNode;
     size?: "small" | "medium";
     useChips?: boolean;
@@ -91,7 +91,7 @@ export const RelationSelector = React.forwardRef<
 
         const collection = relation.target();
         const dataClient = useData();
-        const sideEntityController = useSideEntityController();
+        const sideSnapshotController = useSideSnapshotController();
         const multiple = relation.cardinality === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -113,7 +113,7 @@ export const RelationSelector = React.forwardRef<
             hasMore,
             search,
             loadMore,
-            entityToRelationItem
+            snapshotToRelationItem
         } = useRelationSelector({
             path: getCollectionDataPath(collection),
             collection,
@@ -141,8 +141,8 @@ export const RelationSelector = React.forwardRef<
         // so the effect only re-fires when the actual `value` identity changes.
         const dataClientRef = useRef(dataClient);
         dataClientRef.current = dataClient;
-        const entityToRelationItemRef = useRef(entityToRelationItem);
-        entityToRelationItemRef.current = entityToRelationItem;
+        const snapshotToRelationItemRef = useRef(snapshotToRelationItem);
+        snapshotToRelationItemRef.current = snapshotToRelationItem;
         const collectionSlugRef = useRef(collection.slug);
         collectionSlugRef.current = collection.slug;
 
@@ -155,18 +155,18 @@ export const RelationSelector = React.forwardRef<
         selectedItemsRef.current = selectedItems;
 
         // Normalize incoming values — plain { __type: "relation" } objects
-        // from the server are converted to proper EntityRelation instances.
+        // from the server are converted to proper SnapshotRelation instances.
         const rawArray = !value ? [] : Array.isArray(value) ? value : [value];
         const relationsArray = rawArray.map(rel => {
             if (typeof rel === "string" || typeof rel === "number") return rel;
-            return normalizeToEntityRelation(rel) ?? rel;
+            return normalizeToSnapshotRelation(rel) ?? rel;
         });
 
         // Build a fingerprint of the incoming value's IDs
         const incomingIds = relationsArray
             .map(rel => {
                 const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                return String(isPrimitive ? rel : (rel as EntityRelation).id);
+                return String(isPrimitive ? rel : (rel as SnapshotRelation).id);
             })
             .sort()
             .join(",");
@@ -174,7 +174,7 @@ export const RelationSelector = React.forwardRef<
         // CheckIcon if every relation already has embedded data
         const allHaveData = relationsArray.length > 0 && relationsArray.every(rel => {
             if (typeof rel === "string" || typeof rel === "number") return false;
-            return !!(rel as EntityRelation)?.data;
+            return !!(rel as SnapshotRelation)?.data;
         });
 
         const relationsArrayRef = useRef(relationsArray);
@@ -203,17 +203,18 @@ export const RelationSelector = React.forwardRef<
 
             let allCovered = true;
             const newResolvedItems: RelationItem[] = [];
-            const toRelationItem = entityToRelationItemRef.current;
+            const toRelationItem = snapshotToRelationItemRef.current;
             const slug = collectionSlugRef.current;
 
             for (const rel of currentRelationsArray) {
                 const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                const relId = String(isPrimitive ? rel : (rel as EntityRelation).id);
-                const hasEmbeddedData = !isPrimitive && !!(rel as EntityRelation).data;
+                const relId = String(isPrimitive ? rel : (rel as SnapshotRelation).id);
+                const hasEmbeddedData = !isPrimitive && !!(rel as SnapshotRelation).data;
 
                 if (hasEmbeddedData) {
-                    const r = rel as EntityRelation;
-                    newResolvedItems.push(toRelationItem(r.data!, r));
+                    const r = rel as SnapshotRelation;
+                    // CMS wire format embeds relation data as { id, path, values }
+                    newResolvedItems.push(toRelationItem(r.data as unknown as Snapshot, r));
                 } else if (currentSelectedMap.has(relId)) {
                     // We already have it in currentSelected
                     const existingItem = currentSelectedMap.get(relId)!;
@@ -243,22 +244,23 @@ export const RelationSelector = React.forwardRef<
             Promise.all(
                 currentRelationsArray.map(async (rel) => {
                     const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                    const relId = isPrimitive ? rel : (rel as EntityRelation).id;
-                    const path = isPrimitive ? slug : (rel as EntityRelation).path;
-                    const relation = isPrimitive ? new EntityRelation(relId, path) : rel as EntityRelation;
+                    const relId = isPrimitive ? rel : (rel as SnapshotRelation).id;
+                    const path = isPrimitive ? slug : (rel as SnapshotRelation).path;
+                    const relation = isPrimitive ? new SnapshotRelation(relId, path) : rel as SnapshotRelation;
 
-                    if (!isPrimitive && (rel as EntityRelation).data) {
-                        return toRelationItem((rel as EntityRelation).data!, relation);
+                    if (!isPrimitive && (rel as SnapshotRelation).data) {
+                        // CMS wire format embeds relation data as { id, path, values }
+                        return toRelationItem((rel as SnapshotRelation).data as unknown as Snapshot, relation);
                     }
                     if (currentSelectedMap.has(String(relId))) {
                         return currentSelectedMap.get(String(relId))!;
                     }
 
                     try {
-                        const entity = await client.collection(path).findById(relId);
-                        if (entity) return toRelationItem(entity, relation);
+                        const snapshot = await client.collection(path).findById(relId);
+                        if (snapshot) return toRelationItem(snapshot, relation);
                     } catch (e) {
-                        console.warn("RelationSelector: could not fetch entity for relation", rel, e);
+                        console.warn("RelationSelector: could not fetch snapshot for relation", rel, e);
                     }
                     return { id: relId,
 label: String(relId),
@@ -485,11 +487,11 @@ relation } as RelationItem;
                                                     <div key={String(item.id)}
                                                         className="flex flex-row items-center gap-1 truncate">
                                                         {item.data ? (
-                                                            <EntityPreviewData size={"medium"}
-                                                                entity={item.data}
-                                                                includeEntityLink={false}
+                                                            <SnapshotPreviewData size={"medium"}
+                                                                snapshot={item.data}
+                                                                includeSnapshotLink={false}
                                                                 includeId={false}
-                                                                onSideEntityClick={closePopover}
+                                                                onSideSnapshotClick={closePopover}
                                                             />
                                                         ) : (
                                                             <span className="text-sm truncate">{item.label}</span>
@@ -504,8 +506,8 @@ relation } as RelationItem;
                                                     className={cls("flex flex-row items-center gap-1 truncate")}
                                                 >
                                                     {item.data ? (
-                                                        <EntityPreviewData size={"smallest"} entity={item.data}
-                                                            includeEntityLink={false}
+                                                        <SnapshotPreviewData size={"smallest"} snapshot={item.data}
+                                                            includeSnapshotLink={false}
                                                             includeId={false}/>
                                                     ) : (
                                                         <span className="text-sm truncate">{item.label}</span>
@@ -539,11 +541,11 @@ relation } as RelationItem;
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     e.preventDefault();
-                                                    const entity = selectedItems[0].data!;
+                                                    const snapshot = selectedItems[0].data!;
                                                     setIsPopoverOpen(false);
-                                                    sideEntityController.open({
-                                                        entityId: entity.id,
-                                                        path: entity.path,
+                                                    sideSnapshotController.open({
+                                                        snapshotId: snapshot.id,
+                                                        path: snapshot.path,
                                                         collection,
                                                         updateUrl: true
                                                     });
@@ -666,11 +668,11 @@ relation } as RelationItem;
                                                     {item.data ? (
                                                         <div
                                                             className="flex flex-row items-center gap-2 min-w-0 w-full">
-                                                            <EntityPreviewData
+                                                            <SnapshotPreviewData
                                                                 size={multiple ? "smallest" : "medium"}
-                                                                entity={item.data}
+                                                                snapshot={item.data}
                                                                 includeId={false}
-                                                                includeEntityLink={true}
+                                                                includeSnapshotLink={true}
                                                             />
                                                         </div>
                                                     ) : (

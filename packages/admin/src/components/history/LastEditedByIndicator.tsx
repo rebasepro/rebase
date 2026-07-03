@@ -1,4 +1,4 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 import React, { useEffect, useState, useCallback } from "react";
 ;
 import { useApiConfig } from "@rebasepro/core";
@@ -22,30 +22,30 @@ function getRelativeTimeString(date: Date): string {
 
 /**
  * Fetches the latest history entry from the backend API and displays
- * who last edited the entity and when.
+ * who last edited the snapshot and when.
  */
 export function LastEditedByIndicator({
     path,
-    entityId,
+    snapshotId,
     collection
 }: {
     path: string;
-    entityId: string;
-    collection: EntityCollection;
+    snapshotId: string;
+    collection: SnapshotCollection;
 }) {
     const apiConfig = useApiConfig();
     const authController = useAuthController();
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
     const fetchLatest = useCallback(async () => {
-        if (!apiConfig?.apiUrl || !entityId || !collection.slug) return;
+        if (!apiConfig?.apiUrl || !snapshotId || !collection.slug) return;
 
         try {
             const token = await apiConfig.getAuthToken?.();
             const headers: Record<string, string> = {};
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const url = `${apiConfig.apiUrl}/api/data/${collection.slug}/${entityId}/history?limit=1&offset=0`;
+            const url = `${apiConfig.apiUrl}/api/data/${collection.slug}/${snapshotId}/history?limit=1&offset=0`;
             const response = await fetch(url, { headers });
 
             if (response.ok) {
@@ -58,7 +58,7 @@ export function LastEditedByIndicator({
             // Silently fail — this is a non-critical UI indicator
             console.debug("Failed to fetch latest history entry:", error);
         }
-    }, [apiConfig, entityId, collection.slug]);
+    }, [apiConfig, snapshotId, collection.slug]);
 
     useEffect(() => {
         fetchLatest();

@@ -14,7 +14,7 @@ import type {
     BinaryProperty,
     BooleanProperty,
     DateProperty,
-    EntityCollection,
+    SnapshotCollection,
     GeopointProperty,
     MapProperty,
     NumberProperty,
@@ -107,7 +107,7 @@ function serializeMatches(matches: string | RegExp | undefined): string | undefi
 
 /**
  * Resolve a relation target to a string slug.
- * Functions are called to extract the target; EntityCollection objects
+ * Functions are called to extract the target; SnapshotCollection objects
  * use their slug.
  */
 function resolveRelationTarget(target: RelationProperty["target"]): string | undefined {
@@ -118,7 +118,7 @@ function resolveRelationTarget(target: RelationProperty["target"]): string | und
             const resolved = target();
             if (typeof resolved === "string") return resolved;
             if (resolved && typeof resolved === "object" && "slug" in resolved) {
-                return (resolved as EntityCollection).slug;
+                return (resolved as SnapshotCollection).slug;
             }
         } catch {
             // If the lazy resolver throws (e.g., circular dependency not yet ready), return undefined
@@ -263,7 +263,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (rp.path) result.path = rp.path;
             if (rp.fixedFilter) result.fixedFilter = rp.fixedFilter;
             if (rp.includeId !== undefined) result.includeId = rp.includeId;
-            if (rp.includeEntityLink !== undefined) result.includeEntityLink = rp.includeEntityLink;
+            if (rp.includeSnapshotLink !== undefined) result.includeSnapshotLink = rp.includeSnapshotLink;
             return result;
         }
 
@@ -289,7 +289,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (rl.relationName) result.relationName = rl.relationName;
             if (rl.fixedFilter) result.fixedFilter = rl.fixedFilter;
             if (rl.includeId !== undefined) result.includeId = rl.includeId;
-            if (rl.includeEntityLink !== undefined) result.includeEntityLink = rl.includeEntityLink;
+            if (rl.includeSnapshotLink !== undefined) result.includeSnapshotLink = rl.includeSnapshotLink;
             if (rl.widget) result.widget = rl.widget;
             // overrides and relation (resolved) are dropped
             return result;
@@ -389,14 +389,14 @@ export function toSerializableProperties(properties: Properties): SerializablePr
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Convert an `EntityCollection` to its JSON-serializable form.
+ * Convert an `SnapshotCollection` to its JSON-serializable form.
  *
  * Strips all non-serializable fields (functions, React nodes, class instances)
  * while preserving the structural schema that the collection editor works with.
  *
  * The result is safe for `JSON.stringify()` and database storage.
  */
-export function toSerializableCollection(collection: EntityCollection): SerializableCollection {
+export function toSerializableCollection(collection: SnapshotCollection): SerializableCollection {
     const result: SerializableCollection = {
         slug: collection.slug,
         name: collection.name,
@@ -429,8 +429,8 @@ export function toSerializableCollection(collection: EntityCollection): Serializ
     if (collection.securityRules) result.securityRules = collection.securityRules;
 
     // Enum-like fields
-    if (collection.openEntityMode) result.openEntityMode = collection.openEntityMode;
-    if (collection.defaultEntityAction) result.defaultEntityAction = collection.defaultEntityAction;
+    if (collection.openSnapshotMode) result.openSnapshotMode = collection.openSnapshotMode;
+    if (collection.defaultSnapshotAction) result.defaultSnapshotAction = collection.defaultSnapshotAction;
     if (collection.defaultViewMode) result.defaultViewMode = collection.defaultViewMode;
     if (collection.defaultSize) result.defaultSize = collection.defaultSize;
     if (collection.localChangesBackup !== undefined) result.localChangesBackup = collection.localChangesBackup;
@@ -560,17 +560,17 @@ export function fromSerializableProperties(serialized: SerializableProperties): 
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Convert a `SerializableCollection` back to an `EntityCollection`.
+ * Convert a `SerializableCollection` back to an `SnapshotCollection`.
  *
  * The result will NOT contain any of the non-serializable fields
- * (callbacks, entityActions, etc.) — those must be re-attached by the
+ * (callbacks, snapshotActions, etc.) — those must be re-attached by the
  * consumer if needed.
  */
-export function fromSerializableCollection(serialized: SerializableCollection): EntityCollection {
+export function fromSerializableCollection(serialized: SerializableCollection): SnapshotCollection {
     const { properties, ...rest } = serialized;
 
     return {
         ...rest,
         properties: fromSerializableProperties(properties),
-    } as EntityCollection;
+    } as SnapshotCollection;
 }

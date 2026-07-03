@@ -1,24 +1,24 @@
 ---
 name: rebase-admin
-description: Guide for navigating the Rebase admin CMS, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open an entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access CMS-specific controllers.
+description: Guide for navigating the Rebase admin CMS, opening snapshots in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a snapshot in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the snapshot selection dialog, or access CMS-specific controllers.
 ---
 
 # Rebase Admin (`@rebasepro/admin`)
 
-The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full CMS context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
+The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles collection views, snapshot editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full CMS context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
 
-> **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SideEntityProvider>`, and `<RebaseRouteDefs>`.
+> **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SideSnapshotProvider>`, and `<RebaseRouteDefs>`.
 
 ## Quick Reference — Common Tasks
 
 | Task | Hook / Component | Package |
 |------|-----------------|---------|
-| Open entity in side drawer | `useSideEntityController()` | `@rebasepro/admin` |
+| Open snapshot in side drawer | `useSideSnapshotController()` | `@rebasepro/admin` |
 | Navigate to a collection view | `useUrlController()` | `@rebasepro/admin` |
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/admin` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/admin` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/admin` |
-| Open an entity selection dialog | `useEntitySelectionDialog()` | `@rebasepro/admin` |
+| Open a snapshot selection dialog | `useSnapshotSelectionDialog()` | `@rebasepro/admin` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/admin` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/admin` |
 | Access full CMS context | `useCMSContext()` | `@rebasepro/admin` |
@@ -26,40 +26,40 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 
 ---
 
-## 1. Opening Entities in the Side Drawer
+## 1. Opening Snapshots in the Side Drawer
 
-Use `useSideEntityController()` to open, replace, or close entity side panels (the sliding drawer that shows entity forms).
+Use `useSideSnapshotController()` to open, replace, or close snapshot side panels (the sliding drawer that shows snapshot forms).
 
 ```typescript
-import { useSideEntityController } from "@rebasepro/admin";
+import { useSideSnapshotController } from "@rebasepro/admin";
 ```
 
-### SideEntityController Interface
+### SideSnapshotController Interface
 
 ```typescript
-interface SideEntityController {
+interface SideSnapshotController {
     /** Close the last (topmost) panel */
     close: () => void;
 
-    /** Open a new entity side panel */
-    open: <M extends Record<string, unknown>>(props: EntitySidePanelProps<M>) => void;
+    /** Open a new snapshot side panel */
+    open: <M extends Record<string, unknown>>(props: SnapshotSidePanelProps<M>) => void;
 
     /** Replace the last open panel with a new one */
-    replace: <M extends Record<string, unknown>>(props: EntitySidePanelProps<M>) => void;
+    replace: <M extends Record<string, unknown>>(props: SnapshotSidePanelProps<M>) => void;
 }
 ```
 
-### EntitySidePanelProps
+### SnapshotSidePanelProps
 
 ```typescript
-interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Absolute path of the entity's collection (e.g. "products") */
+interface SnapshotSidePanelProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** Absolute path of the snapshot's collection (e.g. "products") */
     path: string;
 
-    /** ID of the entity. Omit to create a new entity. */
-    entityId?: string | number;
+    /** ID of the snapshot. Omit to create a new snapshot. */
+    snapshotId?: string | number;
 
-    /** Set to true to create a copy of an existing entity */
+    /** Set to true to create a copy of an existing snapshot */
     copy?: boolean;
 
     /** Open with a specific sub-collection tab selected */
@@ -69,13 +69,13 @@ interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string
     width?: number | string;
 
     /** Explicit collection config (auto-resolved from navigation if omitted) */
-    collection?: EntityCollection<M>;
+    collection?: SnapshotCollection<M>;
 
     /** Whether to update the browser URL when opening (default: true) */
     updateUrl?: boolean;
 
-    /** Callback when the entity is saved/updated */
-    onUpdate?: (params: { entity: Entity<M> }) => void;
+    /** Callback when the snapshot is saved/updated */
+    onUpdate?: (params: { snapshot: Snapshot<M> }) => void;
 
     /** Callback when the panel is closed */
     onClose?: () => void;
@@ -89,27 +89,27 @@ interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string
     /** Show a full-screen toggle button */
     allowFullScreen?: boolean;
 
-    /** Pre-populate form values when creating a new entity (only when entityId is not set) */
+    /** Pre-populate form values when creating a new snapshot (only when snapshotId is not set) */
     defaultValues?: Partial<M>;
 }
 ```
 
 ### Examples
 
-**Open an existing entity for editing:**
+**Open an existing snapshot for editing:**
 ```tsx
-const sideEntityController = useSideEntityController();
+const sideSnapshotController = useSideSnapshotController();
 
 // Open the product with ID "abc123" in the side drawer
-sideEntityController.open({
+sideSnapshotController.open({
     path: "products",
-    entityId: "abc123"
+    snapshotId: "abc123"
 });
 ```
 
-**Create a new entity with pre-filled values:**
+**Create a new snapshot with pre-filled values:**
 ```tsx
-sideEntityController.open({
+sideSnapshotController.open({
     path: "products",
     defaultValues: {
         name: "New Product",
@@ -120,21 +120,21 @@ sideEntityController.open({
 
 **Open with a callback on save:**
 ```tsx
-sideEntityController.open({
+sideSnapshotController.open({
     path: "orders",
-    entityId: orderId,
+    snapshotId: orderId,
     closeOnSave: true,
-    onUpdate: ({ entity }) => {
-        console.log("Saved:", entity.id, entity.values);
+    onUpdate: ({ snapshot }) => {
+        console.log("Saved:", snapshot.id, snapshot.values);
     }
 });
 ```
 
 **Replace the current panel (instead of stacking):**
 ```tsx
-sideEntityController.replace({
+sideSnapshotController.replace({
     path: "clients",
-    entityId: "xyz789"
+    snapshotId: "xyz789"
 });
 ```
 
@@ -193,7 +193,7 @@ urlController.navigate(url);
 // This navigates to "/c/products"
 ```
 
-**Navigate to a specific entity within a collection:**
+**Navigate to a specific snapshot within a collection:**
 ```tsx
 const url = urlController.buildUrlCollectionPath("products/abc123");
 urlController.navigate(url);
@@ -236,10 +236,10 @@ import { useCollectionRegistryController } from "@rebasepro/admin";
 ```typescript
 type CollectionRegistryController<
     DB = Record<string, unknown>,
-    EC extends EntityCollection = EntityCollection
+    EC extends SnapshotCollection = SnapshotCollection
 > = {
     /** All registered collections */
-    collections?: EntityCollection[];
+    collections?: SnapshotCollection[];
 
     /** Whether the registry is ready */
     initialised: boolean;
@@ -250,14 +250,14 @@ type CollectionRegistryController<
     /** Get the raw (un-normalized) collection config — for the Visual Editor only */
     getRawCollection: (slugOrPath: string) => EC | undefined;
 
-    /** Get all parent entity references for a path */
-    getParentReferencesFromPath: (path: string) => EntityReference[];
+    /** Get all parent snapshot references for a path */
+    getParentReferencesFromPath: (path: string) => SnapshotReference[];
 
     /** Get parent collection slugs for a path */
     getParentCollectionSlugs: (path: string) => string[];
 
-    /** Get parent entity IDs for a path */
-    getParentEntityIds: (path: string) => string[];
+    /** Get parent snapshot IDs for a path */
+    getParentSnapshotIds: (path: string) => string[];
 
     /** Resolve IDs to paths */
     convertIdsToPaths: (ids: string[]) => string[];
@@ -286,7 +286,7 @@ registry.collections?.forEach(c => {
 
 ## 4. Embedding Collections with CollectionPanel
 
-`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, entity detail views).
+`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, snapshot detail views).
 
 ```typescript
 import { CollectionPanel } from "@rebasepro/admin";
@@ -308,20 +308,20 @@ type CollectionPanelProps = {
     /** Override sort: [fieldName, direction] */
     sort?: [string, "asc" | "desc"];
 
-    /** Max entities to display */
+    /** Max snapshots to display */
     limit?: number;
 
     /** Sync filter/sort with URL params (default: false) */
     updateUrl?: boolean;
 
-    /** Entity open mode when clicking */
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    /** Snapshot open mode when clicking */
+    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /** Container CSS class */
     className?: string;
 
     /** Additional collection-level overrides */
-    collectionOverrides?: Partial<EntityCollection>;
+    collectionOverrides?: Partial<SnapshotCollection>;
 };
 ```
 
@@ -343,7 +343,7 @@ type CollectionPanelProps = {
 <CollectionPanel
     path="orders"
     title={false}
-    openEntityMode="dialog"
+    openSnapshotMode="dialog"
     collectionOverrides={{
         defaultFilter: { status: ["!=", "completed"] }
     }}
@@ -354,22 +354,22 @@ type CollectionPanelProps = {
 
 ---
 
-## 5. Entity Selection Dialog
+## 5. Snapshot Selection Dialog
 
-Use `useEntitySelectionDialog()` to open a side dialog for selecting entities (same mechanism used by reference fields).
+Use `useSnapshotSelectionDialog()` to open a side dialog for selecting snapshots (same mechanism used by reference fields).
 
 ```typescript
-import { useEntitySelectionDialog } from "@rebasepro/admin";
+import { useSnapshotSelectionDialog } from "@rebasepro/admin";
 ```
 
 ### Usage
 
 ```tsx
 function MyComponent() {
-    const { open, close } = useEntitySelectionDialog<Product>({
+    const { open, close } = useSnapshotSelectionDialog<Product>({
         path: "products",
-        onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity.id);
+        onSingleSnapshotSelected: (snapshot) => {
+            console.log("Selected:", snapshot.id);
             close();
         }
     });
@@ -378,13 +378,13 @@ function MyComponent() {
 }
 ```
 
-The hook accepts all `EntitySelectionProps` except `path` (which you pass separately), plus an `onClose` callback.
+The hook accepts all `SnapshotSelectionProps` except `path` (which you pass separately), plus an `onClose` callback.
 
 ---
 
 ## 6. Side Dialogs (Generic)
 
-Use `useSideDialogsController()` to open arbitrary side panels with custom React content. This is the lower-level mechanism behind entity side panels.
+Use `useSideDialogsController()` to open arbitrary side panels with custom React content. This is the lower-level mechanism behind snapshot side panels.
 
 ```typescript
 import { useSideDialogsController } from "@rebasepro/admin";
@@ -545,7 +545,7 @@ import { useCMSContext } from "@rebasepro/admin";
 
 ```typescript
 type CMSContext = RebaseContext & {
-    sideEntityController: SideEntityController;
+    sideSnapshotController: SideSnapshotController;
     sideDialogsController: SideDialogsController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
@@ -559,7 +559,7 @@ type CMSContext = RebaseContext & {
 const context = useCMSContext();
 
 // Access any controller
-context.sideEntityController.open({ path: "products", entityId: "abc" });
+context.sideSnapshotController.open({ path: "products", snapshotId: "abc" });
 context.urlController.navigate(context.urlController.buildUrlCollectionPath("orders"));
 context.collectionRegistryController.getCollection("products");
 context.authController; // from RebaseContext
@@ -572,38 +572,38 @@ context.data;           // DataSource from RebaseContext
 
 ## 10. Common Patterns
 
-### Navigate to a collection and open an entity
+### Navigate to a collection and open a snapshot
 
 ```tsx
-import { useUrlController, useSideEntityController } from "@rebasepro/admin";
+import { useUrlController, useSideSnapshotController } from "@rebasepro/admin";
 
 function navigateAndOpen() {
     const urlController = useUrlController();
-    const sideEntityController = useSideEntityController();
+    const sideSnapshotController = useSideSnapshotController();
 
     // First navigate to the collection
     urlController.navigate(urlController.buildUrlCollectionPath("products"));
 
-    // Then open the entity in the side drawer
-    sideEntityController.open({
+    // Then open the snapshot in the side drawer
+    sideSnapshotController.open({
         path: "products",
-        entityId: "abc123"
+        snapshotId: "abc123"
     });
 }
 ```
 
-### Open entity from a custom view without navigating
+### Open snapshot from a custom view without navigating
 
 ```tsx
-import { useSideEntityController } from "@rebasepro/admin";
+import { useSideSnapshotController } from "@rebasepro/admin";
 
 function MyCustomView() {
-    const sideEntityController = useSideEntityController();
+    const sideSnapshotController = useSideSnapshotController();
 
     return (
-        <button onClick={() => sideEntityController.open({
+        <button onClick={() => sideSnapshotController.open({
             path: "products",
-            entityId: "abc123",
+            snapshotId: "abc123",
             updateUrl: false  // don't change the URL
         })}>
             View Product
@@ -612,24 +612,24 @@ function MyCustomView() {
 }
 ```
 
-### Programmatic entity creation from a custom view
+### Programmatic snapshot creation from a custom view
 
 ```tsx
-import { useSideEntityController } from "@rebasepro/admin";
+import { useSideSnapshotController } from "@rebasepro/admin";
 
 function CreateButton() {
-    const sideEntity = useSideEntityController();
+    const sideSnapshot = useSideSnapshotController();
 
     return (
-        <button onClick={() => sideEntity.open({
+        <button onClick={() => sideSnapshot.open({
             path: "orders",
             defaultValues: {
                 status: "pending",
                 createdAt: new Date()
             },
             closeOnSave: true,
-            onUpdate: ({ entity }) => {
-                console.log("Created order:", entity.id);
+            onUpdate: ({ snapshot }) => {
+                console.log("Created order:", snapshot.id);
             }
         })}>
             New Order
@@ -754,13 +754,13 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `RebaseCMS` | Declarative CMS config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages |
-| `EntityCollectionView` | The collection view component |
-| `EntityView` | Entity detail/edit view |
-| `EntityPreview` | Reference/relation preview chip |
-| `EntityCard` | Card representation of an entity |
+| `SnapshotCollectionView` | The collection view component |
+| `SnapshotCustomView` | Snapshot detail/edit view |
+| `SnapshotPreview` | Reference/relation preview chip |
+| `SnapshotCard` | Card representation of a snapshot |
 | `SideDialogs` | Side dialog container |
-| `SideEntityProvider` | Context provider for side entity controller |
-| `EntitySelectionTable` | Table for selecting entities |
+| `SideSnapshotProvider` | Context provider for side snapshot controller |
+| `SnapshotSelectionTable` | Table for selecting snapshots |
 | `Scaffold` | Layout scaffold component |
 | `AppBar` | Top app bar |
 | `Drawer` / `DefaultDrawer` | Sidebar drawer |
@@ -773,16 +773,16 @@ The admin package exports the following components (from `@rebasepro/admin`):
 
 | Hook | Description |
 |------|-------------|
-| `useSideEntityController()` | Open/close entity side panels |
+| `useSideSnapshotController()` | Open/close snapshot side panels |
 | `useSideDialogsController()` | Open/close generic side dialogs |
 | `useUrlController()` | Build URLs and navigate |
 | `useNavigationStateController()` | Access navigation state |
 | `useCollectionRegistryController()` | Look up collections by slug |
 | `useBreadcrumbsController()` | Read/set breadcrumbs |
 | `useCMSContext()` | Full CMS context (core + CMS controllers) |
-| `useEntitySelectionDialog()` | Open entity selection dialog |
+| `useSnapshotSelectionDialog()` | Open snapshot selection dialog |
 | `useSelectionController()` | Multi-select controller |
-| `useEntityHistory()` | Entity version history |
+| `useSnapshotHistory()` | Snapshot version history |
 | `useApp()` | App-level utilities |
 
 ## Exported Utilities
@@ -795,22 +795,22 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `removeInitialAndTrailingSlashes(path)` | Strip both |
 | `getLastSegment(path)` | Get last path segment |
 | `getCollectionBySlugWithin(collections, slug)` | Find collection in array |
-| `mergeEntityActions(...)` | Merge entity action arrays |
-| `resolveEntityAction(...)` | Resolve an entity action |
-| `resolveEntityView(...)` | Resolve an entity view |
+| `mergeSnapshotActions(...)` | Merge snapshot action arrays |
+| `resolveSnapshotAction(...)` | Resolve a snapshot action |
+| `resolveSnapshotView(...)` | Resolve a snapshot view |
 | `isReferenceProperty(prop)` | Check if property is a reference |
 | `isRelationProperty(prop)` | Check if property is a relation |
 | `getIconForProperty(prop)` | Get icon for a property type |
 
-## Built-in Entity Actions
+## Built-in Snapshot Actions
 
 ```typescript
 import {
-    editEntityAction,
-    copyEntityAction,
-    deleteEntityAction,
+    editSnapshotAction,
+    copySnapshotAction,
+    deleteSnapshotAction,
     resetPasswordAction
 } from "@rebasepro/admin";
 ```
 
-These are pre-built `EntityAction` objects that can be added to a collection's `entityActions` array.
+These are pre-built `SnapshotAction` objects that can be added to a collection's `snapshotActions` array.

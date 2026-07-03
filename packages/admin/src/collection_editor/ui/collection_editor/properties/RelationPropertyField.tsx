@@ -8,7 +8,7 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { EntityCollection, OnAction, RelationProperty } from "@rebasepro/types";
+import { SnapshotCollection, OnAction, RelationProperty } from "@rebasepro/types";
 
 import { CollectionsSelect } from "./ReferencePropertyField";
 
@@ -87,7 +87,7 @@ targetColumn: "" };
         }
     }, [targetSlug, relationName, setFieldValue]);
 
-    const collections: EntityCollection[] = collectionRegistry?.collections ?? [];
+    const collections: SnapshotCollection[] = collectionRegistry?.collections ?? [];
 
     return (
         <>

@@ -18,23 +18,23 @@ export interface RebaseTranslations {
     // ─── Form actions ────────────────────────────────────────────
     save: string;
     create: string;
-    /** Used when duplicating an existing entity */
+    /** Used when duplicating an existing snapshot */
     create_copy: string;
     save_and_close: string;
     create_copy_and_close: string;
     create_and_close: string;
-    /** Discard changes on an existing entity */
+    /** Discard changes on an existing snapshot */
     discard: string;
     /** Clear a new/copy form (not yet persisted) */
     clear: string;
     cancel: string;
 
-    // ─── Entity actions ──────────────────────────────────────────
+    // ─── Snapshot actions ──────────────────────────────────────────
     edit: string;
     copy: string;
     delete: string;
     delete_not_allowed: string;
-    edit_entity?: string;
+    edit_snapshot?: string;
     back_to_detail?: string;
 
     // ─── Delete dialog ───────────────────────────────────────────
@@ -49,7 +49,7 @@ export interface RebaseTranslations {
     keep_editing: string;
     /** Dialog title when clearing a new/copy form */
     clear_form?: string;
-    /** Confirmation body when discarding changes on an existing entity */
+    /** Confirmation body when discarding changes on an existing snapshot */
     discard_changes_confirmation?: string;
     /** Confirmation body when clearing a new/copy form */
     clear_form_confirmation?: string;
@@ -57,7 +57,7 @@ export interface RebaseTranslations {
     // ─── Collection table / toolbar ──────────────────────────────
     search: string;
     find_by_id: string;
-    find_entity_by_id: string;
+    find_snapshot_by_id: string;
     filter: string;
     clear_filter: string;
     clear_filter_sort: string;
@@ -160,13 +160,13 @@ export interface RebaseTranslations {
     value_updated_elsewhere: string;
     add_property: string;
     edit_name: string;
-    this_entity_not_exist: string;
+    this_snapshot_not_exist: string;
     internal_error: string;
     /** Shown in unsaved-changes dialogs */
     are_you_sure_leave: string;
     passkey_error_unsupported: string;
 
-    // ─── Entity form feedback ─────────────────────────────────────
+    // ─── Snapshot form feedback ─────────────────────────────────────
     /** Snackbar message after a successful save */
     saved_correctly: string;
     /** Snackbar title when a beforeSave callback throws */
@@ -174,9 +174,9 @@ export interface RebaseTranslations {
     /** Snackbar title when an afterSave callback throws */
     error_after_saving: string;
     /** Snackbar title when the save itself fails */
-    error_saving_entity: string;
-    /** Alert shown when the entity does not exist in the database */
-    entity_does_not_exist: string;
+    error_saving_snapshot: string;
+    /** Alert shown when the snapshot does not exist in the database */
+    snapshot_does_not_exist: string;
     /** Tooltip when the form has unsaved modifications */
     form_modified: string;
     /** Tooltip when the form is in sync with the database */
@@ -198,9 +198,9 @@ export interface RebaseTranslations {
     open_image_in_new_tab: string;
     reference_not_set: string;
     reference_does_not_exist: string;
-    entity_not_found: string;
+    snapshot_not_found: string;
     file_not_found: string;
-    unsaved_changes_in_entity: string;
+    unsaved_changes_in_snapshot: string;
     delete_this_role: string;
     no_roles_yet: string;
     create_default_roles: string;
@@ -230,7 +230,7 @@ export interface RebaseTranslations {
     /** Default group name shown when collections/views have no explicit group */
     views_group: string;
 
-    // ─── Entity Edit View ─────────────────────────────────────────
+    // ─── Snapshot Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: string;
 
     // ─── Not Found Page ───────────────────────────────────────────
@@ -243,7 +243,7 @@ export interface RebaseTranslations {
     table_view: string;
     cards_view: string;
     kanban_view: string;
-    choose_how_entities_displayed_default: string;
+    choose_how_snapshots_displayed_default: string;
 
     document_view: string;
     side_panel: string;
@@ -304,7 +304,7 @@ export interface RebaseTranslations {
     more_info: string;
     define_custom_actions_cli: string;
     action_defined_in_code: string;
-    add_custom_entity_action: string;
+    add_custom_snapshot_action: string;
     remove_this_action: string;
     remove_action_warning: string;
 
@@ -313,7 +313,7 @@ export interface RebaseTranslations {
     custom_views: string;
     define_custom_views_cli: string;
     view_defined_in_code: string;
-    add_custom_entity_view: string;
+    add_custom_snapshot_view: string;
     delete_this_subcollection: string;
     remove_collection_warning: string;
     remove_this_view: string;
@@ -340,7 +340,7 @@ export interface RebaseTranslations {
 
     enum_form_dialog: string;
     imported_data_preview: string;
-    entities_with_same_id_overwritten: string;
+    snapshots_with_same_id_overwritten: string;
     collection_editor: string;
     properties_in_this_group: string;
     data_property_mapping: string;
@@ -355,12 +355,12 @@ export interface RebaseTranslations {
     role: string;
     name_of_this_role: string;
     id_of_this_role: string;
-    create_entities: string;
-    read_entities: string;
-    update_entities: string;
-    delete_entities: string;
+    create_snapshots: string;
+    read_snapshots: string;
+    update_snapshots: string;
+    delete_snapshots: string;
     all_collections: string;
-    create_entities_in_collections: string;
+    create_snapshots_in_collections: string;
     access_all_data_in_every_collection: string;
     update_data_in_any_collection: string;
     delete_data_in_any_collection: string;
@@ -394,7 +394,7 @@ export interface RebaseTranslations {
     create_user: string;
 
     filters: string;
-    multiple_entities: string;
+    multiple_snapshots: string;
     unsaved_changes: string;
     so_empty: string;
     no_results: string;
@@ -436,7 +436,7 @@ export interface RebaseTranslations {
     error_saving_data: string;
     retry: string;
     saving_data: string;
-    entities_saved: string;
+    snapshots_saved: string;
     do_not_close_tab: string;
     import: string;
     import_data: string;
@@ -446,7 +446,7 @@ export interface RebaseTranslations {
     save_data: string;
     use_column_as_id: string;
     do_not_import_property: string;
-    entities_will_be_overwritten: string;
+    snapshots_will_be_overwritten: string;
     data_imported_successfully: string;
 
     // data export
@@ -486,7 +486,7 @@ export interface RebaseTranslations {
     kanban_order_not_configured: string;
     initialize: string;
     confirm_multiple_delete: string;
-    delete_entity_confirm_title: string;
+    delete_snapshot_confirm_title: string;
 
     no_filter: string;
     is_true: string;
@@ -497,8 +497,8 @@ export interface RebaseTranslations {
     drag_drop_file: string;
 
     multiple_deleted: string;
-    some_entities_deleted: string;
-    error_deleting_entities: string;
+    some_snapshots_deleted: string;
+    error_deleting_snapshots: string;
     deleted: string;
 
     select_reference: string;
@@ -835,7 +835,7 @@ export interface RebaseTranslations {
     studio_sql_save_first_to_favorite?: string;
     studio_sql_cms?: string;
     studio_sql_cms_collections_tooltip?: string;
-    studio_sql_edit_entity?: string;
+    studio_sql_edit_snapshot?: string;
     studio_sql_sql_not_supported?: string;
     studio_sql_fetch_error?: string;
     studio_sql_unexpected_format?: string;
@@ -955,8 +955,8 @@ export interface RebaseTranslations {
     studio_editor_collection_start_tooltip?: string;
     studio_editor_collection_start_no_permission?: string;
     studio_editor_collection_start_copied?: string;
-    studio_editor_entity_tooltip?: string;
-    studio_editor_entity_no_permission?: string;
+    studio_editor_snapshot_tooltip?: string;
+    studio_editor_snapshot_no_permission?: string;
     studio_home_edit_collection?: string;
     studio_home_delete_collection?: string;
     studio_home_confirm_delete_title?: string;
@@ -974,8 +974,8 @@ export interface RebaseTranslations {
     studio_collection_view_edit?: string;
     studio_editor_collection_disabled?: string;
     studio_editor_collection_edit?: string;
-    studio_editor_entity_save_first?: string;
-    studio_editor_entity_edit_schema?: string;
+    studio_editor_snapshot_save_first?: string;
+    studio_editor_snapshot_edit_schema?: string;
     studio_editor_collection_start_save_filter?: string;
     studio_editor_collection_start_clear_filter?: string;
     studio_editor_collection_start_reset_filter?: string;

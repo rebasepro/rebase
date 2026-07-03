@@ -6,7 +6,7 @@
  * using MongoDB as the database.
  *
  * The package implements the abstract interfaces from @rebasepro/server-core
- * (EntityRepository, RealtimeProvider, CollectionRegistryInterface, etc.)
+ * (DataRepository, RealtimeProvider, CollectionRegistryInterface, etc.)
  */
 
 // Connection
@@ -16,7 +16,7 @@ export * from "./connection";
 export * from "./factory";
 
 // Database services
-export * from "./db/MongoEntityService";
+export * from "./db/MongoDataService";
 export * from "./db/MongoConditionBuilder";
 
 // Services

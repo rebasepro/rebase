@@ -10,7 +10,7 @@ const customersCollection = defineCollection({
     icon: "Users",
     group: "E-Commerce",
     history: true,
-    defaultEntityAction: "view",
+    defaultSnapshotAction: "view",
     properties: {
         id: {
             name: "ID",
@@ -131,17 +131,14 @@ hideFromCollection: true }
     ],
     // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
     callbacks: {
-        afterRead: ({ entity }) => ({
-            ...entity,
-            values: maskValues(entity.values, {
-                email: maskEmail,
-                first_name: maskName,
-                last_name: maskName,
-                phone: maskPhone,
-                shipping_address: () => "Redacted Address",
-                billing_address: () => "Redacted Address",
-                avatar: null
-            })
+        afterRead: ({ row }) => maskValues(row, {
+            email: maskEmail,
+            first_name: maskName,
+            last_name: maskName,
+            phone: maskPhone,
+            shipping_address: () => "Redacted Address",
+            billing_address: () => "Redacted Address",
+            avatar: null
         })
     },
     securityRules: [

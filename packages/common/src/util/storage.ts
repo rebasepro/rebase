@@ -1,4 +1,4 @@
-import { ArrayProperty, EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, StringProperty, UploadedFileContext } from "@rebasepro/types";
+import { ArrayProperty, SnapshotValues, StorageConfig, StorageSource, StorageSourceRegistry, StringProperty, UploadedFileContext } from "@rebasepro/types";
 import { randomString } from "@rebasepro/utils";
 
 /**
@@ -37,8 +37,8 @@ export function resolveStorageSource(params: {
 interface ResolveFilenameStringParams<M extends Record<string, unknown>> {
     input: string | ((context: UploadedFileContext) => (Promise<string> | string));
     storage: StorageConfig;
-    values: EntityValues<M>;
-    entityId?: string | number;
+    values: SnapshotValues<M>;
+    snapshotId?: string | number;
     path?: string;
     property: StringProperty | ArrayProperty,
     file: File;
@@ -50,7 +50,7 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
         input,
         storage,
         values,
-        entityId,
+        snapshotId,
         path,
         property,
         file,
@@ -61,7 +61,7 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
     if (typeof input === "function") {
         result = await input({
             path,
-            entityId,
+            snapshotId,
             values,
             property,
             file,
@@ -74,7 +74,7 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
         result = replacePlaceholders({
             file,
             input,
-            entityId,
+            snapshotId,
             propertyKey,
             path
         });
@@ -89,8 +89,8 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
 interface ResolveStoragePathStringParams<M extends Record<string, unknown>> {
     input: string | ((context: UploadedFileContext) => string);
     storage: StorageConfig;
-    values: EntityValues<M>;
-    entityId?: string | number;
+    values: SnapshotValues<M>;
+    snapshotId?: string | number;
     path?: string;
     property: StringProperty | ArrayProperty;
     file: File;
@@ -102,7 +102,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
         input,
         storage,
         values,
-        entityId,
+        snapshotId,
         path,
         property,
         file,
@@ -112,7 +112,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
     if (typeof input === "function") {
         result = input({
             path,
-            entityId,
+            snapshotId,
             values,
             property,
             file,
@@ -125,7 +125,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
         result = replacePlaceholders({
             file,
             input,
-            entityId,
+            snapshotId,
             propertyKey,
             path
         });
@@ -140,7 +140,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
 interface Placeholders {
     file: File;
     input: string;
-    entityId?: string | number;
+    snapshotId?: string | number;
     propertyKey: string;
     path?: string;
 }
@@ -148,7 +148,7 @@ interface Placeholders {
 function replacePlaceholders({
     file,
     input,
-    entityId,
+    snapshotId,
     propertyKey,
     path
 }: Placeholders) {
@@ -158,8 +158,8 @@ function replacePlaceholders({
         .replace("{rand}", randomString())
         .replace("{file}", file.name)
         .replace("{file.type}", file.type);
-    if (entityId) {
-        result = result.replace("{entityId}", String(entityId));
+    if (snapshotId) {
+        result = result.replace("{snapshotId}", String(snapshotId));
     }
     if (path) {
         result = result.replace("{path}", path);

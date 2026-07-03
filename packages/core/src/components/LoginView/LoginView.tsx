@@ -43,7 +43,7 @@ import { useModeController, useTranslation } from "../../hooks";
 /**
  * Props for the generic LoginView.
  * Consumes {@link AuthControllerExtended} — works with any backend
- * (Rebase custom backend, Firebase, Supabase, etc.)
+ * (Rebase custom backend, Firebase, etc.)
  */
 export interface LoginViewProps {
     /**

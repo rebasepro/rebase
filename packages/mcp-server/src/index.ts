@@ -1073,23 +1073,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "get_document": {
             const argsObj = args as { collection: string; id: string };
             const { collection: slug, id } = argsObj;
-            const entity = await client.data.collection(slug).findById(id);
-            if (!entity) return textResult(`Document ${id} not found in ${slug}`);
-            return jsonResult(entity);
+            const snapshot = await client.data.collection(slug).findById(id);
+            if (!snapshot) return textResult(`Document ${id} not found in ${slug}`);
+            return jsonResult(snapshot);
         }
 
         case "create_document": {
             const argsObj = args as { collection: string; data: Record<string, unknown> };
             const { collection: slug, data } = argsObj;
-            const entity = await client.data.collection(slug).create(data);
-            return jsonResult(entity);
+            const snapshot = await client.data.collection(slug).create(data);
+            return jsonResult(snapshot);
         }
 
         case "update_document": {
             const argsObj = args as { collection: string; id: string; data: Record<string, unknown> };
             const { collection: slug, id, data } = argsObj;
-            const entity = await client.data.collection(slug).update(id, data);
-            return jsonResult(entity);
+            const snapshot = await client.data.collection(slug).update(id, data);
+            return jsonResult(snapshot);
         }
 
         case "delete_document": {

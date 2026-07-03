@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Entity, Property } from "@rebasepro/types";
+import { Snapshot, Property } from "@rebasepro/types";
 import { ImportConfig } from "../types";
 
 export const useImportConfig = (): ImportConfig => {
@@ -8,7 +8,7 @@ export const useImportConfig = (): ImportConfig => {
     const [defaultValues, setDefaultValues] = useState<Record<string, any>>({});
     const [idColumn, setIdColumn] = useState<string | undefined>();
     const [importData, setImportData] = useState<object[]>([]);
-    const [entities, setEntities] = useState<Entity<any>[]>([]);
+    const [snapshots, setSnapshots] = useState<Snapshot<any>[]>([]);
     const [headersMapping, setHeadersMapping] = useState<Record<string, string | null>>({});
     const [headingsOrder, setHeadingsOrder] = useState<string[]>([]);
     const [originProperties, setOriginProperties] = useState<Record<string, Property>>({});
@@ -18,8 +18,8 @@ export const useImportConfig = (): ImportConfig => {
         setInUse,
         idColumn,
         setIdColumn,
-        entities,
-        setEntities,
+        snapshots,
+        setSnapshots,
         importData,
         setImportData,
         headingsOrder: (headingsOrder ?? []).length > 0 ? headingsOrder : Object.keys(headersMapping),

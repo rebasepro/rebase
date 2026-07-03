@@ -1,0 +1,201 @@
+{
+  "//": "Authoritative whole-monorepo type check. Resolves @rebasepro/* to SOURCE (not dist), so it is immune to stale build output, build ordering, and incremental caches. Run via `pnpm typecheck`. This is the gate that `pnpm build` (esbuild, no type-check) does NOT provide.",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "module": "ESNext",
+    "target": "ESNext",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "ignoreDeprecations": "6.0",
+    "types": [
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@rebasepro/admin": [
+        "packages/admin/src"
+      ],
+      "@rebasepro/admin/*": [
+        "packages/admin/src/*"
+      ],
+      "@rebasepro/auth": [
+        "packages/auth/src"
+      ],
+      "@rebasepro/auth/*": [
+        "packages/auth/src/*"
+      ],
+      "@rebasepro/cli": [
+        "packages/cli/src"
+      ],
+      "@rebasepro/cli/*": [
+        "packages/cli/src/*"
+      ],
+      "@rebasepro/client": [
+        "packages/client/src"
+      ],
+      "@rebasepro/client/*": [
+        "packages/client/src/*"
+      ],
+      "@rebasepro/client-firebase": [
+        "packages/client-firebase/src"
+      ],
+      "@rebasepro/client-firebase/*": [
+        "packages/client-firebase/src/*"
+      ],
+      "@rebasepro/client-postgresql": [
+        "packages/client-postgresql/src"
+      ],
+      "@rebasepro/client-postgresql/*": [
+        "packages/client-postgresql/src/*"
+      ],
+      "@rebasepro/common": [
+        "packages/common/src"
+      ],
+      "@rebasepro/common/*": [
+        "packages/common/src/*"
+      ],
+      "@rebasepro/core": [
+        "packages/core/src"
+      ],
+      "@rebasepro/core/*": [
+        "packages/core/src/*"
+      ],
+      "@rebasepro/formex": [
+        "packages/formex/src"
+      ],
+      "@rebasepro/formex/*": [
+        "packages/formex/src/*"
+      ],
+      "@rebasepro/mcp-server": [
+        "packages/mcp-server/src"
+      ],
+      "@rebasepro/mcp-server/*": [
+        "packages/mcp-server/src/*"
+      ],
+      "@rebasepro/plugin-data-enhancement": [
+        "packages/plugin-data-enhancement/src"
+      ],
+      "@rebasepro/plugin-data-enhancement/*": [
+        "packages/plugin-data-enhancement/src/*"
+      ],
+      "@rebasepro/plugin-insights": [
+        "packages/plugin-insights/src"
+      ],
+      "@rebasepro/plugin-insights/*": [
+        "packages/plugin-insights/src/*"
+      ],
+      "@rebasepro/schema-inference": [
+        "packages/schema-inference/src"
+      ],
+      "@rebasepro/schema-inference/*": [
+        "packages/schema-inference/src/*"
+      ],
+      "@rebasepro/sdk-generator": [
+        "packages/sdk-generator/src"
+      ],
+      "@rebasepro/sdk-generator/*": [
+        "packages/sdk-generator/src/*"
+      ],
+      "@rebasepro/server-core": [
+        "packages/server-core/src"
+      ],
+      "@rebasepro/server-core/*": [
+        "packages/server-core/src/*"
+      ],
+      "@rebasepro/server-mongodb": [
+        "packages/server-mongodb/src"
+      ],
+      "@rebasepro/server-mongodb/*": [
+        "packages/server-mongodb/src/*"
+      ],
+      "@rebasepro/server-postgresql": [
+        "packages/server-postgresql/src"
+      ],
+      "@rebasepro/server-postgresql/*": [
+        "packages/server-postgresql/src/*"
+      ],
+      "@rebasepro/studio": [
+        "packages/studio/src"
+      ],
+      "@rebasepro/studio/*": [
+        "packages/studio/src/*"
+      ],
+      "@rebasepro/types": [
+        "packages/types/src"
+      ],
+      "@rebasepro/types/*": [
+        "packages/types/src/*"
+      ],
+      "@rebasepro/ui": [
+        "packages/ui/src"
+      ],
+      "@rebasepro/ui/*": [
+        "packages/ui/src/*"
+      ],
+      "@rebasepro/utils": [
+        "packages/utils/src"
+      ],
+      "@rebasepro/utils/*": [
+        "packages/utils/src/*"
+      ],
+      "hono": [
+        "node_modules/hono"
+      ]
+    },
+    "typeRoots": [
+      "node_modules/.pnpm/node_modules/@types",
+      "node_modules/@types"
+    ],
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "packages/admin/src",
+    "packages/auth/src",
+    "packages/cli/src",
+    "packages/client/src",
+    "packages/client-firebase/src",
+    "packages/client-postgresql/src",
+    "packages/common/src",
+    "packages/core/src",
+    "packages/formex/src",
+    "packages/mcp-server/src",
+    "packages/plugin-data-enhancement/src",
+    "packages/plugin-insights/src",
+    "packages/schema-inference/src",
+    "packages/sdk-generator/src",
+    "packages/server-core/src",
+    "packages/server-mongodb/src",
+    "packages/server-postgresql/src",
+    "packages/studio/src",
+    "packages/types/src",
+    "packages/ui/src",
+    "packages/utils/src"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__",
+    "**/test/**",
+    "packages/*/src/test/**"
+  ]
+}

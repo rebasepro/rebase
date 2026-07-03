@@ -120,10 +120,10 @@ const { data: posts } = await rebase.data.collection('posts').find();
 
 | Method | Signature | Returns | Description |
 |--------|-----------|---------|-------------|
-| `find` | `find(params?)` | `{ data: Entity[], meta }` | List documents with filtering/pagination |
-| `findById` | `findById(id)` | `Entity \| undefined` | Get a single document by ID |
-| `create` | `create(data, id?)` | `Entity` | Create a new document |
-| `update` | `update(id, data)` | `Entity` | Update an existing document |
+| `find` | `find(params?)` | `{ data: Snapshot[], meta }` | List documents with filtering/pagination |
+| `findById` | `findById(id)` | `Snapshot \| undefined` | Get a single document by ID |
+| `create` | `create(data, id?)` | `Snapshot` | Create a new document |
+| `update` | `update(id, data)` | `Snapshot` | Update an existing document |
 | `delete` | `delete(id)` | `void` | Delete a document |
 | `count` | `count(params?)` | `number` | Count matching documents |
 
@@ -161,7 +161,7 @@ The `find()` method returns a response with data and pagination metadata:
 ```typescript
 const response = await rebase.data.posts.find({ limit: 20, offset: 0 });
 
-// response.data  → Entity[]
+// response.data  → Snapshot[]
 // response.meta  → { total: number, limit: number, offset: number, hasMore: boolean }
 ```
 
@@ -247,7 +247,7 @@ const result = await rebase.data.posts
 | `.limit(n)` | Limit number of results |
 | `.offset(n)` | Skip first `n` results |
 | `.search(term)` | Full-text search |
-| `.include(...relations)` | Include related entities |
+| `.include(...relations)` | Include related snapshots |
 | `.find()` | Execute the query |
 | `.listen(callback, errorCallback?)` | Subscribe to realtime updates |
 
@@ -363,14 +363,14 @@ const unsubscribe = rebase.data.posts.listen(
 );
 ```
 
-### Listen to a Single Entity
+### Listen to a Single Snapshot
 
 ```typescript
 const unsubscribe = rebase.data.posts.listenById(
     'post-123',
-    (entity) => {
-        // entity: Entity | undefined
-        console.log('Post updated:', entity);
+    (snapshot) => {
+        // snapshot: Snapshot | undefined
+        console.log('Post updated:', snapshot);
     },
     (error) => {
         console.error('Error:', error);
@@ -405,8 +405,8 @@ rebase.ws?.disconnect();
 **Realtime features:**
 - Auto-reconnect with exponential backoff (max 5 attempts)
 - Subscription deduplication
-- Client-side entity caching with structural merge
-- Instant entity patches across subscriptions
+- Client-side snapshot caching with structural merge
+- Instant snapshot patches across subscriptions
 - Auto-authentication and re-authentication on token refresh
 
 ## File Storage

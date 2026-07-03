@@ -1,6 +1,6 @@
 import React from "react";
-import type { CollectionActionsProps, EntityTableController, SelectionController, EntityCollection } from "./collections";
-import type { Entity } from "./entities";
+import type { CollectionActionsProps, SnapshotTableController, SelectionController, SnapshotCollection } from "./collections";
+import type { Snapshot } from "./snapshots";
 import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
 import type { Property } from "./properties";
 import type { RebaseContext } from "../rebase_context";
@@ -39,7 +39,7 @@ export interface SlotRegistry {
     /** Insight widgets rendered above the collection table. */
     "collection.insights": CollectionInsightsSlotProps;
 
-    // ── Entity / Form ─────────────────────────────────────────────────
+    // ── Snapshot / Form ─────────────────────────────────────────────────
     "form.actions": PluginFormActionProps;
     "form.actions.top": PluginFormActionProps;
     /** Rendered before the form title / field list. */
@@ -47,15 +47,15 @@ export interface SlotRegistry {
     /** Rendered after the form field list. */
     "form.after": PluginFormActionProps;
 
-    // ── Entity row actions ────────────────────────────────────────────
-    /** Per-row actions in entity tables (e.g. bulk actions, row context menus). */
-    "entity.row.actions": EntityRowActionsProps;
+    // ── Snapshot row actions ────────────────────────────────────────────
+    /** Per-row actions in snapshot tables (e.g. bulk actions, row context menus). */
+    "snapshot.row.actions": SnapshotRowActionsProps;
 
-    // ── Entity field decoration ───────────────────────────────────────
+    // ── Snapshot field decoration ───────────────────────────────────────
     /** Inject UI before an individual form field. */
-    "entity.field.before": EntityFieldSlotProps;
+    "snapshot.field.before": SnapshotFieldSlotProps;
     /** Inject UI after an individual form field. */
-    "entity.field.after": EntityFieldSlotProps;
+    "snapshot.field.after": SnapshotFieldSlotProps;
 
     // ── Collection filter panel ───────────────────────────────────────
     /** Custom filter sidebar for a collection. */
@@ -128,10 +128,10 @@ export interface NavigationSlotProps {
  */
 export interface CollectionToolbarProps {
     path: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-    tableController: EntityTableController;
+    parentSnapshotIds: string[];
+    tableController: SnapshotTableController;
     selectionController: SelectionController;
 }
 
@@ -141,9 +141,9 @@ export interface CollectionToolbarProps {
  */
 export interface CollectionEmptyStateProps {
     path: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
     canCreate: boolean;
     onNewClick?: () => void;
 }
@@ -157,10 +157,10 @@ export interface CollectionHeaderActionProps {
     propertyKey: string;
     path: string;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
     onHover: boolean;
-    collection: EntityCollection;
-    tableController: EntityTableController;
+    collection: SnapshotCollection;
+    tableController: SnapshotTableController;
 }
 
 /**
@@ -170,9 +170,9 @@ export interface CollectionHeaderActionProps {
 export interface CollectionAddColumnProps {
     path: string;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-    collection: EntityCollection;
-    tableController: EntityTableController;
+    parentSnapshotIds: string[];
+    collection: SnapshotCollection;
+    tableController: SnapshotTableController;
 }
 
 /**
@@ -181,9 +181,9 @@ export interface CollectionAddColumnProps {
  */
 export interface CollectionErrorProps {
     path: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     parentCollectionSlugs?: string[];
-    parentEntityIds?: string[];
+    parentSnapshotIds?: string[];
     error: Error;
 }
 
@@ -192,10 +192,10 @@ export interface CollectionErrorProps {
  * @group Plugins
  */
 export interface KanbanSetupProps {
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     fullPath: string;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
 }
 
 /**
@@ -203,42 +203,42 @@ export interface KanbanSetupProps {
  * @group Plugins
  */
 export interface KanbanAddColumnProps {
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     fullPath: string;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
     columnProperty: string;
 }
 
 // ── New slot prop interfaces ──────────────────────────────────────────
 
 /**
- * Props for `entity.row.actions` slot.
- * Rendered for each row in an entity collection table.
+ * Props for `snapshot.row.actions` slot.
+ * Rendered for each row in a snapshot collection table.
  * @group Plugins
  */
-export interface EntityRowActionsProps {
-    entity: Entity;
-    entityId: string;
+export interface SnapshotRowActionsProps {
+    snapshot: Snapshot;
+    snapshotId: string;
     path: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
     selectionController: SelectionController;
     context: RebaseContext;
 }
 
 /**
- * Props for `entity.field.before` and `entity.field.after` slots.
- * Rendered around individual form fields in the entity edit view.
+ * Props for `snapshot.field.before` and `snapshot.field.after` slots.
+ * Rendered around individual form fields in the snapshot edit view.
  * @group Plugins
  */
-export interface EntityFieldSlotProps {
+export interface SnapshotFieldSlotProps {
     propertyKey: string;
     property: Property;
     path: string;
-    entityId?: string | number;
-    collection: EntityCollection;
+    snapshotId?: string | number;
+    collection: SnapshotCollection;
     context: RebaseContext;
 }
 
@@ -249,10 +249,10 @@ export interface EntityFieldSlotProps {
  */
 export interface CollectionFilterPanelProps {
     path: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-    tableController: EntityTableController;
+    parentSnapshotIds: string[];
+    tableController: SnapshotTableController;
     context: RebaseContext;
 }
 
@@ -290,9 +290,9 @@ export interface ShellToolbarProps {
  */
 export interface CollectionInsightsSlotProps {
     path: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
 }
 
 /**
@@ -302,6 +302,6 @@ export interface CollectionInsightsSlotProps {
  */
 export interface HomeCardInsightSlotProps {
     slug: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     context: RebaseContext;
 }

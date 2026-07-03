@@ -107,16 +107,13 @@ const authorsCollection = defineCollection({
     ],
     // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
     callbacks: {
-        afterRead: ({ entity }) => ({
-            ...entity,
-            values: maskValues(entity.values, {
-                email: maskEmail,
-                name: maskName,
-                twitter: maskHandle,
-                github: maskHandle,
-                website: () => "https://***",
-                picture: null
-            })
+        afterRead: ({ row }) => maskValues(row, {
+            email: maskEmail,
+            name: maskName,
+            twitter: maskHandle,
+            github: maskHandle,
+            website: () => "https://***",
+            picture: null
         })
     },
     securityRules: [

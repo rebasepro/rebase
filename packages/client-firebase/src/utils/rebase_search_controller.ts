@@ -1,7 +1,7 @@
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
 import { FirebaseApp } from "@firebase/app";
 import { getFunctions, httpsCallable } from "@firebase/functions";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 /**
  * Configuration returned by the Rebase Search Extension
@@ -204,7 +204,7 @@ export function buildRebaseSearchController(
          */
         const init = async (props: {
             path: string;
-            collection?: EntityCollection;
+            collection?: SnapshotCollection;
             databaseId?: string;
         }): Promise<boolean> => {
             try {
@@ -289,7 +289,7 @@ export function buildRebaseSearchController(
             searchString: string;
             path: string;
             databaseId?: string;
-            collection?: EntityCollection;
+            collection?: SnapshotCollection;
         }): Promise<readonly string[] | undefined> => {
             if (!typesenseClient) {
                 // Ensure client is initialized

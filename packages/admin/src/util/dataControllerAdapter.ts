@@ -1,33 +1,27 @@
 /**
- * Adapts an `EntityTableController<M>` (from @rebasepro/types) to a
+ * Adapts an `SnapshotTableController<M>` (from @rebasepro/types) to a
  * `CollectionDataController<T>` (from @rebasepro/ui), bridging the
- * entity-aware data layer to the headless collection view.
+ * snapshot-aware data layer to the headless collection view.
  */
 
 import { useMemo } from "react";
-import type { Entity, EntityTableController } from "@rebasepro/types";
+import type { Snapshot, SnapshotTableController } from "@rebasepro/types";
 import type { CollectionDataController } from "@rebasepro/ui";
 
 /**
- * Flatten Entity<M> objects to plain row objects.
- * The headless view works with flat `Record<string, unknown>` rows,
- * while the entity system uses `{ id, path, values: M }`.
- *
- * The flattened row includes `id` and `path` at the top level,
- * plus all values spread.
+ * Unwrap `Snapshot<M>` objects to flat rows for the headless view.
+ * The snapshot system uses `{ id, path, values: M }`; `values` is already the
+ * flat row `M` carrying its real primary key, so unwrapping is just `.values` —
+ * no `id`/`path` merge (those are view-model metadata, not row columns).
  */
-function flattenEntities<M extends Record<string, unknown>>(
-    entities: Entity<M>[]
-): Array<M & { id: string | number; path: string }> {
-    return entities.map(entity => ({
-        id: entity.id,
-        path: entity.path,
-        ...entity.values
-    }));
+function flattenSnapshots<M extends Record<string, unknown>>(
+    snapshots: Snapshot<M>[]
+): M[] {
+    return snapshots.map(snapshot => snapshot.values);
 }
 
 /**
- * React hook that adapts an EntityTableController to a CollectionDataController.
+ * React hook that adapts a SnapshotTableController to a CollectionDataController.
  *
  * Usage:
  * ```tsx
@@ -38,14 +32,14 @@ function flattenEntities<M extends Record<string, unknown>>(
  * ```
  */
 export function useCollectionDataController<M extends Record<string, unknown>>(
-    tableController: EntityTableController<M>
-): CollectionDataController<M & { id: string | number; path: string }> {
+    tableController: SnapshotTableController<M>
+): CollectionDataController<M> {
     const flatData = useMemo(
-        () => flattenEntities(tableController.data),
+        () => flattenSnapshots(tableController.data),
         [tableController.data]
     );
 
-    return useMemo((): CollectionDataController<M & { id: string | number; path: string }> => ({
+    return useMemo((): CollectionDataController<M> => ({
         data: flatData,
         loading: tableController.dataLoading,
         noMoreToLoad: tableController.noMoreToLoad,

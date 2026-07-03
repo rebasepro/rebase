@@ -1,5 +1,4 @@
-import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
-import { Entity } from "@rebasepro/types";
+import { defineCollection, SnapshotCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import { maskValues } from "../masking";
@@ -20,7 +19,7 @@ const ordersCollection = defineCollection({
     icon: "ShoppingCart",
     group: "E-Commerce",
     history: true,
-    defaultEntityAction: "view",
+    defaultSnapshotAction: "view",
     enabledViews: ["table", "kanban"],
     kanban: {
         columnProperty: "status"
@@ -233,11 +232,8 @@ const ordersCollection = defineCollection({
             return values;
         },
         // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
-        afterRead: ({ entity }) => ({
-            ...entity,
-            values: maskValues(entity.values, {
-                shipping_address: () => "Redacted Address"
-            })
+        afterRead: ({ row }) => maskValues(row, {
+            shipping_address: () => "Redacted Address"
         }),
         afterSave: async ({ values, previousValues, context }) => {
             const customerId = getRelationId(values.customer) ?? getRelationId(previousValues?.customer);
@@ -245,8 +241,8 @@ const ordersCollection = defineCollection({
                 await updateCustomerMetrics(customerId, context);
             }
         },
-        afterDelete: async ({ entity, context }) => {
-            const customerId = getRelationId(entity.values.customer);
+        afterDelete: async ({ row, context }) => {
+            const customerId = getRelationId(row.customer);
             if (customerId) {
                 await updateCustomerMetrics(customerId, context);
             }
@@ -292,7 +288,7 @@ const ordersCollection = defineCollection({
 });
 
 // Helper function to update customer lifetime value and total orders count
-async function updateCustomerMetrics(customerId: string | number, context: EntityCallbackContext) {
+async function updateCustomerMetrics(customerId: string | number, context: SnapshotCallbackContext) {
     const { data: customerOrders } = await context.data.collection("orders").find({
         where: {
             customer: ["==", customerId],
@@ -301,10 +297,10 @@ async function updateCustomerMetrics(customerId: string | number, context: Entit
     });
 
     const totalOrders = customerOrders.length;
-    const lifetimeValue = customerOrders.reduce((sum: number, order: Entity) => {
+    const lifetimeValue = customerOrders.reduce((sum: number, order) => {
         // Sum only paid or delivered orders
-        if (order.values.payment_status === "paid" || order.values.status === "delivered") {
-            return sum + Number(order.values.total ?? 0);
+        if (order.payment_status === "paid" || order.status === "delivered") {
+            return sum + Number(order.total ?? 0);
         }
         return sum;
     }, 0);

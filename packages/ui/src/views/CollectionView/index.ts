@@ -4,7 +4,7 @@
  * Data-agnostic collection rendering — table, card, list, and kanban views
  * driven entirely by property configurations and callbacks.
  *
- * Zero imports from any entity or data layer.
+ * Zero imports from any snapshot or data layer.
  *
  * @module CollectionView
  */

@@ -8,7 +8,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { useCMSContext } from "../../hooks";
-import { CollectionActionsProps, Entity, EntityCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
+import { CollectionActionsProps, Snapshot, SnapshotCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
     Alert,
@@ -27,19 +27,19 @@ import {
     RadioGroupItem,
     Tooltip
 } from "@rebasepro/ui";
-import { downloadEntitiesExport } from "./export";
+import { downloadSnapshotsExport } from "./export";
 
 const DOCS_LIMIT = 500;
 
 export function ExportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
     path,
-    collectionEntitiesCount,
+    collectionSnapshotsCount,
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
-}: CollectionActionsProps<M, USER, EntityCollection<M>> & {
-    exportAllowed?: (props: { collectionEntitiesCount: number, path: string, collection: EntityCollection }) => boolean;
+}: CollectionActionsProps<M, USER, SnapshotCollection<M>> & {
+    exportAllowed?: (props: { collectionSnapshotsCount: number, path: string, collection: SnapshotCollection }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
 }) {
@@ -59,7 +59,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const dataClient = useData();
 
     const canExport = !exportAllowed || exportAllowed({
-        collectionEntitiesCount: collectionEntitiesCount ?? 0,
+        collectionSnapshotsCount: collectionSnapshotsCount ?? 0,
         path,
         collection
     });
@@ -77,17 +77,17 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setOpen(false);
     }, [setOpen]);
 
-    const fetchAdditionalFields = useCallback(async (entities: Entity<M>[]) => {
+    const fetchAdditionalFields = useCallback(async (snapshots: Snapshot<M>[]) => {
 
         const additionalExportFields = exportConfig?.additionalFields;
         const additionalFields = collection.additionalFields;
 
         const resolvedExportColumnsValues: Record<string, any>[] = additionalExportFields
-            ? await Promise.all(entities.map(async (entity) => {
+            ? await Promise.all(snapshots.map(async (snapshot) => {
                 return (await Promise.all(additionalExportFields.map(async (column) => {
                     return {
                         [column.key]: await column.builder({
-                            entity,
+                            snapshot,
                             context: context as RebaseContext
                         })
                     };
@@ -97,14 +97,14 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             : [];
 
         const resolvedColumnsValues: Record<string, any>[] = additionalFields
-            ? await Promise.all(entities.map(async (entity) => {
+            ? await Promise.all(snapshots.map(async (snapshot) => {
                 return (await Promise.all(additionalFields
                     .map(async (field) => {
                         if (!field.value)
                             return {};
                         return {
                             [field.key]: await field.value({
-                                entity,
+                                snapshot,
                                 context: context as RebaseContext
                             })
                         };
@@ -115,7 +115,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         return [...resolvedExportColumnsValues, ...resolvedColumnsValues];
     }, [exportConfig?.additionalFields]);
 
-    const doDownload = useCallback(async (collection: EntityCollection<M>,
+    const doDownload = useCallback(async (collection: SnapshotCollection<M>,
         exportConfig: ExportConfig<any> | undefined) => {
 
         onAnalyticsEvent?.("export_collection", {
@@ -124,7 +124,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setDataLoading(true);
         dataClient.collection(path).find({})
             .then(async (res) => {
-                const data = res.data as Entity<M>[];
+                const data = res.data as Snapshot<M>[];
                 setDataLoadingError(undefined);
                 const additionalData = await fetchAdditionalFields(data);
                 const additionalHeaders = [
@@ -133,16 +133,16 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                 ];
 
                 const dataWithDefaults = includeUndefinedValues
-                    ? data.map(entity => {
+                    ? data.map(snapshot => {
                         const defaultValues = getDefaultValuesFor(collection.properties);
                         return {
-                            ...entity,
+                            ...snapshot,
                             values: { ...defaultValues,
-...entity.values }
+...snapshot.values }
                         };
                     })
                     : data;
-                downloadEntitiesExport({
+                downloadSnapshotsExport({
                     data: dataWithDefaults,
                     additionalData,
                     properties: collection.properties,
@@ -193,10 +193,10 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 <div>{t("download_table_csv")}</div>
 
-                {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT &&
+                {collectionSnapshotsCount !== undefined && collectionSnapshotsCount > DOCS_LIMIT &&
                     <Alert color={"warning"}>
                         <div>
-                            {t("large_number_of_documents", { count: collectionEntitiesCount.toString() })}
+                            {t("large_number_of_documents", { count: collectionSnapshotsCount.toString() })}
                         </div>
                     </Alert>}
 

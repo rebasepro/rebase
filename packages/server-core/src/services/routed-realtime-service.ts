@@ -1,4 +1,4 @@
-import { RealtimeProvider, Entity } from "@rebasepro/types";
+import { RealtimeProvider } from "@rebasepro/types";
 
 /**
  * A realtime client message as forwarded by the WebSocket server.
@@ -41,7 +41,7 @@ export interface RoutedRealtimeOptions {
  *
  * The WebSocket server stays single and engine-agnostic; this composite is
  * passed in its place. Routing rules:
- * - `subscribe_collection` / `subscribe_entity` → the provider for the
+ * - `subscribe_collection` / `subscribe_snapshot` → the provider for the
  *   collection's data source (by `payload.path`).
  * - `unsubscribe` → forwarded to all providers (a no-op on non-owners).
  * - channel / presence / broadcast → the default provider (these are global
@@ -68,7 +68,7 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
 
         async handleClientMessage(clientId, message, authContext) {
             const { type } = message;
-            if (type === "subscribe_collection" || type === "subscribe_entity") {
+            if (type === "subscribe_collection" || type === "subscribe_one") {
                 await forPath(message.payload?.path as string | undefined)
                     .handleClientMessage(clientId, message, authContext);
                 return;
@@ -86,16 +86,16 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
             forPath((config as { path?: string }).path).subscribeToCollection(subscriptionId, config, callback);
         },
 
-        subscribeToEntity(subscriptionId, config, callback) {
-            forPath((config as { path?: string }).path).subscribeToEntity(subscriptionId, config, callback);
+        subscribeToOne(subscriptionId, config, callback) {
+            forPath((config as { path?: string }).path).subscribeToOne(subscriptionId, config, callback);
         },
 
         unsubscribe(subscriptionId) {
             for (const p of all()) p.unsubscribe(subscriptionId);
         },
 
-        async notifyEntityUpdate(path: string, entityId: string, entity: Entity | null, databaseId?: string) {
-            await forPath(path).notifyEntityUpdate(path, entityId, entity, databaseId);
+        async notifyUpdate(path: string, id: string, row: Record<string, unknown> | null, databaseId?: string) {
+            await forPath(path).notifyUpdate(path, id, row, databaseId);
         },
 
         onServerReady(serverInfo) {

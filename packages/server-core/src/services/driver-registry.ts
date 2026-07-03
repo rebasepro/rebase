@@ -176,8 +176,8 @@ function isDataDriverDelegate(obj: unknown): obj is DataDriver {
     return (
         typeof delegate.key === "string" &&
         typeof delegate.fetchCollection === "function" &&
-        typeof delegate.fetchEntity === "function" &&
-        typeof delegate.saveEntity === "function" &&
-        typeof delegate.deleteEntity === "function"
+        typeof delegate.fetchOne === "function" &&
+        typeof delegate.save === "function" &&
+        typeof delegate.delete === "function"
     );
 }

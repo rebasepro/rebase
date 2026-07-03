@@ -7,7 +7,7 @@ import {
 
 /**
  * The subset of a collection needed to resolve its data source. Accepting a
- * structural type (rather than the full `EntityCollection`) keeps this usable
+ * structural type (rather than the full `SnapshotCollection`) keeps this usable
  * from anywhere — frontend router, backend registry, editor — without coupling
  * to the collection union.
  */

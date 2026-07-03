@@ -1,8 +1,8 @@
 
-import type { EntityLinkBuilder } from "../types/entity_link_builder";
+import type { SnapshotLinkBuilder } from "../types/snapshot_link_builder";
 import type { Locale } from "../types/locales";
-import type { EntityAction } from "../types/entity_actions";
-import type { EntityCustomView } from "../types/entity_views";
+import type { SnapshotAction } from "../types/snapshot_actions";
+import type { SnapshotCustomView } from "../types/snapshot_views";
 import type { RebasePlugin } from "../types/plugins";
 import type { PropertyConfig } from "../types/property_config";
 import type { SlotContribution } from "../types/slots";
@@ -11,9 +11,9 @@ import type { ComponentOverrideMap } from "../types/component_overrides";
 export type CustomizationController = {
 
     /**
-     * Builder for generating utility links for entities
+     * Builder for generating utility links for snapshots
      */
-    entityLinkBuilder?: EntityLinkBuilder;
+    snapshotLinkBuilder?: SnapshotLinkBuilder;
 
     /**
      * Use plugins to modify the behaviour of the CMS.
@@ -26,21 +26,21 @@ export type CustomizationController = {
     resolvedSlots: SlotContribution[];
 
     /**
-     * List of additional custom views for entities.
+     * List of additional custom views for snapshots.
      * You can use the key to reference the custom view in
-     * the `entityViews` prop of a collection.
+     * the `snapshotViews` prop of a collection.
      *
-     * You can also define an entity view from the UI.
+     * You can also define a snapshot view from the UI.
      */
-    entityViews?: EntityCustomView[];
+    snapshotViews?: SnapshotCustomView[];
 
     /**
-     * List of actions that can be performed on entities.
-     * These actions are displayed in the entity view and in the collection view.
-     * You can later reuse these actions in the `entityActions` prop of a collection,
+     * List of actions that can be performed on snapshots.
+     * These actions are displayed in the snapshot view and in the collection view.
+     * You can later reuse these actions in the `snapshotActions` prop of a collection,
      * by specifying the `key` of the action.
      */
-    entityActions?: EntityAction[];
+    snapshotActions?: SnapshotAction[];
 
     /**
      * Format of the dates in the CMS.

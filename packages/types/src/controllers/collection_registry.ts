@@ -1,13 +1,13 @@
-import type { EntityCollection } from "../types/collections";
-import type { EntityReference } from "../types/entities";
+import type { SnapshotCollection } from "../types/collections";
+import type { SnapshotReference } from "../types/snapshots";
 
 /**
- * Controller that provides access to the registered entity collections.
+ * Controller that provides access to the registered snapshot collections.
  * @group Models
  */
 export type CollectionRegistryController<
     DB = Record<string, unknown>,
-    EC extends EntityCollection = EntityCollection
+    EC extends SnapshotCollection = SnapshotCollection
 > = {
 
     /**
@@ -16,7 +16,7 @@ export type CollectionRegistryController<
      * Each of the navigation entries in this field
      * generates an entry in the main menu.
      */
-    collections?: EntityCollection[];
+    collections?: SnapshotCollection[];
 
     /**
      * Is the registry ready to be used
@@ -40,14 +40,14 @@ export type CollectionRegistryController<
      * Retrieve all the related parent references for a given path
      * @param path
      */
-    getParentReferencesFromPath: (path: string) => EntityReference[];
+    getParentReferencesFromPath: (path: string) => SnapshotReference[];
 
     /**
      * Retrieve all the related parent collection ids for a given path
      * @param path
      */
     getParentCollectionSlugs: (path: string) => string[];
-    getParentEntityIds: (path: string) => string[];
+    getParentSnapshotIds: (path: string) => string[];
 
     /**
      * Resolve paths from a list of ids

@@ -1,4 +1,4 @@
-import { EntityService } from "./services/entityService";
+import { DataService } from "./services/dataService";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
@@ -6,18 +6,18 @@ import { DrizzleClient } from "./interfaces";
 import {
     DatabaseAdmin,
     DataDriver,
-    DeleteEntityProps,
-    Entity,
-    EntityCollection,
+    DeleteProps,
+    SnapshotCollection,
     FetchCollectionProps,
-    FetchEntityProps,
+    FetchOneProps,
     ListenCollectionProps,
-    ListenEntityProps,
+    ListenOneProps,
     RebaseCallContext,
     RebaseClient,
     RebaseData,
+    RebaseSdkData,
     RestFetchService,
-    SaveEntityProps,
+    SaveProps,
     TableColumnInfo,
     TableForeignKeyInfo,
     TableJunctionInfo,
@@ -26,7 +26,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, buildRebaseData, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, resolveCollectionRelations, updateDateAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
@@ -38,12 +38,12 @@ export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
 
-    public entityService: EntityService;
+    public dataService: DataService;
     public realtimeService: RealtimeService;
     public historyService?: HistoryService;
     public branchService?: BranchService;
     public user?: User;
-    public data: RebaseData;
+    public data: RebaseSdkData;
     public client?: RebaseClient;
 
     /**
@@ -61,8 +61,8 @@ export class PostgresBackendDriver implements DataDriver {
     _deferNotifications = false;
     _pendingNotifications: Array<{
         path: string;
-        entityId: string;
-        entity: Entity | null;
+        id: string;
+        row: Record<string, unknown> | null;
         databaseId?: string;
     }> = [];
 
@@ -74,11 +74,11 @@ export class PostgresBackendDriver implements DataDriver {
         public poolManager?: DatabasePoolManager,
         historyService?: HistoryService
     ) {
-        this.entityService = new EntityService(db, registry);
+        this.dataService = new DataService(db, registry);
         this.realtimeService = realtimeService;
         this.historyService = historyService;
         this.user = user;
-        this.data = buildRebaseData(this);
+        this.data = buildSdkData(this);
 
         // Initialize BranchService when adminConnectionString is configured
         if (poolManager) {
@@ -112,11 +112,25 @@ export class PostgresBackendDriver implements DataDriver {
 
     /**
      * REST-optimised fetch service (include-aware eager-loading).
-     * Delegates to the underlying EntityFetchService which already
-     * implements the matching method signatures.
+     * Delegates to the underlying FetchService (include-aware eager loading),
+     * then runs the afterRead pipeline on the results. The raw FetchService does
+     * NOT run callbacks, so masking must be applied here — otherwise every
+     * REST/SDK read leaks unmasked data (see {@link applyAfterReadForRest}).
      */
-    get restFetchService() {
-        return this.entityService.getFetchService();
+    get restFetchService(): RestFetchService {
+        const raw = this.dataService.getFetchService();
+        return {
+            fetchCollectionForRest: async (collectionPath, options, include) => {
+                const rows = await raw.fetchCollectionForRest(collectionPath, options, include);
+                return this.applyAfterReadForRest(rows, collectionPath);
+            },
+            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
+                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId);
+                if (!row) return row;
+                const [masked] = await this.applyAfterReadForRest([row], collectionPath);
+                return masked;
+            }
+        };
     }
 
     private buildCallContext(): RebaseCallContext {
@@ -129,7 +143,7 @@ export class PostgresBackendDriver implements DataDriver {
         } as unknown as RebaseCallContext;
     }
 
-    private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: EntityCollection<M> | undefined, path: string) {
+    private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: SnapshotCollection<M> | undefined, path: string) {
         if (!collection && !path) return {
             collection: undefined,
             callbacks: undefined,
@@ -141,8 +155,8 @@ export class PostgresBackendDriver implements DataDriver {
             ? {
                 ...collection,
                 ...registryCollection
-            } as EntityCollection<M>
-            : collection as EntityCollection<M>;
+            } as SnapshotCollection<M>
+            : collection as SnapshotCollection<M>;
 
         const callbacks = resolvedCollection?.callbacks;
         const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -159,6 +173,116 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
+    /**
+     * Run the three-tier afterRead pipeline (global → collection → property) on a
+     * single row for a collection whose callbacks have already been resolved.
+     */
+    private async applyAfterReadToRow(
+        row: Record<string, unknown>,
+        path: string,
+        resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>,
+        contextForCallback: RebaseCallContext
+    ): Promise<Record<string, unknown>> {
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = resolved;
+        let out = row;
+        if (globalCallbacks?.afterRead) {
+            out = await globalCallbacks.afterRead({
+                collection: resolvedCollection as unknown as SnapshotCollection,
+                path, row: out, context: contextForCallback
+            });
+        }
+        if (callbacks?.afterRead) {
+            out = await callbacks.afterRead({
+                collection: resolvedCollection as SnapshotCollection,
+                path, row: out, context: contextForCallback
+            }) ?? out;
+        }
+        if (propertyCallbacks?.afterRead) {
+            out = await propertyCallbacks.afterRead({
+                collection: resolvedCollection as unknown as SnapshotCollection,
+                path, row: out, context: contextForCallback
+            });
+        }
+        return out;
+    }
+
+    private static hasAfterRead(resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>): boolean {
+        return !!(resolved.globalCallbacks?.afterRead || resolved.callbacks?.afterRead || resolved.propertyCallbacks?.afterRead);
+    }
+
+    /**
+     * Apply afterRead to REST/SDK read results.
+     *
+     * The REST / `include` path fetches rows through the raw fetch service, which
+     * does NOT run callbacks — so without this, `afterRead` transforms (e.g. PII
+     * masking) are silently skipped on every SDK/REST read, leaking raw data.
+     * This choke point guarantees afterRead runs there too, matching the driver's
+     * fetchCollection/fetchOne paths.
+     *
+     * It also masks embedded relation data one level deep by running the TARGET
+     * collection's afterRead (so `post.author.email` is masked by the authors
+     * collection, not left raw).
+     */
+    async applyAfterReadForRest(
+        rows: Record<string, unknown>[],
+        path: string
+    ): Promise<Record<string, unknown>[]> {
+        if (!rows || rows.length === 0) return rows;
+
+        const resolved = this.resolveCollectionCallbacks(undefined, path);
+        const contextForCallback = this.buildCallContext();
+        const hasOwn = PostgresBackendDriver.hasAfterRead(resolved);
+
+        // Resolve embedded relation targets (relationKey -> { path, resolved callbacks })
+        // once, keeping only those whose target collection actually has an afterRead.
+        const relationTargets: Record<string, { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }> = {};
+        if (resolved.collection) {
+            try {
+                const rels = resolveCollectionRelations(resolved.collection as SnapshotCollection);
+                for (const [key, rel] of Object.entries(rels)) {
+                    const target = typeof (rel as { target?: unknown }).target === "function"
+                        ? (rel as { target: () => SnapshotCollection }).target()
+                        : undefined;
+                    const targetPath = target?.slug;
+                    if (!targetPath) continue;
+                    const targetResolved = this.resolveCollectionCallbacks(undefined, targetPath);
+                    if (PostgresBackendDriver.hasAfterRead(targetResolved)) {
+                        relationTargets[key] = { path: targetPath, resolved: targetResolved };
+                    }
+                }
+            } catch {
+                // Ignore relation resolution errors (e.g. incomplete config during setup)
+            }
+        }
+        const relKeys = Object.keys(relationTargets);
+
+        if (!hasOwn && relKeys.length === 0) return rows;
+
+        const maskEmbedded = async (value: unknown, target: { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }): Promise<unknown> => {
+            if (Array.isArray(value)) {
+                return Promise.all(value.map((v) => maskEmbedded(v, target)));
+            }
+            if (!value || typeof value !== "object") return value;
+            const obj = value as Record<string, unknown>;
+            // A pre-fetched relation payload may nest the row under `.data`.
+            if (obj.__type === "relation" && obj.data && typeof obj.data === "object") {
+                return { ...obj, data: await this.applyAfterReadToRow(obj.data as Record<string, unknown>, target.path, target.resolved, contextForCallback) };
+            }
+            // A bare reference pointer carries no row data to mask.
+            if (obj.__type === "reference") return obj;
+            return this.applyAfterReadToRow(obj, target.path, target.resolved, contextForCallback);
+        };
+
+        return Promise.all(rows.map(async (row) => {
+            let out = hasOwn ? await this.applyAfterReadToRow(row, path, resolved, contextForCallback) : row;
+            for (const key of relKeys) {
+                if (out[key] === undefined || out[key] === null) continue;
+                out = { ...out, [key]: await maskEmbedded(out[key], relationTargets[key]) };
+            }
+            return out;
+        }));
+    }
+
     async fetchCollection<M extends Record<string, unknown>>({
                                                                  path,
                                                                  collection,
@@ -170,9 +294,9 @@ export class PostgresBackendDriver implements DataDriver {
                                                                  searchString,
                                                                  order,
                                                                  vectorSearch
-                                                             }: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+                                                             }: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
 
-        const entities = await this.entityService.fetchCollection<M>(path, {
+        const rows = await this.dataService.fetchCollection<M>(path, {
             filter,
             orderBy,
             order,
@@ -193,40 +317,40 @@ export class PostgresBackendDriver implements DataDriver {
 
         if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
             const contextForCallback = this.buildCallContext();
-            return Promise.all(entities.map(async (entity) => {
-                let fetched = entity;
+            return Promise.all(rows.map(async (row) => {
+                let fetched = row;
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entity: fetched as unknown as Entity<Record<string, unknown>>,
+                        row: fetched,
                         context: contextForCallback
-                    }) as unknown as Entity<M>;
+                    });
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
                     }) ?? fetched;
                 }
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entity: fetched as unknown as Entity<Record<string, unknown>>,
+                        row: fetched,
                         context: contextForCallback
-                    }) as unknown as Entity<M>;
+                    });
                 }
                 return fetched;
             }));
         }
 
-        return entities;
+        return rows;
     }
 
     listenCollection<M extends Record<string, unknown>>({
@@ -246,8 +370,8 @@ export class PostgresBackendDriver implements DataDriver {
         const subscriptionId = this.generateSubscriptionId();
 
         // Type-adapter wrapper: RealtimeService expects a union callback signature
-        const callbackWrapper = (entities: Entity<M>[]) => {
-            onUpdate(entities);
+        const callbackWrapper = (rows: Record<string, unknown>[]) => {
+            onUpdate(rows);
         };
 
         // Store the subscription in RealtimeService properly using the new public method
@@ -268,7 +392,7 @@ export class PostgresBackendDriver implements DataDriver {
         });
 
         // Store the callback for this subscription
-        this.realtimeService.addSubscriptionCallback(subscriptionId, callbackWrapper as (data: Entity | Entity[] | null) => void);
+        this.realtimeService.addSubscriptionCallback(subscriptionId, callbackWrapper as (data: Record<string, unknown> | Record<string, unknown>[] | null) => void);
 
         // Send initial data immediately
         this.fetchCollection({
@@ -281,8 +405,8 @@ export class PostgresBackendDriver implements DataDriver {
             orderBy,
             searchString,
             order
-        }).then(entities => {
-            callbackWrapper(entities);
+        }).then(rows => {
+            callbackWrapper(rows);
         }).catch(error => {
             if (onError) onError(error);
         });
@@ -293,15 +417,15 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    async fetchEntity<M extends Record<string, unknown>>({
+    async fetchOne<M extends Record<string, unknown>>({
                                                              path,
-                                                             entityId,
+                                                             id,
                                                              databaseId,
                                                              collection
-                                                         }: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
-        let entity = await this.entityService.fetchEntity<M>(
+                                                         }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
+        let row = await this.dataService.fetchOne<M>(
             path,
-            entityId,
+            id,
             databaseId || collection?.databaseId
         );
 
@@ -312,73 +436,73 @@ export class PostgresBackendDriver implements DataDriver {
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
 
-        if (entity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+        if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = this.buildCallContext();
             // 1. Global callbacks first
             if (globalCallbacks?.afterRead) {
-                entity = await globalCallbacks.afterRead({
-                    collection: resolvedCollection as unknown as EntityCollection,
+                row = await globalCallbacks.afterRead({
+                    collection: resolvedCollection as unknown as SnapshotCollection,
                     path,
-                    entity: entity as unknown as Entity<Record<string, unknown>>,
-                    context: contextForCallback
-                }) as unknown as Entity<M>;
-            }
-            // 2. Collection callbacks second
-            if (callbacks?.afterRead) {
-                entity = await callbacks.afterRead({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path,
-                    entity: entity!,
+                    row,
                     context: contextForCallback
                 });
             }
+            // 2. Collection callbacks second
+            if (callbacks?.afterRead) {
+                row = await callbacks.afterRead({
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path,
+                    row,
+                    context: contextForCallback
+                }) ?? row;
+            }
             // 3. Property callbacks third
             if (propertyCallbacks?.afterRead) {
-                entity = await propertyCallbacks.afterRead({
-                    collection: resolvedCollection as unknown as EntityCollection,
+                row = await propertyCallbacks.afterRead({
+                    collection: resolvedCollection as unknown as SnapshotCollection,
                     path,
-                    entity: entity as unknown as Entity<Record<string, unknown>>,
+                    row,
                     context: contextForCallback
-                }) as unknown as Entity<M>;
+                });
             }
         }
 
-        return entity;
+        return row;
     }
 
-    listenEntity<M extends Record<string, unknown>>({
+    listenOne<M extends Record<string, unknown>>({
                                                         path,
-                                                        entityId,
+                                                        id,
                                                         collection,
                                                         onUpdate,
                                                         onError
-                                                    }: ListenEntityProps<M>): () => void {
+                                                    }: ListenOneProps<M>): () => void {
 
         const subscriptionId = this.generateSubscriptionId();
-        const callbackWrapper = (entity: Entity<M> | null) => {
-            if (entity)
-                onUpdate(entity);
+        const callbackWrapper = (row: Record<string, unknown> | null) => {
+            if (row)
+                onUpdate(row);
         };
 
         // Register the subscription with the RealtimeService
         this.realtimeService.registerDataDriverSubscription(subscriptionId, {
             clientId: "driver",
-            type: "entity" as const,
+            type: "single" as const,
             path,
-            entityId
+            id
         });
 
         // Store the callback for this subscription
-        this.realtimeService.addSubscriptionCallback(subscriptionId, callbackWrapper as (data: Entity | Entity[] | null) => void);
+        this.realtimeService.addSubscriptionCallback(subscriptionId, callbackWrapper as (data: Record<string, unknown> | Record<string, unknown>[] | null) => void);
 
         // Fetch initial data
-        this.fetchEntity({
+        this.fetchOne({
             path,
-            entityId,
+            id,
             collection
         })
-            .then(entity => {
-                if (entity) onUpdate(entity);
+            .then(row => {
+                if (row) onUpdate(row);
             })
             .catch(error => {
                 if (onError) onError(error as Error);
@@ -391,13 +515,13 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    async saveEntity<M extends Record<string, unknown>>({
+    async save<M extends Record<string, unknown>>({
                                                             path,
-                                                            entityId,
+                                                            id,
                                                             values,
                                                             collection,
                                                             status
-                                                        }: SaveEntityProps<M>): Promise<Entity<M>> {
+                                                        }: SaveProps<M>): Promise<Record<string, unknown>> {
 
         const {
             collection: resolvedCollection,
@@ -410,11 +534,12 @@ export class PostgresBackendDriver implements DataDriver {
         const contextForCallback = this.buildCallContext();
 
         // Fetch previous values for callbacks AND history recording
-        let previousValuesForHistory: Partial<Entity<M>["values"]> | undefined;
-        if (status === "existing" && entityId) {
-            const existing = await this.entityService.fetchEntity<M>(path, entityId, resolvedCollection?.databaseId);
+        let previousValuesForHistory: Partial<M> | undefined;
+        if (status === "existing" && id) {
+            const existing = await this.dataService.fetchOne<M>(path, id, resolvedCollection?.databaseId);
             if (existing) {
-                previousValuesForHistory = existing.values as Partial<Entity<M>["values"]>;
+                const { id: _existingId, ...existingValues } = existing;
+                previousValuesForHistory = existingValues as Partial<M>;
             }
         }
 
@@ -422,9 +547,9 @@ export class PostgresBackendDriver implements DataDriver {
             // 1. Global callbacks first
             if (globalCallbacks?.beforeSave) {
                 const result = await globalCallbacks.beforeSave({
-                    collection: resolvedCollection as unknown as EntityCollection,
+                    collection: resolvedCollection as unknown as SnapshotCollection,
                     path,
-                    entityId,
+                    id,
                     values: updatedValues,
                     previousValues: previousValuesForHistory,
                     status,
@@ -436,9 +561,9 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.beforeSave) {
                 const result = await callbacks.beforeSave({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entityId,
+                    id,
                     values: updatedValues,
                     previousValues: previousValuesForHistory,
                     status,
@@ -450,9 +575,9 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.beforeSave) {
                 const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as unknown as EntityCollection,
+                    collection: resolvedCollection as unknown as SnapshotCollection,
                     path,
-                    entityId,
+                    id,
                     values: updatedValues,
                     previousValues: previousValuesForHistory,
                     status,
@@ -475,51 +600,54 @@ export class PostgresBackendDriver implements DataDriver {
         }
 
         try {
-            let savedEntity = await this.entityService.saveEntity<M>(
+            let savedRow = await this.dataService.save<M>(
                 path,
                 updatedValues,
-                entityId,
+                id,
                 resolvedCollection?.databaseId
             );
 
-            if (savedEntity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+            if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
-                    savedEntity = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                    savedRow = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entity: savedEntity as unknown as Entity<Record<string, unknown>>,
+                        row: savedRow,
                         context: contextForCallback
-                    }) as unknown as Entity<M>;
+                    });
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
-                    savedEntity = await callbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                    savedRow = await callbacks.afterRead({
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: savedEntity,
+                        row: savedRow,
                         context: contextForCallback
-                    }) ?? savedEntity;
+                    }) ?? savedRow;
                 }
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
-                    savedEntity = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                    savedRow = await propertyCallbacks.afterRead({
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entity: savedEntity as unknown as Entity<Record<string, unknown>>,
+                        row: savedRow,
                         context: contextForCallback
-                    }) as unknown as Entity<M>;
+                    });
                 }
             }
+
+            const savedId = savedRow.id as string | number;
+            const { id: _savedId, ...savedValues } = savedRow;
 
             if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSave) {
                     await globalCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entityId: savedEntity.id,
-                        values: savedEntity.values,
+                        id: savedId,
+                        values: savedValues,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -528,10 +656,10 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterSave) {
                     await callbacks.afterSave({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: savedEntity.id,
-                        values: savedEntity.values,
+                        id: savedId,
+                        values: savedValues as Partial<M>,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -540,10 +668,10 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSave) {
                     await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entityId: savedEntity.id,
-                        values: savedEntity.values,
+                        id: savedId,
+                        values: savedValues,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -551,13 +679,13 @@ export class PostgresBackendDriver implements DataDriver {
                 }
             }
 
-            // Record entity history (fire-and-forget, never blocks the save)
+            // Record row history (fire-and-forget, never blocks the save)
             if (this.historyService && resolvedCollection?.history) {
                 this.historyService.recordHistory({
                     tableName: path,
-                    entityId: savedEntity.id.toString(),
+                    id: savedId.toString(),
                     action: status === "new" ? "create" : "update",
-                    values: savedEntity.values as Record<string, unknown>,
+                    values: savedValues as Record<string, unknown>,
                     previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
                     updatedBy: this.user?.uid
                 });
@@ -567,28 +695,28 @@ export class PostgresBackendDriver implements DataDriver {
             if (this._deferNotifications) {
                 this._pendingNotifications.push({
                     path,
-                    entityId: savedEntity.id.toString(),
-                    entity: savedEntity,
+                    id: savedId.toString(),
+                    row: savedRow,
                     databaseId: resolvedCollection?.databaseId
                 });
             } else {
-                await this.realtimeService.notifyEntityUpdate(
+                await this.realtimeService.notifyUpdate(
                     path,
-                    savedEntity.id.toString(),
-                    savedEntity,
+                    savedId.toString(),
+                    savedRow,
                     resolvedCollection?.databaseId
                 );
             }
 
-            return savedEntity;
+            return savedRow;
         } catch (error) {
             if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSaveError) {
                     await globalCallbacks.afterSaveError({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entityId: entityId || "unknown",
+                        id: id || "unknown",
                         values: updatedValues,
                         previousValues: undefined,
                         status,
@@ -598,9 +726,9 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: entityId || "unknown",
+                        id: id || "unknown",
                         values: updatedValues,
                         previousValues: undefined,
                         status,
@@ -610,9 +738,9 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as unknown as EntityCollection,
+                        collection: resolvedCollection as unknown as SnapshotCollection,
                         path,
-                        entityId: entityId || "unknown",
+                        id: id || "unknown",
                         values: updatedValues,
                         previousValues: undefined,
                         status,
@@ -624,10 +752,13 @@ export class PostgresBackendDriver implements DataDriver {
         }
     }
 
-    async deleteEntity<M extends Record<string, unknown>>({
-                                                              entity,
+    async delete<M extends Record<string, unknown>>({
+                                                              row,
                                                               collection
-                                                          }: DeleteEntityProps<M>): Promise<void> {
+                                                          }: DeleteProps<M>): Promise<void> {
+
+        const targetPath = row.path;
+        const targetRow: Record<string, unknown> = { id: row.id, ...(row.values ?? {}) };
 
         // Resolve from backend registry to restore callbacks lost during WebSocket serialization
         const {
@@ -635,7 +766,7 @@ export class PostgresBackendDriver implements DataDriver {
             callbacks,
             globalCallbacks,
             propertyCallbacks
-        } = this.resolveCollectionCallbacks(collection, entity.path);
+        } = this.resolveCollectionCallbacks(collection, targetPath);
 
         const contextForCallback = this.buildCallContext();
 
@@ -644,10 +775,10 @@ export class PostgresBackendDriver implements DataDriver {
             // 1. Global callbacks first
             if (globalCallbacks?.beforeDelete) {
                 const result = await globalCallbacks.beforeDelete({
-                    collection: resolvedCollection as unknown as EntityCollection,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    path: targetPath,
+                    id: row.id,
+                    row: targetRow,
                     context: contextForCallback
                 });
                 if (result === false) {
@@ -657,10 +788,10 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.beforeDelete) {
                 const result = await callbacks.beforeDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: targetPath,
+                    id: row.id,
+                    row: targetRow,
                     context: contextForCallback
                 });
                 if (result === false) {
@@ -670,10 +801,10 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.beforeDelete) {
                 const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as unknown as EntityCollection,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    path: targetPath,
+                    id: row.id,
+                    row: targetRow,
                     context: contextForCallback
                 });
                 if (result === false) {
@@ -685,40 +816,40 @@ export class PostgresBackendDriver implements DataDriver {
             }
         }
 
-        await this.entityService.deleteEntity(
-            entity.path,
-            entity.id,
-            entity.databaseId || resolvedCollection?.databaseId
+        await this.dataService.delete(
+            targetPath,
+            row.id,
+            resolvedCollection?.databaseId
         );
 
         if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
             // 1. Global callbacks first
             if (globalCallbacks?.afterDelete) {
                 await globalCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as EntityCollection,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    path: targetPath,
+                    id: row.id,
+                    row: targetRow,
                     context: contextForCallback
                 });
             }
             // 2. Collection callbacks second
             if (callbacks?.afterDelete) {
                 await callbacks.afterDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: targetPath,
+                    id: row.id,
+                    row: targetRow,
                     context: contextForCallback
                 });
             }
             // 3. Property callbacks third
             if (propertyCallbacks?.afterDelete) {
                 await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as EntityCollection,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    path: targetPath,
+                    id: row.id,
+                    row: targetRow,
                     context: contextForCallback
                 });
             }
@@ -727,10 +858,10 @@ export class PostgresBackendDriver implements DataDriver {
         // Record delete history (fire-and-forget)
         if (this.historyService && resolvedCollection?.history) {
             this.historyService.recordHistory({
-                tableName: entity.path,
-                entityId: entity.id.toString(),
+                tableName: targetPath,
+                id: row.id.toString(),
                 action: "delete",
-                values: entity.values as Record<string, unknown>,
+                values: row.values as Record<string, unknown> ?? {},
                 updatedBy: this.user?.uid
             });
         }
@@ -738,51 +869,51 @@ export class PostgresBackendDriver implements DataDriver {
         // Notify real-time subscribers (deferred if inside a transaction)
         if (this._deferNotifications) {
             this._pendingNotifications.push({
-                path: entity.path,
-                entityId: entity.id.toString(),
-                entity: null,
-                databaseId: entity.databaseId || resolvedCollection?.databaseId
+                path: targetPath,
+                id: row.id.toString(),
+                row: null,
+                databaseId: resolvedCollection?.databaseId
             });
         } else {
-            await this.realtimeService.notifyEntityUpdate(
-                entity.path,
-                entity.id.toString(),
+            await this.realtimeService.notifyUpdate(
+                targetPath,
+                row.id.toString(),
                 null,
-                entity.databaseId || resolvedCollection?.databaseId
+                resolvedCollection?.databaseId
             );
         }
 
     }
 
     async deleteAll(path: string): Promise<void> {
-        await this.entityService.deleteAll(path);
+        await this.dataService.deleteAll(path);
         // Notify real-time subscribers of bulk change
-        await this.realtimeService.notifyEntityUpdate(path, "*", null);
+        await this.realtimeService.notifyUpdate(path, "*", null);
     }
 
     async checkUniqueField(
         path: string,
         name: string,
         value: unknown,
-        entityId?: string,
-        collection?: EntityCollection
+        id?: string,
+        collection?: SnapshotCollection
     ): Promise<boolean> {
-        return this.entityService.checkUniqueField(
+        return this.dataService.checkUniqueField(
             path,
             name,
             value,
-            entityId,
+            id,
             collection?.databaseId
         );
     }
 
-    async countEntities<M extends Record<string, unknown>>({
+    async count<M extends Record<string, unknown>>({
                                                                path,
                                                                collection,
                                                                filter,
                                                                searchString
                                                            }: FetchCollectionProps<M>): Promise<number> {
-        return this.entityService.countEntities(
+        return this.dataService.count(
             path,
             {
                 filter,
@@ -809,7 +940,7 @@ export class PostgresBackendDriver implements DataDriver {
         params?: unknown[]
     }): Promise<Record<string, unknown>[]> {
         if (!options?.database && !options?.role) {
-            return this.entityService.executeSql(sqlText, options?.params);
+            return this.dataService.executeSql(sqlText, options?.params);
         }
 
         const targetDb = this.getTargetDb(options?.database);
@@ -1085,14 +1216,14 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     initialised = true;
 
     public user: User;
-    public data: RebaseData;
+    public data: RebaseSdkData;
 
     constructor(
         public delegate: PostgresBackendDriver,
         user: User
     ) {
         this.user = user;
-        this.data = buildRebaseData(this);
+        this.data = buildSdkData(this);
 
         // Delegate admin ops to the base driver (no RLS wrapping for admin)
         this.admin = delegate.admin;
@@ -1103,17 +1234,18 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      */
     admin: DatabaseAdmin;
 
-    get restFetchService(): RestFetchService | undefined {
-        if (!this.delegate.restFetchService) return undefined;
+    get restFetchService(): RestFetchService {
         return {
+            // The base driver's restFetchService already applies the afterRead
+            // pipeline, so we only wrap it in the authenticated transaction here.
             fetchCollectionForRest: async (collectionPath, options, include) => {
                 return this.withTransaction(async (delegate) => {
                     return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
                 }, { accessMode: "read only" });
             },
-            fetchEntityForRest: async (collectionPath, entityId, include, databaseId) => {
+            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
                 return this.withTransaction(async (delegate) => {
-                    return delegate.restFetchService.fetchEntityForRest(collectionPath, entityId, include, databaseId);
+                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId);
                 }, { accessMode: "read only" });
             }
         };
@@ -1154,10 +1286,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             })}, true)
             `);
 
-            const txEntityService = new EntityService(tx, this.delegate.registry);
+            const txSnapshotService = new DataService(tx, this.delegate.registry);
             const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
-            txDelegate.entityService = txEntityService;
+            txDelegate.dataService = txSnapshotService;
             txDelegate._deferNotifications = true;
             txDelegate._pendingNotifications = pendingNotifications;
             txDelegate.client = this.delegate.client;
@@ -1167,10 +1299,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
 
         for (const notification of pendingNotifications) {
             try {
-                await this.delegate.realtimeService.notifyEntityUpdate(
+                await this.delegate.realtimeService.notifyUpdate(
                     notification.path,
-                    notification.entityId,
-                    notification.entity,
+                    notification.id,
+                    notification.row,
                     notification.databaseId
                 );
             } catch (e) {
@@ -1181,7 +1313,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         return result;
     }
 
-    async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+    async fetchCollection<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
         return this.withTransaction((delegate) => delegate.fetchCollection(props), { accessMode: "read only" });
     }
 
@@ -1207,20 +1339,20 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         return this.injectAuthContext(this.delegate.listenCollection(props));
     }
 
-    async fetchEntity<M extends Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
-        return this.withTransaction((delegate) => delegate.fetchEntity(props), { accessMode: "read only" });
+    async fetchOne<M extends Record<string, unknown>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
+        return this.withTransaction((delegate) => delegate.fetchOne(props), { accessMode: "read only" });
     }
 
-    listenEntity<M extends Record<string, unknown>>(props: ListenEntityProps<M>): () => void {
-        return this.injectAuthContext(this.delegate.listenEntity(props));
+    listenOne<M extends Record<string, unknown>>(props: ListenOneProps<M>): () => void {
+        return this.injectAuthContext(this.delegate.listenOne(props));
     }
 
-    async saveEntity<M extends Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
-        return this.withTransaction((delegate) => delegate.saveEntity(props));
+    async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
+        return this.withTransaction((delegate) => delegate.save(props));
     }
 
-    async deleteEntity<M extends Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void> {
-        return this.withTransaction((delegate) => delegate.deleteEntity(props));
+    async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {
+        return this.withTransaction((delegate) => delegate.delete(props));
     }
 
     async deleteAll(path: string): Promise<void> {
@@ -1231,14 +1363,14 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         path: string,
         name: string,
         value: unknown,
-        entityId?: string,
-        collection?: EntityCollection
+        id?: string,
+        collection?: SnapshotCollection
     ): Promise<boolean> {
-        return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, entityId, collection), { accessMode: "read only" });
+        return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, id, collection), { accessMode: "read only" });
     }
 
-    async countEntities<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
-        return this.withTransaction((delegate) => delegate.countEntities(props), { accessMode: "read only" });
+    async count<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {
+        return this.withTransaction((delegate) => delegate.count(props), { accessMode: "read only" });
     }
 
 }

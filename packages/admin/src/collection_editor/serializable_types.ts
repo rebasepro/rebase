@@ -257,13 +257,13 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
     path?: string;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeEntityLink?: boolean;
+    includeSnapshotLink?: boolean;
 }
 
 /**
  * JSON-serializable `RelationProperty`.
  * `target` is string-only (collection slug). The function variant
- * `() => EntityCollection` is not serializable.
+ * `() => SnapshotCollection` is not serializable.
  */
 export interface SerializableRelationProperty extends SerializableBaseProperty {
     ui?: SerializableRelationUIConfig;
@@ -287,9 +287,9 @@ export interface SerializableRelationProperty extends SerializableBaseProperty {
     relationName?: string;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeEntityLink?: boolean;
+    includeSnapshotLink?: boolean;
     widget?: "select" | "dialog";
-    // overrides are dropped (can contain non-serializable EntityCollection fields)
+    // overrides are dropped (can contain non-serializable SnapshotCollection fields)
     // relation (resolved Relation object) is dropped (runtime-only, contains function target)
 }
 
@@ -352,13 +352,13 @@ export type SerializableProperties = {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * JSON-serializable version of `EntityCollection` / `BaseEntityCollection`.
+ * JSON-serializable version of `SnapshotCollection` / `BaseSnapshotCollection`.
  *
  * Strips all non-serializable fields:
  * - Functions: `callbacks`, `childCollections`, `additionalFields`, `defaultSelectedView` (fn)
- * - React nodes: `icon` (ReactNode variant), `entityViews`, `formView`
+ * - React nodes: `icon` (ReactNode variant), `snapshotViews`, `formView`
  * - Runtime objects: `selectionController`, `overrides`
- * - Component refs: `Actions`, `components`, `entityActions`
+ * - Component refs: `Actions`, `components`, `snapshotActions`
  * - `exportable` when it's an `ExportConfig` (contains functions)
  * - `auth` when it's an `AuthCollectionConfig` (contains functions)
  *
@@ -388,8 +388,8 @@ export interface SerializableCollection {
     titleProperty?: string;
 
     // ── Display config ────────────────────────────────────────────────
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
-    defaultEntityAction?: "view" | "edit";
+    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    defaultSnapshotAction?: "view" | "edit";
     defaultViewMode?: ViewMode;
     enabledViews?: ViewMode[];
     kanban?: KanbanConfig<Record<string, unknown>>;

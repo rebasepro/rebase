@@ -2,16 +2,16 @@ import type {
     AppView,
     AppViewsBuilder,
     AuthCollectionConfig,
-    EntityAction,
-    EntityCollection,
-    EntityCollectionsBuilder,
+    SnapshotAction,
+    SnapshotCollection,
+    SnapshotCollectionsBuilder,
     RebaseContext,
     RebasePlugin,
     UserCreationResult
 } from "@rebasepro/types";
 import { type AuthController, type User, type RebaseData } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
-import { resetPasswordAction } from "../../components/common/default_entity_actions";
+import { resetPasswordAction } from "../../components/common/default_snapshot_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
 import React from "react";
 
@@ -23,7 +23,7 @@ function isRebaseContext(ctx: unknown): ctx is RebaseContext {
     return typeof ctx === "object" && ctx !== null && "dialogsController" in ctx;
 }
 
-export function filterOutNotAllowedCollections(resolvedCollections: EntityCollection[], authController: AuthController): EntityCollection[] {
+export function filterOutNotAllowedCollections(resolvedCollections: SnapshotCollection[], authController: AuthController): SnapshotCollection[] {
     return resolvedCollections
         .filter((c) => canReadCollection(c, authController))
         .map((c) => {
@@ -35,8 +35,8 @@ export function filterOutNotAllowedCollections(resolvedCollections: EntityCollec
         });
 }
 
-export function applyPluginModifyCollection(resolvedCollections: EntityCollection[], modifyCollection: (collection: EntityCollection) => EntityCollection): EntityCollection[] {
-    return resolvedCollections.map((collection): EntityCollection => {
+export function applyPluginModifyCollection(resolvedCollections: SnapshotCollection[], modifyCollection: (collection: SnapshotCollection) => SnapshotCollection): SnapshotCollection[] {
+    return resolvedCollections.map((collection): SnapshotCollection => {
         const modifiedCollection = modifyCollection(collection);
         if (modifiedCollection.childCollections) {
             return {
@@ -49,17 +49,17 @@ export function applyPluginModifyCollection(resolvedCollections: EntityCollectio
 }
 
 /**
- * Auto-inject auth-specific entity actions and callbacks for collections
+ * Auto-inject auth-specific snapshot actions and callbacks for collections
  * with `auth: true` or `auth: { enabled: true }`.
  *
  * Injections:
- * 1. **resetPasswordAction** — adds the entity action unless explicitly disabled
+ * 1. **resetPasswordAction** — adds the snapshot action unless explicitly disabled
  * 2. **afterSave callback** — shows the `CreationResultDialog` when a new user
  *    is created with `invitationSent` or `temporaryPassword` in the response
  *
  * Skips injection if the collection already has the action/callback present.
  */
-function injectAuthCollectionConfig(collections: EntityCollection[]): EntityCollection[] {
+function injectAuthCollectionConfig(collections: SnapshotCollection[]): SnapshotCollection[] {
     return collections.map((collection) => {
         const authProp = collection.auth;
         if (!authProp) return collection;
@@ -71,9 +71,9 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
 
         let result = collection;
 
-        // ─── Entity Action injection (resetPassword) ─────────────────────
+        // ─── Snapshot Action injection (resetPassword) ─────────────────────
         const resetPref = authConfig?.actions?.resetPassword;
-        let actionToInject: EntityAction | undefined;
+        let actionToInject: SnapshotAction | undefined;
 
         if (resetPref === false) {
             actionToInject = undefined;
@@ -85,14 +85,14 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
 
         if (actionToInject) {
             const injectedAction = actionToInject;
-            const existing = result.entityActions ?? [];
+            const existing = result.snapshotActions ?? [];
             const alreadyHas = existing.some(
                 (a) => a.key != null && a.key === injectedAction.key
             );
             if (!alreadyHas) {
                 result = {
                     ...result,
-                    entityActions: [...existing, injectedAction]
+                    snapshotActions: [...existing, injectedAction]
                 };
             }
         }
@@ -116,7 +116,7 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
 
                     const creationResult: UserCreationResult = {
                         user: {
-                            uid: String(props.entityId),
+                            uid: String(props.id),
                             email: typeof values.email === "string" ? values.email : "",
                             displayName: typeof values.displayName === "string" ? values.displayName : "",
                             roles: Array.isArray(values.roles) ? values.roles as string[] : [],
@@ -150,12 +150,12 @@ function injectAuthCollectionConfig(collections: EntityCollection[]): EntityColl
 }
 
 export async function resolveCollections(
-    collections: undefined | EntityCollection[] | EntityCollectionsBuilder,
+    collections: undefined | SnapshotCollection[] | SnapshotCollectionsBuilder,
     authController: AuthController,
     data: RebaseData,
     plugins: RebasePlugin[] | undefined
-): Promise<EntityCollection[]> {
-    let resolvedCollections: EntityCollection[] = [];
+): Promise<SnapshotCollection[]> {
+    let resolvedCollections: SnapshotCollection[] = [];
     if (typeof collections === "function") {
         resolvedCollections = await collections({
             user: authController.user,
@@ -178,7 +178,7 @@ export async function resolveCollections(
         }
     }
 
-    // Auto-inject auth entity actions and callbacks (resetPassword, creation dialog, etc.)
+    // Auto-inject auth snapshot actions and callbacks (resetPassword, creation dialog, etc.)
     resolvedCollections = injectAuthCollectionConfig(resolvedCollections);
 
     resolvedCollections = filterOutNotAllowedCollections(resolvedCollections, authController);

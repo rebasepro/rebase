@@ -408,7 +408,7 @@ auth: {
 
 ## `rebase.email` Singleton
 
-When email is configured, the email service is automatically attached to the `rebase` server-side singleton as `rebase.email`. This allows sending emails programmatically from custom functions, cron jobs, and entity callbacks.
+When email is configured, the email service is automatically attached to the `rebase` server-side singleton as `rebase.email`. This allows sending emails programmatically from custom functions, cron jobs, and collection callbacks.
 
 ```typescript
 import { rebase } from "@rebasepro/server-core";

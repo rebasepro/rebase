@@ -21,7 +21,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { EntityCollection, MapProperty, Properties, Property, PropertyConfig, User } from "@rebasepro/types";
+import { SnapshotCollection, MapProperty, Properties, Property, PropertyConfig, User } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "./util";
@@ -44,7 +44,7 @@ type CollectionEditorFormProps = {
     extraIcon: React.ReactNode;
     getUser?: (uid: string) => User | null;
     getData?: () => Promise<object[]>;
-    doCollectionInference?: (collection: EntityCollection) => Promise<Partial<EntityCollection> | null> | undefined;
+    doCollectionInference?: (collection: SnapshotCollection) => Promise<Partial<SnapshotCollection> | null> | undefined;
     propertyConfigs: Record<string, PropertyConfig>;
     propertyTypePresets?: PropertyTypePreset[];
     hiddenPropertyTypes?: PropertyType[];
@@ -82,7 +82,7 @@ export function CollectionPropertiesEditorForm({
         setFieldTouched,
         errors,
         dirty
-    } = useFormex<EntityCollection>();
+    } = useFormex<SnapshotCollection>();
 
     const snackbarController = useSafeSnackbarController();
     const configControllerFromContext = useCollectionsConfigController();

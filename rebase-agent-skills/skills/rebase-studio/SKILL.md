@@ -244,24 +244,24 @@ These components can be overridden globally on `<Rebase>` (which acts as a fallb
 - `"Collection.Card"` — Individual card wrapper.
 - `"Collection.EmptyState"` — View shown when a collection is empty.
 - `"Collection.Actions"` — Toolbar actions header.
-- `"Entity.Form"` — The detail form view.
-- `"Entity.FormActions"` — Form action button bar.
-- `"Entity.DetailView"` — Read-only detail view.
-- `"Entity.SidePanel"` — Side panel wrapper.
-- `"Entity.Preview"` — Reference / relation preview chip.
-- `"Entity.MissingReference"` — Placeholder view when a relation references a deleted/non-existent entity.
+- `"Snapshot.Form"` — The detail form view.
+- `"Snapshot.FormActions"` — Form action button bar.
+- `"Snapshot.DetailView"` — Read-only detail view.
+- `"Snapshot.SidePanel"` — Side panel wrapper.
+- `"Snapshot.Preview"` — Reference / relation preview chip.
+- `"Snapshot.MissingReference"` — Placeholder view when a relation references a deleted/non-existent snapshot.
 
 ## RebaseCMS Configuration
 
 `<RebaseCMS>` accepts the full `RebaseCMSConfig`:
 
 ```typescript
-interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection> {
-    collections?: EC[] | EntityCollectionsBuilder<EC>;
+interface RebaseCMSConfig<EC extends SnapshotCollection = SnapshotCollection> {
+    collections?: EC[] | SnapshotCollectionsBuilder<EC>;
     views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
-    entityViews?: EntityCustomView[];
-    entityActions?: EntityAction[];
+    snapshotViews?: SnapshotCustomView[];
+    snapshotActions?: SnapshotAction[];
     plugins?: RebasePlugin[];
     navigationGroupMappings?: NavigationGroupMapping[];
     collectionEditor?: boolean | CollectionEditorOptions;
@@ -450,7 +450,7 @@ Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They
 
 ## CollectionPanel Component
 
-`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, entity detail views):
+`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, snapshot detail views):
 
 ```typescript
 import { CollectionPanel } from "@rebasepro/admin";
@@ -460,11 +460,11 @@ type CollectionPanelProps = {
     title?: string | false;                 // Title above the collection (false = hide)
     viewMode?: ViewMode;                    // Force view mode (table, card, etc.)
     sort?: [string, "asc" | "desc"];        // Override sort
-    limit?: number;                         // Max entities to display
+    limit?: number;                         // Max snapshots to display
     updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
     className?: string;                     // Container CSS class
-    collectionOverrides?: Partial<EntityCollection>; // Additional overrides
+    collectionOverrides?: Partial<SnapshotCollection>; // Additional overrides
 };
 ```
 
@@ -494,7 +494,7 @@ function MyDashboard() {
             <CollectionPanel
                 path="orders"
                 title={false}
-                openEntityMode="dialog"
+                openSnapshotMode="dialog"
             />
         </div>
     );
@@ -512,7 +512,7 @@ The Studio Bridge provides CMS capabilities to Studio components. When CMS is pr
 ```typescript
 interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
-    sideEntityController: SideEntityController;
+    sideSnapshotController: SideSnapshotController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
@@ -524,7 +524,7 @@ interface StudioBridge {
 | Hook | Return Type | Description |
 |------|-------------|-------------|
 | `useStudioCollectionRegistry()` | `CollectionRegistryController` | Access registered collections from Studio |
-| `useStudioSideEntityController()` | `SideEntityController` | Open/close entity side panels from Studio |
+| `useStudioSideSnapshotController()` | `SideSnapshotController` | Open/close snapshot side panels from Studio |
 | `useStudioUrlController()` | `UrlController` | Build URLs and navigate from Studio |
 | `useStudioNavigationState()` | `NavigationStateController` | Access navigation state from Studio |
 | `useStudioBreadcrumbs()` | `BreadcrumbsController` | Set breadcrumbs from Studio tools |
@@ -534,7 +534,7 @@ All bridge hooks are exported from `@rebasepro/studio` (re-exported from `@rebas
 ```typescript
 import {
     useStudioCollectionRegistry,
-    useStudioSideEntityController,
+    useStudioSideSnapshotController,
     useStudioUrlController,
     useStudioNavigationState,
     useStudioBreadcrumbs
@@ -567,7 +567,7 @@ import { StudioBridgeProvider } from "@rebasepro/studio";
 
 <StudioBridgeProvider value={{
     collectionRegistry: useCollectionRegistryController(),
-    sideEntityController: useSideEntityController(),
+    sideSnapshotController: useSideSnapshotController(),
     urlController: useUrlController(),
     navigationState: useNavigationStateController(),
     breadcrumbs: useBreadcrumbsController(),
@@ -610,7 +610,7 @@ These hooks are exported from `@rebasepro/core` and available inside any `<Rebas
 
 | Hook | Package | Description |
 |------|---------|-------------|
-| `useSideEntityController()` | `@rebasepro/admin` | Open/close entity side panels |
+| `useSideSnapshotController()` | `@rebasepro/admin` | Open/close snapshot side panels |
 | `useNavigationStateController()` | `@rebasepro/admin` | Navigate between views |
 | `useUrlController()` | `@rebasepro/admin` | Build URLs and navigate |
 | `useBreadcrumbsController()` | `@rebasepro/admin` | Set breadcrumbs |
@@ -661,8 +661,8 @@ const { canCreate, canEdit, canDelete, canRead } = usePermissions();
 // Check if current user can create in a collection
 if (canCreate(myCollection, "products")) { ... }
 
-// Check if current user can edit a specific entity
-if (canEdit(myCollection, "products", entity)) { ... }
+// Check if current user can edit a specific snapshot
+if (canEdit(myCollection, "products", snapshot)) { ... }
 ```
 
 ### useRebaseContext

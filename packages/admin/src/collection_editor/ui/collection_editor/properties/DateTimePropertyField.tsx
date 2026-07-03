@@ -183,7 +183,7 @@ export function DateTimePropertyField({ disabled }: {
                         <SelectItem value={"on_update"}> On any update </SelectItem>
                     </Select>
                     <FieldCaption error={Boolean(autoValueError)}>
-                        {autoValueError ?? "Update this field automatically when creating or updating the entity"}
+                        {autoValueError ?? "Update this field automatically when creating or updating the snapshot"}
                     </FieldCaption>
                 </div>
                 <div>

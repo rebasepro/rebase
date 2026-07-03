@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import chalk from "chalk";
 import { logger } from "@rebasepro/server-core";
-import type { EntityCollection, Relation } from "@rebasepro/types";
+import type { SnapshotCollection, Relation } from "@rebasepro/types";
 
 const getHelpersDirname = () => {
     try {
@@ -58,7 +58,7 @@ export function resolveLocalBin(binName: string): string | null {
     return null;
 }
 
-export async function getTableIncludesFromCollections(collections: EntityCollection[]): Promise<string[]> {
+export async function getTableIncludesFromCollections(collections: SnapshotCollection[]): Promise<string[]> {
     const { getTableName, resolveCollectionRelations } = await import("@rebasepro/common");
     const { isPostgresCollection } = await import("@rebasepro/types");
 
@@ -86,7 +86,7 @@ export async function getTableIncludesFromCollections(collections: EntityCollect
 
 export async function getTableIncludes(collectionsPath: string): Promise<string[]> {
     const resolvedPath = path.resolve(collectionsPath);
-    const collections: EntityCollection[] = [];
+    const collections: SnapshotCollection[] = [];
     if (fs.existsSync(resolvedPath)) {
         const stats = fs.statSync(resolvedPath);
         if (stats.isDirectory()) {

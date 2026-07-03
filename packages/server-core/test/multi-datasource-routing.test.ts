@@ -15,9 +15,9 @@ function mockDriver(key: string, withRls: boolean): DataDriver {
     const base: Record<string, unknown> = {
         key,
         fetchCollection: async () => [],
-        fetchEntity: async () => undefined,
-        saveEntity: async () => ({ id: "x", path: key, values: {} }),
-        deleteEntity: async () => undefined
+        fetchOne: async () => undefined,
+        save: async () => ({ id: "x", path: key, values: {} }),
+        delete: async () => undefined
     };
     if (withRls) {
         // Returns a scoped clone that keeps the same key tag.

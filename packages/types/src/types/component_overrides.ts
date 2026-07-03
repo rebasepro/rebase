@@ -44,13 +44,13 @@ export type CollectionComponentName =
     | "Collection.EmptyState"
     | "Collection.Actions"
 
-    // ── Entity / Form ──
-    | "Entity.Form"
-    | "Entity.FormActions"
-    | "Entity.DetailView"
-    | "Entity.SidePanel"
-    | "Entity.Preview"
-    | "Entity.MissingReference";
+    // ── Snapshot / Form ──
+    | "Snapshot.Form"
+    | "Snapshot.FormActions"
+    | "Snapshot.DetailView"
+    | "Snapshot.SidePanel"
+    | "Snapshot.Preview"
+    | "Snapshot.MissingReference";
 
 /**
  * All overridable component names across all scopes.
@@ -128,7 +128,7 @@ export interface ComponentOverride<P = any> {
  *     name: "Products",
  *     slug: "products",
  *     components: {
- *         "Entity.Form": { Component: ProductForm },
+ *         "Snapshot.Form": { Component: ProductForm },
  *         "Collection.EmptyState": { Component: ProductsEmptyState },
  *         "Collection.Card": { Component: ProductCard },
  *     }
@@ -161,7 +161,7 @@ export type CollectionComponentOverrideMap = {
  *         "HomePage": { Component: MyDashboard },
  *
  *         // Collection defaults: apply to ALL collections
- *         "Entity.FormActions": {
+ *         "Snapshot.FormActions": {
  *             Component: MyFormActions,
  *             wrap: true
  *         },

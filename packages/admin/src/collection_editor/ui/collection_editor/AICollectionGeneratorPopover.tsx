@@ -3,7 +3,7 @@ import { AIIcon } from "@rebasepro/core";
 import { useCollectionRegistryController } from "../../_cms_internals";
 import React, { useState } from "react";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import {
     Button,
     CircularProgress,
@@ -25,13 +25,13 @@ export interface AICollectionGeneratorPopoverProps {
     /**
      * Current collection being edited (if modifying an existing collection)
      */
-    existingCollection?: EntityCollection<any>;
+    existingCollection?: SnapshotCollection<any>;
 
     /**
      * Callback when a collection is generated or modified.
      * Includes the collection and optionally the operations that were applied.
      */
-    onGenerated: (collection: EntityCollection, operations?: CollectionOperation[]) => void;
+    onGenerated: (collection: SnapshotCollection, operations?: CollectionOperation[]) => void;
 
     /**
      * Callback function for generating/modifying collections.
@@ -95,7 +95,7 @@ export function AICollectionGeneratorPopover({
                 name: c.name,
                 properties: c.properties,
                 propertiesOrder: c.propertiesOrder
-            } as Partial<EntityCollection>));
+            } as Partial<SnapshotCollection>));
 
             const result = await generateCollection({
                 prompt: prompt.trim(),
@@ -106,7 +106,7 @@ export function AICollectionGeneratorPopover({
                         name: existingCollection.name,
                         properties: existingCollection.properties,
                         propertiesOrder: existingCollection.propertiesOrder
-                    } as Partial<EntityCollection>
+                    } as Partial<SnapshotCollection>
                 })
             });
 

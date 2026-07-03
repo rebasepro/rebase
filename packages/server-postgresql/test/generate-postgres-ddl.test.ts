@@ -1,4 +1,4 @@
-import { EntityCollection, PostgresCollection } from "@rebasepro/types";
+import { SnapshotCollection, PostgresCollection } from "@rebasepro/types";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 
 describe("generatePostgresDdl", () => {
@@ -11,7 +11,7 @@ describe("generatePostgresDdl", () => {
     };
 
     it("should generate a simple table with basic types", async () => {
-        const collections: EntityCollection[] = [
+        const collections: SnapshotCollection[] = [
             {
                 slug: "products",
                 table: "products",
@@ -54,7 +54,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate enum types", async () => {
-        const collections: EntityCollection[] = [
+        const collections: SnapshotCollection[] = [
             {
                 slug: "orders",
                 table: "orders",
@@ -74,7 +74,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate one-to-many relation foreign keys", async () => {
-        const usersCollection: EntityCollection = {
+        const usersCollection: SnapshotCollection = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -82,7 +82,7 @@ describe("generatePostgresDdl", () => {
                 name: { type: "string" }
             }
         };
-        const postsCollection: EntityCollection = {
+        const postsCollection: SnapshotCollection = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -109,7 +109,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate many-to-many junction tables", async () => {
-        const postsCollection: EntityCollection = {
+        const postsCollection: SnapshotCollection = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -131,7 +131,7 @@ describe("generatePostgresDdl", () => {
                 }
             ]
         };
-        const tagsCollection: EntityCollection = {
+        const tagsCollection: SnapshotCollection = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -152,7 +152,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate column default values", async () => {
-        const collections: EntityCollection[] = [
+        const collections: SnapshotCollection[] = [
             {
                 slug: "users_uuid",
                 table: "users_uuid",
@@ -214,7 +214,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate advanced column types, constraints, and default values", async () => {
-        const collections: EntityCollection[] = [
+        const collections: SnapshotCollection[] = [
             {
                 slug: "items",
                 table: "items",

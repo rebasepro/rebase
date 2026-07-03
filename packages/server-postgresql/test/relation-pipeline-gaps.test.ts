@@ -3,7 +3,7 @@
  *
  * Covers the remaining risk areas identified by gap analysis:
  *
- * 1. 🔴 ID type coercion in batchFetchRelatedEntities (single-cardinality)
+ * 1. 🔴 ID type coercion in batchFetchRelatedSnapshots (single-cardinality)
  *    — parsedParentIds.includes(parentId) used strict ===, silently dropping
  *    all inverse results when Drizzle returned string IDs for numeric PKs.
  *    Fixed by using Set<string> + String() normalization.
@@ -19,7 +19,7 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { EntityCollection, Relation } from "@rebasepro/types";
+import { SnapshotCollection, Relation } from "@rebasepro/types";
 import { sanitizeRelation } from "@rebasepro/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -57,7 +57,7 @@ dataType: "number" },
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 
-const tagsCollection: EntityCollection = {
+const tagsCollection: SnapshotCollection = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -68,7 +68,7 @@ const tagsCollection: EntityCollection = {
     idField: "id"
 };
 
-const postsCollection: EntityCollection = {
+const postsCollection: SnapshotCollection = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -94,7 +94,7 @@ relationName: "tags" }
     idField: "id"
 };
 
-const authorsCollection: EntityCollection = {
+const authorsCollection: SnapshotCollection = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -117,7 +117,7 @@ relationName: "posts" }
 };
 
 // Inverse M2M: tags → posts (from tag's perspective)
-const tagsWithInversePosts: EntityCollection = {
+const tagsWithInversePosts: SnapshotCollection = {
     slug: "tags_inv",
     name: "Tags (inverse)",
     table: "tags",
@@ -198,10 +198,10 @@ function createMockDb(resolveResults: () => unknown[]) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 1. ID type coercion in batchFetchRelatedEntities (single cardinality)
+// 1. ID type coercion in batchFetchRelatedSnapshots (single cardinality)
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () => {
+describe("batchFetchRelatedSnapshots: ID type coercion (single cardinality)", () => {
     let registry: PostgresCollectionRegistry;
 
     beforeEach(() => {
@@ -248,7 +248,7 @@ author_id: "2" }
         const relation = authorsCollection.relations![0] as Relation;
 
         // Pass numeric parent IDs — parseIdValues will return numbers
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "authors", [1, 2], "posts", relation
         );
 
@@ -272,7 +272,7 @@ author_id: 1 }
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "authors", [1], "posts", relation
         );
 
@@ -294,7 +294,7 @@ author_id: "2" } // string
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "authors", [1, 2], "posts", relation
         );
 
@@ -313,7 +313,7 @@ author_id: "999" }
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "authors", [1, 2], "posts", relation
         );
 
@@ -323,7 +323,7 @@ author_id: "999" }
 
     it("should handle inferredForeignKeyName path with string IDs", async () => {
         // Test the `inverseRelationName`-based FK inference path
-        const authorsWithInverseNameOnly: EntityCollection = {
+        const authorsWithInverseNameOnly: SnapshotCollection = {
             slug: "authors_inr",
             name: "Authors (inverseRelationName)",
             table: "authors",
@@ -334,7 +334,7 @@ author_id: "999" }
             idField: "id"
         };
 
-        const postsWithFK: EntityCollection = {
+        const postsWithFK: SnapshotCollection = {
             slug: "posts_fk",
             name: "Posts (FK)",
             table: "posts",
@@ -369,7 +369,7 @@ author_id: "1" }
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "authors_inr", [1], "posts", relation
         );
 
@@ -466,13 +466,13 @@ describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
 
 describe("sanitizeRelation: auto-inferred junction table naming", () => {
     it("should produce sorted junction table name: posts + tags → posts_tags", () => {
-        const source: EntityCollection = {
+        const source: SnapshotCollection = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: EntityCollection = {
+        const target: SnapshotCollection = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -493,13 +493,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should sort alphabetically: articles + tags → articles_tags (not tags_articles)", () => {
-        const source: EntityCollection = {
+        const source: SnapshotCollection = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: {}
         };
-        const target: EntityCollection = {
+        const target: SnapshotCollection = {
             slug: "articles",
             name: "Articles",
             table: "articles",
@@ -519,13 +519,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should handle underscore-containing slugs: blog_posts + labels → blog_posts_labels", () => {
-        const source: EntityCollection = {
+        const source: SnapshotCollection = {
             slug: "blog-posts",
             name: "Blog Posts",
             table: "blog_posts",
             properties: {}
         };
-        const target: EntityCollection = {
+        const target: SnapshotCollection = {
             slug: "labels",
             name: "Labels",
             table: "labels",
@@ -545,13 +545,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should generate correct source and target columns", () => {
-        const source: EntityCollection = {
+        const source: SnapshotCollection = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: EntityCollection = {
+        const target: SnapshotCollection = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -574,13 +574,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should preserve explicit through config and not overwrite it", () => {
-        const source: EntityCollection = {
+        const source: SnapshotCollection = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: EntityCollection = {
+        const target: SnapshotCollection = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -607,7 +607,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should handle self-referencing M2M: users + users → users_users", () => {
-        const usersCollection: EntityCollection = {
+        const usersCollection: SnapshotCollection = {
             slug: "users",
             name: "Users",
             table: "users",
@@ -628,13 +628,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should NOT add through config for joinPath-based relations", () => {
-        const source: EntityCollection = {
+        const source: SnapshotCollection = {
             slug: "users",
             name: "Users",
             table: "users",
             properties: {}
         };
-        const target: EntityCollection = {
+        const target: SnapshotCollection = {
             slug: "permissions",
             name: "Permissions",
             table: "permissions",
@@ -667,7 +667,7 @@ to: "id" } }
 // 4. Owning direction batch relation loading (tasks → client pattern)
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
+describe("batchFetchRelatedSnapshots: owning direction (FK-based)", () => {
     let registry: PostgresCollectionRegistry;
 
     // Mock collections simulating tasks → clients owning relation
@@ -688,7 +688,7 @@ dataType: "string" },
         _def: { tableName: "tasks" }
     };
 
-    const clientsCollection: EntityCollection = {
+    const clientsCollection: SnapshotCollection = {
         slug: "clients",
         name: "Clients",
         table: "clients",
@@ -700,7 +700,7 @@ isId: "uuid" },
         }
     };
 
-    const tasksCollection: EntityCollection = {
+    const tasksCollection: SnapshotCollection = {
         slug: "tasks",
         name: "Tasks",
         table: "tasks",
@@ -783,7 +783,7 @@ columnName: "client_id" },
             // Query 1: FK lookup from tasks table
             () => [{ parentId: taskUuid,
 fkValue: clientUuid }],
-            // Query 2: Target entity from clients table
+            // Query 2: Target snapshot from clients table
             () => [{ id: clientUuid,
 name: "Francesco",
 email: "f@test.com" }]
@@ -792,19 +792,19 @@ email: "f@test.com" }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "tasks", [taskUuid], "client", relation
         );
 
         expect(results.size).toBe(1);
 
-        const clientEntity = results.get(taskUuid);
-        expect(clientEntity).toBeDefined();
-        expect(clientEntity!.id).toBe(clientUuid);
-        expect(clientEntity!.path).toBe("clients");
-        expect(clientEntity!.values).toBeDefined();
-        expect(clientEntity!.values.name).toBe("Francesco");
-        expect(clientEntity!.values.email).toBe("f@test.com");
+        const clientSnapshot = results.get(taskUuid);
+        expect(clientSnapshot).toBeDefined();
+        expect(clientSnapshot!.id).toBe(clientUuid);
+        expect(clientSnapshot!.path).toBe("clients");
+        expect(clientSnapshot!.values).toBeDefined();
+        expect(clientSnapshot!.values.name).toBe("Francesco");
+        expect(clientSnapshot!.values.email).toBe("f@test.com");
     });
 
     it("should handle multiple tasks pointing to the same client", async () => {
@@ -829,7 +829,7 @@ email: "f@test.com" }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "tasks", [task1, task2], "client", relation
         );
 
@@ -850,7 +850,7 @@ fkValue: null }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedEntities(
+        const results = await service.batchFetchRelatedSnapshots(
             "tasks", [task1], "client", relation
         );
 
@@ -864,7 +864,7 @@ fkValue: null }]
 // ═══════════════════════════════════════════════════════════════════════
 
 import { createRelationRefWithData } from "@rebasepro/common";
-import { EntityRelation } from "@rebasepro/types";
+import { SnapshotRelation } from "@rebasepro/types";
 
 // Inline reviver for test isolation (matches packages/client/src/reviver.ts)
 function rebaseReviver(_key: string, value: unknown): unknown {
@@ -872,8 +872,8 @@ function rebaseReviver(_key: string, value: unknown): unknown {
         const record = value as Record<string, unknown>;
         switch (record.__type) {
             case "relation":
-            case "EntityRelation":
-                return new EntityRelation(
+            case "SnapshotRelation":
+                return new SnapshotRelation(
                     record.id as string | number,
                     record.path as string,
                     record.data as any
@@ -887,7 +887,7 @@ function rebaseReviver(_key: string, value: unknown): unknown {
 
 describe("Relation data JSON round-trip", () => {
     it("should preserve relation data through JSON.stringify → JSON.parse with reviver", () => {
-        const clientEntity = {
+        const clientSnapshot = {
             id: "client-uuid-123",
             path: "clients",
             values: {
@@ -898,7 +898,7 @@ describe("Relation data JSON round-trip", () => {
         };
 
         // Server creates this
-        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
+        const ref = createRelationRefWithData(clientSnapshot.id, clientSnapshot.path, clientSnapshot as any);
 
         // Verify server-side structure
         expect(ref.__type).toBe("relation");
@@ -907,8 +907,8 @@ describe("Relation data JSON round-trip", () => {
         expect(ref.data).toBeDefined();
         expect(ref.data.values.name).toBe("Francesco");
 
-        // Simulate full entity with relation in values
-        const taskEntity = {
+        // Simulate full snapshot with relation in values
+        const taskSnapshot = {
             id: "task-uuid-456",
             path: "tasks",
             values: {
@@ -919,14 +919,14 @@ describe("Relation data JSON round-trip", () => {
         };
 
         // Server JSON.stringify for WebSocket
-        const json = JSON.stringify(taskEntity);
+        const json = JSON.stringify(taskSnapshot);
 
         // Client JSON.parse with reviver
         const parsed = JSON.parse(json, rebaseReviver);
 
-        // The client relation should be an EntityRelation instance
+        // The client relation should be a SnapshotRelation instance
         const clientRelation = parsed.values.client;
-        expect(clientRelation).toBeInstanceOf(EntityRelation);
+        expect(clientRelation).toBeInstanceOf(SnapshotRelation);
         expect(clientRelation.id).toBe("client-uuid-123");
         expect(clientRelation.path).toBe("clients");
 
@@ -937,7 +937,7 @@ describe("Relation data JSON round-trip", () => {
         expect(clientRelation.data.values.email).toBe("f@test.com");
     });
 
-    it("should handle entity with no relation data (stub)", () => {
+    it("should handle snapshot with no relation data (stub)", () => {
         const stubRef = { id: "client-uuid",
 path: "clients",
 __type: "relation" as const };
@@ -946,7 +946,7 @@ __type: "relation" as const };
         const parsed = JSON.parse(json, rebaseReviver);
 
         const clientRelation = parsed.values.client;
-        expect(clientRelation).toBeInstanceOf(EntityRelation);
+        expect(clientRelation).toBeInstanceOf(SnapshotRelation);
         expect(clientRelation.id).toBe("client-uuid");
 
         // data should be undefined for stubs
@@ -954,20 +954,20 @@ __type: "relation" as const };
     });
 
     it("should handle WebSocket collection_update message format", () => {
-        const clientEntity = {
+        const clientSnapshot = {
             id: "client-uuid",
             path: "clients",
             values: { name: "Acme Corp",
 email: "acme@corp.com" }
         };
 
-        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
+        const ref = createRelationRefWithData(clientSnapshot.id, clientSnapshot.path, clientSnapshot as any);
 
         // Simulate full WebSocket message
         const wsMessage = {
             type: "collection_update",
             subscriptionId: "sub-123",
-            entities: [
+            snapshots: [
                 {
                     id: "task-1",
                     path: "tasks",
@@ -989,9 +989,9 @@ status: "completed" }
         const parsed = JSON.parse(json, rebaseReviver);
 
         // Both tasks should have correctly hydrated client relations
-        for (const entity of parsed.entities) {
-            const clientRel = entity.values.client;
-            expect(clientRel).toBeInstanceOf(EntityRelation);
+        for (const snapshot of parsed.snapshots) {
+            const clientRel = snapshot.values.client;
+            expect(clientRel).toBeInstanceOf(SnapshotRelation);
             expect(clientRel.data).toBeDefined();
             expect(clientRel.data.values.name).toBe("Acme Corp");
         }

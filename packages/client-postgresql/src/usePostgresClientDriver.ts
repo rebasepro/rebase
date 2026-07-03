@@ -1,15 +1,13 @@
 import { useMemo, useEffect } from "react";
 import {
     DataDriver,
-    DeleteEntityProps,
-    Entity,
-    EntityCollection,
-    EntityReference, EntityRelation,
+    DeleteProps,
+    SnapshotCollection,
     FetchCollectionProps,
-    FetchEntityProps,
+    FetchOneProps,
     ListenCollectionProps,
-    ListenEntityProps,
-    SaveEntityProps,
+    ListenOneProps,
+    SaveProps,
     BranchInfo
 } from "@rebasepro/types";
 import { RebaseWebSocketClient } from "@rebasepro/client";
@@ -37,7 +35,7 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
 
         client,
 
-        async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+        async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
             // Pick only the fields the client needs, ignoring extra fields from the CMS layer
             const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
             return client.fetchCollection({ path,
@@ -46,38 +44,38 @@ limit,
 startAfter,
 orderBy,
 searchString,
-order }) as Promise<Entity<M>[]>;
+order });
         },
 
-        async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
-            const { path, entityId, databaseId } = props;
-            return client.fetchEntity({ path,
-entityId,
-databaseId }) as Promise<Entity<M> | undefined>;
+        async fetchOne<M extends Record<string, any>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
+            const { path, id, databaseId } = props;
+            return client.fetchOne({ path,
+id,
+databaseId });
         },
 
-        async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
-            return client.saveEntity({
+        async save<M extends Record<string, any>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
+            return client.save({
                 path: props.path,
                 values: props.values,
-                entityId: props.entityId,
+                id: props.id,
                 previousValues: props.previousValues,
                 status: props.status
-            }) as Promise<Entity<M>>;
+            });
         },
 
-        async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {
-            const { entity } = props;
-            return client.deleteEntity({ entity });
+        async delete<M extends Record<string, any>>(props: DeleteProps<M>): Promise<void> {
+            const { row } = props;
+            return client.delete({ row });
         },
 
-        async checkUniqueField(path: string, name: string, value: unknown, entityId?: string, collection?: EntityCollection): Promise<boolean> {
-            return client.checkUniqueField(path, name, value, entityId, collection);
+        async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: SnapshotCollection): Promise<boolean> {
+            return client.checkUniqueField(path, name, value, id, collection);
         },
 
-        async countEntities<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
+        async count<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
             const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
-            return client.countEntities({ path,
+            return client.count({ path,
 filter,
 limit,
 startAfter,
@@ -96,19 +94,19 @@ startAfter,
 orderBy,
 searchString,
 order },
-                (entities: Entity[]) => props.onUpdate(entities as Entity<M>[]),
+                (rows: Record<string, unknown>[]) => props.onUpdate(rows),
                 props.onError
             );
         },
 
-        listenEntity<M extends Record<string, any>>(props: ListenEntityProps<M>): () => void {
-            const { path, entityId, databaseId, onUpdate, onError } = props;
-            return client.listenEntity(
+        listenOne<M extends Record<string, any>>(props: ListenOneProps<M>): () => void {
+            const { path, id, databaseId, onUpdate, onError } = props;
+            return client.listenOne(
                 { path,
-entityId,
+id,
 databaseId },
-                (entity: Entity | null) => {
-                    props.onUpdate(entity as Entity<M> | null);
+                (row: Record<string, unknown> | null) => {
+                    props.onUpdate(row);
                 },
                 props.onError
             );

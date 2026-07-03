@@ -25,7 +25,7 @@ Collections support multiple view modes, configured via:
 - `enabledViews` — Array of enabled view modes: `"table"`, `"cards"`, `"kanban"`, `"list"`
 - `defaultViewMode` — The default view when opening the collection
 - `kanban` — Kanban board configuration: `{ columnProperty: "status" }`
-- `openEntityMode` — How entities open: `"split"` (side-by-side), `"side_panel"` (right drawer), `"full_screen"` (full page)
+- `openSnapshotMode` — How snapshots open: `"split"` (side-by-side), `"side_panel"` (right drawer), `"full_screen"` (full page)
 
 ## 5. Frontend Composition API
 The frontend uses a declarative composition pattern:
@@ -33,7 +33,7 @@ The frontend uses a declarative composition pattern:
 ```tsx
 <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={plugins}>
     <RebaseAuth/>
-    <RebaseCMS collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
+    <RebaseCMS collections={collections} collectionEditor={collectionEditor} snapshotViews={snapshotViews}/>
     <RebaseStudio/>
     <RebaseShell title="Rebase"/>
 </Rebase>
@@ -42,7 +42,7 @@ The frontend uses a declarative composition pattern:
 Key components:
 - `<Rebase>` — Root provider (client, auth, user management, plugins)
 - `<RebaseAuth/>` — Authentication UI (login/register screens)
-- `<RebaseCMS>` — CMS frontend (collections, entity views, collection editor)
+- `<RebaseCMS>` — CMS frontend (collections, snapshot views, collection editor)
 - `<RebaseStudio/>` — Admin panel (visual schema editor, settings)
 - `<RebaseShell>` — App shell (drawer, navigation, title)
 

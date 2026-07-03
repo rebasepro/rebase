@@ -85,7 +85,7 @@ export function clone(value: unknown): unknown {
     if (Array.isArray(value)) {
         return [...value];
     } else if (typeof value === "object" && value !== null) {
-        // Preserve class instances (EntityReference, GeoPoint, etc.) - don't spread them
+        // Preserve class instances (SnapshotReference, GeoPoint, etc.) - don't spread them
         if (Object.getPrototypeOf(value) !== Object.prototype) {
             return value;
         }

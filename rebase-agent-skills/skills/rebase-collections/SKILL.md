@@ -39,7 +39,7 @@ Properties define the fields of your collection. Rebase supports these built-in 
 
 | Feature | `relation` (Recommended) | `reference` (Legacy) |
 |---------|-------------------------|---------------------|
-| Backend | SQL JOINs, FK constraints | Stores a collection path + entity ID |
+| Backend | SQL JOINs, FK constraints | Stores a collection path + snapshot ID |
 | Cascade rules | `onDelete`, `onUpdate` | None |
 | Junction tables | Yes (many-to-many) | No |
 | Multi-hop joins | Yes (`joinPath`) | No |
@@ -71,7 +71,7 @@ const productsCollection: PostgresCollection = {
     history: true,
     defaultViewMode: "table",
     enabledViews: ["table", "cards"],
-    openEntityMode: "split",
+    openSnapshotMode: "split",
     inlineEditing: true,
     exportable: true,
     selectionEnabled: true,
@@ -142,15 +142,15 @@ export default productsCollection;
 | `dataSource` | `string` | `"(default)"` | Data-source key — routes the collection to a backend registered on `<Rebase dataSources>` / `initializeRebaseBackend({ dataSources })`. See **Data sources & multiple backends** below. |
 | `driver` | `string` | `undefined` | **Deprecated** — engine hint (`"postgres"`/`"firestore"`/`"mongodb"`). Prefer `dataSource`. When `dataSource` is omitted, `driver` doubles as the routing key. |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
-| `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
+| `history` | `boolean` | `false` | Enable snapshot audit trail (requires history plugin) |
 | `defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
 | `enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
-| `openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
-| `defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
+| `openSnapshotMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How snapshots open when clicked |
+| `defaultSnapshotAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
 | `kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
 | `propertiesOrder` | `string[]` | — | Field display order in forms and table |
-| `entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
-| `titleProperty` | `string` | first text prop | Property used as entity title in previews |
+| `snapshotViews` | `(string \| SnapshotCustomView)[]` | — | Custom tabs on snapshot detail |
+| `titleProperty` | `string` | first text prop | Property used as snapshot title in previews |
 | `previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
 | `listProperties` | `string[]` | — | Columns to display in list view |
 | `selectionEnabled` | `boolean` | — | Enable row selection checkboxes |
@@ -165,24 +165,24 @@ export default productsCollection;
 | `sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["created_at", "desc"]` |
 | `orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general) |
 | `formAutoSave` | `boolean` | `false` | Auto-save form on field change |
-| `formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
+| `formView` | `FormViewConfig` | — | Custom component replacing the default snapshot form |
 | `hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
-| `hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form |
+| `hideIdFromForm` | `boolean` | `false` | Hide ID field in snapshot form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
 | `defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
 | `sideDialogWidth` | `number \| string` | — | Width of side dialog in pixels |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Re-apply defaults on every update |
-| `includeJsonView` | `boolean` | `false` | Show a JSON tab in entity detail |
+| `includeJsonView` | `boolean` | `false` | Show a JSON tab in snapshot detail |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Local changes backup strategy |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | — | Disable built-in actions |
 | `additionalFields` | `AdditionalFieldDelegate[]` | — | Virtual computed columns for views |
-| `entityActions` | `EntityAction[]` | — | Custom action buttons (see Entity Actions section) |
+| `snapshotActions` | `SnapshotAction[]` | — | Custom action buttons (see Snapshot Actions section) |
 | `Actions` | `ComponentRef[]` | — | Custom toolbar action components |
-| `callbacks` | `EntityCallbacks<M, USER>` | — | Lifecycle hooks (see Entity Callbacks section) |
+| `callbacks` | `CollectionCallbacks<M, USER>` | — | Lifecycle hooks (see Collection Callbacks section) |
 | `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
 | `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
-| `childCollections` | `() => EntityCollection[]` | — | Nested child collections (populated automatically) |
-| `overrides` | `EntityOverrides` | — | Override data source or storage source |
+| `childCollections` | `() => SnapshotCollection[]` | — | Nested child collections (populated automatically) |
+| `overrides` | `SnapshotOverrides` | — | Override data source or storage source |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
 | `components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
@@ -230,7 +230,7 @@ initializeRebaseBackend({
 });
 ```
 
-Routing is automatic and resolved by collection path: list/entity views,
+Routing is automatic and resolved by collection path: list/snapshot views,
 references, board, import/export, and `context.data` all hit the right backend
 with no per-collection wiring. The data-source key matches the backend
 bootstrapper id/type (e.g. `"mongodb"`). RLS is applied per-engine where
@@ -251,9 +251,9 @@ All property types share these base options:
 | `description` | `string` | — | Help text displayed under the field |
 | `columnName` | `string` | auto from key | Explicit DB column name (bypasses snake_case conversion) |
 | `validation` | `PropertyValidationSchema` | — | Validation rules (see below) |
-| `defaultValue` | `unknown` | — | Default value for new entities |
+| `defaultValue` | `unknown` | — | Default value for new snapshots |
 | `propertyConfig` | `string` | — | Reuse a globally defined property config by key |
-| `dynamicProps` | `(props) => Partial<Property>` | — | Dynamic property overrides based on entity values |
+| `dynamicProps` | `(props) => Partial<Property>` | — | Dynamic property overrides based on snapshot values |
 | `conditions` | `PropertyConditions` | — | JSON Logic-based declarative conditions |
 | `callbacks` | `PropertyCallbacks` | — | Per-field `afterRead` and `beforeSave` hooks |
 
@@ -335,7 +335,7 @@ avatar: {
     name: "Avatar",
     type: "string",
     storage: {
-        storagePath: "avatars/{entityId}",
+        storagePath: "avatars/{snapshotId}",
         acceptedFiles: ["image/*"],
         maxSize: 5 * 1024 * 1024, // 5MB
         fileName: "{rand}_{file.name}.{file.ext}",
@@ -356,7 +356,7 @@ avatar: {
 
 | StorageConfig Option | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `storagePath` | `string \| (ctx) => string` | **required** | Upload destination path. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` |
+| `storagePath` | `string \| (ctx) => string` | **required** | Upload destination path. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{snapshotId}`, `{propertyKey}`, `{path}` |
 | `acceptedFiles` | `FileType[]` | all | Allowed MIME types. E.g. `["image/*"]`, `["application/pdf"]` |
 | `maxSize` | `number` | — | Max file size in bytes |
 | `fileName` | `string \| (ctx) => string` | — | Custom filename. Same placeholders as `storagePath` |
@@ -379,7 +379,7 @@ image: {
     type: "string",
     storage: {
         storageSource: "firebase",
-        storagePath: "products/{entityId}",
+        storagePath: "products/{snapshotId}",
         acceptedFiles: ["image/*"],
     }
 }
@@ -551,7 +551,7 @@ gallery: {
     of: {
         type: "string",
         storage: {
-            storagePath: "products/{entityId}/gallery",
+            storagePath: "products/{snapshotId}/gallery",
             acceptedFiles: ["image/*"]
         }
     }
@@ -619,7 +619,7 @@ content: {
             image: {
                 name: "Image",
                 type: "string",
-                storage: { storagePath: "blog/{entityId}/content" }
+                storage: { storagePath: "blog/{snapshotId}/content" }
             },
             quote: {
                 name: "Quote",
@@ -643,7 +643,7 @@ Every property supports a `validation` object with these common options:
 |--------|------|-----------|-------------|
 | `required` | `boolean` | All | Field is mandatory |
 | `requiredMessage` | `string` | All | Custom error message when required validation fails |
-| `unique` | `boolean` | All | Value must be unique across all entities |
+| `unique` | `boolean` | All | Value must be unique across all snapshots |
 | `uniqueInArray` | `boolean` | All | Value must be unique within parent array |
 | `min` | `number \| Date` | String (length), Number, Date, Array (count) | Minimum value/length/count/date |
 | `max` | `number \| Date` | String (length), Number, Date, Array (count) | Maximum value/length/count/date |
@@ -762,7 +762,7 @@ comments: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `target` | `string \| (() => EntityCollection \| string)` | — | Target collection (use a function for lazy resolution to avoid circular imports) |
+| `target` | `string \| (() => SnapshotCollection \| string)` | — | Target collection (use a function for lazy resolution to avoid circular imports) |
 | `cardinality` | `"one" \| "many"` | `"one"` | Whether this references one or many records |
 | `direction` | `"owning" \| "inverse"` | `"owning"` | Which side owns the FK or junction table |
 | `localKey` | `string` | auto-inferred | Column on THIS table storing the FK (e.g. `"author_id"`) |
@@ -773,10 +773,10 @@ comments: {
 | `inverseRelationName` | `string` | — | Name of the corresponding relation on the target collection |
 | `onDelete` | `OnAction` | — | Cascade rule on delete |
 | `onUpdate` | `OnAction` | — | Cascade rule on update |
-| `overrides` | `Partial<EntityCollection>` | — | Override target collection config when rendered as subcollection tab |
-| `fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
-| `includeId` | `boolean` | `true` | Show entity ID in the reference preview |
-| `includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
+| `overrides` | `Partial<SnapshotCollection>` | — | Override target collection config when rendered as subcollection tab |
+| `fixedFilter` | `FilterValues` | — | Filter applied when selecting related snapshots |
+| `includeId` | `boolean` | `true` | Show snapshot ID in the reference preview |
+| `includeSnapshotLink` | `boolean` | `true` | Show link to open the related snapshot |
 | `isId` | `boolean` | — | Mark as primary key |
 | `validation` | `{ required?: boolean }` | — | Relation-level validation |
 
@@ -864,21 +864,21 @@ customer: {
 
 > **See full documentation:** [Relations](https://rebase.pro/docs/collections/relations)
 
-## Entity Callbacks (Lifecycle Hooks)
+## Collection Callbacks (Lifecycle Hooks)
 
-> **IMPORTANT FOR AGENTS**: Collections support **lifecycle callbacks** that let you run custom logic when entities are created, updated, read, or deleted. Use these to **sync data between collections**, transform data, validate business rules, or trigger side effects. **Do NOT use raw SQL triggers, cron jobs, or external scripts** when a callback can solve the problem.
+> **IMPORTANT FOR AGENTS**: Collections support **lifecycle callbacks** that let you run custom logic when snapshots are created, updated, read, or deleted. Use these to **sync data between collections**, transform data, validate business rules, or trigger side effects. **Do NOT use raw SQL triggers, cron jobs, or external scripts** when a callback can solve the problem.
 
 ### Generic Type Parameters
 
-`EntityCallbacks<M, USER>` accepts two generic type parameters:
+`CollectionCallbacks<M, USER>` accepts two generic type parameters:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `M` | `Record<string, unknown>` | Entity values type — maps to your collection's property schema |
+| `M` | `Record<string, unknown>` | Snapshot values type — maps to your collection's property schema |
 | `USER` | `User` | User type — extends the base `User` type with custom fields |
 
 ```typescript
-import { PostgresCollection, EntityCallbacks } from "@rebasepro/types";
+import { PostgresCollection, CollectionCallbacks } from "@rebasepro/types";
 
 interface Product {
     name: string;
@@ -887,7 +887,7 @@ interface Product {
     status: string;
 }
 
-const callbacks: EntityCallbacks<Product> = {
+const callbacks: CollectionCallbacks<Product> = {
     beforeSave: async ({ values, status }) => {
         // `values` is typed as Partial<Product>
         if (values.name) {
@@ -925,15 +925,15 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 > **IMPORTANT FOR AGENTS:** `rebase.data` calls (used in cron jobs, afterSave side-effects, custom functions) go through the full middleware pipeline with the service key, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
 >
 > ```typescript
-> afterRead: async ({ entity, context }) => {
+> afterRead: async ({ snapshot, context }) => {
 >     // Server-side reads (cron jobs, admin) see real values
->     if (context.user?.roles?.includes("admin")) return entity;
+>     if (context.user?.roles?.includes("admin")) return snapshot;
 >     // End-user reads get masked values
->     return { ...entity, values: { ...entity.values, email: "***@***.***" } };
+>     return { ...snapshot, values: { ...snapshot.values, email: "***@***.***" } };
 > }
 > ```
 
-> **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sideEntityController`, etc.). Entity callbacks always receive `RebaseCallContext`.
+> **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sideSnapshotController`, etc.). Snapshot callbacks always receive `RebaseCallContext`.
 
 ### Callback Example
 
@@ -955,37 +955,37 @@ const jobSubmissionsCollection: PostgresCollection = {
         },
 
         // Runs AFTER saving — trigger side effects, sync other collections
-        afterSave: async ({ values, entityId, previousValues, context }) => {
+        afterSave: async ({ values, snapshotId, previousValues, context }) => {
             if (values.status === "approved" && previousValues?.status !== "approved") {
                 await context.data.jobs.create({
                     title: values.title,
                     description: values.description,
                     company_id: values.company_id,
                     status: "published",
-                    source_submission_id: entityId,
+                    source_submission_id: snapshotId,
                 });
             }
         },
 
         // Runs BEFORE deleting — block or validate
-        beforeDelete: async ({ entity }) => {
-            if (entity.values.status === "published") {
+        beforeDelete: async ({ snapshot }) => {
+            if (snapshot.values.status === "published") {
                 throw new Error("Cannot delete published submissions");
             }
         },
 
         // Runs AFTER deleting — cleanup related data
-        afterDelete: async ({ entityId, context }) => {
-            console.log(`Submission ${entityId} deleted`);
+        afterDelete: async ({ snapshotId, context }) => {
+            console.log(`Submission ${snapshotId} deleted`);
         },
 
         // Runs AFTER reading — transform for display
-        afterRead: async ({ entity }) => {
+        afterRead: async ({ snapshot }) => {
             return {
-                ...entity,
+                ...snapshot,
                 values: {
-                    ...entity.values,
-                    displayName: `${entity.values.title} (${entity.values.company_name})`
+                    ...snapshot.values,
+                    displayName: `${snapshot.values.title} (${snapshot.values.company_name})`
                 }
             };
         }
@@ -998,10 +998,10 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Callback | When It Runs | Return Value | Can Block? |
 |----------|-------------|--------------|------------|
-| `beforeSave` | Before write to DB (after validation) | Modified `values` (`Partial<EntityValues<M>>`) | Yes (throw to block) |
+| `beforeSave` | Before write to DB (after validation) | Modified `values` (`Partial<SnapshotValues<M>>`) | Yes (throw to block) |
 | `afterSave` | After successful write | `void` | No |
 | `afterSaveError` | After a failed write | `void` | No |
-| `afterRead` | After reading from DB | Modified `entity` (`Entity<M>`) | No |
+| `afterRead` | After reading from DB | Modified `snapshot` (`Snapshot<M>`) | No |
 | `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw to block) |
 | `afterDelete` | After successful deletion | `void` | No |
 
@@ -1011,11 +1011,11 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `values` | `Partial<EntityValues<M>>` | Entity values being saved |
-| `entityId` | `string \| number` (optional in `beforeSave`) | Entity ID (`undefined` for new entities in `beforeSave`) |
-| `previousValues` | `Partial<EntityValues<M>> \| undefined` | Previous values (for updates) |
-| `status` | `EntityStatus` | `"new"`, `"existing"`, or `"copy"` |
-| `collection` | `EntityCollection<M>` | The collection definition |
+| `values` | `Partial<SnapshotValues<M>>` | Snapshot values being saved |
+| `snapshotId` | `string \| number` (optional in `beforeSave`) | Snapshot ID (`undefined` for new snapshots in `beforeSave`) |
+| `previousValues` | `Partial<SnapshotValues<M>> \| undefined` | Previous values (for updates) |
+| `status` | `SnapshotStatus` | `"new"`, `"existing"`, or `"copy"` |
+| `collection` | `SnapshotCollection<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context with `client`, `data`, `storageSource`, `user` |
 
@@ -1023,8 +1023,8 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity<M>` | The fetched entity |
-| `collection` | `EntityCollection<M>` | The collection definition |
+| `snapshot` | `Snapshot<M>` | The fetched snapshot |
+| `collection` | `SnapshotCollection<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context |
 
@@ -1032,9 +1032,9 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity<M>` | The entity being deleted |
-| `entityId` | `string \| number` | Entity ID |
-| `collection` | `EntityCollection<M>` | The collection definition |
+| `snapshot` | `Snapshot<M>` | The snapshot being deleted |
+| `snapshotId` | `string \| number` | Snapshot ID |
+| `collection` | `SnapshotCollection<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context |
 
@@ -1061,35 +1061,35 @@ title: {
 
 ### Common Use Cases
 
-- **Syncing data between collections** — Use `afterSave` to copy/move entities from one collection to another (e.g., approved submissions → published jobs)
+- **Syncing data between collections** — Use `afterSave` to copy/move snapshots from one collection to another (e.g., approved submissions → published jobs)
 - **Computed fields** — Use `beforeSave` to generate slugs, timestamps, or derived values
 - **Validation** — Use `beforeSave` to enforce business rules beyond schema validation
 - **Notifications** — Use `afterSave` to send emails, Slack messages, or webhook calls
 - **Cascade operations** — Use `afterDelete` to clean up related records in other collections
 - **Data enrichment** — Use `afterRead` to add computed/virtual fields for display
 
-> **See full documentation:** [Entity Callbacks](https://rebase.pro/docs/collections/callbacks)
+> **See full documentation:** [Collection Callbacks](https://rebase.pro/docs/collections/callbacks)
 
-## Entity Actions (Custom UI Buttons)
+## Snapshot Actions (Custom UI Buttons)
 
-> **IMPORTANT FOR AGENTS**: Collections support **custom action buttons** that appear in the collection table view and entity form. Use these for workflow actions like "Approve", "Send Email", "Export PDF", "Clone to Staging", etc. Do NOT build separate pages or scripts for common admin actions.
+> **IMPORTANT FOR AGENTS**: Collections support **custom action buttons** that appear in the collection table view and snapshot form. Use these for workflow actions like "Approve", "Send Email", "Export PDF", "Clone to Staging", etc. Do NOT build separate pages or scripts for common admin actions.
 
-Add an `entityActions` array to any collection definition:
+Add an `snapshotActions` array to any collection definition:
 
 ```typescript
 const jobSubmissionsCollection: PostgresCollection = {
     name: "Job Submissions",
     slug: "job_submissions",
     table: "job_submissions",
-    entityActions: [
+    snapshotActions: [
         {
             name: "Approve",
             icon: <CheckCircleIcon />,
             // Only show for pending submissions
-            isEnabled: ({ entity }) => entity?.values.status === "pending",
-            onClick: async ({ entity, context, onCollectionChange }) => {
-                if (!entity) return;
-                await context.data.job_submissions.update(entity.id, {
+            isEnabled: ({ snapshot }) => snapshot?.values.status === "pending",
+            onClick: async ({ snapshot, context, onCollectionChange }) => {
+                if (!snapshot) return;
+                await context.data.job_submissions.update(snapshot.id, {
                     status: "approved"
                 });
                 context.snackbarController?.open({
@@ -1103,8 +1103,8 @@ const jobSubmissionsCollection: PostgresCollection = {
             name: "Export PDF",
             collapsed: true,  // Show in overflow menu
             includeInForm: true,
-            onClick: async ({ entity }) => {
-                window.open(`/api/functions/export-pdf/${entity?.id}`);
+            onClick: async ({ snapshot }) => {
+                window.open(`/api/functions/export-pdf/${snapshot?.id}`);
             }
         }
     ],
@@ -1112,50 +1112,50 @@ const jobSubmissionsCollection: PostgresCollection = {
 };
 ```
 
-### EntityAction Interface
+### SnapshotAction Interface
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `name` | `string` | — | Button label |
 | `key` | `string` | — | Override default actions: `"edit"`, `"delete"`, `"copy"` |
 | `icon` | `ReactElement` | — | Optional icon |
-| `onClick` | `(props: EntityActionClickProps) => void \| Promise<void>` | — | Action handler |
-| `isEnabled` | `(props: EntityActionClickProps) => boolean` | — | Conditionally disable the action |
+| `onClick` | `(props: SnapshotActionClickProps) => void \| Promise<void>` | — | Action handler |
+| `isEnabled` | `(props: SnapshotActionClickProps) => boolean` | — | Conditionally disable the action |
 | `collapsed` | `boolean` | `true` | If `true`, show in overflow menu |
-| `includeInForm` | `boolean` | `true` | Show in entity form view |
+| `includeInForm` | `boolean` | `true` | Show in snapshot form view |
 | `showActionsInListView` | `boolean` | `false` | Show inline on each row in list view |
 
-### EntityActionClickProps
+### SnapshotActionClickProps
 
 The `onClick` and `isEnabled` handlers receive:
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity<M> \| undefined` | The current entity |
+| `snapshot` | `Snapshot<M> \| undefined` | The current snapshot |
 | `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
 | `path` | `string \| undefined` | Collection path |
-| `collection` | `EntityCollection<M> \| undefined` | Collection definition |
+| `collection` | `SnapshotCollection<M> \| undefined` | Collection definition |
 | `formContext` | `FormContext \| undefined` | Form state (when called from a form) |
-| `sideEntityController` | `SideEntityController \| undefined` | Side panel control |
+| `sideSnapshotController` | `SideSnapshotController \| undefined` | Side panel control |
 | `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
-| `highlightEntity` | `(entity) => void` | Highlight an entity row |
-| `unhighlightEntity` | `(entity) => void` | Remove highlight |
+| `openSnapshotMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the snapshot form is opened |
+| `highlightSnapshot` | `(snapshot) => void` | Highlight a snapshot row |
+| `unhighlightSnapshot` | `(snapshot) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
 | `onCollectionChange` | `() => void` | Refresh the collection view |
 
-## Entity Custom Views (Tabs)
+## Snapshot Custom Views (Tabs)
 
-Collections support `entityViews` — custom React components that appear as **tabs** in the entity detail view. Use these for previews, analytics, related items, or any custom UI per entity.
+Collections support `snapshotViews` — custom React components that appear as **tabs** in the snapshot detail view. Use these for previews, analytics, related items, or any custom UI per snapshot.
 
-Entity views can be registered:
-1. **Globally** in the `<RebaseCMS>` component via the `entityViews` prop
-2. **Per-collection** by referencing view keys in the collection's `entityViews` array
+Snapshot views can be registered:
+1. **Globally** in the `<RebaseCMS>` component via the `snapshotViews` prop
+2. **Per-collection** by referencing view keys in the collection's `snapshotViews` array
 
 ```typescript
 // Global registration in App.tsx
-const entityViews = [
+const snapshotViews = [
     {
         key: "blog_preview",
         name: "Preview",
@@ -1164,41 +1164,41 @@ const entityViews = [
     }
 ];
 
-<RebaseCMS collections={collections} entityViews={entityViews}/>
+<RebaseCMS collections={collections} snapshotViews={snapshotViews}/>
 
 // Per-collection reference in collection definition
 const postsCollection: PostgresCollection = {
     name: "Posts",
     slug: "posts",
     table: "posts",
-    entityViews: ["blog_preview"],  // References the global view by key
+    snapshotViews: ["blog_preview"],  // References the global view by key
     properties: { /* ... */ }
 };
 ```
 
 The `Builder` component receives:
-- `entity` — The saved entity (may be `undefined` for new entities)
+- `snapshot` — The saved snapshot (may be `undefined` for new snapshots)
 - `modifiedValues` — Current unsaved form values
 - `formContext` — Form state and methods
 - `collection` — The collection definition
 
 ### TypeScript Strict Checks in Custom Views
 
-Under strict TypeScript checks (`strictNullChecks: true`), since `entity` is typed as optional (`entity?: Entity<M>`), accessing `entity.id` or `entity.values` directly will cause compilation errors like:
-`error TS18048: 'entity' is possibly 'undefined'.`
+Under strict TypeScript checks (`strictNullChecks: true`), since `snapshot` is typed as optional (`snapshot?: Snapshot<M>`), accessing `snapshot.id` or `snapshot.values` directly will cause compilation errors like:
+`error TS18048: 'snapshot' is possibly 'undefined'.`
 
 Always add a guard clause at the very beginning of your custom view component to handle the undefined state:
 ```typescript
-if (!entity) {
+if (!snapshot) {
     return null; // or show a loading/error state
 }
 ```
-This narrows the type of `entity` for the remainder of the component, allowing safe property access (e.g. `entity.id`, `entity.values.field`).
+This narrows the type of `snapshot` for the remainder of the component, allowing safe property access (e.g. `snapshot.id`, `snapshot.values.field`).
 
-## Entity Preview & Title Resolution
+## Snapshot Preview & Title Resolution
 
 ### Title Property Selection
-By default, the property used as the entity's display title (previews, headers) is resolved as follows:
+By default, the property used as the snapshot's display title (previews, headers) is resolved as follows:
 1. If `titleProperty` is explicitly specified on the collection, it is used.
 2. If `propertiesOrder` is explicitly defined on the collection, the first non-ID property that is either a `relation` or `string` type is chosen as the title key.
 3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
@@ -1207,7 +1207,7 @@ By default, the property used as the entity's display title (previews, headers) 
 When `propertiesOrder` is explicitly set, relation properties are *not* automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
 ### resolveTitleToString Utility
-Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, renderable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data, falling back to stringified IDs or JSON representations.
+Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex snapshot title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, renderable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data, falling back to stringified IDs or JSON representations.
 
 ## Collection-Scoped Component Overrides
 
@@ -1227,7 +1227,7 @@ const productsCollection: PostgresCollection = {
         "Collection.EmptyState": { Component: ProductCustomEmptyState },
         
         // Wrap Mode: Wrap the built-in form, augmenting it
-        "Entity.Form": {
+        "Snapshot.Form": {
             Component: ({ OriginalComponent, ...props }) => (
                 <div>
                     <div className="bg-amber-100 p-2 text-amber-800 text-sm">Editing Product</div>
@@ -1250,12 +1250,12 @@ const productsCollection: PostgresCollection = {
 | `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
 | `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Displayed when a collection has no items |
 | `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
-| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
-| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
-| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
-| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is deleted or missing |
+| `"Snapshot.Form"` | `SnapshotFormProps` | The detail form for creating/updating |
+| `"Snapshot.FormActions"` | `SnapshotFormActionsProps` | Form submission/cancel button bar |
+| `"Snapshot.DetailView"` | `SnapshotDetailViewProps` | Read-only detail view |
+| `"Snapshot.SidePanel"` | `SnapshotSidePanelProps` | The side panel container for form/detail |
+| `"Snapshot.Preview"` | `SnapshotPreviewProps` | Inline reference/relation chip preview |
+| `"Snapshot.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced snapshot is deleted or missing |
 
 ## Authentication Collection Configuration (auth)
 
@@ -1292,7 +1292,7 @@ const customUsersCollection: PostgresCollection = {
         },
         // Override/disable default user management actions
         actions: {
-            resetPassword: true // Or false to disable, or a custom EntityAction to replace the UI
+            resetPassword: true // Or false to disable, or a custom SnapshotAction to replace the UI
         }
     },
     properties: { ... }

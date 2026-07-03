@@ -3,7 +3,7 @@
  */
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useBuildNavigationStateController } from "../../src/hooks/navigation/useBuildNavigationStateController";
-import { AuthController, UrlController, CollectionRegistryController, DataDriver, EntityCollection } from "@rebasepro/types";
+import { AuthController, UrlController, CollectionRegistryController, DataDriver, SnapshotCollection } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 

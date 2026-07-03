@@ -1,26 +1,26 @@
 import type { CollectionRegistryController } from "./collection_registry";
-import type { Entity, EntityStatus, EntityValues } from "../types/entities";
-import type { EntityCollection, FilterValues } from "../types/collections";
+import type { SnapshotStatus, SnapshotValues } from "../types/snapshots";
+import type { SnapshotCollection, FilterValues } from "../types/collections";
 import type { RebaseContext } from "../rebase_context";
 
 
 /**
  * @internal
  */
-export interface FetchEntityProps<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface FetchOneProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    entityId: string | number;
+    id: string | number;
     databaseId?: string;
-    collection?: EntityCollection<M>
+    collection?: SnapshotCollection<M>
 }
 
 /**
  * @internal
  */
-export type ListenEntityProps<M extends Record<string, unknown> = Record<string, unknown>> =
-    FetchEntityProps<M>
+export type ListenOneProps<M extends Record<string, unknown> = Record<string, unknown>> =
+    FetchOneProps<M>
     & {
-        onUpdate: (entity: Entity<M> | null) => void,
+        onUpdate: (row: Record<string, unknown> | null) => void,
         onError?: (error: Error) => void,
     }
 
@@ -45,7 +45,7 @@ export interface VectorSearchParams {
  */
 export interface FetchCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    collection?: EntityCollection<M>;
+    collection?: SnapshotCollection<M>;
     filter?: FilterValues<Extract<keyof M, string>>,
     limit?: number;
     offset?: number;
@@ -63,34 +63,34 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
 export type ListenCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> =
     FetchCollectionProps<M> &
     {
-        onUpdate: (entities: Entity<M>[]) => void;
+        onUpdate: (rows: Record<string, unknown>[]) => void;
         onError?: (error: Error) => void;
     };
 
 /**
  * @internal
  */
-export interface SaveEntityProps<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface SaveProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    values: Partial<EntityValues<M>>;
-    entityId?: string | number; // can be empty for new entities
-    previousValues?: Partial<EntityValues<M>>;
-    collection?: EntityCollection<M>;
-    status: EntityStatus;
+    values: Partial<SnapshotValues<M>>;
+    id?: string | number; // can be empty for new snapshots
+    previousValues?: Partial<SnapshotValues<M>>;
+    collection?: SnapshotCollection<M>;
+    status: SnapshotStatus;
 }
 
 /**
  * @internal
  */
-export interface DeleteEntityProps<M extends Record<string, unknown> = Record<string, unknown>> {
-    entity: Entity<M>;
-    collection?: EntityCollection<M>;
+export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    row: { id: string | number; path: string; values?: Partial<SnapshotValues<M>> };
+    collection?: SnapshotCollection<M>;
 }
 
 export type FilterCombinationValidProps = {
     path: string;
     databaseId?: string;
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     filterValues: FilterValues<string>;
     sortBy?: [string, "asc" | "desc"];
 };
@@ -123,9 +123,9 @@ export interface DataDriver {
     /**
      * Fetch data from a collection
      * @param props
-     * @return Promise of entities
+     * @return Promise of flat rows
      */
-    fetchCollection<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]>;
+    fetchCollection<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]>;
 
     /**
      * Listen to a collection in a given path. If you don't implement this method
@@ -136,33 +136,33 @@ export interface DataDriver {
     listenCollection?<M extends Record<string, unknown> = Record<string, unknown>>(props: ListenCollectionProps<M>): () => void;
 
     /**
-     * Retrieve an entity given a path and a collection
+     * Retrieve a single row given a path and a collection
      * @param props
      */
-    fetchEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined>;
+    fetchOne<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined>;
 
     /**
-     * Get realtime updates on one entity.
+     * Get realtime updates on one row.
      * @param props
      * @return Function to cancel subscription
      */
-    listenEntity?<M extends Record<string, unknown> = Record<string, unknown>>(props: ListenEntityProps<M>): () => void;
+    listenOne?<M extends Record<string, unknown> = Record<string, unknown>>(props: ListenOneProps<M>): () => void;
 
     /**
-     * Save entity to the specified path
+     * Save a row to the specified path
      * @param props
      */
-    saveEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveEntityProps<M>): Promise<Entity<M>>;
+    save<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>>;
 
     /**
-     * Delete an entity
+     * Delete a snapshot
      * @param props
      * @return was the whole deletion flow successful
      */
-    deleteEntity<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteEntityProps<M>): Promise<void>;
+    delete<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteProps<M>): Promise<void>;
 
     /**
-     * Delete all entities from a collection.
+     * Delete all snapshots from a collection.
      * @param path Collection path
      */
     deleteAll?(path: string): Promise<void>;
@@ -172,22 +172,22 @@ export interface DataDriver {
      * @param path Collection path
      * @param name of the property
      * @param value
-     * @param entityId
+     * @param id
      * @param collection
-     * @return `true` if there are no other fields besides the given entity
+     * @return `true` if there are no other fields besides the given snapshot
      */
     checkUniqueField(
         path: string,
         name: string,
         value: unknown,
-        entityId?: string | number,
-        collection?: EntityCollection
+        id?: string | number,
+        collection?: SnapshotCollection
     ): Promise<boolean>;
 
     /**
-     * Count the number of entities in a collection
+     * Count the number of snapshots in a collection
      */
-    countEntities?<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number>;
+    count?<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number>;
 
     /**
      * Check if the given filter combination is valid
@@ -210,9 +210,9 @@ export interface DataDriver {
         context: RebaseContext,
         path: string,
         databaseId?: string,
-        collection: EntityCollection,
+        collection: SnapshotCollection,
         parentCollectionSlugs?: string[];
-        parentEntityIds?: string[];
+        parentSnapshotIds?: string[];
     }) => Promise<boolean>;
 
     /**
@@ -224,7 +224,7 @@ export interface DataDriver {
 
     /**
      * Optional REST-optimised fetch service. When present, the REST API
-     * generator uses these methods instead of the generic `fetchEntity` /
+     * generator uses these methods instead of the generic `fetchOne` /
      * `fetchCollection` pipeline, enabling include-aware eager-loading.
      */
     restFetchService?: RestFetchService;
@@ -252,14 +252,15 @@ export interface DataDriver {
  * REST-optimised fetch service exposed by drivers that support
  * eager-loading of relations via `include`.
  *
- * The methods return flattened rows (`{ id, ...columns }`) rather
- * than the `Entity<M>` wrapper used by the generic DataDriver API.
+ * The methods return flattened rows (`{ id, ...columns }`) with
+ * included relations inlined as plain nested rows — the shape served
+ * to app developers through the REST API / SDK client.
  *
  * @group DataDriver
  */
 export interface RestFetchService {
     /**
-     * Fetch a collection of flattened entities with optional relation includes.
+     * Fetch a collection of flattened snapshots with optional relation includes.
      */
     fetchCollectionForRest(
         collectionPath: string,
@@ -278,11 +279,11 @@ export interface RestFetchService {
     ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Fetch a single flattened entity with optional relation includes.
+     * Fetch a single flattened snapshot with optional relation includes.
      */
-    fetchEntityForRest(
+    fetchOneForRest(
         collectionPath: string,
-        entityId: string | number,
+        id: string | number,
         include?: string[],
         databaseId?: string
     ): Promise<Record<string, unknown> | null>;

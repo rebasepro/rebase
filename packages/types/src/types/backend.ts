@@ -1,5 +1,4 @@
-import type { Entity } from "./entities";
-import type { EntityCollection, FilterValues, WhereFilterOp } from "./collections";
+import type { SnapshotCollection, FilterValues, WhereFilterOp } from "./collections";
 import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
 
@@ -42,7 +41,7 @@ export interface QueryFilter {
 }
 
 /**
- * Options for fetching a collection of entities
+ * Options for fetching a collection of snapshots
  */
 export interface FetchCollectionOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -53,11 +52,11 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
     startAfter?: unknown;
     searchString?: string;
     databaseId?: string;
-    collection?: EntityCollection;
+    collection?: SnapshotCollection;
 }
 
 /**
- * Options for searching entities
+ * Options for searching snapshots
  */
 export interface SearchOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -65,11 +64,11 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
     order?: "desc" | "asc";
     limit?: number;
     databaseId?: string;
-    collection?: EntityCollection;
+    collection?: SnapshotCollection;
 }
 
 /**
- * Options for counting entities
+ * Options for counting snapshots
  */
 export interface CountOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -139,69 +138,69 @@ export type ConditionBuilderStatic<T = unknown> = {
 };
 
 // =============================================================================
-// ENTITY REPOSITORY INTERFACES
+// SNAPSHOT REPOSITORY INTERFACES
 // =============================================================================
 
 /**
- * Abstract entity repository interface.
- * Handles all CRUD operations for entities in the database.
+ * Abstract snapshot repository interface.
+ * Handles all CRUD operations for snapshots in the database.
  *
  * Implementations should handle:
- * - Entity serialization/deserialization
+ * - Snapshot serialization/deserialization
  * - Relation resolution
  * - ID generation and conversion
  */
-export interface EntityRepository {
+export interface DataRepository {
     /**
-     * Fetch a single entity by ID
+     * Fetch a single snapshot by ID
      */
-    fetchEntity<M extends Record<string, unknown>>(
+    fetchOne<M extends Record<string, unknown>>(
         collectionPath: string,
-        entityId: string | number,
+        id: string | number,
         databaseId?: string
-    ): Promise<Entity<M> | undefined>;
+    ): Promise<Record<string, unknown> | undefined>;
 
     /**
-     * Fetch a collection of entities with optional filtering, ordering, and pagination
+     * Fetch a collection of snapshots with optional filtering, ordering, and pagination
      */
     fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
         options?: FetchCollectionOptions<M>
-    ): Promise<Entity<M>[]>;
+    ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Search entities by text
+     * Search snapshots by text
      */
-    searchEntities<M extends Record<string, unknown>>(
+    searchRows<M extends Record<string, unknown>>(
         collectionPath: string,
         searchString: string,
         options?: SearchOptions<M>
-    ): Promise<Entity<M>[]>;
+    ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Count entities in a collection
+     * Count snapshots in a collection
      */
-    countEntities<M extends Record<string, unknown>>(
+    count<M extends Record<string, unknown>>(
         collectionPath: string,
         options?: CountOptions<M>
     ): Promise<number>;
 
     /**
-     * Save an entity (create or update)
+     * Save a snapshot (create or update)
      */
-    saveEntity<M extends Record<string, unknown>>(
+    save<M extends Record<string, unknown>>(
         collectionPath: string,
         values: Partial<M>,
-        entityId?: string | number,
+        id?: string | number,
         databaseId?: string
-    ): Promise<Entity<M>>;
+    ): Promise<Record<string, unknown>>;
 
     /**
-     * Delete an entity by ID
+     * Delete a snapshot by ID
      */
-    deleteEntity(
+    delete(
         collectionPath: string,
-        entityId: string | number,
+        id: string | number,
         databaseId?: string
     ): Promise<void>;
 
@@ -212,7 +211,7 @@ export interface EntityRepository {
         collectionPath: string,
         fieldName: string,
         value: unknown,
-        excludeEntityId?: string,
+        excludeSnapshotId?: string,
         databaseId?: string
     ): Promise<boolean>;
 
@@ -238,17 +237,17 @@ export interface CollectionSubscriptionConfig {
 }
 
 /**
- * Configuration for subscribing to a single entity
+ * Configuration for subscribing to a single snapshot
  */
-export interface EntitySubscriptionConfig {
+export interface SingleSubscriptionConfig {
     clientId: string;
     path: string;
-    entityId: string | number;
+    id: string | number;
 }
 
 /**
  * Abstract realtime provider interface.
- * Handles real-time subscriptions and notifications for entity changes.
+ * Handles real-time subscriptions and notifications for snapshot changes.
  */
 export interface RealtimeProvider {
     /**
@@ -257,16 +256,16 @@ export interface RealtimeProvider {
     subscribeToCollection(
         subscriptionId: string,
         config: CollectionSubscriptionConfig,
-        callback?: (entities: Entity[]) => void
+        callback?: (rows: Record<string, unknown>[]) => void
     ): void;
 
     /**
-     * Subscribe to single entity changes
+     * Subscribe to single snapshot changes
      */
-    subscribeToEntity(
+    subscribeToOne(
         subscriptionId: string,
-        config: EntitySubscriptionConfig,
-        callback?: (entity: Entity | null) => void
+        config: SingleSubscriptionConfig,
+        callback?: (row: Record<string, unknown> | null) => void
     ): void;
 
     /**
@@ -275,12 +274,12 @@ export interface RealtimeProvider {
     unsubscribe(subscriptionId: string): void;
 
     /**
-     * Notify all relevant subscribers of an entity update
+     * Notify all relevant subscribers of a snapshot update
      */
-    notifyEntityUpdate(
+    notifyUpdate(
         path: string,
-        entityId: string,
-        entity: Entity | null,
+        id: string,
+        row: Record<string, unknown> | null,
         databaseId?: string
     ): Promise<void>;
 
@@ -309,23 +308,23 @@ export interface RealtimeProvider {
 
 /**
  * Abstract collection registry interface.
- * Manages registration and lookup of entity collections.
+ * Manages registration and lookup of snapshot collections.
  */
 export interface CollectionRegistryInterface {
     /**
      * Register a collection
      */
-    register(collection: EntityCollection): void;
+    register(collection: SnapshotCollection): void;
 
     /**
      * Get a collection by its path
      */
-    getCollectionByPath(path: string): EntityCollection | undefined;
+    getCollectionByPath(path: string): SnapshotCollection | undefined;
 
     /**
      * Get all registered collections
      */
-    getCollections(): EntityCollection[];
+    getCollections(): SnapshotCollection[];
 
     /**
      * Get the currently registered global callbacks, if any.
@@ -343,19 +342,19 @@ export interface CollectionRegistryInterface {
  */
 export interface DataTransformer {
     /**
-     * Transform entity data for storage in the database
+     * Transform snapshot data for storage in the database
      */
     serializeToDatabase<M extends Record<string, unknown>>(
-        entity: M,
-        collection: EntityCollection
+        snapshot: M,
+        collection: SnapshotCollection
     ): Record<string, unknown>;
 
     /**
-     * Transform database data back to entity format
+     * Transform database data back to snapshot format
      */
     deserializeFromDatabase<M extends Record<string, unknown>>(
         data: Record<string, unknown>,
-        collection: EntityCollection
+        collection: SnapshotCollection
     ): Promise<M>;
 }
 
@@ -588,9 +587,9 @@ export interface BackendConfig {
  */
 export interface BackendInstance extends BackendLifecycle {
     /**
-     * Entity repository for CRUD operations
+     * Snapshot repository for CRUD operations
      */
-    entityRepository: EntityRepository;
+    snapshotRepository: DataRepository;
 
     /**
      * Realtime provider for subscriptions

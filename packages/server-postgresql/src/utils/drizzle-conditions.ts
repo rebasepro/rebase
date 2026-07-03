@@ -5,7 +5,7 @@ import { getColumnName, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { logger } from "@rebasepro/server-core";
-import { getColumnMeta } from "../services/entity-helpers";
+import { getColumnMeta } from "../services/collection-helpers";
 
 /** Drizzle dynamic query builder — accepts innerJoin + where chaining */
 
@@ -173,7 +173,7 @@ export class DrizzleConditionBuilder {
      */
     static buildRelationConditions(
         relation: Relation,
-        parentEntityId: string | number | (string | number)[],
+        parentId: string | number | (string | number)[],
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
@@ -190,7 +190,7 @@ export class DrizzleConditionBuilder {
             hasThrough: !!relation.through,
             hasForeignKeyOnTarget: !!relation.foreignKeyOnTarget,
             inverseRelationName: relation.inverseRelationName,
-            parentEntityId: parentEntityId
+            parentId: parentId
         });
 
         const joinConditions: { table: PgTable<any>; condition: SQL }[] = [];
@@ -207,7 +207,7 @@ export class DrizzleConditionBuilder {
                 targetTable,
                 parentTable,
                 parentIdColumn,
-                parentEntityId,
+                parentId,
                 registry
             );
             joinConditions.push(...joins);
@@ -219,7 +219,7 @@ export class DrizzleConditionBuilder {
             const junctionResult = this.buildJunctionTableConditions(
                 relation.through,
                 targetIdColumn,
-                parentEntityId,
+                parentId,
                 registry
             );
             joinConditions.push(junctionResult.join);
@@ -231,7 +231,7 @@ export class DrizzleConditionBuilder {
             const junctionResult = this.buildInverseJunctionTableConditions(
                 relation.through,
                 targetIdColumn,
-                parentEntityId,
+                parentId,
                 registry
             );
             joinConditions.push(junctionResult.join);
@@ -247,7 +247,7 @@ export class DrizzleConditionBuilder {
                 const junctionResult = this.buildInverseJunctionTableConditions(
                     junctionInfo,
                     targetIdColumn,
-                    parentEntityId,
+                    parentId,
                     registry
                 );
                 joinConditions.push(junctionResult.join);
@@ -259,7 +259,7 @@ export class DrizzleConditionBuilder {
                     relation,
                     targetTable,
                     parentTable,
-                    parentEntityId
+                    parentId
                 );
                 whereConditions.push(simpleCondition);
             } else {
@@ -273,7 +273,7 @@ export class DrizzleConditionBuilder {
                 relation,
                 targetTable,
                 parentTable,
-                parentEntityId
+                parentId
             );
             whereConditions.push(simpleCondition);
         }
@@ -297,7 +297,7 @@ export class DrizzleConditionBuilder {
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
-        parentEntityId: string | number | (string | number)[],
+        parentId: string | number | (string | number)[],
         registry: PostgresCollectionRegistry
     ): {
         joins: { table: PgTable<any>; condition: SQL }[];
@@ -385,9 +385,9 @@ export class DrizzleConditionBuilder {
         }
 
         // Handle both single ID and array of IDs
-        const finalCondition = Array.isArray(parentEntityId)
-            ? inArray(parentIdColumn, parentEntityId)
-            : eq(parentIdColumn, parentEntityId);
+        const finalCondition = Array.isArray(parentId)
+            ? inArray(parentIdColumn, parentId)
+            : eq(parentIdColumn, parentId);
 
         return {
             joins,
@@ -554,7 +554,7 @@ export class DrizzleConditionBuilder {
     private static buildJunctionTableConditions(
         through: { table: string; sourceColumn: string; targetColumn: string },
         targetIdColumn: AnyPgColumn,
-        parentEntityId: string | number | (string | number)[],
+        parentId: string | number | (string | number)[],
         registry: PostgresCollectionRegistry
     ): { join: { table: PgTable<any>; condition: SQL }; condition: SQL } {
         const junctionTable = registry.getTable(through.table);
@@ -573,9 +573,9 @@ export class DrizzleConditionBuilder {
         }
 
         // Handle both single ID and array of IDs
-        const condition = Array.isArray(parentEntityId)
-            ? inArray(junctionSourceCol, parentEntityId)
-            : eq(junctionSourceCol, parentEntityId);
+        const condition = Array.isArray(parentId)
+            ? inArray(junctionSourceCol, parentId)
+            : eq(junctionSourceCol, parentId);
 
         return {
             join: {
@@ -592,7 +592,7 @@ export class DrizzleConditionBuilder {
     private static buildInverseJunctionTableConditions(
         through: { table: string; sourceColumn: string; targetColumn: string },
         targetIdColumn: AnyPgColumn,
-        parentEntityId: string | number | (string | number)[],
+        parentId: string | number | (string | number)[],
         registry: PostgresCollectionRegistry
     ): { join: { table: PgTable<any>; condition: SQL }; condition: SQL } {
         const junctionTable = registry.getTable(through.table);
@@ -610,11 +610,11 @@ export class DrizzleConditionBuilder {
             throw new Error(`Target column '${through.targetColumn}' not found in junction table '${through.table}'`);
         }
 
-        // For inverse relations, the parentEntityId (tag ID) should match the sourceColumn (tag_id)
-        // and we want to find target entities (posts) through the targetColumn (post_id)
-        const condition = Array.isArray(parentEntityId)
-            ? inArray(junctionSourceCol, parentEntityId)
-            : eq(junctionSourceCol, parentEntityId);
+        // For inverse relations, the parentId (tag ID) should match the sourceColumn (tag_id)
+        // and we want to find target rows (posts) through the targetColumn (post_id)
+        const condition = Array.isArray(parentId)
+            ? inArray(junctionSourceCol, parentId)
+            : eq(junctionSourceCol, parentId);
 
         return {
             join: {
@@ -632,10 +632,10 @@ export class DrizzleConditionBuilder {
         relation: Relation,
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
-        parentEntityId: string | number | (string | number)[]
+        parentId: string | number | (string | number)[]
     ): SQL {
         if (relation.direction === "owning" && relation.localKey) {
-            // For owning relations, the parentEntityId is actually the foreign key value
+            // For owning relations, the parentId is actually the foreign key value
             // that should match the target table's primary key
             const targetIdCol = Object.values(targetTable).find((col: Record<string, unknown>) => col.primary) as AnyPgColumn;
             if (!targetIdCol) {
@@ -644,13 +644,13 @@ export class DrizzleConditionBuilder {
                 if (!idCol) {
                     throw new Error("No primary key or \"id\" column found in target table");
                 }
-                return Array.isArray(parentEntityId)
-                    ? inArray(idCol, parentEntityId)
-                    : eq(idCol, parentEntityId);
+                return Array.isArray(parentId)
+                    ? inArray(idCol, parentId)
+                    : eq(idCol, parentId);
             }
-            return Array.isArray(parentEntityId)
-                ? inArray(targetIdCol, parentEntityId)
-                : eq(targetIdCol, parentEntityId);
+            return Array.isArray(parentId)
+                ? inArray(targetIdCol, parentId)
+                : eq(targetIdCol, parentId);
 
         } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
             // Inverse relation: use foreign key on target table
@@ -660,9 +660,9 @@ export class DrizzleConditionBuilder {
                 // but the column doesn't actually exist. In this case, we should suggest using junction tables.
                 throw new Error(`Foreign key column '${relation.foreignKeyOnTarget}' not found in target table. This might be a many-to-many relationship that requires a junction table. Consider using 'through' property or ensure the corresponding owning relation exists with junction table configuration.`);
             }
-            return Array.isArray(parentEntityId)
-                ? inArray(foreignKeyCol, parentEntityId)
-                : eq(foreignKeyCol, parentEntityId);
+            return Array.isArray(parentId)
+                ? inArray(foreignKeyCol, parentId)
+                : eq(foreignKeyCol, parentId);
 
         } else if (relation.direction === "inverse" && relation.cardinality === "many" && relation.inverseRelationName) {
             // For inverse many-to-many relations, this should not be called directly
@@ -682,9 +682,9 @@ export class DrizzleConditionBuilder {
 
             console.debug(`🔍 [DrizzleConditionBuilder] Auto-inferred foreign key '${inferredForeignKeyName}' for inverse relation '${relation.relationName}'`);
 
-            return Array.isArray(parentEntityId)
-                ? inArray(foreignKeyCol, parentEntityId)
-                : eq(foreignKeyCol, parentEntityId);
+            return Array.isArray(parentId)
+                ? inArray(foreignKeyCol, parentId)
+                : eq(foreignKeyCol, parentId);
 
         } else {
             throw new Error(`Relation '${relation.relationName}' lacks proper configuration. For many-to-many relations, use 'through' property. For simple relations, use 'localKey' or 'foreignKeyOnTarget'.`);
@@ -766,7 +766,7 @@ export class DrizzleConditionBuilder {
     static buildRelationQuery<T extends DrizzleDynamicQuery>(
         baseQuery: T,
         relation: Relation,
-        parentEntityId: string | number | (string | number)[],
+        parentId: string | number | (string | number)[],
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
@@ -776,7 +776,7 @@ export class DrizzleConditionBuilder {
     ): T {
         const { joinConditions, whereConditions } = this.buildRelationConditions(
             relation,
-            parentEntityId,
+            parentId,
             targetTable,
             parentTable,
             parentIdColumn,
@@ -811,7 +811,7 @@ export class DrizzleConditionBuilder {
     static buildRelationCountQuery<T extends DrizzleDynamicQuery>(
         baseCountQuery: T,
         relation: Relation,
-        parentEntityId: string | number,
+        parentId: string | number,
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
@@ -827,7 +827,7 @@ export class DrizzleConditionBuilder {
                 targetTable,
                 parentTable,
                 parentIdColumn,
-                parentEntityId,
+                parentId,
                 registry,
                 additionalFilters
             );
@@ -836,7 +836,7 @@ export class DrizzleConditionBuilder {
                 baseCountQuery,
                 relation.through,
                 targetIdColumn,
-                parentEntityId,
+                parentId,
                 registry,
                 additionalFilters
             );
@@ -845,7 +845,7 @@ export class DrizzleConditionBuilder {
                 baseCountQuery,
                 relation.through,
                 targetIdColumn,
-                parentEntityId,
+                parentId,
                 registry,
                 additionalFilters
             );
@@ -855,7 +855,7 @@ export class DrizzleConditionBuilder {
                 relation,
                 targetTable,
                 parentTable,
-                parentEntityId
+                parentId
             );
 
             const allConditions = [simpleCondition];
@@ -876,7 +876,7 @@ export class DrizzleConditionBuilder {
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
-        parentEntityId: string | number,
+        parentId: string | number,
         registry: PostgresCollectionRegistry,
         additionalFilters?: SQL[]
     ): T {
@@ -915,7 +915,7 @@ export class DrizzleConditionBuilder {
             throw new Error("Join path did not result in connecting to parent table");
         }
 
-        const allConditions = [eq(parentIdColumn, parentEntityId)];
+        const allConditions = [eq(parentIdColumn, parentId)];
         if (additionalFilters) {
             allConditions.push(...additionalFilters);
         }
@@ -930,7 +930,7 @@ export class DrizzleConditionBuilder {
         baseCountQuery: T,
         through: { table: string; sourceColumn: string; targetColumn: string },
         targetIdColumn: AnyPgColumn,
-        parentEntityId: string | number,
+        parentId: string | number,
         registry: PostgresCollectionRegistry,
         additionalFilters?: SQL[]
     ): T {
@@ -949,7 +949,7 @@ export class DrizzleConditionBuilder {
             throw new Error(`Target column '${through.targetColumn}' not found in junction table '${through.table}'`);
         }
 
-        const baseConditions = [eq(junctionSourceCol, parentEntityId)];
+        const baseConditions = [eq(junctionSourceCol, parentId)];
         if (additionalFilters && additionalFilters.length > 0) {
             baseConditions.push(...additionalFilters);
         }
@@ -966,7 +966,7 @@ export class DrizzleConditionBuilder {
         baseCountQuery: T,
         through: { table: string; sourceColumn: string; targetColumn: string },
         targetIdColumn: AnyPgColumn,
-        parentEntityId: string | number,
+        parentId: string | number,
         registry: PostgresCollectionRegistry,
         additionalFilters?: SQL[]
     ): T {
@@ -985,7 +985,7 @@ export class DrizzleConditionBuilder {
             throw new Error(`Target column '${through.targetColumn}' not found in junction table '${through.table}'`);
         }
 
-        const baseConditions = [eq(junctionSourceCol, parentEntityId)];
+        const baseConditions = [eq(junctionSourceCol, parentId)];
         if (additionalFilters && additionalFilters.length > 0) {
             baseConditions.push(...additionalFilters);
         }

@@ -1,4 +1,4 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 
 export const blogCollectionTemplate = {
     slug: "blog",
@@ -109,4 +109,4 @@ export const blogCollectionTemplate = {
             }
         }
     }
-} as unknown as EntityCollection;
+} as unknown as SnapshotCollection;

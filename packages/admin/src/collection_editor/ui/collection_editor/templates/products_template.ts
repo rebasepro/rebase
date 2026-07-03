@@ -1,4 +1,4 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 
 export const productsCollectionTemplate = {
     slug: "products",
@@ -85,4 +85,4 @@ export const productsCollectionTemplate = {
             autoValue: "on_create"
         }
     }
-} as unknown as EntityCollection;
+} as unknown as SnapshotCollection;

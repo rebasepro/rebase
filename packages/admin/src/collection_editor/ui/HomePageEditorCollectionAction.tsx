@@ -29,7 +29,7 @@ export function HomePageEditorCollectionAction({
         collectionEditorController?.editCollection({
             id: collection.slug,
             parentCollectionSlugs: [],
-            parentEntityIds: []
+            parentSnapshotIds: []
         });
     };
 
@@ -39,7 +39,7 @@ export function HomePageEditorCollectionAction({
         collectionEditorController?.createCollection({
             copyFrom: collection,
             parentCollectionSlugs: [],
-            parentEntityIds: [],
+            parentSnapshotIds: [],
             redirect: true,
             sourceClick: "home_page_duplicate"
         });

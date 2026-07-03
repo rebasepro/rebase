@@ -1,4 +1,4 @@
-import { DataType, EntityCollection } from "@rebasepro/types";
+import { DataType, SnapshotCollection } from "@rebasepro/types";
 
 
 /**
@@ -33,7 +33,7 @@ export interface CollectionValidationError {
 export interface CollectionValidationResult {
     valid: boolean;
     errors: CollectionValidationError[];
-    collection?: EntityCollection;
+    collection?: SnapshotCollection;
 }
 
 /**
@@ -461,6 +461,6 @@ export function validateCollectionJson(jsonString: string): CollectionValidation
     return {
         valid: errors.length === 0,
         errors,
-        collection: errors.length === 0 ? parsed as unknown as EntityCollection : undefined
+        collection: errors.length === 0 ? parsed as unknown as SnapshotCollection : undefined
     };
 }

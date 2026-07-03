@@ -1,4 +1,4 @@
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 
 export const pagesCollectionTemplate = {
     slug: "pages",
@@ -180,4 +180,4 @@ export const pagesCollectionTemplate = {
             description: "Should this page be live on the site?"
         }
     }
-} as unknown as EntityCollection;
+} as unknown as SnapshotCollection;

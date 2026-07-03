@@ -8,25 +8,25 @@
 export { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 export { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 export { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-export { useSideEntityController } from "../hooks/useSideEntityController";
+export { useSideSnapshotController } from "../hooks/useSideSnapshotController";
 export { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 
 // Components
 export { FieldCaption } from "../components/FieldCaption";
 export { SearchIconsView } from "../components/SearchIconsView";
 export { PropertyConfigBadge } from "../components/PropertyConfigBadge";
-export { EntityCollectionTable } from "../components/EntityCollectionTable";
+export { SnapshotCollectionTable } from "../components/SnapshotCollectionTable";
 export { VirtualTableInput } from "@rebasepro/ui";
 export { ArrayContainer } from "../components/ArrayContainer";
 export type { ArrayEntryParams } from "../components/ArrayContainer";
-export { useSelectionController } from "../components/EntityCollectionView/useSelectionController";
+export { useSelectionController } from "../components/SnapshotCollectionView/useSelectionController";
 
 // Data import
 export { ImportFileUpload } from "../data_import/components/ImportFileUpload";
 export { ImportSaveInProgress } from "../data_import/components/ImportSaveInProgress";
 export { useImportConfig } from "../data_import/hooks/useImportConfig";
 export { getInferenceType } from "../data_import/utils/get_import_inference_type";
-export { convertDataToEntity } from "../data_import/utils/data";
+export { convertDataToSnapshot } from "../data_import/utils/data";
 export type { ImportConfig } from "../data_import/types";
 
 // Data import components
@@ -38,4 +38,4 @@ export { getFieldConfig, getFieldId, getDefaultFieldConfig, getDefaultFieldId, D
 
 // Property & resolution utilities
 export { getPropertyInPath, getResolvedPropertyInPath, getDefaultPropertiesOrder, getPropertiesWithPropertiesOrder } from "../util/property_utils";
-export { resolveEntityAction, resolveEntityView } from "../util/resolutions";
+export { resolveSnapshotAction, resolveSnapshotView } from "../util/resolutions";

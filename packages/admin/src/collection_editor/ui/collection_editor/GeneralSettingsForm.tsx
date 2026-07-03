@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
 
 import { SearchIconsView } from "../../_cms_internals";
-import type { EntityCollection, PostgresCollection } from "@rebasepro/types";
+import type { SnapshotCollection, PostgresCollection } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Chip,
@@ -40,7 +40,7 @@ export function GeneralSettingsForm({
     isNewCollection: boolean;
     existingPaths?: string[];
     existingIds?: string[];
-    parentCollection?: EntityCollection;
+    parentCollection?: SnapshotCollection;
     renderExtraCollectionFields?: (params: ExtraCollectionFieldsParams) => React.ReactNode;
     standalone?: boolean;
 }) {
@@ -165,7 +165,7 @@ export function GeneralSettingsForm({
                                 value={values.singularName ?? ""}
                                 label={"Singular name"}/>
                             <FieldCaption error={showErrors && Boolean(errors.singularName)}>
-                                {showErrors && Boolean(errors.singularName) ? errors.singularName : "Optionally define a singular name for your entities"}
+                                {showErrors && Boolean(errors.singularName) ? errors.singularName : "Optionally define a singular name for your snapshots"}
                             </FieldCaption>
                         </div>
 

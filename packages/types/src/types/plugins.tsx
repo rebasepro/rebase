@@ -1,9 +1,9 @@
 import React, { PropsWithChildren } from "react";
 
-import type { EntityCollection, CollectionActionsProps, EntityTableController, SelectionController } from "./collections";
-import type { EntityStatus } from "./entities";
+import type { SnapshotCollection, CollectionActionsProps, SnapshotTableController, SelectionController } from "./collections";
+import type { SnapshotStatus } from "./snapshots";
 import type { InferPropertyType, Property } from "./properties";
-import type { FormContext } from "./entity_views";
+import type { FormContext } from "./snapshot_views";
 import type { RebaseContext } from "../rebase_context";
 import type { NavigationGroupMapping, AppView } from "../controllers/navigation";
 
@@ -20,7 +20,7 @@ import type { SlotContribution } from "./slots";
  *
  * @typeParam P - The property type this field is bound to
  * @typeParam CustomProps - Extra props injected via the property's `customProps`
- * @typeParam M - The entity model type
+ * @typeParam M - The snapshot model type
  * @group Form custom fields
  */
 export interface FieldProps<
@@ -76,7 +76,7 @@ export interface FieldProps<
     /** Additional properties set by the developer */
     customProps?: CustomProps;
 
-    /** Additional values related to the state of the form or the entity */
+    /** Additional values related to the state of the form or the snapshot */
     context: FormContext<M>;
 
     /** Flag to indicate if this field should be disabled */
@@ -116,7 +116,7 @@ export interface RebasePlugin {
     /**
      * HOC providers wrapping root or form content.
      * Providers with `scope: "root"` wrap the entire CMS below RebaseContext.
-     * Providers with `scope: "form"` wrap each entity form/edit view.
+     * Providers with `scope: "form"` wrap each snapshot form/edit view.
      */
     providers?: PluginProvider[];
 
@@ -153,7 +153,7 @@ export interface RebasePlugin {
 export interface PluginProvider {
     /**
      * `"root"` — wraps the entire CMS below RebaseContext.
-     * `"form"` — wraps each entity form / edit view.
+     * `"form"` — wraps each snapshot form / edit view.
      */
     scope: "root" | "form";
 
@@ -181,19 +181,19 @@ export interface PluginHooks {
     /**
      * Modify a single collection before it is rendered (synchronous).
      */
-    modifyCollection?: (collection: EntityCollection) => EntityCollection;
+    modifyCollection?: (collection: SnapshotCollection) => SnapshotCollection;
 
     /**
      * Async version of modifyCollection — supports fetching remote config.
      * Runs during navigation resolution. If provided alongside `modifyCollection`,
      * the sync version runs first, then the async version.
      */
-    modifyCollectionAsync?: (collection: EntityCollection) => Promise<EntityCollection>;
+    modifyCollectionAsync?: (collection: SnapshotCollection) => Promise<SnapshotCollection>;
 
     /**
      * Modify, add or remove collections.
      */
-    injectCollections?: (collections: EntityCollection[]) => EntityCollection[];
+    injectCollections?: (collections: SnapshotCollection[]) => SnapshotCollection[];
 
     /**
      * Callback called when columns are reordered via drag and drop.
@@ -201,8 +201,8 @@ export interface PluginHooks {
     onColumnsReorder?: (props: {
         fullPath: string;
         parentCollectionSlugs: string[];
-        parentEntityIds: string[];
-        collection: EntityCollection;
+        parentSnapshotIds: string[];
+        collection: SnapshotCollection;
         newPropertiesOrder: string[];
     }) => void;
 
@@ -212,8 +212,8 @@ export interface PluginHooks {
     onKanbanColumnsReorder?: (props: {
         fullPath: string;
         parentCollectionSlugs: string[];
-        parentEntityIds: string[];
-        collection: EntityCollection;
+        parentSnapshotIds: string[];
+        collection: SnapshotCollection;
         kanbanColumnProperty: string;
         newColumnsOrder: string[];
     }) => void;
@@ -261,10 +261,10 @@ export interface PluginLifecycle {
     onAuthStateChange?: (user: User | null) => void;
 
     /**
-     * Called when a collection's visible entities change.
+     * Called when a collection's visible snapshots change.
      * Useful for analytics, caching, or cross-plugin coordination.
      */
-    onCollectionChange?: (slug: string, entities: unknown[]) => void;
+    onCollectionChange?: (slug: string, snapshots: unknown[]) => void;
 }
 
 // ── Field Builder ─────────────────────────────────────────────────────
@@ -291,34 +291,34 @@ export interface FieldBuilderConfig {
  * Props passed to home page collection card action components.
  * @group Models
  */
-export interface PluginHomePageActionsProps<EP extends object = object, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends EntityCollection<M> = EntityCollection<M>> {
+export interface PluginHomePageActionsProps<EP extends object = object, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends SnapshotCollection<M> = SnapshotCollection<M>> {
     slug: string;
     collection: EC;
     context: RebaseContext<USER>;
 }
 
 /**
- * Props passed to form action components in entity edit/form views.
+ * Props passed to form action components in snapshot edit/form views.
  * @group Models
  */
-export interface PluginFormActionProps<USER extends User = User, EC extends EntityCollection = EntityCollection> {
-    entityId?: string | number;
+export interface PluginFormActionProps<USER extends User = User, EC extends SnapshotCollection = SnapshotCollection> {
+    snapshotId?: string | number;
     path: string;
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-    status: EntityStatus;
+    parentSnapshotIds: string[];
+    status: SnapshotStatus;
     collection: EC;
     disabled: boolean;
     formContext?: FormContext;
     context: RebaseContext<USER>;
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }
 
 /**
  * Parameters passed to the field builder wrap function.
  * @group Models
  */
-export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<string, unknown>, EC extends EntityCollection<M> = EntityCollection<M>> = {
+export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<string, unknown>, EC extends SnapshotCollection<M> = SnapshotCollection<M>> = {
     fieldConfigId: string;
     propertyKey: string;
     property: Property;

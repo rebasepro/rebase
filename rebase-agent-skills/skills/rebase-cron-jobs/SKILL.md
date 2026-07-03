@@ -230,8 +230,8 @@ interface CronJobContext {
 | `log` | `(...args: unknown[]) => void` | Logger whose output is captured in `CronJobLogEntry.logs`. Use like `console.log`. |
 | `client` | `RebaseClient` | Admin-level client for CRUD, auth, storage, and any SDK operation. |
 
-> **IMPORTANT FOR AGENTS:** `ctx.client` authenticates as the **service identity** (`userId: "service"`, `roles: ["admin"]`). All data operations through `ctx.client` go through the full REST middleware pipeline (including DataHooks and Entity Callbacks). This means:
-> - Entity Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
+> **IMPORTANT FOR AGENTS:** `ctx.client` authenticates as the **service identity** (`userId: "service"`, `roles: ["admin"]`). All data operations through `ctx.client` go through the full REST middleware pipeline (including DataHooks and Collection Callbacks). This means:
+> - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
 > - If your callbacks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
 > - The service identity bypasses RLS policies
 

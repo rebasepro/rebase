@@ -1,4 +1,4 @@
-import type { EntityCollection, PostgresProperties, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import type { SnapshotCollection, PostgresProperties, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
 
 /**
  * Maps a PostgreSQL column data type to a Rebase property type.
@@ -194,13 +194,13 @@ label: v.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) }))
 }
 
 /**
- * Builds a partial EntityCollection from PostgreSQL table metadata.
+ * Builds a partial SnapshotCollection from PostgreSQL table metadata.
  * This is used when creating a new collection from an existing database table.
  */
 export function buildCollectionFromTableMetadata(
     tableName: string,
     metadata: TableMetadata
-): Partial<EntityCollection> {
+): Partial<SnapshotCollection> {
     const properties: Record<string, Property> = {};
     const propertiesOrder: string[] = [];
     const relations: Array<{

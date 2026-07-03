@@ -1,5 +1,5 @@
-import type { EntityCollection, EntityCustomView } from "@rebasepro/types";
-import { Entity, RebaseContext, User } from "@rebasepro/types";
+import type { SnapshotCollection, SnapshotCustomView } from "@rebasepro/types";
+import { Snapshot, RebaseContext, User } from "@rebasepro/types";
 import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/common";
 import { useCMSContext } from "./useCMSContext";
@@ -9,20 +9,20 @@ import { useCMSContext } from "./useCMSContext";
  * @group Hooks and utilities
  */
 export type ResolvedNavigationEntry<M extends Record<string, unknown>> =
-    | ResolvedNavigationEntity<M>
+    | ResolvedNavigationSnapshot<M>
     | ResolvedNavigationCollection<M>
-    | ResolvedNavigationEntityCustom<M>;
+    | ResolvedNavigationSnapshotCustom<M>;
 
 /**
  * @see resolveNavigationFrom
  * @group Hooks and utilities
  */
-export interface ResolvedNavigationEntity<M extends Record<string, unknown>> {
-    type: "entity";
-    entity: Entity<M>;
-    entityId: string | number;
+export interface ResolvedNavigationSnapshot<M extends Record<string, unknown>> {
+    type: "snapshot";
+    snapshot: Snapshot<M>;
+    snapshotId: string | number;
     path: string;
-    parentCollection: EntityCollection<M>;
+    parentCollection: SnapshotCollection<M>;
 }
 
 /**
@@ -32,22 +32,22 @@ export interface ResolvedNavigationEntity<M extends Record<string, unknown>> {
 export interface ResolvedNavigationCollection<M extends Record<string, unknown>> {
     type: "collection";
     path: string;
-    collection: EntityCollection<M>;
+    collection: SnapshotCollection<M>;
 }
 
 /**
  * @see resolveNavigationFrom
  * @group Hooks and utilities
  */
-interface ResolvedNavigationEntityCustom<M extends Record<string, unknown>> {
+interface ResolvedNavigationSnapshotCustom<M extends Record<string, unknown>> {
     type: "custom_view";
     path: string;
-    view: EntityCustomView<M>;
+    view: SnapshotCustomView<M>;
 }
 
 /**
  * Use this function to retrieve an array of navigation entries (resolved
- * collection, entity or entity custom_view) for the given path. You need to pass the app context
+ * collection, snapshot or snapshot custom_view) for the given path. You need to pass the app context
  * that you receive in different callbacks, such as the save hooks.
  *
  * It will take into account the `navigation` provided at the `Rebase` level.
@@ -80,21 +80,24 @@ export function resolveNavigationFrom<M extends Record<string, unknown>, USER ex
         .map((entry) => {
             if (entry.type === "collection") {
                 return Promise.resolve(entry);
-            } else if (entry.type === "entity") {
+            } else if (entry.type === "snapshot") {
                 const collection = collectionRegistryController.getCollection(entry.slug);
                 if (!collection) {
-                    throw Error(`No collection defined in the navigation for the entity with path ${entry.slug}`);
+                    throw Error(`No collection defined in the navigation for the snapshot with path ${entry.slug}`);
                 }
-                return data.collection(entry.slug).findById(entry.entityId)
-                    .then((entity) => {
-                        if (!entity) return undefined;
+                // `context.data` is the flat SDK layer; re-wrap the row into the
+                // Snapshot view-model the navigation entry expects.
+                return data.collection(entry.slug).findById(entry.snapshotId)
+                    .then((row) => {
+                        if (!row) return undefined;
+                        const snapshot = { id: row.id, path: entry.slug, values: row };
                         return { ...entry,
-entity };
+snapshot };
                     });
             } else if (entry.type === "custom_view") {
                 return Promise.resolve(entry);
             } else {
-                throw Error("Unmapped element in useEntitiesFromPath");
+                throw Error("Unmapped element in useSnapshotsFromPath");
             }
         })
         .filter(v => Boolean(v)) as Promise<ResolvedNavigationEntry<any>>[];
@@ -120,7 +123,7 @@ export interface NavigationFrom<M extends Record<string, unknown>> {
 
 /**
  * Use this hook to retrieve an array of navigation entries (resolved
- * collection or entity) for the given path. You can use this hook
+ * collection or snapshot) for the given path. You can use this hook
  * in any React component that lives under `Rebase`
  * @group Hooks and utilities
  */

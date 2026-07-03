@@ -1,4 +1,4 @@
-import { EntityCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
+import { SnapshotCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
 
 export interface CollectionsSetupInfo {
     status: "ongoing" | "complete" | "error";
@@ -13,7 +13,7 @@ export interface CollectionsConfigController {
 
     loading: boolean;
 
-    collections?: EntityCollection[];
+    collections?: SnapshotCollection[];
 
     /**
      * If true, the configuration cannot be modified.
@@ -32,7 +32,7 @@ export interface CollectionsConfigController {
      */
     collectionsSetup?: CollectionsSetupInfo;
 
-    getCollection: (id: string) => EntityCollection;
+    getCollection: (id: string) => SnapshotCollection;
 
     saveCollection: <M extends { [Key: string]: any }>(params: SaveCollectionParams<M>) => Promise<void>;
     updateCollection: <M extends { [Key: string]: any }>(params: UpdateCollectionParams<M>) => Promise<void>;
@@ -59,16 +59,16 @@ export interface CollectionsConfigController {
 
 export type UpdateCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
-    collectionData: Partial<EntityCollection<M>>,
+    collectionData: Partial<SnapshotCollection<M>>,
     previousId?: string,
-    parentCollectionSlugs?: string[], parentEntityIds?: string[]
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
 
 export type SaveCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
-    collectionData: EntityCollection<M>,
+    collectionData: SnapshotCollection<M>,
     previousId?: string,
-    parentCollectionSlugs?: string[], parentEntityIds?: string[]
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
 
 export type SavePropertyParams = {
@@ -77,7 +77,7 @@ export type SavePropertyParams = {
     namespace?: string,
     newPropertiesOrder?: string[],
     property: Property,
-    parentCollectionSlugs?: string[], parentEntityIds?: string[]
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
 
 export type DeletePropertyParams = {
@@ -85,25 +85,25 @@ export type DeletePropertyParams = {
     propertyKey: string,
     namespace?: string,
     newPropertiesOrder?: string[],
-    parentCollectionSlugs?: string[], parentEntityIds?: string[]
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
 
 export type DeleteCollectionParams = {
     id: string,
-    parentCollectionSlugs?: string[], parentEntityIds?: string[]
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
 
 export type UpdatePropertiesOrderParams = {
     fullPath: string;
-    parentCollectionSlugs: string[], parentEntityIds: string[];
-    collection: EntityCollection;
+    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    collection: SnapshotCollection;
     newPropertiesOrder: string[];
 }
 
 export type UpdateKanbanColumnsOrderParams = {
     fullPath: string;
-    parentCollectionSlugs: string[], parentEntityIds: string[];
-    collection: EntityCollection;
+    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    collection: SnapshotCollection;
     kanbanColumnProperty: string;
     newColumnsOrder: string[];
 }

@@ -1,8 +1,8 @@
 import { useCollectionRegistryController } from "../../../_cms_internals";
-import { convertDataToEntity, ImportConfig } from "../../../_cms_internals";
+import { convertDataToSnapshot, ImportConfig } from "../../../_cms_internals";
 import { useAuthController } from "@rebasepro/core";
-import { EntityCollectionTable } from "../../../../components/EntityCollectionTable/EntityCollectionTable";
-import { useSelectionController } from "../../../../components/EntityCollectionView/useSelectionController";
+import { SnapshotCollectionTable } from "../../../../components/SnapshotCollectionTable/SnapshotCollectionTable";
+import { useSelectionController } from "../../../../components/SnapshotCollectionView/useSelectionController";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { Properties } from "@rebasepro/types";
 import { useEffect, useState } from "react";
@@ -22,8 +22,8 @@ export function CollectionEditorImportDataPreview({
     const registry = useCollectionRegistryController();
     const [loading, setLoading] = useState<boolean>(false);
 
-    async function loadEntities() {
-        const mappedData = importConfig.importData.map(d => convertDataToEntity(authController,
+    async function loadSnapshots() {
+        const mappedData = importConfig.importData.map(d => convertDataToSnapshot(authController,
             registry,
             d,
             importConfig.idColumn,
@@ -31,24 +31,24 @@ export function CollectionEditorImportDataPreview({
             properties,
             "TEMP_PATH",
             importConfig.defaultValues));
-        importConfig.setEntities(mappedData);
+        importConfig.setSnapshots(mappedData);
     }
 
     useEffect(() => {
-        loadEntities().finally(() => setLoading(false));
+        loadSnapshots().finally(() => setLoading(false));
     }, []);
 
     const selectionController = useSelectionController();
     if (loading)
         return <CircularProgressCenter/>
 
-    return <EntityCollectionTable
+    return <SnapshotCollectionTable
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
+            <Typography variant={"caption"}>Snapshots with the same id will be overwritten</Typography>
         </div>}
         tableController={{
-            data: importConfig.entities,
+            data: importConfig.snapshots,
             dataLoading: false,
             noMoreToLoad: false
         }}
@@ -60,7 +60,7 @@ export function CollectionEditorImportDataPreview({
             key: p,
             disabled: false
         }))}
-        openEntityMode={"side_panel"}
+        openSnapshotMode={"side_panel"}
         properties={properties}
         enablePopupIcon={false}/>
 

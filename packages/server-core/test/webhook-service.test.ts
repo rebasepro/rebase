@@ -43,12 +43,12 @@ enabled: true })
         });
     });
 
-    describe("onEntityChange", () => {
+    describe("onSnapshotChange", () => {
         it("returns empty array when no webhooks match", async () => {
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([makeWebhook({ table: "posts" })]);
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1",
 name: "Test" }
             );
@@ -65,7 +65,7 @@ events: ["INSERT"] })]);
                 text: () => Promise.resolve("OK")
             });
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1" }
             );
             expect(results).toHaveLength(1);
@@ -76,7 +76,7 @@ events: ["INSERT"] })]);
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([makeWebhook({ table: "users" })]);
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "posts", "INSERT", "id_1", { id: "id_1" }
             );
             expect(results).toEqual([]);
@@ -86,7 +86,7 @@ events: ["INSERT"] })]);
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([makeWebhook({ events: ["INSERT"] })]);
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "users", "DELETE", "id_1", { id: "id_1" }
             );
             expect(results).toEqual([]);
@@ -102,7 +102,7 @@ events: ["INSERT"] })]);
                 text: () => Promise.resolve("OK")
             });
 
-            await dispatcher.onEntityChange(
+            await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1" }
             );
 
@@ -127,7 +127,7 @@ events: ["INSERT"] })]);
                 text: () => Promise.resolve("OK")
             });
 
-            await dispatcher.onEntityChange(
+            await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1" }
             );
 
@@ -145,15 +145,15 @@ events: ["INSERT"] })]);
                 text: () => Promise.resolve("OK")
             });
 
-            const entity = { id: "id_1",
+            const snapshot = { id: "id_1",
 name: "Test User" };
-            await dispatcher.onEntityChange("users", "INSERT", "id_1", entity);
+            await dispatcher.onSnapshotChange("users", "INSERT", "id_1", snapshot);
 
             const [, options] = mockFetch.mock.calls[0];
             const payload = JSON.parse(options.body as string);
             expect(payload.type).toBe("INSERT");
             expect(payload.table).toBe("users");
-            expect(payload.record).toEqual(entity);
+            expect(payload.record).toEqual(snapshot);
             expect(payload.timestamp).toBeTruthy();
             expect(payload.schema).toBe("public");
         });
@@ -167,11 +167,11 @@ name: "Test User" };
                 text: () => Promise.resolve("OK")
             });
 
-            const entity = { id: "id_1",
+            const snapshot = { id: "id_1",
 name: "Updated" };
             const previous = { id: "id_1",
 name: "Original" };
-            await dispatcher.onEntityChange("users", "UPDATE", "id_1", entity, previous);
+            await dispatcher.onSnapshotChange("users", "UPDATE", "id_1", snapshot, previous);
 
             const [, options] = mockFetch.mock.calls[0];
             const payload = JSON.parse(options.body as string);
@@ -184,7 +184,7 @@ name: "Original" };
 
             mockFetch.mockRejectedValue(new Error("Network error"));
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1" }
             );
 
@@ -203,7 +203,7 @@ name: "Original" };
                 text: () => Promise.resolve("Internal Server Error")
             });
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1" }
             );
 
@@ -226,7 +226,7 @@ name: "Original" };
                 text: () => Promise.resolve("OK")
             });
 
-            await dispatcher.onEntityChange("users", "INSERT", "id_1", { id: "id_1" });
+            await dispatcher.onSnapshotChange("users", "INSERT", "id_1", { id: "id_1" });
 
             const [, options] = mockFetch.mock.calls[0];
             const headers = options.headers as Record<string, string>;
@@ -248,7 +248,7 @@ url: "https://b.com/hook" })
                 text: () => Promise.resolve("OK")
             });
 
-            const results = await dispatcher.onEntityChange(
+            const results = await dispatcher.onSnapshotChange(
                 "users", "INSERT", "id_1", { id: "id_1" }
             );
 

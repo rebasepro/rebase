@@ -1,5 +1,5 @@
-import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
-import { getPrimaryKeys } from "../services/entity-helpers";
+import { SnapshotCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import { getPrimaryKeys } from "../services/collection-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
@@ -19,7 +19,7 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
     return toSnakeCase(propName);
 };
 
-const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
+const getPrimaryKeyProp = (collection: SnapshotCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
@@ -52,7 +52,7 @@ isUuid: isUuid ?? false };
  * Returns the property key (the Drizzle object key) if found, or the original
  * column name as a fallback.
  */
-const resolvePropertyKeyForColumn = (collection: EntityCollection, column: string): string => {
+const resolvePropertyKeyForColumn = (collection: SnapshotCollection, column: string): string => {
     if (!collection.properties) return column;
     for (const [propKey, prop] of Object.entries(collection.properties)) {
         const p = prop as Property;
@@ -68,15 +68,15 @@ const resolvePropertyKeyForColumn = (collection: EntityCollection, column: strin
     return column;
 };
 
-const isNumericId = (collection: EntityCollection): boolean => {
+const isNumericId = (collection: SnapshotCollection): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
 };
 
-const getPrimaryKeyName = (collection: EntityCollection): string => {
+const getPrimaryKeyName = (collection: SnapshotCollection): string => {
     return getPrimaryKeyProp(collection).name;
 };
 
-const isIdProperty = (propName: string, prop: Property, collection: EntityCollection): boolean => {
+const isIdProperty = (propName: string, prop: Property, collection: SnapshotCollection): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;
 
     // We only fallback to "id" if NO property is explicitly marked with `isId: true` or a generator string
@@ -84,7 +84,7 @@ const isIdProperty = (propName: string, prop: Property, collection: EntityCollec
     return !hasExplicitId && propName === "id";
 };
 
-const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCollection, collections: EntityCollection[]): string | null => {
+const getDrizzleColumn = (propName: string, prop: Property, collection: SnapshotCollection, collections: SnapshotCollection[]): string | null => {
 
     const colName = resolveColumnName(propName, prop);
     let columnDefinition: string;
@@ -243,7 +243,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: EntityCo
                 return null;
             }
 
-            let targetCollection: EntityCollection;
+            let targetCollection: SnapshotCollection;
             try {
                 targetCollection = relation.target();
             } catch {
@@ -342,7 +342,7 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
  * - operations[] array: generates one policy per operation
  * - Combinations: roles + ownerField, roles + raw SQL, etc.
  */
-const generatePolicyCode = (collection: EntityCollection, rule: SecurityRule, index: number): string => {
+const generatePolicyCode = (collection: SnapshotCollection, rule: SecurityRule, index: number): string => {
     const tableName = getTableName(collection);
     // Resolve operations: operations[] takes precedence over operation (singular)
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
@@ -364,7 +364,7 @@ const generatePolicyCode = (collection: EntityCollection, rule: SecurityRule, in
 /**
  * Generates a single pgPolicy() call for one specific operation.
  */
-const generateSinglePolicyCode = (collection: EntityCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+const generateSinglePolicyCode = (collection: SnapshotCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
     const mode = rule.mode ?? "permissive";
 
     // Determine which clauses this operation needs:
@@ -421,8 +421,8 @@ const generateSinglePolicyCode = (collection: EntityCollection, rule: SecurityRu
  */
 const computeSharedRelationName = (
     rel: Relation,
-    sourceCollection: EntityCollection,
-    _collections: EntityCollection[]
+    sourceCollection: SnapshotCollection,
+    _collections: SnapshotCollection[]
 ): string => {
     const fallback = rel.relationName ?? toSnakeCase(rel.target().slug);
 
@@ -487,7 +487,7 @@ const computeSharedRelationName = (
 };
 
 // --- Main Schema Generation Logic ---
-export const generateSchema = async (collections: EntityCollection[], stripPolicies = false): Promise<string> => {
+export const generateSchema = async (collections: SnapshotCollection[], stripPolicies = false): Promise<string> => {
     let schemaContent = "// This file is auto-generated by the Rebase Drizzle generator. Do not edit manually.\n\n";
 
 
@@ -537,10 +537,10 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
     const exportedRelationVars: string[] = [];
 
     const allTablesToGenerate = new Map<string, {
-        collection: EntityCollection,
+        collection: SnapshotCollection,
         isJunction?: boolean,
         relation?: Relation,
-        sourceCollection?: EntityCollection
+        sourceCollection?: SnapshotCollection
     }>();
 
     // 1. Generate Enums
@@ -581,7 +581,7 @@ export const generateSchema = async (collections: EntityCollection[], stripPolic
                         collection: {
                             table: junctionTableName,
                             properties: {}
-                        } as EntityCollection,
+                        } as SnapshotCollection,
                         isJunction: true,
                         relation: relation,
                         sourceCollection: collection

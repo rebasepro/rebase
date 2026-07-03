@@ -1,24 +1,24 @@
 ---
 name: rebase-webhooks
-description: Guide for sending outbound HTTP webhooks on entity changes in a Rebase backend. Use this skill when the user needs to notify external services on INSERT, UPDATE, or DELETE, verify HMAC signatures, understand retry/backoff behavior, or build a webhook receiver.
+description: Guide for sending outbound HTTP webhooks on snapshot changes in a Rebase backend. Use this skill when the user needs to notify external services on INSERT, UPDATE, or DELETE, verify HMAC signatures, understand retry/backoff behavior, or build a webhook receiver.
 ---
 
 # Rebase Webhooks
 
-> **IMPORTANT FOR AGENTS**: The `WebhookDispatcher` is a **standalone service class** exported from `@rebasepro/server-core`. It is **not** auto-wired into the backend init pipeline — you must instantiate it yourself and call `onEntityChange()` from your application code (e.g. entity callbacks, custom functions, or cron jobs). Do NOT look for a `webhooks` key in `RebaseBackendConfig`.
+> **IMPORTANT FOR AGENTS**: The `WebhookDispatcher` is a **standalone service class** exported from `@rebasepro/server-core`. It is **not** auto-wired into the backend init pipeline — you must instantiate it yourself and call `onSnapshotChange()` from your application code (e.g. collection callbacks, custom functions, or cron jobs). Do NOT look for a `webhooks` key in `RebaseBackendConfig`.
 
 > **IMPORTANT FOR AGENTS**: Webhooks are **outbound** HTTP POST requests sent by your Rebase backend to external URLs. They are NOT inbound endpoints. To receive webhooks FROM external services, use Rebase custom functions instead (see `rebase-custom-functions` skill).
 
 ## Overview
 
-Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notifications when entities change. It handles:
+Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notifications when snapshots change. It handles:
 
 - **Table + event matching** — Only dispatches to webhooks whose `table` and `events` match
 - **HMAC-SHA256 signing** — Optional payload signing for receiver verification
 - **Automatic retries** — Up to 3 attempts with exponential backoff (1s → 5s → 15s)
 - **Custom headers** — Attach authorization tokens or other headers to outbound requests
 - **10-second timeout** — Requests are aborted if the receiver doesn't respond in time
-- **Multiple webhooks** — Multiple webhooks can match the same entity change
+- **Multiple webhooks** — Multiple webhooks can match the same snapshot change
 
 ## Setup
 
@@ -69,23 +69,23 @@ dispatcher.setWebhooks([
 
 > **WARNING FOR AGENTS**: `setWebhooks()` **replaces** the entire webhook list each time it's called. It does NOT append. Disabled webhooks (`enabled: false`) are silently dropped.
 
-### Dispatch on Entity Changes
+### Dispatch on Snapshot Changes
 
-Call `onEntityChange()` whenever an entity is created, updated, or deleted. The dispatcher checks all registered webhooks and fires matching ones.
+Call `onSnapshotChange()` whenever a snapshot is created, updated, or deleted. The dispatcher checks all registered webhooks and fires matching ones.
 
 ```typescript
-const results = await dispatcher.onEntityChange(
+const results = await dispatcher.onSnapshotChange(
     "orders",                          // table name
     "INSERT",                          // event type
-    "order_abc123",                    // entity ID
-    { id: "order_abc123", total: 99 }  // the entity record
+    "order_abc123",                    // snapshot ID
+    { id: "order_abc123", total: 99 }  // the snapshot record
 );
 ```
 
-For **UPDATE** events, pass the previous entity as the 5th argument:
+For **UPDATE** events, pass the previous snapshot as the 5th argument:
 
 ```typescript
-const results = await dispatcher.onEntityChange(
+const results = await dispatcher.onSnapshotChange(
     "users",
     "UPDATE",
     "user_42",
@@ -94,14 +94,14 @@ const results = await dispatcher.onEntityChange(
 );
 ```
 
-For **DELETE** events, the entity may be `null`:
+For **DELETE** events, the snapshot may be `null`:
 
 ```typescript
-const results = await dispatcher.onEntityChange(
+const results = await dispatcher.onSnapshotChange(
     "orders",
     "DELETE",
     "order_abc123",
-    null  // entity was deleted
+    null  // snapshot was deleted
 );
 ```
 
@@ -131,7 +131,7 @@ interface WebhookConfig {
 
 ## WebhookDeliveryResult Interface
 
-Every call to `onEntityChange()` returns an array of `WebhookDeliveryResult` — one per matching webhook.
+Every call to `onSnapshotChange()` returns an array of `WebhookDeliveryResult` — one per matching webhook.
 
 ```typescript
 interface WebhookDeliveryResult {
@@ -178,8 +178,8 @@ Every webhook sends a `POST` request with a JSON body containing:
 |-------|------|-------------|
 | `type` | `string` | The event type: `"INSERT"`, `"UPDATE"`, or `"DELETE"`. |
 | `table` | `string` | The database table name where the change occurred. |
-| `record` | `object \| null` | The current state of the entity. `null` for DELETE events if no entity data available. |
-| `old_record` | `object \| undefined` | The previous state of the entity. **Only present for `UPDATE` events.** `undefined` for INSERT and DELETE. |
+| `record` | `object \| null` | The current state of the snapshot. `null` for DELETE events if no snapshot data available. |
+| `old_record` | `object \| undefined` | The previous state of the snapshot. **Only present for `UPDATE` events.** `undefined` for INSERT and DELETE. |
 | `schema` | `string` | Always `"public"`. |
 | `timestamp` | `string` | ISO 8601 timestamp of when the webhook was dispatched. |
 
@@ -187,9 +187,9 @@ Every webhook sends a `POST` request with a JSON body containing:
 
 | Event | `record` | `old_record` |
 |-------|----------|--------------|
-| `INSERT` | The newly created entity | `undefined` |
-| `UPDATE` | The updated entity (new state) | The entity before the update (old state) |
-| `DELETE` | The deleted entity (or `null`) | `undefined` |
+| `INSERT` | The newly created snapshot | `undefined` |
+| `UPDATE` | The updated snapshot (new state) | The snapshot before the update (old state) |
+| `DELETE` | The deleted snapshot (or `null`) | `undefined` |
 
 ## HTTP Headers
 
@@ -355,13 +355,13 @@ If the receiver does not respond within 10 seconds, the request is aborted and t
 
 ## Integration Patterns
 
-### With Entity Callbacks
+### With Collection Callbacks
 
-The most common pattern is to wire the dispatcher into Rebase entity callbacks so webhooks fire automatically on CRUD operations:
+The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations:
 
 ```typescript
 // backend/collections/orders.ts
-import type { EntityCollection, EntityCallbacks } from "@rebasepro/types";
+import type { SnapshotCollection, CollectionCallbacks } from "@rebasepro/types";
 import { WebhookDispatcher } from "@rebasepro/server-core/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
@@ -376,35 +376,35 @@ dispatcher.setWebhooks([
     },
 ]);
 
-const callbacks: EntityCallbacks = {
-    afterCreate: async ({ entity, collection }) => {
-        await dispatcher.onEntityChange(
+const callbacks: CollectionCallbacks = {
+    afterCreate: async ({ snapshot, collection }) => {
+        await dispatcher.onSnapshotChange(
             collection.path,
             "INSERT",
-            entity.id,
-            entity
+            snapshot.id,
+            snapshot
         );
     },
-    afterUpdate: async ({ entity, previousEntity, collection }) => {
-        await dispatcher.onEntityChange(
+    afterUpdate: async ({ snapshot, previousSnapshot, collection }) => {
+        await dispatcher.onSnapshotChange(
             collection.path,
             "UPDATE",
-            entity.id,
-            entity,
-            previousEntity
+            snapshot.id,
+            snapshot,
+            previousSnapshot
         );
     },
-    afterDelete: async ({ entityId, collection }) => {
-        await dispatcher.onEntityChange(
+    afterDelete: async ({ snapshotId, collection }) => {
+        await dispatcher.onSnapshotChange(
             collection.path,
             "DELETE",
-            entityId,
+            snapshotId,
             null
         );
     },
 };
 
-const ordersCollection: EntityCollection = {
+const ordersCollection: SnapshotCollection = {
     name: "Orders",
     path: "orders",
     callbacks,
@@ -450,7 +450,7 @@ const fn: RebaseFunctionDefinition = {
         });
 
         // Manually dispatch the webhook
-        const results = await dispatcher.onEntityChange(
+        const results = await dispatcher.onSnapshotChange(
             "payments",
             "INSERT",
             payment.id,
@@ -519,9 +519,9 @@ Then import it from any callback or function:
 ```typescript
 import { dispatcher } from "../lib/webhooks";
 
-// In an entity callback:
-afterCreate: async ({ entity, collection }) => {
-    await dispatcher.onEntityChange(collection.path, "INSERT", entity.id, entity);
+// In an collection callback:
+afterCreate: async ({ snapshot, collection }) => {
+    await dispatcher.onSnapshotChange(collection.path, "INSERT", snapshot.id, snapshot);
 },
 ```
 
@@ -535,36 +535,36 @@ Registers the list of webhooks to watch. Filters out any with `enabled: false`. 
 |-----------|------|-------------|
 | `webhooks` | `WebhookConfig[]` | Array of webhook configurations. |
 
-### `onEntityChange(table, event, entityId, entity, previousEntity?): Promise<WebhookDeliveryResult[]>`
+### `onSnapshotChange(table, event, snapshotId, snapshot, previousSnapshot?): Promise<WebhookDeliveryResult[]>`
 
 Checks all registered webhooks for matching `table` + `event`, and dispatches to each match.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `table` | `string` | The database table name (e.g. `"orders"`). |
-| `event` | `"INSERT" \| "UPDATE" \| "DELETE"` | The type of entity change. |
-| `entityId` | `string` | The unique ID of the changed entity. |
-| `entity` | `Record<string, unknown> \| null` | The current entity data. May be `null` for deletes. |
-| `previousEntity` | `Record<string, unknown> \| null` | *(Optional)* The previous entity state. Only relevant for `UPDATE` events — included as `old_record` in the payload. |
+| `event` | `"INSERT" \| "UPDATE" \| "DELETE"` | The type of snapshot change. |
+| `snapshotId` | `string` | The unique ID of the changed snapshot. |
+| `snapshot` | `Record<string, unknown> \| null` | The current snapshot data. May be `null` for deletes. |
+| `previousSnapshot` | `Record<string, unknown> \| null` | *(Optional)* The previous snapshot state. Only relevant for `UPDATE` events — included as `old_record` in the payload. |
 
 **Returns:** `Promise<WebhookDeliveryResult[]>` — One result per matching webhook. Empty array if no webhooks match.
 
 ## Event Types
 
-The dispatcher supports three event types, passed as the `event` parameter to `onEntityChange()`:
+The dispatcher supports three event types, passed as the `event` parameter to `onSnapshotChange()`:
 
 | Event | When to Use | `record` Contains | `old_record` Contains |
 |-------|-------------|--------------------|-----------------------|
-| `INSERT` | A new entity was created | The new entity | `undefined` |
-| `UPDATE` | An existing entity was modified | The updated entity | The entity before update |
-| `DELETE` | An entity was removed | The deleted entity (or `null`) | `undefined` |
+| `INSERT` | A new snapshot was created | The new snapshot | `undefined` |
+| `UPDATE` | An existing snapshot was modified | The updated snapshot | The snapshot before update |
+| `DELETE` | a snapshot was removed | The deleted snapshot (or `null`) | `undefined` |
 
 ## Error Handling
 
 ### Checking Delivery Results
 
 ```typescript
-const results = await dispatcher.onEntityChange("orders", "INSERT", id, entity);
+const results = await dispatcher.onSnapshotChange("orders", "INSERT", id, snapshot);
 
 for (const result of results) {
     if (!result.success) {
@@ -592,9 +592,9 @@ for (const result of results) {
 If you don't want webhook delivery to block your API response, use fire-and-forget:
 
 ```typescript
-afterCreate: async ({ entity, collection }) => {
+afterCreate: async ({ snapshot, collection }) => {
     // Fire-and-forget — don't await
-    dispatcher.onEntityChange(collection.path, "INSERT", entity.id, entity)
+    dispatcher.onSnapshotChange(collection.path, "INSERT", snapshot.id, snapshot)
         .catch(err => console.error("Webhook dispatch error:", err));
 },
 ```
@@ -613,9 +613,9 @@ afterCreate: async ({ entity, collection }) => {
 | **`secret` is not set** | No `X-Webhook-Signature` header is sent. Payload is not signed. |
 | **Custom header conflicts with built-in** | Custom headers override built-in headers (they are spread after). |
 | **Response body very large** | Truncated to **1000 characters** in the `WebhookDeliveryResult`. |
-| **`entity` is `null` for DELETE** | Sent as `"record": null` in the payload. |
-| **`previousEntity` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |
-| **`onEntityChange` is async** | The entire retry sequence is awaited. For INSERT with 3 failed attempts: ~6s of waiting. |
+| **`snapshot` is `null` for DELETE** | Sent as `"record": null` in the payload. |
+| **`previousSnapshot` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |
+| **`onSnapshotChange` is async** | The entire retry sequence is awaited. For INSERT with 3 failed attempts: ~6s of waiting. |
 
 ## References
 

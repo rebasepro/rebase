@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
-import type { EntityCollection } from "../types/collections";
-import type { EntityCollectionsBuilder, AppViewsBuilder } from "../types/builders";
-import type { EntityCustomView } from "../types/entity_views";
-import type { EntityAction } from "../types/entity_actions";
+import type { SnapshotCollection } from "../types/collections";
+import type { SnapshotCollectionsBuilder, AppViewsBuilder } from "../types/builders";
+import type { SnapshotCustomView } from "../types/snapshot_views";
+import type { SnapshotAction } from "../types/snapshot_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
 
 /**
@@ -21,8 +21,8 @@ export interface CollectionEditorOptions {
     pathSuggestions?: string[];
 }
 
-export interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection> {
-    collections?: EC[] | EntityCollectionsBuilder<EC>;
+export interface RebaseCMSConfig<EC extends SnapshotCollection = SnapshotCollection> {
+    collections?: EC[] | SnapshotCollectionsBuilder<EC>;
 
     /**
      * Custom top-level views added to the main navigation.
@@ -32,8 +32,8 @@ export interface RebaseCMSConfig<EC extends EntityCollection = EntityCollection>
     views?: AppView[] | AppViewsBuilder;
 
     homePage?: ReactNode;
-    entityViews?: EntityCustomView[];
-    entityActions?: EntityAction[];
+    snapshotViews?: SnapshotCustomView[];
+    snapshotActions?: SnapshotAction[];
 
     /**
      * Centralized configuration for how collections and views are grouped

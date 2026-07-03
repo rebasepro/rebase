@@ -1,8 +1,8 @@
-import type { EntityCollection, RebasePlugin } from "@rebasepro/types";
+import type { SnapshotCollection, RebasePlugin } from "@rebasepro/types";
 import { useRef, useMemo } from "react";
 
 import { AuthController, CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
-import type { EntityCollectionsBuilder } from "@rebasepro/types";
+import type { SnapshotCollectionsBuilder } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 
 
@@ -10,9 +10,9 @@ import { resolveCollections } from "./useNavigationResolution";
 import { areCollectionListsEqual } from "./utils";
 import { useAsyncResolver } from "./useAsyncResolver";
 
-export type UseResolvedCollectionsProps<EC extends EntityCollection, USER extends User> = {
+export type UseResolvedCollectionsProps<EC extends SnapshotCollection, USER extends User> = {
     authController: AuthController<USER>;
-    collections?: EC[] | EntityCollectionsBuilder<EC>;
+    collections?: EC[] | SnapshotCollectionsBuilder<EC>;
     data: RebaseData;
     plugins?: RebasePlugin[];
     disabled?: boolean;
@@ -21,7 +21,7 @@ export type UseResolvedCollectionsProps<EC extends EntityCollection, USER extend
 };
 
 export type UseResolvedCollectionsResult = {
-    collections: EntityCollection[];
+    collections: SnapshotCollection[];
     loading: boolean;
     error: Error | undefined;
     refresh: () => void;
@@ -29,7 +29,7 @@ export type UseResolvedCollectionsResult = {
 
 /**
  * Hook that resolves collection props (which may be async builders or arrays)
- * into concrete EntityCollection[], and registers them with the CollectionRegistry.
+ * into concrete SnapshotCollection[], and registers them with the CollectionRegistry.
  *
  * When userManagement is provided, the default users collection is always
  * prepended. Developer collections override via generic slug-based dedup
@@ -38,7 +38,7 @@ export type UseResolvedCollectionsResult = {
  * Uses refs for potentially-unstable dependencies (driver, authController,
  * plugins) to avoid re-triggering effects when their object identity changes.
  */
-export function useResolvedCollections<EC extends EntityCollection, USER extends User>(
+export function useResolvedCollections<EC extends SnapshotCollection, USER extends User>(
     props: UseResolvedCollectionsProps<EC, USER>
 ): UseResolvedCollectionsResult {
 
@@ -66,7 +66,7 @@ export function useResolvedCollections<EC extends EntityCollection, USER extends
     const pluginsRef = useRef(plugins);
     pluginsRef.current = plugins;
 
-    const { data: collections, loading, error, refresh } = useAsyncResolver<EntityCollection[]>({
+    const { data: collections, loading, error, refresh } = useAsyncResolver<SnapshotCollection[]>({
         resolver: async () => {
             const resolved = await resolveCollections(
                 collectionsProp,

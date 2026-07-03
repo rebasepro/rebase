@@ -1,4 +1,4 @@
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 import { getSubcollections } from "./resolutions";
 
@@ -33,13 +33,13 @@ export function getLastSegment(path: string) {
     return cleanPath;
 }
 
-export function resolveCollectionPathIds(path: string, allCollections: EntityCollection[]): string {
+export function resolveCollectionPathIds(path: string, allCollections: SnapshotCollection[]): string {
     let remainingPath = removeInitialAndTrailingSlashes(path);
     if (!remainingPath) {
         return "";
     }
 
-    let currentCollections: EntityCollection[] | undefined = allCollections;
+    let currentCollections: SnapshotCollection[] | undefined = allCollections;
     const resolvedPathParts: string[] = [];
 
     while (remainingPath.length > 0) {
@@ -53,7 +53,7 @@ export function resolveCollectionPathIds(path: string, allCollections: EntityCol
 
         let foundMatch = false;
         // Sort potential matches by length descending to prioritize longer matches (e.g., "a/b" over "a")
-        const potentialMatches: { col: EntityCollection; match: string; }[] = currentCollections
+        const potentialMatches: { col: SnapshotCollection; match: string; }[] = currentCollections
             .flatMap(col => [{
                 col,
                 match: col.slug
@@ -76,28 +76,28 @@ export function resolveCollectionPathIds(path: string, allCollections: EntityCol
                 break; // Path ends with a collection segment
             }
 
-            // The next segment must be an entity ID
+            // The next segment must be a snapshot ID
             const idSeparatorIndex = remainingPath.indexOf("/");
-            let entityId: string | number;
+            let snapshotId: string | number;
             if (idSeparatorIndex > -1) {
-                entityId = remainingPath.substring(0, idSeparatorIndex);
+                snapshotId = remainingPath.substring(0, idSeparatorIndex);
                 remainingPath = remainingPath.substring(idSeparatorIndex + 1);
             } else {
                 // This should not happen if the original path is valid (odd segments)
                 // but handle it defensively: assume the rest is the ID
-                entityId = remainingPath;
+                snapshotId = remainingPath;
                 remainingPath = "";
-                console.warn(`resolveCollectionPathIds: Path seems to end with an entity ID "${entityId}" instead of a collection segment in original path "${path}". This might indicate an invalid input path.`);
+                console.warn(`resolveCollectionPathIds: Path seems to end with a snapshot ID "${snapshotId}" instead of a collection segment in original path "${path}". This might indicate an invalid input path.`);
                 // Even if it ends here, we still need to push the ID
             }
 
-            resolvedPathParts.push(entityId); // Append entity ID
+            resolvedPathParts.push(snapshotId); // Append snapshot ID
             currentCollections = getSubcollections(foundCollection); // Move to subcollections
             foundMatch = true;
 
             if (!currentCollections && remainingPath.length > 0) {
                 // Warn if the path continues but no subcollections were defined
-                console.warn(`resolveCollectionPathIds: Path continues after entity ID "${entityId}", but no subcollections are defined for the preceding collection "${foundCollection.slug}" in path "${path}". Appending remaining original path.`);
+                console.warn(`resolveCollectionPathIds: Path continues after snapshot ID "${snapshotId}", but no subcollections are defined for the preceding collection "${foundCollection.slug}" in path "${path}". Appending remaining original path.`);
                 resolvedPathParts.push(remainingPath); // Append the rest
                 remainingPath = ""; // Stop processing
                 break;
@@ -123,7 +123,7 @@ export function resolveCollectionPathIds(path: string, allCollections: EntityCol
  * @param slugOrPath
  * @param collections
  */
-export function getCollectionBySlugWithin(slugOrPath: string, collections: EntityCollection[]): EntityCollection | undefined {
+export function getCollectionBySlugWithin(slugOrPath: string, collections: SnapshotCollection[]): SnapshotCollection | undefined {
 
     const subpaths = removeInitialAndTrailingSlashes(slugOrPath).split("/");
     if (subpaths.length % 2 === 0) {
@@ -131,7 +131,7 @@ export function getCollectionBySlugWithin(slugOrPath: string, collections: Entit
     }
 
     const subpathCombinations = getCollectionPathsCombinations(subpaths);
-    let result: EntityCollection | undefined;
+    let result: SnapshotCollection | undefined;
     for (let i = 0; i < subpathCombinations.length; i++) {
         const subpathCombination = subpathCombinations[i];
         const navigationEntry = collections && collections

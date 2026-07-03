@@ -11,9 +11,9 @@ const usersCollection = defineCollection({
     schema: "rebase",
     icon: "Users",
     group: "Settings",
-    openEntityMode: "dialog",
+    openSnapshotMode: "dialog",
     disableDefaultActions: ["copy"],
-    entityActions: [
+    snapshotActions: [
         resetPasswordAction
     ],
     sort: ["createdAt", "desc"],
@@ -111,13 +111,10 @@ disabled: { hidden: true } }
     propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"],
     // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
     callbacks: {
-        afterRead: ({ entity }) => ({
-            ...entity,
-            values: maskValues(entity.values, {
-                email: maskEmail,
-                displayName: maskName,
-                photoURL: null
-            })
+        afterRead: ({ row }) => maskValues(row, {
+            email: maskEmail,
+            displayName: maskName,
+            photoURL: null
         })
     },
     securityRules: [

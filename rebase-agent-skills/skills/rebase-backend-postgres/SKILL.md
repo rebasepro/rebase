@@ -306,7 +306,7 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 |------|--------|---------|
 | 1 | `initializeDriver(config)` | Creates the `PostgresBackendDriver`, registry, realtime service, read replica, pool manager |
 | 2 | `initializeAuth(config, driverResult)` | Creates auth tables, `UserService`, `PostgresAuthRepository` |
-| 3 | `initializeHistory(config, driverResult)` | Creates the `rebase.entity_history` table and `HistoryService` |
+| 3 | `initializeHistory(config, driverResult)` | Creates the `rebase.snapshot_history` table and `HistoryService` |
 | 4 | `initializeRealtime(config, driverResult)` | Returns the `RealtimeService` for WebSocket subscriptions |
 | 5 | `initializeWebsockets(server, ...)` | Creates the WebSocket upgrade handler for realtime |
 | 6 | `getAdmin(driverResult)` | Returns the `DatabaseAdmin` for SQL execution |
@@ -326,7 +326,7 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 | `bootstrappers` | `BackendBootstrapper[]` | — | Bootstrapper protocol (alternative to `database`) |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication configuration or external adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration |
-| `history` | `true \| { retention?: number }` | — | Enable entity audit trail. Pass `true` or `{ retention: 90 }` for TTL in days |
+| `history` | `true \| { retention?: number }` | — | Enable snapshot audit trail. Pass `true` or `{ retention: 90 }` for TTL in days |
 | `defaultSecurityRules` | `SecurityRule[]` | — | Default RLS rules for collections without explicit rules |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI/Swagger documentation |
 | `cronPersistence` | `boolean` | `true` | Persist cron execution logs to database |
@@ -339,7 +339,7 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `collection` | `EntityCollection` | Built-in `rebase.users` | Auth users collection |
+| `collection` | `SnapshotCollection` | Built-in `rebase.users` | Auth users collection |
 | `jwtSecret` | `string` | Auto-generated in dev | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |
@@ -495,9 +495,9 @@ export default defineConfig({
 });
 ```
 
-## Entity History (Audit Trail)
+## Snapshot History (Audit Trail)
 
-Enable audit logging for all entity mutations by setting `history: true` in the backend config:
+Enable audit logging for all snapshot mutations by setting `history: true` in the backend config:
 
 ```typescript
 const backend = await initializeRebaseBackend({
@@ -513,9 +513,9 @@ const backend = await initializeRebaseBackend({
 ```
 
 When enabled:
-- The bootstrapper auto-creates a `rebase.entity_history` table
+- The bootstrapper auto-creates a `rebase.snapshot_history` table
 - Every `INSERT`, `UPDATE`, `DELETE` is recorded with before/after snapshots
-- History is queryable via the `/:slug/:entityId/history` REST endpoint
+- History is queryable via the `/:slug/:snapshotId/history` REST endpoint
 
 ## Health Check
 

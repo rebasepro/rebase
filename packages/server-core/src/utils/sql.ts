@@ -2,7 +2,7 @@ import { sql, SQL } from "drizzle-orm";
 
 /**
  * Returns a SQL chunk calling `auth.uid()` — the current user's ID.
- * This is a Supabase-style helper function created in the `auth` schema
+ * This is a PostgreSQL RLS helper function created in the `auth` schema
  * that reads `app.user_id` set per-transaction by `withAuth()`.
  *
  * @example

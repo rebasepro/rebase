@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export type Entity<M> = M & { id: string };
+export interface Snapshot<M> { id: string; values: M; }
 
 export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Record<string, unknown>> {
     readonly dependencies?: Extract<keyof M, string> | (string & {})[];

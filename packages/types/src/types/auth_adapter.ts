@@ -396,7 +396,7 @@ export interface AuthAdapter {
      *
      * @param values - Raw request body from the client.
      * @param collectionAuth - The parsed `AuthCollectionConfig` from the collection (if `auth` is an object).
-     * @returns Processed values ready for `driver.saveEntity()`, plus metadata for the post-save step.
+     * @returns Processed values ready for `driver.save()`, plus metadata for the post-save step.
      */
     prepareUserCreation?(
         values: Record<string, unknown>,
@@ -404,17 +404,17 @@ export interface AuthAdapter {
     ): Promise<UserCreationPrepareResult>;
 
     /**
-     * Finalize a user creation after the entity has been persisted.
+     * Finalize a user creation after the snapshot has been persisted.
      *
      * Handles post-save work: sending invitation emails, generating
      * password-reset tokens, or falling back to returning a temporary password.
      *
-     * @param entity - The persisted entity (id + values).
+     * @param snapshot - The persisted snapshot (id + values).
      * @param clearPassword - The cleartext password from the prepare step (if any).
      * @returns Metadata for the API response (temporary password, invitation status).
      */
     finalizeUserCreation?(
-        entity: { id: string; values: Record<string, unknown> },
+        snapshot: { id: string; values: Record<string, unknown> },
         clearPassword?: string
     ): Promise<UserCreationFinalizeResult>;
 

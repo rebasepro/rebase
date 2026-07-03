@@ -12,7 +12,7 @@ type: "number" }
         expect(buildPropertyCallbacks(properties)).toBeUndefined();
     });
 
-    it("returns EntityCallbacks with afterRead when a property has afterRead", () => {
+    it("returns CollectionCallbacks with afterRead when a property has afterRead", () => {
         const properties: Properties = {
             title: {
                 name: "title",
@@ -29,7 +29,7 @@ type: "number" }
         expect(callbacks?.beforeSave).toBeUndefined();
     });
 
-    it("returns EntityCallbacks with beforeSave when a property has beforeSave", () => {
+    it("returns CollectionCallbacks with beforeSave when a property has beforeSave", () => {
         const properties: Properties = {
             slug: {
                 name: "slug",
@@ -70,7 +70,7 @@ type: "number" }
         expect(callbacks?.beforeSave).toBeDefined();
     });
 
-    it("afterRead callback transforms entity values", async () => {
+    it("afterRead callback transforms snapshot values", async () => {
         const properties: Properties = {
             title: {
                 name: "title",
@@ -83,12 +83,11 @@ type: "number" }
 
         const callbacks = buildPropertyCallbacks(properties);
         const result = await callbacks?.afterRead?.({
-            entity: { id: "1",
-path: "test/1",
-values: { title: "hello" } }
+            row: { id: "1",
+title: "hello" }
         } as never);
 
-        expect(result?.values?.title).toBe("HELLO");
+        expect((result as Record<string, unknown>)?.title).toBe("HELLO");
     });
 
     it("beforeSave callback transforms values", async () => {
@@ -126,16 +125,15 @@ type: "string" }
 
         const callbacks = buildPropertyCallbacks(properties);
         const result = await callbacks?.afterRead?.({
-            entity: {
+            row: {
                 id: "1",
-                path: "test/1",
-                values: { title: "hello",
-description: "unchanged" }
+                title: "hello",
+                description: "unchanged"
             }
         } as never);
 
-        expect(result?.values?.title).toBe("HELLO");
-        expect(result?.values?.description).toBe("unchanged");
+        expect((result as Record<string, unknown>)?.title).toBe("HELLO");
+        expect((result as Record<string, unknown>)?.description).toBe("unchanged");
     });
 
     it("handles nested map properties with callbacks", () => {

@@ -5,7 +5,7 @@ import { removeUndefined } from "@rebasepro/utils";
 import {
     AuthController,
     DataDriver,
-    Entity,
+    Snapshot,
     User
 } from "@rebasepro/types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";
@@ -107,11 +107,11 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         setRolesLoading(true);
         return dataSourceDelegate.listenCollection?.({
             path: rolesPath,
-            onUpdate(entities: Entity<any>[]): void {
+            onUpdate(rows: Record<string, unknown>[]): void {
                 setRolesError(undefined);
-                console.debug("Updating roles", entities);
+                console.debug("Updating roles", rows);
                 try {
-                    const newRoles = entityToRoles(entities);
+                    const newRoles = rowsToRoles(rows);
                     if (!equal(newRoles, roles)) {
                         setRoles(newRoles);
                     }
@@ -144,11 +144,11 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         setUsersLoading(true);
         return dataSourceDelegate.listenCollection?.({
             path: usersPath,
-            onUpdate(entities: Entity<any>[]): void {
-                console.debug("Updating users", entities);
+            onUpdate(rows: Record<string, unknown>[]): void {
+                console.debug("Updating users", rows);
                 setUsersError(undefined);
                 try {
-                    const newUsers = entitiesToUsers(entities) as UserWithRoleIds<USER>[];
+                    const newUsers = rowsToUsers(rows) as UserWithRoleIds<USER>[];
                     // if (!equal(newUsers, usersWithRoleIds))
                     setUsersWithRoleIds(newUsers);
                 } catch (e) {
@@ -186,12 +186,12 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         };
         // delete the previous user entry if it exists and the uid has changed
         if (userExists && userExists.uid !== user.uid) {
-            const entity: Entity<any> = {
+            const row = {
                 values: {},
                 path: usersPath,
                 id: userExists.uid
             }
-            await dataSourceDelegate.deleteEntity({ entity })
+            await dataSourceDelegate.delete({ row })
                 .then(() => {
                     console.debug("Deleted previous user", userExists);
                 })
@@ -201,10 +201,10 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
 
         }
 
-        return dataSourceDelegate.saveEntity({
+        return dataSourceDelegate.save({
             status: "existing",
             path: usersPath,
-            entityId: email,
+            id: email,
             values: removeUndefined(data) as Record<string, unknown>
         }).then(() => user);
     }, [usersPath, dataSourceDelegate?.initialised]);
@@ -217,10 +217,10 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
             id,
             ...roleData
         } = role;
-        return dataSourceDelegate.saveEntity({
+        return dataSourceDelegate.save({
             status: "existing",
             path: rolesPath,
-            entityId: id,
+            id: id,
             values: removeUndefined(roleData) as Record<string, unknown>
         }).then(() => {
             return;
@@ -232,12 +232,12 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         if (!usersPath) throw Error("useBuildUserManagement Firestore not initialised");
         console.debug("Deleting", user);
         const { uid } = user;
-        const entity: Entity<any> = {
+        const row = {
             path: usersPath,
             id: uid,
             values: {}
         };
-        await dataSourceDelegate.deleteEntity({ entity })
+        await dataSourceDelegate.delete({ row })
     }, [usersPath, dataSourceDelegate?.initialised]);
 
     const deleteRole = useCallback(async (role: Role): Promise<void> => {
@@ -245,12 +245,12 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         if (!rolesPath) throw Error("useBuildUserManagement Firestore not initialised");
         console.debug("Deleting", role);
         const { id } = role;
-        const entity: Entity<any> = {
+        const row = {
             path: rolesPath,
             id: id,
             values: {}
         };
-        await dataSourceDelegate.deleteEntity({ entity })
+        await dataSourceDelegate.delete({ row })
     }, [rolesPath, dataSourceDelegate?.initialised]);
 
 
@@ -345,23 +345,22 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
     }
 }
 
-const entitiesToUsers = (docs: Entity<Omit<UserWithRoleIds, "id">>[]): (UserWithRoleIds)[] => {
-    return docs.map((doc) => {
-        const data = doc.values;
-        const record = data as Record<string, unknown>;
+const rowsToUsers = (rows: Record<string, unknown>[]): (UserWithRoleIds)[] => {
+    return rows.map((row) => {
+        const { id, ...data } = row;
         const newVar = {
             ...data,
-            uid: doc.id,
-            created_on: record.created_on as Date | undefined,
-            updated_on: record.updated_on as Date | undefined
+            uid: id,
+            created_on: data.created_on as Date | undefined,
+            updated_on: data.updated_on as Date | undefined
         };
         return newVar as unknown as UserWithRoleIds;
     });
 }
 
-const entityToRoles = (entities: Entity<Omit<Role, "id">>[]): Role[] => {
-    return entities.map((doc) => ({
-        id: doc.id,
-        ...doc.values
-    } as Role));
+const rowsToRoles = (rows: Record<string, unknown>[]): Role[] => {
+    return rows.map((row) => ({
+        ...row,
+        id: row.id
+    } as unknown as Role));
 }

@@ -1,14 +1,14 @@
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 export interface GenerateCollectionRequest {
     /** User's natural language description of what they want */
     prompt: string;
 
     /** Other collections in the project (for context/relationships). Limit to 30. */
-    existingCollections: Partial<EntityCollection>[];
+    existingCollections: Partial<SnapshotCollection>[];
 
     /** Optional for generate, required for modifications. If provided, modifies this collection */
-    existingCollection?: Partial<EntityCollection>;
+    existingCollection?: Partial<SnapshotCollection>;
 }
 
 /** Operation types for modifying a collection */
@@ -23,7 +23,7 @@ export interface CollectionOperation {
 
 /** Result from collection generation, including optional delta operations */
 export interface GenerateCollectionResult {
-    collection: EntityCollection;
+    collection: SnapshotCollection;
     operations?: CollectionOperation[];
 }
 

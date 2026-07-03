@@ -1,9 +1,9 @@
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 /**
  * Utility function to perform a text search in an external index,
- * returning the ids of the entities.
+ * returning the ids of the snapshots.
  * @group Firebase
  */
 export function buildExternalSearchController({
@@ -20,7 +20,7 @@ export function buildExternalSearchController({
 
         const init = (props: {
             path: string,
-            collection?: EntityCollection
+            collection?: SnapshotCollection
         }) => {
             return Promise.resolve(isPathSupported(props.path));
         }

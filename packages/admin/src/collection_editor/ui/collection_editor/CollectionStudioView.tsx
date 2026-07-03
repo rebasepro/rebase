@@ -6,7 +6,7 @@ import { Button, PlusIcon, Typography } from "@rebasepro/ui";
 import { CollectionEditorDialogProps } from "./CollectionEditorDialog";
 import { AIModifiedPathsProvider } from "./AIModifiedPathsContext";
 import { CollectionEditor } from "./CollectionEditorDialog";
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 
 export type CollectionStudioViewProps = Omit<CollectionEditorDialogProps, "open" | "isNewCollection" | "editedCollectionId" | "handleClose" | "handleCancel"> & {
     collectionId?: string | "new";
@@ -16,7 +16,7 @@ export type CollectionStudioViewProps = Omit<CollectionEditorDialogProps, "open"
      * Receives the saved collection (or undefined if dismissed without saving).
      * When not provided, save completes silently.
      */
-    onSave?: (collection?: EntityCollection) => void;
+    onSave?: (collection?: SnapshotCollection) => void;
 
     /**
      * Called when the user cancels editing.

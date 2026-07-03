@@ -2,7 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import { toPascalCase, toCamelCase, toSafeIdentifier, indent } from "../src/utils";
 import { generateTypedefs } from "../src/generate-types";
 import { generateSDK } from "../src/index";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 // ─── Test Fixtures ─────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ validation: { required: true } },
         email: { name: "Email",
 type: "string" }
     }
-} as unknown as EntityCollection;
+} as unknown as SnapshotCollection;
 
 describe("Utils", () => {
     describe("toPascalCase", () => {
@@ -30,7 +30,7 @@ describe("Utils", () => {
             expect(toPascalCase("private_notes")).toBe("PrivateNotes");
         });
         it("handles already PascalCase input", () => {
-            expect(toPascalCase("TestEntities")).toBe("Testentities"); // Note: toPascalCase implementation lowercases follow-up chars per word split
+            expect(toPascalCase("TestSnapshots")).toBe("Testsnapshots"); // Note: toPascalCase implementation lowercases follow-up chars per word split
         });
         it("handles kebab-case", () => {
             expect(toPascalCase("private-notes")).toBe("PrivateNotes");
@@ -93,7 +93,7 @@ describe("propertyToTypeScriptType mapping", () => {
                 bin: { type: "binary" },
                 unknown: { type: "something-weird" }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const ts = generateTypedefs([col]);
         expect(ts).toContain("bool?: boolean;");
@@ -115,7 +115,7 @@ describe("propertyToTypeScriptType mapping", () => {
                         enum: ["draft", "published"]
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain('status?: "draft" | "published";');
@@ -135,7 +135,7 @@ label: "Published" }
                         ]
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain('status?: "draft" | "published";');
@@ -153,7 +153,7 @@ label: "Published" }
                         }
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain('status?: "draft" | "published";');
@@ -170,7 +170,7 @@ label: "Published" }
                         enum: [1, 2, 3]
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("level?: 1 | 2 | 3;");
@@ -190,7 +190,7 @@ label: "High" }
                         ]
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("level?: 10 | 20;");
@@ -208,7 +208,7 @@ label: "High" }
                         }
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("level?: 1 | 2;");
@@ -228,7 +228,7 @@ label: "High" }
                         }
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("profile?: { age: number; tagline: string; };");
@@ -242,7 +242,7 @@ label: "High" }
                         type: "map"
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("metadata?: Record<string, unknown>;");
@@ -259,7 +259,7 @@ label: "High" }
                         of: { type: "string" }
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("tags?: Array<string>;");
@@ -273,7 +273,7 @@ label: "High" }
                         type: "array"
                     }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("generic?: Array<unknown>;");
@@ -289,7 +289,7 @@ describe("generateTypedefs schemas configurations", () => {
                 properties: {
                     title: { type: "string" }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -303,7 +303,7 @@ describe("generateTypedefs schemas configurations", () => {
                     title: { type: "string",
 validation: { required: true } }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -318,7 +318,7 @@ validation: { required: true } }
 isId: "increment",
 validation: { required: true } }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -333,7 +333,7 @@ validation: { required: true } }
 isId: "uuid",
 validation: { required: true } }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -348,7 +348,7 @@ validation: { required: true } }
 isId: "manual",
 validation: { required: true } }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -363,7 +363,7 @@ validation: { required: true } }
 isId: true,
 validation: { required: true } }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Insert: {");
@@ -382,7 +382,7 @@ validation: { required: true } },
                     title: { type: "string",
 validation: { required: true } }
                 }
-            } as unknown as EntityCollection;
+            } as unknown as SnapshotCollection;
 
             const ts = generateTypedefs([col]);
             expect(ts).toContain("Update: {");
@@ -401,7 +401,7 @@ describe("Collection relations and FK resolutions", () => {
                 id: { type: "number",
 isId: "increment" }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const postsCol = {
             slug: "posts",
@@ -417,7 +417,7 @@ isId: "increment" },
                     localKey: "author_id"
                 }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const ts = generateTypedefs([postsCol, authorsCol]);
 
@@ -442,7 +442,7 @@ isId: "increment" },
                     localKey: "author_id"
                 }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const ts = generateTypedefs([postsCol]);
 
@@ -459,7 +459,7 @@ isId: "increment" },
                 id: { type: "string",
 isId: "uuid" }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const postsCol = {
             slug: "posts",
@@ -483,7 +483,7 @@ isId: "increment" },
                     validation: { required: true }
                 }
             ]
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const ts = generateTypedefs([postsCol, authorsCol]);
 
@@ -500,7 +500,7 @@ isId: "increment" },
                 id: { type: "number",
 isId: "increment" }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const postsCol = {
             slug: "posts",
@@ -515,7 +515,7 @@ isId: "increment" },
                     direction: "owning"
                 }
             }
-        } as unknown as EntityCollection;
+        } as unknown as SnapshotCollection;
 
         const ts = generateTypedefs([postsCol, tagsCol]);
 

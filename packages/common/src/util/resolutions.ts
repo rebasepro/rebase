@@ -1,7 +1,7 @@
 import {
     ArrayProperty,
     AuthController,
-    EntityCollection,
+    SnapshotCollection,
     EnumValueConfig,
     EnumValues,
     NumberProperty,
@@ -15,7 +15,7 @@ import {
 } from "@rebasepro/types";
 
 type PropertyConfig = { property: unknown; [key: string]: unknown };
-import { isPropertyBuilder } from "./entities";
+import { isPropertyBuilder } from "./snapshots";
 import { enumToObjectEntries } from "./enums";
 import { DEFAULT_ONE_OF_TYPE } from "./common";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";
@@ -32,7 +32,7 @@ export type ResolvePropertyProps<M extends Record<string, unknown> = Record<stri
     values?: Partial<M>,
     previousValues?: Partial<M>,
     path?: string,
-    entityId?: string | number,
+    snapshotId?: string | number,
     index?: number,
     propertyConfigs?: Record<string, PropertyConfig>;
     ignoreMissingFields?: boolean;
@@ -187,7 +187,7 @@ export function resolveProperties<M extends Record<string, unknown>>({
     values?: Partial<M>,
     previousValues?: Partial<M>,
     path?: string,
-    entityId?: string | number,
+    snapshotId?: string | number,
     index?: number,
     propertyConfigs?: Record<string, PropertyConfig>;
     ignoreMissingFields?: boolean;
@@ -222,7 +222,7 @@ export function resolveArrayProperties<M>({
     values?: Partial<M>,
     previousValues?: Partial<M>,
     path?: string,
-    entityId?: string | number,
+    snapshotId?: string | number,
     index?: number,
     propertyConfigs?: Record<string, PropertyConfig>;
     ignoreMissingFields?: boolean;
@@ -255,7 +255,7 @@ export function resolveArrayProperties<M>({
                 previousValues,
                 ...rest
             } = props;
-            const ofProperty = resolveProperty({ // we don't want to pass the values of the parent entity
+            const ofProperty = resolveProperty({ // we don't want to pass the values of the parent snapshot
                 property: of,
                 ignoreMissingFields,
                 ...rest
@@ -301,7 +301,7 @@ export function getArrayResolvedProperties({
     values?: object;
     previousValues?: object;
     path?: string;
-    entityId?: string | number;
+    snapshotId?: string | number;
     index?: number;
     propertyConfigs?: Record<string, PropertyConfig>;
     authController: AuthController;
@@ -341,7 +341,7 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 }
 
 
-export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: EntityCollection<M>): EntityCollection<Record<string, unknown>>[] {
+export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: SnapshotCollection<M>): SnapshotCollection<Record<string, unknown>>[] {
     if (collection.childCollections) {
         return collection.childCollections() ?? [];
     }
@@ -371,7 +371,7 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
                 }
             }
 
-            const baseOverrides: Partial<EntityCollection> = { slug: relationKey };
+            const baseOverrides: Partial<SnapshotCollection> = { slug: relationKey };
             if (customName) {
                 baseOverrides.name = customName;
                 baseOverrides.singularName = customName;
@@ -379,8 +379,8 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
 
             const targetWithOverrides = { ...target,
 ...baseOverrides };
-            return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as EntityCollection<Record<string, unknown>>;
-        }).filter((c: EntityCollection<Record<string, unknown>> | undefined): c is EntityCollection<Record<string, unknown>> => Boolean(c));
+            return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as SnapshotCollection<Record<string, unknown>>;
+        }).filter((c: SnapshotCollection<Record<string, unknown>> | undefined): c is SnapshotCollection<Record<string, unknown>> => Boolean(c));
     }
 
     return [];

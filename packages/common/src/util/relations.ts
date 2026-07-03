@@ -1,18 +1,18 @@
-import { EntityCollection, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { SnapshotCollection, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
 export function sanitizeRelation(
     relation: Partial<Relation>,
-    sourceCollection: EntityCollection,
-    resolveCollection?: (slugOrTable: string) => EntityCollection | undefined
+    sourceCollection: SnapshotCollection,
+    resolveCollection?: (slugOrTable: string) => SnapshotCollection | undefined
 ): Relation {
     if (!relation.target) {
         throw new Error("Relation is missing a `target` collection.");
     }
 
     const rawTarget = relation.target;
-    let targetCollection: EntityCollection | undefined;
+    let targetCollection: SnapshotCollection | undefined;
 
     if (typeof rawTarget === "string") {
         if (resolveCollection) {
@@ -20,7 +20,7 @@ export function sanitizeRelation(
         }
         if (!targetCollection) {
             targetCollection = { slug: rawTarget,
-name: rawTarget } as EntityCollection;
+name: rawTarget } as SnapshotCollection;
         }
     } else if (typeof rawTarget === "function") {
         const evaluated = rawTarget();
@@ -30,13 +30,13 @@ name: rawTarget } as EntityCollection;
             }
             if (!targetCollection) {
                 targetCollection = { slug: evaluated,
-name: evaluated } as EntityCollection;
+name: evaluated } as SnapshotCollection;
             }
         } else {
             targetCollection = evaluated;
         }
     } else if (rawTarget && typeof rawTarget === "object") {
-        targetCollection = rawTarget as EntityCollection;
+        targetCollection = rawTarget as SnapshotCollection;
     }
 
     if (!targetCollection) {
@@ -198,10 +198,10 @@ name: evaluated } as EntityCollection;
 }
 
 /** WeakMap cache — same collection instance always yields the same relation map. */
-const _resolvedRelationsCache = new WeakMap<EntityCollection, Record<string, Relation>>();
+const _resolvedRelationsCache = new WeakMap<SnapshotCollection, Record<string, Relation>>();
 
 export function resolveCollectionRelations(
-    collection: EntityCollection
+    collection: SnapshotCollection
 ): Record<string, Relation> {
     const cached = _resolvedRelationsCache.get(collection);
     if (cached) return cached;
@@ -251,7 +251,7 @@ export function resolveCollectionRelations(
 
                 // We previously skipped if the underlying relation was already registered under
                 // its canonical relationName in section 1. But we need to keep the property mapping
-                // for EntityFetchService to hydrate the relation back to the correct property key.
+                // for FetchService to hydrate the relation back to the correct property key.
                 // Deduplication for Drizzle schema generation is handled in generate-drizzle-schema-logic.ts.
 
                 if (!relation.relationName) {
@@ -275,7 +275,7 @@ export function resolvePropertyRelation({
 }: {
     propertyKey: string;
     property: Property;
-    sourceCollection: EntityCollection;
+    sourceCollection: SnapshotCollection;
 }): Relation | undefined {
     if (property.type !== "relation") return undefined;
 
@@ -304,7 +304,7 @@ export function resolvePropertyRelation({
     return undefined;
 }
 
-export function getTableName(collection: EntityCollection): string {
+export function getTableName(collection: SnapshotCollection): string {
     if (getDataSourceCapabilities(collection.engine).supportsRelations) {
         return collection.table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
     }

@@ -5,7 +5,7 @@ import { logger } from "@rebasepro/server-core";
 export interface HistoryEntry {
     id: string;
     table_name: string;
-    entity_id: string;
+    snapshot_id: string;
     action: "create" | "update" | "delete";
     changed_fields: string[] | null;
     values: Record<string, unknown> | null;
@@ -16,7 +16,7 @@ export interface HistoryEntry {
 
 export interface RecordHistoryParams {
     tableName: string;
-    entityId: string;
+    id: string;
     action: "create" | "update" | "delete";
     values?: Record<string, unknown> | null;
     previousValues?: Record<string, unknown> | null;
@@ -29,7 +29,7 @@ export interface FetchHistoryOptions {
 }
 
 export interface HistoryRetentionConfig {
-    /** Max entries per entity. Oldest pruned first. Default 200. */
+    /** Max entries per row. Oldest pruned first. Default 200. */
     maxEntries: number;
     /** Entries older than this many days are pruned. Default 90. */
     ttlDays: number;
@@ -41,8 +41,8 @@ const DEFAULT_RETENTION: HistoryRetentionConfig = {
 };
 
 /**
- * Service for recording and querying entity change history.
- * Stores snapshots in the `rebase.entity_history` table.
+ * Service for recording and querying row change history.
+ * Stores history entries in the `rebase.snapshot_history` table.
  */
 export class HistoryService {
     public retention: HistoryRetentionConfig;
@@ -56,16 +56,16 @@ export class HistoryService {
     }
 
     /**
-     * Record a history entry for an entity change.
+     * Record a history entry for an row change.
      * This is intentionally fire-and-forget safe — errors are logged but never
      * bubble up to block the main save/delete operation.
      *
-     * After inserting, kicks off a non-blocking pruning pass for this entity.
+     * After inserting, kicks off a non-blocking pruning pass for this row.
      */
     async recordHistory(params: RecordHistoryParams): Promise<void> {
         const {
             tableName,
-            entityId,
+            id,
             action,
             values,
             previousValues,
@@ -85,11 +85,11 @@ export class HistoryService {
 
         try {
             await this.db.execute(sql`
-                INSERT INTO rebase.entity_history 
-                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by)
+                INSERT INTO rebase.snapshot_history 
+                    (table_name, snapshot_id, action, changed_fields, "values", previous_values, updated_by)
                 VALUES (
                     ${tableName},
-                    ${String(entityId)},
+                    ${String(id)},
                     ${action},
                     ${changedFields ? sql`ARRAY[${sql.join(changedFields.map(f => sql`${f}`), sql`, `)}]::text[]` : sql`NULL`},
                     ${values ? sql`${JSON.stringify(values)}::jsonb` : sql`NULL`},
@@ -98,21 +98,21 @@ export class HistoryService {
                 )
             `);
 
-            // Non-blocking prune for this specific entity
-            this.pruneEntity(tableName, entityId).catch(err =>
+            // Non-blocking prune for this specific row
+            this.pruneSnapshot(tableName, id).catch(err =>
                 logger.error("History prune failed", { error: err })
             );
         } catch (error) {
-            logger.error("Failed to record entity history", { error: error });
+            logger.error("Failed to record row history", { error: error });
         }
     }
 
     /**
-     * Fetch history entries for an entity, ordered by most recent first.
+     * Fetch history entries for an row, ordered by most recent first.
      */
     async fetchHistory(
         tableName: string,
-        entityId: string,
+        id: string,
         options: FetchHistoryOptions = {}
     ): Promise<{ data: HistoryEntry[]; total: number }> {
         const limit = options.limit ?? 20;
@@ -121,16 +121,16 @@ export class HistoryService {
         const [countResult, dataResult] = await Promise.all([
             this.db.execute(sql`
                 SELECT COUNT(*) as count
-                FROM rebase.entity_history
+                FROM rebase.snapshot_history
                 WHERE table_name = ${tableName}
-                  AND entity_id = ${String(entityId)}
+                  AND snapshot_id = ${String(id)}
             `),
             this.db.execute(sql`
-                SELECT id, table_name, entity_id, action, changed_fields,
+                SELECT id, table_name, snapshot_id, action, changed_fields,
                        "values", previous_values, updated_by, updated_at
-                FROM rebase.entity_history
+                FROM rebase.snapshot_history
                 WHERE table_name = ${tableName}
-                  AND entity_id = ${String(entityId)}
+                  AND snapshot_id = ${String(id)}
                 ORDER BY updated_at DESC
                 LIMIT ${limit}
                 OFFSET ${offset}
@@ -153,9 +153,9 @@ export class HistoryService {
      */
     async fetchHistoryEntry(historyId: string): Promise<HistoryEntry | null> {
         const result = await this.db.execute(sql`
-            SELECT id, table_name, entity_id, action, changed_fields,
+            SELECT id, table_name, snapshot_id, action, changed_fields,
                    "values", previous_values, updated_by, updated_at
-            FROM rebase.entity_history
+            FROM rebase.snapshot_history
             WHERE id = ${historyId}
         `);
 
@@ -166,27 +166,27 @@ export class HistoryService {
     // ───────── Retention / Pruning ─────────
 
     /**
-     * Prune history for a single entity: enforce maxEntries and TTL.
+     * Prune history for a single row: enforce maxEntries and TTL.
      */
-    async pruneEntity(tableName: string, entityId: string): Promise<number> {
+    async pruneSnapshot(tableName: string, id: string): Promise<number> {
         let deleted = 0;
 
         // 1. TTL — delete entries older than ttlDays
         const ttlResult = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
+            DELETE FROM rebase.snapshot_history
             WHERE table_name = ${tableName}
-              AND entity_id = ${String(entityId)}
+              AND snapshot_id = ${String(id)}
               AND updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
         `);
         deleted += ttlResult.rowCount ?? 0;
 
         // 2. Max entries — keep the newest maxEntries, delete the rest
         const maxResult = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
+            DELETE FROM rebase.snapshot_history
             WHERE id IN (
-                SELECT id FROM rebase.entity_history
+                SELECT id FROM rebase.snapshot_history
                 WHERE table_name = ${tableName}
-                  AND entity_id = ${String(entityId)}
+                  AND snapshot_id = ${String(id)}
                 ORDER BY updated_at DESC
                 OFFSET ${this.retention.maxEntries}
             )
@@ -197,12 +197,12 @@ export class HistoryService {
     }
 
     /**
-     * Global prune: enforce TTL across ALL entities in a single sweep.
+     * Global prune: enforce TTL across ALL rows in a single sweep.
      * Intended to be called periodically (e.g. once per hour or daily).
      */
     async pruneExpired(): Promise<number> {
         const result = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
+            DELETE FROM rebase.snapshot_history
             WHERE updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
         `);
         return result.rowCount ?? 0;

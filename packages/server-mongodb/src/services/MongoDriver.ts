@@ -8,25 +8,26 @@
 import { Db } from "mongodb";
 import {
     DataDriver,
-    DeleteEntityProps,
-    Entity,
-    EntityCollection,
+    DeleteProps,
+    Snapshot,
+    SnapshotCollection,
     FetchCollectionProps,
-    FetchEntityProps,
+    FetchOneProps,
     ListenCollectionProps,
-    ListenEntityProps,
-    SaveEntityProps,
+    ListenOneProps,
+    SaveProps,
     RebaseCallContext,
     CollectionRegistryInterface,
     User,
     RebaseClient,
     RebaseData,
+    RebaseSdkData,
     SecurityRule
 } from "@rebasepro/types";
-import { MongoEntityService } from "../db/MongoEntityService";
+import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, updateDateAutoValues, buildRebaseData, checkOperation } from "@rebasepro/common";
+import { buildPropertyCallbacks, updateDateAutoValues, buildSdkData, checkOperation } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server-core";
@@ -43,11 +44,11 @@ export class MongoDriver implements DataDriver {
     key = "mongodb";
     initialised = true;
 
-    private entityService: MongoEntityService;
+    private dataService: MongoDataService;
     private realtimeService: MongoRealtimeService;
     public historyService: MongoHistoryService;
     public user?: User;
-    public data: RebaseData;
+    public data: RebaseSdkData;
     public client?: RebaseClient;
 
     constructor(
@@ -57,11 +58,11 @@ export class MongoDriver implements DataDriver {
         public readonly registry?: CollectionRegistryInterface,
         user?: User
     ) {
-        this.entityService = new MongoEntityService(db);
+        this.dataService = new MongoDataService(db);
         this.realtimeService = realtimeService ?? new MongoRealtimeService(db);
         this.historyService = historyService ?? new MongoHistoryService(db);
         this.user = user;
-        this.data = buildRebaseData(this);
+        this.data = buildSdkData(this);
         this.realtimeService.setDataDriver(this);
     }
 
@@ -77,7 +78,7 @@ export class MongoDriver implements DataDriver {
      * Used by AuthenticatedMongoDriver to apply callbacks after RLS filtering.
      */
     resolveCollectionCallbacks<M extends Record<string, unknown>>(
-        collection: EntityCollection<M> | undefined,
+        collection: SnapshotCollection<M> | undefined,
         path: string
     ) {
         if (!collection && !path) return { collection: undefined,
@@ -87,8 +88,8 @@ propertyCallbacks: undefined };
         const registryCollection = this.registry?.getCollectionByPath(path);
         const resolvedCollection = registryCollection
             ? ({ ...collection,
-...registryCollection } as EntityCollection<M>)
-            : (collection as EntityCollection<M>);
+...registryCollection } as SnapshotCollection<M>)
+            : (collection as SnapshotCollection<M>);
 
         const callbacks = resolvedCollection?.callbacks;
         const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -106,7 +107,7 @@ propertyCallbacks: undefined };
     }
 
     /**
-     * Fetch a collection of entities
+     * Fetch a collection of rows
      */
     async fetchCollection<M extends Record<string, any>>({
         path,
@@ -117,15 +118,15 @@ propertyCallbacks: undefined };
         orderBy,
         searchString,
         order
-    }: FetchCollectionProps<M>): Promise<Entity<M>[]> {
-        const entities = await this.entityService.fetchCollection<M>(path, {
+    }: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
+        const rows = await this.dataService.fetchCollection<M>(path, {
             filter,
             limit,
             startAfter,
             orderBy,
             order,
             searchString,
-            collection: collection as EntityCollection
+            collection: collection as SnapshotCollection
         });
 
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
@@ -138,37 +139,37 @@ propertyCallbacks: undefined };
                 client: this.client,
                 storageSource: this.client?.storage
             } as unknown as RebaseCallContext; // Backend context
-            return Promise.all(entities.map(async (entity) => {
-                let fetched = entity;
+            return Promise.all(rows.map(async (row) => {
+                let fetched = row;
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
                     }) ?? fetched;
                 }
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
                     }) ?? fetched;
                 }
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
-                    }) as Entity<M> ?? fetched;
+                    }) ?? fetched;
                 }
                 return fetched;
             }));
         }
 
-        return entities;
+        return rows;
     }
 
     /**
@@ -188,9 +189,9 @@ propertyCallbacks: undefined };
     }: ListenCollectionProps<M>): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
-        const callback = (entities: Entity<any>[]) => {
+        const callback = (rows: Record<string, unknown>[]) => {
             try {
-                onUpdate(entities as Entity<M>[]);
+                onUpdate(rows);
             } catch (error) {
                 logger.error("Error in collection update callback", { error: error });
                 if (onError) {
@@ -221,19 +222,19 @@ propertyCallbacks: undefined };
     }
 
     /**
-     * Fetch a single entity
+     * Fetch a single row
      */
-    async fetchEntity<M extends Record<string, any>>({
+    async fetchOne<M extends Record<string, any>>({
         path,
-        entityId,
+        id,
         databaseId,
         collection
-    }: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
-        let entity = await this.entityService.fetchEntity<M>(path, entityId, databaseId);
+    }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
+        let row = await this.dataService.fetchOne<M>(path, id, databaseId);
 
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
-        if (entity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+        if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = {
                 user: this.user,
                 driver: this,
@@ -241,64 +242,66 @@ propertyCallbacks: undefined };
                 client: this.client,
                 storageSource: this.client?.storage
             } as unknown as RebaseCallContext; // Backend context
+            let processedRow: Record<string, unknown> = row;
             if (globalCallbacks?.afterRead) {
-                entity = await globalCallbacks.afterRead({
-                    collection: resolvedCollection as EntityCollection<M>,
+                processedRow = await globalCallbacks.afterRead({
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entity: entity as Entity<M>,
+                    row: processedRow,
                     context: contextForCallback
-                }) ?? entity;
+                }) ?? processedRow;
             }
             if (callbacks?.afterRead) {
-                entity = await callbacks.afterRead({
-                    collection: resolvedCollection as EntityCollection<M>,
+                processedRow = await callbacks.afterRead({
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entity: entity as Entity<M>,
+                    row: processedRow,
                     context: contextForCallback
-                }) ?? entity;
+                }) ?? processedRow;
             }
             if (propertyCallbacks?.afterRead) {
-                entity = await propertyCallbacks.afterRead({
-                    collection: resolvedCollection as EntityCollection<M>,
+                processedRow = await propertyCallbacks.afterRead({
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entity: entity as Entity<M>,
+                    row: processedRow,
                     context: contextForCallback
-                }) as Entity<M> ?? entity;
+                }) ?? processedRow;
             }
+            row = processedRow;
         }
 
-        return entity;
+        return row;
     }
 
     /**
-     * Listen to entity changes
+     * Listen to row changes
      */
-    listenEntity<M extends Record<string, any>>({
+    listenOne<M extends Record<string, any>>({
         path,
-        entityId,
+        id,
         collection,
         onUpdate,
         onError
-    }: ListenEntityProps<M>): () => void {
+    }: ListenOneProps<M>): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
-        const callback = (entity: Entity<any> | null) => {
+        const callback = (row: Record<string, unknown> | null) => {
             try {
-                onUpdate(entity as Entity<M>);
+                onUpdate(row);
             } catch (error) {
-                logger.error("Error in entity update callback", { error: error });
+                logger.error("Error in row update callback", { error: error });
                 if (onError) {
                     onError(error instanceof Error ? error : new Error(String(error)));
                 }
             }
         };
 
-        this.realtimeService.subscribeToEntity(
+        this.realtimeService.subscribeToOne(
             subscriptionId,
             {
                 clientId: "driver",
                 path,
-                entityId
+                id
             },
             callback
         );
@@ -310,15 +313,15 @@ propertyCallbacks: undefined };
     }
 
     /**
-     * Save an entity (create or update)
+     * Save an row (create or update)
      */
-    async saveEntity<M extends Record<string, any>>({
+    async save<M extends Record<string, any>>({
         path,
-        entityId,
+        id,
         values,
         collection,
         status
-    }: SaveEntityProps<M>): Promise<Entity<M>> {
+    }: SaveProps<M>): Promise<Record<string, unknown>> {
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
 
         let updatedValues = values;
@@ -331,20 +334,21 @@ propertyCallbacks: undefined };
         } as unknown as RebaseCallContext;
 
         // Fetch previous values for callbacks AND history recording
-        let previousValuesForHistory: Partial<Entity<M>["values"]> | undefined;
-        if (status === "existing" && entityId) {
-            const existing = await this.entityService.fetchEntity<M>(path, entityId, resolvedCollection?.databaseId);
+        let previousValuesForHistory: Partial<M> | undefined;
+        if (status === "existing" && id) {
+            const existing = await this.dataService.fetchOne<M>(path, id, resolvedCollection?.databaseId);
             if (existing) {
-                previousValuesForHistory = existing.values as Partial<Entity<M>["values"]>;
+                const { id: _existingId, ...existingValues } = existing;
+                previousValuesForHistory = existingValues as Partial<M>;
             }
         }
 
         if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
             if (globalCallbacks?.beforeSave) {
                 const result = await globalCallbacks.beforeSave({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entityId,
+                    id,
                     values: updatedValues,
                     previousValues: previousValuesForHistory,
                     status,
@@ -355,9 +359,9 @@ propertyCallbacks: undefined };
 
             if (callbacks?.beforeSave) {
                 const result = await callbacks.beforeSave({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entityId,
+                    id,
                     values: updatedValues,
                     previousValues: previousValuesForHistory,
                     status,
@@ -368,9 +372,9 @@ propertyCallbacks: undefined };
 
             if (propertyCallbacks?.beforeSave) {
                 const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as EntityCollection<M>,
+                    collection: resolvedCollection as SnapshotCollection<M>,
                     path,
-                    entityId,
+                    id,
                     values: updatedValues,
                     previousValues: previousValuesForHistory,
                     status,
@@ -391,47 +395,50 @@ propertyCallbacks: undefined };
         }
 
         try {
-            let savedEntity = await this.entityService.saveEntity<M>(
+            let savedRow = await this.dataService.save<M>(
                 path,
                 updatedValues,
-                entityId,
+                id,
                 resolvedCollection?.databaseId
             );
 
-            if (savedEntity && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+            if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
                 if (globalCallbacks?.afterRead) {
-                    savedEntity = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                    savedRow = await globalCallbacks.afterRead({
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: savedEntity,
+                        row: savedRow,
                         context: contextForCallback
-                    }) ?? savedEntity;
+                    }) ?? savedRow;
                 }
                 if (callbacks?.afterRead) {
-                    savedEntity = await callbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                    savedRow = await callbacks.afterRead({
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: savedEntity,
+                        row: savedRow,
                         context: contextForCallback
-                    }) ?? savedEntity;
+                    }) ?? savedRow;
                 }
                 if (propertyCallbacks?.afterRead) {
-                    savedEntity = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                    savedRow = await propertyCallbacks.afterRead({
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entity: savedEntity,
+                        row: savedRow,
                         context: contextForCallback
-                    }) as Entity<M> ?? savedEntity;
+                    }) ?? savedRow;
                 }
             }
+
+            const savedId = savedRow.id as string | number;
+            const { id: _savedId, ...savedValues } = savedRow;
 
             if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
                 if (globalCallbacks?.afterSave) {
                     await globalCallbacks.afterSave({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: savedEntity.id,
-                        values: savedEntity.values,
+                        id: savedId,
+                        values: savedValues,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -439,10 +446,10 @@ propertyCallbacks: undefined };
                 }
                 if (callbacks?.afterSave) {
                     await callbacks.afterSave({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: savedEntity.id,
-                        values: savedEntity.values,
+                        id: savedId,
+                        values: savedValues as Partial<M>,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -450,10 +457,10 @@ propertyCallbacks: undefined };
                 }
                 if (propertyCallbacks?.afterSave) {
                     await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: savedEntity.id,
-                        values: savedEntity.values,
+                        id: savedId,
+                        values: savedValues,
                         previousValues: previousValuesForHistory,
                         status,
                         context: contextForCallback
@@ -461,35 +468,35 @@ propertyCallbacks: undefined };
                 }
             }
 
-            // Record entity history (fire-and-forget, never blocks the save)
+            // Record row history (fire-and-forget, never blocks the save)
             if (this.historyService && resolvedCollection?.history) {
                 this.historyService.recordHistory({
                     tableName: path,
-                    entityId: savedEntity.id.toString(),
+                    id: savedId.toString(),
                     action: status === "new" ? "create" : "update",
-                    values: savedEntity.values as Record<string, unknown>,
+                    values: savedValues as Record<string, unknown>,
                     previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
                     updatedBy: this.user?.uid
                 }).catch(err => {
-                    logger.error(`Failed to record history for ${path}/${savedEntity.id}`, { error: err });
+                    logger.error(`Failed to record history for ${path}/${savedId}`, { error: err });
                 });
             }
 
             // Notify real-time subscribers
-            await this.realtimeService.notifyEntityUpdate(
+            await this.realtimeService.notifyUpdate(
                 path,
-                savedEntity.id.toString(),
-                savedEntity
+                savedId.toString(),
+                savedRow
             );
 
-            return savedEntity;
+            return savedRow;
         } catch (error) {
             if (callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: entityId || "unknown",
+                        id: id || "unknown",
                         values: updatedValues,
                         previousValues: undefined,
                         status,
@@ -498,9 +505,9 @@ propertyCallbacks: undefined };
                 }
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path,
-                        entityId: entityId || "unknown",
+                        id: id || "unknown",
                         values: updatedValues,
                         previousValues: undefined,
                         status,
@@ -513,13 +520,15 @@ propertyCallbacks: undefined };
     }
 
     /**
-     * Delete an entity
+     * Delete an row
      */
-    async deleteEntity<M extends Record<string, any>>({
-        entity,
+    async delete<M extends Record<string, any>>({
+        row,
         collection
-    }: DeleteEntityProps<M>): Promise<void> {
-        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, entity.path);
+    }: DeleteProps<M>): Promise<void> {
+        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, row.path);
+
+        const callbackRow: Record<string, unknown> = { id: row.id, ...(row.values ?? {}) };
 
         const contextForCallback = {
             user: this.user,
@@ -533,10 +542,10 @@ propertyCallbacks: undefined };
             let preventDefault = false;
             if (globalCallbacks?.beforeDelete) {
                 const result = await globalCallbacks.beforeDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: row.path,
+                    id: row.id,
+                    row: callbackRow,
                     context: contextForCallback
                 });
                 if (result === false) {
@@ -545,10 +554,10 @@ propertyCallbacks: undefined };
             }
             if (callbacks?.beforeDelete) {
                 const result = await callbacks.beforeDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: row.path,
+                    id: row.id,
+                    row: callbackRow,
                     context: contextForCallback
                 });
                 if (result === false) {
@@ -557,10 +566,10 @@ propertyCallbacks: undefined };
             }
             if (propertyCallbacks?.beforeDelete) {
                 const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: row.path,
+                    id: row.id,
+                    row: callbackRow,
                     context: contextForCallback
                 });
                 if (result === false) {
@@ -572,33 +581,33 @@ propertyCallbacks: undefined };
             }
         }
 
-        await this.entityService.deleteEntity(entity.path, entity.id);
+        await this.dataService.delete(row.path, row.id);
 
         if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
             if (globalCallbacks?.afterDelete) {
                 await globalCallbacks.afterDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: row.path,
+                    id: row.id,
+                    row: callbackRow,
                     context: contextForCallback
                 });
             }
             if (callbacks?.afterDelete) {
                 await callbacks.afterDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: row.path,
+                    id: row.id,
+                    row: callbackRow,
                     context: contextForCallback
                 });
             }
             if (propertyCallbacks?.afterDelete) {
                 await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as EntityCollection<M>,
-                    path: entity.path,
-                    entityId: entity.id,
-                    entity,
+                    collection: resolvedCollection as SnapshotCollection<M>,
+                    path: row.path,
+                    id: row.id,
+                    row: callbackRow,
                     context: contextForCallback
                 });
             }
@@ -608,17 +617,17 @@ propertyCallbacks: undefined };
         if (this.historyService && resolvedCollection?.history) {
             this.historyService.recordHistory({
                 action: "delete",
-                entityId: String(entity.id),
-                tableName: entity.path,
-                previousValues: entity.values,
+                id: String(row.id),
+                tableName: row.path,
+                previousValues: row.values,
                 updatedBy: this.user?.uid
             }).catch(err => {
-                logger.error(`Failed to record history for ${entity.path}/${entity.id}`, { error: err });
+                logger.error(`Failed to record history for ${row.path}/${row.id}`, { error: err });
             });
         }
 
         // Notify subscribers of the deletion
-        await this.realtimeService.notifyEntityUpdate(entity.path, String(entity.id), null);
+        await this.realtimeService.notifyUpdate(row.path, String(row.id), null);
     }
 
     /**
@@ -628,28 +637,28 @@ propertyCallbacks: undefined };
         path: string,
         name: string,
         value: any,
-        entityId?: string,
-        collection?: EntityCollection
+        id?: string,
+        collection?: SnapshotCollection
     ): Promise<boolean> {
-        return this.entityService.checkUniqueField(path, name, value, entityId);
+        return this.dataService.checkUniqueField(path, name, value, id);
     }
 
     /**
-     * Generate a new entity ID
+     * Generate a new row ID
      */
-    generateEntityId(path: string, collection?: EntityCollection): string {
-        return this.entityService.generateEntityId();
+    generateId(path: string, collection?: SnapshotCollection): string {
+        return this.dataService.generateId();
     }
 
     /**
-     * Count entities in a collection
+     * Count rows in a collection
      */
-    async countEntities<M extends Record<string, any>>({
+    async count<M extends Record<string, any>>({
         path,
         collection,
         filter
     }: FetchCollectionProps<M>): Promise<number> {
-        return this.entityService.countEntities<M>(path, { filter });
+        return this.dataService.count<M>(path, { filter });
     }
 
     /**
@@ -667,10 +676,10 @@ propertyCallbacks: undefined };
     }
 
     /**
-     * Get the underlying entity service for direct access
+     * Get the underlying row service for direct access
      */
-    getEntityService(): MongoEntityService {
-        return this.entityService;
+    getDataService(): MongoDataService {
+        return this.dataService;
     }
 
     /**
@@ -692,18 +701,18 @@ export class AuthenticatedMongoDriver implements DataDriver {
     key = "mongodb";
     initialised = true;
     public user: User;
-    public data: RebaseData;
+    public data: RebaseSdkData;
 
     constructor(public delegate: MongoDriver, user: User) {
         this.user = user;
-        this.data = buildRebaseData(this);
+        this.data = buildSdkData(this);
     }
 
     currentTime(): Date {
         return this.delegate.currentTime();
     }
 
-    async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Entity<M>[]> {
+    async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const rlsFilter = buildMongoFilterFromSecurityRules(resolvedCollection, this.user, "select");
         if (rlsFilter === null) {
@@ -720,8 +729,8 @@ export class AuthenticatedMongoDriver implements DataDriver {
             ? ({ $and: [userQuery, rlsFilter] } as Filter<Document>)
             : userQuery;
 
-        const originalService = this.delegate.getEntityService();
-        const entities = await originalService.fetchCollection<M>(props.path, {
+        const originalService = this.delegate.getDataService();
+        const rows = await originalService.fetchCollection<M>(props.path, {
             ...props,
             rawQuery: combinedQuery,
             collection: resolvedCollection
@@ -737,37 +746,37 @@ export class AuthenticatedMongoDriver implements DataDriver {
                 client: this.delegate.client,
                 storageSource: this.delegate.client?.storage
             } as unknown as RebaseCallContext;
-            return Promise.all(entities.map(async (entity) => {
-                let fetched = entity;
+            return Promise.all(rows.map(async (row) => {
+                let fetched = row;
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path: props.path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
                     }) ?? fetched;
                 }
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path: props.path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
                     }) ?? fetched;
                 }
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as EntityCollection<M>,
+                        collection: resolvedCollection as SnapshotCollection<M>,
                         path: props.path,
-                        entity: fetched,
+                        row: fetched,
                         context: contextForCallback
-                    }) as Entity<M> ?? fetched;
+                    }) ?? fetched;
                 }
                 return fetched;
             }));
         }
 
-        return entities;
+        return rows;
     }
 
     listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
@@ -783,20 +792,20 @@ roles: this.user.roles ?? [] };
         return unsubscribe;
     }
 
-    async fetchEntity<M extends Record<string, any>>(props: FetchEntityProps<M>): Promise<Entity<M> | undefined> {
+    async fetchOne<M extends Record<string, any>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
-        const entity = await this.delegate.fetchEntity(props);
-        if (entity) {
-            const authorized = checkOperation(resolvedCollection as EntityCollection, { user: this.user }, entity as Entity, "select", { onUnknown: "deny" });
+        const row = await this.delegate.fetchOne(props);
+        if (row) {
+            const authorized = checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(row, props.path), "select", { onUnknown: "deny" });
             if (!authorized) {
                 return undefined;
             }
         }
-        return entity;
+        return row;
     }
 
-    listenEntity<M extends Record<string, any>>(props: ListenEntityProps<M>): () => void {
-        const unsubscribe = this.delegate.listenEntity(props);
+    listenOne<M extends Record<string, any>>(props: ListenOneProps<M>): () => void {
+        const unsubscribe = this.delegate.listenOne(props);
         const authContext = { userId: this.user.uid,
 roles: this.user.roles ?? [] };
         const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
@@ -808,66 +817,66 @@ roles: this.user.roles ?? [] };
         return unsubscribe;
     }
 
-    async saveEntity<M extends Record<string, any>>(props: SaveEntityProps<M>): Promise<Entity<M>> {
+    async save<M extends Record<string, any>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
-        if (props.status === "existing" && props.entityId) {
-            const existing = await this.delegate.fetchEntity({ path: props.path,
-entityId: props.entityId,
+        if (props.status === "existing" && props.id) {
+            const existing = await this.delegate.fetchOne({ path: props.path,
+id: props.id,
 collection: resolvedCollection });
-            if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "update", { onUnknown: "deny" })) {
+            if (!existing || !checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(existing, props.path), "update", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
-            const tempEntity = { id: props.entityId || "new",
+            const tempSnapshot = { id: props.id || "new",
 path: props.path,
-values: props.values } as Entity;
-            if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, tempEntity, "insert", { onUnknown: "deny" })) {
+values: props.values } as Snapshot;
+            if (!checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, tempSnapshot, "insert", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         }
 
-        const saved = await this.delegate.saveEntity({
+        const saved = await this.delegate.save({
             ...props,
             collection: resolvedCollection
         });
 
         // After save / withCheck rules verification
-        if (!checkOperation(resolvedCollection as EntityCollection, { user: this.user }, saved as Entity, props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
+        if (!checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(saved, props.path), props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
         return saved;
     }
 
-    async deleteEntity<M extends Record<string, any>>(props: DeleteEntityProps<M>): Promise<void> {
-        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.entity.path);
+    async delete<M extends Record<string, any>>(props: DeleteProps<M>): Promise<void> {
+        const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.row.path);
 
-        const existing = await this.delegate.fetchEntity({ path: props.entity.path,
-entityId: props.entity.id,
+        const existing = await this.delegate.fetchOne({ path: props.row.path,
+id: props.row.id,
 collection: resolvedCollection });
-        if (!existing || !checkOperation(resolvedCollection as EntityCollection, { user: this.user }, existing as Entity, "delete", { onUnknown: "deny" })) {
+        if (!existing || !checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(existing, props.row.path), "delete", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
-        return this.delegate.deleteEntity(props);
+        return this.delegate.delete(props);
     }
 
     async checkUniqueField(
         path: string,
         name: string,
         value: any,
-        entityId?: string,
-        collection?: EntityCollection
+        id?: string,
+        collection?: SnapshotCollection
     ): Promise<boolean> {
-        return this.delegate.checkUniqueField(path, name, value, entityId, collection);
+        return this.delegate.checkUniqueField(path, name, value, id, collection);
     }
 
-    generateEntityId(path: string, collection?: EntityCollection): string {
-        return this.delegate.generateEntityId(path, collection);
+    generateId(path: string, collection?: SnapshotCollection): string {
+        return this.delegate.generateId(path, collection);
     }
 
-    async countEntities<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
+    async count<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const rlsFilter = buildMongoFilterFromSecurityRules(resolvedCollection, this.user, "select");
         if (rlsFilter === null) {
@@ -884,8 +893,8 @@ collection: resolvedCollection });
             ? ({ $and: [userQuery, rlsFilter] } as Filter<Document>)
             : userQuery;
 
-        const originalService = this.delegate.getEntityService();
-        return originalService.countEntities(props.path, {
+        const originalService = this.delegate.getDataService();
+        return originalService.count(props.path, {
             ...props,
             rawQuery: combinedQuery
         });
@@ -894,6 +903,18 @@ collection: resolvedCollection });
     isReady(): boolean {
         return this.delegate.isReady();
     }
+}
+
+/**
+ * Wrap a flat row into the Snapshot shape expected by `checkOperation`,
+ * which evaluates security rules against `row.values`.
+ */
+function rowToSnapshotForCheck(row: Record<string, unknown>, path: string): Snapshot {
+    return {
+        id: row.id as string | number,
+        path,
+        values: row
+    };
 }
 
 function getMongoFilterForSQL(sqlString: string, user: User): Filter<Document> | null {
@@ -1020,7 +1041,7 @@ function getMongoFilterForRule(rule: SecurityRule, user: User): Filter<Document>
 }
 
 function buildMongoFilterFromSecurityRules<M extends Record<string, any>>(
-    collection: EntityCollection<M> | undefined,
+    collection: SnapshotCollection<M> | undefined,
     user: User,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): Filter<Document> | null {

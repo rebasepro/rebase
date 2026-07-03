@@ -255,7 +255,7 @@ code: "AUTH_FAILED" } }
             ws.onmessage!({ data: JSON.stringify({
                 type: "FETCH_COLLECTION",
                 requestId: sent.requestId,
-                payload: { entities: [{ id: "1" }] }
+                payload: { rows: [{ id: "1" }] }
             }) });
 
             const result = await fetchPromise;
@@ -285,38 +285,36 @@ ws: getWs() };
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
-                payload: { entities: [] }
+                payload: { rows: [] }
             }) });
 
             const result = await promise;
             expect(result).toEqual([]);
         });
 
-        it("fetchEntity sends correct message type", async () => {
+        it("fetchOne sends correct message type", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "123" });
+            const promise = client.fetchOne({ path: "posts",
+id: "123" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
-            expect(msg.type).toBe("FETCH_ENTITY");
-            expect(msg.payload.entityId).toBe("123");
+            expect(msg.type).toBe("FETCH_ONE");
+            expect(msg.payload.id).toBe("123");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
-                payload: { entity: { id: "123",
-values: {} } }
+                payload: { row: { id: "123" } }
             }) });
 
             const result = await promise;
-            expect(result).toEqual({ id: "123",
-values: {} });
+            expect(result).toEqual({ id: "123" });
         });
 
-        it("fetchEntity returns undefined when no entity in response", async () => {
+        it("fetchOne returns undefined when no row in response", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "missing" });
+            const promise = client.fetchOne({ path: "posts",
+id: "missing" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -328,36 +326,35 @@ entityId: "missing" });
             expect(result).toBeUndefined();
         });
 
-        it("saveEntity sends correct message type and returns entity", async () => {
+        it("save sends correct message type and returns row", async () => {
             const { client, ws } = await setupConnected();
 
-            const entity = { id: "1",
-path: "posts",
-values: { title: "Hello" } };
-            const promise = client.saveEntity({ path: "posts",
-entityId: "1",
+            const wireSnapshot = { id: "1",
+title: "Hello" };
+            const promise = client.save({ path: "posts",
+id: "1",
 values: { title: "Hello" } } as any);
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
-            expect(msg.type).toBe("SAVE_ENTITY");
+            expect(msg.type).toBe("SAVE");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
-                payload: { entity }
+                payload: { row: wireSnapshot }
             }) });
 
             const result = await promise;
-            expect(result).toEqual(entity);
+            expect(result).toEqual({ id: "1", title: "Hello" });
         });
 
-        it("deleteEntity sends correct message type", async () => {
+        it("delete sends correct message type", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.deleteEntity({ path: "posts",
-entity: { id: "1",
+            const promise = client.delete({ path: "posts",
+row: { id: "1",
 path: "posts",
 values: {} } as any });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
-            expect(msg.type).toBe("DELETE_ENTITY");
+            expect(msg.type).toBe("DELETE");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
@@ -402,12 +399,12 @@ role: "admin" });
             expect(result).toEqual([]);
         });
 
-        it("countEntities sends correct message and returns count", async () => {
+        it("count sends correct message and returns count", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.countEntities({ path: "users" });
+            const promise = client.count({ path: "users" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
-            expect(msg.type).toBe("COUNT_ENTITIES");
+            expect(msg.type).toBe("COUNT");
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
@@ -421,14 +418,14 @@ role: "admin" });
         it("checkUniqueField sends correct message", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.checkUniqueField("users", "email", "test@test.com", "entity-1");
+            const promise = client.checkUniqueField("users", "email", "test@test.com", "row-1");
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
             expect(msg.type).toBe("CHECK_UNIQUE_FIELD");
             expect(msg.payload).toEqual(expect.objectContaining({
                 path: "users",
                 name: "email",
                 value: "test@test.com",
-                entityId: "entity-1"
+                id: "row-1"
             }));
 
             ws.onmessage!({ data: JSON.stringify({
@@ -564,8 +561,8 @@ code: "FORBIDDEN" } }
         it("rejects pending request when message has error field", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "x",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "x",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
@@ -639,7 +636,7 @@ code: "ERR_001" } }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: sent.payload.subscriptionId,
-                entities: [{ id: "user1" }]
+                rows: [{ id: "user1" }]
             }) });
 
             expect(onUpdate1).toHaveBeenCalledWith([{ id: "user1" }]);
@@ -690,7 +687,7 @@ limit: 20 }, jest.fn());
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entities: [{ id: "cached" }]
+                rows: [{ id: "cached" }]
             }) });
 
             expect(onUpdate1).toHaveBeenCalledWith([{ id: "cached" }]);
@@ -703,26 +700,26 @@ limit: 20 }, jest.fn());
     });
 
     // -----------------------------------------------------------------------
-    // Entity subscriptions
+    // Snapshot subscriptions
     // -----------------------------------------------------------------------
-    describe("Entity subscriptions", () => {
-        it("subscribes to entity updates", () => {
+    describe("Snapshot subscriptions", () => {
+        it("subscribes to row updates", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate);
 
             expect(ws.sentMessages).toHaveLength(1);
             const sent = JSON.parse(ws.sentMessages[0]);
-            expect(sent.type).toBe("subscribe_entity");
+            expect(sent.type).toBe("subscribe_one");
             expect(sent.payload.path).toBe("posts");
-            expect(sent.payload.entityId).toBe("1");
+            expect(sent.payload.id).toBe("1");
         });
 
-        it("deduplicates entity subscriptions", () => {
+        it("deduplicates row subscriptions", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -730,80 +727,80 @@ entityId: "1" }, onUpdate);
             const onUpdate1 = jest.fn();
             const onUpdate2 = jest.fn();
 
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate1);
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate2);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate1);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate2);
 
             expect(ws.sentMessages).toHaveLength(1);
 
-            // Simulate entity update
+            // Simulate row update
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
-                type: "entity_update",
+                type: "single_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entity: { id: "1",
-values: { title: "Updated" } }
+                row: { id: "1",
+title: "Updated" }
             }) });
 
             expect(onUpdate1).toHaveBeenCalledWith({ id: "1",
-values: { title: "Updated" } });
+title: "Updated" });
             expect(onUpdate2).toHaveBeenCalledWith({ id: "1",
-values: { title: "Updated" } });
+title: "Updated" });
         });
 
-        it("handles null entity (deletion)", () => {
+        it("handles null row (deletion)", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
-                type: "entity_update",
+                type: "single_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entity: null
+                row: null
             }) });
 
             expect(onUpdate).toHaveBeenCalledWith(null);
         });
 
-        it("caches entity data for late subscribers", () => {
+        it("caches row data for late subscribers", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
             const onUpdate1 = jest.fn();
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate1);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate1);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
-                type: "entity_update",
+                type: "single_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entity: { id: "1",
-values: { title: "Cached" } }
+                row: { id: "1",
+title: "Cached" }
             }) });
 
             const onUpdate2 = jest.fn();
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate2);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate2);
             expect(onUpdate2).toHaveBeenCalledWith({ id: "1",
-values: { title: "Cached" } });
+title: "Cached" });
         });
 
-        it("unsubscribes entity when all callbacks removed", () => {
+        it("unsubscribes row when all callbacks removed", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
-            const unsub1 = client.listenEntity({ path: "posts",
-entityId: "1" }, jest.fn());
-            const unsub2 = client.listenEntity({ path: "posts",
-entityId: "1" }, jest.fn());
+            const unsub1 = client.listenOne({ path: "posts",
+id: "1" }, jest.fn());
+            const unsub2 = client.listenOne({ path: "posts",
+id: "1" }, jest.fn());
 
             unsub1();
             expect(ws.sentMessages).toHaveLength(1); // Just subscribe
@@ -814,10 +811,10 @@ entityId: "1" }, jest.fn());
     });
 
     // -----------------------------------------------------------------------
-    // mergeEntities structural equality and normalization
+    // mergeSnapshots structural equality and normalization
     // -----------------------------------------------------------------------
-    describe("mergeEntities structural equality and normalization", () => {
-        it("preserves entity reference if only relation .data changes", () => {
+    describe("mergeSnapshots structural equality and normalization", () => {
+        it("preserves row reference if only relation .data changes", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -829,50 +826,43 @@ entityId: "1" }, jest.fn());
             const subId = subMsg.payload.subscriptionId;
 
             // Initial data contains a relation without .data
-            const initialEntity = {
+            const initialSnapshot = {
                 id: "1",
-                path: "posts",
-                values: {
-                    title: "Hello",
-                    author: { __type: "relation",
+                title: "Hello",
+                author: { __type: "relation",
 id: "2",
 path: "users" }
-                }
             };
 
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [initialEntity]
+                rows: [initialSnapshot]
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
-            const cachedEntityInstance = firstUpdate[0];
+            const cachedSnapshotInstance = firstUpdate[0];
 
             onUpdate.mockClear();
 
             // Next update contains EXACTLY the same relation, but WITH .data appended
-            const refetchedEntity = {
+            const refetchedSnapshot = {
                 id: "1",
-                path: "posts",
-                values: {
-                    title: "Hello",
-                    author: {
-                        __type: "relation",
-                        id: "2",
-                        path: "users",
-                        data: { id: "2",
-path: "users",
-values: { name: "Alice" } }
-                    }
+                title: "Hello",
+                author: {
+                    __type: "relation",
+                    id: "2",
+                    path: "users",
+                    data: { id: "2",
+name: "Alice" }
                 }
             };
 
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [refetchedEntity]
+                rows: [refetchedSnapshot]
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
@@ -880,10 +870,10 @@ values: { name: "Alice" } }
 
             // Because the .data is purely denormalized cache, the identity of the relation
             // is the same, so it should have preserved the SAME object reference!
-            expect(secondUpdate[0]).toBe(cachedEntityInstance);
+            expect(secondUpdate[0]).toBe(cachedSnapshotInstance);
         });
 
-        it("does NOT preserve entity reference if the relation ID changes", () => {
+        it("does NOT preserve row reference if the relation ID changes", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -894,48 +884,42 @@ values: { name: "Alice" } }
             const subMsg = JSON.parse(ws.sentMessages[0]);
             const subId = subMsg.payload.subscriptionId;
 
-            const initialEntity = {
+            const initialSnapshot = {
                 id: "1",
-                path: "posts",
-                values: {
-                    title: "Hello",
-                    author: { __type: "relation",
+                title: "Hello",
+                author: { __type: "relation",
 id: "2",
 path: "users" }
-                }
             };
 
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [initialEntity]
+                rows: [initialSnapshot]
             }) });
 
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
-            const cachedEntityInstance = firstUpdate[0];
+            const cachedSnapshotInstance = firstUpdate[0];
             onUpdate.mockClear();
 
             // Next update changes the author ID
-            const newAuthorEntity = {
+            const newAuthorSnapshot = {
                 id: "1",
-                path: "posts",
-                values: {
-                    title: "Hello",
-                    author: { __type: "relation",
+                title: "Hello",
+                author: { __type: "relation",
 id: "3",
 path: "users" }
-                }
             };
 
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [newAuthorEntity]
+                rows: [newAuthorSnapshot]
             }) });
 
             const secondUpdate = onUpdate.mock.calls[0][0] as any[];
             // It should be a new reference because the value is structurally different
-            expect(secondUpdate[0]).not.toBe(cachedEntityInstance);
+            expect(secondUpdate[0]).not.toBe(cachedSnapshotInstance);
         });
 
         it("preserves relation identity inside array of relations", () => {
@@ -948,46 +932,40 @@ path: "users" }
 
             const subId = JSON.parse(ws.sentMessages[0]).payload.subscriptionId;
 
-            const entity = {
+            const row = {
                 id: "1",
-                path: "posts",
-                values: {
-                    tags: [
-                        { __type: "relation",
+                tags: [
+                    { __type: "relation",
 id: "10",
 path: "tags" },
-                        { __type: "relation",
+                    { __type: "relation",
 id: "11",
 path: "tags" }
-                    ]
-                }
+                ]
             };
             ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
 subscriptionId: subId,
-entities: [entity] }) });
+rows: [row] }) });
 
             const firstInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             onUpdate.mockClear();
 
-            const entityWithData = {
+            const snapshotWithData = {
                 id: "1",
-                path: "posts",
-                values: {
-                    tags: [
-                        { __type: "relation",
+                tags: [
+                    { __type: "relation",
 id: "10",
 path: "tags",
 data: { id: "10" } },
-                        { __type: "relation",
+                    { __type: "relation",
 id: "11",
 path: "tags",
 data: { id: "11" } }
-                    ]
-                }
+                ]
             };
             ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
 subscriptionId: subId,
-entities: [entityWithData] }) });
+rows: [snapshotWithData] }) });
 
             const secondInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             expect(secondInstance).toBe(firstInstance);
@@ -995,10 +973,10 @@ entities: [entityWithData] }) });
     });
 
     // -----------------------------------------------------------------------
-    // collection_entity_patch handling
+    // collection_snapshot_patch handling
     // -----------------------------------------------------------------------
-    describe("collection_entity_patch", () => {
-        it("patches existing entity in collection", () => {
+    describe("collection_patch", () => {
+        it("patches existing row in collection", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -1013,34 +991,34 @@ entities: [entityWithData] }) });
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [
+                rows: [
                     { id: "1",
-values: { title: "Old" } },
+title: "Old" },
                     { id: "2",
-values: { title: "Two" } }
+title: "Two" }
                 ]
             }) });
 
             onUpdate.mockClear();
 
-            // Patch entity 1
+            // Patch row 1
             ws.onmessage!({ data: JSON.stringify({
-                type: "collection_entity_patch",
+                type: "collection_patch",
                 subscriptionId: subId,
-                entity: { id: "1",
-values: { title: "New" } }
+                row: { id: "1",
+title: "New" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const updatedEntities = onUpdate.mock.calls[0][0];
-            expect(updatedEntities).toHaveLength(2);
-            expect(updatedEntities[0]).toEqual({ id: "1",
-values: { title: "New" } });
-            expect(updatedEntities[1]).toEqual({ id: "2",
-values: { title: "Two" } });
+            const updatedSnapshots = onUpdate.mock.calls[0][0];
+            expect(updatedSnapshots).toHaveLength(2);
+            expect(updatedSnapshots[0]).toEqual({ id: "1",
+title: "New" });
+            expect(updatedSnapshots[1]).toEqual({ id: "2",
+title: "Two" });
         });
 
-        it("adds new entity via patch (prepends)", () => {
+        it("adds new row via patch (prepends)", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -1055,17 +1033,16 @@ values: { title: "Two" } });
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [{ id: "1",
-values: {} }]
+                rows: [{ id: "1" }]
             }) });
             onUpdate.mockClear();
 
-            // New entity via patch
+            // New row via patch
             ws.onmessage!({ data: JSON.stringify({
-                type: "collection_entity_patch",
+                type: "collection_patch",
                 subscriptionId: subId,
-                entity: { id: "new",
-values: { title: "Fresh" } }
+                row: { id: "new",
+title: "Fresh" }
             }) });
 
             const result = onUpdate.mock.calls[0][0];
@@ -1073,7 +1050,7 @@ values: { title: "Fresh" } }
             expect(result[0].id).toBe("new"); // Prepended
         });
 
-        it("removes entity from collection on null patch", () => {
+        it("removes row from collection on null patch", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -1088,21 +1065,19 @@ values: { title: "Fresh" } }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [
-                    { id: "1",
-values: {} },
-                    { id: "2",
-values: {} }
+                rows: [
+                    { id: "1" },
+                    { id: "2" }
                 ]
             }) });
             onUpdate.mockClear();
 
-            // Delete entity 1
+            // Delete row 1
             ws.onmessage!({ data: JSON.stringify({
-                type: "collection_entity_patch",
+                type: "collection_patch",
                 subscriptionId: subId,
-                entity: null,
-                entityId: "1"
+                row: null,
+                id: "1"
             }) });
 
             const result = onUpdate.mock.calls[0][0];
@@ -1123,10 +1098,9 @@ values: {} }
 
             // Patch before any collection_update
             ws.onmessage!({ data: JSON.stringify({
-                type: "collection_entity_patch",
+                type: "collection_patch",
                 subscriptionId: subId,
-                entity: { id: "1",
-values: {} }
+                row: { id: "1" }
             }) });
 
             expect(onUpdate).not.toHaveBeenCalled();
@@ -1159,15 +1133,15 @@ code: "FORBIDDEN" } }
             expect(onError.mock.calls[0][0].message).toBe("Access denied");
         });
 
-        it("calls onError for entity subscription errors", () => {
+        it("calls onError for row subscription errors", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
             const onUpdate = jest.fn();
             const onError = jest.fn();
-            client.listenEntity({ path: "secret",
-entityId: "1" }, onUpdate, onError);
+            client.listenOne({ path: "secret",
+id: "1" }, onUpdate, onError);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
@@ -1192,7 +1166,7 @@ entityId: "1" }, onUpdate, onError);
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entities: []
+                rows: []
             }) });
 
             // Error should have been caught and reported to onError
@@ -1378,7 +1352,7 @@ ws: getWs() };
             const fetchParsed = JSON.parse(fetchMsg!);
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
-                payload: { entities: [{ id: "1" }] }
+                payload: { rows: [{ id: "1" }] }
             }) });
 
             const result = await fetchPromise;
@@ -1491,7 +1465,7 @@ ws: getWs() };
             const fetchParsed = JSON.parse(fetchMsg!);
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
-                payload: { entities: [] }
+                payload: { rows: [] }
             }) });
 
             await fetchPromise;
@@ -1514,7 +1488,7 @@ ws: getWs() };
             const fetchParsed = JSON.parse(fetchMsg!);
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
-                payload: { entities: [{ id: "pub1" }] }
+                payload: { rows: [{ id: "pub1" }] }
             }) });
 
             const result = await fetchPromise;
@@ -1572,7 +1546,7 @@ ws: getWs() };
             const fetchParsed = JSON.parse(fetchMsg!);
             ws.onmessage!({ data: JSON.stringify({
                 requestId: fetchParsed.requestId,
-                payload: { entities: [] }
+                payload: { rows: [] }
             }) });
 
             const result = await fetchPromise;
@@ -1604,7 +1578,7 @@ ws: getWs() };
     });
 
     // -----------------------------------------------------------------------
-    // rehydrateServerValues / rehydrateEntity  (tested via public API)
+    // rehydrateServerValues / rehydrateSnapshot  (tested via public API)
     // -----------------------------------------------------------------------
     describe("rehydrateServerValues (date rehydration)", () => {
         async function setupConnected() {
@@ -1626,22 +1600,19 @@ ws: getWs() };
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entities: [{
+                    rows: [{
                         id: "1",
-                        path: "posts",
-                        values: {
-                            title: "Hello",
-                            createdAt: { __type: "date",
+                        title: "Hello",
+                        createdAt: { __type: "date",
 value: "2025-06-15T12:00:00.000Z" }
-                        }
                     }]
                 }
             }) });
 
             const result = await promise;
             expect(result).toHaveLength(1);
-            expect(result[0].values.createdAt).toBeInstanceOf(Date);
-            expect((result[0].values.createdAt as unknown as Date).toISOString()).toBe("2025-06-15T12:00:00.000Z");
+            expect(result[0].createdAt).toBeInstanceOf(Date);
+            expect((result[0].createdAt as unknown as Date).toISOString()).toBe("2025-06-15T12:00:00.000Z");
         });
 
         it("returns null for invalid serialized dates in fetchCollection", async () => {
@@ -1653,22 +1624,19 @@ value: "2025-06-15T12:00:00.000Z" }
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entities: [{
+                    rows: [{
                         id: "1",
-                        path: "posts",
-                        values: {
-                            badDate: { __type: "date",
+                        badDate: { __type: "date",
 value: "not-a-date" }
-                        }
                     }]
                 }
             }) });
 
             const result = await promise;
-            expect(result[0].values.badDate).toBeNull();
+            expect(result[0].badDate).toBeNull();
         });
 
-        it("handles multiple serialized dates across entities", async () => {
+        it("handles multiple serialized dates across rows", async () => {
             const { client, ws } = await setupConnected();
 
             const promise = client.fetchCollection({ path: "posts" });
@@ -1677,63 +1645,58 @@ value: "not-a-date" }
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entities: [
+                    rows: [
                         { id: "1",
-path: "posts",
-values: { publishedAt: { __type: "date",
-value: "2025-01-01T00:00:00.000Z" } } },
+publishedAt: { __type: "date",
+value: "2025-01-01T00:00:00.000Z" } },
                         { id: "2",
-path: "posts",
-values: { publishedAt: { __type: "date",
-value: "2025-12-31T23:59:59.999Z" } } }
+publishedAt: { __type: "date",
+value: "2025-12-31T23:59:59.999Z" } }
                     ]
                 }
             }) });
 
             const result = await promise;
-            expect(result[0].values.publishedAt).toBeInstanceOf(Date);
-            expect(result[1].values.publishedAt).toBeInstanceOf(Date);
-            expect((result[1].values.publishedAt as unknown as Date).toISOString()).toBe("2025-12-31T23:59:59.999Z");
+            expect(result[0].publishedAt).toBeInstanceOf(Date);
+            expect(result[1].publishedAt).toBeInstanceOf(Date);
+            expect((result[1].publishedAt as unknown as Date).toISOString()).toBe("2025-12-31T23:59:59.999Z");
         });
 
-        // -- fetchEntity path ----------------------------------------------
+        // -- fetchOne path ----------------------------------------------
 
-        it("converts serialized dates in fetchEntity", async () => {
+        it("converts serialized dates in fetchOne", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            updatedAt: { __type: "date",
+                        updatedAt: { __type: "date",
 value: "2025-03-20T08:30:00.000Z" },
-                            title: "Test"
-                        }
+                        title: "Test"
                     }
                 }
             }) });
 
             const result = await promise;
             expect(result).toBeDefined();
-            expect(result!.values.updatedAt).toBeInstanceOf(Date);
-            expect(result!.values.title).toBe("Test");
+            expect(result!.updatedAt).toBeInstanceOf(Date);
+            expect(result!.title).toBe("Test");
         });
 
-        // -- saveEntity path -----------------------------------------------
+        // -- save path -----------------------------------------------
 
-        it("converts serialized dates in saveEntity response", async () => {
+        it("converts serialized dates in save response", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.saveEntity({
+            const promise = client.save({
                 path: "posts",
-                entityId: "1",
+                id: "1",
                 values: { title: "Updated" }
             } as any);
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
@@ -1741,20 +1704,17 @@ value: "2025-03-20T08:30:00.000Z" },
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            title: "Updated",
-                            updatedAt: { __type: "date",
+                        title: "Updated",
+                        updatedAt: { __type: "date",
 value: "2025-07-01T00:00:00.000Z" }
-                        }
                     }
                 }
             }) });
 
             const result = await promise;
-            expect(result.values.updatedAt).toBeInstanceOf(Date);
+            expect(result.updatedAt).toBeInstanceOf(Date);
         });
 
         // -- Nested & complex structures -----------------------------------
@@ -1762,30 +1722,27 @@ value: "2025-07-01T00:00:00.000Z" }
         it("converts dates nested inside plain objects (maps)", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            metadata: {
-                                createdAt: { __type: "date",
+                        metadata: {
+                            createdAt: { __type: "date",
 value: "2025-01-01T00:00:00.000Z" },
-                                editedAt: { __type: "date",
+                            editedAt: { __type: "date",
 value: "2025-06-01T00:00:00.000Z" }
-                            }
                         }
                     }
                 }
             }) });
 
             const result = await promise;
-            const metadata = result!.values.metadata as Record<string, unknown>;
+            const metadata = result!.metadata as Record<string, unknown>;
             expect(metadata.createdAt).toBeInstanceOf(Date);
             expect(metadata.editedAt).toBeInstanceOf(Date);
         });
@@ -1793,30 +1750,27 @@ value: "2025-06-01T00:00:00.000Z" }
         it("converts dates inside arrays", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "events",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "events",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "events",
-                        values: {
-                            dates: [
-                                { __type: "date",
+                        dates: [
+                            { __type: "date",
 value: "2025-01-01T00:00:00.000Z" },
-                                { __type: "date",
+                            { __type: "date",
 value: "2025-02-01T00:00:00.000Z" }
-                            ]
-                        }
+                        ]
                     }
                 }
             }) });
 
             const result = await promise;
-            const dates = result!.values.dates as Date[];
+            const dates = result!.dates as Date[];
             expect(dates).toHaveLength(2);
             expect(dates[0]).toBeInstanceOf(Date);
             expect(dates[1]).toBeInstanceOf(Date);
@@ -1825,32 +1779,29 @@ value: "2025-02-01T00:00:00.000Z" }
         it("converts dates inside array of objects", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            revisions: [
-                                { author: "Alice",
+                        revisions: [
+                            { author: "Alice",
 savedAt: { __type: "date",
 value: "2025-03-01T10:00:00.000Z" } },
-                                { author: "Bob",
+                            { author: "Bob",
 savedAt: { __type: "date",
 value: "2025-03-02T10:00:00.000Z" } }
-                            ]
-                        }
+                        ]
                     }
                 }
             }) });
 
             const result = await promise;
-            const revisions = result!.values.revisions as Array<{ author: string; savedAt: Date }>;
+            const revisions = result!.revisions as Array<{ author: string; savedAt: Date }>;
             expect(revisions[0].savedAt).toBeInstanceOf(Date);
             expect(revisions[1].author).toBe("Bob");
             expect(revisions[1].savedAt).toBeInstanceOf(Date);
@@ -1859,32 +1810,29 @@ value: "2025-03-02T10:00:00.000Z" } }
         it("preserves relation objects while converting sibling dates", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            author: { __type: "relation",
+                        author: { __type: "relation",
 id: "42",
 path: "users" },
-                            createdAt: { __type: "date",
+                        createdAt: { __type: "date",
 value: "2025-05-01T00:00:00.000Z" }
-                        }
                     }
                 }
             }) });
 
             const result = await promise;
             // Date should be converted
-            expect(result!.values.createdAt).toBeInstanceOf(Date);
+            expect(result!.createdAt).toBeInstanceOf(Date);
             // Relation should be preserved as a plain object (not converted)
-            const author = result!.values.author as Record<string, unknown>;
+            const author = result!.author as Record<string, unknown>;
             expect(author.__type).toBe("relation");
             expect(author.id).toBe("42");
             expect(author.path).toBe("users");
@@ -1895,61 +1843,55 @@ value: "2025-05-01T00:00:00.000Z" }
         it("passes through null and undefined values", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            title: null,
-                            count: 0,
-                            active: false,
-                            name: "hello"
-                        }
+                        title: null,
+                        count: 0,
+                        active: false,
+                        name: "hello"
                     }
                 }
             }) });
 
             const result = await promise;
-            expect(result!.values.title).toBeNull();
-            expect(result!.values.count).toBe(0);
-            expect(result!.values.active).toBe(false);
-            expect(result!.values.name).toBe("hello");
+            expect(result!.title).toBeNull();
+            expect(result!.count).toBe(0);
+            expect(result!.active).toBe(false);
+            expect(result!.name).toBe("hello");
         });
 
         it("does not mutate objects that have __type but not 'date'", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            ref: { __type: "reference",
+                        ref: { __type: "reference",
 path: "some/path" },
-                            custom: { __type: "custom",
+                        custom: { __type: "custom",
 data: 123 }
-                        }
                     }
                 }
             }) });
 
             const result = await promise;
-            const ref = result!.values.ref as Record<string, unknown>;
+            const ref = result!.ref as Record<string, unknown>;
             expect(ref.__type).toBe("reference");
             expect(ref.path).toBe("some/path");
-            const custom = result!.values.custom as Record<string, unknown>;
+            const custom = result!.custom as Record<string, unknown>;
             expect(custom.__type).toBe("custom");
             expect(custom.data).toBe(123);
         });
@@ -1957,74 +1899,64 @@ data: 123 }
         it("handles __type date with non-string value gracefully (treats as plain object)", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             // __type is "date" but value is a number, not a string → should NOT match the date rehydration branch
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            weird: { __type: "date",
+                        weird: { __type: "date",
 value: 12345 }
-                        }
                     }
                 }
             }) });
 
             const result = await promise;
-            const weird = result!.values.weird as Record<string, unknown>;
+            const weird = result!.weird as Record<string, unknown>;
             // Because value is not a string, it falls through to the plain-object recursion
             expect(weird.__type).toBe("date");
             expect(weird.value).toBe(12345);
         });
 
-        it("handles empty entity values", async () => {
+        it("handles empty row values", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: { id: "1",
-path: "posts",
-values: {} }
+                    row: { id: "1" }
                 }
             }) });
 
             const result = await promise;
-            expect(result).toEqual({ id: "1",
-path: "posts",
-values: {} });
+            expect(result).toEqual({ id: "1" });
         });
 
         it("handles deeply nested date structures (3+ levels)", async () => {
             const { client, ws } = await setupConnected();
 
-            const promise = client.fetchEntity({ path: "posts",
-entityId: "1" });
+            const promise = client.fetchOne({ path: "posts",
+id: "1" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entity: {
+                    row: {
                         id: "1",
-                        path: "posts",
-                        values: {
-                            level1: {
-                                level2: {
-                                    level3: {
-                                        deepDate: { __type: "date",
+                        level1: {
+                            level2: {
+                                level3: {
+                                    deepDate: { __type: "date",
 value: "2024-12-25T00:00:00.000Z" }
-                                    }
                                 }
                             }
                         }
@@ -2033,7 +1965,7 @@ value: "2024-12-25T00:00:00.000Z" }
             }) });
 
             const result = await promise;
-            const deepDate = (result!.values as any).level1.level2.level3.deepDate;
+            const deepDate = (result as any).level1.level2.level3.deepDate;
             expect(deepDate).toBeInstanceOf(Date);
             expect(deepDate.toISOString()).toBe("2024-12-25T00:00:00.000Z");
         });
@@ -2052,53 +1984,47 @@ value: "2024-12-25T00:00:00.000Z" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entities: [{
+                rows: [{
                     id: "1",
-                    path: "posts",
-                    values: {
-                        createdAt: { __type: "date",
+                    createdAt: { __type: "date",
 value: "2025-08-01T00:00:00.000Z" },
-                        title: "Sub Test"
-                    }
+                    title: "Sub Test"
                 }]
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const entities = onUpdate.mock.calls[0][0] as any[];
-            expect(entities[0].values.createdAt).toBeInstanceOf(Date);
-            expect(entities[0].values.title).toBe("Sub Test");
+            const rows = onUpdate.mock.calls[0][0] as any[];
+            expect(rows[0].createdAt).toBeInstanceOf(Date);
+            expect(rows[0].title).toBe("Sub Test");
         });
 
-        it("rehydrates dates in entity subscription updates", () => {
+        it("rehydrates dates in row subscription updates", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
             const onUpdate = jest.fn();
-            client.listenEntity({ path: "posts",
-entityId: "1" }, onUpdate);
+            client.listenOne({ path: "posts",
+id: "1" }, onUpdate);
 
             const subMsg = JSON.parse(ws.sentMessages[0]);
             ws.onmessage!({ data: JSON.stringify({
-                type: "entity_update",
+                type: "single_update",
                 subscriptionId: subMsg.payload.subscriptionId,
-                entity: {
+                row: {
                     id: "1",
-                    path: "posts",
-                    values: {
-                        updatedAt: { __type: "date",
+                    updatedAt: { __type: "date",
 value: "2025-09-15T18:30:00.000Z" }
-                    }
                 }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const entity = onUpdate.mock.calls[0][0] as any;
-            expect(entity.values.updatedAt).toBeInstanceOf(Date);
-            expect(entity.values.updatedAt.toISOString()).toBe("2025-09-15T18:30:00.000Z");
+            const row = onUpdate.mock.calls[0][0] as any;
+            expect(row.updatedAt).toBeInstanceOf(Date);
+            expect(row.updatedAt.toISOString()).toBe("2025-09-15T18:30:00.000Z");
         });
 
-        it("rehydrates dates in collection_entity_patch updates", () => {
+        it("rehydrates dates in collection_snapshot_patch updates", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -2113,54 +2039,49 @@ value: "2025-09-15T18:30:00.000Z" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                entities: [{ id: "1",
-path: "posts",
-values: { title: "Original" } }]
+                rows: [{ id: "1",
+title: "Original" }]
             }) });
 
             onUpdate.mockClear();
 
             // Now send a patch with a date
             ws.onmessage!({ data: JSON.stringify({
-                type: "collection_entity_patch",
+                type: "collection_patch",
                 subscriptionId: subId,
-                entityId: "1",
-                entity: {
+                id: "1",
+                row: {
                     id: "1",
-                    path: "posts",
-                    values: {
-                        title: "Patched",
-                        patchedAt: { __type: "date",
+                    title: "Patched",
+                    patchedAt: { __type: "date",
 value: "2025-10-01T00:00:00.000Z" }
-                    }
                 }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const entities = onUpdate.mock.calls[0][0] as any[];
-            const patched = entities.find((e: any) => e.id === "1");
-            expect(patched.values.patchedAt).toBeInstanceOf(Date);
+            const rows = onUpdate.mock.calls[0][0] as any[];
+            const patched = rows.find((e: any) => e.id === "1");
+            expect(patched.patchedAt).toBeInstanceOf(Date);
         });
 
-        // -- rehydrateEntity guards ----------------------------------------
+        // -- rehydrateSnapshot guards ----------------------------------------
 
-        it("handles entity with missing values gracefully", async () => {
+        it("handles row with missing values gracefully", async () => {
             const { client, ws } = await setupConnected();
 
             const promise = client.fetchCollection({ path: "posts" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
-            // Entity without a values property
+            // Snapshot without a values property
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {
-                    entities: [{ id: "1",
-path: "posts" }]
+                    rows: [{ id: "1" }]
                 }
             }) });
 
             const result = await promise;
-            // Should not throw, entity is returned as-is
+            // Should not throw, row is returned as-is
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe("1");
         });
@@ -2241,7 +2162,7 @@ code: "UNAUTHORIZED" } }
             ws.onmessage!({ data: JSON.stringify({
                 type: "FETCH_COLLECTION",
                 requestId: retriedMsg.requestId,
-                payload: { entities: [{ id: "post1" }] }
+                payload: { rows: [{ id: "post1" }] }
             }) });
 
             const result = await fetchPromise;
@@ -2315,7 +2236,7 @@ code: "UNAUTHORIZED" } }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: resubMsg.payload.subscriptionId,
-                entities: [{ id: "post1" }]
+                rows: [{ id: "post1" }]
             }) });
 
             expect(onUpdate).toHaveBeenCalledWith([{ id: "post1" }]);

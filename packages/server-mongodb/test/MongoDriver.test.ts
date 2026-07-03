@@ -7,7 +7,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
 import { MongoDriver } from "../src/services/MongoDriver";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
 describe("MongoDriver", () => {
     let mongoServer: MongoMemoryServer;
@@ -15,7 +15,7 @@ describe("MongoDriver", () => {
     let db: Db;
     let delegate: MongoDriver;
 
-    const mockCollection: EntityCollection = {
+    const mockCollection: SnapshotCollection = {
         name: "users",
         properties: {
             name: { dataType: "string" },
@@ -59,9 +59,9 @@ describe("MongoDriver", () => {
         });
     });
 
-    describe("generateEntityId", () => {
+    describe("generateId", () => {
         it("should generate a valid ObjectId string", () => {
-            const id = delegate.generateEntityId("users");
+            const id = delegate.generateId("users");
             expect(ObjectId.isValid(id)).toBe(true);
         });
     });
@@ -78,32 +78,32 @@ describe("MongoDriver", () => {
     });
 
 
-    describe("fetchEntity", () => {
-        it("should fetch an entity", async () => {
+    describe("fetchOne", () => {
+        it("should fetch a snapshot", async () => {
             // Insert test data
             const result = await db.collection("users").insertOne({
                 name: "Test User",
                 email: "test@example.com"
             });
 
-            const entity = await delegate.fetchEntity({
+            const snapshot = await delegate.fetchOne({
                 path: "users",
-                entityId: result.insertedId.toString(),
+                id: result.insertedId.toString(),
                 collection: mockCollection
             });
 
-            expect(entity).toBeDefined();
-            expect(entity?.values.name).toBe("Test User");
+            expect(snapshot).toBeDefined();
+            expect(snapshot?.name).toBe("Test User");
         });
 
-        it("should return undefined for non-existent entity", async () => {
-            const entity = await delegate.fetchEntity({
+        it("should return undefined for non-existent snapshot", async () => {
+            const snapshot = await delegate.fetchOne({
                 path: "users",
-                entityId: new ObjectId().toString(),
+                id: new ObjectId().toString(),
                 collection: mockCollection
             });
 
-            expect(entity).toBeUndefined();
+            expect(snapshot).toBeUndefined();
         });
     });
 
@@ -119,41 +119,41 @@ age: 35 }
             ]);
         });
 
-        it("should fetch all entities", async () => {
-            const entities = await delegate.fetchCollection({
+        it("should fetch all snapshots", async () => {
+            const snapshots = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection
             });
 
-            expect(entities).toHaveLength(3);
+            expect(snapshots).toHaveLength(3);
         });
 
         it("should apply limit", async () => {
-            const entities = await delegate.fetchCollection({
+            const snapshots = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection,
                 limit: 2
             });
 
-            expect(entities).toHaveLength(2);
+            expect(snapshots).toHaveLength(2);
         });
 
         it("should apply ordering", async () => {
-            const entities = await delegate.fetchCollection({
+            const snapshots = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection,
                 orderBy: "age",
                 order: "desc"
             });
 
-            const ages = entities.map(e => e.values.age);
+            const ages = snapshots.map(e => e.age);
             expect(ages).toEqual([35, 30, 25]);
         });
     });
 
-    describe("saveEntity", () => {
-        it("should create a new entity", async () => {
-            const entity = await delegate.saveEntity({
+    describe("save", () => {
+        it("should create a new snapshot", async () => {
+            const snapshot = await delegate.save({
                 path: "users",
                 values: { name: "New User",
 email: "new@example.com" },
@@ -161,21 +161,21 @@ email: "new@example.com" },
                 status: "new"
             });
 
-            expect(entity.id).toBeDefined();
-            expect(entity.values.name).toBe("New User");
+            expect(snapshot.id).toBeDefined();
+            expect(snapshot.name).toBe("New User");
 
             // Verify it was saved
-            const fetched = await delegate.fetchEntity({
+            const fetched = await delegate.fetchOne({
                 path: "users",
-                entityId: entity.id,
+                id: snapshot.id,
                 collection: mockCollection
             });
-            expect(fetched?.values.name).toBe("New User");
+            expect(fetched?.name).toBe("New User");
         });
 
-        it("should update an existing entity", async () => {
+        it("should update an existing snapshot", async () => {
             // Create first
-            const created = await delegate.saveEntity({
+            const created = await delegate.save({
                 path: "users",
                 values: { name: "Original",
 email: "test@example.com" },
@@ -184,9 +184,9 @@ email: "test@example.com" },
             });
 
             // Update
-            const updated = await delegate.saveEntity({
+            const updated = await delegate.save({
                 path: "users",
-                entityId: created.id,
+                id: created.id,
                 values: { name: "Updated",
 email: "test@example.com" },
                 collection: mockCollection,
@@ -194,37 +194,37 @@ email: "test@example.com" },
             });
 
             expect(updated.id).toBe(created.id);
-            expect(updated.values.name).toBe("Updated");
+            expect(updated.name).toBe("Updated");
         });
     });
 
-    describe("deleteEntity", () => {
-        it("should delete an entity", async () => {
+    describe("delete", () => {
+        it("should delete a snapshot", async () => {
             // Create
-            const entity = await delegate.saveEntity({
+            const snapshot = await delegate.save({
                 path: "users",
                 values: { name: "To Delete" },
                 collection: mockCollection,
                 status: "new"
             });
 
-            // Delete
-            await delegate.deleteEntity({
-                entity,
+            // Delete — rows are flat, so the caller provides the collection path
+            await delegate.delete({
+                row: { id: snapshot.id as string, path: "users" },
                 collection: mockCollection
             });
 
             // Verify deleted
-            const fetched = await delegate.fetchEntity({
+            const fetched = await delegate.fetchOne({
                 path: "users",
-                entityId: entity.id,
+                id: snapshot.id,
                 collection: mockCollection
             });
             expect(fetched).toBeUndefined();
         });
     });
 
-    describe("countEntities", () => {
+    describe("count", () => {
         beforeEach(async () => {
             await db.collection("users").insertMany([
                 { status: "active" },
@@ -233,8 +233,8 @@ email: "test@example.com" },
             ]);
         });
 
-        it("should count all entities", async () => {
-            const count = await delegate.countEntities({
+        it("should count all snapshots", async () => {
+            const count = await delegate.count({
                 path: "users",
                 collection: mockCollection
             });
@@ -243,7 +243,7 @@ email: "test@example.com" },
         });
 
         it("should count with filter", async () => {
-            const count = await delegate.countEntities({
+            const count = await delegate.count({
                 path: "users",
                 collection: mockCollection,
                 filter: { status: ["==", "active"] }
@@ -295,8 +295,8 @@ email: "test@example.com" },
                 const unsubscribe = delegate.listenCollection({
                     path: "users",
                     collection: mockCollection,
-                    onUpdate: (entities) => {
-                        expect(entities).toHaveLength(2);
+                    onUpdate: (snapshots) => {
+                        expect(snapshots).toHaveLength(2);
                         unsubscribe();
                         done();
                     },
@@ -321,17 +321,17 @@ email: "test@example.com" },
         });
     });
 
-    describe("listenEntity", () => {
+    describe("listenOne", () => {
         it("should call onUpdate with initial data", (done) => {
             db.collection("users").insertOne({ name: "Test User" }).then((result) => {
-                const entityId = result.insertedId.toString();
+                const id = result.insertedId.toString();
 
-                const unsubscribe = delegate.listenEntity({
+                const unsubscribe = delegate.listenOne({
                     path: "users",
-                    entityId,
+                    id,
                     collection: mockCollection,
-                    onUpdate: (entity) => {
-                        expect(entity?.values.name).toBe("Test User");
+                    onUpdate: (snapshot) => {
+                        expect(snapshot?.name).toBe("Test User");
                         unsubscribe();
                         done();
                     },
@@ -351,9 +351,9 @@ email: "test@example.com" },
                 storage: mockStorage
             } as any;
 
-            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => {
-                entity.values.hooked = true;
-                return entity;
+            const afterReadSpy = jest.fn().mockImplementation(async ({ row }) => {
+                row.hooked = true;
+                return row;
             });
             const beforeSaveSpy = jest.fn().mockImplementation(async ({ values }) => {
                 return { beforeSaved: true };
@@ -362,7 +362,7 @@ email: "test@example.com" },
             const beforeDeleteSpy = jest.fn();
             const afterDeleteSpy = jest.fn();
 
-            const collectionWithHooks: EntityCollection = {
+            const collectionWithHooks: SnapshotCollection = {
                 name: "hooked_users",
                 properties: {
                     name: { dataType: "string" }
@@ -376,8 +376,8 @@ email: "test@example.com" },
                 }
             } as any;
 
-            // 1. Test saveEntity
-            const saved = await delegate.saveEntity({
+            // 1. Test save
+            const saved = await delegate.save({
                 path: "hooked_users",
                 values: { name: "John" },
                 collection: collectionWithHooks,
@@ -390,28 +390,28 @@ email: "test@example.com" },
             expect(saveArgs.values.name).toBe("John");
 
             // Verifies updatedValues includes returned value from beforeSave callback
-            expect(saved.values.beforeSaved).toBe(true);
+            expect(saved.beforeSaved).toBe(true);
 
             expect(afterSaveSpy).toHaveBeenCalled();
             const afterSaveArgs = afterSaveSpy.mock.calls[0][0];
             expect(afterSaveArgs.context.storageSource).toBe(mockStorage);
 
-            // 2. Test fetchEntity
-            const fetched = await delegate.fetchEntity({
+            // 2. Test fetchOne
+            const fetched = await delegate.fetchOne({
                 path: "hooked_users",
-                entityId: saved.id,
+                id: saved.id,
                 collection: collectionWithHooks
             });
 
             expect(fetched).toBeDefined();
-            expect(fetched?.values.hooked).toBe(true);
+            expect(fetched?.hooked).toBe(true);
             expect(afterReadSpy).toHaveBeenCalled();
             const readArgs = afterReadSpy.mock.calls[0][0];
             expect(readArgs.context.storageSource).toBe(mockStorage);
 
-            // 3. Test deleteEntity
-            await delegate.deleteEntity({
-                entity: fetched!,
+            // 3. Test delete
+            await delegate.delete({
+                row: { id: fetched!.id as string, path: "hooked_users", values: fetched! },
                 collection: collectionWithHooks
             });
 

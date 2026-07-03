@@ -1,8 +1,9 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import type { DataDriver, DeleteEntityProps, FetchCollectionProps, FetchEntityProps, SaveEntityProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
+import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
 import { isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
+
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -290,11 +291,11 @@ roles: verifiedUser.roles }
                         wsDebug("📋 [WebSocket Server] Processing FETCH_COLLECTION request");
                         const request: FetchCollectionProps = payload;
                         const delegate = await getScopedDelegate();
-                        const entities = await delegate.fetchCollection(request);
-                        wsDebug("📋 [WebSocket Server] FETCH_COLLECTION result - entities count:", entities.length);
+                        const rows = await delegate.fetchCollection(request);
+                        wsDebug("📋 [WebSocket Server] FETCH_COLLECTION result - rows count:", rows.length);
                         const response = {
                             type: "FETCH_COLLECTION_SUCCESS",
-                            payload: { entities },
+                            payload: { rows },
                             requestId
                         };
                         wsDebug("📋 [WebSocket Server] Sending FETCH_COLLECTION_SUCCESS response");
@@ -302,54 +303,54 @@ roles: verifiedUser.roles }
                     }
                         break;
 
-                    case "FETCH_ENTITY": {
-                        wsDebug("📄 [WebSocket Server] Processing FETCH_ENTITY request");
-                        const request: FetchEntityProps = payload;
+                    case "FETCH_ONE": {
+                        wsDebug("📄 [WebSocket Server] Processing FETCH_SNAPSHOT request");
+                        const request: FetchOneProps = payload;
                         const delegate = await getScopedDelegate();
-                        const entity = await delegate.fetchEntity(request);
-                        wsDebug("📄 [WebSocket Server] FETCH_ENTITY result:", entity);
+                        const row = await delegate.fetchOne(request);
+                        wsDebug("📄 [WebSocket Server] FETCH_SNAPSHOT result:", row);
                         const response = {
-                            type: "FETCH_ENTITY_SUCCESS",
-                            payload: { entity },
+                            type: "FETCH_ONE_SUCCESS",
+                            payload: { row: row ?? null },
                             requestId
                         };
-                        wsDebug("📄 [WebSocket Server] Sending FETCH_ENTITY_SUCCESS response");
+                        wsDebug("📄 [WebSocket Server] Sending FETCH_SNAPSHOT_SUCCESS response");
                         ws.send(JSON.stringify(response));
                     }
                         break;
 
-                    case "SAVE_ENTITY": {
-                        wsDebug("💾 [WebSocket Server] Processing SAVE_ENTITY request");
-                        const request: SaveEntityProps = payload;
-                        wsDebug("💾 [WebSocket Server] Saving entity with request:", inspect(request, { depth: null,
+                    case "SAVE": {
+                        wsDebug("💾 [WebSocket Server] Processing SAVE_SNAPSHOT request");
+                        const request: SaveProps = payload;
+                        wsDebug("💾 [WebSocket Server] Saving row with request:", inspect(request, { depth: null,
 colors: true }));
                         const delegate = await getScopedDelegate();
-                        const entity = await delegate.saveEntity(request);
-                        wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(entity, { depth: null,
+                        const row = await delegate.save(request);
+                        wsDebug("💾 [WebSocket Server] SAVE_SNAPSHOT result:", inspect(row, { depth: null,
 colors: true }));
                         const response = {
-                            type: "SAVE_ENTITY_SUCCESS",
-                            payload: { entity },
+                            type: "SAVE_SUCCESS",
+                            payload: { row },
                             requestId
                         };
-                        wsDebug("💾 [WebSocket Server] Sending SAVE_ENTITY_SUCCESS response");
+                        wsDebug("💾 [WebSocket Server] Sending SAVE_SNAPSHOT_SUCCESS response");
                         ws.send(JSON.stringify(response));
                     }
                         break;
 
-                    case "DELETE_ENTITY": {
-                        wsDebug("🗑️ [WebSocket Server] Processing DELETE_ENTITY request");
-                        const request: DeleteEntityProps = payload;
-                        wsDebug("🗑️ [WebSocket Server] Deleting entity:", request.entity);
+                    case "DELETE": {
+                        wsDebug("🗑️ [WebSocket Server] Processing DELETE_SNAPSHOT request");
+                        const request: DeleteProps = payload;
+                        wsDebug("🗑️ [WebSocket Server] Deleting row:", request.row);
                         const delegate = await getScopedDelegate();
-                        await delegate.deleteEntity(request);
-                        wsDebug("🗑️ [WebSocket Server] DELETE_ENTITY completed successfully");
+                        await delegate.delete(request);
+                        wsDebug("🗑️ [WebSocket Server] DELETE_SNAPSHOT completed successfully");
                         const response = {
-                            type: "DELETE_ENTITY_SUCCESS",
+                            type: "DELETE_SUCCESS",
                             payload: { success: true },
                             requestId
                         };
-                        wsDebug("🗑️ [WebSocket Server] Sending DELETE_ENTITY_SUCCESS response");
+                        wsDebug("🗑️ [WebSocket Server] Sending DELETE_SNAPSHOT_SUCCESS response");
                         ws.send(JSON.stringify(response));
                     }
                         break;
@@ -360,11 +361,11 @@ colors: true }));
                             path,
                             name,
                             value,
-                            entityId,
+                            id,
                             collection
                         } = payload;
                         const delegate = await getScopedDelegate();
-                        const isUnique = await delegate.checkUniqueField(path, name, value, entityId, collection);
+                        const isUnique = await delegate.checkUniqueField(path, name, value, id, collection);
                         wsDebug("🔍 [WebSocket Server] CHECK_UNIQUE_FIELD result:", isUnique);
                         const response = {
                             type: "CHECK_UNIQUE_FIELD_SUCCESS",
@@ -377,12 +378,12 @@ colors: true }));
                         break;
 
 
-                    case "COUNT_ENTITIES": {
+                    case "COUNT": {
                         const request: FetchCollectionProps = payload;
                         const delegate = await getScopedDelegate();
-                        const count = await delegate.countEntities!(request);
+                        const count = await delegate.count!(request);
                         const response = {
-                            type: "COUNT_ENTITIES_SUCCESS",
+                            type: "COUNT_SUCCESS",
                             payload: { count },
                             requestId
                         };
@@ -574,7 +575,7 @@ colors: true }));
 
                     // Route subscription messages, broadcast channels, and presence to RealtimeService
                     case "subscribe_collection":
-                    case "subscribe_entity":
+                    case "subscribe_one":
                     case "unsubscribe":
                     case "join_channel":
                     case "leave_channel":

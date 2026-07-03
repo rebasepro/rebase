@@ -1,14 +1,14 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { WebSocket } from "ws";
 
-jest.mock("../src/services/entityService", () => ({
-    EntityService: jest.fn().mockImplementation(() => ({
+jest.mock("../src/services/dataService", () => ({
+    DataService: jest.fn().mockImplementation(() => ({
         fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(null),
-        searchEntities: jest.fn().mockResolvedValue([])
+        fetchOne: jest.fn().mockResolvedValue(null),
+        searchRows: jest.fn().mockResolvedValue([])
     }))
 }));
 
@@ -20,7 +20,7 @@ class MockWebSocket {
     constructor() {}
 }
 
-const mockPostsCollection: EntityCollection = {
+const mockPostsCollection: SnapshotCollection = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -463,8 +463,8 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             });
 
             // Trigger a refetch timer by notifying
-            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as unknown as import("@rebasepro/types").Entity;
-            await service.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
+            const dummySnapshot = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
+            await service.notifyUpdate("posts", "1", dummySnapshot, undefined, false);
 
             // Remove client before the timer fires
             await service.removeClient("c1");
@@ -478,12 +478,12 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             expect(service.subscriptions.has("sub-timer")).toBe(false);
         });
 
-        it("removeClient() with entity subscriptions cleans up properly", async () => {
+        it("removeClient() with row subscriptions cleans up properly", async () => {
             createClient(service, "c1");
 
             await service.handleClientMessage("c1", {
-                type: "subscribe_entity",
-                payload: { path: "posts", entityId: "42", subscriptionId: "sub-ent-1" }
+                type: "subscribe_one",
+                payload: { path: "posts", id: "42", subscriptionId: "sub-ent-1" }
             });
 
             expect(service.subscriptions.has("sub-ent-1")).toBe(true);
@@ -615,8 +615,8 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             });
 
             // Trigger a refetch debounce
-            const dummyEntity = { id: "1", path: "posts", values: { _rebase_invalidated: true } } as unknown as import("@rebasepro/types").Entity;
-            await service.notifyEntityUpdate("posts", "1", dummyEntity, undefined, false);
+            const dummySnapshot = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
+            await service.notifyUpdate("posts", "1", dummySnapshot, undefined, false);
 
             // Destroy before the timer fires
             await service.destroy();

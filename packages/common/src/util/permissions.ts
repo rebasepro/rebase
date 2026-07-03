@@ -1,4 +1,4 @@
-import { Entity, EntityCollection, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { Snapshot, SnapshotCollection, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
 
@@ -83,9 +83,9 @@ function resolveTriState(value: TriState, onUnknown: UnknownResolution): boolean
  *   for optimistic UI gating; enforcement callers should pass `"deny"`.
  */
 export function checkOperation<M extends Record<string, unknown>, USER extends User>(
-    collection: EntityCollection<M>,
+    collection: SnapshotCollection<M>,
     authContext: AuthContext<USER>,
-    entity: Entity<M> | null,
+    snapshot: Snapshot<M> | null,
     targetOperation: SecurityOperation,
     options?: CheckOperationOptions
 ): boolean {
@@ -101,7 +101,7 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
     const ctx: PolicyEvalContext = {
         uid: authContext.user?.uid,
         roles: authContext.user?.roles ?? [],
-        entity
+        snapshot
     };
 
     let grantedByPermissive = false;
@@ -129,38 +129,38 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 
 export function canReadCollection<M extends Record<string, unknown>, USER extends User>
     (
-        collection: EntityCollection<M>,
+        collection: SnapshotCollection<M>,
         authContext: AuthContext<USER>
     ): boolean {
     return checkOperation(collection, authContext, null, "select");
 }
 
-export function canEditEntity<M extends Record<string, unknown>, USER extends User>
+export function canEditSnapshot<M extends Record<string, unknown>, USER extends User>
     (
-        collection: EntityCollection<M>,
+        collection: SnapshotCollection<M>,
         authContext: AuthContext<USER>,
         path: string,
-        entity: Entity<M> | null
+        snapshot: Snapshot<M> | null
     ): boolean {
-    return checkOperation(collection, authContext, entity, "update");
+    return checkOperation(collection, authContext, snapshot, "update");
 }
 
-export function canCreateEntity<M extends Record<string, unknown>, USER extends User>
+export function canCreateSnapshot<M extends Record<string, unknown>, USER extends User>
     (
-        collection: EntityCollection<M>,
+        collection: SnapshotCollection<M>,
         authContext: AuthContext<USER>,
         path: string,
-        entity: Entity<M> | null
+        snapshot: Snapshot<M> | null
     ): boolean {
-    return checkOperation(collection, authContext, entity, "insert");
+    return checkOperation(collection, authContext, snapshot, "insert");
 }
 
-export function canDeleteEntity<M extends Record<string, unknown>, USER extends User>
+export function canDeleteSnapshot<M extends Record<string, unknown>, USER extends User>
     (
-        collection: EntityCollection<M>,
+        collection: SnapshotCollection<M>,
         authContext: AuthContext<USER>,
         path: string,
-        entity: Entity<M> | null
+        snapshot: Snapshot<M> | null
     ): boolean {
-    return checkOperation(collection, authContext, entity, "delete");
+    return checkOperation(collection, authContext, snapshot, "delete");
 }

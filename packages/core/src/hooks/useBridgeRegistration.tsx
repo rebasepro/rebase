@@ -5,7 +5,7 @@ import { StudioBridgeRegistryContext } from "./useStudioBridge";
 /**
  * Registers a value into the self-assembling Studio bridge.
  *
- * Each controller (collectionRegistry, sideEntity, url, navigation, breadcrumbs)
+ * Each controller (collectionRegistry, sideSnapshot, url, navigation, breadcrumbs)
  * calls this hook on mount to inject its real implementation into the bridge.
  * On unmount the slice is automatically removed, reverting to the noop default.
  *
@@ -13,7 +13,7 @@ import { StudioBridgeRegistryContext } from "./useStudioBridge";
  * ```tsx
  * function SomeProvider({ children }) {
  *     const controller = useBuildSomeController();
- *     useBridgeRegistration("sideEntityController", controller);
+ *     useBridgeRegistration("sideSnapshotController", controller);
  *     return <SomeContext.Provider value={controller}>{children}</SomeContext.Provider>;
  * }
  * ```

@@ -1,5 +1,5 @@
 import type { User } from "../users";
-import type { RebaseData } from "./data";
+import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
@@ -194,7 +194,7 @@ export interface FunctionsAPI {
 // ─── HistoryConfig ───────────────────────────────────────────────────────────
 
 /**
- * Configuration for entity history / audit-log tracking.
+ * Configuration for snapshot history / audit-log tracking.
  *
  * - `true` — enable history with default settings
  * - `{ retention?: number }` — enable with optional retention period in days
@@ -234,7 +234,7 @@ export interface RebaseWebSocket {
  */
 export interface RebaseClient<DB = unknown> {
     /** Unified Data access layer */
-    data: RebaseData<DB>;
+    data: RebaseSdkData<DB>;
 
     /** Unified Authentication layer */
     auth: AuthClient;

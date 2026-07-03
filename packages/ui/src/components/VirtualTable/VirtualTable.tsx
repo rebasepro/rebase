@@ -100,8 +100,8 @@ zIndex: 20 }}>
 
 /**
  * This is a Table component that allows displaying arbitrary data, not
- * necessarily related to entities or properties. It is the component
- * that powers the entity collections but has a generic API, so it
+ * necessarily related to snapshots or properties. It is the component
+ * that powers the snapshot collections but has a generic API, so it
  * can be reused.
  *
  * @group Components

@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "./api-generator";
-import type { DataDriver, Entity, EntityCollection, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, Snapshot, SnapshotCollection, FetchCollectionProps } from "@rebasepro/types";
 
 /**
  * Minimal mock DataDriver for testing.
@@ -9,30 +9,30 @@ import type { DataDriver, Entity, EntityCollection, FetchCollectionProps } from 
 function createMockDriver(overrides?: Partial<DataDriver>): DataDriver {
     return {
         fetchCollection: jest.fn<DataDriver["fetchCollection"]>().mockResolvedValue([]),
-        fetchEntity: jest.fn<DataDriver["fetchEntity"]>().mockResolvedValue(undefined),
-        saveEntity: jest.fn<DataDriver["saveEntity"]>().mockResolvedValue({ id: "1",
+        fetchOne: jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined),
+        save: jest.fn<DataDriver["save"]>().mockResolvedValue({ id: "1",
 path: "test",
-values: {} } as Entity),
-        deleteEntity: jest.fn<DataDriver["deleteEntity"]>().mockResolvedValue(undefined),
-        countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(0),
+values: {} } as Snapshot),
+        delete: jest.fn<DataDriver["delete"]>().mockResolvedValue(undefined),
+        count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(0),
         ...overrides
     } as unknown as DataDriver;
 }
 
-function createTestCollection(slug: string): EntityCollection {
+function createTestCollection(slug: string): SnapshotCollection {
     return {
         slug,
         name: slug.charAt(0).toUpperCase() + slug.slice(1),
         path: slug,
         properties: {}
-    } as unknown as EntityCollection;
+    } as unknown as SnapshotCollection;
 }
 
 /**
  * Wraps generated routes in a parent Hono app that injects the driver
  * into context — replicating what auth middleware does in production.
  */
-function createApp(collections: EntityCollection[], driver: DataDriver): Hono {
+function createApp(collections: SnapshotCollection[], driver: DataDriver): Hono {
     const parent = new Hono();
     parent.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -45,11 +45,11 @@ function createApp(collections: EntityCollection[], driver: DataDriver): Hono {
 
 describe("RestApiGenerator - Count Endpoint", () => {
     let driver: DataDriver;
-    let collection: EntityCollection;
+    let collection: SnapshotCollection;
 
     beforeEach(() => {
         driver = createMockDriver({
-            countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(42)
+            count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(42)
         });
         collection = createTestCollection("products");
     });
@@ -64,7 +64,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
         expect(json.count).toBe(42);
     });
 
-    it("should pass filters to countEntities driver", async () => {
+    it("should pass filters to count driver", async () => {
         const app = createApp([collection], driver);
 
         const res = await app.request("/products/count?status=eq.active");
@@ -73,14 +73,14 @@ describe("RestApiGenerator - Count Endpoint", () => {
         const json = await res.json() as { count: number };
         expect(json.count).toBe(42);
 
-        // Verify countEntities was called with the filter
-        expect(driver.countEntities).toHaveBeenCalled();
-        const callArgs = (driver.countEntities as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
+        // Verify count was called with the filter
+        expect(driver.count).toHaveBeenCalled();
+        const callArgs = (driver.count as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
         expect(callArgs.path).toBe("products");
         expect(callArgs.filter).toHaveProperty("status");
     });
 
-    it("should pass searchString to countEntities driver", async () => {
+    it("should pass searchString to count driver", async () => {
         const app = createApp([collection], driver);
 
         const res = await app.request("/products/count?searchString=widget");
@@ -89,13 +89,13 @@ describe("RestApiGenerator - Count Endpoint", () => {
         const json = await res.json() as { count: number };
         expect(json.count).toBe(42);
 
-        expect(driver.countEntities).toHaveBeenCalled();
-        const callArgs = (driver.countEntities as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
+        expect(driver.count).toHaveBeenCalled();
+        const callArgs = (driver.count as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
         expect(callArgs.searchString).toBe("widget");
     });
 
-    it("should return 0 when countEntities is not available on driver", async () => {
-        const driverWithoutCount = createMockDriver({ countEntities: undefined });
+    it("should return 0 when count is not available on driver", async () => {
+        const driverWithoutCount = createMockDriver({ count: undefined });
         const app = createApp([collection], driverWithoutCount);
 
         const res = await app.request("/products/count");
@@ -107,10 +107,10 @@ describe("RestApiGenerator - Count Endpoint", () => {
 
     it("GET /products/count should not be confused with GET /products/:id", async () => {
         // Ensure the count route is registered before the :id route
-        const fetchEntity = jest.fn<DataDriver["fetchEntity"]>().mockResolvedValue(undefined);
+        const fetchOne = jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined);
         const driverCustom = createMockDriver({
-            countEntities: jest.fn<NonNullable<DataDriver["countEntities"]>>().mockResolvedValue(99),
-            fetchEntity: fetchEntity as unknown as DataDriver["fetchEntity"]
+            count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(99),
+            fetchOne: fetchOne as unknown as DataDriver["fetchOne"]
         });
         const app = createApp([collection], driverCustom);
 
@@ -120,7 +120,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
         const json = await res.json() as { count: number };
         expect(json.count).toBe(99);
 
-        // fetchEntity should NOT have been called (i.e. "count" was not treated as an entity ID)
-        expect(fetchEntity).not.toHaveBeenCalled();
+        // fetchOne should NOT have been called (i.e. "count" was not treated as a snapshot ID)
+        expect(fetchOne).not.toHaveBeenCalled();
     });
 });

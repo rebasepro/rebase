@@ -6,7 +6,7 @@ import React from "react";
  * Wraps children with all provider components from plugins that match the given scope.
  *
  * Replaces the 3 copy-pasted `plugins.forEach(plugin => { if (plugin.form?.provider) ... })` patterns
- * in Rebase.tsx, EntityEditView.tsx, and PopupFormField.tsx.
+ * in Rebase.tsx, SnapshotEditView.tsx, and PopupFormField.tsx.
  *
  * @param plugins - Array of plugins to extract providers from.
  * @param scope - `"root"` or `"form"` — which providers to apply.

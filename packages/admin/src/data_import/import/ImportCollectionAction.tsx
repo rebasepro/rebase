@@ -5,13 +5,13 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
-import { CollectionActionsProps, Properties, Property, User, EntityCollection } from "@rebasepro/types";
+import { CollectionActionsProps, Properties, Property, User, SnapshotCollection } from "@rebasepro/types";
 import {
     getFieldConfig,
     PropertyConfigBadge,
     useSelectionController
 } from "../../components";
-import { EntityCollectionTable } from "../../components/EntityCollectionTable/EntityCollectionTable";
+import { SnapshotCollectionTable } from "../../components/SnapshotCollectionTable/SnapshotCollectionTable";
 import { useCollectionRegistryController } from "../../hooks";
 import {
     Button,
@@ -29,9 +29,9 @@ import {
     Typography,
     UploadIcon
 } from "@rebasepro/ui";
-import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
+import { buildSnapshotPropertiesFromData } from "@rebasepro/schema-inference";
 import { useImportConfig } from "../hooks";
-import { convertDataToEntity, getInferenceType } from "../utils";
+import { convertDataToSnapshot, getInferenceType } from "../utils";
 import { DataNewPropertiesMapping, ImportFileUpload, ImportSaveInProgress } from "../components";
 import { ImportConfig } from "../types";
 import { slugify } from "@rebasepro/utils";
@@ -79,7 +79,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
         importConfig.setImportData(data);
 
         if (data.length > 0) {
-            const originProperties = await buildEntityPropertiesFromData(data, getInferenceType);
+            const originProperties = await buildSnapshotPropertiesFromData(data, getInferenceType);
             importConfig.setOriginProperties(originProperties as Properties);
 
             const headersMapping = buildHeadersMappingFromData(data, collection?.properties);
@@ -176,7 +176,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
                 {step === "import_data_saving" && importConfig &&
                     <ImportSaveInProgress importConfig={importConfig}
-                        collection={collection as EntityCollection}
+                        collection={collection as SnapshotCollection}
                         path={path}
                         onImportSuccess={(importedCollection) => {
                             handleClose();
@@ -381,7 +381,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
     const authController = useAuthController();
     const collectionRegistry = useCollectionRegistryController();
     useEffect(() => {
-        const mappedData = importConfig.importData.map(d => convertDataToEntity(
+        const mappedData = importConfig.importData.map(d => convertDataToSnapshot(
             authController,
             collectionRegistry,
             d,
@@ -391,18 +391,18 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
             "TEMP_PATH",
             importConfig.defaultValues
         ));
-        importConfig.setEntities(mappedData);
+        importConfig.setSnapshots(mappedData);
     }, []);
 
     const selectionController = useSelectionController();
 
-    return <EntityCollectionTable
+    return <SnapshotCollectionTable
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
+            <Typography variant={"caption"}>Snapshots with the same id will be overwritten</Typography>
         </div>}
         tableController={{
-            data: importConfig.entities,
+            data: importConfig.snapshots,
             dataLoading: false,
             noMoreToLoad: false
         }}
@@ -410,7 +410,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
         endAdornment={<div className={"h-12"}/>}
         filterable={false}
         sortable={false}
-        openEntityMode={"full_screen"}
+        openSnapshotMode={"full_screen"}
         selectionController={selectionController}
         properties={properties}/>
 

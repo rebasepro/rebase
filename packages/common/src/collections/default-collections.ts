@@ -16,7 +16,7 @@ export const defaultUsersCollection = defineCollection({
     schema: "rebase",
     icon: "Users",
     group: "Settings",
-    openEntityMode: "dialog",
+    openSnapshotMode: "dialog",
     disableDefaultActions: ["copy"],
     securityRules: [
         { operation: "select",

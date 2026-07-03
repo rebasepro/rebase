@@ -1,10 +1,10 @@
-import { EntityCallbacks, Properties, RebaseCallContext } from "@rebasepro/types";
+import { CollectionCallbacks, Properties, RebaseCallContext } from "@rebasepro/types";
 
 /**
- * Context passed to entity lifecycle callbacks.
+ * Context passed to snapshot lifecycle callbacks.
  * @group Models
  */
-export type EntityCallbackContext = RebaseCallContext;
+export type SnapshotCallbackContext = RebaseCallContext;
 
 
 /**
@@ -85,24 +85,24 @@ async function processProperties(
 
 /**
  * Helper function to extract field-level PropertyCallbacks from a properties schema
- * and wrap them into an EntityCallbacks object recursively.
+ * and wrap them into an CollectionCallbacks object recursively.
  */
-export const buildPropertyCallbacks = (properties: Properties): EntityCallbacks | undefined => {
+export const buildPropertyCallbacks = (properties: Properties): CollectionCallbacks | undefined => {
     if (!properties) return undefined;
 
-    const propertyCallbacks: EntityCallbacks = {};
+    const propertyCallbacks: CollectionCallbacks = {};
 
     if (hasPropertyCallbacks(properties, "afterRead")) {
         propertyCallbacks.afterRead = async (props) => {
+            const row = props.row;
             const processedValues = await processProperties(
                 properties,
-                props.entity.values as Record<string, unknown>,
-                props.entity.values as Record<string, unknown>,
+                row,
+                row,
                 props as unknown,
                 "afterRead"
             );
-            return { ...props.entity,
-values: processedValues };
+            return { ...props.row, ...processedValues };
         };
     }
 

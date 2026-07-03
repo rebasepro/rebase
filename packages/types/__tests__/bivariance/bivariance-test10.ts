@@ -1,14 +1,14 @@
-export type EntityCallbacks<M extends Record<string, unknown>> = {
-    beforeSave?({ entityId, values }: { entityId: string, values: M }): M;
+export type CollectionCallbacks<M extends Record<string, unknown>> = {
+    beforeSave?({ snapshotId, values }: { snapshotId: string, values: M }): M;
 };
 
 export interface PostgresCollection<M extends Record<string, unknown>> {
-    callbacks?: EntityCallbacks<M>;
+    callbacks?: CollectionCallbacks<M>;
 }
 
-export type EntityCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
+export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
 
-declare let specificColl: EntityCollection<{ id: string, name: string }>;
-declare let genericColl: EntityCollection;
+declare let specificColl: SnapshotCollection<{ id: string, name: string }>;
+declare let genericColl: SnapshotCollection;
 
 genericColl = specificColl; // Should succeed?

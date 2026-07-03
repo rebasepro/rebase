@@ -4,7 +4,7 @@ import { TaskTable } from "./TaskTable";
 
 /* ── Types ──────────────────────────────────────────────────── */
 
-interface TaskEntity {
+interface TaskSnapshot {
     id: string;
     values: {
         title: string;
@@ -36,7 +36,7 @@ function isDueDateOverdue(dateStr: string | null): boolean {
 
 export interface TasksViewProps {
     loading: boolean;
-    tasks: TaskEntity[];
+    tasks: TaskSnapshot[];
     togglingIds: Set<string>;
     onToggleTask: (taskId: string, currentStatus: string) => void;
     onOpenTask: (taskId: string) => void;
@@ -44,7 +44,7 @@ export interface TasksViewProps {
     clientsMap: Map<string, { name: string; picture?: string }>;
     pipelineStages: any[];
     recentlyToggledIds: Set<string>;
-    completedTasks: TaskEntity[];
+    completedTasks: TaskSnapshot[];
     completedLoaded: boolean;
     loadingCompleted: boolean;
     completedHasMore: boolean;

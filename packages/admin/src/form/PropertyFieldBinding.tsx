@@ -1,4 +1,4 @@
-import type { EntityCollection, FieldProps as CoreFieldProps } from "@rebasepro/types";
+import type { SnapshotCollection, FieldProps as CoreFieldProps } from "@rebasepro/types";
 import type { FieldProps, PropertyFieldBindingProps } from "../types/fields";
 import type { RebasePlugin, PluginFieldBuilderParams, Property } from "@rebasepro/types";
 import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
@@ -29,7 +29,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
  *
  * Please note that if you build a custom field in a component, the
  * **validation** passed in the property will have no effect. You need to set
- * the validation in the `EntityCollection` definition.
+ * the validation in the `SnapshotCollection` definition.
  *
  * @param propertyKey You can use nested names such as `address.street` or `friends[2]`
  * @param property
@@ -102,7 +102,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                     property: property,
                     values: fieldProps.form.values,
                     path: context.path,
-                    entityId: context.entityId,
+                    snapshotId: context.snapshotId,
                     propertyConfigs: customizationController.propertyConfigs,
                     index,
                     authController
@@ -130,7 +130,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                         property: propertyConfig.property as Property,
                         values: fieldProps.form.values,
                         path: context.path,
-                        entityId: context.entityId,
+                        snapshotId: context.snapshotId,
                         propertyConfigs: customizationController.propertyConfigs,
                         index,
                         authController
@@ -292,7 +292,7 @@ const shouldPropertyReRender = (property: Property, plugins?: RebasePlugin[]): b
 
 interface UseWrappedComponentParams<M extends Record<string, unknown> = Record<string, unknown>> {
     path?: string,
-    collection?: EntityCollection<M>,
+    collection?: SnapshotCollection<M>,
     propertyKey: string,
     property: Property,
     Component: ComponentType<FieldProps<Property, unknown, M>>,
@@ -323,7 +323,7 @@ function useWrappedComponent<T, M extends Record<string, unknown> = Record<strin
                         Field: Component as unknown as ComponentType<CoreFieldProps<Property, unknown, Record<string, unknown>>>,
                         plugin,
                         path,
-                        collection: collection as EntityCollection | undefined
+                        collection: collection as SnapshotCollection | undefined
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)

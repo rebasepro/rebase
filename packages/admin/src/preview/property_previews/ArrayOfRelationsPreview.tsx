@@ -1,7 +1,7 @@
 import type { ArrayProperty, RelationProperty } from "@rebasepro/types";
-import { EntityRelation } from "@rebasepro/types";
+import { SnapshotRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../../types/components/PropertyPreviewProps";
-import { normalizeToEntityRelation } from "@rebasepro/common";
+import { normalizeToSnapshotRelation } from "@rebasepro/common";
 import { RelationPreview } from "../components/RelationPreview";
 
 /**
@@ -27,9 +27,9 @@ export function ArrayOfRelationsPreview({
         <div className="flex flex-col w-full gap-0.5">
             {value ?
                 (value as unknown[]).map((relation: unknown, index: number) => {
-                    const entityRelation = normalizeToEntityRelation(relation);
+                    const snapshotRelation = normalizeToSnapshotRelation(relation);
 
-                    if (!entityRelation) return null;
+                    if (!snapshotRelation) return null;
 
                     return (
                         <div className="w-full"
@@ -38,9 +38,9 @@ export function ArrayOfRelationsPreview({
                                 disabled={!ofProperty.relation}
                                 previewProperties={ofProperty.ui?.previewProperties}
                                 size={"small"}
-                                relation={entityRelation}
+                                relation={snapshotRelation}
                                 includeId={ofProperty.includeId}
-                                includeEntityLink={ofProperty.includeEntityLink}
+                                includeSnapshotLink={ofProperty.includeSnapshotLink}
                             />
                         </div>
                     );

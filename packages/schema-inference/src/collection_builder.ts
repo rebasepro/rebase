@@ -13,7 +13,7 @@ import { DataType, EnumValues, Properties, Property, StringProperty, Vector } fr
 
 export type InferenceTypeBuilder = (value: unknown) => DataType;
 
-export async function buildEntityPropertiesFromData(
+export async function buildSnapshotPropertiesFromData(
     data: object[],
     getType: InferenceTypeBuilder
 ): Promise<Properties> {

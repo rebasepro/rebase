@@ -7,9 +7,9 @@ import { AuthController } from "@rebasepro/types";
 import * as util from "util";
 
 const testCollection = buildCollection({
-    slug: "test_entity",
-    table: "test_entity",
-    name: "Test entities",
+    slug: "test_snapshot",
+    table: "test_snapshot",
+    name: "Test snapshots",
     properties: {
         mainSaturation: {
             name: "Main saturation",

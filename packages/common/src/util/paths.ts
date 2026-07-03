@@ -1,7 +1,7 @@
 export const COLLECTION_PATH_SEPARATOR = "::";
 
 /**
- * Remove the entity ids from a given path
+ * Remove the snapshot ids from a given path
  * `products/B44RG6APH/locales` => `products::locales`
  * @param path
  */

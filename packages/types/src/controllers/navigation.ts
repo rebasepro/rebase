@@ -1,6 +1,6 @@
 import React from "react";
-import type { EntityReference } from "../types/entities";
-import type { EntityCollection } from "../types/collections";
+import type { SnapshotReference } from "../types/snapshots";
+import type { SnapshotCollection } from "../types/collections";
 
 
 /**
@@ -21,7 +21,7 @@ export type UrlController = {
     baseCollectionPath: string;
 
     /**
-     * Convert a URL path to a collection or entity path
+     * Convert a URL path to a collection or snapshot path
      * `/c/products` => `products`
      * `/my_cms/c/products/B34SAP8Z` => `products/B34SAP8Z`
      * `/my_cms/my_view` => `my_view`
@@ -248,7 +248,7 @@ export interface NavigationEntry {
     name: string;
     slug: string;
     type: "collection" | "view" | "admin";
-    collection?: EntityCollection;
+    collection?: SnapshotCollection;
     view?: AppView;
     description?: string;
     group: string;

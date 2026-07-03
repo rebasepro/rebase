@@ -93,7 +93,7 @@ __type: "relation" }
         it("should skip execution when changed fields evaluate to null on update", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
-                entityId: "1",
+                id: "1",
                 action: "update",
                 previousValues: { title: "same" },
                 values: { title: "same" }
@@ -106,7 +106,7 @@ __type: "relation" }
         it("should properly structure database query on actual array changes", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
-                entityId: "1",
+                id: "1",
                 action: "update",
                 previousValues: { title: "old",
 tags: [{ id: 1 }] },
@@ -126,10 +126,10 @@ tags: [{ id: 2 }] }
             expect(serializedSql).toContain("ARRAY[");
         });
 
-        it("should properly perform query during entity creation (insert)", async () => {
+        it("should properly perform query during snapshot creation (insert)", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
-                entityId: "1",
+                id: "1",
                 action: "create",
                 previousValues: undefined,
                 values: { title: "new" }

@@ -34,8 +34,8 @@ import {
 } from "@rebasepro/ui";
 import {
     EngineProperties,
-    Entity,
-    EntityCollection,
+    Snapshot,
+    SnapshotCollection,
     getDataSourceCapabilities,
     MapProperty,
     Properties,
@@ -52,7 +52,7 @@ import { CollectionPropertiesEditorForm } from "./CollectionPropertiesEditorForm
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionEditorWelcomeView } from "./CollectionEditorWelcomeView";
 import { CollectionInference } from "../../types/collection_inference";
-import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
+import { buildSnapshotPropertiesFromData } from "@rebasepro/schema-inference";
 import { CollectionEditorImportMapping } from "./import/CollectionEditorImportMapping";
 import { CollectionEditorImportDataPreview } from "./import/CollectionEditorImportDataPreview";
 import { cleanPropertiesFromImport } from "./import/clean_import_data";
@@ -77,11 +77,11 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
      * A collection to duplicate from. If provided, the new collection will be
      * pre-populated with the same properties (but with empty name, path, and id).
      */
-    copyFrom?: EntityCollection;
+    copyFrom?: SnapshotCollection;
     editedCollectionId?: string;
     path?: string; // full path of this particular collection, like `products/123/locales`
-    parentCollectionSlugs?: string[], parentEntityIds?: string[]; // path ids of the parent collection, like [`products`]
-    handleClose: (collection?: EntityCollection) => void;
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]; // path ids of the parent collection, like [`products`]
+    handleClose: (collection?: SnapshotCollection) => void;
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
     extraView?: {
@@ -92,8 +92,8 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
     };
     getUser?: (uid: string) => User | null;
     getData?: (path: string, parentPaths: string[]) => Promise<object[]>;
-    parentCollection?: EntityCollection;
-    existingEntities?: Entity<any>[];
+    parentCollection?: SnapshotCollection;
+    existingSnapshots?: Snapshot<any>[];
     /**
      * Initial view to open when editing: "general", "display", or "properties".
      * For new collections, this is ignored.
@@ -213,7 +213,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     const collectionsInThisLevel = (props.parentCollection ? getSubcollections(props.parentCollection) : collections) ?? [];
     const existingPaths = collectionsInThisLevel.map(col => getTableName(col)?.trim().toLowerCase()).filter(Boolean);
     const existingIds = collectionsInThisLevel.map(col => col.slug?.trim().toLowerCase()).filter(Boolean) as string[];
-    const [collection, setCollection] = React.useState<EntityCollection<any> | undefined>();
+    const [collection, setCollection] = React.useState<SnapshotCollection<any> | undefined>();
     const [initialLoadingCompleted, setInitialLoadingCompleted] = React.useState(false);
 
     useEffect(() => {
@@ -234,7 +234,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
 
                     const registryCol = getRawCollection ? getRawCollection(collectionPath) : undefined;
                     const configCol = props.configController?.collections?.find(c => c.slug === props.editedCollectionId);
-                    setCollection((registryCol ?? configCol) as EntityCollection<any>);
+                    setCollection((registryCol ?? configCol) as SnapshotCollection<any>);
                 } else {
                     setCollection(undefined);
                 }
@@ -243,7 +243,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         } catch (e) {
             console.error(e);
         }
-    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading, collections]);
+    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentSnapshotIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading, collections]);
 
 
     const initialIcon = React.useMemo(() => coolIconKeys[Math.floor(Math.random() * coolIconKeys.length)], []);
@@ -259,7 +259,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     }, [collection, fallbackSlug]);
 
     // Build initial values - handle copyFrom for duplication
-    const initialValues = React.useMemo((): EntityCollection<any> => {
+    const initialValues = React.useMemo((): SnapshotCollection<any> => {
         return (initialCollection
             ? applyPropertyConfigs(initialCollection, propertyConfigs)
             : copyFromProp
@@ -270,7 +270,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                         ...rest,
                         name: "",
                         ownerId: authController.user?.uid ?? ""
-                    } as EntityCollection<any>;
+                    } as SnapshotCollection<any>;
                 })()
                 : {
                     slug: initialValuesProp?.slug ?? fallbackSlug,
@@ -280,7 +280,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                     propertiesOrder: [],
                     icon: initialIcon,
                     ownerId: authController.user?.uid ?? ""
-                }) as EntityCollection<any>;
+                }) as SnapshotCollection<any>;
     }, [initialCollection, propertyConfigs, copyFromProp, initialValuesProp, fallbackSlug, initialIcon, authController.user?.uid]);
 
     if (!initialLoadingCompleted) {
@@ -307,7 +307,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     isNewCollection,
     configController,
     editedCollectionId,
-    parentCollectionSlugs, parentEntityIds,
+    parentCollectionSlugs, parentSnapshotIds,
     path,
     collectionInference,
     handleClose,
@@ -324,7 +324,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     setCollection,
     initialValues,
     propertyConfigs,
-    existingEntities,
+    existingSnapshots,
     initialView: initialViewProp,
     expandKanban,
     generateCollection,
@@ -341,12 +341,12 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 }: CollectionEditorDialogProps & {
     handleCancel: () => void,
     setFormDirty: (dirty: boolean) => void,
-    initialValues: EntityCollection<M>,
+    initialValues: SnapshotCollection<M>,
     existingPaths: string[],
     existingIds: string[],
     includeTemplates: boolean,
-    collection: EntityCollection<M> | undefined,
-    setCollection: (collection: EntityCollection<M>) => void,
+    collection: SnapshotCollection<M> | undefined,
+    setCollection: (collection: SnapshotCollection<M>) => void,
     propertyConfigs: Record<string, PropertyConfig>,
 }
 ) {
@@ -395,7 +395,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const [error, setError] = React.useState<Error | undefined>();
 
-    const saveCollection = (updatedCollection: EntityCollection<M>): Promise<boolean> => {
+    const saveCollection = (updatedCollection: SnapshotCollection<M>): Promise<boolean> => {
         const id = updatedCollection.slug;
 
         return configController.saveCollection({
@@ -442,7 +442,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     };
 
-    const doCollectionInference = collectionInference ? (collection: EntityCollection<any>) => {
+    const doCollectionInference = collectionInference ? (collection: SnapshotCollection<any>) => {
         if (!collectionInference) return undefined;
         return collectionInference?.(
             collection.slug,
@@ -451,7 +451,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         );
     } : undefined;
 
-    const inferCollectionFromData = async (newCollection: EntityCollection<M>) => {
+    const inferCollectionFromData = async (newCollection: SnapshotCollection<M>) => {
 
         try {
             if (!doCollectionInference) {
@@ -497,7 +497,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    const onSubmit = async (newCollectionState: EntityCollection<M>, formexController: FormexController<EntityCollection<M>>) => {
+    const onSubmit = async (newCollectionState: SnapshotCollection<M>, formexController: FormexController<SnapshotCollection<M>>) => {
         console.debug("Submitting collection", newCollectionState);
         try {
 
@@ -506,7 +506,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 if (success) {
                     aiModifiedPaths?.clearAllPaths();
                     formexController.resetForm({ values: newCollectionState });
-                    handleClose(newCollectionState as EntityCollection);
+                    handleClose(newCollectionState as SnapshotCollection);
                 }
                 return;
             }
@@ -544,7 +544,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 if (success) {
                     formexController.resetForm({ values: initialValues });
                     setNextMode();
-                    handleClose(newCollectionState as EntityCollection);
+                    handleClose(newCollectionState as SnapshotCollection);
                 }
             } else {
                 setNextMode();
@@ -560,7 +560,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    const validation = (col: EntityCollection<M>) => {
+    const validation = (col: SnapshotCollection<M>) => {
 
         let errors: Record<string, string> = {};
         const schema = (currentView === "properties" || currentView === "general") && CollectionEditorSchema;
@@ -595,7 +595,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         return errors;
     };
 
-    const formController = useCreateFormex<EntityCollection<M>>({
+    const formController = useCreateFormex<SnapshotCollection<M>>({
         initialValues,
         onSubmit,
         validation,
@@ -622,8 +622,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const resolvedPath = !pathError ? urlController.resolveDatabasePathsFrom(updatedFullPath) : undefined;
     const getDataWithPath = resolvedPath && getData ? async () => {
         const data = await getData!(resolvedPath, parentPaths ?? []);
-        if (existingEntities) {
-            const existingData = existingEntities.map(e => e.values);
+        if (existingSnapshots) {
+            const existingData = existingSnapshots.map(e => e.values);
             data.push(...existingData);
         }
         return data;
@@ -635,7 +635,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     function onImportDataSet(data: object[], propertiesOrder?: string[]) {
         importConfig?.setInUse(true);
-        buildEntityPropertiesFromData(data, getInferenceType)
+        buildSnapshotPropertiesFromData(data, getInferenceType)
             .then((properties: unknown) => {
                 const res = cleanPropertiesFromImport(properties as Properties);
 
@@ -689,8 +689,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const aiModifiedPaths = useAIModifiedPaths();
 
-    const handleAIGenerated = (generatedCollection: EntityCollection, operations?: CollectionOperation[]) => {
-        formController.setValues(generatedCollection as EntityCollection<M>);
+    const handleAIGenerated = (generatedCollection: SnapshotCollection, operations?: CollectionOperation[]) => {
+        formController.setValues(generatedCollection as SnapshotCollection<M>);
         if (operations && aiModifiedPaths) {
             aiModifiedPaths.addModifiedPaths(operations);
         }
@@ -776,7 +776,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                         formController.setValues({
                                             ...formController.values,
                                             ...collectionData
-                                        } as EntityCollection<M>);
+                                        } as SnapshotCollection<M>);
                                         onWelcomeScreenContinue();
                                     } catch (e: unknown) {
                                         console.error("Error importing table:", e);
@@ -975,7 +975,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
 }
 
-function applyPropertyConfigs<M extends Record<string, unknown> = Record<string, unknown>>(collection: EntityCollection<M>, propertyConfigs: Record<string, PropertyConfig>): EntityCollection<M> {
+function applyPropertyConfigs<M extends Record<string, unknown> = Record<string, unknown>>(collection: SnapshotCollection<M>, propertyConfigs: Record<string, PropertyConfig>): SnapshotCollection<M> {
     const {
         properties,
         ...rest
@@ -992,7 +992,7 @@ function applyPropertyConfigs<M extends Record<string, unknown> = Record<string,
     return {
         ...rest,
         properties: propertiesResult as EngineProperties
-    } as EntityCollection<M>;
+    } as SnapshotCollection<M>;
 }
 
 function applyPropertiesConfig(property: Property, propertyConfigs: Record<string, PropertyConfig>) {

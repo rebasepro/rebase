@@ -1,11 +1,11 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { EntityCollection, Properties, Property, Relation, RelationProperty, Vector, BinaryProperty } from "@rebasepro/types";
+import { SnapshotCollection, Properties, Property, Relation, RelationProperty, Vector, BinaryProperty } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
-import { getPrimaryKeys, buildCompositeId } from "./services/entity-helpers";
+import { getPrimaryKeys, buildCompositeId } from "./services/collection-helpers";
 import { logger } from "@rebasepro/server-core";
 
 /**
@@ -17,7 +17,7 @@ import { logger } from "@rebasepro/server-core";
  * Replaces the hidden `__inverseRelationUpdates` / `__joinPathRelationUpdates`
  * dunder-property mutation pattern with explicit, typed state management.
  */
-export interface SerializedEntityData {
+export interface SerializedSnapshotData {
     /** Scalar column values ready for INSERT/UPDATE. */
     scalarData: Record<string, unknown>;
     /** Inverse relation updates that must be applied to target tables. */
@@ -25,7 +25,7 @@ export interface SerializedEntityData {
         relationKey: string;
         relation: Relation;
         newValue: unknown;
-        currentEntityId?: string | number;
+        currentId?: string | number;
     }>;
     /** JoinPath relation updates that require multi-hop writes. */
     joinPathRelationUpdates: Array<{
@@ -86,12 +86,12 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
  * Transform relations for database storage (relation objects to IDs)
  */
 export function serializeDataToServer<M extends Record<string, unknown>>(
-    entity: M,
+    row: M,
     properties: Properties,
-    collection?: EntityCollection,
+    collection?: SnapshotCollection,
     registry?: PostgresCollectionRegistry
-): SerializedEntityData {
-    if (!entity || !properties) return { scalarData: entity ?? {},
+): SerializedSnapshotData {
+    if (!row || !properties) return { scalarData: row ?? {},
 inverseRelationUpdates: [],
 joinPathRelationUpdates: [] };
 
@@ -105,7 +105,7 @@ joinPathRelationUpdates: [] };
         relationKey: string;
         relation: Relation;
         newValue: unknown;
-        currentEntityId?: string | number;
+        currentId?: string | number;
     }> = [];
     const joinPathRelationUpdates: Array<{
         relationKey: string;
@@ -119,7 +119,7 @@ joinPathRelationUpdates: [] };
         if (relation.localKey) foreignKeys.add(relation.localKey);
     });
 
-    for (const [key, value] of Object.entries(entity)) {
+    for (const [key, value] of Object.entries(row)) {
         const property = properties[key as keyof M] as Property;
 
         // Coerce empty strings to null for any field that acts as a foreign key
@@ -151,7 +151,7 @@ joinPathRelationUpdates: [] };
                         relationKey: key,
                         relation,
                         newValue: serializedValue,
-                        currentEntityId: (entity.id as string | number | undefined) || buildCompositeId(entity, pks)
+                        currentId: (row.id as string | number | undefined) || buildCompositeId(row, pks)
                     });
                     // Don't add the original relation property to the result
                     continue;
@@ -159,9 +159,9 @@ joinPathRelationUpdates: [] };
                     const serializedValue = serializePropertyToServer(effectiveValue, property);
                     if (relation.cardinality === "one") {
                         // One-to-one inverse joinPath: route through joinPathRelationUpdates.
-                        // The write ordering in EntityPersistService ensures these are processed
+                        // The write ordering in PersistService ensures these are processed
                         // BEFORE the main UPDATE, so parentSourceCol reads the pre-update FK value.
-                        // This prevents stale values from corrupting related entities when an
+                        // This prevents stale values from corrupting related rows when an
                         // intermediate FK (e.g. author_id) changes in the same save.
                         joinPathRelationUpdates.push({
                             relationKey: key,
@@ -175,7 +175,7 @@ joinPathRelationUpdates: [] };
                             relationKey: key,
                             relation,
                             newValue: serializedValue,
-                            currentEntityId: (entity.id as string | number | undefined) || buildCompositeId(entity, pks)
+                            currentId: (row.id as string | number | undefined) || buildCompositeId(row, pks)
                         });
                     }
                     // Don't add the original relation property to the result
@@ -299,7 +299,7 @@ export function serializePropertyToServer(value: unknown, property: Property): u
  */
 export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
-    collection: EntityCollection,
+    collection: SnapshotCollection,
     db?: NodePgDatabase<Record<string, unknown>>,
     registry?: PostgresCollectionRegistry
 ): Promise<M> {
@@ -335,29 +335,29 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                         const targetCollection = relation.target();
                         const targetTable = registry.getTable(getTableName(targetCollection));
                         const pks = getPrimaryKeys(collection, registry!);
-                        const currentEntityId = buildCompositeId(data, pks);
+                        const currentId = buildCompositeId(data, pks);
 
-                        if (targetTable && currentEntityId) {
+                        if (targetTable && currentId) {
                             const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
                             if (foreignKeyColumn) {
-                                // Query the target table to find entity that references this entity
-                                const relatedEntities = await db
+                                // Query the target table to find row that references this row
+                                const relatedRows = await db
                                     .select()
                                     .from(targetTable)
-                                    .where(eq(foreignKeyColumn, currentEntityId))
+                                    .where(eq(foreignKeyColumn, currentId))
                                     .limit(relation.cardinality === "one" ? 1 : 100); // Limit for one-to-one vs one-to-many
 
-                                if (relatedEntities.length > 0) {
+                                if (relatedRows.length > 0) {
                                     if (relation.cardinality === "one") {
                                         // One-to-one: return single relation object
                                         const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                        const relatedEntity = relatedEntities[0] as Record<string, unknown>;
-                                        result[propKey] = createRelationRef(buildCompositeId(relatedEntity, targetPks), targetCollection.slug);
+                                        const relatedRow = relatedRows[0] as Record<string, unknown>;
+                                        result[propKey] = createRelationRef(buildCompositeId(relatedRow, targetPks), targetCollection.slug);
                                     } else {
                                         // One-to-many: return array of relation objects
                                         const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                        result[propKey] = relatedEntities.map((entity: Record<string, unknown>) =>
-                                            createRelationRef(buildCompositeId(entity, targetPks), targetCollection.slug)
+                                        result[propKey] = relatedRows.map((row: Record<string, unknown>) =>
+                                            createRelationRef(buildCompositeId(row, targetPks), targetCollection.slug)
                                         );
                                     }
                                 }
@@ -371,9 +371,9 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                     try {
                         const targetCollection = relation.target();
                         const pks = getPrimaryKeys(collection, registry!);
-                        const currentEntityId = buildCompositeId(data, pks);
+                        const currentId = buildCompositeId(data, pks);
 
-                        if (currentEntityId) {
+                        if (currentId) {
                             // Build the join query following the join path
                             const sourceTable = registry.getTable(getTableName(collection));
                             if (!sourceTable) {
@@ -414,10 +414,10 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                 currentTable = joinTable;
                             }
 
-                            // Add where condition for the current entity
+                            // Add where condition for the current row
                             if (pks.length === 1) {
                                 const sourceIdField = sourceTable[pks[0].fieldName as keyof typeof sourceTable] as AnyPgColumn;
-                                query = query.where(eq(sourceIdField, currentEntityId)) as typeof query;
+                                query = query.where(eq(sourceIdField, currentId)) as typeof query;
                             } else {
                                 // For composite keys, we would need to map the split parts. For now log a warning.
                                 logger.warn(`Join path resolution for composite primary keys is not yet fully supported: ${collection.slug}`);
@@ -432,7 +432,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             if (pks.length === 1) {
                                 const sourceIdField = sourceTable[pks[0].fieldName as keyof typeof sourceTable] as AnyPgColumn;
                                 combinedWhere = DrizzleConditionBuilder.combineConditionsWithAnd([
-                                    eq(sourceIdField, currentEntityId),
+                                    eq(sourceIdField, currentId),
                                     ...additionalFilters
                                 ].filter(Boolean) as SQL[]);
                             }
@@ -447,13 +447,13 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                 if (relation.cardinality === "one") {
                                     // One-to-one: return single relation object
                                     const joinResult = joinResults[0] as Record<string, unknown>;
-                                    const targetEntity = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
-                                    result[propKey] = createRelationRef(buildCompositeId(targetEntity, targetPks), targetCollection.slug);
+                                    const targetRow = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
+                                    result[propKey] = createRelationRef(buildCompositeId(targetRow, targetPks), targetCollection.slug);
                                 } else {
                                     // One-to-many: return array of relation objects
                                     result[propKey] = joinResults.map((joinResult: Record<string, unknown>) => {
-                                        const targetEntity = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
-                                        return createRelationRef(buildCompositeId(targetEntity, targetPks), targetCollection.slug);
+                                        const targetRow = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
+                                        return createRelationRef(buildCompositeId(targetRow, targetPks), targetCollection.slug);
                                     });
                                 }
                             }
@@ -511,7 +511,7 @@ function bufferToStringOrBase64(buf: Buffer): string {
     return buf.toString("utf8");
 }
 
-export function parsePropertyFromServer(value: unknown, property: Property, collection: EntityCollection, propertyKey?: string): unknown {
+export function parsePropertyFromServer(value: unknown, property: Property, collection: SnapshotCollection, propertyKey?: string): unknown {
     if (value === null || value === undefined) return value;
 
     switch (property.type) {
@@ -680,7 +680,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,
     properties: Properties,
-    collection: EntityCollection,
+    collection: SnapshotCollection,
     resolvedRelations: Record<string, Relation>,
     options: { skipRelations: boolean }
 ): Record<string, unknown> {
@@ -723,7 +723,7 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
  */
 export function normalizeDbValues<M extends Record<string, unknown>>(
     data: M,
-    collection: EntityCollection
+    collection: SnapshotCollection
 ): M {
     const properties = collection.properties;
     if (!data || !properties) return data;

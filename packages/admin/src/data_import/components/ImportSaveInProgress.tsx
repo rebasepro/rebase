@@ -1,11 +1,11 @@
 import { useData } from "@rebasepro/core";
-import { Entity, EntityCollection } from "@rebasepro/types";
+import { Snapshot, SnapshotCollection } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";
 import { useEffect, useRef, useState } from "react";
 import { ImportConfig } from "../types";
 
-export function ImportSaveInProgress<C extends EntityCollection<any>>
+export function ImportSaveInProgress<C extends SnapshotCollection<any>>
     ({
         path,
         importConfig,
@@ -24,7 +24,7 @@ export function ImportSaveInProgress<C extends EntityCollection<any>>
 
     const savingRef = useRef<boolean>(false);
 
-    const [processedEntities, setProcessedEntities] = useState<number>(0);
+    const [processedSnapshots, setProcessedSnapshots] = useState<number>(0);
 
     function save() {
 
@@ -37,10 +37,10 @@ export function ImportSaveInProgress<C extends EntityCollection<any>>
             dataClient,
             collection,
             path,
-            importConfig.entities,
+            importConfig.snapshots,
             0,
             25,
-            setProcessedEntities
+            setProcessedSnapshots
         ).then(() => {
             onImportSuccess(collection);
             savingRef.current = false;
@@ -82,7 +82,7 @@ export function ImportSaveInProgress<C extends EntityCollection<any>>
             </Typography>
 
             <Typography variant={"body2"}>
-                {processedEntities}/{importConfig.entities.length} entities saved
+                {processedSnapshots}/{importConfig.snapshots.length} snapshots saved
             </Typography>
 
             <Typography variant={"caption"}>
@@ -95,9 +95,9 @@ export function ImportSaveInProgress<C extends EntityCollection<any>>
 }
 
 function saveDataBatch(dataClient: RebaseData,
-    collection: EntityCollection,
+    collection: SnapshotCollection,
     path: string,
-    data: Partial<Entity<any>>[],
+    data: Partial<Snapshot<any>>[],
     offset = 0,
     batchSize = 25,
     onProgressUpdate: (progress: number) => void): Promise<void> {

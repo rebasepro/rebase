@@ -1,4 +1,4 @@
-import { EntityCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import { SnapshotCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
@@ -13,7 +13,7 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
     return toSnakeCase(propName);
 };
 
-const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
+const getPrimaryKeyProp = (collection: SnapshotCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
@@ -30,15 +30,15 @@ const getPrimaryKeyProp = (collection: EntityCollection): { name: string, type: 
     return { name: "id", type: "string", isUuid: isUuid ?? false };
 };
 
-const isNumericId = (collection: EntityCollection): boolean => {
+const isNumericId = (collection: SnapshotCollection): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
 };
 
-const getPrimaryKeyName = (collection: EntityCollection): string => {
+const getPrimaryKeyName = (collection: SnapshotCollection): string => {
     return getPrimaryKeyProp(collection).name;
 };
 
-const isIdProperty = (propName: string, prop: Property, collection: EntityCollection): boolean => {
+const isIdProperty = (propName: string, prop: Property, collection: SnapshotCollection): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;
     const hasExplicitId = Object.values(collection.properties ?? {}).some(p => "isId" in (p as unknown as object) && Boolean((p as unknown as Record<string, unknown>).isId));
     return !hasExplicitId && propName === "id";
@@ -61,7 +61,7 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
     return createHash("sha1").update(data).digest("hex").substring(0, 7);
 };
 
-const generatePolicyDdl = (collection: EntityCollection, rule: SecurityRule): string => {
+const generatePolicyDdl = (collection: SnapshotCollection, rule: SecurityRule): string => {
     const tableName = getTableName(collection);
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
@@ -78,7 +78,7 @@ const generatePolicyDdl = (collection: EntityCollection, rule: SecurityRule): st
     }).join("");
 };
 
-const generateSinglePolicyDdl = (collection: EntityCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+const generateSinglePolicyDdl = (collection: SnapshotCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
     const schema = isPostgresCollection(collection) && collection.schema ? collection.schema : "public";
     const tableName = getTableName(collection);
     const mode = (rule.mode ?? "permissive").toUpperCase();
@@ -110,7 +110,7 @@ const generateSinglePolicyDdl = (collection: EntityCollection, rule: SecurityRul
     return `${ddl};\n`;
 };
 
-const getSqlColumnType = (propName: string, prop: Property, collection: EntityCollection, collections: EntityCollection[]): string => {
+const getSqlColumnType = (propName: string, prop: Property, collection: SnapshotCollection, collections: SnapshotCollection[]): string => {
     switch (prop.type) {
         case "string": {
             const stringProp = prop as StringProperty;
@@ -189,7 +189,7 @@ const getSqlColumnType = (propName: string, prop: Property, collection: EntityCo
             if (!relation || relation.direction !== "owning" || relation.cardinality !== "one") {
                 throw new Error(`Relation ${propName} is not an owning one-to-one/many-to-one relation`);
             }
-            let targetCollection: EntityCollection;
+            let targetCollection: SnapshotCollection;
             try {
                 targetCollection = relation.target();
             } catch {
@@ -211,7 +211,7 @@ const getSqlColumnType = (propName: string, prop: Property, collection: EntityCo
 };
 
 export const generatePostgresDdl = async (
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     options: { includePolicies?: boolean } = { includePolicies: true }
 ): Promise<string> => {
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n\n";
@@ -247,10 +247,10 @@ export const generatePostgresDdl = async (
     if (ddl.endsWith(";\n")) ddl += "\n";
 
     const allTablesToGenerate = new Map<string, {
-        collection: EntityCollection,
+        collection: SnapshotCollection,
         isJunction?: boolean,
         relation?: Relation,
-        sourceCollection?: EntityCollection
+        sourceCollection?: SnapshotCollection
     }>();
 
     // Identify all tables
@@ -269,7 +269,7 @@ export const generatePostgresDdl = async (
                         collection: {
                             table: junctionTableName,
                             properties: {}
-                        } as EntityCollection,
+                        } as SnapshotCollection,
                         isJunction: true,
                         relation: relation,
                         sourceCollection: collection
@@ -331,7 +331,7 @@ export const generatePostgresDdl = async (
                         return;
                     }
 
-                    let targetCollection: EntityCollection;
+                    let targetCollection: SnapshotCollection;
                     try {
                         targetCollection = relInfo.target();
                     } catch {
@@ -449,11 +449,11 @@ export const generatePostgresDdl = async (
     return ddl;
 };
 
-export const generatePostgresPoliciesDdl = (collections: EntityCollection[]): string => {
+export const generatePostgresPoliciesDdl = (collections: SnapshotCollection[]): string => {
     let ddl = "-- This file contains RLS policies generated by Rebase. Applied separately from migrations.\n\n";
 
     const allTablesToGenerate = new Map<string, {
-        collection: EntityCollection
+        collection: SnapshotCollection
     }>();
 
     for (const collection of collections) {

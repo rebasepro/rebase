@@ -29,7 +29,7 @@ import {
     useStudioCollectionRegistry,
     IconForView
 } from "@rebasepro/core";
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 import { isPostgresCollection } from "@rebasepro/types";
 import { useSchemaGraph } from "./useSchemaGraph";
 import type { TableNodeData } from "./useSchemaGraph";
@@ -52,7 +52,7 @@ const edgeTypes = {
 function SchemaVisualizerCanvas({
     collections
 }: {
-    collections: EntityCollection[];
+    collections: SnapshotCollection[];
 }) {
     const reactFlowInstance = useReactFlow();
     const {
@@ -629,7 +629,7 @@ duration: 400 }
 export const SchemaVisualizer = () => {
     const { collections: registryCollections } =
         useStudioCollectionRegistry() as {
-            collections?: EntityCollection[];
+            collections?: SnapshotCollection[];
         };
 
     // Merge registry collections with any passed collections

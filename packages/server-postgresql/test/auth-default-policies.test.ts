@@ -1,4 +1,4 @@
-import { EntityCollection, PostgresCollection } from "@rebasepro/types";
+import { SnapshotCollection, PostgresCollection } from "@rebasepro/types";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { getEffectiveSecurityRules } from "../src/schema/auth-default-policies";
 
@@ -77,7 +77,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("leaves non-auth collections untouched", () => {
-        const collection: EntityCollection = {
+        const collection: SnapshotCollection = {
             slug: "products",
             table: "products",
             name: "Products",

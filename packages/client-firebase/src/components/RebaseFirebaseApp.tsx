@@ -23,10 +23,10 @@ import {
     CollectionRegistryContext,
     UrlContext,
     NavigationStateContext,
-    SideEntityProvider,
+    SideSnapshotProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { DEFAULT_DATA_SOURCE_KEY, Entity, PropertyConfig, RebaseContext } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY, Snapshot, PropertyConfig, RebaseContext } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";
@@ -53,7 +53,7 @@ const DEFAULT_SIGN_IN_OPTIONS = [
  * This is the default implementation of a Rebase app using the Firebase services
  * as a backend.
  * You can use this component as a full app, by specifying collections and
- * entity collections.
+ * snapshot collections.
  *
  * This component is in charge of initialising Firebase, with the given
  * configuration object.
@@ -227,7 +227,7 @@ export function RebaseFirebaseApp({
                             driver: firestoreDelegate
                         }]}
                         storageSource={storageSource}
-                        entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
+                        snapshotLinkBuilder={({ snapshot }: { snapshot: Snapshot<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${snapshot.path}/${snapshot.id}`}
                         locale={locale}
                         onAnalyticsEvent={onAnalyticsEvent}
                         plugins={plugins}
@@ -258,7 +258,7 @@ export function RebaseFirebaseApp({
                                     const fallbackRoute = firstCollectionEntry ? <Navigate to={urlController.buildUrlCollectionPath(firstCollectionEntry.id)} replace /> : <CenteredView>No home page or collections provided.</CenteredView>;
 
                                     component = (
-                                        <SideEntityProvider>
+                                        <SideSnapshotProvider>
                                             <RebaseRoutes>
                                                 <Route element={
                                                     <Scaffold
@@ -274,7 +274,7 @@ export function RebaseFirebaseApp({
                                                     <Route path="/c/*" element={<RebaseRoute/>}/>
                                                 </Route>
                                             </RebaseRoutes>
-                                        </SideEntityProvider>
+                                        </SideSnapshotProvider>
                                     );
                                 }
                             }

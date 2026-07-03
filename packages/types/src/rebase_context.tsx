@@ -5,12 +5,12 @@ import type { UserConfigurationPersistence } from "./controllers/local_config_pe
 import type { DatabaseAdmin } from "./types/backend";
 import type { RebaseClient } from "./controllers/client";
 
-import type { RebaseData } from "./controllers/data";
+import type { RebaseSdkData } from "./controllers/data";
 import type { User } from "./users";
 
 
 /**
- * Context that is provided to entity callbacks (hooks).
+ * Context that is provided to snapshot callbacks (hooks).
  * It contains only the dependencies that are available in both the frontend and the backend.
  * @group Hooks and utilities
  */
@@ -18,7 +18,7 @@ export type RebaseCallContext<USER extends User = User> = {
 
     /**
      * The Rebase client instance.
-     * Available in all entity callbacks (beforeSave, afterSave, afterRead,
+     * Available in all snapshot callbacks (beforeSave, afterSave, afterRead,
      * beforeDelete, afterDelete) and in CollectionActionsProps via context.
      * Use it to call backend functions, access data, storage, etc.
      *
@@ -36,8 +36,12 @@ export type RebaseCallContext<USER extends User = User> = {
     /**
      * Unified data access — `context.data.products.create(...)`.
      * Access any collection as a dynamic property.
+     *
+     * Returns flat rows (`{ id, ...columns }`), identical to the frontend SDK
+     * client — so `context.data` in a backend callback and `client.data` in the
+     * frontend behave the same way (`row.title`, never `row.values.title`).
      */
-    data: RebaseData;
+    data: RebaseSdkData;
 
     /**
      * Used storage implementation
@@ -77,9 +81,9 @@ export type RebaseContext<USER extends User = User, AuthControllerType extends A
     sideDialogsController?: import("./controllers/side_dialogs_controller").SideDialogsController;
 
     /**
-     * Controller to open the side dialog displaying entity forms
+     * Controller to open the side dialog displaying snapshot forms
      */
-    sideEntityController?: import("./controllers/side_entity_controller").SideEntityController;
+    sideSnapshotController?: import("./controllers/side_snapshot_controller").SideSnapshotController;
 
     /**
      * Controller resolving URLs in the CMS

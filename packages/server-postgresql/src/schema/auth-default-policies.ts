@@ -1,4 +1,4 @@
-import { EntityCollection, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollection, policy } from "@rebasepro/types";
+import { SnapshotCollection, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollection, policy } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
 
 /**
@@ -50,7 +50,7 @@ const ADMIN_WRITE_EXPR: PolicyExpression = policy.or(
 const DEFAULT_GUARDED_OPS: SecurityOperation[] = ["insert", "update", "delete"];
 
 /** Whether a collection is flagged as an authentication collection. */
-function isAuthCollection(collection: EntityCollection): boolean {
+function isAuthCollection(collection: SnapshotCollection): boolean {
     const auth = collection.auth;
     return auth === true || (typeof auth === "object" && (auth as AuthCollectionConfig)?.enabled === true);
 }
@@ -65,7 +65,7 @@ function isAuthCollection(collection: EntityCollection): boolean {
  * Non-auth collections, and auth collections that opt out via
  * `disableDefaultAuthPolicies`, are returned unchanged.
  */
-export function getEffectiveSecurityRules(collection: EntityCollection): SecurityRule[] {
+export function getEffectiveSecurityRules(collection: SnapshotCollection): SecurityRule[] {
     const explicit = [...((isPostgresCollection(collection) ? collection.securityRules : undefined) ?? [])];
 
     if (!isAuthCollection(collection) || collection.disableDefaultAuthPolicies) {

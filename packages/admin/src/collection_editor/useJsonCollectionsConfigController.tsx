@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EngineProperties, EntityCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
+import type { EngineProperties, SnapshotCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
 import type {
     CollectionsConfigController,
     SaveCollectionParams,
@@ -55,7 +55,7 @@ export function useJsonCollectionsConfigController({
     readOnly = false,
     autoLoad = true,
 }: UseJsonCollectionsConfigControllerOptions): CollectionsConfigController {
-    const [collections, setCollections] = useState<EntityCollection[]>([]);
+    const [collections, setCollections] = useState<SnapshotCollection[]>([]);
     const [loading, setLoading] = useState(autoLoad);
     const [navigationEntries, setNavigationEntries] = useState<NavigationGroupMapping[]>([]);
 
@@ -92,7 +92,7 @@ export function useJsonCollectionsConfigController({
     /**
      * Update local state and persist a collection to the store.
      */
-    const persistCollection = useCallback(async (collection: EntityCollection) => {
+    const persistCollection = useCallback(async (collection: SnapshotCollection) => {
         const serializable = toSerializableCollection(collection);
         await storeRef.current.save(collection.slug, serializable);
     }, []);
@@ -100,7 +100,7 @@ export function useJsonCollectionsConfigController({
     /**
      * Find collection by id (slug).
      */
-    const getCollection = useCallback((id: string): EntityCollection => {
+    const getCollection = useCallback((id: string): SnapshotCollection => {
         const found = collections.find(c => c.slug === id);
         if (found) return found;
         throw new Error(`Collection "${id}" not found`);
@@ -111,7 +111,7 @@ export function useJsonCollectionsConfigController({
     const saveCollection = useCallback(async <M extends Record<string, unknown>>(
         { id, collectionData }: SaveCollectionParams<M>
     ) => {
-        const collection = collectionData as EntityCollection;
+        const collection = collectionData as SnapshotCollection;
         await persistCollection(collection);
         setCollections(prev => {
             const idx = prev.findIndex(c => c.slug === id);
@@ -132,7 +132,7 @@ export function useJsonCollectionsConfigController({
             const idx = prev.findIndex(c => c.slug === lookupId);
             if (idx < 0) return prev;
 
-            const merged = { ...prev[idx], ...collectionData } as EntityCollection;
+            const merged = { ...prev[idx], ...collectionData } as SnapshotCollection;
             const next = [...prev];
             next[idx] = merged;
 
@@ -177,7 +177,7 @@ export function useJsonCollectionsConfigController({
             }
 
             const next = [...prev];
-            next[idx] = collection as EntityCollection;
+            next[idx] = collection as SnapshotCollection;
 
             persistCollection(next[idx]).catch(e =>
                 console.error("useJsonCollectionsConfigController: failed to save property", e)
@@ -204,7 +204,7 @@ export function useJsonCollectionsConfigController({
             }
 
             const next = [...prev];
-            next[idx] = collection as EntityCollection;
+            next[idx] = collection as SnapshotCollection;
 
             persistCollection(next[idx]).catch(e =>
                 console.error("useJsonCollectionsConfigController: failed to delete property", e)
@@ -221,7 +221,7 @@ export function useJsonCollectionsConfigController({
         const updated = {
             ...collection,
             propertiesOrder: newPropertiesOrder,
-        } as EntityCollection;
+        } as SnapshotCollection;
 
         setCollections(prev => {
             const idx = prev.findIndex(c => c.slug === collection.slug);

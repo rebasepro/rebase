@@ -1,8 +1,8 @@
-import { EntityCollection, Relation } from "@rebasepro/types";
+import { SnapshotCollection, Relation } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { sanitizeRelation } from "@rebasepro/common";
 
-const mockAuthorCollection: EntityCollection = {
+const mockAuthorCollection: SnapshotCollection = {
     name: "Author",
     slug: "author",
     table: "authors",
@@ -17,7 +17,7 @@ const mockAuthorCollection: EntityCollection = {
     idField: "id"
 };
 
-const mockPostCollection: EntityCollection = {
+const mockPostCollection: SnapshotCollection = {
     name: "Post",
     slug: "posts",
     table: "posts",
@@ -35,7 +35,7 @@ const mockPostCollection: EntityCollection = {
     idField: "id"
 };
 
-const mockTagCollection: EntityCollection = {
+const mockTagCollection: SnapshotCollection = {
     name: "Tag",
     slug: "tags",
     table: "tags",
@@ -221,7 +221,7 @@ describe("Comprehensive Relations Test Suite", () => {
 
     describe("Many-to-Many Relations", () => {
         it("should handle many-to-many with a through table", async () => {
-            const authorsCollection: EntityCollection = {
+            const authorsCollection: SnapshotCollection = {
                 slug: "authors",
                 table: "authors",
                 name: "Authors",
@@ -245,7 +245,7 @@ relationName: "books" }
                 ]
             };
 
-            const booksCollection: EntityCollection = {
+            const booksCollection: SnapshotCollection = {
                 slug: "books",
                 table: "books",
                 name: "Books",
@@ -265,7 +265,7 @@ relationName: "books" }
         });
 
         it("should handle a 4-table many-to-many chain with joinPath", async () => {
-            const usersCollection: EntityCollection = {
+            const usersCollection: SnapshotCollection = {
                 slug: "users",
                 table: "users",
                 name: "Users",
@@ -297,14 +297,14 @@ to: "id" } }
                 ]
             };
 
-            const rolesCollection: EntityCollection = {
+            const rolesCollection: SnapshotCollection = {
                 slug: "roles",
                 table: "roles",
                 name: "Roles",
                 properties: { name: { type: "string" } }
             };
 
-            const permissionsCollection: EntityCollection = {
+            const permissionsCollection: SnapshotCollection = {
                 slug: "permissions",
                 table: "permissions",
                 name: "Permissions",
@@ -334,7 +334,7 @@ to: "id" } }
 
     describe("Owning Relations", () => {
         it("should generate owning one-to-one relations", async () => {
-            const authorsCollection: EntityCollection = {
+            const authorsCollection: SnapshotCollection = {
                 slug: "authors",
                 table: "authors",
                 name: "Authors",
@@ -354,7 +354,7 @@ relationName: "profile" }
                 ]
             };
 
-            const profilesCollection: EntityCollection = {
+            const profilesCollection: SnapshotCollection = {
                 slug: "profiles",
                 table: "profiles",
                 name: "Profiles",
@@ -387,7 +387,7 @@ relationName: "author" }
         });
 
         it("should generate owning one-to-many relations", async () => {
-            const categoriesCollection: EntityCollection = {
+            const categoriesCollection: SnapshotCollection = {
                 slug: "categories",
                 table: "categories",
                 name: "Categories",
@@ -396,7 +396,7 @@ relationName: "author" }
                 }
             };
 
-            const postsCollection: EntityCollection = {
+            const postsCollection: SnapshotCollection = {
                 slug: "posts",
                 table: "posts",
                 name: "Posts",
@@ -427,7 +427,7 @@ relationName: "category" }
 
     describe("Mixed Relation Types", () => {
         it("should handle collections with multiple relations", async () => {
-            const authorsCollection: EntityCollection = {
+            const authorsCollection: SnapshotCollection = {
                 slug: "authors",
                 table: "authors",
                 name: "Authors",
@@ -446,7 +446,7 @@ relationName: "publisher" }
                 ]
             };
 
-            const publishersCollection: EntityCollection = {
+            const publishersCollection: SnapshotCollection = {
                 slug: "publishers",
                 table: "publishers",
                 name: "Publishers",
@@ -455,7 +455,7 @@ relationName: "publisher" }
                 }
             };
 
-            const booksCollection: EntityCollection = {
+            const booksCollection: SnapshotCollection = {
                 slug: "books",
                 table: "books",
                 name: "Books",
@@ -487,7 +487,7 @@ relationName: "author" }
 
     describe("Complex Multi-Column Relations", () => {
         it("should handle multi-column foreign keys", async () => {
-            const ordersCollection: EntityCollection = {
+            const ordersCollection: SnapshotCollection = {
                 slug: "orders",
                 table: "orders",
                 name: "Orders",
@@ -512,7 +512,7 @@ to: ["code", "region_id"] } }
                 ]
             };
 
-            const customersCollection: EntityCollection = {
+            const customersCollection: SnapshotCollection = {
                 slug: "customers",
                 table: "customers",
                 name: "Customers",
@@ -551,7 +551,7 @@ validation: { integer: true } },
 
     describe("Edge Cases and Production Scenarios", () => {
         it("should handle self-referencing many-to-many", async () => {
-            const usersCollection: EntityCollection = {
+            const usersCollection: SnapshotCollection = {
                 slug: "users",
                 table: "users",
                 name: "Users",
@@ -585,7 +585,7 @@ relationName: "friends" }
         });
 
         it("should handle mixed ID types in relations", async () => {
-            const productsCollection: EntityCollection = {
+            const productsCollection: SnapshotCollection = {
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -611,7 +611,7 @@ relationName: "categories" }
                 ]
             };
 
-            const categoriesCollection: EntityCollection = {
+            const categoriesCollection: SnapshotCollection = {
                 slug: "categories",
                 table: "categories",
                 name: "Categories",
@@ -631,42 +631,42 @@ relationName: "categories" }
         });
 
         it("should handle circular references", async () => {
-            const aCollection: EntityCollection = {
-                slug: "a_entities",
-                table: "a_entities",
-                name: "A Entities",
+            const aCollection: SnapshotCollection = {
+                slug: "a_snapshots",
+                table: "a_snapshots",
+                name: "A Snapshots",
                 properties: {
                     name: { type: "string" },
-                    b_entities: { type: "relation",
-relationName: "b_entities" }
+                    b_snapshots: { type: "relation",
+relationName: "b_snapshots" }
                 },
                 relations: [
                     {
-                        relationName: "b_entities",
+                        relationName: "b_snapshots",
                         target: () => bCollection,
                         cardinality: "many",
                         direction: "inverse",
-                        foreignKeyOnTarget: "a_entity_id"
+                        foreignKeyOnTarget: "a_snapshot_id"
                     }
                 ]
             };
 
-            const bCollection: EntityCollection = {
-                slug: "b_entities",
-                table: "b_entities",
-                name: "B Entities",
+            const bCollection: SnapshotCollection = {
+                slug: "b_snapshots",
+                table: "b_snapshots",
+                name: "B Snapshots",
                 properties: {
                     name: { type: "string" },
-                    a_entity: { type: "relation",
-relationName: "a_entity" }
+                    a_snapshot: { type: "relation",
+relationName: "a_snapshot" }
                 },
                 relations: [
                     {
-                        relationName: "a_entity",
+                        relationName: "a_snapshot",
                         target: () => aCollection,
                         cardinality: "one",
                         direction: "owning",
-                        localKey: "a_entity_id"
+                        localKey: "a_snapshot_id"
                     }
                 ]
             };
@@ -676,12 +676,12 @@ relationName: "a_entity" }
 
             // Should handle circular references without infinite loops
             // The 'owning' relation on bCollection should correctly generate the FK
-            expect(cleanResult).toContain("export const aEntities = pgTable(\"a_entities\"");
-            expect(cleanResult).toContain("export const bEntities = pgTable(\"b_entities\"");
-            expect(cleanResult).toContain("a_entity_id: varchar(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("export const aSnapshots = pgTable(\"a_snapshots\"");
+            expect(cleanResult).toContain("export const bSnapshots = pgTable(\"b_snapshots\"");
+            expect(cleanResult).toContain("a_snapshot_id: varchar(\"a_snapshot_id\").references(() => aSnapshots.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
-            expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_a_entity_id\" })");
-            expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.a_entity_id], references: [aEntities.id], relationName: \"b_entities_a_entity_id\" })");
+            expect(cleanResult).toContain("\"b_snapshots\": many(bSnapshots, { relationName: \"b_snapshots_a_snapshot_id\" })");
+            expect(cleanResult).toContain("\"a_snapshot\": one(aSnapshots, { fields: [bSnapshots.a_snapshot_id], references: [aSnapshots.id], relationName: \"b_snapshots_a_snapshot_id\" })");
         });
     });
 });
@@ -709,7 +709,7 @@ describe("Shared relationName regression", () => {
     };
 
     it("should emit identical relationName for one-to-many owning + inverse pair", async () => {
-        const companiesCollection: EntityCollection = {
+        const companiesCollection: SnapshotCollection = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -727,7 +727,7 @@ describe("Shared relationName regression", () => {
             ]
         };
 
-        const jobsCollection: EntityCollection = {
+        const jobsCollection: SnapshotCollection = {
             slug: "jobs",
             table: "jobs",
             name: "Jobs",
@@ -770,7 +770,7 @@ relationName: "company" }
     });
 
     it("should emit identical relationName for one-to-one owning + inverse pair", async () => {
-        const usersCollection: EntityCollection = {
+        const usersCollection: SnapshotCollection = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -788,7 +788,7 @@ relationName: "company" }
             ]
         };
 
-        const profilesCollection: EntityCollection = {
+        const profilesCollection: SnapshotCollection = {
             slug: "profiles",
             table: "profiles",
             name: "Profiles",
@@ -830,7 +830,7 @@ relationName: "user" }
     });
 
     it("should emit different shared names for multiple relations between same tables", async () => {
-        const companiesCollection: EntityCollection = {
+        const companiesCollection: SnapshotCollection = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -853,7 +853,7 @@ relationName: "user" }
             ]
         };
 
-        const peopleCollection: EntityCollection = {
+        const peopleCollection: SnapshotCollection = {
             slug: "people",
             table: "people",
             name: "People",
@@ -937,7 +937,7 @@ describe("Duplicate relation deduplication regression", () => {
         //   - Explicit relation: { relationName: "company", localKey: "company_id", ... }
         //   - Property:          { company_id: { type: "relation", relationName: "company" } }
         // Both reference the same FK `company_id`, but under different keys.
-        const companiesCollection: EntityCollection = {
+        const companiesCollection: SnapshotCollection = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -955,7 +955,7 @@ describe("Duplicate relation deduplication regression", () => {
             ]
         };
 
-        const jobsCollection: EntityCollection = {
+        const jobsCollection: SnapshotCollection = {
             slug: "jobs",
             table: "jobs",
             name: "Jobs",
@@ -1002,7 +1002,7 @@ describe("Duplicate relation deduplication regression", () => {
     it("should not create aliases when relation key contains underscores", async () => {
         // Verify that resolving a collection with a snake_case relation name
         // does NOT produce slug-variant alias entries in the generated schema
-        const parentCollection: EntityCollection = {
+        const parentCollection: SnapshotCollection = {
             slug: "departments",
             table: "departments",
             name: "Departments",
@@ -1020,7 +1020,7 @@ describe("Duplicate relation deduplication regression", () => {
             ]
         };
 
-        const memberCollection: EntityCollection = {
+        const memberCollection: SnapshotCollection = {
             slug: "team-members",
             table: "team_members",
             name: "Team Members",
@@ -1063,7 +1063,7 @@ describe("Duplicate relation deduplication regression", () => {
 
     it("should handle multiple different relations to the same target without duplicates", async () => {
         // Two separate FKs from one table to the same target table
-        const usersCollection: EntityCollection = {
+        const usersCollection: SnapshotCollection = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -1071,7 +1071,7 @@ describe("Duplicate relation deduplication regression", () => {
             relations: []
         };
 
-        const messagesCollection: EntityCollection = {
+        const messagesCollection: SnapshotCollection = {
             slug: "messages",
             table: "messages",
             name: "Messages",
@@ -1126,7 +1126,7 @@ describe("columnName vs property key deduplication regression", () => {
         // The inverse relation on clients uses foreignKeyOnTarget: "client_id" (raw column).
         // Without the fix, the synthetic loop would emit a broken second relation
         // using engagements.client_id (which doesn't exist as a Drizzle property).
-        const clientsCollection: EntityCollection = {
+        const clientsCollection: SnapshotCollection = {
             slug: "clients",
             table: "clients",
             name: "Clients",
@@ -1145,7 +1145,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const engagementsCollection: EntityCollection = {
+        const engagementsCollection: SnapshotCollection = {
             slug: "engagements",
             table: "engagements",
             name: "Engagements",
@@ -1189,7 +1189,7 @@ describe("columnName vs property key deduplication regression", () => {
     });
 
     it("should produce matching relation names on both sides when columnName differs from property key", async () => {
-        const clientsCollection: EntityCollection = {
+        const clientsCollection: SnapshotCollection = {
             slug: "clients",
             table: "clients",
             name: "Clients",
@@ -1208,7 +1208,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const engagementsCollection: EntityCollection = {
+        const engagementsCollection: SnapshotCollection = {
             slug: "engagements",
             table: "engagements",
             name: "Engagements",
@@ -1256,7 +1256,7 @@ describe("columnName vs property key deduplication regression", () => {
 
     it("should correctly handle inverse one-to-one with columnName on target", async () => {
         // One-to-one: user has a profile, profile has userId with columnName: "user_id"
-        const usersCollection: EntityCollection = {
+        const usersCollection: SnapshotCollection = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -1275,7 +1275,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const profilesCollection: EntityCollection = {
+        const profilesCollection: SnapshotCollection = {
             slug: "profiles",
             table: "profiles",
             name: "Profiles",
@@ -1321,7 +1321,7 @@ describe("columnName vs property key deduplication regression", () => {
     it("should still emit synthetic relations when no explicit owning relation exists", async () => {
         // When a collection has a FK column but no explicit owning relation defined,
         // the synthetic loop should still create the missing relation.
-        const categoriesCollection: EntityCollection = {
+        const categoriesCollection: SnapshotCollection = {
             slug: "categories",
             table: "categories",
             name: "Categories",
@@ -1340,7 +1340,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const productsCollection: EntityCollection = {
+        const productsCollection: SnapshotCollection = {
             slug: "products",
             table: "products",
             name: "Products",

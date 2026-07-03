@@ -7,9 +7,9 @@ function mockProvider() {
         addClient: jest.fn(),
         handleClientMessage: jest.fn(async () => {}),
         subscribeToCollection: jest.fn(),
-        subscribeToEntity: jest.fn(),
+        subscribeToOne: jest.fn(),
         unsubscribe: jest.fn(),
-        notifyEntityUpdate: jest.fn(async () => {}),
+        notifyUpdate: jest.fn(async () => {}),
         onServerReady: jest.fn(),
         destroy: jest.fn(async () => {}),
         stopListening: jest.fn(async () => {})
@@ -37,8 +37,8 @@ describe("createRoutedRealtimeService", () => {
         expect(pg.handleClientMessage).not.toHaveBeenCalled();
     });
 
-    it("routes subscribe_entity by path", async () => {
-        await routed.handleClientMessage("c1", { type: "subscribe_entity", payload: { path: "products", subscriptionId: "s2" } });
+    it("routes subscribe_snapshot by path", async () => {
+        await routed.handleClientMessage("c1", { type: "subscribe_one", payload: { path: "products", subscriptionId: "s2" } });
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
         expect(mongo.handleClientMessage).not.toHaveBeenCalled();
     });
@@ -64,10 +64,10 @@ describe("createRoutedRealtimeService", () => {
         expect(mongo.addClient).toHaveBeenCalledWith("c1", ws);
     });
 
-    it("notifyEntityUpdate routes by path", async () => {
-        await routed.notifyEntityUpdate("events", "e1", null);
-        expect(mongo.notifyEntityUpdate).toHaveBeenCalledTimes(1);
-        expect(pg.notifyEntityUpdate).not.toHaveBeenCalled();
+    it("notifyUpdate routes by path", async () => {
+        await routed.notifyUpdate("events", "e1", null);
+        expect(mongo.notifyUpdate).toHaveBeenCalledTimes(1);
+        expect(pg.notifyUpdate).not.toHaveBeenCalled();
     });
 
     it("unknown path falls back to the default provider", async () => {

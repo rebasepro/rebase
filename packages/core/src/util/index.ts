@@ -3,7 +3,7 @@ export * from "./icon_list";
 
 export * from "./icons";
 export * from "./createFormexStub";
-export * from "./entity_cache";
+export * from "./snapshot_cache";
 
 export * from "./useStorageUploadController";
 

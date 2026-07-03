@@ -134,13 +134,13 @@ function MapEditView<T extends Record<string, unknown>>({
         setInternalState(newRowIds);
     }, [value]);
 
-    const updatetype = (rowId: number, type: DataType) => {
-        if (!rowId) {
+    const updatetype = (id: number, type: DataType) => {
+        if (!id) {
             console.warn("No key selected for data type update");
             return;
         }
         setInternalState(internalState.map((row) => {
-            if (row[0] === rowId) {
+            if (row[0] === id) {
                 return [row[0], {
                     key: row[1].key,
                     type
@@ -150,27 +150,27 @@ function MapEditView<T extends Record<string, unknown>>({
         }));
         setValue({
             ...(value ?? {} as T),
-            [internalState.find((row) => row[0] === rowId)?.[1].key ?? ""]: getDefaultValueFortype(type)
+            [internalState.find((row) => row[0] === id)?.[1].key ?? ""]: getDefaultValueFortype(type)
         })
     };
 
     return <div className="py-1 flex flex-col gap-1">
         {internalState
-            .map(([rowId, {
+            .map(([id, {
                     key: fieldKey,
                     type
                 }], index) => {
                     const entryValue = fieldKey ? value?.[fieldKey] : "";
                     const onFieldKeyChange = (newKey: string) => {
 
-                        setInternalState(internalState.map((currentRowId) => {
-                            if (currentRowId[0] === rowId) {
-                                return [rowId, {
+                        setInternalState(internalState.map((currentId) => {
+                            if (currentId[0] === id) {
+                                return [id, {
                                     key: newKey ?? "",
-                                    type: currentRowId[1].type
+                                    type: currentId[1].type
                                 }];
                             }
-                            return currentRowId;
+                            return currentId;
                         }));
 
                         if (typeof value === "object" && newKey in value) {
@@ -189,8 +189,8 @@ function MapEditView<T extends Record<string, unknown>>({
                             [newKey ?? ""]: entryValue
                         });
                     };
-                    return <MapKeyValueRow rowId={rowId}
-                                           key={rowId}
+                    return <MapKeyValueRow id={id}
+                                           key={id}
                                            fieldKey={fieldKey}
                                            value={value ?? {} as T}
                                            onDeleteClick={() => {
@@ -200,7 +200,7 @@ function MapEditView<T extends Record<string, unknown>>({
                                                } else {
                                                    delete (newValue as Record<string, unknown>)[fieldKey];
                                                }
-                                               setInternalState(internalState.filter((currentRowId) => currentRowId[0] !== rowId));
+                                               setInternalState(internalState.filter((currentId) => currentId[0] !== id));
                                                setValue({
                                                    ...newValue
                                                });
@@ -238,7 +238,7 @@ function MapEditView<T extends Record<string, unknown>>({
 }
 
 function MapKeyValueRow<T extends Record<string, unknown>>({
-                                                               rowId,
+                                                               id,
                                                                fieldKey,
                                                                value,
                                                                onFieldKeyChange,
@@ -249,7 +249,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                                                                updatetype,
                                                                disabled
                                                            }: {
-    rowId: number,
+    id: number,
     fieldKey: string,
     value: T,
     onFieldKeyChange: (newKey: string) => void,
@@ -258,7 +258,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
     entryValue: unknown,
     type: DataType,
     disabled?: boolean,
-    updatetype: (rowId: number, type: DataType) => void
+    updatetype: (id: number, type: DataType) => void
 }) {
 
     const { locale } = useCustomizationController();
@@ -327,7 +327,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                 className={cls(defaultBorderMixin, "ml-2 pl-2 border-l border-solid")}>
                 <ArrayContainer value={arrayValue}
                                 newDefaultEntry={""}
-                                droppableId={rowId.toString()}
+                                droppableId={id.toString()}
                                 addLabel={fieldKey ? t("add_to_field", { fieldName: fieldKey }) : t("add")}
                                 size={"small"}
                                 disabled={disabled || !fieldKey}
@@ -379,11 +379,11 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
     }
 
     function doUpdatetype(type: DataType) {
-        updatetype(rowId, type);
+        updatetype(id, type);
     }
 
     return (<>
-            <Typography key={rowId.toString()}
+            <Typography key={id.toString()}
                         component={"div"}
                         className="font-mono flex flex-row gap-1">
                 <div className="w-[300px] max-w-[30%]">
@@ -558,7 +558,7 @@ function gettype(value: unknown): DataType | undefined {
         return "array";
     } else if (value instanceof Date) {
         return "date";
-    } else if (value && typeof value === "object" && "isEntityReference" in value && typeof (value as Record<string, unknown>).isEntityReference === "function" && (value as Record<string, (...args: unknown[]) => unknown>).isEntityReference()) {
+    } else if (value && typeof value === "object" && "isSnapshotReference" in value && typeof (value as Record<string, unknown>).isSnapshotReference === "function" && (value as Record<string, (...args: unknown[]) => unknown>).isSnapshotReference()) {
         return "reference";
     } else if (value instanceof GeoPoint) {
         return "geopoint";

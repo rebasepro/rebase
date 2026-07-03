@@ -1,4 +1,4 @@
-import { Entity, EntityValues } from "../types/entities";
+import { Snapshot, SnapshotValues } from "../types/snapshots";
 import { WhereFilterOp, FilterValues, OrderByTuple } from "../types/filter-operators";
 
 export type WhereValue<T> = T | T[] | null;
@@ -56,8 +56,8 @@ export interface FindParams {
  * @group Data
  */
 export interface FindResponse<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Array of entities matching the query */
-    data: Entity<M>[];
+    /** Array of snapshots matching the query */
+    data: Snapshot<M>[];
     /** Pagination metadata */
     meta: {
         total: number;
@@ -110,21 +110,21 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Find a single record by its ID.
      */
-    findById(id: string | number): Promise<Entity<M> | undefined>;
+    findById(id: string | number): Promise<Snapshot<M> | undefined>;
 
     /**
      * Create a new record.
-     * @param data The entity data to create.
+     * @param data The snapshot data to create.
      * @param id Optional specific ID to use for the new record.
-     * @returns The created entity
+     * @returns The created snapshot
      */
-    create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>>;
+    create(data: Partial<SnapshotValues<M>>, id?: string | number): Promise<Snapshot<M>>;
 
     /**
      * Update an existing record by ID.
-     * @returns The updated entity
+     * @returns The updated snapshot
      */
-    update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>>;
+    update(id: string | number, data: Partial<SnapshotValues<M>>): Promise<Snapshot<M>>;
 
     /**
      * Delete a record by ID.
@@ -146,7 +146,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      * Subscribe to a single record for real-time updates.
      * Optional method.
      */
-    listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void): () => void;
+    listenById?(id: string | number, onUpdate: (snapshot: Snapshot<M> | undefined) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Count the number of records matching the given filter.
@@ -163,29 +163,151 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     include(...relations: string[]): QueryBuilderInterface<M>;
 }
 
+// =============================================================================
+// SDK-facing types — flat rows, no Snapshot wrapper
+// =============================================================================
+
 /**
- * The unified data access object.
- *
- * Access collections as dynamic properties: `data.products.find(...)`.
- * In the SDK this is backed by HTTP transport (typed, generated per-project).
- * In the framework this is backed by a Proxy + in-process database driver (dynamic).
- *
- * When the `DB` generic is supplied (e.g. from `createRebaseClient<Database>`),
- * each key in `DB` is mapped to a typed `CollectionAccessor`. When `DB` is
- * `unknown` (the default), the type falls back to a dynamic index signature
- * for runtime-only access.
+ * Pagination metadata returned with collection queries.
+ * @group Data
+ */
+export interface PaginationMeta {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+    /**
+     * `true` when `total` and `hasMore` are heuristic estimates
+     * (e.g. realtime first-paint). A follow-up emission with
+     * authoritative meta may follow. When absent or `false`,
+     * the values are authoritative.
+     */
+    estimated?: boolean;
+}
+
+/**
+ * Paginated response from a collection query (SDK-facing).
+ * Returns flat rows instead of Snapshot-wrapped objects.
  *
  * @example
- * // SDK
- * const client = createRebaseClient({ baseUrl: "..." });
- * await client.data.products.create({ name: "Camera", price: 299 });
+ * const { data, meta } = await rebase.data.posts.find();
+ * console.log(data[0].title); // direct access — no .values
+ * console.log(meta.total);
  *
- * // Framework callback
- * callbacks: {
- *   afterSave({ context }) {
- *     await context.data.logs.create({ action: "saved", timestamp: new Date() });
- *   }
- * }
+ * @group Data
+ */
+export interface FindResult<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** Array of flat rows matching the query */
+    data: M[];
+    /** Pagination metadata */
+    meta: PaginationMeta;
+}
+
+/**
+ * Fluent Query Builder Interface for the SDK client.
+ * Returns `FindResult<M>` (flat rows) instead of `FindResponse<M>` (Snapshot-wrapped).
+ *
+ * @group Data
+ */
+export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
+    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
+    where(logicalCondition: LogicalCondition): this;
+    orderBy(column: keyof M & string, direction?: "asc" | "desc"): this;
+    limit(count: number): this;
+    offset(count: number): this;
+    search(searchString: string): this;
+    include(...relations: string[]): this;
+    find(): Promise<FindResult<M>>;
+    count(): Promise<number>;
+    listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+}
+
+/**
+ * SDK collection client — returns flat rows, no Snapshot wrapper.
+ *
+ * This is the public API surface for app developers using
+ * `createRebaseClient()`. CMS internals use `CollectionAccessor` instead.
+ *
+ * @example
+ * const { data: posts } = await rebase.data.posts.find();
+ * console.log(posts[0].title);       // flat access
+ * console.log(posts[0].id);          // id at top level
+ *
+ * const post = await rebase.data.posts.findById(1);
+ * console.log(post?.title);          // no .values needed
+ *
+ * @group Data
+ */
+export interface SDKCollectionClient<M extends Record<string, unknown> = Record<string, unknown>> {
+    /**
+     * Find multiple records with optional filtering, pagination, and sorting.
+     */
+    find(params?: FindParams): Promise<FindResult<M>>;
+
+    /**
+     * Find a single record by its ID.
+     */
+    findById(id: string | number): Promise<M | undefined>;
+
+    /**
+     * Create a new record.
+     * @param data The record data to create.
+     * @param id Optional specific ID to use for the new record.
+     * @returns The created row
+     */
+    create(data: Partial<M>, id?: string | number): Promise<M>;
+
+    /**
+     * Update an existing record by ID.
+     * @returns The updated row
+     */
+    update(id: string | number, data: Partial<M>): Promise<M>;
+
+    /**
+     * Delete a record by ID.
+     */
+    delete(id: string | number): Promise<void>;
+
+    /**
+     * Delete all records in this collection.
+     */
+    deleteAll?(): Promise<void>;
+
+    /**
+     * Subscribe to a collection for real-time updates.
+     */
+    listen?(params: FindParams | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+
+    /**
+     * Subscribe to a single record for real-time updates.
+     */
+    listenById?(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
+
+    /**
+     * Count the number of records matching the given filter.
+     */
+    count?(params?: FindParams): Promise<number>;
+
+    // Fluent Query Builder
+    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): SDKQueryBuilderInterface<M>;
+    where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
+    orderBy(column: keyof M & string, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
+    limit(count: number): SDKQueryBuilderInterface<M>;
+    offset(count: number): SDKQueryBuilderInterface<M>;
+    search(searchString: string): SDKQueryBuilderInterface<M>;
+    include(...relations: string[]): SDKQueryBuilderInterface<M>;
+}
+
+/**
+ * The unified data access object for the **admin CMS** (Snapshot-shaped).
+ *
+ * Access collections as dynamic properties: `data.products.find(...)`. Each
+ * accessor returns `Snapshot`-wrapped records (`{ id, path, values }`) — the
+ * view-model the CMS renders. This is what `useData()` / the admin
+ * `RebaseContext.data` are backed by.
+ *
+ * App developers do NOT use this — they use {@link RebaseSdkData} (flat rows),
+ * which is what the SDK client and backend `context.data` expose.
  *
  * @group Data
  */
@@ -212,5 +334,56 @@ export type RebaseData<DB = unknown> = {
              * data.products.find({ where: { status: ["==", "published"] } })
              */
             [collectionSlug: string]: CollectionAccessor | ((slug: string) => CollectionAccessor);
+        }
+);
+
+/**
+ * The unified data access object for the **SDK** — flat rows, no Snapshot wrapper.
+ *
+ * This is the symmetric developer-facing data API, identical in shape on both
+ * sides of the stack:
+ * - The frontend SDK client (`client.data.products.find()`)
+ * - Backend framework callbacks & scripts (`context.data.products.find()`)
+ *
+ * Every accessor returns flat rows (`{ id, ...columns }`) via
+ * {@link SDKCollectionClient} — access fields directly (`row.title`), never
+ * `row.values.title`. The admin CMS uses {@link RebaseData} (Snapshot) instead.
+ *
+ * @example
+ * // Frontend SDK
+ * const { data: posts } = await client.data.posts.find();
+ * console.log(posts[0].title);        // flat — no .values
+ *
+ * // Backend callback — identical shape
+ * callbacks: {
+ *   beforeSave: async ({ context }) => {
+ *     const product = await context.data.products.findById(id);
+ *     console.log(product?.price);     // flat — no .values
+ *   }
+ * }
+ *
+ * @group Data
+ */
+export type RebaseSdkData<DB = unknown> = {
+    /**
+     * Get a flat collection accessor by slug.
+     *
+     * @example
+     * const accessor = data.collection("products");
+     * await accessor.find({ limit: 10 });
+     */
+    collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKCollectionClient<M>;
+} & (
+    DB extends Record<string, unknown>
+        ? { [K in keyof DB]: SDKCollectionClient<DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>> }
+        : {
+            /**
+             * Dynamic flat collection accessor.
+             * Access any collection by its slug as a property.
+             *
+             * @example
+             * data.products.find({ where: { status: ["==", "published"] } })
+             */
+            [collectionSlug: string]: SDKCollectionClient | ((slug: string) => SDKCollectionClient);
         }
 );

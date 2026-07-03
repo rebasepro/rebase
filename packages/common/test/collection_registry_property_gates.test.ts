@@ -1,5 +1,5 @@
 import {
-    EntityCollection,
+    SnapshotCollection,
     PostgresCollection,
     FirebaseCollection,
     MongoDBCollection,
@@ -12,7 +12,7 @@ import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 describe("CollectionRegistry — engine-specific property gates", () => {
 
     it("registers and retrieves a Postgres collection with relation properties", () => {
-        const postsCollection: EntityCollection = {
+        const postsCollection: SnapshotCollection = {
             id: "posts",
             name: "Posts",
             path: "posts",
@@ -150,7 +150,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("StringProperty does not carry a reference field after normalization", () => {
-        const col: EntityCollection = {
+        const col: SnapshotCollection = {
             id: "items",
             name: "Items",
             path: "items",
@@ -175,7 +175,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("preserves raw collection data when using narrowed Postgres types", () => {
-        const postsCollection: EntityCollection = {
+        const postsCollection: SnapshotCollection = {
             id: "posts",
             name: "Posts",
             path: "posts",

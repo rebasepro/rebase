@@ -1,6 +1,6 @@
-import { EntityValues, Properties, Property } from "@rebasepro/types";
+import { SnapshotValues, Properties, Property } from "@rebasepro/types";
 
-export function countStringCharacters(values: EntityValues<any>, properties: Properties) {
+export function countStringCharacters(values: SnapshotValues<any>, properties: Properties) {
     let count = 0;
 
     for (const key in values) {

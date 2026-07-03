@@ -1,9 +1,9 @@
 /**
  * Maps a Rebase `Property` (from @rebasepro/types) to a `CollectionPropertyConfig`
- * (from @rebasepro/ui), stripping all entity-specific fields and keeping only
+ * (from @rebasepro/ui), stripping all snapshot-specific fields and keeping only
  * the UI-relevant subset.
  *
- * This is the bridge between the entity-aware and headless layers.
+ * This is the bridge between the snapshot-aware and headless layers.
  */
 
 import type { Property, Properties, EnumValues, EnumValueConfig } from "@rebasepro/types";
@@ -78,7 +78,7 @@ export function mapPropertyToConfig(property: Property): CollectionPropertyConfi
     // Custom preview component
     if (property.ui?.Preview) {
         // The connected wrapper will handle this by injecting via cellRenderer override
-        // We don't copy it here because Preview may reference entity-aware components
+        // We don't copy it here because Preview may reference snapshot-aware components
     }
 
     return base;

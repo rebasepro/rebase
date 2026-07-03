@@ -1,50 +1,23 @@
 import { buildQueryString, FindParams, RebaseApiError, Transport } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import {
-    CollectionAccessor,
-    Entity,
-    FindResponse,
+    FindResult,
     LogicalCondition,
+    SDKCollectionClient,
+    SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValue
 } from "@rebasepro/types";
 
-import { QueryBuilder } from "./query_builder";
+import { SDKQueryBuilder } from "./sdk_query_builder";
 
 /**
- * Wrap a flat row (returned by the REST API as `{ id, ...fields }`) into
- * a proper `Entity<M>` structure expected by the core framework.
- * The `id` is kept inside `values` as well, since collection properties
- * may define an `isId` field that the form binds to `formex.values`.
- */
-function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Entity<M> {
-    return {
-        id: row.id as string | number,
-        path: slug,
-        values: row as M
-    };
-}
-
-/**
- * CollectionClient extends `CollectionAccessor` from `@rebasepro/types` so that
- * `client.data` can be passed directly to the core Rebase component.
+ * CollectionClient returns flat rows (no Snapshot wrapper).
+ * This is the public API surface for app developers.
  *
  * Additionally it exposes fluent query builder methods like `.where()`, `.orderBy()`.
  */
-export interface CollectionClient<M extends Record<string, unknown> = Record<string, unknown>> extends CollectionAccessor<M> {
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): QueryBuilder<M>;
-    where(logicalCondition: LogicalCondition): QueryBuilder<M>;
-
-    orderBy(column: keyof M & string, direction?: "asc" | "desc"): QueryBuilder<M>;
-
-    limit(count: number): QueryBuilder<M>;
-
-    offset(count: number): QueryBuilder<M>;
-
-    search(searchString: string): QueryBuilder<M>;
-
-    include(...relations: string[]): QueryBuilder<M>;
-
+export interface CollectionClient<M extends Record<string, unknown> = Record<string, unknown>> extends SDKCollectionClient<M> {
     count(params?: FindParams): Promise<number>;
 }
 
@@ -52,14 +25,14 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     const basePath = `/data/${slug}`;
 
     const client: CollectionClient<M> = {
-        async find(params?: FindParams): Promise<FindResponse<M>> {
+        async find(params?: FindParams): Promise<FindResult<M>> {
             const qs = buildQueryString(params);
             const raw = await transport.request<{
                 data: Record<string, unknown>[];
-                meta: FindResponse<M>["meta"]
+                meta: FindResult<M>["meta"]
             }>(basePath + qs, { method: "GET" });
             return {
-                data: (raw.data || []).map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
+                data: (raw.data || []) as M[],
                 meta: raw.meta
             };
         },
@@ -68,7 +41,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             try {
                 const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, { method: "GET" });
                 if (!raw) return undefined;
-                return rowToEntity<M>(raw, slug);
+                return raw as M;
             } catch (err) {
                 if (err instanceof RebaseApiError && err.status === 404) {
                     return undefined;
@@ -86,7 +59,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 method: "POST",
                 body: JSON.stringify(body)
             });
-            return rowToEntity<M>(raw, slug);
+            return raw as M;
         },
 
         async update(id: string | number, data: Partial<M>) {
@@ -94,7 +67,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 method: "PUT",
                 body: JSON.stringify(data)
             });
-            return rowToEntity<M>(raw, slug);
+            return raw as M;
         },
 
         async delete(id: string | number) {
@@ -116,31 +89,31 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
         // Fluent builder instantiation
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
-            const builder = new QueryBuilder<M>(client as unknown as CollectionAccessor<M>);
+            const builder = new SDKQueryBuilder<M>(client);
             if (typeof columnOrCondition === "object") {
                 return builder.where(columnOrCondition);
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
         },
         orderBy(column: keyof M & string, direction?: "asc" | "desc") {
-            return new QueryBuilder<M>(client).orderBy(column, direction);
+            return new SDKQueryBuilder<M>(client).orderBy(column, direction);
         },
         limit(count: number) {
-            return new QueryBuilder<M>(client).limit(count);
+            return new SDKQueryBuilder<M>(client).limit(count);
         },
         offset(count: number) {
-            return new QueryBuilder<M>(client).offset(count);
+            return new SDKQueryBuilder<M>(client).offset(count);
         },
         search(searchString: string) {
-            return new QueryBuilder<M>(client).search(searchString);
+            return new SDKQueryBuilder<M>(client).search(searchString);
         },
         include(...relations: string[]) {
-            return new QueryBuilder<M>(client).include(...relations);
+            return new SDKQueryBuilder<M>(client).include(...relations);
         }
     };
 
     if (ws) {
-        client.listen = (params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
+        client.listen = (params: FindParams | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void) => {
             let active = true;
             let lastUpdateId = 0;
             const unsub = ws.listenCollection(
@@ -153,16 +126,19 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString
                 },
-                (entities: Entity[]) => {
+                (incomingRows: Record<string, unknown>[]) => {
                     const currentUpdateId = ++lastUpdateId;
                     const requestedLimit = params?.limit || 20;
                     const offset = params?.offset || 0;
 
+                    // WS client already delivers flat rows — just cast
+                    const rows = incomingRows as M[];
+
                     // Immediately fire update with heuristic metadata
-                    const estimatedTotal = entities.length;
-                    const estimatedHasMore = entities.length >= requestedLimit;
+                    const estimatedTotal = rows.length;
+                    const estimatedHasMore = rows.length >= requestedLimit;
                     onUpdate({
-                        data: entities as Entity<M>[],
+                        data: rows,
                         meta: {
                             total: estimatedTotal,
                             limit: requestedLimit,
@@ -177,7 +153,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                         client.count(params)
                             .then((total) => {
                                 if (active && currentUpdateId === lastUpdateId) {
-                                    const authoritativeHasMore = offset + entities.length < total;
+                                    const authoritativeHasMore = offset + rows.length < total;
 
                                     // Dedupe: skip if the estimate was already correct
                                     if (total === estimatedTotal && authoritativeHasMore === estimatedHasMore) {
@@ -185,7 +161,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                                     }
 
                                     onUpdate({
-                                        data: entities as Entity<M>[],
+                                        data: rows,
                                         meta: {
                                             total,
                                             limit: requestedLimit,
@@ -209,15 +185,15 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             };
         };
 
-        client.listenById = (id: string | number, onUpdate: (data: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
-            return ws.listenEntity(
+        client.listenById = (id: string | number, onUpdate: (data: M | undefined) => void, onError?: (error: Error) => void) => {
+            return ws.listenOne(
                 {
                     path: slug,
-                    entityId: String(id)
+                    id: String(id)
                 },
-                (entity: Entity | null) => {
-                    if (entity) {
-                        onUpdate(entity as Entity<M>);
+                (row: Record<string, unknown> | null) => {
+                    if (row) {
+                        onUpdate(row as M);
                     } else {
                         onUpdate(undefined);
                     }

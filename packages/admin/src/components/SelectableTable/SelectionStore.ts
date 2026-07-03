@@ -7,8 +7,8 @@ import {
 } from "@rebasepro/ui";
 
 export interface AdminSelectedCell extends SelectedCell {
-    entityPath: string;
-    entityId: string | number;
+    snapshotPath: string;
+    snapshotId: string | number;
     propertyKey: string;
     cellRect: DOMRect;
     width: number;
@@ -24,19 +24,19 @@ export type SelectionStore = VirtualTableSelectionStore<AdminSelectedCell>;
 export function useCellSelected(
     store: { getSnapshot: () => SelectedCellProps | undefined; subscribe: (listener: () => void) => () => void },
     propertyKey: string,
-    entityPath: string,
-    entityId: string | number
+    snapshotPath: string,
+    snapshotId: string | number
 ): boolean {
-    const selectorRef = useRef({ propertyKey, entityPath, entityId });
-    selectorRef.current = { propertyKey, entityPath, entityId };
+    const selectorRef = useRef({ propertyKey, snapshotPath, snapshotId });
+    selectorRef.current = { propertyKey, snapshotPath, snapshotId };
 
     const getSnapshot = useCallback(() => {
         const cell = store.getSnapshot();
         if (!cell) return false;
         const s = selectorRef.current;
         return cell.propertyKey === s.propertyKey &&
-            cell.entityPath === s.entityPath &&
-            cell.entityId === s.entityId;
+            cell.snapshotPath === s.snapshotPath &&
+            cell.snapshotId === s.snapshotId;
     }, [store]);
 
     return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);

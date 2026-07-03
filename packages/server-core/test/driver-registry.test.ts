@@ -13,11 +13,11 @@ function createMockDataDriverDelegate(key: string): DataDriver {
         key,
         initialised: true,
         fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(undefined),
-        saveEntity: jest.fn().mockResolvedValue({ id: "test-id",
+        fetchOne: jest.fn().mockResolvedValue(undefined),
+        save: jest.fn().mockResolvedValue({ id: "test-id",
 path: "test",
 values: {} }),
-        deleteEntity: jest.fn().mockResolvedValue(undefined),
+        delete: jest.fn().mockResolvedValue(undefined),
         checkUniqueField: jest.fn().mockResolvedValue(true)
     };
 }

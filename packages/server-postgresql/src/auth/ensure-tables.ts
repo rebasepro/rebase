@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server-core";
-import type { EntityCollection } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
 
 
 /**
@@ -11,7 +11,7 @@ import type { EntityCollection } from "@rebasepro/types";
  * @param collection — The collection that represents auth users.
  *                     When omitted, a default `rebase.users` table is created.
  */
-export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: EntityCollection): Promise<void> {
+export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: SnapshotCollection): Promise<void> {
     logger.info("🔍 Checking auth tables...");
 
     try {
@@ -219,7 +219,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Ent
             )
         `);
 
-        // Create the `auth` schema with Supabase-style helper functions for RLS.
+        // Create the `auth` schema with PostgreSQL RLS helper functions.
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS auth`);
 
         // Use an advisory transaction lock to serialize function recreation during HMR

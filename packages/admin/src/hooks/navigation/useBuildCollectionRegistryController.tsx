@@ -1,7 +1,7 @@
-import type { EntityCollection, DataSourceDefinition } from "@rebasepro/types";
+import type { SnapshotCollection, DataSourceDefinition } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
-import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
+import { SnapshotReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
 
 export function useBuildCollectionRegistryController(props: {
@@ -21,7 +21,7 @@ export function useBuildCollectionRegistryController(props: {
     const getCollection = useCallback((
         slugOrPath: string,
         includeUserOverride = false
-    ): EntityCollection | undefined => {
+    ): SnapshotCollection | undefined => {
 
         const registry = collectionRegistryRef.current;
 
@@ -31,14 +31,14 @@ export function useBuildCollectionRegistryController(props: {
         const pathSegments = cleanedPath.split("/");
 
         let collectionPath = pathSegments.join("/");
-        // If the path has an even number of segments, it points to an entity, so we get the parent collection
+        // If the path has an even number of segments, it points to a snapshot, so we get the parent collection
         if (pathSegments.length > 0 && pathSegments.length % 2 === 0) {
             collectionPath = pathSegments.slice(0, -1).join("/");
         }
 
         if (!collectionPath) return undefined;
 
-        let collection: EntityCollection | undefined;
+        let collection: SnapshotCollection | undefined;
         try {
             collection = registry.resolvePathToCollections(collectionPath).finalCollection;
         } catch (e) {
@@ -56,7 +56,7 @@ export function useBuildCollectionRegistryController(props: {
 
         if (!overriddenCollection) return undefined;
 
-        let result: Partial<EntityCollection> | undefined = overriddenCollection;
+        let result: Partial<SnapshotCollection> | undefined = overriddenCollection;
         const subcollections = "subcollections" in overriddenCollection ? overriddenCollection.subcollections : undefined;
         const callbacks = overriddenCollection.callbacks;
         result = {
@@ -69,11 +69,11 @@ export function useBuildCollectionRegistryController(props: {
         }
 
         return { ...overriddenCollection,
-...result } as EntityCollection;
+...result } as SnapshotCollection;
 
     }, [userConfigPersistence]);
 
-    const getRawCollection = useCallback((slugOrPath: string): EntityCollection | undefined => {
+    const getRawCollection = useCallback((slugOrPath: string): SnapshotCollection | undefined => {
         const registry = collectionRegistryRef.current;
         if (registry === undefined) return undefined;
 
@@ -82,10 +82,10 @@ export function useBuildCollectionRegistryController(props: {
 
         const pathSegments = cleanedPath.split("/");
 
-        return registry.getRaw(pathSegments.join("/")) as EntityCollection | undefined;
+        return registry.getRaw(pathSegments.join("/")) as SnapshotCollection | undefined;
     }, []);
 
-    const getParentReferencesFromPath = useCallback((path: string): EntityReference[] => {
+    const getParentReferencesFromPath = useCallback((path: string): SnapshotReference[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) {
             return [];
@@ -115,7 +115,7 @@ export function useBuildCollectionRegistryController(props: {
             result.push(oddPathSegments.slice(0, i));
         }
 
-        const getCollectionFromPaths = (pathSegments: string[]): EntityCollection | undefined => {
+        const getCollectionFromPaths = (pathSegments: string[]): SnapshotCollection | undefined => {
             if (!pathSegments?.length) return undefined;
             const testPath = pathSegments.reduce((acc, segment, idx) => {
                 if (idx === 0) return segment;
@@ -131,7 +131,7 @@ export function useBuildCollectionRegistryController(props: {
         return result.map(r => getCollectionFromPaths(r)?.slug).filter(Boolean) as string[];
     }, []);
 
-    const getParentEntityIds = useCallback((path: string): string[] => {
+    const getParentSnapshotIds = useCallback((path: string): string[] => {
         const cleanedPath = removeInitialAndTrailingSlashes(path);
         const strings = cleanedPath.split("/");
         const evenPathSegments = strings.filter((_, i) => i % 2 !== 0);
@@ -144,11 +144,11 @@ export function useBuildCollectionRegistryController(props: {
     const convertIdsToPaths = useCallback((ids: string[]): string[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) return [];
-        let currentCollections: EntityCollection[] = registry.getCollections();
+        let currentCollections: SnapshotCollection[] = registry.getCollections();
         const paths: string[] = [];
         for (let i = 0; i < ids.length; i++) {
             const id = ids[i];
-            const collection: EntityCollection | undefined = currentCollections.find(c => c.slug === id);
+            const collection: SnapshotCollection | undefined = currentCollections.find(c => c.slug === id);
             if (!collection)
                 throw Error(`Collection with id ${id} not found`);
             paths.push(collection.slug);
@@ -174,7 +174,7 @@ export function useBuildCollectionRegistryController(props: {
         getRawCollection,
         getParentReferencesFromPath,
         getParentCollectionSlugs,
-        getParentEntityIds,
+        getParentSnapshotIds,
         convertIdsToPaths,
         collectionRegistryRef
     }), [
@@ -184,7 +184,7 @@ export function useBuildCollectionRegistryController(props: {
         getRawCollection,
         getParentReferencesFromPath,
         getParentCollectionSlugs,
-        getParentEntityIds,
+        getParentSnapshotIds,
         convertIdsToPaths
     ]);
 }

@@ -1,14 +1,14 @@
-import { useEntitySelectionDialog } from "../../hooks/useEntitySelectionDialog";
-import type { EntityCollection } from "@rebasepro/types";
+import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
+import type { SnapshotCollection } from "@rebasepro/types";
 import type { FieldProps } from "../../types/fields";
 import type { Property, ReferenceProperty } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 
-import { Entity, EntityReference } from "@rebasepro/types";
+import { Snapshot, SnapshotReference } from "@rebasepro/types";
 import { ErrorView } from "@rebasepro/core";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { EntityPreviewContainer } from "../../components/EntityPreview";
+import { SnapshotPreviewContainer } from "../../components/SnapshotPreview";
 import { ReferencePreview } from "../../preview";
 import { IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
@@ -53,7 +53,7 @@ function ReferenceFieldBindingInternal({
         throw new Error("Property path is required for ReferenceFieldBinding");
     }
 
-    const refValue = value as EntityReference | null | undefined;
+    const refValue = value as SnapshotReference | null | undefined;
 
     useClearRestoreValue({
         property,
@@ -61,10 +61,10 @@ function ReferenceFieldBindingInternal({
         setValue
     });
 
-    const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
+    const validValue = refValue && typeof refValue === "object" && "isSnapshotReference" in refValue && refValue.isSnapshotReference();
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: EntityCollection | undefined = useMemo(() => {
+    const collection: SnapshotCollection | undefined = useMemo(() => {
         return property.path ? collectionRegistryController.getCollection(property.path) : undefined;
     }, [property.path]);
 
@@ -72,17 +72,17 @@ function ReferenceFieldBindingInternal({
         throw Error(`Couldn't find the corresponding collection for the path: ${property.path}`);
     }
 
-    const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
+    const onSingleSnapshotSelected = useCallback((e: Snapshot<Record<string, unknown>> | null) => {
         const ref = e ? getReferenceFrom(e) : null;
         setValue(ref);
     }, [setValue, propertyKey]);
 
-    const referenceDialogController = useEntitySelectionDialog({
+    const referenceDialogController = useSnapshotSelectionDialog({
         multiselect: false,
         path: property.path,
         collection,
-        onSingleEntitySelected,
-        selectedEntityIds: validValue && refValue ? [refValue.id] : undefined,
+        onSingleSnapshotSelected,
+        selectedSnapshotIds: validValue && refValue ? [refValue.id] : undefined,
         fixedFilter: property.fixedFilter
     }
     );
@@ -113,12 +113,12 @@ function ReferenceFieldBindingInternal({
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
                     reference={refValue}
-                    includeEntityLink={property.includeEntityLink}
+                    includeSnapshotLink={property.includeSnapshotLink}
                     includeId={property.includeId}
                 />}
 
                 {!refValue && <div className="justify-center text-left">
-                    <EntityPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
+                    <SnapshotPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}
@@ -127,7 +127,7 @@ function ReferenceFieldBindingInternal({
                         <IconForView collectionOrView={collection}
                             className={"text-surface-300 dark:text-surface-600"}/>
                         {`Edit ${property.name}`.toUpperCase()}
-                    </EntityPreviewContainer>
+                    </SnapshotPreviewContainer>
                 </div>}
             </>}
 

@@ -1,4 +1,4 @@
-import { Entity, EntityReference, Properties, Property } from "@rebasepro/types";
+import { Snapshot, SnapshotReference, Properties, Property } from "@rebasepro/types";
 import { type ArrayValuesCount, getArrayValuesCount, getValueInPath } from "@rebasepro/utils";
 
 interface Header {
@@ -6,8 +6,8 @@ interface Header {
     label: string;
 }
 
-export interface DownloadEntitiesExportParams<M extends Record<string, unknown>> {
-    data: Entity<M>[];
+export interface DownloadSnapshotsExportParams<M extends Record<string, unknown>> {
+    data: Snapshot<M>[];
     additionalData: Record<string, unknown>[] | undefined;
     properties: Properties;
     propertiesOrder: string[] | undefined;
@@ -18,7 +18,7 @@ export interface DownloadEntitiesExportParams<M extends Record<string, unknown>>
     dateExportType: "timestamp" | "string";
 }
 
-export function downloadEntitiesExport<M extends Record<string, unknown>>({
+export function downloadSnapshotsExport<M extends Record<string, unknown>>({
     data,
     additionalData,
     properties,
@@ -28,7 +28,7 @@ export function downloadEntitiesExport<M extends Record<string, unknown>>({
     additionalHeaders,
     exportType,
     dateExportType
-}: DownloadEntitiesExportParams<M>
+}: DownloadSnapshotsExportParams<M>
 ) {
 
     console.debug("Downloading export", {
@@ -41,18 +41,18 @@ export function downloadEntitiesExport<M extends Record<string, unknown>>({
     if (exportType === "csv") {
         const arrayValuesCount = flattenArrays ? getArrayValuesCount(data.map(d => d.values)) : {};
         const headers = getExportHeaders(properties, propertiesOrder, additionalHeaders, arrayValuesCount);
-        const exportableData = getEntityCSVExportableData(data, additionalData, properties, headers, dateExportType);
+        const exportableData = getSnapshotCSVExportableData(data, additionalData, properties, headers, dateExportType);
         const headersData = entryToCSVRow(headers.map(h => h.label));
         const csvData = exportableData.map(entry => entryToCSVRow(entry));
         downloadBlob([headersData, ...csvData], `${name}.csv`, "text/csv");
     } else {
-        const exportableData = getEntityJsonExportableData(data, additionalData, properties, dateExportType);
+        const exportableData = getSnapshotJsonExportableData(data, additionalData, properties, dateExportType);
         const json = JSON.stringify(exportableData, null, 2);
         downloadBlob([json], `${name}.json`, "application/json");
     }
 }
 
-export function getEntityCSVExportableData(data: Entity<Record<string, unknown>>[],
+export function getSnapshotCSVExportableData(data: Snapshot<Record<string, unknown>>[],
     additionalData: Record<string, unknown>[] | undefined,
     properties: Properties,
     headers: Header[],
@@ -76,7 +76,7 @@ export function getEntityCSVExportableData(data: Entity<Record<string, unknown>>
     });
 }
 
-export function getEntityJsonExportableData(data: Entity<Record<string, unknown>>[],
+export function getSnapshotJsonExportableData(data: Snapshot<Record<string, unknown>>[],
     additionalData: Record<string, unknown>[] | undefined,
     properties: Properties,
     dateExportType: "timestamp" | "string"
@@ -178,8 +178,8 @@ function processValueForExport(inputValue: unknown,
         } else {
             value = inputValue;
         }
-    } else if (property.type === "reference" && inputValue && typeof inputValue === "object" && "isEntityReference" in inputValue && typeof (inputValue as EntityReference).isEntityReference === "function" && (inputValue as EntityReference).isEntityReference()) {
-        const ref = inputValue ? inputValue as EntityReference : undefined;
+    } else if (property.type === "reference" && inputValue && typeof inputValue === "object" && "isSnapshotReference" in inputValue && typeof (inputValue as SnapshotReference).isSnapshotReference === "function" && (inputValue as SnapshotReference).isSnapshotReference()) {
+        const ref = inputValue ? inputValue as SnapshotReference : undefined;
         value = ref ? ref.fullPath : null;
     } else if (property.type === "date" && inputValue instanceof Date) {
         value = inputValue ? (dateExportType === "timestamp" ? inputValue.getTime() : inputValue.toISOString()) : null;

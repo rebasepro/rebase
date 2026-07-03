@@ -2,7 +2,7 @@ import { collection, getFirestore, onSnapshot, query } from "@firebase/firestore
 import Fuse from "fuse.js"
 
 import { FirebaseApp } from "@firebase/app";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
 
 const MAX_SEARCH_RESULTS = 80;
@@ -32,7 +32,7 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
         databaseId
     }: {
         path: string,
-        collection?: EntityCollection,
+        collection?: SnapshotCollection,
         databaseId?: string
     }): Promise<boolean> => {
 
@@ -112,7 +112,7 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
     }
 }
 
-function buildIndex(list: (object & { id: string })[], collection: EntityCollection) {
+function buildIndex(list: (object & { id: string })[], collection: SnapshotCollection) {
 
     const keys = ["id", ...Object.keys(collection.properties)];
 

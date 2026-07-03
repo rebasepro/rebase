@@ -2,9 +2,9 @@ import type { ArrayProperty, MapProperty, NumberProperty, Property, StringProper
 import React, { createElement, Suspense } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { SnapshotReference, SnapshotRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
-import { resolveProperty, normalizeToEntityRelation } from "@rebasepro/common";
+import { resolveProperty, normalizeToSnapshotRelation } from "@rebasepro/common";
 import { useAuthController, useCustomizationController, resolveComponentRef } from "@rebasepro/core";
 import { EmptyValue } from "./components/EmptyValue";
 import { UrlComponentPreview } from "./components/UrlComponentPreview";
@@ -191,14 +191,14 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         }
     } else if (property.type === "reference") {
         if (typeof property.path === "string") {
-            if (typeof value === "object" && value !== null && "isEntityReference" in value && (value as EntityReference).isEntityReference()) {
+            if (typeof value === "object" && value !== null && "isSnapshotReference" in value && (value as SnapshotReference).isSnapshotReference()) {
                 content = <ReferencePreview
                     disabled={!property.path}
                     previewProperties={property.ui?.previewProperties}
                     includeId={property.includeId}
-                    includeEntityLink={property.includeEntityLink}
+                    includeSnapshotLink={property.includeSnapshotLink}
                     size={props.size}
-                    reference={value as EntityReference}
+                    reference={value as SnapshotReference}
                     textOnly={props.textOnly}
                 />;
             } else {
@@ -212,12 +212,12 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         if (!value) {
             content = <EmptyValue/>;
         } else if (Array.isArray(value)) {
-            // Many-cardinality relation: value is an array of EntityRelation (or plain objects)
+            // Many-cardinality relation: value is an array of SnapshotRelation (or plain objects)
             content = (
                 <div className="flex flex-col w-full gap-0.5">
                     {(value as unknown[]).map((item: unknown, index: number) => {
-                        const entityRelation = normalizeToEntityRelation(item, "relation");
-                        if (!entityRelation) return null;
+                        const snapshotRelation = normalizeToSnapshotRelation(item, "relation");
+                        if (!snapshotRelation) return null;
                         return (
                             <div className="w-full"
                                 key={`preview_rel_${propertyKey}_${index}`}>
@@ -225,9 +225,9 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                                     disabled={!property.relation}
                                     previewProperties={property.ui?.previewProperties}
                                     includeId={property.includeId}
-                                    includeEntityLink={property.includeEntityLink}
+                                    includeSnapshotLink={property.includeSnapshotLink}
                                     size={"small"}
-                                    relation={entityRelation}
+                                    relation={snapshotRelation}
                                     textOnly={props.textOnly}
                                 />
                             </div>
@@ -237,13 +237,13 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             );
         } else {
             // Single-cardinality relation
-            const relationValue = normalizeToEntityRelation(value, "relation");
+            const relationValue = normalizeToSnapshotRelation(value, "relation");
             if (relationValue) {
                 content = <RelationPreview
                     disabled={!property.relation}
                     previewProperties={property.ui?.previewProperties}
                     includeId={property.includeId}
-                    includeEntityLink={property.includeEntityLink}
+                    includeSnapshotLink={property.includeSnapshotLink}
                     size={props.size}
                     relation={relationValue}
                     textOnly={props.textOnly}

@@ -1,26 +1,30 @@
-import type { EntityCollection } from "@rebasepro/types";
-import { DataDriver, Entity, EntityValues, RebaseContext, SaveEntityProps } from "@rebasepro/types";
+import type { SnapshotCollection } from "@rebasepro/types";
+import { Snapshot, SnapshotStatus, SnapshotValues, RebaseContext } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 
 /**
  * @group Hooks and utilities
  */
-export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> =
-    SaveEntityProps<M> &
-    {
-        afterSave?: (updatedEntity: Entity<M>) => void,
-        afterSaveError?: (e: Error) => void
-    }
+export type SaveSnapshotWithCallbacksProps<M extends Record<string, unknown>> = {
+    path: string;
+    values: Partial<SnapshotValues<M>>;
+    snapshotId?: string | number;
+    previousValues?: Partial<SnapshotValues<M>>;
+    collection?: SnapshotCollection<M>;
+    status: SnapshotStatus;
+    afterSave?: (updatedSnapshot: Snapshot<M>) => void,
+    afterSaveError?: (e: Error) => void
+}
 
 /**
- * This function is in charge of saving an entity.
+ * This function is in charge of saving a snapshot.
  * It will run all the save callbacks specified in the collection.
  * It is also possible to attach callbacks on save success or error, and callback
  * errors.
  *
  * @param collection
  * @param path
- * @param entityId
+ * @param snapshotId
  * @param callbacks
  * @param values
  * @param previousValues
@@ -31,10 +35,10 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> =
  * @param afterSaveError
  * @group Hooks and utilities
  */
-export async function saveEntityWithCallbacks<M extends Record<string, unknown>>({
+export async function saveSnapshotWithCallbacks<M extends Record<string, unknown>>({
     collection,
     path,
-    entityId,
+    snapshotId,
     values,
     previousValues,
     status,
@@ -42,30 +46,30 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
     context,
     afterSave,
     afterSaveError
-}: SaveEntityWithCallbacksProps<M> & {
-    collection: EntityCollection,
+}: SaveSnapshotWithCallbacksProps<M> & {
+    collection: SnapshotCollection,
     data: RebaseData,
     context: RebaseContext,
 }
-): Promise<Entity<M>> {
+): Promise<Snapshot<M>> {
 
-    if (status !== "new" && status !== "copy" && !entityId) {
-        throw new Error("Entity id must be specified when updating an existing entity");
+    if (status !== "new" && status !== "copy" && !snapshotId) {
+        throw new Error("Snapshot id must be specified when updating an existing snapshot");
     }
 
     const accessor = data.collection(path);
 
-    let savePromise: Promise<Entity<M>>;
+    let savePromise: Promise<Snapshot<M>>;
     if (status === "new" || status === "copy") {
-        savePromise = accessor.create(values, entityId) as Promise<Entity<M>>;
+        savePromise = accessor.create(values, snapshotId) as Promise<Snapshot<M>>;
     } else {
-        savePromise = accessor.update(entityId!, values) as Promise<Entity<M>>;
+        savePromise = accessor.update(snapshotId!, values) as Promise<Snapshot<M>>;
     }
 
-    return savePromise.then((entity) => {
+    return savePromise.then((snapshot) => {
         if (afterSave)
-            afterSave(entity);
-        return entity as Entity<M>;
+            afterSave(snapshot);
+        return snapshot as Snapshot<M>;
     }).catch((e) => {
         if (afterSaveError) afterSaveError(e);
         throw e;

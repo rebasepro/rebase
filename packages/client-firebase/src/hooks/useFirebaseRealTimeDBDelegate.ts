@@ -15,7 +15,7 @@ import {
     startAt
 } from "@firebase/database";
 import { useCallback } from "react";
-import { DataDriver, DeleteEntityProps, Entity, EntityCollection, FetchCollectionProps, FetchEntityProps, FilterValues, ListenCollectionProps, ListenEntityProps, SaveEntityProps } from "@rebasepro/types";
+import { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps } from "@rebasepro/types";
 
 export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: FirebaseApp }): DataDriver {
 
@@ -27,7 +27,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         orderBy,
         order,
         searchString
-    }: FetchCollectionProps<M>): Promise<Entity<M>[]> => {
+    }: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
         }
@@ -46,9 +46,8 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         const snapshot = await get(dbQuery);
         if (snapshot.exists()) {
             return Object.entries(snapshot.val()).map(([id, values]) => ({
-                id,
-                path: path,
-                values: delegateToCMSModel(values) as M
+                ...(delegateToCMSModel(values) as Record<string, unknown>),
+                id
             }));
         }
         return [];
@@ -67,10 +66,9 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         const dbRef = ref(database, path);
         const unsubscribe = onValue(dbRef, (snapshot) => {
             if (snapshot.exists()) {
-                const result: Entity<M>[] = Object.entries(snapshot.val()).map(([id, values]) => ({
-                    id,
-                    path: path,
-                    values: delegateToCMSModel(values) as M
+                const result: Record<string, unknown>[] = Object.entries(snapshot.val()).map(([id, values]) => ({
+                    ...(delegateToCMSModel(values) as Record<string, unknown>),
+                    id
                 }));
                 onUpdate(result);
             } else {
@@ -81,65 +79,63 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         return () => unsubscribe();
     }, [firebaseApp]);
 
-    const fetchEntity = useCallback(async <M extends Record<string, any>>({
+    const fetchOne = useCallback(async <M extends Record<string, any>>({
         path,
-        entityId
-    }: FetchEntityProps<M>): Promise<Entity<M> | undefined> => {
+        id
+    }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
         }
         const database = getDatabase(firebaseApp);
 
-        const snapshot = await get(ref(database, `${path}/${entityId}`));
+        const snapshot = await get(ref(database, `${path}/${id}`));
         if (snapshot.exists()) {
             return {
-                id: entityId,
-                path: path,
-                values: delegateToCMSModel(snapshot.val()) as M
+                ...(delegateToCMSModel(snapshot.val()) as Record<string, unknown>),
+                id: id
             };
         }
         return undefined;
     }, [firebaseApp]);
 
-    const listenEntity = useCallback(<M extends Record<string, any>>({
+    const listenOne = useCallback(<M extends Record<string, any>>({
         path,
-        entityId,
+        id,
         onUpdate,
         onError
-    }: ListenEntityProps<M>): () => void => {
+    }: ListenOneProps<M>): () => void => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
         }
         const database = getDatabase(firebaseApp);
 
-        const dbRef = ref(database, `${path}/${entityId}`);
+        const dbRef = ref(database, `${path}/${id}`);
         const unsubscribe = onValue(dbRef, (snapshot) => {
             if (snapshot.exists()) {
                 onUpdate({
-                    id: entityId,
-                    path,
-                    values: delegateToCMSModel(snapshot.val()) as M
+                    ...(delegateToCMSModel(snapshot.val()) as Record<string, unknown>),
+                    id: id
                 });
             } else {
-                onError?.(new Error("Entity does not exist"));
+                onError?.(new Error("Snapshot does not exist"));
             }
         });
 
         return () => unsubscribe();
     }, [firebaseApp]);
 
-    const saveEntity = useCallback(async <M extends Record<string, any>>({
+    const save = useCallback(async <M extends Record<string, any>>({
         path,
-        entityId,
+        id,
         values
-    }: SaveEntityProps<M>): Promise<Entity<M>> => {
+    }: SaveProps<M>): Promise<Record<string, unknown>> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
         }
         const database = getDatabase(firebaseApp);
 
-        // If entityId is not provided, a new entity will be created
-        const finalId = entityId ?? push(ref(database, path)).key;
+        // If id is not provided, a new snapshot will be created
+        const finalId = id ?? push(ref(database, path)).key;
         if (!finalId) {
             throw new Error("Could not generate a new id");
         }
@@ -149,25 +145,24 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         await set(ref(database, `${path}/${finalId}`), transformedValues);
 
         return {
-            id: finalId,
-            path: path,
-            values: values as M
+            ...values,
+            id: finalId
         };
     }, [firebaseApp]);
 
-    const deleteEntity = useCallback(async <M extends Record<string, any>>({
-        entity
-    }: DeleteEntityProps<M>): Promise<void> => {
+    const deleteOne = useCallback(async <M extends Record<string, any>>({
+        row
+    }: DeleteProps<M>): Promise<void> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
         }
         const database = getDatabase(firebaseApp);
 
-        await remove(ref(database, `${entity.path}/${entity.id}`));
+        await remove(ref(database, `${row.path}/${row.id}`));
     }, [firebaseApp]);
 
     // Implementing additional methods required by DataDriver
-    const checkUniqueField = useCallback(async (slug: string, name: string, value: unknown, entityId?: string | number): Promise<boolean> => {
+    const checkUniqueField = useCallback(async (slug: string, name: string, value: unknown, id?: string | number): Promise<boolean> => {
         if (!firebaseApp) {
             throw new Error("Firebase app not provided");
         }
@@ -181,9 +176,9 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
             return true;
         }
 
-        // Check if the found entity is the same as the one being checked
-        const [key, entityValue] = Object.entries(snapshot.val())[0];
-        if (entityValue && typeof entityValue === "object" && (entityValue as Record<string, unknown>)[name] === value && key === entityId) {
+        // Check if the found snapshot is the same as the one being checked
+        const [key, snapshotValue] = Object.entries(snapshot.val())[0];
+        if (snapshotValue && typeof snapshotValue === "object" && (snapshotValue as Record<string, unknown>)[name] === value && key === id) {
             return true;
         }
 
@@ -206,10 +201,10 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         key: "firebase_rtdb",
         fetchCollection,
         listenCollection,
-        fetchEntity,
-        listenEntity,
-        saveEntity,
-        deleteEntity,
+        fetchOne,
+        listenOne,
+        save,
+        delete: deleteOne,
         checkUniqueField,
         isFilterCombinationValid,
         currentTime: () => new Date()
@@ -252,9 +247,9 @@ function cmsToRTDBModel(data: unknown, database: Database): unknown {
         return null;
     } else if (Array.isArray(data)) {
         return data.filter(v => v !== undefined).map(v => cmsToRTDBModel(v, database));
-    } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
-        const entityRef = data as unknown as { slug: string; id: string };
-        return ref(database, `${entityRef.slug}/${entityRef.id}`);
+    } else if (typeof data === "object" && data !== null && "isSnapshotReference" in data && typeof (data as Record<string, unknown>).isSnapshotReference === "function" && (data as { isSnapshotReference: () => boolean }).isSnapshotReference()) {
+        const snapshotRef = data as unknown as { slug: string; id: string };
+        return ref(database, `${snapshotRef.slug}/${snapshotRef.id}`);
     } else if (data instanceof Date) {
         // For dates, convert to ISO string or timestamp.
         return data.toISOString();

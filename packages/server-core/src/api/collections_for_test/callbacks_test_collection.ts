@@ -1,4 +1,4 @@
-import { EntityCollection, EntityBeforeSaveProps, EntityAfterSaveProps, EntityAfterSaveErrorProps, EntityAfterReadProps, EntityBeforeDeleteProps, EntityAfterDeleteProps, PostgresCollection } from "@rebasepro/types";
+import { SnapshotCollection, BeforeSaveProps, AfterSaveProps, AfterSaveErrorProps, AfterReadProps, BeforeDeleteProps, AfterDeleteProps, PostgresCollection } from "@rebasepro/types";
 import { logger } from "../../utils/logger";
 
 export const callbacksTestCollection: PostgresCollection = {
@@ -26,7 +26,7 @@ export const callbacksTestCollection: PostgresCollection = {
         }
     },
     callbacks: {
-        beforeSave: (props: EntityBeforeSaveProps) => {
+        beforeSave: (props: BeforeSaveProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] beforeSave Triggered!", { detail: props });
             return {
                 ...props.values,
@@ -34,27 +34,24 @@ export const callbacksTestCollection: PostgresCollection = {
                 name: props.values.name + " (PreSaved)" // Modifying value before save
             };
         },
-        afterSave: (props: EntityAfterSaveProps) => {
+        afterSave: (props: AfterSaveProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] afterSave Triggered!", { detail: props });
             // This usually triggers other side effects (emails, notifications), log for now
         },
-        afterSaveError: (props: EntityAfterSaveErrorProps) => {
+        afterSaveError: (props: AfterSaveErrorProps) => {
             logger.error("🔥 [BACKEND_CALLBACK] afterSaveError Triggered!", { detail: props });
         },
-        afterRead: (props: EntityAfterReadProps) => {
+        afterRead: (props: AfterReadProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] afterRead Triggered!", { detail: props });
             return {
-                ...props.entity,
-                values: {
-                    ...props.entity.values,
-                    hasFetchTriggered: true
-                }
+                ...props.row,
+                hasFetchTriggered: true
             };
         },
-        beforeDelete: (props: EntityBeforeDeleteProps) => {
+        beforeDelete: (props: BeforeDeleteProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] beforeDelete Triggered!", { detail: props });
         },
-        afterDelete: (props: EntityAfterDeleteProps) => {
+        afterDelete: (props: AfterDeleteProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] afterDelete Triggered!", { detail: props });
         }
     }

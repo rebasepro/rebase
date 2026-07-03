@@ -16,7 +16,7 @@ import type {
     PostgresCollection,
     FirebaseCollection,
     MongoDBCollection,
-    EntityCollection,
+    SnapshotCollection,
     PostgresProperties,
     FirebaseProperties,
     MongoProperties,
@@ -147,7 +147,7 @@ describe("Engine-specific property type gates", () => {
         });
     });
 
-    describe("EntityCollection union", () => {
+    describe("SnapshotCollection union", () => {
 
         it("is the union of all three engine-specific types", () => {
             const pgCol: PostgresCollection = {
@@ -169,8 +169,8 @@ describe("Engine-specific property type gates", () => {
                 properties: { title: { type: "string" } }
             };
 
-            // All three should be assignable to EntityCollection
-            const collections: EntityCollection[] = [pgCol, fsCol, mongoCol];
+            // All three should be assignable to SnapshotCollection
+            const collections: SnapshotCollection[] = [pgCol, fsCol, mongoCol];
             expect(collections).toHaveLength(3);
         });
     });

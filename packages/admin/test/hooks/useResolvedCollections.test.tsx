@@ -4,7 +4,7 @@
 
 import { renderHook, waitFor } from "@testing-library/react";
 import { useResolvedCollections } from "../../src/hooks/navigation/useResolvedCollections";
-import { AuthController, CollectionRegistryController, RebaseData, EntityCollection } from "@rebasepro/types";
+import { AuthController, CollectionRegistryController, RebaseData, SnapshotCollection } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 
@@ -27,7 +27,7 @@ describe("useResolvedCollections", () => {
             user: { uid: "test-user" }
         } as unknown as AuthController;
 
-        const mockCollections: EntityCollection[] = [
+        const mockCollections: SnapshotCollection[] = [
             { id: "test",
 name: "Test Collection",
 path: "test" }
@@ -57,7 +57,7 @@ path: "test" }
             user: { uid: "test-user" }
         } as unknown as AuthController;
 
-        const mockCollections: EntityCollection[] = [
+        const mockCollections: SnapshotCollection[] = [
             { id: "dynamic",
 name: "Dynamic",
 path: "dynamic" }
@@ -91,7 +91,7 @@ path: "dynamic" }
             user: null
         };
 
-        const mockCollections: EntityCollection[] = [{ id: "test",
+        const mockCollections: SnapshotCollection[] = [{ id: "test",
 name: "Test",
 path: "test" }];
 

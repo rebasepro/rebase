@@ -23,11 +23,7 @@ interface MonacoTypeScriptApi {
 const REBASE_CLIENT_TYPES = `
 // ─── Rebase Client SDK Type Definitions ─────────────────────────────
 
-interface Entity<M extends Record<string, any> = any> {
-    id: string | number;
-    path: string;
-    values: M;
-}
+/** A flat database row with the id merged at the top level. */
 
 interface FindParams {
     limit?: number;
@@ -39,8 +35,8 @@ interface FindParams {
     searchString?: string;
 }
 
-interface FindResponse<M extends Record<string, any> = any> {
-    data: Entity<M>[];
+interface FindResult<M extends Record<string, any> = any> {
+    data: M[];
     meta: {
         total: number;
         limit: number;
@@ -57,24 +53,23 @@ interface QueryBuilder<M extends Record<string, any> = any> {
     limit(count: number): QueryBuilder<M>;
     offset(count: number): QueryBuilder<M>;
     search(searchString: string): QueryBuilder<M>;
-    find(): Promise<FindResponse<M>>;
-    findOne(): Promise<Entity<M> | undefined>;
+    find(): Promise<FindResult<M>>;
     count(): Promise<number>;
 }
 
 interface CollectionClient<M extends Record<string, any> = any> {
-    find(params?: FindParams): Promise<FindResponse<M>>;
-    findById(id: string | number): Promise<Entity<M> | undefined>;
-    create(data: Partial<M>, id?: string | number): Promise<Entity<M>>;
-    update(id: string | number, data: Partial<M>): Promise<Entity<M>>;
+    find(params?: FindParams): Promise<FindResult<M>>;
+    findById(id: string | number): Promise<M | undefined>;
+    create(data: Partial<M>, id?: string | number): Promise<M>;
+    update(id: string | number, data: Partial<M>): Promise<M>;
     delete(id: string | number): Promise<void>;
     where(column: keyof M & string, operator: WhereFilterOp, value: any): QueryBuilder<M>;
     orderBy(column: keyof M & string, direction?: "asc" | "desc"): QueryBuilder<M>;
     limit(count: number): QueryBuilder<M>;
     offset(count: number): QueryBuilder<M>;
     search(searchString: string): QueryBuilder<M>;
-    listen?(params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
-    listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void): () => void;
+    listen?(params: FindParams | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+    listenById?(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
     count?(params?: FindParams): Promise<number>;
 }
 

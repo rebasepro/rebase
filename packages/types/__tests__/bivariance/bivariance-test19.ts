@@ -1,10 +1,10 @@
 import * as React from "react";
 
-export type Entity<M> = M & { id: string };
+export interface Snapshot<M> { id: string; values: M; }
 
 export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Record<string, unknown>> {
-    Builder?(props: { entity: Entity<M>, context: any }): React.ReactNode;
-    value?(props: { entity: Entity<M>, context: any }): string | number | undefined;
+    Builder?(props: { snapshot: Snapshot<M>, context: any }): React.ReactNode;
+    value?(props: { snapshot: Snapshot<M>, context: any }): string | number | undefined;
     dependencies?: (Extract<keyof M, string> | (string & {}))[];
 }
 

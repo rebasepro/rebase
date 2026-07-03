@@ -10,19 +10,19 @@ import type { RebaseCMSConfig } from "@rebasepro/types";
  * is auto-wired as a native feature (slots, provider, Studio view) without
  * needing any external plugin.
  */
-export function RebaseCMS({ collections, views, homePage, entityViews, entityActions, collectionEditor, navigationGroupMappings }: RebaseCMSConfig) {
+export function RebaseCMS({ collections, views, homePage, snapshotViews, snapshotActions, collectionEditor, navigationGroupMappings }: RebaseCMSConfig) {
     const dispatch = useRebaseRegistryDispatch();
 
     useLayoutEffect(() => {
         dispatch.registerCMS({ collections,
 views,
 homePage,
-entityViews,
-entityActions,
+snapshotViews,
+snapshotActions,
 collectionEditor,
 navigationGroupMappings });
         return () => dispatch.unregisterCMS();
-    }, [dispatch, collections, views, homePage, entityViews, entityActions, collectionEditor, navigationGroupMappings]);
+    }, [dispatch, collections, views, homePage, snapshotViews, snapshotActions, collectionEditor, navigationGroupMappings]);
 
     return null;
 }

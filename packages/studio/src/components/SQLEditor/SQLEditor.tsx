@@ -1,6 +1,6 @@
 
 import { IconForView } from "@rebasepro/core";
-import { useStudioCollectionRegistry, useStudioSideEntityController } from "@rebasepro/core";
+import { useStudioCollectionRegistry, useStudioSideSnapshotController } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -213,7 +213,7 @@ const getStoragePrefix = (baseUrl?: string) => {
 
 export const SQLEditor = () => {
     const { databaseAdmin, client } = useRebaseContext();
-    const sideEntityController = useStudioSideEntityController();
+    const sideSnapshotController = useStudioSideSnapshotController();
     const snackbarController = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
 
@@ -1024,14 +1024,14 @@ role: selectedRole });
         // Only collections that have a PK column in the result set can be opened
         const actionableCollections = matchedCollections.filter(mc => mc.pkColumn && resultColumnKeys.includes(mc.pkColumn));
 
-        // For each row, determine which entities can be opened
-        const getRowEntityActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
+        // For each row, determine which snapshots can be opened
+        const getRowSnapshotActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, snapshotId: string | number }[] => {
             if (!rowData) return [];
             return actionableCollections
                 .filter(mc => rowData[mc.pkColumn!] != null)
                 .map(mc => ({
                     collection: mc,
-                    entityId: rowData[mc.pkColumn!] as string | number
+                    snapshotId: rowData[mc.pkColumn!] as string | number
                 }));
         };
 
@@ -1085,7 +1085,7 @@ resizable: false }, ...dataColumns]
                         cellRenderer={({ rowData, column, rowIndex }) => {
                             // Dedicated collection action column
                             if (column.key === "__cms_action__") {
-                                const rowActions = getRowEntityActions(rowData ?? {});
+                                const rowActions = getRowSnapshotActions(rowData ?? {});
                                 if (rowActions.length === 0) {
                                     return <div className="h-full w-full"/>;
                                 }
@@ -1093,16 +1093,16 @@ resizable: false }, ...dataColumns]
                                     const ra = rowActions[0];
                                     return (
                                         <div className="h-full flex items-center justify-center">
-                                            <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}>
+                                            <Tooltip title={t("studio_sql_edit_snapshot", { name: ra.collection.collection.name,
+id: String(ra.snapshotId) })}>
                                                 <IconButton
                                                     size="small"
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        sideEntityController?.open({
+                                                        sideSnapshotController?.open({
                                                             path: ra.collection.collection.slug,
-                                                            entityId: ra.entityId,
+                                                            snapshotId: ra.snapshotId,
                                                             collection: ra.collection.collection,
                                                             updateUrl: false
                                                         });
@@ -1133,16 +1133,16 @@ id: String(ra.entityId) })}>
                                                     key={ra.collection.tableName}
                                                     dense
                                                     onClick={() => {
-                                                        sideEntityController?.open({
+                                                        sideSnapshotController?.open({
                                                             path: ra.collection.collection.slug,
-                                                            entityId: ra.entityId,
+                                                            snapshotId: ra.snapshotId,
                                                             collection: ra.collection.collection,
                                                             updateUrl: false
                                                         });
                                                     }}
                                                 >
-                                                    {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}
+                                                    {t("studio_sql_edit_snapshot", { name: ra.collection.collection.name,
+id: String(ra.snapshotId) })}
                                                 </MenuItem>
                                             ))}
                                         </Menu>

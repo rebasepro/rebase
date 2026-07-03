@@ -1,26 +1,26 @@
-import { Entity } from "@rebasepro/types";
+import { Snapshot } from "@rebasepro/types";
 
 export interface DataOrderProps<M extends Record<string, any>> {
-    data: Entity<M>[];
-    entitiesDisplayedFirst?: Entity<M>[];
+    data: Snapshot<M>[];
+    snapshotsDisplayedFirst?: Snapshot<M>[];
 }
 
 /**
- * This hook is used to have some entities at the beginning of data.
+ * This hook is used to have some snapshots at the beginning of data.
  * @param path
- * @param entitiesDisplayedFirst
+ * @param snapshotsDisplayedFirst
  * @group Hooks and utilities
  */
 export function useDataOrder<M extends Record<string, any>>(
     {
         data,
-        entitiesDisplayedFirst
-    }: DataOrderProps<M>): Entity<M>[] {
+        snapshotsDisplayedFirst
+    }: DataOrderProps<M>): Snapshot<M>[] {
 
-    if (!entitiesDisplayedFirst)
+    if (!snapshotsDisplayedFirst)
         return data;
 
-    const displayedFirstId = new Set(entitiesDisplayedFirst.map((e) => e.id));
-    return [...entitiesDisplayedFirst, ...data.filter((e) => !displayedFirstId.has(e.id))];
+    const displayedFirstId = new Set(snapshotsDisplayedFirst.map((e) => e.id));
+    return [...snapshotsDisplayedFirst, ...data.filter((e) => !displayedFirstId.has(e.id))];
 
 }

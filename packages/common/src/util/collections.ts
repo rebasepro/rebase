@@ -1,11 +1,11 @@
 import {
     DefaultSelectedViewBuilder,
     DefaultSelectedViewParams,
-    EntityCollection,
+    SnapshotCollection,
     Properties,
     Property
 } from "@rebasepro/types";
-import { isPropertyBuilder } from "./entities";
+import { isPropertyBuilder } from "./snapshots";
 
 export function sortProperties<M extends Record<string, unknown>>(properties: Properties, propertiesOrder?: string[]): Properties {
     try {
@@ -99,7 +99,7 @@ export function resolveDefaultSelectedView(
 }
 
 
-export function getLocalChangesBackup(collection: EntityCollection) {
+export function getLocalChangesBackup(collection: SnapshotCollection) {
     if (!collection.localChangesBackup) {
         return "manual_apply";
     }
@@ -108,12 +108,12 @@ export function getLocalChangesBackup(collection: EntityCollection) {
 }
 
 /**
- * Returns the primary keys for an entity collection by inspecting the properties
+ * Returns the primary keys for a snapshot collection by inspecting the properties
  * and finding any properties with `isId`.
  * Fallbacks to `["id"]` if no properties are marked as `isId: true`.
  * @param collection
  */
-export function getPrimaryKeys<M extends Record<string, unknown>>(collection: EntityCollection<M>): Extract<keyof M, string>[] {
+export function getPrimaryKeys<M extends Record<string, unknown>>(collection: SnapshotCollection<M>): Extract<keyof M, string>[] {
     const properties = collection.properties;
     if (!properties) {
         return ["id"] as Extract<keyof M, string>[];

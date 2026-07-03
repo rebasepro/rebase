@@ -4,7 +4,7 @@ import type {
     AuthController,
     RebaseContext,
     SideDialogsController,
-    SideEntityController,
+    SideSnapshotController,
     User
 } from "@rebasepro/types";
 import type {
@@ -12,7 +12,7 @@ import type {
     NavigationStateController,
     UrlController
 } from "@rebasepro/types";
-import { useSideEntityController } from "./useSideEntityController";
+import { useSideSnapshotController } from "./useSideSnapshotController";
 import { useSideDialogsController } from "./useSideDialogsController";
 import {
     useUrlController,
@@ -32,7 +32,7 @@ export type CMSContext<
     USER extends User = User,
     AuthControllerType extends AuthController<USER> = AuthController<USER>
 > = RebaseContext<USER, AuthControllerType> & {
-    sideEntityController: SideEntityController;
+    sideSnapshotController: SideSnapshotController;
     sideDialogsController: SideDialogsController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
@@ -44,7 +44,7 @@ export type CMSContext<
  * core {@link RebaseContext} with CMS-specific controllers.
  *
  * Use this instead of `useRebaseContext()` in CMS components that
- * need to pass context to entity action callbacks, plugin slots,
+ * need to pass context to snapshot action callbacks, plugin slots,
  * or any consumer that expects CMS controllers on the context object.
  *
  * @group Hooks and utilities
@@ -55,7 +55,7 @@ export function useCMSContext<
     AuthControllerType extends AuthController<USER> = AuthController<USER>
 >(): CMSContext<DB, USER, AuthControllerType> {
     const baseContext = useRebaseContext<USER, AuthControllerType>();
-    const sideEntityController = useSideEntityController();
+    const sideSnapshotController = useSideSnapshotController();
     const sideDialogsController = useSideDialogsController();
     const urlController = useUrlController();
     const navigationStateController = useNavigationStateController();
@@ -63,14 +63,14 @@ export function useCMSContext<
 
     return useMemo(() => ({
         ...baseContext,
-        sideEntityController,
+        sideSnapshotController,
         sideDialogsController,
         urlController,
         navigationStateController,
         collectionRegistryController
     }), [
         baseContext,
-        sideEntityController,
+        sideSnapshotController,
         sideDialogsController,
         urlController,
         navigationStateController,

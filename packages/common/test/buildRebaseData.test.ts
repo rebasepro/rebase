@@ -1,18 +1,18 @@
 import { buildRebaseData } from "../src/data/buildRebaseData";
-import { DataDriver, Entity } from "@rebasepro/types";
+import { DataDriver, Snapshot } from "@rebasepro/types";
 
 // ── Mock driver ─────────────────────────────────────────────
 function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
     return {
         fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(undefined),
-        saveEntity: jest.fn().mockImplementation(async ({ path, values, entityId, status }) => ({
-            id: entityId ?? "new-id",
+        fetchOne: jest.fn().mockResolvedValue(undefined),
+        save: jest.fn().mockImplementation(async ({ path, values, id, status }) => ({
+            id: id ?? "new-id",
             path,
             values
         })),
-        deleteEntity: jest.fn().mockResolvedValue(undefined),
-        countEntities: jest.fn().mockResolvedValue(0),
+        delete: jest.fn().mockResolvedValue(undefined),
+        count: jest.fn().mockResolvedValue(0),
         ...overrides
     };
 }
@@ -73,7 +73,7 @@ describe("buildRebaseData", () => {
 
         // Let's also verify that creating uses the correct path
         companyMembers.create({ name: "Test" });
-        expect(driver.saveEntity).toHaveBeenCalledWith(
+        expect(driver.save).toHaveBeenCalledWith(
             expect.objectContaining({
                 path: "company_members"
             })
@@ -83,13 +83,13 @@ describe("buildRebaseData", () => {
     // ── find ────────────────────────────────────────────────
     describe("CollectionAccessor.find", () => {
         it("delegates to driver.fetchCollection", async () => {
-            const mockEntities: Entity[] = [
+            // The driver returns flat rows; the accessor wraps them into Snapshots
+            const mockRows = [
                 { id: "1",
-path: "products",
-values: { name: "Camera" } }
+name: "Camera" }
             ];
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(mockEntities)
+                fetchCollection: jest.fn().mockResolvedValue(mockRows)
             });
             const data = buildRebaseData(driver);
 
@@ -99,7 +99,12 @@ values: { name: "Camera" } }
                 expect.objectContaining({ path: "products",
 limit: 10 })
             );
-            expect(result.data).toEqual(mockEntities);
+            expect(result.data).toEqual([
+                { id: "1",
+path: "products",
+values: { id: "1",
+name: "Camera" } }
+            ]);
             expect(result.meta.limit).toBe(10);
         });
 
@@ -159,17 +164,17 @@ price: "gte.100" }
             );
         });
 
-        it("sets hasMore based on entity count vs limit", async () => {
-            const entities = Array.from({ length: 20 }, (_, i) => ({
+        it("sets hasMore based on snapshot count vs limit", async () => {
+            const snapshots = Array.from({ length: 20 }, (_, i) => ({
                 id: String(i),
                 path: "products",
                 values: {}
             }));
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(entities),
-                // When countEntities is available, hasMore is based on
+                fetchCollection: jest.fn().mockResolvedValue(snapshots),
+                // When count is available, hasMore is based on
                 // total vs offset+fetched. 100 > 0+20 → hasMore=true.
-                countEntities: jest.fn().mockResolvedValue(100)
+                count: jest.fn().mockResolvedValue(100)
             });
             const data = buildRebaseData(driver);
 
@@ -177,11 +182,11 @@ price: "gte.100" }
             expect(result.meta.hasMore).toBe(true);
             expect(result.meta.total).toBe(100);
 
-            const partial = entities.slice(0, 5);
+            const partial = snapshots.slice(0, 5);
             (driver.fetchCollection as jest.Mock).mockResolvedValue(partial);
             // 5 returned, total still 100 → offset 0 + 5 < 100 → hasMore=true
             // but typically the driver returns fewer when near the end
-            (driver.countEntities as jest.Mock).mockResolvedValue(5);
+            (driver.count as jest.Mock).mockResolvedValue(5);
             const result2 = await data.products.find({ limit: 20 });
             expect(result2.meta.hasMore).toBe(false);
             expect(result2.meta.total).toBe(5);
@@ -190,32 +195,35 @@ price: "gte.100" }
 
     // ── findById ────────────────────────────────────────────
     describe("CollectionAccessor.findById", () => {
-        it("delegates to driver.fetchEntity", async () => {
-            const entity: Entity = { id: "abc",
-path: "products",
-values: { name: "Camera" } };
+        it("delegates to driver.fetchOne", async () => {
+            // The driver returns a flat row; the accessor wraps it into a Snapshot
+            const row = { id: "abc",
+name: "Camera" };
             const driver = createMockDriver({
-                fetchEntity: jest.fn().mockResolvedValue(entity)
+                fetchOne: jest.fn().mockResolvedValue(row)
             });
             const data = buildRebaseData(driver);
 
             const result = await data.products.findById("abc");
-            expect(result).toEqual(entity);
-            expect(driver.fetchEntity).toHaveBeenCalledWith({ path: "products",
-entityId: "abc" });
+            expect(result).toEqual({ id: "abc",
+path: "products",
+values: { id: "abc",
+name: "Camera" } });
+            expect(driver.fetchOne).toHaveBeenCalledWith({ path: "products",
+id: "abc" });
         });
     });
 
     // ── create ──────────────────────────────────────────────
     describe("CollectionAccessor.create", () => {
-        it("delegates to driver.saveEntity with status new", async () => {
+        it("delegates to driver.save with status new", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
             await data.products.create({ name: "Camera",
 price: 299 });
 
-            expect(driver.saveEntity).toHaveBeenCalledWith(
+            expect(driver.save).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "products",
                     values: { name: "Camera",
@@ -231,9 +239,9 @@ price: 299 },
 
             await data.products.create({ name: "Camera" }, "custom-id");
 
-            expect(driver.saveEntity).toHaveBeenCalledWith(
+            expect(driver.save).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    entityId: "custom-id",
+                    id: "custom-id",
                     status: "new"
                 })
             );
@@ -242,16 +250,16 @@ price: 299 },
 
     // ── update ──────────────────────────────────────────────
     describe("CollectionAccessor.update", () => {
-        it("delegates to driver.saveEntity with status existing", async () => {
+        it("delegates to driver.save with status existing", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
             await data.products.update("prod-1", { price: 399 });
 
-            expect(driver.saveEntity).toHaveBeenCalledWith(
+            expect(driver.save).toHaveBeenCalledWith(
                 expect.objectContaining({
                     path: "products",
-                    entityId: "prod-1",
+                    id: "prod-1",
                     values: { price: 399 },
                     status: "existing"
                 })
@@ -261,15 +269,15 @@ price: 299 },
 
     // ── delete ──────────────────────────────────────────────
     describe("CollectionAccessor.delete", () => {
-        it("delegates to driver.deleteEntity", async () => {
+        it("delegates to driver.delete", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
             await data.products.delete("prod-1");
 
-            expect(driver.deleteEntity).toHaveBeenCalledWith(
+            expect(driver.delete).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    entity: expect.objectContaining({ id: "prod-1",
+                    row: expect.objectContaining({ id: "prod-1",
 path: "products" })
                 })
             );
@@ -278,17 +286,17 @@ path: "products" })
 
     // ── count ───────────────────────────────────────────────
     describe("CollectionAccessor.count", () => {
-        it("delegates to driver.countEntities when available", async () => {
+        it("delegates to driver.count when available", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
             expect(data.products.count).toBeDefined();
             const result = await data.products.count!();
-            expect(driver.countEntities).toHaveBeenCalled();
+            expect(driver.count).toHaveBeenCalled();
         });
 
-        it("is undefined when driver has no countEntities", () => {
-            const driver = createMockDriver({ countEntities: undefined });
+        it("is undefined when driver has no count", () => {
+            const driver = createMockDriver({ count: undefined });
             const data = buildRebaseData(driver);
             expect(data.products.count).toBeUndefined();
         });

@@ -19,18 +19,18 @@ import {
     AIIcon,
     useLargeLayout
 } from "@rebasepro/core";
-import { EntityStatus, PluginFormActionProps, Properties, Property } from "@rebasepro/types";
+import { SnapshotStatus, PluginFormActionProps, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder, stripCollectionPath } from "@rebasepro/common";
 import { useDataEnhancementController } from "./DataEnhancementControllerProvider";
 import { SamplePrompt } from "../types/data_enhancement_controller";
 
 export function FormEnhanceAction({
-    entityId,
+    snapshotId,
     path,
     status,
     collection,
     formContext,
-    openEntityMode
+    openSnapshotMode
 }: PluginFormActionProps) {
 
     const largeLayout = useLargeLayout();
@@ -52,7 +52,7 @@ export function FormEnhanceAction({
         loadingPrompts.current = true;
         const prompts = status === "new"
             ? (await getSamplePrompts(collection.singularName ?? collection.name, instructions)).prompts
-            : getPromptsForExistingEntities(collection.properties);
+            : getPromptsForExistingSnapshots(collection.properties);
 
         const recentPromptsFromStorage = getRecentPromptsFromStorage(storageKey);
         const recentPrompts = recentPromptsFromStorage.map(prompt => prompt.prompt);
@@ -88,7 +88,7 @@ export function FormEnhanceAction({
             }, ...(samplePrompts ?? []).slice(0, 5)]);
         }
         return dataEnhancementController.enhance({
-            entityId,
+            snapshotId,
             values: formContext!.values,
             instructions: prompt,
             replaceValues: true
@@ -106,7 +106,7 @@ export function FormEnhanceAction({
     const disabledSuggestionActions = !hasSuggestions;
     const promptSuggestionsEnabled = (samplePrompts ?? []).length > 0 && instructions.length === 0;
 
-    // const noIdSet = !formContext?.entityId;
+    // const noIdSet = !formContext?.snapshotId;
 
     function submit() {
         enhance(instructions);
@@ -119,7 +119,7 @@ export function FormEnhanceAction({
             className={"max-w-[100vw]"}
             trigger={<Button variant={"filled"}
                 color={"neutral"}
-                fullWidth={largeLayout && openEntityMode === "full_screen"}
+                fullWidth={largeLayout && openSnapshotMode === "full_screen"}
                 size={"small"}
                 disabled={loading}>
                 {!loading && <AIIcon size={"small"}/>}
@@ -220,7 +220,7 @@ export function FormEnhanceAction({
     );
 }
 
-function getPromptsForExistingEntities(properties: Properties): SamplePrompt[] {
+function getPromptsForExistingSnapshots(properties: Properties): SamplePrompt[] {
 
     const multilineProperties = Object.values(properties).filter((p: Property) => {
         if (isPropertyBuilder(p)) {
@@ -246,7 +246,7 @@ function getPromptsForExistingEntities(properties: Properties): SamplePrompt[] {
     }));
 }
 
-const createLocalStorageKey = (path: string, status: EntityStatus) => {
+const createLocalStorageKey = (path: string, status: SnapshotStatus) => {
     const statusString = status === "new" ? "new" : "existing";
     return `data_enhancement::${statusString}::${stripCollectionPath(path)}`;
 };

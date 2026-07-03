@@ -7,14 +7,14 @@ function createMockDriver(key: string): DataDriver {
     return {
         key,
         fetchCollection: jest.fn().mockResolvedValue([]),
-        fetchEntity: jest.fn().mockResolvedValue(undefined),
-        saveEntity: jest.fn().mockImplementation(async ({ path, values, entityId }) => ({
-            id: entityId ?? "new-id",
+        fetchOne: jest.fn().mockResolvedValue(undefined),
+        save: jest.fn().mockImplementation(async ({ path, values, id }) => ({
+            id: id ?? "new-id",
             path,
             values
         })),
-        deleteEntity: jest.fn().mockResolvedValue(undefined),
-        countEntities: jest.fn().mockResolvedValue(0)
+        delete: jest.fn().mockResolvedValue(undefined),
+        count: jest.fn().mockResolvedValue(0)
     };
 }
 
@@ -87,8 +87,8 @@ describe("buildRoutedRebaseData", () => {
         await routed.collection("pg_authors").findById("a1");
 
         expect(fsDriver.fetchCollection).toHaveBeenCalledTimes(1);
-        expect(pgDriver.fetchEntity).toHaveBeenCalledTimes(1);
-        expect((pgDriver.fetchEntity as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "pg_authors", entityId: "a1" });
+        expect(pgDriver.fetchOne).toHaveBeenCalledTimes(1);
+        expect((pgDriver.fetchOne as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "pg_authors", id: "a1" });
     });
 
     it("routes dynamic camelCase property access (snake_case slug)", async () => {
@@ -126,11 +126,11 @@ describe("buildRoutedRebaseData", () => {
         await routed.collection("events").find();
 
         // All writes/reads went to Firestore, none to the default.
-        expect(fsDriver.saveEntity).toHaveBeenCalledTimes(2); // create + update
-        expect(fsDriver.deleteEntity).toHaveBeenCalledTimes(1);
+        expect(fsDriver.save).toHaveBeenCalledTimes(2); // create + update
+        expect(fsDriver.delete).toHaveBeenCalledTimes(1);
         expect(fsDriver.fetchCollection).toHaveBeenCalledTimes(1);
-        expect(pgDriver.saveEntity).not.toHaveBeenCalled();
-        expect(pgDriver.deleteEntity).not.toHaveBeenCalled();
+        expect(pgDriver.save).not.toHaveBeenCalled();
+        expect(pgDriver.delete).not.toHaveBeenCalled();
     });
 
     it("ignores Symbol and Promise-interop properties", () => {

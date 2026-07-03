@@ -38,14 +38,14 @@ export function InsightWidget({
     definition,
     collectionSlug,
     path,
-    parentCollectionSlugs, parentEntityIds,
+    parentCollectionSlugs, parentSnapshotIds,
     compact = false,
     embedded = false
 }: {
     definition: InsightDefinition;
     collectionSlug?: string;
     path?: string;
-    parentCollectionSlugs?: string[], parentEntityIds?: string[];
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
     compact?: boolean;
     /** When true, inner views skip their own borders since the parent card provides them. */
     embedded?: boolean;

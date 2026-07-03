@@ -89,7 +89,7 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
 
 /**
  * Extended auth controller with common optional auth methods.
- * Backend implementations (Rebase backend, Firebase, Supabase, etc.)
+ * Backend implementations (Rebase backend, Firebase, etc.)
  * extend this with their own backend-specific extras.
  * @group Hooks and utilities
  */

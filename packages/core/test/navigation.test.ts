@@ -3,10 +3,10 @@
 
 import { expect, it } from "@jest/globals";
 import { siteConfig } from "./test_site_config";
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 import { buildCollection, buildProperty, getCollectionBySlugWithin, resolveCollectionPathIds, getNavigationEntriesFromPath } from "@rebasepro/common";
 
-const collections = siteConfig.collections as EntityCollection[];
+const collections = siteConfig.collections as SnapshotCollection[];
 
 describe("Resolving paths test", () => {
     it("collection view matches ok", () => {
@@ -48,7 +48,7 @@ describe("Resolving paths test", () => {
 
     });
 
-    it("build entity collection array", () => {
+    it("build snapshot collection array", () => {
 
         const navigationEntries = getNavigationEntriesFromPath({
             path: "products/pid",
@@ -70,7 +70,7 @@ describe("Resolving paths test", () => {
         expect(navigationEntries.length).toEqual(3);
     });
 
-    it("build entity collection array 2", () => {
+    it("build snapshot collection array 2", () => {
 
         const navigationEntries = getNavigationEntriesFromPath({
             path: "products/pid/locales/yep",

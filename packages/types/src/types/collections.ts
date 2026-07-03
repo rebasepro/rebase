@@ -1,6 +1,6 @@
 import React, { Dispatch, SetStateAction } from "react";
-import type { Entity, EntityStatus, EntityValues } from "./entities";
-import type { EntityCallbacks } from "./entity_callbacks";
+import type { Snapshot, SnapshotStatus, SnapshotValues } from "./snapshots";
+import type { CollectionCallbacks } from "./snapshot_callbacks";
 
 import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, MongoProperties } from "./properties";
 import type { ExportConfig } from "./export_import";
@@ -8,8 +8,8 @@ import type { ExportConfig } from "./export_import";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
-import type { EntityCustomView, FormViewConfig } from "./entity_views";
-import type { EntityAction } from "./entity_actions";
+import type { SnapshotCustomView, FormViewConfig } from "./snapshot_views";
+import type { SnapshotAction } from "./snapshot_actions";
 import type { PolicyExpression } from "./policy";
 import type { ComponentRef } from "./component_ref";
 import type { CollectionComponentOverrideMap } from "./component_overrides";
@@ -18,12 +18,12 @@ import type { WhereFilterOp, FilterValues, FilterPreset, OrderByTuple } from "./
 /**
  * Base interface containing all driver-agnostic collection properties.
  * Use {@link PostgresCollection} or {@link FirebaseCollection} for
- * driver-specific type safety, or {@link EntityCollection} when you
+ * driver-specific type safety, or {@link SnapshotCollection} when you
  * need to handle any collection regardless of backend.
  *
  * @group Models
  */
-export interface BaseEntityCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
+export interface BaseSnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * You can set an alias that will be used internally instead of the collection name.
@@ -50,13 +50,13 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     description?: string;
 
     /**
-     * Child collections nested under entities of this collection.
+     * Child collections nested under snapshots of this collection.
      * Populated automatically during normalization from driver-specific fields
      * (e.g. Firebase `subcollections`, Postgres `relations` with many-cardinality).
      *
      * Custom drivers can set this directly to expose child collections to the UI.
      */
-    childCollections?: () => EntityCollection<Record<string, unknown>>[];
+    childCollections?: () => SnapshotCollection<Record<string, unknown>>[];
 
 
     /**
@@ -103,7 +103,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     databaseId?: string;
 
     /**
-     * Set of properties that compose an entity
+     * Set of properties that compose a snapshot
      */
     properties: Properties;
 
@@ -121,10 +121,10 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     group?: string;
 
     /**
-     * Array of entity views that this collection has.
-     * Can be an array of `EntityCustomView` or a string representing the key of a global `EntityCustomView`.
+     * Array of snapshot views that this collection has.
+     * Can be an array of `SnapshotCustomView` or a string representing the key of a global `SnapshotCustomView`.
      */
-    entityViews?: (string | EntityCustomView<Record<string, unknown>>)[];
+    snapshotViews?: (string | SnapshotCustomView<Record<string, unknown>>)[];
 
     /**
      * Default preview properties displayed when this collection is referenced to.
@@ -138,31 +138,31 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     listProperties?: string[];
 
     /**
-     * Title property of the entity. This is the property that will be used
-     * as the title in entity related views and references.
+     * Title property of the snapshot. This is the property that will be used
+     * as the title in snapshot related views and references.
      * If not specified, the first property simple text property will be used.
      */
     readonly titleProperty?: Extract<keyof M, string> | (string & {});
 
     /**
-     * When editing an entity, you can choose to open the entity in a side dialog
+     * When editing a snapshot, you can choose to open the snapshot in a side dialog
      * or in a full screen dialog. Defaults to `full_screen`.
      */
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
-     * Controls what happens when a user clicks on an entity in the collection view.
-     * - `"edit"` (default): Opens the entity in the edit form.
+     * Controls what happens when a user clicks on a snapshot in the collection view.
+     * - `"edit"` (default): Opens the snapshot in the edit form.
      * - `"view"`: Opens a read-only detail view with an "Edit" button.
      */
-    defaultEntityAction?: "view" | "edit";
+    defaultSnapshotAction?: "view" | "edit";
 
     /**
-     * Replace the default entity form with a custom component.
-     * The Builder receives the same props as entity view tabs
-     * (entity, formContext, collection, etc.) and has full control over the UI.
+     * Replace the default snapshot form with a custom component.
+     * The Builder receives the same props as snapshot view tabs
+     * (snapshot, formContext, collection, etc.) and has full control over the UI.
      *
-     * Works in both edit mode and read-only mode (when `defaultEntityAction`
+     * Works in both edit mode and read-only mode (when `defaultSnapshotAction`
      * is `"view"`). In read-only mode, `formContext.readOnly` will be `true`.
      */
     formView?: FormViewConfig;
@@ -220,9 +220,9 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     propertiesOrder?: (Extract<keyof M, string> | (string & {}) | string | `subcollection:${string}`)[];
 
     /**
-     * If enabled, content is loaded in batches. If `false` all entities in the
+     * If enabled, content is loaded in batches. If `false` all snapshots in the
      * collection are loaded. This means that when reaching the end of the
-     * collection, the CMS will load more entities.
+     * collection, the CMS will load more snapshots.
      * You can specify a number to specify the pagination size (50 by default)
      * Defaults to `true`
      */
@@ -232,15 +232,15 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     selectionEnabled?: boolean;
 
     /**
-     * This interface defines all the callbacks that can be used when an entity
+     * This interface defines all the callbacks that can be used when a snapshot
      * is being created, updated or deleted.
      * Useful for adding your own logic or blocking the execution of the operation.
      */
-    readonly callbacks?: EntityCallbacks<M, USER>;
+    readonly callbacks?: CollectionCallbacks<M, USER>;
 
     /**
      * Pass your own selection controller if you want to control selected
-     * entities externally.
+     * snapshots externally.
      * @see useSelectionController
      */
     selectionController?: SelectionController<M>;
@@ -249,7 +249,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * Force a filter in this view. If applied, the rest of the filters will
      * be disabled. Filters applied with this prop cannot be changed.
      * e.g. `fixedFilter: { age: [">", 18] }`
-     * e.g. `fixedFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
+     * e.g. `fixedFilter: { related_user: ["==", new SnapshotReference("sdc43dsw2", "users")] }`
      */
     readonly fixedFilter?: FilterValues<Extract<keyof M, string> | (string & {})>;
 
@@ -257,7 +257,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * Initial filters applied to the collection this collection is related to.
      * Defaults to none. Filters applied with this prop can be changed.
      * e.g. `defaultFilter: { age: [">", 18] }`
-     * e.g. `defaultFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
+     * e.g. `defaultFilter: { related_user: ["==", new SnapshotReference("sdc43dsw2", "users")] }`
      */
     readonly defaultFilter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
 
@@ -282,7 +282,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * Default sort applied to this collection.
-     * When setting this prop, entities will have a default order
+     * When setting this prop, snapshots will have a default order
      * applied in the collection.
      * e.g. `sort: ["order", "asc"]`
      */
@@ -301,14 +301,14 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * Can the elements in this collection be edited inline in the collection
-     * view. Even when inline editing is disabled, entities can still be
+     * view. Even when inline editing is disabled, snapshots can still be
      * edited in the side panel (subject to `securityRules`).
      */
     inlineEditing?: boolean;
 
     /**
      * Should this collection be hidden from the main navigation panel, if
-     * it is at the root level, or in the entity side panel if it's a
+     * it is at the root level, or in the snapshot side panel if it's a
      * subcollection.
      * It will still be accessible if you reach the specified path.
      * You can also use this collection as a reference target.
@@ -317,9 +317,9 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * If you want to open custom views or subcollections by default when opening the edit
-     * view of an entity, you can specify the path to the view here.
+     * view of a snapshot, you can specify the path to the view here.
      * The path is relative to the current collection. For example if you have a collection
-     * that has a custom view as well as a subcollection that refers to another entity, you can
+     * that has a custom view as well as a subcollection that refers to another snapshot, you can
      * either specify the path to the custom view or the path to the subcollection.
      */
     defaultSelectedView?: string | DefaultSelectedViewBuilder;
@@ -338,7 +338,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      * If set to true, the form will be auto-saved when the user changes
      * the value of a field.
      * Defaults to false.
-     * When a new entity is created, this property can be updated to generated a new ID
+     * When a new snapshot is created, this property can be updated to generated a new ID
      */
     formAutoSave?: boolean;
 
@@ -361,24 +361,24 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     metadata?: Record<string, unknown>;
 
     /**
-     * Width of the side dialog (in pixels) when opening an entity in this collection.
+     * Width of the side dialog (in pixels) when opening a snapshot in this collection.
      */
     sideDialogWidth?: number | string;
 
     /**
      * If set to true, the default values of the properties will be applied
-     * to the entity every time the entity is updated (not only when created).
+     * to the snapshot every time the snapshot is updated (not only when created).
      * Defaults to false.
      */
     alwaysApplyDefaultValues?: boolean;
 
     /**
-     * If set to true, a tab including the JSON representation of the entity will be included.
+     * If set to true, a tab including the JSON representation of the snapshot will be included.
      */
     includeJsonView?: boolean;
 
     /**
-     * If set to true, changes to the entity will be saved in a subcollection.
+     * If set to true, changes to the snapshot will be saved in a subcollection.
      * This prop has no effect if the history plugin is not enabled
      */
     history?: boolean;
@@ -386,9 +386,9 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     /**
      * Should local changes be backed up in local storage, to prevent data loss on
      * accidental navigations.
-     * - `manual_apply`: When the user navigates back to an entity with local changes,
+     * - `manual_apply`: When the user navigates back to a snapshot with local changes,
      *   they will be prompted to restore the changes.
-     * - `auto_apply`: When the user navigates back to an entity with local changes,
+     * - `auto_apply`: When the user navigates back to a snapshot with local changes,
      *   the changes will be automatically applied.
      * - `false`: Local changes will not be backed up.
      * Defaults to `manual_apply`.
@@ -397,9 +397,9 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
 
     /**
      * Default view mode for displaying this collection.
-     * - "table": Display entities in a table with inline editing (default)
-     * - "cards": Display entities as a grid of cards with thumbnails
-     * - "kanban": Display entities in a Kanban board grouped by a property
+     * - "table": Display snapshots in a table with inline editing (default)
+     * - "cards": Display snapshots as a grid of cards with thumbnails
+     * - "kanban": Display snapshots in a Kanban board grouped by a property
      * Defaults to "table".
      */
     defaultViewMode?: ViewMode;
@@ -430,9 +430,9 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     readonly orderProperty?: Extract<keyof M, string> | (string & {});
 
     /**
-     * Actions that can be performed on the entities in this collection.
+     * Actions that can be performed on the snapshots in this collection.
      */
-    entityActions?: EntityAction<M, USER>[];
+    snapshotActions?: SnapshotAction<M, USER>[];
 
     /**
      * Builder for the collection actions rendered in the toolbar
@@ -462,9 +462,9 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
     /**
      * Collection-scoped component overrides. These take precedence over
      * global overrides set on `<Rebase>`, but only within this collection's
-     * views (entity form, detail view, table, empty state, etc.).
+     * views (snapshot form, detail view, table, empty state, etc.).
      *
-     * Only collection-scoped components (like `Entity.Form`, `Collection.EmptyState`,
+     * Only collection-scoped components (like `Snapshot.Form`, `Collection.EmptyState`,
      * `Collection.Card`, etc.) can be overridden here. App-level components
      * (like `Shell.AppBar`, `HomePage`) can only be overridden at the `<Rebase>` level.
      *
@@ -475,7 +475,7 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
      *     slug: "products",
      *     table: "products",
      *     components: {
-     *         "Entity.Form": { Component: ProductCustomForm },
+     *         "Snapshot.Form": { Component: ProductCustomForm },
      *         "Collection.Card": { Component: ProductCard },
      *     },
      *     properties: { ... }
@@ -491,13 +491,13 @@ export interface BaseEntityCollection<M extends Record<string, unknown> = Record
  * A collection backed by PostgreSQL (or any SQL database).
  * Adds support for SQL-style relations (JOINs) and Row Level Security.
  *
- * Use this type instead of {@link EntityCollection} when you want
+ * Use this type instead of {@link SnapshotCollection} when you want
  * compile-time safety that only SQL-relevant fields appear.
  *
  * @group Models
  */
 export interface PostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseEntityCollection<M, USER> {
+    extends BaseSnapshotCollection<M, USER> {
     properties: PostgresProperties;
 
     /**
@@ -525,7 +525,7 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
     relations?: Relation[];
 
     /**
-     * Security rules for this collection (Supabase-style Row Level Security).
+     * Security rules for this collection (PostgreSQL Row Level Security).
      * When defined, the schema generator will enable RLS on the table and
      * create the corresponding PostgreSQL policies.
      *
@@ -546,20 +546,20 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
  * A collection backed by Firebase / Firestore.
  * Adds support for subcollections (nested document collections).
  *
- * Use this type instead of {@link EntityCollection} when you want
+ * Use this type instead of {@link SnapshotCollection} when you want
  * compile-time safety that only Firestore-relevant fields appear.
  *
  * @group Models
  */
 export interface FirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseEntityCollection<M, USER> {
+    extends BaseSnapshotCollection<M, USER> {
     /**
      * The database engine for this collection. Must be set to `"firestore"`.
      */
     engine: "firestore";
 
     /**
-     * Set of properties that compose an entity.
+     * Set of properties that compose a snapshot.
      * Firestore collections support `reference` properties but not `relation`.
      */
     properties: FirebaseProperties;
@@ -583,23 +583,23 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
     path?: string;
 
     /**
-     * You can add subcollections to your entity in the same way you define the root
+     * You can add subcollections to your snapshot in the same way you define the root
      * collections. The collections added here will be displayed when opening
-     * the side dialog of an entity.
+     * the side dialog of a snapshot.
      */
-    subcollections?: () => EntityCollection<Record<string, unknown>>[];
+    subcollections?: () => SnapshotCollection<Record<string, unknown>>[];
 }
 
 /**
  * A collection backed by MongoDB.
  *
- * Use this type instead of {@link EntityCollection} when you want
+ * Use this type instead of {@link SnapshotCollection} when you want
  * compile-time safety that only MongoDB-relevant fields appear.
  *
  * @group Models
  */
 export interface MongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseEntityCollection<M, USER> {
+    extends BaseSnapshotCollection<M, USER> {
 
     /**
      * The database engine for this collection. Must be set to `"mongodb"`.
@@ -607,7 +607,7 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
     engine: "mongodb";
 
     /**
-     * Set of properties that compose an entity.
+     * Set of properties that compose a snapshot.
      * MongoDB collections support `reference` properties but not `relation`.
      */
     properties: MongoProperties;
@@ -639,7 +639,7 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
  *
  * @group Models
  */
-export type EntityCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
+export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     | PostgresCollection<M, USER>
     | FirebaseCollection<M, USER>
     | MongoDBCollection<M, USER>;
@@ -650,7 +650,7 @@ export type EntityCollection<M extends Record<string, unknown> = Record<string, 
  * @group Models
  */
 export function isPostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: EntityCollection<M, USER>
+    collection: SnapshotCollection<M, USER>
 ): collection is PostgresCollection<M, USER> {
     return !collection.engine || collection.engine === "postgres";
 }
@@ -660,7 +660,7 @@ export function isPostgresCollection<M extends Record<string, unknown> = Record<
  * @group Models
  */
 export function isFirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: EntityCollection<M, USER>
+    collection: SnapshotCollection<M, USER>
 ): collection is FirebaseCollection<M, USER> {
     return collection.engine === "firestore";
 }
@@ -670,7 +670,7 @@ export function isFirebaseCollection<M extends Record<string, unknown> = Record<
  * @group Models
  */
 export function isMongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: EntityCollection<M, USER>
+    collection: SnapshotCollection<M, USER>
 ): collection is MongoDBCollection<M, USER> {
     return collection.engine === "mongodb";
 }
@@ -681,7 +681,7 @@ export function isMongoDBCollection<M extends Record<string, unknown> = Record<s
  * otherwise falls back to `slug`.
  */
 export function getCollectionDataPath<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: EntityCollection<M, USER>
+    collection: SnapshotCollection<M, USER>
 ): string {
     if (isFirebaseCollection(collection) && collection.path) {
         return collection.path;
@@ -703,8 +703,8 @@ export function getCollectionDataPath<M extends Record<string, unknown> = Record
  * @group Models
  */
 export function getDeclaredSubcollections<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: EntityCollection<M, USER>
-): (() => EntityCollection<Record<string, unknown>>[]) | undefined {
+    collection: SnapshotCollection<M, USER>
+): (() => SnapshotCollection<Record<string, unknown>>[]) | undefined {
     return (collection as FirebaseCollection<M, USER>).subcollections;
 }
 
@@ -717,7 +717,7 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
     /**
      * Property key to use for Kanban board columns.
      * Must reference a string property with `enum` values defined.
-     * Entities will be grouped into columns based on this property's value.
+     * Snapshots will be grouped into columns based on this property's value.
      * The column order is determined by the order of `enum` values in the property.
      */
     columnProperty: Extract<keyof M, string> | (string & {});
@@ -740,9 +740,9 @@ export type ViewMode = "list" | "table" | "cards" | "kanban";
  *
  * @group Models
  */
-export interface CollectionActionsProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends EntityCollection<M> = EntityCollection<M>> {
+export interface CollectionActionsProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends SnapshotCollection<M> = SnapshotCollection<M>> {
     /**
-     * Full collection path of this entity. This is the full path, like
+     * Full collection path of this snapshot. This is the full path, like
      * `users/1234/addresses`
      */
     path: string;
@@ -756,7 +756,7 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
      * Array of the parent path segments like `['users']`
      */
     parentCollectionSlugs: string[];
-    parentEntityIds: string[];
+    parentSnapshotIds: string[];
 
     /**
      * The collection configuration
@@ -764,8 +764,8 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
     collection: EC;
 
     /**
-     * Use this controller to get the selected entities and to update the
-     * selected entities state.
+     * Use this controller to get the selected snapshots and to update the
+     * selected snapshots state.
      */
     selectionController: SelectionController<M>;
 
@@ -773,7 +773,7 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
      * Use this controller to get the table controller and to update the
      * table controller state.
      */
-    tableController: EntityTableController<M>;
+    tableController: SnapshotTableController<M>;
 
     /**
      * Context of the app status
@@ -781,10 +781,10 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
     context: RebaseContext<USER>;
 
     /**
-     * Count of the entities in this collection.
+     * Count of the snapshots in this collection.
      * undefined means the count is still loading.
      */
-    collectionEntitiesCount?: number;
+    collectionSnapshotsCount?: number;
 
     /**
      * Programmatically open the new-document form for this collection,
@@ -805,16 +805,16 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
 }
 
 /**
- * Use this controller to retrieve the selected entities or modify them in
- * an {@link EntityCollection}
+ * Use this controller to retrieve the selected snapshots or modify them in
+ * an {@link SnapshotCollection}
  * @group Models
  */
 export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
-    selectedEntities: Entity<M>[];
-    setSelectedEntities(entities: Entity<M>[]): void;
-    setSelectedEntities(action: (prev: Entity<M>[]) => Entity<M>[]): void;
-    isEntitySelected(entity: Entity<M>): boolean;
-    toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
+    selectedSnapshots: Snapshot<M>[];
+    setSelectedSnapshots(snapshots: Snapshot<M>[]): void;
+    setSelectedSnapshots(action: (prev: Snapshot<M>[]) => Snapshot<M>[]): void;
+    isSnapshotSelected(snapshot: Snapshot<M>): boolean;
+    toggleSnapshotSelection(snapshot: Snapshot<M>, newSelectedState?: boolean): void;
 }
 
 // Canonical filter types — re-exported from the single source-of-truth.
@@ -836,12 +836,12 @@ export type FilterCombination<Key extends string> = Partial<Record<Key, "asc" | 
 export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
 
 export type AdditionalFieldDelegateProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
-    entity: Entity<M>,
+    snapshot: Snapshot<M>,
     context: RebaseContext<USER>
 };
 
 /**
- * Use this interface for adding additional fields to entity collection views and forms.
+ * Use this interface for adding additional fields to snapshot collection views and forms.
  * @group Models
  */
 export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Record<string, unknown>,
@@ -866,7 +866,7 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
     /**
      * Builder for the custom field
      */
-    Builder?(props: { entity: Entity<M>, context: RebaseContext<USER> }): React.ReactNode;
+    Builder?(props: { snapshot: Snapshot<M>, context: RebaseContext<USER> }): React.ReactNode;
 
 
     /**
@@ -884,36 +884,36 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
      * This is the value that will be used for exporting the collection.
      * If `Builder` is defined, this prop will be ignored in the collection
      * view.
-     * @param entity
+     * @param snapshot
      */
     value?(props: {
-        entity: Entity<M>,
+        snapshot: Snapshot<M>,
         context: RebaseContext
     }): string | number | Promise<string | number> | undefined;
 }
 
 
-export type InferCollectionType<S extends EntityCollection> = S extends EntityCollection<infer M> ? M : never;
+export type InferCollectionType<S extends SnapshotCollection> = S extends SnapshotCollection<infer M> ? M : never;
 
 /**
- * Used in the {@link EntityCollection#defaultSelectedView} to define the default
+ * Used in the {@link SnapshotCollection#defaultSelectedView} to define the default
  * @group Models
  */
 export type DefaultSelectedViewBuilder = (params: DefaultSelectedViewParams) => string | undefined;
 
 /**
- * Used in the {@link EntityCollection#defaultSelectedView} to define the default
+ * Used in the {@link SnapshotCollection#defaultSelectedView} to define the default
  * @group Models
  */
 export type DefaultSelectedViewParams = {
-    status?: EntityStatus;
-    entityId?: string | number;
+    status?: SnapshotStatus;
+    snapshotId?: string | number;
 };
 /**
  * You can use this controller to control the table view of a collection.
  */
-export type EntityTableController<M extends Record<string, unknown> = Record<string, unknown>> = {
-    data: Entity<M>[];
+export type SnapshotTableController<M extends Record<string, unknown> = Record<string, unknown>> = {
+    data: Snapshot<M>[];
     dataLoading: boolean;
     noMoreToLoad: boolean;
     dataLoadingError?: Error;
@@ -947,8 +947,8 @@ export type SelectedCellProps<M extends Record<string, unknown> = Record<string,
     cellRect: DOMRect;
     width: number;
     height: number;
-    entityPath: string;
-    entityId: string | number;
+    snapshotPath: string;
+    snapshotId: string | number;
 };
 
 /**
@@ -960,7 +960,7 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
 /**
  * Flexible Row Level Security rule for a collection.
  *
- * Inspired by Supabase's approach to PostgreSQL RLS. Rules can range from
+ * Built on PostgreSQL Row Level Security. Rules can range from
  * simple convenience shortcuts to fully custom SQL expressions, giving you the
  * full power of PostgreSQL Row Level Security.
  *
@@ -973,7 +973,7 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  *
  * **How rules combine:** PostgreSQL evaluates all matching policies for an
  * operation. Permissive rules are OR'd together (any one passing is enough).
- * Restrictive rules are AND'd (all must pass). This mirrors Supabase behavior.
+ * Restrictive rules are AND'd (all must pass). This is standard PostgreSQL RLS behavior.
  *
  * **Mutual exclusivity:** `ownerField`, `access`, structured `condition`, and
  * raw SQL (`using`/`withCheck`) cannot be combined. The type system enforces
@@ -1050,7 +1050,7 @@ export interface SecurityRuleBase {
      * - **restrictive**: Restrictive policies are AND'd with all permissive
      *   policies — they act as additional gates that *must* also pass.
      *
-     * This is the same model as PostgreSQL / Supabase.
+     * This is the standard PostgreSQL RLS model.
      *
      * @default "permissive"
      */
@@ -1276,7 +1276,7 @@ export interface RolesOnlySecurityRule extends SecurityRuleBase {
  * Configuration for authentication collections.
  *
  * Controls what happens when admins create users, reset passwords,
- * and which entity actions are auto-injected.
+ * and which snapshot actions are auto-injected.
  *
  * Use `auth: true` as sugar for `{ enabled: true }` with all defaults.
  *
@@ -1294,7 +1294,7 @@ export interface RolesOnlySecurityRule extends SecurityRuleBase {
  * }
  * ```
  *
- * @example Disable the reset-password entity action
+ * @example Disable the reset-password snapshot action
  * ```ts
  * auth: {
  *     enabled: true,
@@ -1333,15 +1333,15 @@ export interface AuthCollectionConfig {
     ) => Promise<AuthCollectionResetResult>;
 
     /**
-     * Control which auth-specific entity actions are auto-injected.
+     * Control which auth-specific snapshot actions are auto-injected.
      *
      * Default: `{ resetPassword: true }` — the framework auto-injects
-     * the built-in `resetPasswordAction` into the collection's entity actions.
+     * the built-in `resetPasswordAction` into the collection's snapshot actions.
      *
-     * Set to `false` to disable, or pass a custom `EntityAction` to replace the UI.
+     * Set to `false` to disable, or pass a custom `SnapshotAction` to replace the UI.
      */
     actions?: {
-        resetPassword?: boolean | EntityAction;
+        resetPassword?: boolean | SnapshotAction;
     };
 }
 

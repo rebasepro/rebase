@@ -4,7 +4,7 @@
  * Manages database branching by creating/deleting PostgreSQL databases
  * using `CREATE DATABASE ... TEMPLATE`. Branch metadata is stored in the
  * `rebase.branches` table in the default (main) database, following the
- * same `rebase` schema convention used by entity_history, auth, etc.
+ * same `rebase` schema convention used by snapshot_history, auth, etc.
  */
 
 import { sql } from "drizzle-orm";

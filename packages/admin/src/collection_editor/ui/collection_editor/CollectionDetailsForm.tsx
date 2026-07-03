@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
-import { EntityCollection, Property } from "@rebasepro/types";
+import { SnapshotCollection, Property } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -42,8 +42,8 @@ export function CollectionDetailsForm({
     isNewCollection: boolean,
     existingPaths?: string[];
     existingIds?: string[];
-    parentCollection?: EntityCollection;
-    parentCollectionSlugs?: string[], parentEntityIds?: string[];
+    parentCollection?: SnapshotCollection;
+    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
     expandKanban?: boolean;
 }) {
 
@@ -57,7 +57,7 @@ export function CollectionDetailsForm({
         setFieldTouched,
         isSubmitting,
         submitCount
-    } = useFormex<EntityCollection>();
+    } = useFormex<SnapshotCollection>();
 
     const collectionEditor = useCollectionEditorController();
 
@@ -178,8 +178,8 @@ export function CollectionDetailsForm({
 
                     <LayoutModeSwitch
                         className={"col-span-12"}
-                        value={values.openEntityMode ?? "side_panel"}
-                        onChange={(value) => setFieldValue("openEntityMode", value)}/>
+                        value={values.openSnapshotMode ?? "side_panel"}
+                        onChange={(value) => setFieldValue("openSnapshotMode", value)}/>
 
                     <ViewModeSwitch
                         className={"col-span-12"}

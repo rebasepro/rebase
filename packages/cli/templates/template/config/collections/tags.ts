@@ -1,6 +1,6 @@
-import { EntityCollection } from "@rebasepro/types";
+import { SnapshotCollection } from "@rebasepro/types";
 
-const tagsCollection: EntityCollection = {
+const tagsCollection: SnapshotCollection = {
     name: "Tags",
     singularName: "Tag",
     slug: "tags",

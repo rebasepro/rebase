@@ -195,9 +195,9 @@ user: user ?? null });
     describe("createAuthMiddleware", () => {
         const mockDriver: DataDriver = {
             fetchCollection: jest.fn() as any,
-            fetchEntity: jest.fn() as any,
-            saveEntity: jest.fn() as any,
-            deleteEntity: jest.fn() as any
+            fetchOne: jest.fn() as any,
+            save: jest.fn() as any,
+            delete: jest.fn() as any
         };
 
         it("sets driver in context (requireAuth: false)", async () => {
@@ -370,9 +370,9 @@ roles: ["editor"] })
         const SERVICE_KEY = "a-very-secure-service-key-that-is-at-least-32-characters-long";
         const mockDriver: DataDriver = {
             fetchCollection: jest.fn() as any,
-            fetchEntity: jest.fn() as any,
-            saveEntity: jest.fn() as any,
-            deleteEntity: jest.fn() as any
+            fetchOne: jest.fn() as any,
+            save: jest.fn() as any,
+            delete: jest.fn() as any
         };
 
         it("grants admin access when Bearer token matches the service key", async () => {

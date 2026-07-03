@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import { isPostgresCollection } from "@rebasepro/types";
-import type { EntityCollection, PostgresCollection, Relation } from "@rebasepro/types";
+import type { SnapshotCollection, PostgresCollection, Relation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
 import type { LayoutDirection, RelationEdgeData } from "./schema-visualizer.utils";
@@ -36,9 +36,9 @@ export interface TableNodeData {
     [key: string]: unknown;
 }
 
-// ─── Extract columns from an EntityCollection ─────────────────────────
+// ─── Extract columns from a SnapshotCollection ─────────────────────────
 
-const extractColumns = (collection: EntityCollection): ColumnInfo[] => {
+const extractColumns = (collection: SnapshotCollection): ColumnInfo[] => {
     const columns: ColumnInfo[] = [];
     const properties = collection.properties ?? {};
 
@@ -117,7 +117,7 @@ const extractColumns = (collection: EntityCollection): ColumnInfo[] => {
 // ─── Build graph from collections ─────────────────────────────────────
 
 const buildGraph = (
-    collections: EntityCollection[],
+    collections: SnapshotCollection[],
     direction: LayoutDirection
 ): { nodes: Node[]; edges: Edge[] } => {
     const nodes: Node[] = [];
@@ -191,7 +191,7 @@ y: 0 },
         }
 
         for (const [relationKey, rel] of Object.entries(resolvedRelations)) {
-            let targetCollection: EntityCollection;
+            let targetCollection: SnapshotCollection;
             try {
                 targetCollection = rel.target();
             } catch {
@@ -356,7 +356,7 @@ export interface UseSchemaGraphResult {
 }
 
 export const useSchemaGraph = (
-    collections: EntityCollection[] | undefined
+    collections: SnapshotCollection[] | undefined
 ): UseSchemaGraphResult => {
     const [direction, setDirection] = useState<LayoutDirection>("LR");
     const [version, setVersion] = useState(0);

@@ -98,8 +98,8 @@ export function MarkdownEditorFieldBinding({
         defaultSource: defaultStorageSource
     }), [storage?.storageSource, storageSources.sources, defaultStorageSource]);
 
-    const entityValues = context.values;
-    const entityId = context.entityId;
+    const snapshotValues = context.values;
+    const snapshotId = context.snapshotId;
     const path = context.path;
 
     const [fieldVersion, setFieldVersion] = useState(0);
@@ -154,8 +154,8 @@ export function MarkdownEditorFieldBinding({
             const fileName = await resolveStorageFilenameString({
                 input: storage.fileName,
                 storage,
-                values: entityValues,
-                entityId,
+                values: snapshotValues,
+                snapshotId,
                 path,
                 property: property,
                 file,
@@ -167,21 +167,21 @@ export function MarkdownEditorFieldBinding({
             return fileName;
         }
         return randomString() + "_" + file.name;
-    }, [entityId, entityValues, path, property, propertyKey, storage]);
+    }, [snapshotId, snapshotValues, path, property, propertyKey, storage]);
 
     const storagePathBuilder = useCallback((file: File) => {
         if (!storage) return "/";
         return resolveStoragePathString({
             input: storage.storagePath,
             storage,
-            values: entityValues,
-            entityId,
+            values: snapshotValues,
+            snapshotId,
             path,
             property,
             file,
             propertyKey
         }) ?? "/";
-    }, [entityId, entityValues, path, property, propertyKey, storage]);
+    }, [snapshotId, snapshotValues, path, property, propertyKey, storage]);
 
     const editor = <Suspense fallback={<Skeleton height={200} className="w-full rounded-md"/>}>
         <RichTextEditor

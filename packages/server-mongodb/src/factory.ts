@@ -2,18 +2,18 @@
  * MongoDB Backend Factory
  *
  * This module provides factory functions for creating MongoDB backend instances.
- * It abstracts the creation of drivers, realtime services, and entity services.
+ * It abstracts the creation of drivers, realtime services, and row services.
  */
 
 import { Db, MongoClient } from "mongodb";
-import { DataDriver, EntityCollection } from "@rebasepro/types";
+import { DataDriver, SnapshotCollection } from "@rebasepro/types";
 
-import { MongoEntityService } from "./db/MongoEntityService";
+import { MongoDataService } from "./db/MongoDataService";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
 import { MongoHistoryService, HistoryRetentionConfig } from "./services/MongoHistoryService";
 import { MongoDBConnection } from "./connection";
-import { BackendConfig, BackendInstance, CollectionRegistryInterface, EntityRepository, RealtimeProvider, DatabaseConnection, DatabaseAdmin, DocumentAdmin, SchemaAdmin, HealthCheckResult } from "@rebasepro/types";
+import { BackendConfig, BackendInstance, CollectionRegistryInterface, DataRepository, RealtimeProvider, DatabaseConnection, DatabaseAdmin, DocumentAdmin, SchemaAdmin, HealthCheckResult } from "@rebasepro/types";
 
 /**
  * Configuration for creating a MongoDB backend.
@@ -25,7 +25,7 @@ export interface MongoBackendConfig extends BackendConfig {
     /** MongoDB client (for connection management) */
     client: MongoClient;
     /** Collections to register (optional, can be registered later) */
-    collections?: EntityCollection[];
+    collections?: SnapshotCollection[];
     /** History retention configuration */
     historyRetention?: Partial<HistoryRetentionConfig>;
 }
@@ -40,8 +40,8 @@ export interface MongoBackendInstance extends BackendInstance {
     client: MongoClient;
     /** MongoDB DataDriver for use with Rebase */
     driver: DataDriver;
-    /** Entity service for direct database operations */
-    entityService: MongoEntityService;
+    /** Snapshot service for direct database operations */
+    dataService: MongoDataService;
     /** Realtime service for subscriptions */
     realtimeService: MongoRealtimeService;
     /** Admin capabilities (DocumentAdmin + SchemaAdmin) */
@@ -56,27 +56,27 @@ export interface MongoBackendInstance extends BackendInstance {
  * Simple in-memory collection registry for MongoDB.
  */
 export class MongoCollectionRegistry implements CollectionRegistryInterface {
-    private collections = new Map<string, EntityCollection>();
+    private collections = new Map<string, SnapshotCollection>();
     private _globalCallbacks?: any;
 
     /**
      * Register a collection
      */
-    register(collection: EntityCollection): void {
+    register(collection: SnapshotCollection): void {
         this.collections.set(collection.name, collection);
     }
 
     /**
      * Get a collection by its path
      */
-    getCollectionByPath(path: string): EntityCollection | undefined {
+    getCollectionByPath(path: string): SnapshotCollection | undefined {
         return this.collections.get(path);
     }
 
     /**
      * Get all registered collections
      */
-    getCollections(): EntityCollection[] {
+    getCollections(): SnapshotCollection[] {
         return Array.from(this.collections.values());
     }
 
@@ -104,7 +104,7 @@ export class MongoCollectionRegistry implements CollectionRegistryInterface {
  *
  * This factory function creates all the necessary services for a MongoDB backend:
  * - MongoDBConnection (database connection wrapper)
- * - MongoEntityService (implements EntityRepository)
+ * - MongoDataService (implements DataRepository)
  * - MongoRealtimeService (implements RealtimeProvider)
  * - MongoCollectionRegistry (implements CollectionRegistryInterface)
  * - MongoDriver (for Rebase integration)
@@ -125,7 +125,7 @@ export class MongoCollectionRegistry implements CollectionRegistryInterface {
  * });
  *
  * // Use the backend
- * const entities = await backend.entityRepository.fetchCollection("users", {});
+ * const rows = await backend.snapshotRepository.fetchCollection("users", {});
  * ```
  */
 export function createMongoBackend(config: MongoBackendConfig): MongoBackendInstance {
@@ -140,7 +140,7 @@ export function createMongoBackend(config: MongoBackendConfig): MongoBackendInst
     }
 
     // Create services
-    const entityService = new MongoEntityService(db);
+    const dataService = new MongoDataService(db);
     const realtimeService = new MongoRealtimeService(db);
     const historyService = new MongoHistoryService(db, config.historyRetention);
     const driver = new MongoDriver(db, realtimeService, historyService, collectionRegistry);
@@ -193,7 +193,7 @@ policies: [] };
     return {
         // Abstract interface implementations
         connection: mongoConnection,
-        entityRepository: entityService,
+        snapshotRepository: dataService,
         realtimeProvider: realtimeService,
         collectionRegistry: collectionRegistry,
         admin,
@@ -221,7 +221,7 @@ latencyMs: Date.now() - start };
         db,
         client,
         driver,
-        entityService,
+        dataService,
         realtimeService
     };
 }
@@ -265,18 +265,18 @@ export function createMongoRealtimeService(db: Db): MongoRealtimeService {
 }
 
 /**
- * Create a MongoDB entity repository.
+ * Create a MongoDB row repository.
  *
  * @example
  * ```typescript
- * import { createMongoEntityRepository } from "@rebasepro/server-mongodb";
+ * import { createMongoSnapshotRepository } from "@rebasepro/server-mongodb";
  *
- * const repository = createMongoEntityRepository(db);
+ * const repository = createMongoSnapshotRepository(db);
  * const users = await repository.fetchCollection("users", {});
  * ```
  */
-export function createMongoEntityRepository(db: Db): EntityRepository {
-    return new MongoEntityService(db);
+export function createMongoSnapshotRepository(db: Db): DataRepository {
+    return new MongoDataService(db);
 }
 
 // =============================================================================

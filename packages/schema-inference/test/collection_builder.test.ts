@@ -1,4 +1,4 @@
-import { buildPropertiesOrder, buildEntityPropertiesFromData } from "../src/collection_builder";
+import { buildPropertiesOrder, buildSnapshotPropertiesFromData } from "../src/collection_builder";
 import { DataType, Properties, Property } from "@rebasepro/types";
 
 // Simple type inferrer for testing
@@ -87,9 +87,9 @@ name: "B" } as Property
 });
 
 // ─────────────────────────────────────────────────────────────
-// buildEntityPropertiesFromData
+// buildSnapshotPropertiesFromData
 // ─────────────────────────────────────────────────────────────
-describe("buildEntityPropertiesFromData", () => {
+describe("buildSnapshotPropertiesFromData", () => {
     it("infers string properties from data", async () => {
         const data = [
             { name: "Camera",
@@ -97,7 +97,7 @@ description: "A great camera" },
             { name: "Lens",
 description: "50mm lens" }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties.name).toBeDefined();
         expect(properties.name.type).toBe("string");
         expect(properties.description).toBeDefined();
@@ -110,7 +110,7 @@ count: 5 },
             { price: 200,
 count: 10 }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties.price.type).toBe("number");
         expect(properties.count.type).toBe("number");
     });
@@ -120,7 +120,7 @@ count: 10 }
             { active: true },
             { active: false }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties.active.type).toBe("boolean");
     });
 
@@ -129,7 +129,7 @@ count: 10 }
             { tags: ["electronics", "camera"] },
             { tags: ["lens", "photography"] }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties.tags.type).toBe("array");
     });
 
@@ -140,7 +140,7 @@ zip: "10001" } },
             { address: { city: "LA",
 zip: "90001" } }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties.address.type).toBe("map");
     });
 
@@ -150,7 +150,7 @@ zip: "90001" } }
             { value: "world" },
             { value: 42 }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         // String should win (2 vs 1)
         expect(properties.value.type).toBe("string");
     });
@@ -161,20 +161,20 @@ zip: "90001" } }
 name: "Test",
 _internal: true }
         ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties._id).toBeUndefined();
         expect(properties._internal).toBeUndefined();
         expect(properties.name).toBeDefined();
     });
 
     it("handles empty data array", async () => {
-        const properties = await buildEntityPropertiesFromData([], inferType);
+        const properties = await buildSnapshotPropertiesFromData([], inferType);
         expect(Object.keys(properties)).toHaveLength(0);
     });
 
     it("handles null entries in data", async () => {
         const data = [null, { name: "Test" }, null] as any[];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
+        const properties = await buildSnapshotPropertiesFromData(data, inferType);
         expect(properties.name).toBeDefined();
     });
 });

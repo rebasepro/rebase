@@ -2,11 +2,11 @@
  * @jest-environment jsdom
  */
 import {
-    getEntityPreviewKeys,
-    getEntityTitlePropertyKey
+    getSnapshotPreviewKeys,
+    getSnapshotTitlePropertyKey
 } from "../../src/util/previews";
-import { resolveCollectionSlotKeys } from "../../src/components/EntityCollectionView/useEntityPreviewSlots";
-import type { AuthController, EntityCollection, PropertyConfig, Property } from "@rebasepro/types";
+import { resolveCollectionSlotKeys } from "../../src/components/SnapshotCollectionView/useSnapshotPreviewSlots";
+import type { AuthController, SnapshotCollection, PropertyConfig, Property } from "@rebasepro/types";
 
 const mockAuthController = {
     user: { uid: "test" },
@@ -18,7 +18,7 @@ const fields: Record<string, PropertyConfig> = {};
 /**
  * Exact replica of the databases collection config from saas/config.
  */
-const databasesCollection: EntityCollection = {
+const databasesCollection: SnapshotCollection = {
     id: "databases",
     name: "Databases",
     singularName: "Database",
@@ -36,7 +36,7 @@ const databasesCollection: EntityCollection = {
             relationName: "project",
             cardinality: "one",
             direction: "owning",
-            target: () => ({} as EntityCollection),
+            target: () => ({} as SnapshotCollection),
             onDelete: "cascade"
         } as unknown as Property,
         type: {
@@ -125,29 +125,29 @@ color: "gray" }
         "lastBackupTime",
         "recoveryWindowStart"
     ]
-} as unknown as EntityCollection;
+} as unknown as SnapshotCollection;
 
 /**
  * Same shape but WITHOUT propertiesOrder — should keep the old heuristic behavior.
  */
-const databasesCollectionNoOrder: EntityCollection = {
+const databasesCollectionNoOrder: SnapshotCollection = {
     ...databasesCollection,
     id: "databases_no_order",
     propertiesOrder: undefined
-} as unknown as EntityCollection;
+} as unknown as SnapshotCollection;
 
 // ---------------------------------------------------------------------------
-// getEntityPreviewKeys — with explicit propertiesOrder
+// getSnapshotPreviewKeys — with explicit propertiesOrder
 // ---------------------------------------------------------------------------
-describe("getEntityPreviewKeys with propertiesOrder (databases collection)", () => {
+describe("getSnapshotPreviewKeys with propertiesOrder (databases collection)", () => {
 
     it("includes relation properties when propertiesOrder is set", () => {
-        const result = getEntityPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
+        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
         expect(result).toContain("project");
     });
 
     it("respects the propertiesOrder ordering", () => {
-        const result = getEntityPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
+        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
         const projectIdx = result.indexOf("project");
         const typeIdx = result.indexOf("type");
         const connIdx = result.indexOf("connectionString");
@@ -157,12 +157,12 @@ describe("getEntityPreviewKeys with propertiesOrder (databases collection)", () 
     });
 
     it("excludes id property", () => {
-        const result = getEntityPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
+        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
         expect(result).not.toContain("id");
     });
 
     it("still excludes relations when propertiesOrder is NOT set", () => {
-        const result = getEntityPreviewKeys(mockAuthController, databasesCollectionNoOrder, fields, undefined, 10);
+        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollectionNoOrder, fields, undefined, 10);
         expect(result).not.toContain("project");
     });
 });

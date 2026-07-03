@@ -1,5 +1,5 @@
 import { CollectionsConfigController } from "./config_controller";
-import { Entity, EntityCollection, Property } from "@rebasepro/types";
+import { Snapshot, SnapshotCollection, Property } from "@rebasepro/types";
 
 /**
  * Controller to open the collection editor dialog.
@@ -10,9 +10,9 @@ export interface CollectionEditorController {
     editCollection: (props: {
         id?: string,
         path?: string,
-        parentCollectionSlugs: string[], parentEntityIds: string[],
-        parentCollection?: EntityCollection,
-        existingEntities?: Entity<any>[],
+        parentCollectionSlugs: string[], parentSnapshotIds: string[],
+        parentCollection?: SnapshotCollection,
+        existingSnapshots?: Snapshot<any>[],
         /**
          * Initial view to open: "general", "display", or "properties"
          */
@@ -34,9 +34,9 @@ export interface CollectionEditorController {
          * A collection to duplicate from. If provided, the new collection will be
          * pre-populated with the same properties (but with empty name, path, and id).
          */
-        copyFrom?: EntityCollection,
-        parentCollectionSlugs: string[], parentEntityIds: string[],
-        parentCollection?: EntityCollection,
+        copyFrom?: SnapshotCollection,
+        parentCollectionSlugs: string[], parentSnapshotIds: string[],
+        parentCollection?: SnapshotCollection,
         redirect: boolean,
         sourceClick?: string
     }) => void;
@@ -46,9 +46,9 @@ export interface CollectionEditorController {
         property?: Property,
         currentPropertiesOrder?: string[],
         editedCollectionId: string,
-        parentCollectionSlugs: string[], parentEntityIds: string[],
-        collection: EntityCollection,
-        existingEntities: Entity<any>[]
+        parentCollectionSlugs: string[], parentSnapshotIds: string[],
+        collection: SnapshotCollection,
+        existingSnapshots: Snapshot<any>[]
     }) => void;
 
     /**
