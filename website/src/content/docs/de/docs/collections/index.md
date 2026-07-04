@@ -15,9 +15,9 @@ Eine **Sammlung** ist ein TypeScript-Objekt, das eine Datenbanktabelle beschreib
 - **Lebenszyklus-Hooks** – Callbacks für Erstellungs-, Aktualisierungs- und Löschvorgänge
 
 ```typescript
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: EntityCollection = {
+export const productsCollection: CollectionConfig = {
     slug: "products",              // URL path and API endpoint
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
@@ -120,13 +120,13 @@ export const productsCollection: EntityCollection = {
 
 | Eigenschaft | Typ | Beschreibung |
 |----------|------|-------------|
-| `callbacks` | `EntityCallbacks` | Lebenszyklus-Hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
+| `callbacks` | `CollectionCallbacks` | Lebenszyklus-Hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
 | `entityActions` | `EntityAction[]` | Benutzerdefinierte Aktionen für Entitäten (archivieren, veröffentlichen usw.) |
 | `Actions` | `React.ComponentType` | Benutzerdefinierte Symbolleisten-Aktionskomponente |
 | `entityViews` | `EntityCustomView[]` | Benutzerdefinierte Tabs in der Entitätsdetailansicht |
 | `additionalFields` | `AdditionalFieldDelegate[]` | Berechnete/virtuelle Spalten |
-| `childCollections` | `() => EntityCollection[]` | Verschachtelte Kindersammlungen |
-| `subcollections` | `() => EntityCollection[]` | Verschachtelte Sammlungen (z.B. Bestellung → Posten) |
+| `childCollections` | `() => CollectionConfig[]` | Verschachtelte Kindersammlungen |
+| `subcollections` | `() => CollectionConfig[]` | Verschachtelte Sammlungen (z.B. Bestellung → Posten) |
 | `exportable` | `boolean \| ExportConfig` | Datenexport aktivieren |
 | `ownerId` | `string` | Besitzer-Benutzer-ID (von Plugins/benutzerdefiniertem Code verwendet) |
 | `overrides` | `EntityOverrides` | Overrides für die Entitätsansicht |
@@ -138,7 +138,7 @@ export const productsCollection: EntityCollection = {
 Für dynamische Sammlungen, die sich basierend auf dem Benutzer oder externen Daten ändern, verwenden Sie eine Builder-Funktion:
 
 ```typescript
-const collectionsBuilder: EntityCollectionsBuilder = ({ user, authController }) => {
+const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
     const collections = [productsCollection];
 
     if (authController.extra?.role === "admin") {

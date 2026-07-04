@@ -9,7 +9,7 @@ description: Install and configure the Rebase Client SDK to interact with your b
 The `@rebasepro/client` package provides a type-safe JavaScript SDK for interacting with your Rebase backend. It handles:
 
 - **Data operations** — CRUD with filtering, sorting, and pagination
-- **Relation fetching** — Include related entities with `.include()`
+- **Relation fetching** — Include related snapshots with `.include()`
 - **Real-time subscriptions** — WebSocket-based live updates
 - **Authentication** — Token management, login, signup, OAuth
 - **Storage** — File upload, download, and management

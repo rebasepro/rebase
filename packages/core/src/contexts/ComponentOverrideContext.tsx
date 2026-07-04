@@ -56,7 +56,7 @@ export function GlobalComponentOverrideProvider({
  * around the collection's view subtree. Components within the subtree
  * will resolve overrides in order: collection → global → default.
  *
- * @internal — Used by SnapshotCollectionView when a collection has
+ * @internal — Used by DataCollectionView when a collection has
  * `components` defined.
  */
 export function CollectionComponentOverrideProvider({

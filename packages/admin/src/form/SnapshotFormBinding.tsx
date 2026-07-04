@@ -1,4 +1,4 @@
-import type { SnapshotCollection, PluginFormActionProps } from "@rebasepro/types";
+import type { CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import React, { useCallback, useMemo, useState } from "react";
 import { AnalyticsEvent, Snapshot, SnapshotStatus, SnapshotValues } from "@rebasepro/types";
@@ -26,7 +26,7 @@ import {
     saveSnapshotToCache
 } from "@rebasepro/core";
 
-import { useCollectionRegistryController, useSideSnapshotController, useCMSContext } from "../index";
+import { useCollectionRegistryController, useSidePanel, useCMSContext } from "../index";
 import { SnapshotForm } from "./SnapshotForm";
 import {
     extractTouchedValues,
@@ -92,7 +92,7 @@ export function SnapshotFormBinding<M extends Record<string, unknown>>({
 }: SnapshotFormBindingProps<M>) {
 
     const { t } = useTranslation();
-    const sideSnapshotController = useSideSnapshotController();
+    const sidePanelController = useSidePanel();
     const collectionRegistryController = useCollectionRegistryController();
     const authController = useAuthController();
     const dataClient = useData();
@@ -153,11 +153,11 @@ export function SnapshotFormBinding<M extends Record<string, unknown>>({
             return;
         }
         if (openSnapshotMode === "side_panel" || openSnapshotMode === "dialog") {
-            sideSnapshotController.close();
+            sidePanelController.close();
         } else {
             window.history.back();
         }
-    }, [navigateBackProp, openSnapshotMode, sideSnapshotController]);
+    }, [navigateBackProp, openSnapshotMode, sidePanelController]);
 
     // --- Cache operations ---
     const clearDirtyCache = useCallback(() => {
@@ -276,7 +276,7 @@ export function SnapshotFormBinding<M extends Record<string, unknown>>({
         parentSnapshotIds,
         path,
         status,
-        collection: collection as SnapshotCollection,
+        collection: collection as CollectionConfig,
         context,
         formContext: undefined as unknown as FormContext<Record<string, unknown>>,
         openSnapshotMode,

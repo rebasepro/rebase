@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "@rebasepro/core";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { Button } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -14,7 +14,7 @@ export function KanbanSetupAction({
     parentCollectionSlugs,
     parentSnapshotIds
 }: {
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     fullPath: string;
     parentCollectionSlugs: string[], parentSnapshotIds: string[];
 }) {

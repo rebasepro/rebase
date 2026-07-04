@@ -1,5 +1,5 @@
-import { useSnapshotSelectionDialog } from "../../../hooks/useSnapshotSelectionDialog";
-import type { SnapshotCollection } from "@rebasepro/types";
+import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
+import type { CollectionConfig } from "@rebasepro/types";
 import React, { useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { Snapshot, SnapshotReference } from "@rebasepro/types";
@@ -100,7 +100,7 @@ export function ReferenceFilterField({
     }
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: SnapshotCollection | undefined = useMemo(() => {
+    const collection: CollectionConfig | undefined = useMemo(() => {
         return path ? collectionRegistryController.getCollection(path) : undefined;
     }, [path]);
 
@@ -114,7 +114,7 @@ export function ReferenceFilterField({
 
     const multiple = multipleSelectOperations.includes(operation);
 
-    const referenceDialogController = useSnapshotSelectionDialog({
+    const referenceDialogController = useSelectionDialog({
         multiselect: multiple,
         path,
         collection,

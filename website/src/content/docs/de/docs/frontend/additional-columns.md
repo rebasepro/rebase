@@ -11,7 +11,7 @@ Zusätzliche Spalten ermöglichen es Ihnen, berechnete oder abgeleitete Daten in
 ## Definieren zusätzlicher Spalten
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     additionalFields: [
         {
@@ -51,7 +51,7 @@ const ordersCollection: EntityCollection = {
 
 ## Nächste Schritte
 
-- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
+- **[Entity Actions](/docs/frontend/snapshot-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder
 
 ---

@@ -15,7 +15,7 @@ pnpm add @rebasepro/common
 - **Collection utilities** — collection registry, default collection definitions, path resolution, navigation helpers
 - **Data driver adapter** — `buildRebaseData()` bridges any `DataDriver` implementation into a `RebaseData` proxy with typed collection accessors
 - **Query builder** — fluent `QueryBuilder` class plus `or()`, `and()`, `cond()` helpers for composing complex queries
-- **Entity/property utilities** — entity resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
+- **Snapshot/property utilities** — snapshot resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
 
 This package has no React dependency — it's pure TypeScript and can be used in both client and server contexts.
 
@@ -44,7 +44,7 @@ This package has no React dependency — it's pure TypeScript and can be used in
 |---|---|
 | `collections` | Collection config helpers |
 | `common` | General-purpose utilities |
-| `entities` | Entity value resolution |
+| `snapshots` | Snapshot value resolution |
 | `enums` | Enum type helpers |
 | `paths` | Path parsing and manipulation |
 | `resolutions` | Property and collection resolution |
@@ -69,7 +69,7 @@ const data = buildRebaseData(myDriver);
 
 // Access collections by name (camelCase auto-converts to snake_case)
 const { data: products } = await data.products.find({ limit: 10 });
-const entity = await data.products.findById("abc-123");
+const snapshot = await data.products.findById("abc-123");
 
 // Fluent query builder
 const { data: results } = await data.products
@@ -89,7 +89,7 @@ const { data: filtered } = await data.products
 
 ## Related Packages
 
-- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Entity`, `FindResponse`, etc.
+- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Snapshot`, `FindResponse`, etc.
 - [`@rebasepro/utils`](../utils) — Low-level utilities (`toSnakeCase`, etc.)
 - [`@rebasepro/core`](../core) — Runtime layer that consumes `@rebasepro/common`
 - [`@rebasepro/client`](../client) — HTTP client that re-exports and extends the `QueryBuilder`

@@ -23,16 +23,16 @@ export {
 } from "./useJsonCollectionsConfigController";
 
 export {
-    toSerializableCollection,
+    toSerializableCollectionConfig,
     toSerializableProperty,
     toSerializableProperties,
-    fromSerializableCollection,
+    fromSerializableCollectionConfig,
     fromSerializableProperty,
     fromSerializableProperties,
 } from "./serializable_utils";
 
 export type {
-    SerializableCollection,
+    SerializableCollectionConfig,
     SerializableProperty,
     SerializableProperties,
     SerializableBaseProperty,

@@ -276,7 +276,7 @@ PostgreSQL RLS policies use `auth.uid()`, `auth.roles()`, and `auth.jwt()` to re
 Collection callbacks are per-collection lifecycle hooks that run **inside** the DataDriver, close to the database. They provide collection-specific security enforcement:
 
 ```typescript
-const ordersCollection: PostgresCollection = {
+const ordersCollection: PostgresCollectionConfig = {
     name: "Orders",
     slug: "orders",
     table: "orders",
@@ -289,9 +289,9 @@ const ordersCollection: PostgresCollection = {
             }
             return values;
         },
-        beforeDelete: async ({ snapshot, context }) => {
+        beforeDelete: async ({ row, context }) => {
             // Prevent deletion of fulfilled orders
-            if (snapshot.values.status === "fulfilled") {
+            if (row.status === "fulfilled") {
                 throw new Error("Cannot delete fulfilled orders");
             }
         },
@@ -398,35 +398,35 @@ const hooks: BackendHooks = {
 Collection Callbacks receive the full snapshot data, making them ideal for ownership verification on deletes and updates:
 
 ```typescript
-const ordersCollection: PostgresCollection = {
+const ordersCollection: PostgresCollectionConfig = {
     name: "Orders",
     slug: "orders",
     table: "orders",
     callbacks: {
-        beforeSave: async ({ values, snapshotId, context, previousValues }) => {
+        beforeSave: async ({ values, id, context, previousValues }) => {
             const user = context.user;
             if (!user) throw new Error("Unauthorized");
 
             // On update, verify the current user owns this order
-            if (snapshotId && previousValues) {
+            if (id && previousValues) {
                 if (previousValues.user_id !== user.uid && !user.roles?.includes("admin")) {
                     throw new Error("You can only edit your own orders");
                 }
             }
 
             // On create, stamp ownership
-            if (!snapshotId) {
+            if (!id) {
                 values.user_id = user.uid;
             }
 
             return values;
         },
 
-        beforeDelete: async ({ snapshot, context }) => {
+        beforeDelete: async ({ row, context }) => {
             const user = context.user;
             if (!user) throw new Error("Unauthorized");
 
-            if (snapshot.values.user_id !== user.uid && !user.roles?.includes("admin")) {
+            if (row.user_id !== user.uid && !user.roles?.includes("admin")) {
                 throw new Error("You can only delete your own orders");
             }
         },

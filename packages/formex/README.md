@@ -101,5 +101,5 @@ function SubmitButton() {
 
 ## Related Packages
 
-- `@rebasepro/admin` — Uses Formex for all entity editing forms
+- `@rebasepro/admin` — Uses Formex for all snapshot editing forms
 - `@rebasepro/core` — Core Rebase framework

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { CollectionSize, Snapshot, SnapshotRelation, SnapshotTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
 import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams, VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { enumToObjectEntries } from "@rebasepro/common";
-import { DEFAULT_PAGE_SIZE, SnapshotCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
+import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
 import { FilterFormFieldProps } from "@rebasepro/ui";
 import { ReferenceFilterField } from "./filters/ReferenceFilterField";
 import { StringNumberFilterField } from "./filters/StringNumberFilterField";
@@ -107,23 +107,23 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
  * This component is in charge of rendering a collection table with a high
  * degree of customization.
  *
- * This component is used internally by {@link SnapshotCollectionView} and
+ * This component is used internally by {@link CollectionViewBinding} and
  * {@link useReferenceDialog}
  *
  * Please note that you only need to use this component if you are building
  * a custom view. If you just need to create a default view you can do it
  * exclusively with config options.
  *
- * If you want to bind a {@link SnapshotCollection} to a table with the default
+ * If you want to bind a {@link CollectionConfig} to a table with the default
  * options you see in collections in the top level navigation, you can
- * check {@link SnapshotCollectionView}.
+ * check {@link CollectionViewBinding}.
  *
  * The data displayed in the table is managed by a {@link SnapshotTableController}.
  * You can build the default, bound to a path in the driver, by using the hook
  * {@link useDataTableController}
  *
- * @see SnapshotCollectionTableProps
- * @see SnapshotCollectionView
+ * @see CollectionTableBindingProps
+ * @see CollectionViewBinding
  * @see VirtualTable
  * @group Components
  */
@@ -244,7 +244,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         size: size ?? "m",
         selectionStore,
         setPopupCell
-    } as unknown as SnapshotCollectionTableController<Record<string, unknown>>), [setPopupCell, select, onValueChange, size, selectionStore]);
+    } as unknown as DataCollectionTableController<Record<string, unknown>>), [setPopupCell, select, onValueChange, size, selectionStore]);
 
     return (
         <SelectableTableContext.Provider

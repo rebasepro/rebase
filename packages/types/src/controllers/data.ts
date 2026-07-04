@@ -64,13 +64,6 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
         limit: number;
         offset: number;
         hasMore: boolean;
-        /**
-         * `true` when `total` and `hasMore` are heuristic estimates
-         * (e.g. realtime first-paint). A follow-up emission with
-         * authoritative meta may follow. When absent or `false`,
-         * the values are authoritative.
-         */
-        estimated?: boolean;
     };
 }
 
@@ -176,13 +169,6 @@ export interface PaginationMeta {
     limit: number;
     offset: number;
     hasMore: boolean;
-    /**
-     * `true` when `total` and `hasMore` are heuristic estimates
-     * (e.g. realtime first-paint). A follow-up emission with
-     * authoritative meta may follow. When absent or `false`,
-     * the values are authoritative.
-     */
-    estimated?: boolean;
 }
 
 /**
@@ -259,14 +245,15 @@ export interface SDKCollectionClient<M extends Record<string, unknown> = Record<
 
     /**
      * Update an existing record by ID.
-     * @returns The updated row
+     * @returns The updated row, or `undefined` if the record does not exist.
      */
-    update(id: string | number, data: Partial<M>): Promise<M>;
+    update(id: string | number, data: Partial<M>): Promise<M | undefined>;
 
     /**
      * Delete a record by ID.
+     * @returns Resolves, or returns `undefined` if the record does not exist.
      */
-    delete(id: string | number): Promise<void>;
+    delete(id: string | number): Promise<void | undefined>;
 
     /**
      * Delete all records in this collection.

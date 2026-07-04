@@ -1,4 +1,4 @@
-import { SnapshotCollection, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation, VectorProperty } from "@rebasepro/types";
+import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation, VectorProperty } from "@rebasepro/types";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -17,7 +17,7 @@ export interface OpenApiGeneratorOptions {
 }
 
 export function generateOpenApiSpec(
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     options: OpenApiGeneratorOptions = {}
 ): Record<string, unknown> {
     const basePath = options.basePath ?? "/api";
@@ -395,7 +395,7 @@ schema: { type: "string" } }
  * Build the component schema for a collection (output / read shape).
  * All fields are included (including relation foreign keys).
  */
-function buildCollectionSchema(collection: SnapshotCollection): Record<string, unknown> {
+function buildCollectionSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {
         id: { type: "string",
 description: "Unique identifier" }
@@ -423,7 +423,7 @@ description: "Unique identifier" }
 /**
  * Build an input schema (for POST/PUT) — excludes auto-generated fields.
  */
-function buildCollectionInputSchema(collection: SnapshotCollection): Record<string, unknown> {
+function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
 
@@ -660,7 +660,7 @@ function resolveEnumValues(enumDef: Record<string | number, unknown> | Array<{ i
  * Build PostgREST-style filter parameters for a collection.
  * These are additional query parameters like `?status=eq.active&price=gte.100`.
  */
-function buildFilterParameters(collection: SnapshotCollection): Array<Record<string, unknown>> {
+function buildFilterParameters(collection: CollectionConfig): Array<Record<string, unknown>> {
     const params: Array<Record<string, unknown>> = [];
 
     for (const [key, property] of Object.entries(collection.properties)) {

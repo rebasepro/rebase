@@ -1,4 +1,4 @@
-import type { AppView, SnapshotCollection, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
+import type { AppView, CollectionConfig, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
 
 import { getSubcollections } from "@rebasepro/common";
 import { deepEqual as equal } from "fast-equals";
@@ -6,7 +6,7 @@ import { deepEqual as equal } from "fast-equals";
 export const NAVIGATION_DEFAULT_GROUP_NAME = "Views";
 export const NAVIGATION_ADMIN_GROUP_NAME = "Admin";
 
-export function getGroup(collectionOrView: SnapshotCollection | AppView) {
+export function getGroup(collectionOrView: CollectionConfig | AppView) {
     const trimmed = collectionOrView.group?.trim();
     if (!trimmed || trimmed === "") {
         return NAVIGATION_DEFAULT_GROUP_NAME;
@@ -21,7 +21,7 @@ export function computeNavigationGroups({
     plugins
 }: {
     navigationGroupMappings?: NavigationGroupMapping[],
-    collections?: SnapshotCollection[],
+    collections?: CollectionConfig[],
     views?: AppView[],
     plugins?: RebasePlugin[]
 }): NavigationGroupMapping[] {
@@ -146,7 +146,7 @@ export function computeNavigationGroups({
     return result;
 }
 
-export function areCollectionListsEqual(a: SnapshotCollection[], b: SnapshotCollection[], visitedSlugs: string[] = []) {
+export function areCollectionListsEqual(a: CollectionConfig[], b: CollectionConfig[], visitedSlugs: string[] = []) {
     if (a.length !== b.length) {
         return false;
     }
@@ -157,7 +157,7 @@ export function areCollectionListsEqual(a: SnapshotCollection[], b: SnapshotColl
     return aSorted.every((value, index) => areCollectionsEqual(value, bSorted[index], visitedSlugs));
 }
 
-export function areCollectionsEqual(a: SnapshotCollection, b: SnapshotCollection, visitedSlugs: string[] = []) {
+export function areCollectionsEqual(a: CollectionConfig, b: CollectionConfig, visitedSlugs: string[] = []) {
     if (a.slug !== b.slug) {
         return false;
     }

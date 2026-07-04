@@ -4,7 +4,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { useTopLevelNavigation } from "../../src/hooks/navigation/useTopLevelNavigation";
-import { UrlController, CollectionRegistryController, SnapshotCollection, NavigationResult } from "@rebasepro/types";
+import { UrlController, CollectionRegistryController, CollectionConfig, NavigationResult } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 import { deepEqual } from "fast-equals";
@@ -24,7 +24,7 @@ describe("useTopLevelNavigation", () => {
         getCollections: jest.fn()
     } as Partial<CollectionRegistryController> as CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 
-    const collections: SnapshotCollection[] = [
+    const collections: CollectionConfig[] = [
         { id: "test",
 name: "Test Collection",
 path: "test",

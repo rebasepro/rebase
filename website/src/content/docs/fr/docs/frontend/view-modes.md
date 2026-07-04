@@ -16,7 +16,7 @@ Chaque collection peut être affichée selon quatre modes d'affichage :
 ## Configuration
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     defaultViewMode: "table",            // Default view
     enabledViews: ["list", "table", "kanban"],    // Available views
@@ -67,7 +67,7 @@ Contrôlez la hauteur des lignes avec `defaultSize` :
 Configurez un tableau Kanban en spécifiant la propriété d'énumération à utiliser comme colonnes :
 
 ```typescript
-const tasksCollection: EntityCollection = {
+const tasksCollection: CollectionConfig = {
     slug: "tasks",
     defaultViewMode: "kanban",
     kanban: {
@@ -100,7 +100,7 @@ Le glisser-déposer entre les colonnes met automatiquement à jour le champ d'é
 Les cartes affichent les entités sous forme de cartes visuelles — utile pour le contenu riche en images :
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     defaultViewMode: "cards",
     properties: {
@@ -116,7 +116,7 @@ const articlesCollection: EntityCollection = {
 
 ## Prochaines étapes
 
-- **[Vues d'entités](/docs/frontend/entity-views)** — Onglets personnalisés sur les formulaires d'entités
-- **[Actions d'entités](/docs/frontend/entity-actions)** — Actions d'entités personnalisées
+- **[Vues d'entités](/docs/frontend/snapshot-views)** — Onglets personnalisés sur les formulaires d'entités
+- **[Actions d'entités](/docs/frontend/snapshot-actions)** — Actions d'entités personnalisées
 
 ---

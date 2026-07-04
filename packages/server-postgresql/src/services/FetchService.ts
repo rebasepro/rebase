@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { SnapshotCollection, FilterValues, Relation, LogicalCondition } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, Relation, LogicalCondition } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
@@ -64,7 +64,7 @@ export class FetchService {
     private resolveOrderByField(
         table: PgTable<any>,
         orderBy: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     ): AnyPgColumn | undefined {
         let orderByField = table[orderBy as keyof typeof table] as AnyPgColumn;
         if (!orderByField && collection) {
@@ -87,7 +87,7 @@ export class FetchService {
      * the target relation so actual row data is returned.
      */
     private buildWithConfig(
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         include?: string[]
     ): Record<string, boolean | { with: Record<string, boolean> }> {
         const resolvedRelations = resolveCollectionRelations(collection);
@@ -130,7 +130,7 @@ export class FetchService {
     /**
      * Detect if a many-to-many relation uses a junction table in the Drizzle schema.
      */
-    private isJunctionRelation(relation: Relation, _collection: SnapshotCollection): boolean {
+    private isJunctionRelation(relation: Relation, _collection: CollectionConfig): boolean {
         // If `through` is defined, it's explicitly a junction relation
         if (relation.through) return true;
         // If joinPath has an intermediate table, it's likely junction-based
@@ -142,7 +142,7 @@ export class FetchService {
      * Get the Drizzle relation name on the junction table that points to the actual target row.
      * For example, for posts_tags junction, this returns "tag_id" (the relation pointing to tags).
      */
-    private getJunctionTargetRelationName(relation: Relation, _collection: SnapshotCollection): string | null {
+    private getJunctionTargetRelationName(relation: Relation, _collection: CollectionConfig): string | null {
         if (relation.through) {
             // The junction relation on the junction table pointing to the target
             // uses the targetColumn name as the Drizzle relation name
@@ -161,7 +161,7 @@ export class FetchService {
      */
     private drizzleResultToRow<M extends Record<string, unknown>>(
         row: Record<string, unknown>,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         _collectionPath: string,
         idInfo: { fieldName: string; type: "string" | "number" },
         _databaseId?: string,
@@ -240,7 +240,7 @@ export class FetchService {
      */
     private async resolveJoinPathRelations<M extends Record<string, unknown>>(
         row: Record<string, unknown>,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         collectionPath: string,
         parsedId: string | number,
         _databaseId?: string
@@ -280,7 +280,7 @@ export class FetchService {
      */
     private async resolveJoinPathRelationsBatch<M extends Record<string, unknown>>(
         rows: Record<string, unknown>[],
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         collectionPath: string,
         idInfo: { fieldName: string; type: "string" | "number" },
         _databaseId?: string
@@ -331,7 +331,7 @@ export class FetchService {
      */
     private async resolveJoinPathRelationsBatchRest(
         rows: Record<string, unknown>[],
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         collectionPath: string,
         idInfoArray: { fieldName: string; type: "string" | "number" }[],
         include?: string[]
@@ -409,7 +409,7 @@ export class FetchService {
      */
     private drizzleResultToRestRow(
         row: Record<string, unknown>,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         idInfo: { fieldName: string; type: "string" | "number" },
         idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Record<string, unknown> {
@@ -847,7 +847,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
      */
     private async processRowResults<M extends Record<string, unknown>>(
         results: Record<string, unknown>[],
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         collectionPath: string,
         idInfo: { fieldName: string; type: "string" | "number" },
         _databaseId?: string,
@@ -1526,7 +1526,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
      */
     private async fetchWithDrizzleQuery<M extends Record<string, unknown>>(
         collectionPath: string,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
             orderBy?: string;

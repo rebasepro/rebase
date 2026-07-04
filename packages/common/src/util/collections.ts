@@ -1,7 +1,7 @@
 import {
     DefaultSelectedViewBuilder,
     DefaultSelectedViewParams,
-    SnapshotCollection,
+    CollectionConfig,
     Properties,
     Property
 } from "@rebasepro/types";
@@ -99,7 +99,7 @@ export function resolveDefaultSelectedView(
 }
 
 
-export function getLocalChangesBackup(collection: SnapshotCollection) {
+export function getLocalChangesBackup(collection: CollectionConfig) {
     if (!collection.localChangesBackup) {
         return "manual_apply";
     }
@@ -113,7 +113,7 @@ export function getLocalChangesBackup(collection: SnapshotCollection) {
  * Fallbacks to `["id"]` if no properties are marked as `isId: true`.
  * @param collection
  */
-export function getPrimaryKeys<M extends Record<string, unknown>>(collection: SnapshotCollection<M>): Extract<keyof M, string>[] {
+export function getPrimaryKeys<M extends Record<string, unknown>>(collection: CollectionConfig<M>): Extract<keyof M, string>[] {
     const properties = collection.properties;
     if (!properties) {
         return ["id"] as Extract<keyof M, string>[];

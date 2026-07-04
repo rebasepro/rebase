@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "./api-generator";
-import type { DataDriver, Snapshot, SnapshotCollection, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, Snapshot, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
 
 /**
  * Minimal mock DataDriver for testing.
@@ -19,20 +19,20 @@ values: {} } as Snapshot),
     } as unknown as DataDriver;
 }
 
-function createTestCollection(slug: string): SnapshotCollection {
+function createTestCollection(slug: string): CollectionConfig {
     return {
         slug,
         name: slug.charAt(0).toUpperCase() + slug.slice(1),
         path: slug,
         properties: {}
-    } as unknown as SnapshotCollection;
+    } as unknown as CollectionConfig;
 }
 
 /**
  * Wraps generated routes in a parent Hono app that injects the driver
  * into context — replicating what auth middleware does in production.
  */
-function createApp(collections: SnapshotCollection[], driver: DataDriver): Hono {
+function createApp(collections: CollectionConfig[], driver: DataDriver): Hono {
     const parent = new Hono();
     parent.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -45,7 +45,7 @@ function createApp(collections: SnapshotCollection[], driver: DataDriver): Hono 
 
 describe("RestApiGenerator - Count Endpoint", () => {
     let driver: DataDriver;
-    let collection: SnapshotCollection;
+    let collection: CollectionConfig;
 
     beforeEach(() => {
         driver = createMockDriver({

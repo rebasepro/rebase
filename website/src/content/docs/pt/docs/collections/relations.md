@@ -20,7 +20,7 @@ As relações podem ser definidas inline dentro da propriedade, ou explicitament
 Você pode definir a relação diretamente na propriedade. O framework extrai automaticamente estas para o `relations[]` da coleção no momento da normalização, então você não precisa mais de uma entrada `relations[]` separada para as propriedades.
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -44,7 +44,7 @@ const postsCollection: EntityCollection = {
 Para casos de uso avançados ou quando uma relação não mapeia diretamente para um campo de formulário, você pode defini-la no array `relations`:
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -279,7 +279,7 @@ Para a referência completa do construtor de consultas (filtragem, classificaç�
 ```typescript
 interface Relation {
     relationName?: string;
-    target: () => EntityCollection;
+    target: () => CollectionConfig;
     cardinality: "one" | "many";
     direction?: "owning" | "inverse";
     inverseRelationName?: string;
@@ -293,7 +293,7 @@ interface Relation {
     joinPath?: JoinStep[];
     onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    overrides?: Partial<EntityCollection>;
+    overrides?: Partial<CollectionConfig>;
     validation?: { required?: boolean };
 }
 ```

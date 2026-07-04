@@ -175,9 +175,9 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const membersCollection: PostgresCollection = {
+const membersCollection: PostgresCollectionConfig = {
   name: "Members",
   slug: "members",
   table: "members",
@@ -204,7 +204,7 @@ const membersCollection: PostgresCollection = {
 
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
-      resetPassword: true // Or false to disable, or a custom EntityAction
+      resetPassword: true // Or false to disable, or a custom SnapshotAction
     }
   },
   properties: { ... }
@@ -300,7 +300,7 @@ export interface AuthAdapter {
   ): Promise<UserCreationPrepareResult>;
 
   finalizeUserCreation?(
-    entity: { id: string; values: Record<string, unknown> },
+    snapshot: { id: string; values: Record<string, unknown> },
     clearPassword?: string
   ): Promise<UserCreationFinalizeResult>;
 

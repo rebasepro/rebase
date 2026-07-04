@@ -6,7 +6,7 @@ import {
     getSnapshotTitlePropertyKey,
     resolveTitleToString
 } from "../../src/util/previews";
-import type { AuthController, SnapshotCollection, PropertyConfig, Property } from "@rebasepro/types";
+import type { AuthController, CollectionConfig, PropertyConfig, Property } from "@rebasepro/types";
 
 const mockAuthController = {
     user: { uid: "test" },
@@ -20,7 +20,7 @@ const fields: Record<string, PropertyConfig> = {};
 // ---------------------------------------------------------------------------
 describe("getSnapshotPreviewKeys", () => {
     it("returns previewProperties when explicitly passed", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -32,14 +32,14 @@ name: "Body" } as Property,
                 status: { type: "string",
 name: "Status" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields, ["title", "status"]);
         expect(result).toEqual(["title", "status"]);
     });
 
     it("falls back to collection.previewProperties when no explicit list", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -50,14 +50,14 @@ name: "Title" } as Property,
                 body: { type: "string",
 name: "Body" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
         expect(result).toEqual(["body"]);
     });
 
     it("auto-selects up to 3 non-reference, non-relation, non-id properties", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -71,7 +71,7 @@ name: "Count" } as Property,
                 extra: { type: "string",
 name: "Extra" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
         expect(result).toHaveLength(3);
@@ -79,7 +79,7 @@ name: "Extra" } as Property
     });
 
     it("excludes reference properties from auto-selection", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -92,14 +92,14 @@ path: "users" } as Property,
                 body: { type: "string",
 name: "Body" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("author");
     });
 
     it("excludes relation properties from auto-selection", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -109,14 +109,14 @@ name: "Title" } as Property,
                 tags: { type: "relation",
 name: "Tags" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("tags");
     });
 
     it("excludes id properties from auto-selection", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -127,14 +127,14 @@ isId: true } as unknown as Property,
                 title: { type: "string",
 name: "Title" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("id");
     });
 
     it("excludes hidden properties from auto-selection", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -147,7 +147,7 @@ ui: { hideFromCollection: true } } as Property,
                 body: { type: "string",
 name: "Body" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("secret");
@@ -156,7 +156,7 @@ name: "Body" } as Property
     });
 
     it("respects the limit parameter", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -170,14 +170,14 @@ name: "C" } as Property,
                 d: { type: "string",
 name: "D" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields, undefined, 2);
         expect(result).toHaveLength(2);
     });
 
     it("filters out previewProperties that don't exist in collection properties", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -185,7 +185,7 @@ name: "D" } as Property
                 title: { type: "string",
 name: "Title" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         const result = getSnapshotPreviewKeys(mockAuthController, collection, fields, ["title", "nonexistent"]);
         expect(result).toEqual(["title"]);
@@ -197,7 +197,7 @@ name: "Title" } as Property
 // ---------------------------------------------------------------------------
 describe("getSnapshotTitlePropertyKey", () => {
     it("returns explicit titleProperty when set", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -209,13 +209,13 @@ name: "Name" } as Property,
 name: "Body",
 ui: { multiline: true } } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
     });
 
     it("auto-detects first single-line text field as title", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -228,13 +228,13 @@ name: "Title" } as Property,
 name: "Body",
 ui: { multiline: true } } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("title");
     });
 
     it("skips multiline text fields", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -245,13 +245,13 @@ ui: { multiline: true } } as Property,
                 name: { type: "string",
 name: "Name" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
     });
 
     it("skips markdown text fields", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -262,13 +262,13 @@ ui: { markdown: true } } as Property,
                 slug: { type: "string",
 name: "Slug" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("slug");
     });
 
     it("skips storage text fields", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -279,13 +279,13 @@ storage: { bucket: "test" } } as unknown as Property,
                 label: { type: "string",
 name: "Label" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("label");
     });
 
     it("skips isId fields", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -296,13 +296,13 @@ isId: true } as unknown as Property,
                 name: { type: "string",
 name: "Name" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
     });
 
     it("returns undefined when no suitable title field exists", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -312,13 +312,13 @@ name: "Count" } as Property,
                 flag: { type: "boolean",
 name: "Flag" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBeUndefined();
     });
 
     it("skips hidden properties when auto-detecting title", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
@@ -329,7 +329,7 @@ ui: { hideFromCollection: true } } as Property,
                 name: { type: "string",
 name: "Name" } as Property
             }
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
     });

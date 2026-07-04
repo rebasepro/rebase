@@ -10,21 +10,21 @@ pnpm add @rebasepro/server-mongodb
 
 ## What This Package Does
 
-Implements the Rebase `BackendBootstrapper` and backend interfaces for MongoDB. Provides a complete data driver, change-stream-based realtime, entity history, auth repositories, and WebSocket support. Plug it into `@rebasepro/server-core` via `createMongoBootstrapper()`, or use the standalone `createMongoBackend()` factory for direct access.
+Implements the Rebase `BackendBootstrapper` and backend interfaces for MongoDB. Provides a complete data driver, change-stream-based realtime, snapshot history, auth repositories, and WebSocket support. Plug it into `@rebasepro/server-core` via `createMongoBootstrapper()`, or use the standalone `createMongoBackend()` factory for direct access.
 
 ## Key Exports
 
 | Export | Description |
 |--------|-------------|
 | `createMongoBootstrapper(config)` | Creates a `BackendBootstrapper` for use with `initializeRebaseBackend({ bootstrappers: [...] })`. |
-| `createMongoBackend(config)` | Standalone factory — returns a `MongoBackendInstance` with driver, entity service, realtime, admin, and lifecycle methods. |
+| `createMongoBackend(config)` | Standalone factory — returns a `MongoBackendInstance` with driver, snapshot service, realtime, admin, and lifecycle methods. |
 | `createMongoDelegate(db)` | Convenience factory for just the `MongoDriver` (DataDriver). |
 | `createMongoRealtimeService(db)` | Creates a MongoDB change-stream-based realtime provider. |
-| `createMongoEntityRepository(db)` | Creates an `EntityRepository` for direct CRUD. |
+| `createMongoSnapshotRepository(db)` | Creates an `SnapshotRepository` for direct CRUD. |
 | `createMongoDBConnection(url, dbName)` | Connects to MongoDB and returns a `MongoDBConnection` wrapper. |
 | `MongoDBConnection` | `DatabaseConnection` implementation wrapping `MongoClient` + `Db`. |
 | `MongoDriver` | The `DataDriver` implementation for MongoDB. |
-| `MongoEntityService` | Low-level entity CRUD service. |
+| `MongoSnapshotService` | Low-level snapshot CRUD service. |
 | `MongoRealtimeService` | Change-stream-based `RealtimeProvider`. |
 | `MongoCollectionRegistry` | In-memory collection registry. |
 | `isMongoBackendConfig(config)` | Type guard for `MongoBackendConfig`. |
@@ -71,7 +71,7 @@ const backend = createMongoBackend({
 
 // Use directly
 const health = await backend.healthCheck();
-const entities = await backend.entityService.fetchCollection("users", {});
+const snapshots = await backend.snapshotService.fetchCollection("users", {});
 
 // Cleanup
 await backend.destroy();

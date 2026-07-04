@@ -14,7 +14,7 @@ export * from "./storage";
 export * from "./email";
 export * from "./client";
 export * from "./customization_controller";
-export * from "./side_snapshot_controller";
+export * from "./side_panel_controller";
 export * from "./side_dialogs_controller";
 export * from "./dialogs_controller";
 export * from "./snackbar";

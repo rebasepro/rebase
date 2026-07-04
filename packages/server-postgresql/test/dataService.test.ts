@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -39,8 +39,8 @@ const mockProjectUsersTable = {
 };
 
 // --- Correctly typed Mock Snapshot Collections ---
-let authorsCollection: SnapshotCollection;
-const tagsCollection: SnapshotCollection = {
+let authorsCollection: CollectionConfig;
+const tagsCollection: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -51,7 +51,7 @@ const tagsCollection: SnapshotCollection = {
     idField: "id"
 };
 
-const projectUsersCollection: SnapshotCollection = {
+const projectUsersCollection: CollectionConfig = {
     slug: "project_users",
     name: "Project Users",
     table: "project_users",
@@ -63,7 +63,7 @@ const projectUsersCollection: SnapshotCollection = {
     primaryKeys: ["project_id", "id"]
 };
 
-const postsCollection: SnapshotCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -401,7 +401,7 @@ dataType: "number" },
     };
 
     // Complex collection definitions
-    const usersCollection: SnapshotCollection = {
+    const usersCollection: CollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",
@@ -423,7 +423,7 @@ relationName: "companies" }
         idField: "id"
     };
 
-    const companiesCollection: SnapshotCollection = {
+    const companiesCollection: CollectionConfig = {
         slug: "companies",
         name: "Companies",
         table: "companies",
@@ -454,7 +454,7 @@ relationName: "projects" }
         idField: "id"
     };
 
-    const projectsCollection: SnapshotCollection = {
+    const projectsCollection: CollectionConfig = {
         slug: "projects",
         name: "Projects",
         table: "projects",
@@ -501,7 +501,7 @@ relationName: "tags" }
         idField: "id"
     };
 
-    const tasksCollection: SnapshotCollection = {
+    const tasksCollection: CollectionConfig = {
         slug: "tasks",
         name: "Tasks",
         table: "tasks",
@@ -532,7 +532,7 @@ relationName: "assignee" }
         idField: "id"
     };
 
-    const tagsCollection: SnapshotCollection = {
+    const tagsCollection: CollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -543,7 +543,7 @@ relationName: "assignee" }
         idField: "id"
     };
 
-    const categoriesCollection: SnapshotCollection = {
+    const categoriesCollection: CollectionConfig = {
         slug: "categories",
         name: "Categories",
         table: "categories",

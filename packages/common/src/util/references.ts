@@ -1,6 +1,6 @@
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export function getSnapshotImagePreviewPropertyKey<M extends Record<string, unknown>>(collection: SnapshotCollection<M>): string | undefined {
+export function getSnapshotImagePreviewPropertyKey<M extends Record<string, unknown>>(collection: CollectionConfig<M>): string | undefined {
 
     // find first storage property of type image
     for (const key in collection.properties) {

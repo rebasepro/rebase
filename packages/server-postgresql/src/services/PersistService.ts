@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { SnapshotCollection, Properties, Relation } from "@rebasepro/types";
+import { CollectionConfig, Properties, Relation } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -78,7 +78,7 @@ export class PersistService {
         // If saving under a nested relation path, resolve the parent and inject FK
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
-        let junctionTableInfo: { parentCollection: SnapshotCollection; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
+        let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
 
         if (collectionPath.includes("/")) {
             const segments = collectionPath.split("/").filter(Boolean);

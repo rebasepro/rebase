@@ -11,7 +11,7 @@ As colunas adicionais permitem exibir dados computados ou derivados na tabela de
 ## Definindo Colunas Adicionais
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     additionalFields: [
         {
@@ -51,7 +51,7 @@ const ordersCollection: EntityCollection = {
 
 ## Próximos Passos
 
-- **[Ações da Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
+- **[Ações da Entidade](/docs/frontend/snapshot-actions)** — Botões de ação personalizados
 - **[Campos Personalizados](/docs/frontend/custom-fields)** — Campos de formulário personalizados
 
 ---

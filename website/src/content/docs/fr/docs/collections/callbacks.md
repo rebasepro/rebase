@@ -18,7 +18,7 @@ Les rappels vous permettent d'intervenir dans le cycle de vie de l'entité pour 
 ## Définir les Rappels
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     callbacks: {
         beforeSave: async ({ values, entityId, status }) => {
@@ -342,7 +342,7 @@ afterSave: async ({ values, entityId, context }) => {
 L'une des utilisations les plus puissantes des rappels est la **synchronisation des données entre les collections** à l'aide de `context.data` :
 
 ```typescript
-const submissionsCollection: EntityCollection = {
+const submissionsCollection: CollectionConfig = {
     slug: "job_submissions",
     callbacks: {
         afterSave: async ({ values, entityId, previousValues, context }) => {

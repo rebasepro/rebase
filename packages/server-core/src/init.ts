@@ -6,11 +6,11 @@ import {
     DataDriver,
     DataSourceDefinition,
     CollectionCallbacks,
-    SnapshotCollection,
+    CollectionConfig,
     HealthCheckResult,
     HistoryConfig,
     InitializedDriver,
-    isPostgresCollection,
+    isPostgresCollectionConfig,
     isSQLAdmin,
     RealtimeProvider,
     SecurityRule
@@ -75,7 +75,7 @@ export interface RebaseAuthConfig {
      * Or pass your own collection with the required auth fields
      * (email, passwordHash, displayName, etc.).
      */
-    collection?: SnapshotCollection;
+    collection?: CollectionConfig;
     jwtSecret?: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
@@ -182,7 +182,7 @@ export interface RebaseAuthConfig {
 }
 
 export interface RebaseBackendConfig {
-    collections?: SnapshotCollection[];
+    collections?: CollectionConfig[];
     collectionsDir?: string;
     server: Server;
     app: Hono<HonoEnv>;
@@ -315,9 +315,9 @@ export interface RebaseBackendConfig {
      * @example
      * ```ts
      * callbacks: {
-     *     afterRead({ snapshot, collection }) {
-     *         console.log(`Read ${collection.slug}/${snapshot.id}`);
-     *         return snapshot;
+     *     afterRead({ row, collection }) {
+     *         console.log(`Read ${collection.slug}/${row.id}`);
+     *         return row;
      *     }
      * }
      * ```
@@ -427,7 +427,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Apply default security rules to collections that don't define their own
     if (config.defaultSecurityRules?.length) {
         for (const collection of activeCollections) {
-            if (isPostgresCollection(collection) && (!collection.securityRules || collection.securityRules.length === 0)) {
+            if (isPostgresCollectionConfig(collection) && (!collection.securityRules || collection.securityRules.length === 0)) {
                 collection.securityRules = config.defaultSecurityRules;
             }
         }

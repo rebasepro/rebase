@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { Snapshot, CollectionCallbacks } from "@rebasepro/types";
 import React, { useCallback, useMemo, useState } from "react";
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from "@rebasepro/ui";
@@ -11,12 +11,12 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { useCMSContext } from "../hooks";
-import { SnapshotView } from "./SnapshotView";
+import { RecordViewBinding } from "./RecordViewBinding";
 
 export interface DeleteSnapshotDialogProps<M extends Record<string, unknown>> {
     snapshotOrSnapshotsToDelete?: Snapshot<M> | Snapshot<M>[],
     path: string,
-    collection: SnapshotCollection<M>
+    collection: CollectionConfig<M>
     open: boolean;
     onClose: () => void;
     callbacks?: CollectionCallbacks<M>,
@@ -135,7 +135,7 @@ export function DeleteSnapshotDialog<M extends Record<string, unknown>>({
     } else {
         const snapshot = snapshotOrSnapshots as Snapshot<M> | undefined;
         content = snapshot
-            ? <SnapshotView
+            ? <RecordViewBinding
                 snapshot={snapshot}
                 collection={collection}
                 path={path}/>

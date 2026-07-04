@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import React, { useEffect, useState, useCallback } from "react";
 ;
 import { useApiConfig } from "@rebasepro/core";
@@ -31,7 +31,7 @@ export function LastEditedByIndicator({
 }: {
     path: string;
     snapshotId: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
 }) {
     const apiConfig = useApiConfig();
     const authController = useAuthController();

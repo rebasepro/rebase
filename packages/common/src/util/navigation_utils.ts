@@ -1,4 +1,4 @@
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
 import { getSubcollections } from "./resolutions";
 
@@ -33,13 +33,13 @@ export function getLastSegment(path: string) {
     return cleanPath;
 }
 
-export function resolveCollectionPathIds(path: string, allCollections: SnapshotCollection[]): string {
+export function resolveCollectionPathIds(path: string, allCollections: CollectionConfig[]): string {
     let remainingPath = removeInitialAndTrailingSlashes(path);
     if (!remainingPath) {
         return "";
     }
 
-    let currentCollections: SnapshotCollection[] | undefined = allCollections;
+    let currentCollections: CollectionConfig[] | undefined = allCollections;
     const resolvedPathParts: string[] = [];
 
     while (remainingPath.length > 0) {
@@ -53,7 +53,7 @@ export function resolveCollectionPathIds(path: string, allCollections: SnapshotC
 
         let foundMatch = false;
         // Sort potential matches by length descending to prioritize longer matches (e.g., "a/b" over "a")
-        const potentialMatches: { col: SnapshotCollection; match: string; }[] = currentCollections
+        const potentialMatches: { col: CollectionConfig; match: string; }[] = currentCollections
             .flatMap(col => [{
                 col,
                 match: col.slug
@@ -123,7 +123,7 @@ export function resolveCollectionPathIds(path: string, allCollections: SnapshotC
  * @param slugOrPath
  * @param collections
  */
-export function getCollectionBySlugWithin(slugOrPath: string, collections: SnapshotCollection[]): SnapshotCollection | undefined {
+export function getCollectionBySlugWithin(slugOrPath: string, collections: CollectionConfig[]): CollectionConfig | undefined {
 
     const subpaths = removeInitialAndTrailingSlashes(slugOrPath).split("/");
     if (subpaths.length % 2 === 0) {
@@ -131,7 +131,7 @@ export function getCollectionBySlugWithin(slugOrPath: string, collections: Snaps
     }
 
     const subpathCombinations = getCollectionPathsCombinations(subpaths);
-    let result: SnapshotCollection | undefined;
+    let result: CollectionConfig | undefined;
     for (let i = 0; i < subpathCombinations.length; i++) {
         const subpathCombination = subpathCombinations[i];
         const navigationEntry = collections && collections

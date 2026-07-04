@@ -1,4 +1,4 @@
-import type { SnapshotCollection, PropertyConfig } from "@rebasepro/types";
+import type { CollectionConfig, PropertyConfig } from "@rebasepro/types";
 import type { AuthController, Snapshot, SnapshotStatus, SnapshotValues } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/formex";
@@ -114,7 +114,7 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
 
 export function getInitialSnapshotValues<M extends Record<string, unknown>>(
     authController: AuthController,
-    collection: SnapshotCollection,
+    collection: CollectionConfig,
     path: string,
     status: "new" | "existing" | "copy",
     snapshot: Snapshot<M> | undefined,

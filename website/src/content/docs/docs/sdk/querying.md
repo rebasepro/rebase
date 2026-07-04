@@ -35,7 +35,7 @@ const { data, meta } = await client.data.products.find({
     offset: 0
 });
 
-// data is Entity<M>[]  — each item has { id, values, path }
+// data is Snapshot<M>[]  — each item has { id, values, path }
 // meta has { total, limit, offset, hasMore }
 ```
 
@@ -43,7 +43,7 @@ const { data, meta } = await client.data.products.find({
 
 ```typescript
 const product = await client.data.products.findById(42);
-// Returns Entity<M> | undefined
+// Returns Snapshot<M> | undefined
 ```
 
 ### Create
@@ -110,7 +110,7 @@ const { data } = await client.data.products
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
 | `.search(text)` | Full-text search | `.search("laptop")` |
-| `.include(...relations)` | Include related entities | `.include("author", "tags")` |
+| `.include(...relations)` | Include related snapshots | `.include("author", "tags")` |
 | `.find()` | Execute the query | Returns `FindResponse<M>` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
@@ -200,7 +200,7 @@ const { data } = await client.data.products
 
 ## Fetching Relations
 
-Relations can be included so that related entities are returned alongside the primary data, instead of just their foreign key IDs.
+Relations can be included so that related snapshots are returned alongside the primary data, instead of just their foreign key IDs.
 
 ### Using `include()` (Fluent)
 

@@ -1,6 +1,6 @@
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-const tagsCollection: SnapshotCollection = {
+const tagsCollection: CollectionConfig = {
     name: "Tags",
     singularName: "Tag",
     slug: "tags",

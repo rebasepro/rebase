@@ -5,7 +5,7 @@ import {
     useSnackbarController,
     useTranslation
 } from "@rebasepro/core";
-import { SnapshotCollection, CollectionActionsProps } from "@rebasepro/types";
+import { CollectionConfig, CollectionActionsProps } from "@rebasepro/types";
 import { Button, SaveIcon, Tooltip, UndoIcon } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -42,7 +42,7 @@ export function EditorCollectionActionStart({
                             id: collection.slug,
                             parentCollectionSlugs,
 parentSnapshotIds,
-                            collectionData: mergeDeep(collection as SnapshotCollection,
+                            collectionData: mergeDeep(collection as CollectionConfig,
                                 {
                                     defaultFilter: tableController.filterValues ?? null,
                                     sort: tableController.sortBy ?? null

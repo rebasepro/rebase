@@ -13,7 +13,7 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { validateCollectionJson, CollectionValidationError } from "../../validateCollectionJson";
 
 const EXAMPLE_JSON = `{
@@ -41,7 +41,7 @@ const EXAMPLE_JSON = `{
 export interface CollectionJsonImportDialogProps {
     open: boolean;
     onClose: () => void;
-    onImport: (collection: SnapshotCollection) => void;
+    onImport: (collection: CollectionConfig) => void;
 }
 
 export function CollectionJsonImportDialog({

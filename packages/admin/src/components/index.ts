@@ -1,36 +1,36 @@
-export type { SnapshotViewProps } from "./SnapshotView";
-export { SnapshotView } from "./SnapshotView";
+export type { RecordViewBindingProps } from "./RecordViewBinding";
+export { RecordViewBinding } from "./RecordViewBinding";
 
-export * from "./SnapshotDetailView";
+export * from "./DetailViewBinding";
 
-export type { SnapshotSelectionProps } from "./ReferenceTable/SnapshotSelectionTable";
-export { SnapshotSelectionTable } from "./ReferenceTable/SnapshotSelectionTable";
+export type { SelectionProps } from "./ReferenceTable/SelectionTableBinding";
+export { SelectionTableBinding } from "./ReferenceTable/SelectionTableBinding";
 
 export * from "./SelectableTable/SelectableTable";
 export * from "./SelectableTable/SelectableTableContext";
-export * from "./SnapshotCollectionView/SnapshotCollectionView";
-export * from "./SnapshotCollectionView/SnapshotCollectionViewActions";
-export * from "./SnapshotCollectionView/SnapshotCollectionCardView";
-export * from "./SnapshotCollectionView/SnapshotCard";
-export * from "./SnapshotCollectionView/useSelectionController";
+export * from "./CollectionViewBinding/CollectionViewBinding";
+export * from "./CollectionViewBinding/CollectionViewActions";
+export * from "./CollectionViewBinding/CollectionCardViewBinding";
+export * from "./CollectionViewBinding/RecordCardBinding";
+export * from "./CollectionViewBinding/useSelectionController";
 
 export * from "./PropertyConfigBadge";
 export * from "./PropertyIdCopyTooltip";
 
-export * from "./SnapshotCollectionTable";
+export * from "./CollectionTableBinding";
 // VirtualTable is exported from @rebasepro/ui
 export * from "./ArrayContainer";
 export * from "./ReferenceWidget";
 export * from "./SearchIconsView";
 export * from "./FieldCaption";
-export * from "./SnapshotPreview";
+export * from "./RecordPreviewBinding";
 
-// history is lazy-loaded by SnapshotEditView and resolutions.ts
+// history is lazy-loaded by EditViewBinding and resolutions.ts
 // export * from "./history";
 export * from "./common";
 export * from "./field_configs";
 
-export * from "./SideSnapshotProvider";
+export * from "./SidePanelProvider";
 export * from "./AdminModeSyncer";
 // Admin views: only CreationResultDialog remains (used by resetPasswordAction)
 export * from "./app/AppBar";

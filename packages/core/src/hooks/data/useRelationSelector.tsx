@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Snapshot, SnapshotRelation, FilterValues } from "@rebasepro/types";
@@ -18,7 +18,7 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
     /**
      * The collection that represents the relation snapshots
      */
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
     /**
      * Force filter to be applied to the relation search
      */

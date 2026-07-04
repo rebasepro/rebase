@@ -1,4 +1,4 @@
-import type { SnapshotCollection, DataSourceDefinition } from "@rebasepro/types";
+import type { CollectionConfig, DataSourceDefinition } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
 import { SnapshotReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
@@ -21,7 +21,7 @@ export function useBuildCollectionRegistryController(props: {
     const getCollection = useCallback((
         slugOrPath: string,
         includeUserOverride = false
-    ): SnapshotCollection | undefined => {
+    ): CollectionConfig | undefined => {
 
         const registry = collectionRegistryRef.current;
 
@@ -38,7 +38,7 @@ export function useBuildCollectionRegistryController(props: {
 
         if (!collectionPath) return undefined;
 
-        let collection: SnapshotCollection | undefined;
+        let collection: CollectionConfig | undefined;
         try {
             collection = registry.resolvePathToCollections(collectionPath).finalCollection;
         } catch (e) {
@@ -56,7 +56,7 @@ export function useBuildCollectionRegistryController(props: {
 
         if (!overriddenCollection) return undefined;
 
-        let result: Partial<SnapshotCollection> | undefined = overriddenCollection;
+        let result: Partial<CollectionConfig> | undefined = overriddenCollection;
         const subcollections = "subcollections" in overriddenCollection ? overriddenCollection.subcollections : undefined;
         const callbacks = overriddenCollection.callbacks;
         result = {
@@ -69,11 +69,11 @@ export function useBuildCollectionRegistryController(props: {
         }
 
         return { ...overriddenCollection,
-...result } as SnapshotCollection;
+...result } as CollectionConfig;
 
     }, [userConfigPersistence]);
 
-    const getRawCollection = useCallback((slugOrPath: string): SnapshotCollection | undefined => {
+    const getRawCollection = useCallback((slugOrPath: string): CollectionConfig | undefined => {
         const registry = collectionRegistryRef.current;
         if (registry === undefined) return undefined;
 
@@ -82,7 +82,7 @@ export function useBuildCollectionRegistryController(props: {
 
         const pathSegments = cleanedPath.split("/");
 
-        return registry.getRaw(pathSegments.join("/")) as SnapshotCollection | undefined;
+        return registry.getRaw(pathSegments.join("/")) as CollectionConfig | undefined;
     }, []);
 
     const getParentReferencesFromPath = useCallback((path: string): SnapshotReference[] => {
@@ -115,7 +115,7 @@ export function useBuildCollectionRegistryController(props: {
             result.push(oddPathSegments.slice(0, i));
         }
 
-        const getCollectionFromPaths = (pathSegments: string[]): SnapshotCollection | undefined => {
+        const getCollectionFromPaths = (pathSegments: string[]): CollectionConfig | undefined => {
             if (!pathSegments?.length) return undefined;
             const testPath = pathSegments.reduce((acc, segment, idx) => {
                 if (idx === 0) return segment;
@@ -144,11 +144,11 @@ export function useBuildCollectionRegistryController(props: {
     const convertIdsToPaths = useCallback((ids: string[]): string[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) return [];
-        let currentCollections: SnapshotCollection[] = registry.getCollections();
+        let currentCollections: CollectionConfig[] = registry.getCollections();
         const paths: string[] = [];
         for (let i = 0; i < ids.length; i++) {
             const id = ids[i];
-            const collection: SnapshotCollection | undefined = currentCollections.find(c => c.slug === id);
+            const collection: CollectionConfig | undefined = currentCollections.find(c => c.slug === id);
             if (!collection)
                 throw Error(`Collection with id ${id} not found`);
             paths.push(collection.slug);

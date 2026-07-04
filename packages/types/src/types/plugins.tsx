@@ -1,6 +1,6 @@
 import React, { PropsWithChildren } from "react";
 
-import type { SnapshotCollection, CollectionActionsProps, SnapshotTableController, SelectionController } from "./collections";
+import type { CollectionConfig, CollectionActionsProps, SnapshotTableController, SelectionController } from "./collections";
 import type { SnapshotStatus } from "./snapshots";
 import type { InferPropertyType, Property } from "./properties";
 import type { FormContext } from "./snapshot_views";
@@ -181,19 +181,19 @@ export interface PluginHooks {
     /**
      * Modify a single collection before it is rendered (synchronous).
      */
-    modifyCollection?: (collection: SnapshotCollection) => SnapshotCollection;
+    modifyCollection?: (collection: CollectionConfig) => CollectionConfig;
 
     /**
      * Async version of modifyCollection — supports fetching remote config.
      * Runs during navigation resolution. If provided alongside `modifyCollection`,
      * the sync version runs first, then the async version.
      */
-    modifyCollectionAsync?: (collection: SnapshotCollection) => Promise<SnapshotCollection>;
+    modifyCollectionAsync?: (collection: CollectionConfig) => Promise<CollectionConfig>;
 
     /**
      * Modify, add or remove collections.
      */
-    injectCollections?: (collections: SnapshotCollection[]) => SnapshotCollection[];
+    injectCollections?: (collections: CollectionConfig[]) => CollectionConfig[];
 
     /**
      * Callback called when columns are reordered via drag and drop.
@@ -202,7 +202,7 @@ export interface PluginHooks {
         fullPath: string;
         parentCollectionSlugs: string[];
         parentSnapshotIds: string[];
-        collection: SnapshotCollection;
+        collection: CollectionConfig;
         newPropertiesOrder: string[];
     }) => void;
 
@@ -213,7 +213,7 @@ export interface PluginHooks {
         fullPath: string;
         parentCollectionSlugs: string[];
         parentSnapshotIds: string[];
-        collection: SnapshotCollection;
+        collection: CollectionConfig;
         kanbanColumnProperty: string;
         newColumnsOrder: string[];
     }) => void;
@@ -291,7 +291,7 @@ export interface FieldBuilderConfig {
  * Props passed to home page collection card action components.
  * @group Models
  */
-export interface PluginHomePageActionsProps<EP extends object = object, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends SnapshotCollection<M> = SnapshotCollection<M>> {
+export interface PluginHomePageActionsProps<EP extends object = object, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends CollectionConfig<M> = CollectionConfig<M>> {
     slug: string;
     collection: EC;
     context: RebaseContext<USER>;
@@ -301,7 +301,7 @@ export interface PluginHomePageActionsProps<EP extends object = object, M extend
  * Props passed to form action components in snapshot edit/form views.
  * @group Models
  */
-export interface PluginFormActionProps<USER extends User = User, EC extends SnapshotCollection = SnapshotCollection> {
+export interface PluginFormActionProps<USER extends User = User, EC extends CollectionConfig = CollectionConfig> {
     snapshotId?: string | number;
     path: string;
     parentCollectionSlugs: string[];
@@ -318,7 +318,7 @@ export interface PluginFormActionProps<USER extends User = User, EC extends Snap
  * Parameters passed to the field builder wrap function.
  * @group Models
  */
-export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<string, unknown>, EC extends SnapshotCollection<M> = SnapshotCollection<M>> = {
+export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<string, unknown>, EC extends CollectionConfig<M> = CollectionConfig<M>> = {
     fieldConfigId: string;
     propertyKey: string;
     property: Property;

@@ -1,4 +1,4 @@
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 type SnapshotCustomView<M extends Record<string, unknown> = Record<string, unknown>> = { key: string; [key: string]: unknown };
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "./resolutions";
@@ -13,7 +13,7 @@ export interface NavigationViewSnapshotInternal<M extends Record<string, unknown
     snapshotId: string | number;
     slug: string;
     path: string;
-    parentCollection: SnapshotCollection<M>;
+    parentCollection: CollectionConfig<M>;
 }
 
 export interface NavigationViewCollectionInternal<M extends Record<string, unknown>> {
@@ -21,7 +21,7 @@ export interface NavigationViewCollectionInternal<M extends Record<string, unkno
     id: string;
     slug: string;
     path: string;
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 }
 
 export interface NavigationViewSnapshotCustomInternal<M extends Record<string, unknown>> {
@@ -34,7 +34,7 @@ export interface NavigationViewSnapshotCustomInternal<M extends Record<string, u
 
 export function getNavigationEntriesFromPath(props: {
     path: string,
-    collections: SnapshotCollection[] | undefined,
+    collections: CollectionConfig[] | undefined,
     currentFullPath?: string,
     contextSnapshotViews?: SnapshotCustomView[]
 }): NavigationViewInternal[] {

@@ -2,7 +2,7 @@
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useRef, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
-import { SnapshotCollection, Property } from "@rebasepro/types";
+import { CollectionConfig, Property } from "@rebasepro/types";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { getFieldConfig } from "../../../components/field_configs";
 import { Button, IconButton, iconSize, Select, SelectItem, Typography, XIcon } from "@rebasepro/ui";
@@ -19,7 +19,7 @@ export function KanbanConfigSection({
 }) {
     const authController = useAuthController();
     const customizationController = useCustomizationController();
-    const { values, setFieldValue } = useFormex<SnapshotCollection>();
+    const { values, setFieldValue } = useFormex<CollectionConfig>();
     const panelRef = useRef<HTMLDivElement>(null);
     const [columnPropertyDialogOpen, setColumnPropertyDialogOpen] = useState(false);
 

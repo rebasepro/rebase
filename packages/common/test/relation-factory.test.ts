@@ -3,7 +3,7 @@ import {
     createRelationRefWithData,
     resolveCollectionRelations
 } from "../src/util";
-import { SnapshotCollection, Property } from "@rebasepro/types";
+import { CollectionConfig, Property } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // createRelationRef
@@ -67,7 +67,7 @@ describe("createRelationRefWithData", () => {
 // resolveCollectionRelations — memoization
 // ─────────────────────────────────────────────────────────────
 describe("resolveCollectionRelations memoization", () => {
-    const collection: SnapshotCollection = {
+    const collection: CollectionConfig = {
         name: "Test",
         slug: "test",
         path: "test",
@@ -77,7 +77,7 @@ name: "Title" } as Property
         },
         collectionType: "postgres",
         tableName: "test"
-    } as unknown as SnapshotCollection;
+    } as unknown as CollectionConfig;
 
     it("returns the same reference for the same collection object", () => {
         const result1 = resolveCollectionRelations(collection);
@@ -88,7 +88,7 @@ name: "Title" } as Property
     it("returns different references for structurally identical but distinct objects", () => {
         const clone = { ...collection };
         const result1 = resolveCollectionRelations(collection);
-        const result2 = resolveCollectionRelations(clone as SnapshotCollection);
+        const result2 = resolveCollectionRelations(clone as CollectionConfig);
         // Different object identities → different cache entries (WeakMap is identity-based)
         expect(result1).not.toBe(result2);
         // But they should be deeply equal

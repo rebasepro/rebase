@@ -1,6 +1,6 @@
-import { SnapshotCollection } from "./collections";
+import { CollectionConfig } from "./collections";
 
 export type ModifyCollectionProps = {
-    collection: SnapshotCollection,
+    collection: CollectionConfig,
     parentPaths: string[],
 };

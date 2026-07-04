@@ -1,4 +1,4 @@
-import { SnapshotCollection, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property } from "@rebasepro/types";
+import { CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**
@@ -9,7 +9,7 @@ import { toSnakeCase } from "@rebasepro/utils";
  * {@link evaluatePolicy}); the Postgres schema generators call it so that DDL
  * and the admin UI derive from the exact same expression.
  */
-export function policyToPostgres(expr: PolicyExpression, collection?: SnapshotCollection): string {
+export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig): string {
     switch (expr.kind) {
         case "true":
             return "true";
@@ -51,7 +51,7 @@ const COMPARE_SQL: Record<PolicyCompareOperator, string> = {
     gte: ">="
 };
 
-function operandToSql(operand: PolicyOperand, collection?: SnapshotCollection): string {
+function operandToSql(operand: PolicyOperand, collection?: CollectionConfig): string {
     switch (operand.kind) {
         case "field":
             return resolveColumnName(operand.name, collection);
@@ -64,7 +64,7 @@ function operandToSql(operand: PolicyOperand, collection?: SnapshotCollection): 
     }
 }
 
-function resolveColumnName(propName: string, collection?: SnapshotCollection): string {
+function resolveColumnName(propName: string, collection?: CollectionConfig): string {
     const prop = collection?.properties?.[propName] as Property | undefined;
     if (prop && "columnName" in prop && typeof (prop as { columnName?: unknown }).columnName === "string") {
         return (prop as { columnName: string }).columnName;

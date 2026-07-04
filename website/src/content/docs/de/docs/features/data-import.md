@@ -30,7 +30,7 @@ Der Import-Assistent übernimmt die Spaltenzuordnung, Datentypumwandlung und Val
 Import pro Sammlung aktivieren/deaktivieren:
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     // Import is enabled by default
     // To disable:

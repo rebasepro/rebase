@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type {
     CollectionRegistryController,
-    SideSnapshotController,
+    SidePanelController,
     UrlController,
     NavigationStateController,
     BreadcrumbEntry,
@@ -22,7 +22,7 @@ export type { BreadcrumbEntry, BreadcrumbsController };
  */
 export interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
-    sideSnapshotController: SideSnapshotController;
+    sidePanelController: SidePanelController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
@@ -40,7 +40,7 @@ const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
     initialised: false
 };
 
-const NOOP_SIDE_SNAPSHOT: SideSnapshotController = {
+const NOOP_SIDE_PANEL: SidePanelController = {
     open: () => {},
     replace: () => {},
     close: () => {}
@@ -71,7 +71,7 @@ const NOOP_BREADCRUMBS: BreadcrumbsController = {
 
 const NOOP_BRIDGE: StudioBridge = {
     collectionRegistry: NOOP_COLLECTION_REGISTRY,
-    sideSnapshotController: NOOP_SIDE_SNAPSHOT,
+    sidePanelController: NOOP_SIDE_PANEL,
     urlController: NOOP_URL_CONTROLLER,
     navigationState: NOOP_NAVIGATION_STATE,
     breadcrumbs: NOOP_BREADCRUMBS
@@ -89,7 +89,7 @@ export const StudioBridgeContext = createContext<StudioBridge>(NOOP_BRIDGE);
  * ```tsx
  * <StudioBridgeProvider value={{
  *     collectionRegistry: useCollectionRegistryController(),
- *     sideSnapshotController: useSideSnapshotController(),
+ *     sidePanelController: useSidePanel(),
  *     urlController: useUrlController(),
  *     navigationState: useNavigationStateController(),
  *     breadcrumbs: useBreadcrumbsController(),
@@ -124,9 +124,9 @@ export function useStudioCollectionRegistry(): CollectionRegistryController {
     return useContext(StudioBridgeContext).collectionRegistry;
 }
 
-/** Side snapshot controller — returns noop if CMS is not present. */
-export function useStudioSideSnapshotController(): SideSnapshotController {
-    return useContext(StudioBridgeContext).sideSnapshotController;
+/** Side panel controller — returns noop if CMS is not present. */
+export function useStudioSidePanelController(): SidePanelController {
+    return useContext(StudioBridgeContext).sidePanelController;
 }
 
 /** URL controller — returns noop if CMS is not present. */
@@ -168,11 +168,11 @@ export const StudioBridgeRegistryContext = createContext<StudioBridgeRegistry | 
  * ```tsx
  * <StudioBridgeRegistryProvider>
  *     <CollectionRegistryProvider>   // auto-registers
- *     <SideSnapshotProvider>           // auto-registers
+ *     <SidePanelProvider>           // auto-registers
  *     <UrlProvider>                  // auto-registers
  *         <RebaseStudio />           // consumes bridge
  *     </UrlProvider>
- *     </SideSnapshotProvider>
+ *     </SidePanelProvider>
  *     </CollectionRegistryProvider>
  * </StudioBridgeRegistryProvider>
  * ```

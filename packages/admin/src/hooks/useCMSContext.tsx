@@ -4,7 +4,7 @@ import type {
     AuthController,
     RebaseContext,
     SideDialogsController,
-    SideSnapshotController,
+    SidePanelController,
     User
 } from "@rebasepro/types";
 import type {
@@ -12,7 +12,7 @@ import type {
     NavigationStateController,
     UrlController
 } from "@rebasepro/types";
-import { useSideSnapshotController } from "./useSideSnapshotController";
+import { useSidePanel } from "./useSidePanel";
 import { useSideDialogsController } from "./useSideDialogsController";
 import {
     useUrlController,
@@ -32,7 +32,7 @@ export type CMSContext<
     USER extends User = User,
     AuthControllerType extends AuthController<USER> = AuthController<USER>
 > = RebaseContext<USER, AuthControllerType> & {
-    sideSnapshotController: SideSnapshotController;
+    sidePanelController: SidePanelController;
     sideDialogsController: SideDialogsController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
@@ -55,7 +55,7 @@ export function useCMSContext<
     AuthControllerType extends AuthController<USER> = AuthController<USER>
 >(): CMSContext<DB, USER, AuthControllerType> {
     const baseContext = useRebaseContext<USER, AuthControllerType>();
-    const sideSnapshotController = useSideSnapshotController();
+    const sidePanelController = useSidePanel();
     const sideDialogsController = useSideDialogsController();
     const urlController = useUrlController();
     const navigationStateController = useNavigationStateController();
@@ -63,14 +63,14 @@ export function useCMSContext<
 
     return useMemo(() => ({
         ...baseContext,
-        sideSnapshotController,
+        sidePanelController,
         sideDialogsController,
         urlController,
         navigationStateController,
         collectionRegistryController
     }), [
         baseContext,
-        sideSnapshotController,
+        sidePanelController,
         sideDialogsController,
         urlController,
         navigationStateController,

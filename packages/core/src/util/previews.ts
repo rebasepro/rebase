@@ -1,4 +1,4 @@
-import type { SnapshotCollection, Property, PropertyConfig } from "@rebasepro/types";
+import type { CollectionConfig, Property, PropertyConfig } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 
@@ -48,7 +48,7 @@ function isStorageProperty(property: Property | undefined): boolean {
 
 export function getSnapshotPreviewKeys(
     authController: AuthController,
-    targetCollection: SnapshotCollection<any>,
+    targetCollection: CollectionConfig<any>,
     fields: Record<string, PropertyConfig>,
     previewProperties?: string[],
     limit = 3) {
@@ -74,7 +74,7 @@ export function getSnapshotPreviewKeys(
     }
 }
 
-export function getSnapshotTitlePropertyKey<M extends Record<string, any>>(collection: SnapshotCollection<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+export function getSnapshotTitlePropertyKey<M extends Record<string, any>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }

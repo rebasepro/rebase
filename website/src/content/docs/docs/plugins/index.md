@@ -41,7 +41,7 @@ interface RebasePlugin {
         onCellValueChange?: (params) => void;
     };
 
-    // Entity form customization
+    // Snapshot form customization
     form?: {
         Actions?: React.ComponentType;
         provider?: { Component: React.ComponentType };
@@ -50,8 +50,8 @@ interface RebasePlugin {
 
     // Collection injection/modification
     collection?: {
-        injectCollections?: (params) => EntityCollection[];
-        modifyCollection?: (params) => EntityCollection;
+        injectCollections?: (params) => CollectionConfig[];
+        modifyCollection?: (params) => CollectionConfig;
     };
 }
 ```

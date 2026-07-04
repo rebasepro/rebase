@@ -1,26 +1,26 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { PartialSnapshotCollection, UserConfigurationPersistence } from "@rebasepro/types";
+import { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/types";
 import { stripCollectionPath } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 
 export function useBuildLocalConfigurationPersistence(): UserConfigurationPersistence {
 
-    const configCache = useRef<Record<string, PartialSnapshotCollection>>({});
+    const configCache = useRef<Record<string, PartialCollectionConfig>>({});
 
     const getCollectionFromStorage = useCallback((storageKey: string) => {
         const item = localStorage.getItem(storageKey);
         return item ? JSON.parse(item) : {};
     }, []);
 
-    const getCollectionConfig = useCallback(<M extends Record<string, any>>(path: string): PartialSnapshotCollection<M> => {
+    const getCollectionConfig = useCallback(<M extends Record<string, any>>(path: string): PartialCollectionConfig<M> => {
         const storageKey = `collection_config::${stripCollectionPath(path)}`;
         if (configCache.current[storageKey]) {
-            return configCache.current[storageKey] as PartialSnapshotCollection<M>;
+            return configCache.current[storageKey] as PartialCollectionConfig<M>;
         }
         return getCollectionFromStorage(storageKey);
     }, [getCollectionFromStorage]);
 
-    const onCollectionModified = useCallback(<M extends Record<string, any>>(path: string, data: PartialSnapshotCollection<M>) => {
+    const onCollectionModified = useCallback(<M extends Record<string, any>>(path: string, data: PartialCollectionConfig<M>) => {
         const storageKey = `collection_config::${stripCollectionPath(path)}`;
         localStorage.setItem(storageKey, JSON.stringify(data));
         const cachedConfig = configCache.current[storageKey];

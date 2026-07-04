@@ -16,7 +16,7 @@ Ogni collezione può essere visualizzata in quattro modalità:
 ## Configurazione
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     defaultViewMode: "table",            // Default view
     enabledViews: ["list", "table", "kanban"],    // Available views
@@ -67,7 +67,7 @@ Controlla l'altezza delle righe con `defaultSize`:
 Configura una bacheca Kanban specificando quale proprietà enum utilizzare come colonne:
 
 ```typescript
-const tasksCollection: EntityCollection = {
+const tasksCollection: CollectionConfig = {
     slug: "tasks",
     defaultViewMode: "kanban",
     kanban: {
@@ -100,7 +100,7 @@ Il trascinamento tra le colonne aggiorna automaticamente il campo enum e l'ordin
 Le schede mostrano le entità come schede visive — utili per contenuti ricchi di immagini:
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     defaultViewMode: "cards",
     properties: {
@@ -116,5 +116,5 @@ const articlesCollection: EntityCollection = {
 
 ## Passi Successivi
 
-- **[Visualizzazioni Entità](/docs/frontend/entity-views)** — Schede personalizzate sui moduli entità
-- **[Azioni Entità](/docs/frontend/entity-actions)** — Azioni entità personalizzate
+- **[Visualizzazioni Entità](/docs/frontend/snapshot-views)** — Schede personalizzate sui moduli entità
+- **[Azioni Entità](/docs/frontend/snapshot-actions)** — Azioni entità personalizzate

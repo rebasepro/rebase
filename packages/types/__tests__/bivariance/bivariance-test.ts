@@ -1,5 +1,5 @@
 export type AfterReadProps<M extends Record<string, unknown>> = {
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 };
 
 export type CollectionCallbacks<M extends Record<string, unknown>> = {
@@ -7,14 +7,14 @@ export type CollectionCallbacks<M extends Record<string, unknown>> = {
     afterRead?(props: AfterReadProps<M>): M;
 };
 
-export interface PostgresCollection<M extends Record<string, unknown>> {
+export interface PostgresCollectionConfig<M extends Record<string, unknown>> {
     titleProperty?: Extract<keyof M, string>;
     callbacks?: CollectionCallbacks<M>;
 }
 
-export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
+export type CollectionConfig<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollectionConfig<M>;
 
-let specificColl: SnapshotCollection<{ id: string, name: string }>;
-declare let genericColl: SnapshotCollection;
+let specificColl: CollectionConfig<{ id: string, name: string }>;
+declare let genericColl: CollectionConfig;
 
 genericColl = specificColl; // Fails!

@@ -2,7 +2,7 @@ import type { ComponentRef } from "./component_ref";
 
 import type { Snapshot, SnapshotReference, SnapshotRelation, SnapshotValues, GeoPoint, Vector } from "./snapshots";
 import type { JoinStep, OnAction, Relation } from "./relations";
-import type { SnapshotCollection, FilterValues } from "./collections";
+import type { CollectionConfig, FilterValues } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthController } from "../controllers/auth";
 import type { AfterReadProps, BeforeSaveProps } from "./snapshot_callbacks";
@@ -596,7 +596,7 @@ export interface RelationProperty extends BaseProperty {
      * When set, the framework treats this property as a self-contained relation
      * definition and no separate `relations[]` entry is needed.
      */
-    target?: string | (() => SnapshotCollection | string);
+    target?: string | (() => CollectionConfig | string);
 
     /**
      * Whether this property references one or many records.
@@ -664,7 +664,7 @@ export interface RelationProperty extends BaseProperty {
     /**
      * Overrides applied to the target collection when rendered as a subcollection tab.
      */
-    overrides?: Partial<SnapshotCollection>;
+    overrides?: Partial<CollectionConfig>;
 
     // ─── Framework-managed fields ───
 

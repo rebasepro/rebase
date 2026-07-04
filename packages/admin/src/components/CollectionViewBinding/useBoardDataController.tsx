@@ -1,0 +1,723 @@
+import type { CollectionConfig } from "@rebasepro/types";
+import { Snapshot, FilterValues } from "@rebasepro/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useData, useRebaseContext } from "@rebasepro/core";
+
+const DEFAULT_PAGE_SIZE = 20;
+
+/**
+ * Shallow equality for snapshot value records.
+ * Handles primitives and reference equality for nested values.
+ * Avoids JSON.stringify allocation on every comparison.
+ */
+function shallowEqualValues(
+    a: Record<string, unknown> | undefined,
+    b: Record<string, unknown> | undefined
+): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+        if (a[key] !== b[key]) return false;
+    }
+    return true;
+}
+
+/**
+ * Data state for a single board column
+ */
+export interface BoardColumnData<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** Snapshots loaded for this column */
+    snapshots: Snapshot<M>[];
+    /** Whether the column is currently loading data */
+    loading: boolean;
+    /** Whether there are more items to load */
+    hasMore: boolean;
+    /** Error if loading failed */
+    error?: Error;
+    /** Total count of snapshots in this column */
+    totalCount?: number;
+}
+
+/**
+ * Controller for managing per-column data in a Kanban board
+ */
+export interface BoardDataController<M extends Record<string, unknown> = any, COLUMN extends string = string> {
+    /** Data state for each column */
+    columnData: Record<COLUMN, BoardColumnData<M>>;
+    /** Load more items for a specific column */
+    loadMoreColumn: (column: COLUMN) => void;
+    /** Refresh data for a specific column */
+    refreshColumn: (column: COLUMN) => void;
+    /** Refresh all columns */
+    refreshAll: () => void;
+    /** Update column counts and optionally move item optimistically */
+    moveItemOptimistically: (itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, newIndex?: number) => void;
+    /** Decrement column counts (for optimistic updates when deleting items) */
+    decrementColumnCounts: (columnDeltas: Record<COLUMN, number>) => void;
+    /** Whether any column is loading */
+    loading: boolean;
+    /** Any error from any column */
+    error?: Error;
+}
+
+export interface UseBoardDataControllerProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** Full path to the collection */
+    fullPath: string;
+    /** The snapshot collection configuration */
+    collection: CollectionConfig<M>;
+    /** Property key used for column assignment */
+    columnProperty: string;
+    /** Array of column values (enum values from columnProperty) */
+    columns: string[];
+    /** Property key used for ordering within columns */
+    orderProperty?: string;
+    /** Number of items to load per page per column */
+    pageSize?: number;
+    /** Text search string to filter snapshots */
+    searchString?: string;
+    /** Additional filter values */
+    filterValues?: FilterValues<string>;
+}
+
+/**
+ * Hook that manages per-column data loading for the Kanban board.
+ * Each column gets its own independent query to the data source.
+ */
+export function useBoardDataController<M extends Record<string, unknown> = any, COLUMN extends string = string>({
+    fullPath,
+    collection,
+    columnProperty,
+    columns,
+    orderProperty,
+    pageSize = DEFAULT_PAGE_SIZE,
+    searchString,
+    filterValues
+}: UseBoardDataControllerProps<M>): BoardDataController<M, COLUMN> {
+
+    const context = useRebaseContext();
+    const dataClient = useData();
+    // v4: use fullPath directly instead of resolveIdsFrom
+    const resolvedPath = fullPath;
+
+    // Stable refs for objects that shouldn't trigger re-subscriptions
+    const dataClientRef = useRef(dataClient);
+    const collectionRef = useRef(collection);
+    const contextRef = useRef(context);
+    dataClientRef.current = dataClient;
+    collectionRef.current = collection;
+    contextRef.current = context;
+
+    // Store filter/order params in refs so they're accessible without causing re-subscriptions
+    const filterValuesRef = useRef(filterValues);
+    const columnPropertyRef = useRef(columnProperty);
+    const orderPropertyRef = useRef(orderProperty);
+    const searchStringRef = useRef(searchString);
+    const resolvedPathRef = useRef(resolvedPath);
+    filterValuesRef.current = filterValues;
+    columnPropertyRef.current = columnProperty;
+    orderPropertyRef.current = orderProperty;
+    searchStringRef.current = searchString;
+    resolvedPathRef.current = resolvedPath;
+
+    // Track item count per column for pagination
+    const [columnItemCounts, setColumnItemCounts] = useState<Record<string, number>>(() => {
+        const initial: Record<string, number> = {};
+        columns.forEach(col => {
+            initial[col] = pageSize;
+        });
+        return initial;
+    });
+
+    // Per-column data state
+    const [columnData, setColumnData] = useState<Record<string, BoardColumnData<M>>>(() => {
+        const initial: Record<string, BoardColumnData<M>> = {};
+        columns.forEach(col => {
+            initial[col] = {
+                snapshots: [],
+                loading: true,
+                hasMore: true,
+                error: undefined,
+                totalCount: undefined
+            };
+        });
+        return initial;
+    });
+
+    // Track cleanup functions for subscriptions
+    const unsubscribersRef = useRef<Record<string, () => void>>({});
+
+    // Flag to prevent race conditions during cleanup
+    const isCleaningUpRef = useRef(false);
+
+    // Track items that are currently in an optimistic state (awaiting DB sync)
+    const pendingItemsRef = useRef<Record<string, { snapshot: Snapshot<M>, expectedValues: Record<string, any> }>>({});
+
+    // Stable keys for dependency comparison
+    const columnsKey = useMemo(() => [...columns].sort().join(","), [columns]);
+    const filterKey = useMemo(() => JSON.stringify(filterValues), [filterValues]);
+
+    // Track previous column item counts to detect which column changed
+    const prevColumnItemCountsRef = useRef<Record<string, number>>(columnItemCounts);
+
+    // Version counter to trigger full re-subscription when params change (not just load-more)
+    const [subscriptionVersion, setSubscriptionVersion] = useState(0);
+
+    // Trigger full re-subscription when key params change
+    useEffect(() => {
+        setSubscriptionVersion(v => v + 1);
+    }, [columnsKey, resolvedPath, columnProperty, orderProperty, searchString, filterKey, pageSize]);
+
+    // Cleanup subscriptions on unmount
+    useEffect(() => {
+        return () => {
+            isCleaningUpRef.current = true;
+            Object.values(unsubscribersRef.current).forEach(unsub => unsub?.());
+            unsubscribersRef.current = {};
+        };
+    }, []);
+
+    /**
+     * Check if a column value is excluded by the active filter on the columnProperty.
+     * E.g. if the user sets "Status IN (Open, In Progress)", this returns true
+     * for "Waiting on Customer" since that column should show as empty.
+     */
+    const isColumnExcludedByFilter = useCallback((column: string, filterValues?: FilterValues<string>, colProperty?: string): boolean => {
+        if (!filterValues || !colProperty) return false;
+        const filterForColumn = filterValues[colProperty as keyof typeof filterValues];
+        if (!filterForColumn || !Array.isArray(filterForColumn)) return false;
+
+        const [op, val] = filterForColumn as [string, unknown];
+
+        if (op === "==" && typeof val === "string") {
+            return column !== val;
+        }
+        if (op === "!=" && typeof val === "string") {
+            return column === val;
+        }
+        if (op === "in" && Array.isArray(val)) {
+            return !val.map(String).includes(column);
+        }
+        if (op === "not-in" && Array.isArray(val)) {
+            return val.map(String).includes(column);
+        }
+
+        return false;
+    }, []);
+
+    // Helper function to subscribe to a single column - uses refs to avoid dependency issues
+    const subscribeToColumn = useCallback((column: string, itemCount: number) => {
+        // Skip if we're in the middle of cleanup
+        if (isCleaningUpRef.current) return;
+
+        const currentDataClient = dataClientRef.current;
+        const currentCollection = collectionRef.current;
+        const currentContext = contextRef.current;
+        const currentFilterValues = filterValuesRef.current;
+        const currentColumnProperty = columnPropertyRef.current;
+        const currentOrderProperty = orderPropertyRef.current;
+        const currentSearchString = searchStringRef.current;
+        const currentResolvedPath = resolvedPathRef.current;
+
+        // If the column is excluded by the active filter on the column property,
+        // set it as empty immediately without querying.
+        const excluded = isColumnExcludedByFilter(column, currentFilterValues, currentColumnProperty);
+        if (excluded) {
+            setColumnData(prev => ({
+                ...prev,
+                [column]: {
+                    snapshots: [],
+                    loading: false,
+                    hasMore: false,
+                    error: undefined,
+                    totalCount: 0
+                }
+            }));
+            return;
+        }
+
+        // Build filter map for this column — pass FilterValues directly
+        const whereFilter: FilterValues<string> = {
+            ...(currentFilterValues ?? {}),
+            [currentColumnProperty]: ["==", column]
+        };
+
+        const orderByParam: [string, "asc" | "desc"] | undefined = currentOrderProperty ? [currentOrderProperty, "asc"] : undefined;
+
+        // Mark column as loading
+        setColumnData(prev => ({
+            ...prev,
+            [column]: {
+                ...prev[column],
+                loading: true,
+                error: undefined
+            }
+        }));
+
+        // onUpdate callback
+        const onUpdate = async (snapshots: Snapshot<M>[]) => {
+            // Skip updates if we're cleaning up
+            if (isCleaningUpRef.current) return;
+
+            const pendingMap = pendingItemsRef.current;
+
+            // Apply pending updates to incoming snapshots
+            const mergedSnapshots = snapshots.map(e => {
+                const pending = pendingMap[String(e.id)];
+                if (pending) {
+                    // Check if DB snapshot has caught up to the expected column and order
+                    const expectedCol = pending.expectedValues[currentColumnProperty];
+                    const expectedOrder = currentOrderProperty ? pending.expectedValues[currentOrderProperty] : undefined;
+
+                    let caughtUp = true;
+                    if (e.values?.[currentColumnProperty] !== expectedCol) {
+                        caughtUp = false;
+                    }
+                    if (currentOrderProperty && e.values?.[currentOrderProperty] !== expectedOrder) {
+                        caughtUp = false;
+                    }
+
+                    if (caughtUp) {
+                        // DB has caught up, clear pending state
+                        delete pendingMap[String(e.id)];
+                        return e; // Use the real DB snapshot
+                    }
+
+                    // DB hasn't caught up, overlay expected values
+                    return { ...e,
+values: { ...e.values,
+...pending.expectedValues } };
+                }
+                return e;
+            });
+
+            // Add any pending items that belong to this column but aren't in the incoming snapshots yet
+            // (e.g. backend hasn't moved them to this column yet)
+            Object.values(pendingMap).forEach(pending => {
+                if (pending.expectedValues[currentColumnProperty] === column) {
+                    if (!mergedSnapshots.some(e => String(e.id) === String(pending.snapshot.id))) {
+                        mergedSnapshots.push(pending.snapshot);
+                    }
+                }
+            });
+
+            // Always filter in memory to only show snapshots that belong to this specific column.
+            // This is required because text search returns all matches, and collection_snapshot_patch
+            // may contain snapshots that have just been moved out of this column.
+            let processed = mergedSnapshots.filter(e => e.values?.[currentColumnProperty] === column);
+
+            // Sort locally if orderProperty is defined. This ensures that collection_snapshot_patch
+            // insertions (which prepend by default in websocket.ts) are correctly placed.
+            if (currentOrderProperty) {
+                processed = [...processed].sort((a, b) => {
+                    const valA = a.values?.[currentOrderProperty] as string | undefined | null;
+                    const valB = b.values?.[currentOrderProperty] as string | undefined | null;
+
+                    const isAEmpty = valA === undefined || valA === null || valA === "";
+                    const isBEmpty = valB === undefined || valB === null || valB === "";
+
+                    if (isAEmpty && isBEmpty) return 0;
+                    if (isAEmpty) return 1;
+                    if (isBEmpty) return -1;
+
+                    return valA < valB ? -1 : valA > valB ? 1 : 0;
+                });
+            }
+
+            // Apply afterRead callbacks if any.
+            // afterRead operates on flat rows; unwrap the Snapshot view-model
+            // before invoking and re-wrap the processed row after.
+            if (currentCollection.callbacks?.afterRead) {
+                try {
+                    processed = await Promise.all(
+                        processed.map(async (snapshot) => {
+                            const processedRow = await currentCollection.callbacks!.afterRead!({
+                                collection: currentCollection,
+                                path: currentResolvedPath,
+                                row: { id: snapshot.id, ...snapshot.values },
+                                context: currentContext
+                            });
+                            return {
+                                ...snapshot,
+                                values: processedRow as M
+                            };
+                        })
+                    );
+                } catch (e) {
+                    console.error("Error in afterRead callback:", e);
+                }
+            }
+
+            const newHasMore = snapshots.length >= itemCount;
+
+            // Compare with current state — skip update if identical to avoid UI flash
+            setColumnData(prev => {
+                const existing = prev[column];
+                if (existing && !existing.loading && existing.snapshots.length === processed.length) {
+                    // Quick structural equality check: same IDs in same order with same values
+                    let identical = true;
+                    for (let i = 0; i < processed.length; i++) {
+                        const a = existing.snapshots[i];
+                        const b = processed[i];
+                        if (a.id !== b.id) {
+                            identical = false;
+                            break;
+                        }
+                        // Shallow-compare values to avoid JSON.stringify allocations
+                        // snapshot.values are flat records from the DB, so shallow suffices
+                        if (!shallowEqualValues(a.values, b.values)) {
+                            identical = false;
+                            break;
+                        }
+                    }
+                    if (identical && existing.hasMore === newHasMore) {
+                        // Data is the same — return previous reference to prevent re-render
+                        return prev;
+                    }
+                }
+
+                return {
+                    ...prev,
+                    [column]: {
+                        snapshots: processed,
+                        loading: false,
+                        hasMore: newHasMore,
+                        error: undefined,
+                        totalCount: prev[column]?.totalCount // Keep existing count
+                    }
+                };
+            });
+        };
+
+        const onError = (error: Error) => {
+            // Skip error handling if we're cleaning up
+            if (isCleaningUpRef.current) return;
+
+            console.error(`Error loading column ${column}:`, error);
+            setColumnData(prev => ({
+                ...prev,
+                [column]: {
+                    ...prev[column],
+                    snapshots: [],
+                    loading: false,
+                    hasMore: false,
+                    error
+                }
+            }));
+        };
+
+        // Set up listener or fetch
+        const accessor = currentDataClient.collection(currentResolvedPath);
+        if (accessor.listen) {
+            const unsubscribe = accessor.listen({
+                where: whereFilter,
+                limit: itemCount,
+                orderBy: orderByParam
+            }, res => onUpdate(res.data as Snapshot<M>[]), onError);
+            unsubscribersRef.current[column] = unsubscribe;
+        } else {
+            accessor.find({
+                where: whereFilter,
+                limit: itemCount,
+                orderBy: orderByParam
+            })
+                .then(res => onUpdate(res.data as Snapshot<M>[]))
+                .catch(onError);
+        }
+    }, []); // No dependencies - uses refs for all values
+
+    // Main effect for all column subscriptions - runs when subscriptionVersion changes (i.e., key params change)
+    useEffect(() => {
+        // Mark that we're setting up new subscriptions
+        isCleaningUpRef.current = false;
+
+        // Clean up all existing subscriptions synchronously
+        const existingUnsubscribers = { ...unsubscribersRef.current };
+        unsubscribersRef.current = {};
+        Object.values(existingUnsubscribers).forEach(unsub => {
+            try {
+                unsub?.();
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        });
+
+        const currentDataClient = dataClientRef.current;
+        const currentCollection = collectionRef.current;
+        const currentFilterValues = filterValuesRef.current;
+        const currentColumnProperty = columnPropertyRef.current;
+        const currentSearchString = searchStringRef.current;
+        const currentResolvedPath = resolvedPathRef.current;
+        const currentColumns = columns;
+        const currentColumnItemCounts = columnItemCounts;
+
+        // Small delay to ensure Firestore has cleaned up previous listeners
+        const timeoutId = setTimeout(() => {
+            if (isCleaningUpRef.current) return;
+
+            currentColumns.forEach(column => {
+                const itemCount = currentColumnItemCounts[column] ?? pageSize;
+                subscribeToColumn(column, itemCount);
+
+                // Skip count query for columns excluded by the filter — subscribeToColumn
+                // already set them to totalCount: 0.
+                if (isColumnExcludedByFilter(column, currentFilterValues, currentColumnProperty)) {
+                    return;
+                }
+
+                // Count query for column (for display in column header)
+                const accessor = currentDataClient.collection(currentResolvedPath);
+                if (accessor.count) {
+
+                    const whereFilter: FilterValues<string> = {
+                        ...(currentFilterValues ?? {}),
+                        [currentColumnProperty]: ["==", column]
+                    };
+
+                    accessor.count({
+                        where: whereFilter
+                    }).then(count => {
+                        if (isCleaningUpRef.current) return;
+                        setColumnData(prev => ({
+                            ...prev,
+                            [column]: {
+                                ...prev[column],
+                                totalCount: count
+                            }
+                        }));
+                    }).catch(e => {
+                        console.warn(`Failed to get count for column ${column}:`, e);
+                    });
+                }
+            });
+
+            // Update the ref after subscribing all
+            prevColumnItemCountsRef.current = { ...currentColumnItemCounts };
+        }, 0);
+
+        return () => {
+            clearTimeout(timeoutId);
+            isCleaningUpRef.current = true;
+            const unsubscribers = { ...unsubscribersRef.current };
+            unsubscribersRef.current = {};
+            Object.values(unsubscribers).forEach(unsub => {
+                try {
+                    unsub?.();
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+            });
+        };
+
+    }, [subscriptionVersion, subscribeToColumn, pageSize]);
+
+    // Track which subscription version last updated the counts
+    const lastProcessedVersionRef = useRef(subscriptionVersion);
+
+    // Separate effect to handle individual column load-more WITHOUT triggering full re-subscription
+    useEffect(() => {
+        // If subscriptionVersion changed, the main effect will handle everything
+        // Skip this effect to avoid race conditions
+        if (subscriptionVersion !== lastProcessedVersionRef.current) {
+            lastProcessedVersionRef.current = subscriptionVersion;
+            prevColumnItemCountsRef.current = { ...columnItemCounts };
+            return;
+        }
+
+        const prevCounts = prevColumnItemCountsRef.current;
+
+        columns.forEach(column => {
+            const prevCount = prevCounts[column] ?? pageSize;
+            const newCount = columnItemCounts[column] ?? pageSize;
+
+            // Only re-subscribe if this specific column's count increased (load more)
+            if (newCount > prevCount && !isCleaningUpRef.current) {
+                // Unsubscribe only this column
+                if (unsubscribersRef.current[column]) {
+                    try {
+                        unsubscribersRef.current[column]();
+                    } catch (e) {
+                        // Ignore cleanup errors
+                    }
+                    delete unsubscribersRef.current[column];
+                }
+                // Re-subscribe with new limit after a small delay
+                setTimeout(() => {
+                    if (!isCleaningUpRef.current) {
+                        subscribeToColumn(column, newCount);
+                    }
+                }, 0);
+            }
+        });
+
+        // Update the ref
+        prevColumnItemCountsRef.current = { ...columnItemCounts };
+    }, [columnItemCounts, columns, pageSize, subscribeToColumn, subscriptionVersion]);
+
+    const loadMoreColumn = useCallback((column: COLUMN) => {
+        setColumnItemCounts(prev => ({
+            ...prev,
+            [column]: (prev[column] ?? pageSize) + pageSize
+        }));
+    }, [pageSize]);
+
+    const refreshColumn = useCallback((column: COLUMN) => {
+        // Force re-subscribe by resetting to initial count
+        setColumnItemCounts(prev => ({
+            ...prev,
+            [column]: pageSize
+        }));
+    }, [pageSize]);
+
+    const refreshAll = useCallback(() => {
+        const reset: Record<string, number> = {};
+        columns.forEach(col => {
+            reset[col] = pageSize;
+        });
+        setColumnItemCounts(reset);
+    }, [columns, pageSize]);
+
+    // Optimistic update for when moving an item
+    const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, newIndex?: number) => {
+        setColumnData(prev => {
+            const updated = { ...prev };
+            let itemToMove: Snapshot<M> | undefined;
+
+            const sourceSnapshots = [...(updated[sourceColumn]?.snapshots || [])];
+            const itemIndex = sourceSnapshots.findIndex(e => String(e.id) === itemId);
+
+            if (itemIndex !== -1) {
+                itemToMove = sourceSnapshots[itemIndex];
+                sourceSnapshots.splice(itemIndex, 1);
+            }
+
+            if (itemToMove) {
+                const newValuesMerged = {
+                    ...itemToMove.values,
+                    ...(newValues || {})
+                };
+
+                const updatedSnapshot = {
+                    ...itemToMove,
+                    values: newValuesMerged
+                };
+
+                // Store in pending items ref
+                pendingItemsRef.current[String(updatedSnapshot.id)] = {
+                    snapshot: updatedSnapshot,
+                    expectedValues: newValuesMerged
+                };
+
+                const targetSnapshots = sourceColumn === targetColumn ? sourceSnapshots : [...(updated[targetColumn]?.snapshots || [])];
+
+                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetSnapshots.length) {
+                    targetSnapshots.splice(newIndex, 0, updatedSnapshot);
+                } else {
+                    targetSnapshots.push(updatedSnapshot);
+                    if (orderPropertyRef.current) {
+                        const orderProp = orderPropertyRef.current;
+                        targetSnapshots.sort((a, b) => {
+                            const valA = a.values?.[orderProp] as string | undefined | null;
+                            const valB = b.values?.[orderProp] as string | undefined | null;
+
+                            // Handle nulls/empty strings to match Postgres NULLS LAST (ASC) behavior
+                            const isAEmpty = valA === undefined || valA === null || valA === "";
+                            const isBEmpty = valB === undefined || valB === null || valB === "";
+
+                            if (isAEmpty && isBEmpty) return 0;
+                            if (isAEmpty) return 1; // A is null, B is not -> A goes after B
+                            if (isBEmpty) return -1; // B is null, A is not -> A goes before B
+
+                            return valA < valB ? -1 : valA > valB ? 1 : 0;
+                        });
+                    }
+                }
+
+                updated[sourceColumn] = {
+                    ...updated[sourceColumn],
+                    snapshots: sourceColumn === targetColumn ? targetSnapshots : sourceSnapshots,
+                    totalCount: sourceColumn === targetColumn
+                        ? updated[sourceColumn].totalCount
+                        : Math.max(0, (updated[sourceColumn].totalCount ?? 0) - 1)
+                };
+
+                if (sourceColumn !== targetColumn) {
+                    updated[targetColumn] = {
+                        ...updated[targetColumn],
+                        snapshots: targetSnapshots,
+                        totalCount: (updated[targetColumn].totalCount ?? 0) + 1
+                    };
+                }
+
+            } else if (sourceColumn !== targetColumn) {
+                // If item not found locally but counts need update
+                if (updated[sourceColumn]?.totalCount !== undefined) {
+                    updated[sourceColumn] = {
+                        ...updated[sourceColumn],
+                        totalCount: Math.max(0, (updated[sourceColumn].totalCount ?? 0) - 1)
+                    };
+                }
+                if (updated[targetColumn]?.totalCount !== undefined) {
+                    updated[targetColumn] = {
+                        ...updated[targetColumn],
+                        totalCount: (updated[targetColumn].totalCount ?? 0) + 1
+                    };
+                }
+            }
+
+            return updated;
+        });
+    }, []);
+
+    // Optimistic update for column counts when deleting items
+    const decrementColumnCounts = useCallback((columnDeltas: Record<COLUMN, number>) => {
+        setColumnData(prev => {
+            const updated = { ...prev };
+
+            for (const [column, delta] of Object.entries(columnDeltas) as [COLUMN, number][]) {
+                if (updated[column]?.totalCount !== undefined) {
+                    updated[column] = {
+                        ...updated[column],
+                        totalCount: Math.max(0, (updated[column].totalCount ?? 0) - delta)
+                    };
+                }
+            }
+
+            return updated;
+        });
+    }, []);
+
+    // Aggregate loading and error state
+    const loading = useMemo(() => {
+        return Object.values(columnData).some((col) => col.loading);
+    }, [columnData]);
+
+    const error = useMemo(() => {
+        const errors = Object.values(columnData)
+            .map((col) => col.error)
+            .filter(Boolean);
+        return errors[0];
+    }, [columnData]);
+
+    return useMemo(() => ({
+        columnData: columnData as Record<COLUMN, BoardColumnData<M>>,
+        loadMoreColumn,
+        refreshColumn,
+        refreshAll,
+        moveItemOptimistically,
+        decrementColumnCounts,
+        loading,
+        error
+    }), [
+        columnData,
+        loadMoreColumn,
+        refreshColumn,
+        refreshAll,
+        moveItemOptimistically,
+        decrementColumnCounts,
+        loading,
+        error
+    ]);
+}

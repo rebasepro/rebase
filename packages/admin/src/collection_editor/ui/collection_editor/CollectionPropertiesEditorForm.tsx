@@ -21,7 +21,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { SnapshotCollection, MapProperty, Properties, Property, PropertyConfig, User } from "@rebasepro/types";
+import { CollectionConfig, MapProperty, Properties, Property, PropertyConfig, User } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "./util";
@@ -31,7 +31,7 @@ import { GetCodeDialog } from "./GetCodeDialog";
 import { useAIModifiedPaths } from "./AIModifiedPathsContext";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
-import type { SerializableProperty, SerializableCollection } from "../../serializable_types";
+import type { SerializableProperty, SerializableCollectionConfig } from "../../serializable_types";
 
 type PropertyOrBuilder = Property | Record<string, unknown>;
 
@@ -44,7 +44,7 @@ type CollectionEditorFormProps = {
     extraIcon: React.ReactNode;
     getUser?: (uid: string) => User | null;
     getData?: () => Promise<object[]>;
-    doCollectionInference?: (collection: SnapshotCollection) => Promise<Partial<SnapshotCollection> | null> | undefined;
+    doCollectionInference?: (collection: CollectionConfig) => Promise<Partial<CollectionConfig> | null> | undefined;
     propertyConfigs: Record<string, PropertyConfig>;
     propertyTypePresets?: PropertyTypePreset[];
     hiddenPropertyTypes?: PropertyType[];
@@ -52,7 +52,7 @@ type CollectionEditorFormProps = {
         metadata: Record<string, unknown>;
         onMetadataChange: (key: string, value: unknown) => void;
         property: SerializableProperty;
-        collection: SerializableCollection;
+        collection: SerializableCollectionConfig;
     }) => React.ReactNode;
     standalone?: boolean;
 };
@@ -82,7 +82,7 @@ export function CollectionPropertiesEditorForm({
         setFieldTouched,
         errors,
         dirty
-    } = useFormex<SnapshotCollection>();
+    } = useFormex<CollectionConfig>();
 
     const snackbarController = useSafeSnackbarController();
     const configControllerFromContext = useCollectionsConfigController();

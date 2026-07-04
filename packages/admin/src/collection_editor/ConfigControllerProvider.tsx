@@ -1,6 +1,6 @@
 import { useUrlController } from "./_cms_internals";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Snapshot, SnapshotCollection, Property, TableMetadata, User } from "@rebasepro/types";
+import { Snapshot, CollectionConfig, Property, TableMetadata, User } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
@@ -87,7 +87,7 @@ export const ConfigControllerProvider = React.memo(
 
         const [currentDialog, setCurrentDialog] = React.useState<{
             isNewCollection: boolean,
-            parentCollection?: SnapshotCollection,
+            parentCollection?: CollectionConfig,
             editedCollectionId?: string,
             path?: string,
             parentCollectionSlugs: string[], parentSnapshotIds: string[],
@@ -95,7 +95,7 @@ export const ConfigControllerProvider = React.memo(
                 path?: string,
                 name?: string
             },
-            copyFrom?: SnapshotCollection,
+            copyFrom?: CollectionConfig,
             redirect: boolean,
             existingSnapshots?: Snapshot[],
             pathSuggestions?: string[];
@@ -107,14 +107,14 @@ export const ConfigControllerProvider = React.memo(
             propertyKey?: string,
             property?: Property,
             namespace?: string,
-            parentCollection?: SnapshotCollection,
+            parentCollection?: CollectionConfig,
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
             path?: string,
             parentCollectionSlugs: string[], parentSnapshotIds: string[],
 
             existingSnapshots?: Snapshot[];
-            collection?: SnapshotCollection;
+            collection?: CollectionConfig;
         }>();
 
 
@@ -130,7 +130,7 @@ export const ConfigControllerProvider = React.memo(
             id?: string,
             path?: string,
             parentCollectionSlugs: string[], parentSnapshotIds: string[],
-            parentCollection?: SnapshotCollection,
+            parentCollection?: CollectionConfig,
             existingSnapshots?: Snapshot[],
             initialView?: "general" | "display" | "properties",
             expandKanban?: boolean
@@ -169,7 +169,7 @@ parentSnapshotIds,
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
             parentCollectionSlugs: string[], parentSnapshotIds: string[],
-            collection: SnapshotCollection,
+            collection: CollectionConfig,
             existingSnapshots?: Snapshot[]
         }) => {
             console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentSnapshotIds, collection);
@@ -207,12 +207,12 @@ parentSnapshotIds,
             sourceClick
         }: {
             parentCollectionSlugs: string[], parentSnapshotIds: string[],
-            parentCollection?: SnapshotCollection
+            parentCollection?: CollectionConfig
             initialValues?: {
                 path?: string,
                 name?: string
             },
-            copyFrom?: SnapshotCollection,
+            copyFrom?: CollectionConfig,
             redirect: boolean,
             sourceClick?: string
         }) => {
@@ -262,7 +262,7 @@ parentSnapshotIds,
                 onAnalyticsEvent,
                 unmappedTables,
                 onFetchTableMetadata,
-                handleClose: (collection?: SnapshotCollection) => {
+                handleClose: (collection?: CollectionConfig) => {
                     if (currentDialog?.redirect) {
                         if (collection && currentDialog?.isNewCollection && !currentDialog.parentCollectionSlugs.length) {
                             const url = urlController.buildUrlCollectionPath(collection.slug);

@@ -1,5 +1,5 @@
 import { PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
-import { SnapshotCollection, Property } from "@rebasepro/types";
+import { CollectionConfig, Property } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { getTableName } from "@rebasepro/common";
 
@@ -31,7 +31,7 @@ export function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
     };
 }
 
-export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): SnapshotCollection {
+export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): CollectionConfig {
     const collection = registry.getCollectionByPath(collectionPath);
     if (!collection) {
         const registered = registry.getCollections().map(c => c.slug).join(", ");
@@ -40,7 +40,7 @@ export function getCollectionByPath(collectionPath: string, registry: PostgresCo
     return collection;
 }
 
-export function getTableForCollection(collection: SnapshotCollection, registry: PostgresCollectionRegistry): PgTable<any> {
+export function getTableForCollection(collection: CollectionConfig, registry: PostgresCollectionRegistry): PgTable<any> {
     const tableName = getTableName(collection);
     const table = registry.getTable(tableName);
     if (!table) {
@@ -49,7 +49,7 @@ export function getTableForCollection(collection: SnapshotCollection, registry: 
     return table;
 }
 
-export function getPrimaryKeys(collection: SnapshotCollection, registry: PostgresCollectionRegistry): { fieldName: string; type: "string" | "number"; isUUID?: boolean }[] {
+export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): { fieldName: string; type: "string" | "number"; isUUID?: boolean }[] {
     const table = getTableForCollection(collection, registry);
 
     // Fallback to explicitly defined isId properties

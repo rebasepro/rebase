@@ -733,9 +733,9 @@ console.log(result.nextPageToken); // for next page, or undefined
 Define file upload fields in your collections using the `storage` option on string properties:
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const productsCollection: PostgresCollection = {
+const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     table: "products",
     properties: {

@@ -29,8 +29,8 @@ import {
     useStudioCollectionRegistry,
     IconForView
 } from "@rebasepro/core";
-import type { SnapshotCollection } from "@rebasepro/types";
-import { isPostgresCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { useSchemaGraph } from "./useSchemaGraph";
 import type { TableNodeData } from "./useSchemaGraph";
 import { TableNode } from "./TableNode";
@@ -52,7 +52,7 @@ const edgeTypes = {
 function SchemaVisualizerCanvas({
     collections
 }: {
-    collections: SnapshotCollection[];
+    collections: CollectionConfig[];
 }) {
     const reactFlowInstance = useReactFlow();
     const {
@@ -152,7 +152,7 @@ duration: 400 }
 
     // Group collections for sidebar
     const postgresCollections = useMemo(
-        () => collections.filter(isPostgresCollection),
+        () => collections.filter(isPostgresCollectionConfig),
         [collections]
     );
 
@@ -184,7 +184,7 @@ duration: 400 }
             junctions: junctionNodes.length,
             withRls: postgresCollections.filter(
                 (c) =>
-                    isPostgresCollection(c) &&
+                    isPostgresCollectionConfig(c) &&
                     c.securityRules &&
                     c.securityRules.length > 0
             ).length
@@ -293,7 +293,7 @@ duration: 400 }
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1 shrink-0 ml-1">
-                                            {isPostgresCollection(collection) &&
+                                            {isPostgresCollectionConfig(collection) &&
                                                 collection.securityRules &&
                                                 collection.securityRules
                                                     .length > 0 && (
@@ -629,7 +629,7 @@ duration: 400 }
 export const SchemaVisualizer = () => {
     const { collections: registryCollections } =
         useStudioCollectionRegistry() as {
-            collections?: SnapshotCollection[];
+            collections?: CollectionConfig[];
         };
 
     // Merge registry collections with any passed collections

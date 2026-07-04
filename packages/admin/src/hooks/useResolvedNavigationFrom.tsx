@@ -1,4 +1,4 @@
-import type { SnapshotCollection, SnapshotCustomView } from "@rebasepro/types";
+import type { CollectionConfig, SnapshotCustomView } from "@rebasepro/types";
 import { Snapshot, RebaseContext, User } from "@rebasepro/types";
 import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/common";
@@ -22,7 +22,7 @@ export interface ResolvedNavigationSnapshot<M extends Record<string, unknown>> {
     snapshot: Snapshot<M>;
     snapshotId: string | number;
     path: string;
-    parentCollection: SnapshotCollection<M>;
+    parentCollection: CollectionConfig<M>;
 }
 
 /**
@@ -32,7 +32,7 @@ export interface ResolvedNavigationSnapshot<M extends Record<string, unknown>> {
 export interface ResolvedNavigationCollection<M extends Record<string, unknown>> {
     type: "collection";
     path: string;
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 }
 
 /**

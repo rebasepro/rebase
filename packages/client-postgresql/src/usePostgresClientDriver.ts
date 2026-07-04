@@ -2,7 +2,7 @@ import { useMemo, useEffect } from "react";
 import {
     DataDriver,
     DeleteProps,
-    SnapshotCollection,
+    CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
     ListenCollectionProps,
@@ -69,7 +69,7 @@ databaseId });
             return client.delete({ row });
         },
 
-        async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: SnapshotCollection): Promise<boolean> {
+        async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: CollectionConfig): Promise<boolean> {
             return client.checkUniqueField(path, name, value, id, collection);
         },
 

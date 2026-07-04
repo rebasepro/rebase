@@ -26,7 +26,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/core";
-import { isPostgresCollection } from "@rebasepro/types";
+import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 
@@ -388,7 +388,7 @@ status: "live" };
         });
 
         // Merge code-based policies
-        if (activeCollection && isPostgresCollection(activeCollection) && activeCollection.securityRules) {
+        if (activeCollection && isPostgresCollectionConfig(activeCollection) && activeCollection.securityRules) {
             activeCollection.securityRules.forEach((rule) => {
                 const ruleName = rule.name;
                 if (!ruleName) return;
@@ -721,7 +721,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             roles: newPolicy.roles
                                         };
 
-                                        const existingRules = (isPostgresCollection(activeCollection) ? activeCollection.securityRules : undefined) || [];
+                                        const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                         let newRules;
                                         if (editingPolicy === "new") {
                                             newRules = [...existingRules, rule];
@@ -913,7 +913,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                         roles: policy.roles
                                                                     };
 
-                                                                    const existingRules = (isPostgresCollection(activeCollection) ? activeCollection.securityRules : undefined) || [];
+                                                                    const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
                                                                     const newRules = [...existingRules, rule];
 
                                                                     try {

@@ -1,5 +1,5 @@
 import React from "react";
-import type { CollectionActionsProps, SnapshotTableController, SelectionController, SnapshotCollection } from "./collections";
+import type { CollectionActionsProps, SnapshotTableController, SelectionController, CollectionConfig } from "./collections";
 import type { Snapshot } from "./snapshots";
 import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
 import type { Property } from "./properties";
@@ -128,7 +128,7 @@ export interface NavigationSlotProps {
  */
 export interface CollectionToolbarProps {
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
     tableController: SnapshotTableController;
@@ -141,7 +141,7 @@ export interface CollectionToolbarProps {
  */
 export interface CollectionEmptyStateProps {
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
     canCreate: boolean;
@@ -159,7 +159,7 @@ export interface CollectionHeaderActionProps {
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
     onHover: boolean;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     tableController: SnapshotTableController;
 }
 
@@ -171,7 +171,7 @@ export interface CollectionAddColumnProps {
     path: string;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     tableController: SnapshotTableController;
 }
 
@@ -181,7 +181,7 @@ export interface CollectionAddColumnProps {
  */
 export interface CollectionErrorProps {
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     parentCollectionSlugs?: string[];
     parentSnapshotIds?: string[];
     error: Error;
@@ -192,7 +192,7 @@ export interface CollectionErrorProps {
  * @group Plugins
  */
 export interface KanbanSetupProps {
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     fullPath: string;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
@@ -203,7 +203,7 @@ export interface KanbanSetupProps {
  * @group Plugins
  */
 export interface KanbanAddColumnProps {
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     fullPath: string;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
@@ -221,7 +221,7 @@ export interface SnapshotRowActionsProps {
     snapshot: Snapshot;
     snapshotId: string;
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
     selectionController: SelectionController;
@@ -238,7 +238,7 @@ export interface SnapshotFieldSlotProps {
     property: Property;
     path: string;
     snapshotId?: string | number;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     context: RebaseContext;
 }
 
@@ -249,7 +249,7 @@ export interface SnapshotFieldSlotProps {
  */
 export interface CollectionFilterPanelProps {
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
     tableController: SnapshotTableController;
@@ -290,7 +290,7 @@ export interface ShellToolbarProps {
  */
 export interface CollectionInsightsSlotProps {
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     parentCollectionSlugs: string[];
     parentSnapshotIds: string[];
 }
@@ -302,6 +302,6 @@ export interface CollectionInsightsSlotProps {
  */
 export interface HomeCardInsightSlotProps {
     slug: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     context: RebaseContext;
 }

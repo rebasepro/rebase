@@ -2,8 +2,8 @@
  * Conversion utilities between the full Rebase types and their
  * JSON-serializable counterparts.
  *
- * - `toSerializableCollection` / `toSerializableProperty` — strip non-serializable fields
- * - `fromSerializableCollection` / `fromSerializableProperty` — reconstruct original types
+ * - `toSerializableCollectionConfig` / `toSerializableProperty` — strip non-serializable fields
+ * - `fromSerializableCollectionConfig` / `fromSerializableProperty` — reconstruct original types
  *
  * @module
  */
@@ -14,7 +14,7 @@ import type {
     BinaryProperty,
     BooleanProperty,
     DateProperty,
-    SnapshotCollection,
+    CollectionConfig,
     GeopointProperty,
     MapProperty,
     NumberProperty,
@@ -33,7 +33,7 @@ import type {
     SerializableBaseUIConfig,
     SerializableBinaryProperty,
     SerializableBooleanProperty,
-    SerializableCollection,
+    SerializableCollectionConfig,
     SerializableDateProperty,
     SerializableDateValidation,
     SerializableGeopointProperty,
@@ -107,7 +107,7 @@ function serializeMatches(matches: string | RegExp | undefined): string | undefi
 
 /**
  * Resolve a relation target to a string slug.
- * Functions are called to extract the target; SnapshotCollection objects
+ * Functions are called to extract the target; CollectionConfig objects
  * use their slug.
  */
 function resolveRelationTarget(target: RelationProperty["target"]): string | undefined {
@@ -118,7 +118,7 @@ function resolveRelationTarget(target: RelationProperty["target"]): string | und
             const resolved = target();
             if (typeof resolved === "string") return resolved;
             if (resolved && typeof resolved === "object" && "slug" in resolved) {
-                return (resolved as SnapshotCollection).slug;
+                return (resolved as CollectionConfig).slug;
             }
         } catch {
             // If the lazy resolver throws (e.g., circular dependency not yet ready), return undefined
@@ -389,15 +389,15 @@ export function toSerializableProperties(properties: Properties): SerializablePr
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Convert an `SnapshotCollection` to its JSON-serializable form.
+ * Convert an `CollectionConfig` to its JSON-serializable form.
  *
  * Strips all non-serializable fields (functions, React nodes, class instances)
  * while preserving the structural schema that the collection editor works with.
  *
  * The result is safe for `JSON.stringify()` and database storage.
  */
-export function toSerializableCollection(collection: SnapshotCollection): SerializableCollection {
-    const result: SerializableCollection = {
+export function toSerializableCollectionConfig(collection: CollectionConfig): SerializableCollectionConfig {
+    const result: SerializableCollectionConfig = {
         slug: collection.slug,
         name: collection.name,
         properties: toSerializableProperties(collection.properties),
@@ -436,13 +436,13 @@ export function toSerializableCollection(collection: SnapshotCollection): Serial
     if (collection.localChangesBackup !== undefined) result.localChangesBackup = collection.localChangesBackup;
 
     // Kanban
-    if (collection.kanban) result.kanban = collection.kanban as SerializableCollection["kanban"];
+    if (collection.kanban) result.kanban = collection.kanban as SerializableCollectionConfig["kanban"];
 
     // Filters and sorting
-    if (collection.fixedFilter) result.fixedFilter = collection.fixedFilter as SerializableCollection["fixedFilter"];
-    if (collection.defaultFilter) result.defaultFilter = collection.defaultFilter as SerializableCollection["defaultFilter"];
-    if (collection.filterPresets) result.filterPresets = collection.filterPresets as SerializableCollection["filterPresets"];
-    if (collection.sort) result.sort = collection.sort as SerializableCollection["sort"];
+    if (collection.fixedFilter) result.fixedFilter = collection.fixedFilter as SerializableCollectionConfig["fixedFilter"];
+    if (collection.defaultFilter) result.defaultFilter = collection.defaultFilter as SerializableCollectionConfig["defaultFilter"];
+    if (collection.filterPresets) result.filterPresets = collection.filterPresets as SerializableCollectionConfig["filterPresets"];
+    if (collection.sort) result.sort = collection.sort as SerializableCollectionConfig["sort"];
 
     // Numeric / boolean flags
     if (collection.pagination !== undefined) result.pagination = collection.pagination;
@@ -560,17 +560,17 @@ export function fromSerializableProperties(serialized: SerializableProperties): 
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Convert a `SerializableCollection` back to an `SnapshotCollection`.
+ * Convert a `SerializableCollectionConfig` back to an `CollectionConfig`.
  *
  * The result will NOT contain any of the non-serializable fields
  * (callbacks, snapshotActions, etc.) — those must be re-attached by the
  * consumer if needed.
  */
-export function fromSerializableCollection(serialized: SerializableCollection): SnapshotCollection {
+export function fromSerializableCollectionConfig(serialized: SerializableCollectionConfig): CollectionConfig {
     const { properties, ...rest } = serialized;
 
     return {
         ...rest,
         properties: fromSerializableProperties(properties),
-    } as SnapshotCollection;
+    } as CollectionConfig;
 }

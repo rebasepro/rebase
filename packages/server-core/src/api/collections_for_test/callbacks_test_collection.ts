@@ -1,7 +1,7 @@
-import { SnapshotCollection, BeforeSaveProps, AfterSaveProps, AfterSaveErrorProps, AfterReadProps, BeforeDeleteProps, AfterDeleteProps, PostgresCollection } from "@rebasepro/types";
+import { CollectionConfig, BeforeSaveProps, AfterSaveProps, AfterSaveErrorProps, AfterReadProps, BeforeDeleteProps, AfterDeleteProps, PostgresCollectionConfig } from "@rebasepro/types";
 import { logger } from "../../utils/logger";
 
-export const callbacksTestCollection: PostgresCollection = {
+export const callbacksTestCollection: PostgresCollectionConfig = {
     name: "Callback Tests",
     slug: "callback_tests",
     table: "callback_tests",

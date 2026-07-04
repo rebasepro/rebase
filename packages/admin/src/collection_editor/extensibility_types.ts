@@ -12,7 +12,7 @@
  */
 
 import type React from "react";
-import type { SerializableProperty, SerializableCollection } from "./serializable_types";
+import type { SerializableProperty, SerializableCollectionConfig } from "./serializable_types";
 
 // ═══════════════════════════════════════════════════════════════════════
 // PROPERTY TYPE PRESETS
@@ -90,7 +90,7 @@ export interface ExtraPropertyFieldsParams {
     /** The full current property being edited (serializable form). */
     property: SerializableProperty;
     /** The collection this property belongs to (serializable form). */
-    collection: SerializableCollection;
+    collection: SerializableCollectionConfig;
 }
 
 /**
@@ -102,7 +102,7 @@ export interface ExtraCollectionFieldsParams {
     /** Callback to update a single metadata key. Triggers dirty-state tracking. */
     onMetadataChange: (key: string, value: unknown) => void;
     /** The full current collection being edited (serializable form). */
-    collection: SerializableCollection;
+    collection: SerializableCollectionConfig;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

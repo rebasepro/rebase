@@ -4,7 +4,7 @@ import {
     normalizeDbValues,
     sanitizeAndConvertDates
 } from "../src/data-transformer";
-import type { SnapshotCollection, Property, Properties, RelationProperty } from "@rebasepro/types";
+import type { CollectionConfig, Property, Properties, RelationProperty } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
@@ -12,8 +12,8 @@ import type { SnapshotCollection, Property, Properties, RelationProperty } from 
 function makeCollection(
     slug: string,
     properties: Properties,
-    relations?: SnapshotCollection["relations"]
-): SnapshotCollection {
+    relations?: CollectionConfig["relations"]
+): CollectionConfig {
     return {
         name: slug,
         slug,
@@ -22,7 +22,7 @@ function makeCollection(
         tableName: slug,
         properties,
         relations
-    } as unknown as SnapshotCollection;
+    } as unknown as CollectionConfig;
 }
 
 // ─────────────────────────────────────────────────────────────

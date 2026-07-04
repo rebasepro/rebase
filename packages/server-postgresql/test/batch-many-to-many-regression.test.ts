@@ -24,7 +24,7 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { SnapshotCollection, Relation } from "@rebasepro/types";
+import { CollectionConfig, Relation } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ dataType: "number" },
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 
-const tagsCollection: SnapshotCollection = {
+const tagsCollection: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -78,7 +78,7 @@ const tagsCollection: SnapshotCollection = {
     idField: "id"
 };
 
-const postsCollection: SnapshotCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -104,7 +104,7 @@ relationName: "tags" }
     idField: "id"
 };
 
-const authorsCollection: SnapshotCollection = {
+const authorsCollection: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -116,7 +116,7 @@ const authorsCollection: SnapshotCollection = {
 };
 
 // Inverse M2M: tags → posts (from tag's perspective, "which posts use this tag?")
-const tagsWithInversePosts: SnapshotCollection = {
+const tagsWithInversePosts: CollectionConfig = {
     slug: "tags_inv",
     name: "Tags (inverse)",
     table: "tags",
@@ -143,7 +143,7 @@ relationName: "posts" }
 };
 
 // JoinPath-based M2M: authors → posts via author_posts
-const authorsWithJoinPath: SnapshotCollection = {
+const authorsWithJoinPath: CollectionConfig = {
     slug: "authors_jp",
     name: "Authors (joinPath)",
     table: "authors",

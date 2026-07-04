@@ -23,7 +23,7 @@ import {
     CollectionRegistryContext,
     UrlContext,
     NavigationStateContext,
-    SideSnapshotProvider,
+    SidePanelProvider,
     RebaseRoute
 } from "@rebasepro/admin";
 import { DEFAULT_DATA_SOURCE_KEY, Snapshot, PropertyConfig, RebaseContext } from "@rebasepro/types";
@@ -258,7 +258,7 @@ export function RebaseFirebaseApp({
                                     const fallbackRoute = firstCollectionEntry ? <Navigate to={urlController.buildUrlCollectionPath(firstCollectionEntry.id)} replace /> : <CenteredView>No home page or collections provided.</CenteredView>;
 
                                     component = (
-                                        <SideSnapshotProvider>
+                                        <SidePanelProvider>
                                             <RebaseRoutes>
                                                 <Route element={
                                                     <Scaffold
@@ -274,7 +274,7 @@ export function RebaseFirebaseApp({
                                                     <Route path="/c/*" element={<RebaseRoute/>}/>
                                                 </Route>
                                             </RebaseRoutes>
-                                        </SideSnapshotProvider>
+                                        </SidePanelProvider>
                                     );
                                 }
                             }

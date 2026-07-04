@@ -19,9 +19,9 @@ force: true });
 
     it("should merge properties while preserving existing functions when saving a collection", async () => {
         // Setup initial file
-        const fileContent = `import { SnapshotCollection } from "@rebasepro/types";
+        const fileContent = `import { CollectionConfig } from "@rebasepro/types";
 
-const productsCollection: SnapshotCollection = {
+const productsCollection: CollectionConfig = {
     name: "Products",
     slug: "products",
     properties: {
@@ -63,8 +63,8 @@ description: "Product name" },
 
     it("should safely escape string values containing quotes and prevent code injection", async () => {
         // Setup initial file
-        const fileContent = `import { SnapshotCollection } from "@rebasepro/types";
-const productsCollection: SnapshotCollection = {
+        const fileContent = `import { CollectionConfig } from "@rebasepro/types";
+const productsCollection: CollectionConfig = {
     name: "Products",
     slug: "products",
     properties: {}

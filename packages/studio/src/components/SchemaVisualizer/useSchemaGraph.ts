@@ -1,8 +1,8 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
-import { isPostgresCollection } from "@rebasepro/types";
-import type { SnapshotCollection, PostgresCollection, Relation } from "@rebasepro/types";
+import { isPostgresCollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, Relation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
 import type { LayoutDirection, RelationEdgeData } from "./schema-visualizer.utils";
@@ -36,9 +36,9 @@ export interface TableNodeData {
     [key: string]: unknown;
 }
 
-// ─── Extract columns from a SnapshotCollection ─────────────────────────
+// ─── Extract columns from a CollectionConfig ─────────────────────────
 
-const extractColumns = (collection: SnapshotCollection): ColumnInfo[] => {
+const extractColumns = (collection: CollectionConfig): ColumnInfo[] => {
     const columns: ColumnInfo[] = [];
     const properties = collection.properties ?? {};
 
@@ -79,7 +79,7 @@ const extractColumns = (collection: SnapshotCollection): ColumnInfo[] => {
     }
 
     // Add FK columns from owning relations
-    if (isPostgresCollection(collection)) {
+    if (isPostgresCollectionConfig(collection)) {
         try {
             const resolvedRelations = resolveCollectionRelations(collection);
             for (const rel of Object.values(resolvedRelations)) {
@@ -117,7 +117,7 @@ const extractColumns = (collection: SnapshotCollection): ColumnInfo[] => {
 // ─── Build graph from collections ─────────────────────────────────────
 
 const buildGraph = (
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     direction: LayoutDirection
 ): { nodes: Node[]; edges: Edge[] } => {
     const nodes: Node[] = [];
@@ -143,7 +143,7 @@ const buildGraph = (
 
     // 1. Create nodes for each collection
     for (const collection of collections) {
-        if (!isPostgresCollection(collection)) continue;
+        if (!isPostgresCollectionConfig(collection)) continue;
 
         const tableName = collection.table ?? collection.slug;
         const nodeId = `table-${tableName}`;
@@ -177,7 +177,7 @@ y: 0 },
     const processedJunctions = new Set<string>();
 
     for (const collection of collections) {
-        if (!isPostgresCollection(collection)) continue;
+        if (!isPostgresCollectionConfig(collection)) continue;
 
         const tableName = collection.table ?? collection.slug;
         const sourceNodeId = tableToNodeId.get(tableName);
@@ -191,14 +191,14 @@ y: 0 },
         }
 
         for (const [relationKey, rel] of Object.entries(resolvedRelations)) {
-            let targetCollection: SnapshotCollection;
+            let targetCollection: CollectionConfig;
             try {
                 targetCollection = rel.target();
             } catch {
                 continue;
             }
 
-            if (!isPostgresCollection(targetCollection)) continue;
+            if (!isPostgresCollectionConfig(targetCollection)) continue;
 
             const targetTable = targetCollection.table ?? targetCollection.slug;
             const targetNodeId = tableToNodeId.get(targetTable);
@@ -356,7 +356,7 @@ export interface UseSchemaGraphResult {
 }
 
 export const useSchemaGraph = (
-    collections: SnapshotCollection[] | undefined
+    collections: CollectionConfig[] | undefined
 ): UseSchemaGraphResult => {
     const [direction, setDirection] = useState<LayoutDirection>("LR");
     const [version, setVersion] = useState(0);

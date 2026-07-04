@@ -1,6 +1,6 @@
 
 import { IconForView } from "@rebasepro/core";
-import { useStudioCollectionRegistry, useStudioSideSnapshotController } from "@rebasepro/core";
+import { useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/core";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -213,7 +213,7 @@ const getStoragePrefix = (baseUrl?: string) => {
 
 export const SQLEditor = () => {
     const { databaseAdmin, client } = useRebaseContext();
-    const sideSnapshotController = useStudioSideSnapshotController();
+    const sidePanelController = useStudioSidePanelController();
     const snackbarController = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
 
@@ -1100,7 +1100,7 @@ id: String(ra.snapshotId) })}>
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        sideSnapshotController?.open({
+                                                        sidePanelController?.open({
                                                             path: ra.collection.collection.slug,
                                                             snapshotId: ra.snapshotId,
                                                             collection: ra.collection.collection,
@@ -1133,7 +1133,7 @@ id: String(ra.snapshotId) })}>
                                                     key={ra.collection.tableName}
                                                     dense
                                                     onClick={() => {
-                                                        sideSnapshotController?.open({
+                                                        sidePanelController?.open({
                                                             path: ra.collection.collection.slug,
                                                             snapshotId: ra.snapshotId,
                                                             collection: ra.collection.collection,

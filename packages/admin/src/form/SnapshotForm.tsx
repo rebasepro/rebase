@@ -1,4 +1,4 @@
-import type { SnapshotCollection, SnapshotCustomViewParams, AdditionalFieldDelegateProps } from "@rebasepro/types";
+import type { CollectionConfig, SnapshotCustomViewParams, AdditionalFieldDelegateProps } from "@rebasepro/types";
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
 import type { PropertyConfig } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";

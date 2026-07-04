@@ -655,7 +655,7 @@ GET /api/collections
 | `pagination.maxLimit` | `number` | `100` | Maximum allowed page size |
 | `cors.origin` | `string \| string[] \| boolean` | — | CORS origin configuration |
 | `cors.credentials` | `boolean` | `false` | Allow credentials in CORS |
-| `collections` | `SnapshotCollection[]` | `[]` | Collections to generate APIs for |
+| `collections` | `CollectionConfig[]` | `[]` | Collections to generate APIs for |
 | `collectionsDir` | `string` | — | Directory to auto-discover collections |
 
 ## References

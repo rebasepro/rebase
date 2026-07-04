@@ -9,7 +9,7 @@ description: Definisci le politiche di sicurezza a livello di riga (Row Level Se
 Le regole di sicurezza ti consentono di definire le politiche di **Sicurezza a Livello di Riga (RLS)** per le tue tabelle PostgreSQL direttamente nelle definizioni delle tue collection. Quando lo schema Drizzle viene generato, Rebase crea le corrispondenti istruzioni `CREATE POLICY`.
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     table: "posts",
     properties: { /* ... */ },
@@ -202,7 +202,7 @@ Un'esigenza comune è consentire agli **utenti non autenticati** di inviare dati
 ### Consigliato: `access: "public"` con `withCheck`
 
 ```typescript
-const contactMessagesCollection: EntityCollection = {
+const contactMessagesCollection: CollectionConfig = {
     slug: "contact_messages",
     securityRules: [
         // Chiunque può inviare un messaggio di contatto
@@ -223,7 +223,7 @@ La scorciatoia `access: "public"` genera una policy che consente l'operazione se
 ### Per la Cattura di Lead / Iscrizioni
 
 ```typescript
-const leadSignupsCollection: EntityCollection = {
+const leadSignupsCollection: CollectionConfig = {
     slug: "lead_magnet_signups",
     securityRules: [
         // Consenti inserimenti anonimi

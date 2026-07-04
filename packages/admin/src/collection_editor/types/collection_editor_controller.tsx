@@ -1,5 +1,5 @@
 import { CollectionsConfigController } from "./config_controller";
-import { Snapshot, SnapshotCollection, Property } from "@rebasepro/types";
+import { Snapshot, CollectionConfig, Property } from "@rebasepro/types";
 
 /**
  * Controller to open the collection editor dialog.
@@ -11,7 +11,7 @@ export interface CollectionEditorController {
         id?: string,
         path?: string,
         parentCollectionSlugs: string[], parentSnapshotIds: string[],
-        parentCollection?: SnapshotCollection,
+        parentCollection?: CollectionConfig,
         existingSnapshots?: Snapshot<any>[],
         /**
          * Initial view to open: "general", "display", or "properties"
@@ -34,9 +34,9 @@ export interface CollectionEditorController {
          * A collection to duplicate from. If provided, the new collection will be
          * pre-populated with the same properties (but with empty name, path, and id).
          */
-        copyFrom?: SnapshotCollection,
+        copyFrom?: CollectionConfig,
         parentCollectionSlugs: string[], parentSnapshotIds: string[],
-        parentCollection?: SnapshotCollection,
+        parentCollection?: CollectionConfig,
         redirect: boolean,
         sourceClick?: string
     }) => void;
@@ -47,7 +47,7 @@ export interface CollectionEditorController {
         currentPropertiesOrder?: string[],
         editedCollectionId: string,
         parentCollectionSlugs: string[], parentSnapshotIds: string[],
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         existingSnapshots: Snapshot<any>[]
     }) => void;
 

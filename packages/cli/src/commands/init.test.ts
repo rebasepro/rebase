@@ -198,7 +198,7 @@ describe("template collections", () => {
         expect(basenames).toContain("users");
     });
 
-    it("each blog collection file exports a valid SnapshotCollection shape", () => {
+    it("each blog collection file exports a valid CollectionConfig shape", () => {
         const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
         const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
 
@@ -206,7 +206,7 @@ describe("template collections", () => {
             const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
             expect(content).toContain("name:");
             expect(content).toContain("properties:");
-            expect(content).toContain("SnapshotCollection");
+            expect(content).toContain("CollectionConfig");
         }
     });
 

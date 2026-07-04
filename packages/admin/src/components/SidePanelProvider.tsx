@@ -1,0 +1,77 @@
+import type { SidePanelController } from "@rebasepro/types";
+import React from "react";
+import { useBuildSidePanel } from "../hooks/useBuildSidePanel";
+import { useBuildSideDialogsController } from "../hooks/useBuildSideDialogsController";
+import { SidePanelControllerContext } from "../hooks/useSidePanel";
+import { SideDialogsControllerContext } from "../contexts/SideDialogsControllerContext";
+import { BreadcrumbsProvider } from "../contexts/BreacrumbsContext";
+import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
+import { useCollectionRegistryController, useUrlController } from "../index";
+import { useNavigationStateController } from "../index";
+import { useAuthController, useBridgeRegistration } from "@rebasepro/core";
+
+/**
+ * Provider that builds the SidePanelController and makes it available
+ * via the SidePanelControllerContext from @rebasepro/core.
+ *
+ * After the CMS extraction refactor, `useBuildSidePanel` lives
+ * in the CMS package while the context it feeds into lives in core.
+ * This provider bridges the two: place it inside the `<Rebase>` tree and
+ * above any component that calls `useSidePanel()`.
+ *
+ * Also auto-registers the side snapshot controller and breadcrumbs into the
+ * self-assembling Studio bridge (when a StudioBridgeRegistryProvider is
+ * mounted above in the tree).
+ *
+ * @example
+ * ```tsx
+ * <Rebase ...>
+ *   {({ loading }) => (
+ *     <SidePanelProvider>
+ *       <RebaseRoutes>
+ *         ...
+ *       </RebaseRoutes>
+ *     </SidePanelProvider>
+ *   )}
+ * </Rebase>
+ * ```
+ *
+ * @group Components
+ */
+export function SidePanelProvider({ children }: { children: React.ReactNode }) {
+    const collectionRegistryController = useCollectionRegistryController();
+    const urlController = useUrlController();
+    const navigationStateController = useNavigationStateController();
+    const sideDialogsController = useBuildSideDialogsController();
+    const authController = useAuthController();
+
+    const sidePanelController = useBuildSidePanel(
+        collectionRegistryController,
+        urlController,
+        navigationStateController,
+        sideDialogsController,
+        authController
+    );
+
+    return (
+        <BreadcrumbsProvider>
+            <SideDialogsControllerContext.Provider value={sideDialogsController}>
+                <SidePanelControllerContext.Provider value={sidePanelController}>
+                    <BridgeAutoRegistrar sidePanelController={sidePanelController}/>
+                    {children}
+                </SidePanelControllerContext.Provider>
+            </SideDialogsControllerContext.Provider>
+        </BreadcrumbsProvider>
+    );
+}
+
+/**
+ * Internal component that auto-registers side snapshot and breadcrumbs
+ * into the Studio bridge. Must be a child of BreadcrumbsProvider.
+ */
+function BridgeAutoRegistrar({ sidePanelController }: { sidePanelController: SidePanelController }) {
+    const breadcrumbs = useBreadcrumbsController();
+    useBridgeRegistration("sidePanelController", sidePanelController);
+    useBridgeRegistration("breadcrumbs", breadcrumbs);
+    return null;
+}

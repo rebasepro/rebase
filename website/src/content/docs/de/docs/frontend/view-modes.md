@@ -16,7 +16,7 @@ Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
 ## Konfiguration
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     defaultViewMode: "table",            // Default view
     enabledViews: ["list", "table", "kanban"],    // Available views
@@ -67,7 +67,7 @@ Steuern Sie die Zeilenhöhe mit `defaultSize`:
 Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
 
 ```typescript
-const tasksCollection: EntityCollection = {
+const tasksCollection: CollectionConfig = {
     slug: "tasks",
     defaultViewMode: "kanban",
     kanban: {
@@ -100,7 +100,7 @@ Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die So
 Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     defaultViewMode: "cards",
     properties: {
@@ -116,6 +116,6 @@ const articlesCollection: EntityCollection = {
 
 ## Nächste Schritte
 
-- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs in Entitätsformularen
-- **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Entitätsaktionen
+- **[Entitätsansichten](/docs/frontend/snapshot-views)** — Benutzerdefinierte Tabs in Entitätsformularen
+- **[Entitätsaktionen](/docs/frontend/snapshot-actions)** — Benutzerdefinierte Entitätsaktionen
 ---

@@ -5,13 +5,13 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
-import { CollectionActionsProps, Properties, Property, User, SnapshotCollection } from "@rebasepro/types";
+import { CollectionActionsProps, Properties, Property, User, CollectionConfig } from "@rebasepro/types";
 import {
     getFieldConfig,
     PropertyConfigBadge,
     useSelectionController
 } from "../../components";
-import { SnapshotCollectionTable } from "../../components/SnapshotCollectionTable/SnapshotCollectionTable";
+import { CollectionTableBinding } from "../../components/CollectionTableBinding/CollectionTableBinding";
 import { useCollectionRegistryController } from "../../hooks";
 import {
     Button,
@@ -176,7 +176,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
                 {step === "import_data_saving" && importConfig &&
                     <ImportSaveInProgress importConfig={importConfig}
-                        collection={collection as SnapshotCollection}
+                        collection={collection as CollectionConfig}
                         path={path}
                         onImportSuccess={(importedCollection) => {
                             handleClose();
@@ -396,7 +396,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
 
     const selectionController = useSelectionController();
 
-    return <SnapshotCollectionTable
+    return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
             <Typography variant={"caption"}>Snapshots with the same id will be overwritten</Typography>

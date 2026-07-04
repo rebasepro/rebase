@@ -8,7 +8,7 @@ import { useContext } from "react";
  * This hook allows you to open and close side dialogs. This is the mechanism
  * used when open a side snapshot dialog, or when selecting a reference.
  *
- * If you want to open a side snapshot dialog, you can use the {@link useSideSnapshotController}
+ * If you want to open a side snapshot dialog, you can use the {@link useSidePanel}
  * hook.
  *
  * If you want to select a reference, you can use the {@link useReferenceDialog}

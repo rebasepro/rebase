@@ -1,4 +1,4 @@
-import { SnapshotCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
+import { CollectionConfig, NavigationGroupMapping, Property } from "@rebasepro/types";
 
 export interface CollectionsSetupInfo {
     status: "ongoing" | "complete" | "error";
@@ -13,7 +13,7 @@ export interface CollectionsConfigController {
 
     loading: boolean;
 
-    collections?: SnapshotCollection[];
+    collections?: CollectionConfig[];
 
     /**
      * If true, the configuration cannot be modified.
@@ -32,7 +32,7 @@ export interface CollectionsConfigController {
      */
     collectionsSetup?: CollectionsSetupInfo;
 
-    getCollection: (id: string) => SnapshotCollection;
+    getCollection: (id: string) => CollectionConfig;
 
     saveCollection: <M extends { [Key: string]: any }>(params: SaveCollectionParams<M>) => Promise<void>;
     updateCollection: <M extends { [Key: string]: any }>(params: UpdateCollectionParams<M>) => Promise<void>;
@@ -59,14 +59,14 @@ export interface CollectionsConfigController {
 
 export type UpdateCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
-    collectionData: Partial<SnapshotCollection<M>>,
+    collectionData: Partial<CollectionConfig<M>>,
     previousId?: string,
     parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
 
 export type SaveCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
-    collectionData: SnapshotCollection<M>,
+    collectionData: CollectionConfig<M>,
     previousId?: string,
     parentCollectionSlugs?: string[], parentSnapshotIds?: string[]
 }
@@ -96,14 +96,14 @@ export type DeleteCollectionParams = {
 export type UpdatePropertiesOrderParams = {
     fullPath: string;
     parentCollectionSlugs: string[], parentSnapshotIds: string[];
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     newPropertiesOrder: string[];
 }
 
 export type UpdateKanbanColumnsOrderParams = {
     fullPath: string;
     parentCollectionSlugs: string[], parentSnapshotIds: string[];
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     kanbanColumnProperty: string;
     newColumnsOrder: string[];
 }

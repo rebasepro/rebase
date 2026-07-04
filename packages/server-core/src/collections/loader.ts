@@ -1,4 +1,4 @@
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
@@ -7,8 +7,8 @@ import { logger } from "../utils/logger";
 /**
  * Asynchronously load collection files from a directory for backend initialization
  */
-export async function loadCollectionsFromDirectory(directory: string): Promise<SnapshotCollection[]> {
-    const collections: SnapshotCollection[] = [];
+export async function loadCollectionsFromDirectory(directory: string): Promise<CollectionConfig[]> {
+    const collections: CollectionConfig[] = [];
     try {
         if (!fs.existsSync(directory)) {
             logger.warn(`[loadCollectionsFromDirectory] Collections directory not found: ${directory}`);

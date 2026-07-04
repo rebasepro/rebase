@@ -39,7 +39,7 @@ Authentication is configured via the `auth` property of `initializeRebaseBackend
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `collection` | `SnapshotCollection` | Built-in users collection | The collection used for auth user storage. Import `defaultUsersCollection` from `@rebasepro/common` or pass a custom collection with required auth fields. |
+| `collection` | `CollectionConfig` | Built-in users collection | The collection used for auth user storage. Import `defaultUsersCollection` from `@rebasepro/common` or pass a custom collection with required auth fields. |
 | `jwtSecret` | `string` | — | **Required.** Secret for signing JWT access tokens. |
 | `accessExpiresIn` | `string` | `"1h"` | Access token lifetime (e.g. `"15m"`, `"2h"`). |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token lifetime. |
@@ -107,9 +107,9 @@ await initializeRebaseBackend({
 Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const membersCollection: PostgresCollection = {
+const membersCollection: PostgresCollectionConfig = {
   name: "Members",
   slug: "members",
   table: "members",

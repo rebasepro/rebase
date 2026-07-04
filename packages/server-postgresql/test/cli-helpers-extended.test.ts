@@ -1,5 +1,5 @@
 import { getDevDatabaseUrl, getTableIncludesFromCollections } from "../src/cli-helpers";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
@@ -176,7 +176,7 @@ describe("CLI Helpers — Extended", () => {
 
             // We can't easily mock getTableIncludes (it does dynamic imports of collection files)
             // So we test the subcomponent: getTableIncludesFromCollections
-            const collections: SnapshotCollection[] = [
+            const collections: CollectionConfig[] = [
                 {
                     slug: "users",
                     table: "users",
@@ -201,7 +201,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should handle collection with custom schema", async () => {
-            const collections: SnapshotCollection[] = [
+            const collections: CollectionConfig[] = [
                 {
                     slug: "orders",
                     table: "orders",
@@ -216,7 +216,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should deduplicate table names", async () => {
-            const collections: SnapshotCollection[] = [
+            const collections: CollectionConfig[] = [
                 {
                     slug: "users",
                     table: "users",
@@ -238,14 +238,14 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should include junction tables from many-to-many relations", async () => {
-            const tagsCollection: SnapshotCollection = {
+            const tagsCollection: CollectionConfig = {
                 slug: "tags",
                 table: "tags",
                 name: "Tags",
                 properties: { name: { type: "string" } },
             };
 
-            const postsCollection: SnapshotCollection = {
+            const postsCollection: CollectionConfig = {
                 slug: "posts",
                 table: "posts",
                 name: "Posts",
@@ -272,7 +272,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should include junction tables with custom schema from target collection", async () => {
-            const categoriesCollection: SnapshotCollection = {
+            const categoriesCollection: CollectionConfig = {
                 slug: "categories",
                 table: "categories",
                 name: "Categories",
@@ -280,7 +280,7 @@ describe("CLI Helpers — Extended", () => {
                 properties: { name: { type: "string" } },
             };
 
-            const productsCollection: SnapshotCollection = {
+            const productsCollection: CollectionConfig = {
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -308,7 +308,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should handle collection without explicit table (uses slug)", async () => {
-            const collections: SnapshotCollection[] = [
+            const collections: CollectionConfig[] = [
                 {
                     slug: "customers",
                     name: "Customers",

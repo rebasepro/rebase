@@ -35,7 +35,7 @@ history: {
 Indica quali collezioni devono tracciare la cronologia:
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     history: true,       // Abilita per questa collezione
     properties: { /* ... */ }

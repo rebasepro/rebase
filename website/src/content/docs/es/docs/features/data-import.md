@@ -30,7 +30,7 @@ El asistente de importación gestiona el mapeo de columnas, la coerción de tipo
 Habilitar/deshabilitar la importación por colección:
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     // Import is enabled by default
     // To disable:

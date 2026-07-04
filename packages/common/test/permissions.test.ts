@@ -4,7 +4,7 @@ import {
     canCreateSnapshot,
     canDeleteSnapshot
 } from "../src/util/permissions";
-import { AuthController, Snapshot, SnapshotCollection, SecurityRule, User } from "@rebasepro/types";
+import { AuthController, Snapshot, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ function noUser(): AuthController<User> {
     return { user: null } as AuthController<User>;
 }
 
-function makeCollection(securityRules?: SecurityRule[]): SnapshotCollection {
+function makeCollection(securityRules?: SecurityRule[]): CollectionConfig {
     return {
         name: "Products",
         slug: "products",

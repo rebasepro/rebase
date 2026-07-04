@@ -72,6 +72,6 @@ serveSPA(app, { frontendPath: "./frontend/dist" });
 |---------|------|
 | `@rebasepro/server-postgresql` | PostgreSQL database driver (Drizzle ORM) |
 | `@rebasepro/server-mongodb` | MongoDB database driver |
-| `@rebasepro/types` | Shared type definitions (`DataDriver`, `EntityCollection`, etc.) |
+| `@rebasepro/types` | Shared type definitions (`DataDriver`, `CollectionConfig`, etc.) |
 | `@rebasepro/client` | Client SDK used internally by the `rebase` singleton |
 | `@rebasepro/common` | Shared utilities and default collections |

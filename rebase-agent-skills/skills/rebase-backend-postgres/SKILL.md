@@ -69,7 +69,7 @@ rebase db migrate
 |---------|---------|
 | `@rebasepro/server-core` | Hono server coordinator, API generation, auth, storage, env validation |
 | `@rebasepro/server-postgresql` | PostgreSQL bootstrapper, data driver, connection helpers, realtime (LISTEN/NOTIFY) |
-| `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollection`, etc.) |
+| `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, etc.) |
 
 ## Connection Functions
 
@@ -339,7 +339,7 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `collection` | `SnapshotCollection` | Built-in `rebase.users` | Auth users collection |
+| `collection` | `CollectionConfig` | Built-in `rebase.users` | Auth users collection |
 | `jwtSecret` | `string` | Auto-generated in dev | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |

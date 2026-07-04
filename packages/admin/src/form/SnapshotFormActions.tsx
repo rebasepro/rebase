@@ -1,5 +1,5 @@
 
-import { type SnapshotCollection, getCollectionDataPath } from "@rebasepro/types";
+import { type CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { SnapshotAction } from "@rebasepro/types";
 import React from "react";
@@ -81,7 +81,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     savingError: Error | undefined,
     snapshot: Snapshot<M> | undefined,
     formActions?: SnapshotAction[],
-    collection: SnapshotCollection,
+    collection: CollectionConfig,
     disabled: boolean,
     status: "new" | "existing" | "copy",
     pluginActions?: React.ReactNode[],
@@ -130,7 +130,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                                 path: path ?? getCollectionDataPath(collection),
                                 collection: collection,
                                 context: undefined,
-                                sideSnapshotController: undefined,
+                                sidePanelController: undefined,
                                 openSnapshotMode: openSnapshotMode,
                                 navigateBack,
                                 formContext

@@ -18,7 +18,7 @@ pnpm add @rebasepro/schema-inference
 
 | Export | Type | Description |
 |---|---|---|
-| `buildEntityPropertiesFromData` | `(data: object[], getType: InferenceTypeBuilder) => Promise<Properties>` | Main entry — infer full property schema from data |
+| `buildSnapshotPropertiesFromData` | `(data: object[], getType: InferenceTypeBuilder) => Promise<Properties>` | Main entry — infer full property schema from data |
 | `buildPropertyFromData` | `(data: unknown[], property: Property, getType: InferenceTypeBuilder) => Property` | Refine an existing property with new sample data |
 | `buildPropertiesOrder` | `(properties: Properties, propertiesOrder?: string[], priorityKeys?: string[]) => string[]` | Sort property keys (title/name first, then images, then alphabetical) |
 | `inferTypeFromValue` | `(value: unknown) => DataType` | Default type inference: string, number, boolean, array, map, vector |
@@ -28,7 +28,7 @@ pnpm add @rebasepro/schema-inference
 
 | Export | Description |
 |---|---|
-| `parseReferenceString` | Parse `"path/entityId"` or `"db:::path/entityId"` format |
+| `parseReferenceString` | Parse `"path/snapshotId"` or `"db:::path/snapshotId"` format |
 | `looksLikeReference` | Check if a string looks like a document reference |
 | `findCommonInitialStringInPath` | Find shared collection path prefix in sample values |
 | `removeInitialAndTrailingSlashes` | Path cleanup |
@@ -48,7 +48,7 @@ pnpm add @rebasepro/schema-inference
 
 ```typescript
 import {
-    buildEntityPropertiesFromData,
+    buildSnapshotPropertiesFromData,
     inferTypeFromValue
 } from "@rebasepro/schema-inference";
 
@@ -58,7 +58,7 @@ const sampleData = [
     { name: "Carol", age: 28, active: true, role: "admin" },
 ];
 
-const properties = await buildEntityPropertiesFromData(
+const properties = await buildSnapshotPropertiesFromData(
     sampleData,
     inferTypeFromValue
 );

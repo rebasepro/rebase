@@ -16,7 +16,7 @@ Cada coleção pode ser exibida em quatro modos de visualização:
 ## Configuração
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     defaultViewMode: "table",            // Default view
     enabledViews: ["list", "table", "kanban"],    // Available views
@@ -67,7 +67,7 @@ Controle a altura da linha com `defaultSize`:
 Configure um quadro Kanban especificando qual propriedade enum usar como colunas:
 
 ```typescript
-const tasksCollection: EntityCollection = {
+const tasksCollection: CollectionConfig = {
     slug: "tasks",
     defaultViewMode: "kanban",
     kanban: {
@@ -100,7 +100,7 @@ Arrastar e soltar entre colunas atualiza automaticamente o campo enum e a ordem 
 Os cartões exibem entidades como cartões visuais — úteis para conteúdo com muitas imagens:
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     defaultViewMode: "cards",
     properties: {
@@ -116,6 +116,6 @@ const articlesCollection: EntityCollection = {
 
 ## Próximos Passos
 
-- **[Visualizações de Entidade](/docs/frontend/entity-views)** — Abas personalizadas em formulários de entidade
-- **[Ações de Entidade](/docs/frontend/entity-actions)** — Ações de entidade personalizadas
+- **[Visualizações de Entidade](/docs/frontend/snapshot-views)** — Abas personalizadas em formulários de entidade
+- **[Ações de Entidade](/docs/frontend/snapshot-actions)** — Ações de entidade personalizadas
 ---

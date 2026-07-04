@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { useAuthController } from "./useAuthController";
 import { Snapshot } from "@rebasepro/types";
 import { canCreateSnapshot, canEditSnapshot, canDeleteSnapshot, canReadCollection } from "@rebasepro/common";
@@ -12,25 +12,25 @@ export function usePermissions() {
     const authController = useAuthController();
 
     const canCreate = useCallback(
-        (collection: SnapshotCollection<any>, path: string) =>
+        (collection: CollectionConfig<any>, path: string) =>
             canCreateSnapshot(collection, authController, path, null),
         [authController]
     );
 
     const canEdit = useCallback(
-        (collection: SnapshotCollection<any>, path: string, snapshot: Snapshot<any> | null) =>
+        (collection: CollectionConfig<any>, path: string, snapshot: Snapshot<any> | null) =>
             canEditSnapshot(collection, authController, path, snapshot),
         [authController]
     );
 
     const canDelete = useCallback(
-        (collection: SnapshotCollection<any>, path: string, snapshot: Snapshot<any> | null) =>
+        (collection: CollectionConfig<any>, path: string, snapshot: Snapshot<any> | null) =>
             canDeleteSnapshot(collection, authController, path, snapshot),
         [authController]
     );
 
     const canRead = useCallback(
-        (collection: SnapshotCollection<any>) =>
+        (collection: CollectionConfig<any>) =>
             canReadCollection(collection, authController),
         [authController]
     );

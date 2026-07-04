@@ -14,22 +14,22 @@ Provides the canonical type definitions used across all Rebase packages — both
 
 ## Key Exports
 
-### Collection & Entity Types
+### Collection & Snapshot Types
 
 | Export | Description |
 |--------|-------------|
-| `EntityCollection` | Full collection definition (name, slug, properties, callbacks, security rules, views) |
+| `CollectionConfig` | Full collection definition (name, slug, properties, callbacks, security rules, views) |
 | `Property` | Union type for all property configurations (text, number, date, reference, array, map, etc.) |
-| `Entity` | Generic entity record type |
-| `EntityCallbacks` | Lifecycle hooks (`onPreSave`, `onSaveSuccess`, `onDelete`, etc.) |
-| `EntityValues` | Record of property values for an entity |
+| `Snapshot` | Generic snapshot record type |
+| `CollectionCallbacks` | Lifecycle hooks (`onPreSave`, `onSaveSuccess`, `onDelete`, etc.) |
+| `SnapshotValues` | Record of property values for a snapshot |
 | `SecurityRule` | RLS-style access control rule for a collection |
 
 ### Backend & Driver Interfaces
 
 | Export | Description |
 |--------|-------------|
-| `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `saveEntity`, `deleteEntity`, etc.) |
+| `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `saveSnapshot`, `deleteSnapshot`, etc.) |
 | `DatabaseAdapter` | Pluggable database adapter interface (used by `server-core`) |
 | `BackendBootstrapper` | Lifecycle interface for initializing database drivers, auth, history, and realtime |
 | `DatabaseAdmin` | Admin operations interface (SQL execution, collection stats, table metadata) |
@@ -63,7 +63,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 | Export | Description |
 |--------|-------------|
 | `CronJobDefinition` | Cron job configuration type |
-| `EntityCallbacks` | Lifecycle callbacks for entity CRUD operations |
+| `CollectionCallbacks` | Lifecycle callbacks for snapshot CRUD operations |
 | `PluginConfig` | Plugin system types |
 | `WebSocketMessage` | WebSocket protocol message types |
 | `Locale` | Localization types |
@@ -72,7 +72,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 
 ```typescript
 import type {
-  EntityCollection,
+  CollectionConfig,
   DataDriver,
   DatabaseAdapter,
   RebaseUser,
@@ -88,6 +88,6 @@ Every `@rebasepro/*` package depends on this one. Key consumers:
 |---------|------|
 | `@rebasepro/server-core` | `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
 | `@rebasepro/server-postgresql` | `BackendBootstrapper`, `InitializedDriver`, `RealtimeProvider` |
-| `@rebasepro/server-mongodb` | `BackendBootstrapper`, `DataDriver`, `EntityCollection` |
+| `@rebasepro/server-mongodb` | `BackendBootstrapper`, `DataDriver`, `CollectionConfig` |
 | `@rebasepro/client` | `RebaseClient`, `DataSourceDelegate`, `StorageSource` |
-| `@rebasepro/admin` | `EntityCollection`, `Property`, `PluginConfig`, controller interfaces |
+| `@rebasepro/admin` | `CollectionConfig`, `Property`, `PluginConfig`, controller interfaces |

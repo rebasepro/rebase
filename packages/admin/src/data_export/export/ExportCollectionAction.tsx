@@ -8,7 +8,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { useCMSContext } from "../../hooks";
-import { CollectionActionsProps, Snapshot, SnapshotCollection, ExportConfig, RebaseContext, User } from "@rebasepro/types";
+import { CollectionActionsProps, Snapshot, CollectionConfig, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
     Alert,
@@ -38,8 +38,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
-}: CollectionActionsProps<M, USER, SnapshotCollection<M>> & {
-    exportAllowed?: (props: { collectionSnapshotsCount: number, path: string, collection: SnapshotCollection }) => boolean;
+}: CollectionActionsProps<M, USER, CollectionConfig<M>> & {
+    exportAllowed?: (props: { collectionSnapshotsCount: number, path: string, collection: CollectionConfig }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
 }) {
@@ -115,7 +115,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         return [...resolvedExportColumnsValues, ...resolvedColumnsValues];
     }, [exportConfig?.additionalFields]);
 
-    const doDownload = useCallback(async (collection: SnapshotCollection<M>,
+    const doDownload = useCallback(async (collection: CollectionConfig<M>,
         exportConfig: ExportConfig<any> | undefined) => {
 
         onAnalyticsEvent?.("export_collection", {

@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 const collectionRegistry = new PostgresCollectionRegistry();
@@ -32,7 +32,7 @@ const mockItemsTable = {
 // Collection definitions
 // ---------------------------------------------------------------------------
 
-const projectUsersCollection: SnapshotCollection = {
+const projectUsersCollection: CollectionConfig = {
     slug: "project_users",
     name: "Project Users",
     table: "project_users",
@@ -44,7 +44,7 @@ const projectUsersCollection: SnapshotCollection = {
     primaryKeys: ["project_id", "user_id"]
 };
 
-const itemsCollection: SnapshotCollection = {
+const itemsCollection: CollectionConfig = {
     slug: "items",
     name: "Items",
     table: "items",

@@ -1,10 +1,10 @@
 import React from "react";
 import type { Snapshot } from "./snapshots";
-import type { SnapshotCollection, SelectionController } from "./collections";
+import type { CollectionConfig, SelectionController } from "./collections";
 import type { FormContext } from "./snapshot_views";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
-import type { SideSnapshotController } from "../controllers/side_snapshot_controller";
+import type { SidePanelController } from "../controllers/side_panel_controller";
 
 /**
  * A snapshot action is a custom action that can be performed on a snapshot.
@@ -72,7 +72,7 @@ export type SnapshotActionClickProps<M extends Record<string, unknown>, USER ext
     context?: RebaseContext<USER>;
 
     path?: string;
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
 
     /**
      * Optional form context, present if the action is being called from a form.
@@ -83,7 +83,7 @@ export type SnapshotActionClickProps<M extends Record<string, unknown>, USER ext
     /**
      * Present if this actions is being called from a side dialog only
      */
-    sideSnapshotController?: SideSnapshotController;
+    sidePanelController?: SidePanelController;
 
     /**
      * Is the action being called from the collection view or from the snapshot form view?

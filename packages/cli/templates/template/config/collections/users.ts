@@ -1,6 +1,6 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
-const usersCollection: SnapshotCollection = {
+const usersCollection: CollectionConfig = {
     name: "Users",
     singularName: "User",
     slug: "users",

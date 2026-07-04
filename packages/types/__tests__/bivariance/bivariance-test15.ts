@@ -3,13 +3,13 @@ export interface SelectionController<M extends Record<string, unknown>> {
     setSelectedSnapshots(snapshots: M[]): void;
 }
 
-export interface PostgresCollection<M extends Record<string, unknown>> {
+export interface PostgresCollectionConfig<M extends Record<string, unknown>> {
     readonly selectionController?: SelectionController<M>;
 }
 
-export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollection<M>;
+export type CollectionConfig<M extends Record<string, unknown> = Record<string, unknown>> = PostgresCollectionConfig<M>;
 
-declare let specificColl: SnapshotCollection<{ id: string, name: string }>;
-declare let genericColl: SnapshotCollection;
+declare let specificColl: CollectionConfig<{ id: string, name: string }>;
+declare let genericColl: CollectionConfig;
 
 genericColl = specificColl; // Should succeed!

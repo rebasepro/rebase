@@ -121,7 +121,7 @@ await initializeRebaseBackend({
             basePath: env.STORAGE_PATH || "./uploads"
         },
 
-    history: true,           // Enable entity change history
+    history: true,           // Enable snapshot change history
 
     enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
 

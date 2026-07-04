@@ -73,7 +73,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 
 | Package | Role | Used By |
 |---------|------|---------|
-| `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
+| `@rebasepro/types` | TypeScript interfaces for collections, properties, snapshots, plugins | Everything |
 | `@rebasepro/server-core` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
 | `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/core` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
@@ -92,12 +92,12 @@ Like drivers, storage backends are registered in a registry. You can have multip
 1. User opens a collection in the admin UI
 2. Client SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
 3. Backend queries PostgreSQL via Drizzle ORM
-4. Data transformer deserializes database records into entity format
+4. Data transformer deserializes database records into snapshot format
 5. Response sent to frontend, components render
 6. WebSocket keeps the view synced in real-time
 
 ### Write Flow
-1. User edits an entity in the form
+1. User edits a snapshot in the form
 2. `beforeSave` callbacks run (validation, transformation)
 3. Client SDK sends `PUT /api/data/:slug/:id`
 4. Backend serializes values, runs Drizzle `UPDATE`

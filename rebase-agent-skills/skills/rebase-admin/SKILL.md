@@ -13,12 +13,12 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 
 | Task | Hook / Component | Package |
 |------|-----------------|---------|
-| Open snapshot in side drawer | `useSideSnapshotController()` | `@rebasepro/admin` |
+| Open snapshot in side drawer | `useSidePanel()` | `@rebasepro/admin` |
 | Navigate to a collection view | `useUrlController()` | `@rebasepro/admin` |
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/admin` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/admin` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/admin` |
-| Open a snapshot selection dialog | `useSnapshotSelectionDialog()` | `@rebasepro/admin` |
+| Open a snapshot selection dialog | `useSelectionDialog()` | `@rebasepro/admin` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/admin` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/admin` |
 | Access full CMS context | `useCMSContext()` | `@rebasepro/admin` |
@@ -28,16 +28,16 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 
 ## 1. Opening Snapshots in the Side Drawer
 
-Use `useSideSnapshotController()` to open, replace, or close snapshot side panels (the sliding drawer that shows snapshot forms).
+Use `useSidePanel()` to open, replace, or close snapshot side panels (the sliding drawer that shows snapshot forms).
 
 ```typescript
-import { useSideSnapshotController } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/admin";
 ```
 
-### SideSnapshotController Interface
+### SidePanelController Interface
 
 ```typescript
-interface SideSnapshotController {
+interface SidePanelController {
     /** Close the last (topmost) panel */
     close: () => void;
 
@@ -69,7 +69,7 @@ interface SnapshotSidePanelProps<M extends Record<string, unknown> = Record<stri
     width?: number | string;
 
     /** Explicit collection config (auto-resolved from navigation if omitted) */
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
 
     /** Whether to update the browser URL when opening (default: true) */
     updateUrl?: boolean;
@@ -98,7 +98,7 @@ interface SnapshotSidePanelProps<M extends Record<string, unknown> = Record<stri
 
 **Open an existing snapshot for editing:**
 ```tsx
-const sideSnapshotController = useSideSnapshotController();
+const sideSnapshotController = useSidePanel();
 
 // Open the product with ID "abc123" in the side drawer
 sideSnapshotController.open({
@@ -236,10 +236,10 @@ import { useCollectionRegistryController } from "@rebasepro/admin";
 ```typescript
 type CollectionRegistryController<
     DB = Record<string, unknown>,
-    EC extends SnapshotCollection = SnapshotCollection
+    EC extends CollectionConfig = CollectionConfig
 > = {
     /** All registered collections */
-    collections?: SnapshotCollection[];
+    collections?: CollectionConfig[];
 
     /** Whether the registry is ready */
     initialised: boolean;
@@ -321,7 +321,7 @@ type CollectionPanelProps = {
     className?: string;
 
     /** Additional collection-level overrides */
-    collectionOverrides?: Partial<SnapshotCollection>;
+    collectionOverrides?: Partial<CollectionConfig>;
 };
 ```
 
@@ -356,17 +356,17 @@ type CollectionPanelProps = {
 
 ## 5. Snapshot Selection Dialog
 
-Use `useSnapshotSelectionDialog()` to open a side dialog for selecting snapshots (same mechanism used by reference fields).
+Use `useSelectionDialog()` to open a side dialog for selecting snapshots (same mechanism used by reference fields).
 
 ```typescript
-import { useSnapshotSelectionDialog } from "@rebasepro/admin";
+import { useSelectionDialog } from "@rebasepro/admin";
 ```
 
 ### Usage
 
 ```tsx
 function MyComponent() {
-    const { open, close } = useSnapshotSelectionDialog<Product>({
+    const { open, close } = useSelectionDialog<Product>({
         path: "products",
         onSingleSnapshotSelected: (snapshot) => {
             console.log("Selected:", snapshot.id);
@@ -378,7 +378,7 @@ function MyComponent() {
 }
 ```
 
-The hook accepts all `SnapshotSelectionProps` except `path` (which you pass separately), plus an `onClose` callback.
+The hook accepts all `SelectionProps` except `path` (which you pass separately), plus an `onClose` callback.
 
 ---
 
@@ -545,7 +545,7 @@ import { useCMSContext } from "@rebasepro/admin";
 
 ```typescript
 type CMSContext = RebaseContext & {
-    sideSnapshotController: SideSnapshotController;
+    sideSnapshotController: SidePanelController;
     sideDialogsController: SideDialogsController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
@@ -575,11 +575,11 @@ context.data;           // DataSource from RebaseContext
 ### Navigate to a collection and open a snapshot
 
 ```tsx
-import { useUrlController, useSideSnapshotController } from "@rebasepro/admin";
+import { useUrlController, useSidePanel } from "@rebasepro/admin";
 
 function navigateAndOpen() {
     const urlController = useUrlController();
-    const sideSnapshotController = useSideSnapshotController();
+    const sideSnapshotController = useSidePanel();
 
     // First navigate to the collection
     urlController.navigate(urlController.buildUrlCollectionPath("products"));
@@ -595,10 +595,10 @@ function navigateAndOpen() {
 ### Open snapshot from a custom view without navigating
 
 ```tsx
-import { useSideSnapshotController } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/admin";
 
 function MyCustomView() {
-    const sideSnapshotController = useSideSnapshotController();
+    const sideSnapshotController = useSidePanel();
 
     return (
         <button onClick={() => sideSnapshotController.open({
@@ -615,10 +615,10 @@ function MyCustomView() {
 ### Programmatic snapshot creation from a custom view
 
 ```tsx
-import { useSideSnapshotController } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/admin";
 
 function CreateButton() {
-    const sideSnapshot = useSideSnapshotController();
+    const sideSnapshot = useSidePanel();
 
     return (
         <button onClick={() => sideSnapshot.open({
@@ -754,7 +754,7 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `RebaseCMS` | Declarative CMS config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages |
-| `SnapshotCollectionView` | The collection view component |
+| `DataCollectionView` | The collection view component |
 | `SnapshotCustomView` | Snapshot detail/edit view |
 | `SnapshotPreview` | Reference/relation preview chip |
 | `SnapshotCard` | Card representation of a snapshot |
@@ -773,16 +773,16 @@ The admin package exports the following components (from `@rebasepro/admin`):
 
 | Hook | Description |
 |------|-------------|
-| `useSideSnapshotController()` | Open/close snapshot side panels |
+| `useSidePanel()` | Open/close snapshot side panels |
 | `useSideDialogsController()` | Open/close generic side dialogs |
 | `useUrlController()` | Build URLs and navigate |
 | `useNavigationStateController()` | Access navigation state |
 | `useCollectionRegistryController()` | Look up collections by slug |
 | `useBreadcrumbsController()` | Read/set breadcrumbs |
 | `useCMSContext()` | Full CMS context (core + CMS controllers) |
-| `useSnapshotSelectionDialog()` | Open snapshot selection dialog |
+| `useSelectionDialog()` | Open snapshot selection dialog |
 | `useSelectionController()` | Multi-select controller |
-| `useSnapshotHistory()` | Snapshot version history |
+| `useHistory()` | Snapshot version history |
 | `useApp()` | App-level utilities |
 
 ## Exported Utilities

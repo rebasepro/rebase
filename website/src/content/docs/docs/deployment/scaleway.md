@@ -62,4 +62,4 @@ Now deploy the image completely serverless without managing infrastructure.
 
 Scaleway will immediately provision the container and provide you with a public endpoint URL (e.g., `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`). 
 
-*Note: For strict data compliance, verify that your Scaleway Organization details reflect your European corporate entity.*
+*Note: For strict data compliance, verify that your Scaleway Organization details reflect your European corporate snapshot.*

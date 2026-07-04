@@ -16,12 +16,12 @@ import {
 } from "@rebasepro/core";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions, SnapshotCustomView, SnapshotAction, SnapshotCollection, RebasePlugin } from "@rebasepro/types";
+import type { AppView, CollectionEditorOptions, SnapshotCustomView, SnapshotAction, CollectionConfig, RebasePlugin } from "@rebasepro/types";
 import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/types";
 
 const EMPTY_PLUGINS: RebasePlugin[] = [];
-const EMPTY_COLLECTIONS: SnapshotCollection[] = [];
+const EMPTY_COLLECTIONS: CollectionConfig[] = [];
 
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
@@ -31,7 +31,7 @@ import { CollectionRegistryContext } from "../hooks/navigation/contexts/Collecti
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
 import { NavigationStateContext } from "../hooks/navigation/contexts/NavigationStateContext";
 
-import { SideSnapshotProvider } from "./SideSnapshotProvider";
+import { SidePanelProvider } from "./SidePanelProvider";
 
 // Collection editor internals — used when collectionEditor is enabled
 import { useLocalCollectionsConfigController } from "../collection_editor/useLocalCollectionsConfigController";
@@ -61,7 +61,7 @@ export interface RebaseNavigationProps {
  * ```tsx
  * <RebaseNavigation>
  *   <MyCustomLayout>
- *     <SnapshotCollectionView ... />
+ *     <CollectionViewBinding ... />
  *   </MyCustomLayout>
  * </RebaseNavigation>
  * ```
@@ -213,7 +213,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // The <Rebase> component builds the customizationController from its own props,
     // but snapshot views passed to <RebaseCMS> are stored in the registry and not
     // automatically merged. We re-provide an enriched controller here so that
-    // downstream consumers (SnapshotEditView, side panels, etc.) can resolve
+    // downstream consumers (EditViewBinding, side panels, etc.) can resolve
     // string-keyed snapshot views like "blog_preview".
     const enrichedCustomizationController = useMemo(() => {
         const cmsSnapshotViews = (registry.cmsConfig?.snapshotViews ?? []) as SnapshotCustomView[];
@@ -245,14 +245,14 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             <CollectionRegistryContext.Provider value={collectionRegistryController}>
                 <UrlContext.Provider value={urlController}>
                     <NavigationStateContext.Provider value={navigationStateController}>
-                        <SideSnapshotProvider>
+                        <SidePanelProvider>
                             <BridgeAutoRegistrar
                                 collectionRegistryController={collectionRegistryController}
                                 urlController={urlController}
                                 navigationStateController={navigationStateController}
                             />
                             {children}
-                        </SideSnapshotProvider>
+                        </SidePanelProvider>
                     </NavigationStateContext.Provider>
                 </UrlContext.Provider>
             </CollectionRegistryContext.Provider>

@@ -1,5 +1,5 @@
 import { deleteField, DocumentSnapshot } from "@firebase/firestore";
-import { SnapshotCollection, FirebaseCollection, Properties, Property } from "@rebasepro/types";
+import { CollectionConfig, FirebaseCollectionConfig, Properties, Property } from "@rebasepro/types";
 import { COLLECTION_PATH_SEPARATOR, sortProperties, stripCollectionPath } from "@rebasepro/common";
 
 export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentSnapshotIds?: string[]): string {
@@ -9,7 +9,7 @@ export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: stri
 }
 
 
-export const docsToCollectionTree = (docs: DocumentSnapshot[]): SnapshotCollection[] => {
+export const docsToCollectionTree = (docs: DocumentSnapshot[]): CollectionConfig[] => {
 
     const collectionsMap = docs.map((doc) => {
         const id: string = doc.id;
@@ -26,7 +26,7 @@ export const docsToCollectionTree = (docs: DocumentSnapshot[]): SnapshotCollecti
             const parentId = id.split(COLLECTION_PATH_SEPARATOR).slice(0, -1).join(COLLECTION_PATH_SEPARATOR);
             const parentCollection = collectionsMap[parentId];
             if (parentCollection)
-                (parentCollection as FirebaseCollection).subcollections = () => [...((parentCollection as FirebaseCollection).subcollections?.() ?? []), collection];
+                (parentCollection as FirebaseCollectionConfig).subcollections = () => [...((parentCollection as FirebaseCollectionConfig).subcollections?.() ?? []), collection];
             delete collectionsMap[id];
         }
     });
@@ -34,7 +34,7 @@ export const docsToCollectionTree = (docs: DocumentSnapshot[]): SnapshotCollecti
     return Object.values(collectionsMap);
 }
 
-export const docToCollection = (doc: DocumentSnapshot): SnapshotCollection => {
+export const docToCollection = (doc: DocumentSnapshot): CollectionConfig => {
     const data = doc.data();
     if (!data)
         throw Error("Snapshot collection has not been persisted correctly");
@@ -48,7 +48,7 @@ export const docToCollection = (doc: DocumentSnapshot): SnapshotCollection => {
         ...data,
         properties: sortedProperties,
         slug: data.id ?? data.alias ?? data.slug
-    } as SnapshotCollection;
+    } as CollectionConfig;
 }
 
 

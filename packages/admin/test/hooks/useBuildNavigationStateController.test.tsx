@@ -3,14 +3,14 @@
  */
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useBuildNavigationStateController } from "../../src/hooks/navigation/useBuildNavigationStateController";
-import { AuthController, UrlController, CollectionRegistryController, DataDriver, SnapshotCollection } from "@rebasepro/types";
+import { AuthController, UrlController, CollectionRegistryController, RebaseData, CollectionConfig } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 
 
 describe("useBuildNavigationStateController", () => {
 
-    const mockDataDriver: DataDriver = {} as DataDriver;
+    const mockData = { collection: jest.fn() } as unknown as RebaseData;
 
     const mockCollectionRegistry = new CollectionRegistry();
     jest.spyOn(mockCollectionRegistry, "registerMultiple").mockReturnValue(true);
@@ -39,7 +39,7 @@ describe("useBuildNavigationStateController", () => {
             authController: mockAuthController,
             collections: [],
             views: undefined,
-            driver: mockDataDriver,
+            data: mockData,
             collectionRegistryController: mockCollectionRegistryController,
             urlController: mockCmsUrlController
         }));
@@ -73,7 +73,7 @@ describe("useBuildNavigationStateController", () => {
             authController: mockAuthController,
             collections: [],
             views: undefined,
-            driver: mockDataDriver,
+            data: mockData,
             collectionRegistryController: mockCollectionRegistryController,
             urlController: mockCmsUrlController
         }));
@@ -85,12 +85,13 @@ describe("useBuildNavigationStateController", () => {
         // Calling refreshNavigation shouldn't throw, and it should trigger the sub-hooks
         expect(typeof result.current.refreshNavigation).toBe("function");
 
-        // This is mostly a sanity check that the refresh propagates without errors
-        let refreshPromise: unknown;
-        act(() => {
-            refreshPromise = result.current.refreshNavigation();
+        // refreshNavigation uses queueMicrotask internally, so we need an async
+        // act boundary to let the microtask (and resulting state updates) flush.
+        await act(async () => {
+            result.current.refreshNavigation();
+            // Flush the queueMicrotask scheduled by refreshNavigation
+            await Promise.resolve();
         });
-        expect(refreshPromise).toBeUndefined(); // It's void
     });
 
     it("should aggregate error states if collections fail", async () => {
@@ -109,7 +110,7 @@ describe("useBuildNavigationStateController", () => {
             authController: mockAuthController,
             collections: badBuilder,
             views: undefined,
-            driver: mockDataDriver,
+            data: mockData,
             collectionRegistryController: mockCollectionRegistryController,
             urlController: mockCmsUrlController
         }));

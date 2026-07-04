@@ -48,9 +48,9 @@ For production deployments, use migrations for version-controlled, reviewable ch
 Edit your collection file (e.g., `config/collections/posts.ts`):
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const postsCollection: PostgresCollection = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Posts",
     singularName: "Post",
     slug: "posts",
@@ -140,11 +140,11 @@ rebase schema generate && rebase db generate && rebase db migrate
 Relations are defined **inline on the property** using `type: "relation"`:
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 import authorsCollection from "./authors";
 import tagsCollection from "./tags";
 
-const postsCollection: PostgresCollection = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Posts",
     table: "posts",
     properties: {

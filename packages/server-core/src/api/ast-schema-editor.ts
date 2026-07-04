@@ -236,7 +236,7 @@ export class AstSchemaEditor {
             // Create a new file
             const safeId = this.sanitizeCollectionId(collectionId);
             const newFilePath = this.safePath(`${safeId}.ts`);
-            file = this.project.createSourceFile(newFilePath, `import { SnapshotCollection } from "@rebasepro/types";\n\nconst ${safeId}Collection: SnapshotCollection = ${this.convertJsonToAstString(collectionData)};\n\nexport default ${safeId}Collection;\n`, { overwrite: true });
+            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${safeId}Collection: CollectionConfig = ${this.convertJsonToAstString(collectionData)};\n\nexport default ${safeId}Collection;\n`, { overwrite: true });
         } else {
             // Update root level properties gracefully
 

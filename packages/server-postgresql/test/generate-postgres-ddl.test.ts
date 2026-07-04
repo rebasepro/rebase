@@ -1,4 +1,4 @@
-import { SnapshotCollection, PostgresCollection } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 
 describe("generatePostgresDdl", () => {
@@ -11,7 +11,7 @@ describe("generatePostgresDdl", () => {
     };
 
     it("should generate a simple table with basic types", async () => {
-        const collections: SnapshotCollection[] = [
+        const collections: CollectionConfig[] = [
             {
                 slug: "products",
                 table: "products",
@@ -36,7 +36,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate custom schemas", async () => {
-        const collections: PostgresCollection[] = [
+        const collections: PostgresCollectionConfig[] = [
             {
                 slug: "products",
                 table: "products",
@@ -54,7 +54,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate enum types", async () => {
-        const collections: SnapshotCollection[] = [
+        const collections: CollectionConfig[] = [
             {
                 slug: "orders",
                 table: "orders",
@@ -74,7 +74,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate one-to-many relation foreign keys", async () => {
-        const usersCollection: SnapshotCollection = {
+        const usersCollection: CollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -82,7 +82,7 @@ describe("generatePostgresDdl", () => {
                 name: { type: "string" }
             }
         };
-        const postsCollection: SnapshotCollection = {
+        const postsCollection: CollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -109,7 +109,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate many-to-many junction tables", async () => {
-        const postsCollection: SnapshotCollection = {
+        const postsCollection: CollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -131,7 +131,7 @@ describe("generatePostgresDdl", () => {
                 }
             ]
         };
-        const tagsCollection: SnapshotCollection = {
+        const tagsCollection: CollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -152,7 +152,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate column default values", async () => {
-        const collections: SnapshotCollection[] = [
+        const collections: CollectionConfig[] = [
             {
                 slug: "users_uuid",
                 table: "users_uuid",
@@ -181,7 +181,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate RLS policies with ownerField and roles", async () => {
-        const collections: PostgresCollection[] = [
+        const collections: PostgresCollectionConfig[] = [
             {
                 slug: "posts",
                 table: "posts",
@@ -214,7 +214,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate advanced column types, constraints, and default values", async () => {
-        const collections: SnapshotCollection[] = [
+        const collections: CollectionConfig[] = [
             {
                 slug: "items",
                 table: "items",
@@ -269,7 +269,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate RLS policies with restrictive mode, multiple operations, and custom using/check clauses", async () => {
-        const collections: PostgresCollection[] = [
+        const collections: PostgresCollectionConfig[] = [
             {
                 slug: "documents",
                 table: "documents",

@@ -1,4 +1,4 @@
-import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
+import { useSelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
 import { Snapshot, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
@@ -59,7 +59,7 @@ export function MultipleRelationFieldBinding({
         setValue(snapshots.map(e => getRelationFrom(e)));
     }, [setValue]);
 
-    const referenceDialogController = useSnapshotSelectionDialog({
+    const referenceDialogController = useSelectionDialog({
         multiselect: true,
         path: getCollectionDataPath(collection),
         collection,

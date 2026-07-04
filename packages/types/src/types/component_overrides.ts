@@ -46,10 +46,10 @@ export type CollectionComponentName =
 
     // ── Snapshot / Form ──
     | "Snapshot.Form"
-    | "Snapshot.FormActions"
-    | "Snapshot.DetailView"
+    | "EditView.FormActions"
+    | "DetailView"
     | "Snapshot.SidePanel"
-    | "Snapshot.Preview"
+    | "RecordPreview"
     | "Snapshot.MissingReference";
 
 /**
@@ -89,7 +89,7 @@ export type OverridableComponentName = AppComponentName | CollectionComponentNam
  *
  * @group Component Overrides
  */
-export interface ComponentOverride<P = any> {
+export interface ComponentOverride<P = Record<string, unknown>> {
     /**
      * The replacement component. Receives the same props as the built-in
      * component it replaces.
@@ -161,7 +161,7 @@ export type CollectionComponentOverrideMap = {
  *         "HomePage": { Component: MyDashboard },
  *
  *         // Collection defaults: apply to ALL collections
- *         "Snapshot.FormActions": {
+ *         "EditView.FormActions": {
  *             Component: MyFormActions,
  *             wrap: true
  *         },

@@ -13,7 +13,7 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import type { SnapshotCollection, Relation } from "@rebasepro/types";
+import type { CollectionConfig, Relation } from "@rebasepro/types";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────
@@ -34,9 +34,9 @@ dataType: "number" },
 };
 
 // ─── Mock Collections ─────────────────────────────────────────────
-let authorsCollection: SnapshotCollection;
+let authorsCollection: CollectionConfig;
 
-const postsCollection: SnapshotCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

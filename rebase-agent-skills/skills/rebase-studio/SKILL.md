@@ -256,8 +256,8 @@ These components can be overridden globally on `<Rebase>` (which acts as a fallb
 `<RebaseCMS>` accepts the full `RebaseCMSConfig`:
 
 ```typescript
-interface RebaseCMSConfig<EC extends SnapshotCollection = SnapshotCollection> {
-    collections?: EC[] | SnapshotCollectionsBuilder<EC>;
+interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig> {
+    collections?: EC[] | CollectionConfigsBuilder<EC>;
     views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
     snapshotViews?: SnapshotCustomView[];
@@ -464,7 +464,7 @@ type CollectionPanelProps = {
     updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
     openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
     className?: string;                     // Container CSS class
-    collectionOverrides?: Partial<SnapshotCollection>; // Additional overrides
+    collectionOverrides?: Partial<CollectionConfig>; // Additional overrides
 };
 ```
 
@@ -512,7 +512,7 @@ The Studio Bridge provides CMS capabilities to Studio components. When CMS is pr
 ```typescript
 interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
-    sideSnapshotController: SideSnapshotController;
+    sideSnapshotController: SidePanelController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
@@ -524,7 +524,7 @@ interface StudioBridge {
 | Hook | Return Type | Description |
 |------|-------------|-------------|
 | `useStudioCollectionRegistry()` | `CollectionRegistryController` | Access registered collections from Studio |
-| `useStudioSideSnapshotController()` | `SideSnapshotController` | Open/close snapshot side panels from Studio |
+| `useStudioSidePanelController()` | `SidePanelController` | Open/close snapshot side panels from Studio |
 | `useStudioUrlController()` | `UrlController` | Build URLs and navigate from Studio |
 | `useStudioNavigationState()` | `NavigationStateController` | Access navigation state from Studio |
 | `useStudioBreadcrumbs()` | `BreadcrumbsController` | Set breadcrumbs from Studio tools |
@@ -534,7 +534,7 @@ All bridge hooks are exported from `@rebasepro/studio` (re-exported from `@rebas
 ```typescript
 import {
     useStudioCollectionRegistry,
-    useStudioSideSnapshotController,
+    useStudioSidePanelController,
     useStudioUrlController,
     useStudioNavigationState,
     useStudioBreadcrumbs
@@ -567,7 +567,7 @@ import { StudioBridgeProvider } from "@rebasepro/studio";
 
 <StudioBridgeProvider value={{
     collectionRegistry: useCollectionRegistryController(),
-    sideSnapshotController: useSideSnapshotController(),
+    sideSnapshotController: useSidePanel(),
     urlController: useUrlController(),
     navigationState: useNavigationStateController(),
     breadcrumbs: useBreadcrumbsController(),
@@ -610,7 +610,7 @@ These hooks are exported from `@rebasepro/core` and available inside any `<Rebas
 
 | Hook | Package | Description |
 |------|---------|-------------|
-| `useSideSnapshotController()` | `@rebasepro/admin` | Open/close snapshot side panels |
+| `useSidePanel()` | `@rebasepro/admin` | Open/close snapshot side panels |
 | `useNavigationStateController()` | `@rebasepro/admin` | Navigate between views |
 | `useUrlController()` | `@rebasepro/admin` | Build URLs and navigate |
 | `useBreadcrumbsController()` | `@rebasepro/admin` | Set breadcrumbs |

@@ -45,7 +45,7 @@ All 9 tools are enabled by default. The `schema` tool (collection editor) is aut
 | `StudioBridgeProvider` | Component | Re-exported from `@rebasepro/core` |
 | `StudioBridgeContext` | Context | Re-exported from `@rebasepro/core` |
 | `useStudioCollectionRegistry` | Hook | Access the collection registry |
-| `useStudioSideEntityController` | Hook | Control the side entity panel |
+| `useStudioSidePanelController` | Hook | Control the side snapshot panel |
 | `useStudioUrlController` | Hook | URL state management |
 | `useStudioNavigationState` | Hook | Navigation state |
 | `useStudioBreadcrumbs` | Hook | Breadcrumb management |

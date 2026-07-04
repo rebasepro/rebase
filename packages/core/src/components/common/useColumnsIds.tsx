@@ -1,4 +1,4 @@
-import type { SnapshotCollection, Property, MapProperty, Properties } from "@rebasepro/types";
+import type { CollectionConfig, Property, MapProperty, Properties } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
 import { getSubcollections } from "@rebasepro/common";
@@ -28,10 +28,10 @@ export type PropertyColumnConfig = {
     disabled: boolean;
 };
 
-export function getSubcollectionColumnId(collection: SnapshotCollection<any>) {
+export function getSubcollectionColumnId(collection: CollectionConfig<any>) {
     return `subcollection:${collection.slug}`;
 }
-export function useColumnIds<M extends Record<string, any>>(collection: SnapshotCollection<M>, includeSubcollections: boolean): PropertyColumnConfig[] {
+export function useColumnIds<M extends Record<string, any>>(collection: CollectionConfig<M>, includeSubcollections: boolean): PropertyColumnConfig[] {
     return useMemo(() => {
         if (collection.propertiesOrder) {
             return hideAndExpandKeys(collection, collection.propertiesOrder);
@@ -40,7 +40,7 @@ export function useColumnIds<M extends Record<string, any>>(collection: Snapshot
     }, [collection, includeSubcollections]);
 }
 
-function hideAndExpandKeys<M extends Record<string, any>>(collection: SnapshotCollection<M>, keys: string[]): PropertyColumnConfig[] {
+function hideAndExpandKeys<M extends Record<string, any>>(collection: CollectionConfig<M>, keys: string[]): PropertyColumnConfig[] {
 
     // First, figure out which spread map roots have individual child keys in the order
     // If so, we should NOT auto-expand them - just use the explicit child keys
@@ -171,11 +171,11 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: SnapshotCo
     return result;
 }
 
-function getDefaultColumnKeys<M extends Record<string, any> = any>(collection: SnapshotCollection<M>, includeSubCollections: boolean) {
+function getDefaultColumnKeys<M extends Record<string, any> = any>(collection: CollectionConfig<M>, includeSubCollections: boolean) {
     const propertyKeys = Object.keys(collection.properties);
 
     const additionalFields = collection.additionalFields ?? [];
-    const subCollections: SnapshotCollection[] = getSubcollections(collection) ?? [];
+    const subCollections: CollectionConfig[] = getSubcollections(collection) ?? [];
 
     const columnIds: string[] = [
         ...propertyKeys,
@@ -207,7 +207,7 @@ export function getColumnKeysForProperty(property: Property, key: string, disabl
     }];
 }
 
-export function getFormFieldKeys(collection: SnapshotCollection): string[] {
+export function getFormFieldKeys(collection: CollectionConfig): string[] {
     const propertyKeys = collection.properties ? Object.keys(collection.properties) : [];
     const additionalFields = collection.additionalFields ?? [];
     const allKeys = [

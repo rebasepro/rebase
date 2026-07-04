@@ -3,7 +3,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { getDefaultPropertiesOrder } from "../_cms_internals";
-import { SnapshotCollection, SnapshotTableController } from "@rebasepro/types";
+import { CollectionConfig, SnapshotTableController } from "@rebasepro/types";
 import { PlusIcon, Tooltip } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -15,7 +15,7 @@ export function PropertyAddColumnComponent({
 }: {
     path: string,
     parentCollectionSlugs: string[], parentSnapshotIds: string[],
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     tableController: SnapshotTableController;
 }) {
 

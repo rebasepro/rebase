@@ -1,4 +1,4 @@
-import type { SnapshotCollection, FieldProps as CoreFieldProps } from "@rebasepro/types";
+import type { CollectionConfig, FieldProps as CoreFieldProps } from "@rebasepro/types";
 import type { FieldProps, PropertyFieldBindingProps } from "../types/fields";
 import type { RebasePlugin, PluginFieldBuilderParams, Property } from "@rebasepro/types";
 import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
@@ -29,7 +29,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
  *
  * Please note that if you build a custom field in a component, the
  * **validation** passed in the property will have no effect. You need to set
- * the validation in the `SnapshotCollection` definition.
+ * the validation in the `CollectionConfig` definition.
  *
  * @param propertyKey You can use nested names such as `address.street` or `friends[2]`
  * @param property
@@ -292,7 +292,7 @@ const shouldPropertyReRender = (property: Property, plugins?: RebasePlugin[]): b
 
 interface UseWrappedComponentParams<M extends Record<string, unknown> = Record<string, unknown>> {
     path?: string,
-    collection?: SnapshotCollection<M>,
+    collection?: CollectionConfig<M>,
     propertyKey: string,
     property: Property,
     Component: ComponentType<FieldProps<Property, unknown, M>>,
@@ -323,7 +323,7 @@ function useWrappedComponent<T, M extends Record<string, unknown> = Record<strin
                         Field: Component as unknown as ComponentType<CoreFieldProps<Property, unknown, Record<string, unknown>>>,
                         plugin,
                         path,
-                        collection: collection as SnapshotCollection | undefined
+                        collection: collection as CollectionConfig | undefined
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)

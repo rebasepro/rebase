@@ -1,1 +1,1 @@
-export * from "./default_snapshot_actions";
+export * from "./default_record_actions";

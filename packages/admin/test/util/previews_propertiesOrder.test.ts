@@ -5,8 +5,8 @@ import {
     getSnapshotPreviewKeys,
     getSnapshotTitlePropertyKey
 } from "../../src/util/previews";
-import { resolveCollectionSlotKeys } from "../../src/components/SnapshotCollectionView/useSnapshotPreviewSlots";
-import type { AuthController, SnapshotCollection, PropertyConfig, Property } from "@rebasepro/types";
+import { resolveCollectionSlotKeys } from "../../src/components/CollectionViewBinding/usePreviewSlots";
+import type { AuthController, CollectionConfig, PropertyConfig, Property } from "@rebasepro/types";
 
 const mockAuthController = {
     user: { uid: "test" },
@@ -18,7 +18,7 @@ const fields: Record<string, PropertyConfig> = {};
 /**
  * Exact replica of the databases collection config from saas/config.
  */
-const databasesCollection: SnapshotCollection = {
+const databasesCollection: CollectionConfig = {
     id: "databases",
     name: "Databases",
     singularName: "Database",
@@ -36,7 +36,7 @@ const databasesCollection: SnapshotCollection = {
             relationName: "project",
             cardinality: "one",
             direction: "owning",
-            target: () => ({} as SnapshotCollection),
+            target: () => ({} as CollectionConfig),
             onDelete: "cascade"
         } as unknown as Property,
         type: {
@@ -125,16 +125,16 @@ color: "gray" }
         "lastBackupTime",
         "recoveryWindowStart"
     ]
-} as unknown as SnapshotCollection;
+} as unknown as CollectionConfig;
 
 /**
  * Same shape but WITHOUT propertiesOrder — should keep the old heuristic behavior.
  */
-const databasesCollectionNoOrder: SnapshotCollection = {
+const databasesCollectionNoOrder: CollectionConfig = {
     ...databasesCollection,
     id: "databases_no_order",
     propertiesOrder: undefined
-} as unknown as SnapshotCollection;
+} as unknown as CollectionConfig;
 
 // ---------------------------------------------------------------------------
 // getSnapshotPreviewKeys — with explicit propertiesOrder

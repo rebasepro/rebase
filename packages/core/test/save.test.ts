@@ -1,12 +1,12 @@
 import { saveSnapshotWithCallbacks } from "../src/hooks/data/save";
-import type { SnapshotCollection, Snapshot, RebaseData, RebaseContext } from "@rebasepro/types";
+import type { CollectionConfig, Snapshot, RebaseData, RebaseContext } from "@rebasepro/types";
 
 describe("saveSnapshotWithCallbacks", () => {
-    const mockCollection: SnapshotCollection = {
+    const mockCollection: CollectionConfig = {
         slug: "test-collection",
         name: "Test",
         properties: {}
-    } as SnapshotCollection;
+    } as CollectionConfig;
 
     const mockSnapshot: Snapshot = {
         id: "snapshot-1",

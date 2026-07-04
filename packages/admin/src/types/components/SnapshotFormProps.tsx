@@ -1,5 +1,5 @@
 import { Snapshot, SnapshotStatus } from "@rebasepro/types";
-import { SnapshotCollection, SnapshotCustomViewParams } from "@rebasepro/types";
+import { CollectionConfig, SnapshotCustomViewParams } from "@rebasepro/types";
 import { FormContext } from "../fields";
 import { FormexController } from "./formex";
 import { SnapshotFormActionsProps } from "./SnapshotFormActionsProps";
@@ -12,7 +12,7 @@ import { SnapshotFormActionsProps } from "./SnapshotFormActionsProps";
 export type SnapshotFormProps<M extends Record<string, unknown>> = {
     path: string;
     fullIdPath?: string;
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
     snapshotId?: string | number;
     snapshot?: Snapshot<M>;
     databaseId?: string;
@@ -120,5 +120,5 @@ export type OnUpdateParams = {
     path: string,
     snapshotId?: string | number;
     selectedTab?: string;
-    collection: SnapshotCollection<Record<string, unknown>>
+    collection: CollectionConfig<Record<string, unknown>>
 };

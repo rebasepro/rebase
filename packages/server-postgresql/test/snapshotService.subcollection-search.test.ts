@@ -1,7 +1,7 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { SQL } from "drizzle-orm";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 const collectionRegistry = new PostgresCollectionRegistry();
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
@@ -50,7 +50,7 @@ describe("DataService - Subcollection Search Tests", () => {
     };
 
     // Collection definitions for testing subcollection search
-    const tagsCollection: SnapshotCollection = {
+    const tagsCollection: CollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -73,7 +73,7 @@ relationName: "posts" }
         idField: "id"
     };
 
-    const postsCollection: SnapshotCollection = {
+    const postsCollection: CollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -114,7 +114,7 @@ relationName: "comments" }
         idField: "id"
     };
 
-    const authorsCollection: SnapshotCollection = {
+    const authorsCollection: CollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
@@ -138,7 +138,7 @@ relationName: "posts" }
         idField: "id"
     };
 
-    const commentsCollection: SnapshotCollection = {
+    const commentsCollection: CollectionConfig = {
         slug: "comments",
         name: "Comments",
         table: "comments",

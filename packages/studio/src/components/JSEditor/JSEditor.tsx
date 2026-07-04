@@ -35,9 +35,9 @@ import {
     VirtualTableColumn,
     XIcon
 } from "@rebasepro/ui";
-import { useStudioUrlController, useStudioCollectionRegistry, useStudioSideSnapshotController } from "@rebasepro/core";
+import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/core";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/core";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { createRebaseClient } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
@@ -113,7 +113,7 @@ function formatJSON(value: unknown): string {
 
 interface MatchedJSCollection {
     collectionSlug: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     pkColumn: string;
 }
 
@@ -126,7 +126,7 @@ interface MatchedJSCollection {
 function detectCollectionsInResult(
     code: string,
     resultValue: unknown,
-    collections: SnapshotCollection[]
+    collections: CollectionConfig[]
 ): MatchedJSCollection[] {
     if (!resultValue || !collections?.length) return [];
 
@@ -190,7 +190,7 @@ export function JSEditor() {
     const apiConfig = useApiConfig();
     const snackbar = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
-    const sideSnapshotController = useStudioSideSnapshotController();
+    const sidePanelController = useStudioSidePanelController();
     const { t } = useTranslation();
 
     // User management for the "Run as" picker
@@ -854,7 +854,7 @@ id: String(ra.snapshotId) })}>
                                                                                             className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
-                                                                                                sideSnapshotController.open({
+                                                                                                sidePanelController.open({
                                                                                                     path: ra.collection.collectionSlug,
                                                                                                     snapshotId: ra.snapshotId,
                                                                                                     collection: ra.collection.collection,
@@ -887,7 +887,7 @@ id: String(ra.snapshotId) })}>
                                                                                             key={ra.collection.collectionSlug}
                                                                                             dense
                                                                                             onClick={() => {
-                                                                                                sideSnapshotController.open({
+                                                                                                sidePanelController.open({
                                                                                                     path: ra.collection.collectionSlug,
                                                                                                     snapshotId: ra.snapshotId,
                                                                                                     collection: ra.collection.collection,

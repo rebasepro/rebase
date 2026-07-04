@@ -1,6 +1,6 @@
-import type { SnapshotCollection, ViewMode } from "@rebasepro/types";
+import type { CollectionConfig, ViewMode } from "@rebasepro/types";
 import React, { useMemo } from "react";
-import { SnapshotCollectionView } from "./SnapshotCollectionView/SnapshotCollectionView";
+import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { Typography } from "@rebasepro/ui";
 import { useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
@@ -8,7 +8,7 @@ import { useComponentOverride, CollectionComponentOverrideProvider } from "@reba
 /**
  * Props for the {@link CollectionPanel} component.
  *
- * This is a high-level, consumer-friendly wrapper around {@link SnapshotCollectionView}
+ * This is a high-level, consumer-friendly wrapper around {@link CollectionViewBinding}
  * designed for embedding collection views inside custom pages (home pages,
  * dashboards, snapshot detail views, etc.).
  *
@@ -66,7 +66,7 @@ export type CollectionPanelProps = {
      * Any additional collection-level overrides (e.g. `previewProperties`,
      * `enabledViews`, `snapshotActions`, `defaultFilter`, etc.).
      */
-    collectionOverrides?: Partial<SnapshotCollection>;
+    collectionOverrides?: Partial<CollectionConfig>;
 };
 
 /**
@@ -101,8 +101,8 @@ function CollectionPanelInner({
     title,
     updateUrl,
     className
-}: CollectionPanelProps & { mergedCollection: SnapshotCollection }) {
-    const ResolvedCollectionView = useComponentOverride("Collection.View", SnapshotCollectionView);
+}: CollectionPanelProps & { mergedCollection: CollectionConfig }) {
+    const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
 
     return (
         <div className={className}>
@@ -150,7 +150,7 @@ export function CollectionPanel(props: CollectionPanelProps) {
             ...registeredCollection,
             ...(collectionOverrides ?? {}),
             ...propOverrides
-        } as SnapshotCollection;
+        } as CollectionConfig;
     }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openSnapshotMode]);
 
     if (!mergedCollection) {

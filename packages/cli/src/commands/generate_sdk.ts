@@ -10,7 +10,7 @@
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { generateSDK, GeneratedFile } from "@rebasepro/sdk-generator";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 
@@ -24,9 +24,9 @@ interface GenerateSDKArgs {
  * Dynamically load collection definitions from a directory.
  *
  * Expects the directory to have an index.ts/index.js that exports a default
- * array of SnapshotCollection objects (matching the app/config/collections pattern).
+ * array of CollectionConfig objects (matching the app/config/collections pattern).
  */
-async function loadCollections(collectionsDir: string): Promise<SnapshotCollection[]> {
+async function loadCollections(collectionsDir: string): Promise<CollectionConfig[]> {
     const absDir = path.resolve(collectionsDir);
 
     if (!fs.existsSync(absDir)) {
@@ -66,7 +66,7 @@ async function loadCollections(collectionsDir: string): Promise<SnapshotCollecti
     if (!indexPath) {
         // Fallback: load each .ts/.js file individually
         console.log(chalk.yellow("  No index file found, scanning individual collection files..."));
-        const collections: SnapshotCollection[] = [];
+        const collections: CollectionConfig[] = [];
         const files = fs.readdirSync(absDir).filter(f =>
             (f.endsWith(".ts") || f.endsWith(".js")) && !f.startsWith(".")
         );
@@ -76,7 +76,7 @@ async function loadCollections(collectionsDir: string): Promise<SnapshotCollecti
                 const mod = jitiInstance(path.join(absDir, file));
                 const exported = mod.default || mod;
                 if (exported && typeof exported === "object" && "slug" in exported) {
-                    collections.push(exported as SnapshotCollection);
+                    collections.push(exported as CollectionConfig);
                 } else if (Array.isArray(exported)) {
                     collections.push(...exported);
                 }
@@ -93,17 +93,17 @@ async function loadCollections(collectionsDir: string): Promise<SnapshotCollecti
     const exported = mod.default || mod;
 
     if (Array.isArray(exported)) {
-        return exported as SnapshotCollection[];
+        return exported as CollectionConfig[];
     } else if (typeof exported === "object" && exported !== null) {
         // Could be a named export like { collections: [...] }
         if ("collections" in exported && Array.isArray(exported.collections)) {
             return exported.collections;
         }
         // Or individual named exports
-        const collections: SnapshotCollection[] = [];
+        const collections: CollectionConfig[] = [];
         for (const value of Object.values(exported)) {
-            if (value && typeof value === "object" && "slug" in (value as SnapshotCollection)) {
-                collections.push(value as SnapshotCollection);
+            if (value && typeof value === "object" && "slug" in (value as CollectionConfig)) {
+                collections.push(value as CollectionConfig);
             }
         }
         if (collections.length > 0) return collections;
@@ -111,7 +111,7 @@ async function loadCollections(collectionsDir: string): Promise<SnapshotCollecti
 
     throw new Error(
         `Could not extract collections from ${indexPath}.\n` +
-        "Expected a default export of SnapshotCollection[] or an object with named collection exports."
+        "Expected a default export of CollectionConfig[] or an object with named collection exports."
     );
 }
 

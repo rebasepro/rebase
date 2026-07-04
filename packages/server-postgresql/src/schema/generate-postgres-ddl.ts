@@ -4,7 +4,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generatePostgresDdl, generatePostgresPoliciesDdl } from "./generate-postgres-ddl-logic";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { logger } from "@rebasepro/server-core";
 
 
@@ -16,7 +16,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         }
 
         const resolvedPath = path.resolve(collectionsFilePath);
-        let collections: SnapshotCollection[] = [];
+        let collections: CollectionConfig[] = [];
         const stats = fs.statSync(resolvedPath);
 
         if (stats.isDirectory()) {

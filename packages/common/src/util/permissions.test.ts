@@ -1,5 +1,5 @@
 import { canCreateSnapshot, canEditSnapshot, canDeleteSnapshot, canReadCollection } from "./permissions";
-import { SnapshotCollection, AuthController, Snapshot, User, SecurityRule } from "@rebasepro/types";
+import { CollectionConfig, AuthController, Snapshot, User, SecurityRule } from "@rebasepro/types";
 
 describe("Permissions Evaluator", () => {
 
@@ -46,7 +46,7 @@ describe("Permissions Evaluator", () => {
         user: null
     };
 
-    const createMockCollection = (rules?: SecurityRule[]): SnapshotCollection => ({
+    const createMockCollection = (rules?: SecurityRule[]): CollectionConfig => ({
         slug: "test",
         name: "Test",
         table: "test",

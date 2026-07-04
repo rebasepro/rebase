@@ -16,9 +16,9 @@ pnpm add @rebasepro/core
 
 - **App bootstrapping** — `Rebase`, `RebaseRouter`, `RebaseRoutes`, `PluginProviderStack`
 - **React contexts** — auth, data driver, storage, snackbar, dialogs, mode, admin mode, role, analytics, customization
-- **Hooks** — data fetching (`useData`, `useCollectionFetch`, `useEntityFetch`), data mutation (`save`, `delete`), auth (`useAuthController`), storage, permissions, i18n, and more
+- **Hooks** — data fetching (`useData`, `useCollection`, `useFetch`), data mutation (`save`, `delete`), auth (`useAuthController`), storage, permissions, i18n, and more
 - **UI components** — `LoginView`, `RebaseAuth`, `ConfirmationDialog`, `ErrorView`, `UserSettingsView`, `BootstrapAdminBanner`, etc.
-- **Utilities** — icon system, entity caching, storage upload controller, enums, constants
+- **Utilities** — icon system, snapshot caching, storage upload controller, enums, constants
 - **i18n** — built-in English and Spanish locales via `react-i18next`
 - **Studio Bridge** — shared context for optional CMS↔Studio integration
 
@@ -40,12 +40,12 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 | Export | Description |
 |---|---|
 | `useData` | Access the data driver from context |
-| `useCollectionFetch` | Fetch a collection with filters, pagination, and realtime |
-| `useEntityFetch` | Fetch a single entity by ID |
+| `useCollection` | Fetch a collection with filters, pagination, and realtime |
+| `useFetch` | Fetch a single snapshot by ID |
 | `useRelationSelector` | Relation field selector state |
 | `useUserSelector` | User selector state |
-| `save` utilities | Entity save helpers |
-| `delete` utilities | Entity delete helpers |
+| `save` utilities | Snapshot save helpers |
+| `delete` utilities | Snapshot delete helpers |
 
 ### Hooks — Auth & Permissions
 
@@ -121,7 +121,7 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 |---|---|
 | `iconList` / icon helpers | Full icon set and lookup |
 | `createFormexStub` | Create a form stub for testing |
-| `entityCache` | Entity LRU cache |
+| `snapshotCache` | Snapshot LRU cache |
 | `useStorageUploadController` | File upload progress controller |
 | `previews` | Preview rendering utilities |
 | `enums` / `constants` | Shared enums and constant values |
@@ -145,7 +145,7 @@ import { rebaseVitePlugin } from "@rebasepro/core/vitePlugin";
 ## Quick Start
 
 ```tsx
-import { Rebase, useAuthController, useCollectionFetch } from "@rebasepro/core";
+import { Rebase, useAuthController, useCollection } from "@rebasepro/core";
 
 function App() {
     return (
@@ -159,7 +159,7 @@ function App() {
 
 // Inside any child component:
 function ProductList() {
-    const { data, loading } = useCollectionFetch("products", { limit: 20 });
+    const { data, loading } = useCollection("products", { limit: 20 });
     // ...
 }
 ```

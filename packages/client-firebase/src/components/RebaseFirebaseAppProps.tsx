@@ -1,6 +1,6 @@
 import React from "react";
 
-import { AnalyticsEvent, AppView, AppViewsBuilder, SnapshotCollection, SnapshotCollectionsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/types";
+import { AnalyticsEvent, AppView, AppViewsBuilder, CollectionConfig, CollectionConfigsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/types";
 import { FirebaseAccessGate } from "../hooks/useFirebaseAccessGate";
 
 import { FirebaseApp } from "@firebase/app";
@@ -42,7 +42,7 @@ export type RebaseFirebaseAppProps = {
      * Each of the navigation entries in this field
      * generates an entry in the main menu.
      */
-    collections?: SnapshotCollection[] | SnapshotCollectionsBuilder;
+    collections?: CollectionConfig[] | CollectionConfigsBuilder;
 
     /**
      * Custom additional views created by the developer, added to the main

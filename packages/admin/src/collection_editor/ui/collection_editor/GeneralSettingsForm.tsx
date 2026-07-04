@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
 
 import { SearchIconsView } from "../../_cms_internals";
-import type { SnapshotCollection, PostgresCollection } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Chip,
@@ -27,7 +27,7 @@ import { Field, getIn, useFormex } from "@rebasepro/formex";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { singular, toSnakeCase } from "@rebasepro/utils";
 import type { ExtraCollectionFieldsParams } from "../../extensibility_types";
-import { toSerializableCollection } from "../../serializable_utils";
+import { toSerializableCollectionConfig } from "../../serializable_utils";
 
 export function GeneralSettingsForm({
     isNewCollection,
@@ -40,7 +40,7 @@ export function GeneralSettingsForm({
     isNewCollection: boolean;
     existingPaths?: string[];
     existingIds?: string[];
-    parentCollection?: SnapshotCollection;
+    parentCollection?: CollectionConfig;
     renderExtraCollectionFields?: (params: ExtraCollectionFieldsParams) => React.ReactNode;
     standalone?: boolean;
 }) {
@@ -53,7 +53,7 @@ export function GeneralSettingsForm({
         errors,
         setFieldTouched,
         submitCount
-    } = useFormex<PostgresCollection>();
+    } = useFormex<PostgresCollectionConfig>();
 
     const [iconDialogOpen, setIconDialogOpen] = useState(false);
 
@@ -255,7 +255,7 @@ export function GeneralSettingsForm({
                             onMetadataChange: (key: string, value: unknown) => {
                                 setFieldValue(`metadata.${key}`, value);
                             },
-                            collection: toSerializableCollection(values),
+                            collection: toSerializableCollectionConfig(values),
                         })}
                     </div>
                 )}

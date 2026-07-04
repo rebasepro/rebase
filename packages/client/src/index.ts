@@ -84,7 +84,7 @@ type TypedDataLayer<DB> = {
  * capabilities populated and the `data` layer narrowed to provide
  * typed collection accessors when a `DB` schema generic is supplied.
  */
-export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data"> & {
+export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email"> & {
     setToken: (token: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -299,6 +299,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     }
 
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
+    let untypedWarned = false;
 
     function collection(slug: string): CollectionClient<Record<string, unknown>> {
         if (!collectionClients.has(slug)) {
@@ -332,6 +333,14 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 }
                 // Untyped fallback: convert camelCase property names to snake_case slugs.
                 // e.g. `companyMembers` → `company_members`
+                if (!untypedWarned) {
+                    untypedWarned = true;
+                    console.warn(
+                        `[Rebase] Untyped data access detected (client.data.${prop}). ` +
+                        `Collection names are resolved via snake_case conversion, which may cause silent 404s at request time. ` +
+                        `Pass a \`collections\` dictionary to createRebaseClient() or use the generated SDK for type-safe access.`
+                    );
+                }
                 const slug = toSnakeCase(prop);
                 return collection(slug);
             }
@@ -365,7 +374,6 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             return res.data ?? (res as T);
         },
         data: dataProxy,
-        email: undefined
     } as unknown as CreateRebaseClientResult<DB>;
 
     return target;

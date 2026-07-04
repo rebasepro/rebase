@@ -6,7 +6,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { getPropertyInPath } from "../_cms_internals";
-import { SnapshotCollection, EnumValueConfig, StringProperty } from "@rebasepro/types";
+import { CollectionConfig, EnumValueConfig, StringProperty } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import {
     Button,
@@ -34,7 +34,7 @@ export function AddKanbanColumnAction({
     parentCollectionSlugs, parentSnapshotIds,
     columnProperty
 }: {
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     fullPath: string;
     parentCollectionSlugs: string[], parentSnapshotIds: string[];
     columnProperty: string;

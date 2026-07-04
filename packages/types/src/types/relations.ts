@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "./collections";
+import type { CollectionConfig } from "./collections";
 
 /**
  * @group Models
@@ -20,7 +20,7 @@ export interface Relation {
     /**
      * The final collection you want to retrieve records from.
      */
-    target: (() => SnapshotCollection) | any;
+    target: (() => CollectionConfig) | any;
 
     /**
      * The nature of the relationship, determining if one or many records are returned.
@@ -282,7 +282,7 @@ export interface Relation {
      */
     onDelete?: OnAction;
 
-    overrides?: Partial<SnapshotCollection>;
+    overrides?: Partial<CollectionConfig>;
 
     validation?: {
         required?: boolean;

@@ -1,6 +1,6 @@
 import {
   Snapshot,
-  SnapshotCollection,
+  CollectionConfig,
   SnapshotStatus,
   FilterValues,
   FetchCollectionProps,

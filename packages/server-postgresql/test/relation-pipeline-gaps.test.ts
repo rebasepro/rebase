@@ -19,7 +19,7 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { SnapshotCollection, Relation } from "@rebasepro/types";
+import { CollectionConfig, Relation } from "@rebasepro/types";
 import { sanitizeRelation } from "@rebasepro/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -57,7 +57,7 @@ dataType: "number" },
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 
-const tagsCollection: SnapshotCollection = {
+const tagsCollection: CollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -68,7 +68,7 @@ const tagsCollection: SnapshotCollection = {
     idField: "id"
 };
 
-const postsCollection: SnapshotCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -94,7 +94,7 @@ relationName: "tags" }
     idField: "id"
 };
 
-const authorsCollection: SnapshotCollection = {
+const authorsCollection: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -117,7 +117,7 @@ relationName: "posts" }
 };
 
 // Inverse M2M: tags → posts (from tag's perspective)
-const tagsWithInversePosts: SnapshotCollection = {
+const tagsWithInversePosts: CollectionConfig = {
     slug: "tags_inv",
     name: "Tags (inverse)",
     table: "tags",
@@ -323,7 +323,7 @@ author_id: "999" }
 
     it("should handle inferredForeignKeyName path with string IDs", async () => {
         // Test the `inverseRelationName`-based FK inference path
-        const authorsWithInverseNameOnly: SnapshotCollection = {
+        const authorsWithInverseNameOnly: CollectionConfig = {
             slug: "authors_inr",
             name: "Authors (inverseRelationName)",
             table: "authors",
@@ -334,7 +334,7 @@ author_id: "999" }
             idField: "id"
         };
 
-        const postsWithFK: SnapshotCollection = {
+        const postsWithFK: CollectionConfig = {
             slug: "posts_fk",
             name: "Posts (FK)",
             table: "posts",
@@ -466,13 +466,13 @@ describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
 
 describe("sanitizeRelation: auto-inferred junction table naming", () => {
     it("should produce sorted junction table name: posts + tags → posts_tags", () => {
-        const source: SnapshotCollection = {
+        const source: CollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: SnapshotCollection = {
+        const target: CollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -493,13 +493,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should sort alphabetically: articles + tags → articles_tags (not tags_articles)", () => {
-        const source: SnapshotCollection = {
+        const source: CollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: {}
         };
-        const target: SnapshotCollection = {
+        const target: CollectionConfig = {
             slug: "articles",
             name: "Articles",
             table: "articles",
@@ -519,13 +519,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should handle underscore-containing slugs: blog_posts + labels → blog_posts_labels", () => {
-        const source: SnapshotCollection = {
+        const source: CollectionConfig = {
             slug: "blog-posts",
             name: "Blog Posts",
             table: "blog_posts",
             properties: {}
         };
-        const target: SnapshotCollection = {
+        const target: CollectionConfig = {
             slug: "labels",
             name: "Labels",
             table: "labels",
@@ -545,13 +545,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should generate correct source and target columns", () => {
-        const source: SnapshotCollection = {
+        const source: CollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: SnapshotCollection = {
+        const target: CollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -574,13 +574,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should preserve explicit through config and not overwrite it", () => {
-        const source: SnapshotCollection = {
+        const source: CollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: SnapshotCollection = {
+        const target: CollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -607,7 +607,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should handle self-referencing M2M: users + users → users_users", () => {
-        const usersCollection: SnapshotCollection = {
+        const usersCollection: CollectionConfig = {
             slug: "users",
             name: "Users",
             table: "users",
@@ -628,13 +628,13 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
     });
 
     it("should NOT add through config for joinPath-based relations", () => {
-        const source: SnapshotCollection = {
+        const source: CollectionConfig = {
             slug: "users",
             name: "Users",
             table: "users",
             properties: {}
         };
-        const target: SnapshotCollection = {
+        const target: CollectionConfig = {
             slug: "permissions",
             name: "Permissions",
             table: "permissions",
@@ -688,7 +688,7 @@ dataType: "string" },
         _def: { tableName: "tasks" }
     };
 
-    const clientsCollection: SnapshotCollection = {
+    const clientsCollection: CollectionConfig = {
         slug: "clients",
         name: "Clients",
         table: "clients",
@@ -700,7 +700,7 @@ isId: "uuid" },
         }
     };
 
-    const tasksCollection: SnapshotCollection = {
+    const tasksCollection: CollectionConfig = {
         slug: "tasks",
         name: "Tasks",
         table: "tasks",

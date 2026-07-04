@@ -11,13 +11,13 @@ A **collection** is a TypeScript object that describes a database table and how 
 - **Schema** — Properties (columns), their types, and validation rules
 - **Relations** — Foreign keys, junction tables, and join paths
 - **Security** — Row Level Security policies
-- **UI behavior** — View modes, inline editing, entity views, actions
+- **UI behavior** — View modes, inline editing, snapshot views, actions
 - **Lifecycle hooks** — Callbacks for create, update, delete operations
 
 ```typescript
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: EntityCollection = {
+export const productsCollection: CollectionConfig = {
     slug: "products",              // URL path and API endpoint
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
@@ -72,7 +72,7 @@ export const productsCollection: EntityCollection = {
 |----------|------|-------------|
 | `slug` | `string` | **Required.** URL-safe identifier. Used in the admin UI URL and REST API path (`/api/data/{slug}`). |
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
-| `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
+| `singularName` | `string` | Display name for a single snapshot. Used in "New Product", "Edit Product", etc. |
 | `table` | `string` | **Required.** PostgreSQL table name. If different from `slug`, allows you to decouple URLs from table names. |
 | `icon` | `string` | Material icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
 
@@ -92,7 +92,7 @@ export const productsCollection: EntityCollection = {
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
+| `openSnapshotMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How snapshots open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
@@ -103,42 +103,42 @@ export const productsCollection: EntityCollection = {
 | `hideFromNavigation` | `boolean` | `false` | Hide from the sidebar navigation |
 | `defaultSelectedView` | `string \| function` | — | Default view or subcollection to open |
 
-### Entity Options
+### Snapshot Options
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `formAutoSave` | `boolean` | `false` | Auto-save on field change |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup unsaved changes |
-| `hideIdFromForm` | `boolean` | `false` | Hide the entity ID from the form |
+| `hideIdFromForm` | `boolean` | `false` | Hide the snapshot ID from the form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
-| `includeJsonView` | `boolean` | `false` | Show a JSON tab in the entity view |
-| `history` | `boolean` | `false` | Track changes in entity history |
+| `includeJsonView` | `boolean` | `false` | Show a JSON tab in the snapshot view |
+| `history` | `boolean` | `false` | Track changes in snapshot history |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
 | `previewProperties` | `string[]` | — | Properties to display in reference previews |
-| `titleProperty` | `string` | — | Property to use as the entity title |
+| `titleProperty` | `string` | — | Property to use as the snapshot title |
 
 ### Advanced
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `callbacks` | `EntityCallbacks` | Lifecycle hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
+| `callbacks` | `CollectionCallbacks` | Lifecycle hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
+| `snapshotActions` | `SnapshotAction[]` | Custom actions on snapshots (archive, publish, etc.) |
 | `Actions` | `React.ComponentType` | Custom toolbar actions component |
-| `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
+| `snapshotViews` | `EntityCustomView[]` | Custom tabs in the snapshot detail view |
 | `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
-| `childCollections` | `() => EntityCollection[]` | Nested child collections |
-| `subcollections` | `() => EntityCollection[]` | Nested collections (e.g., order → line items) |
+| `childCollections` | `() => CollectionConfig[]` | Nested child collections |
+| `subcollections` | `() => CollectionConfig[]` | Nested collections (e.g., order → line items) |
 | `exportable` | `boolean \| ExportConfig` | Enable data export |
 | `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
-| `overrides` | `EntityOverrides` | Overrides for the entity view |
+| `overrides` | `EntityOverrides` | Overrides for the snapshot view |
 | `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
 | `driver` | `string` | Database driver to use (default: `"(default)"`) |
 | `databaseId` | `string` | Database/schema ID within the driver |
 
-## Entity Previews & Title Resolution
+## Snapshot Previews & Title Resolution
 
 ### Title Property Selection
-By default, the property used as the entity's display title (previews, headers) is resolved automatically:
+By default, the property used as the snapshot's display title (previews, headers) is resolved automatically:
 1. If `titleProperty` is explicitly specified on the collection, it is used.
 2. If `propertiesOrder` is explicitly defined, the first non-ID property that is either a `relation` or `string` type is chosen as the title.
 3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
@@ -147,14 +147,14 @@ By default, the property used as the entity's display title (previews, headers) 
 When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
 ### resolveTitleToString Utility
-Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
+Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex snapshot title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
 
 ## Collection Builder
 
 For dynamic collections that change based on the user or external data, use a builder function:
 
 ```typescript
-const collectionsBuilder: EntityCollectionsBuilder = ({ user, authController }) => {
+const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
     const collections = [productsCollection];
 
     if (authController.extra?.role === "admin") {
@@ -184,7 +184,7 @@ You can set default or forced filters:
 
 ## Next Steps
 
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks for syncing data between collections, validation, side effects
+- **[Snapshot Callbacks](/docs/collections/callbacks)** — Lifecycle hooks for syncing data between collections, validation, side effects
 - **[Properties](/docs/collections/properties)** — All property types and options
 - **[Relations](/docs/collections/relations)** — Foreign keys, junction tables, joins
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security

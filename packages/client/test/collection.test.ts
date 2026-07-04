@@ -332,7 +332,7 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             expect(result).toBeDefined();
         });
 
-        it("listen callback transforms snapshots into the expected format", () => {
+        it("listen callback waits for count and fires once with authoritative meta", async () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
@@ -343,6 +343,8 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            // count returns 2 (matching heuristic) — still only fires once
+            client.count = jest.fn().mockResolvedValue(2);
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
@@ -356,19 +358,23 @@ values: { title: "B" } }
             ];
             capturedCallback!(snapshots);
 
+            // Wait for count promise to resolve
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            // Single emission — no estimated flag
+            expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
                 data: snapshots,
-                meta: expect.objectContaining({
+                meta: {
                     total: 2,
                     limit: 20,
                     offset: 0,
-                    hasMore: false,
-                    estimated: true
-                })
+                    hasMore: false
+                }
             });
         });
 
-        it("listen callback asynchronously fetches real count from count endpoint", async () => {
+        it("listen callback fires once with authoritative count when available", async () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
@@ -389,27 +395,15 @@ values: { title: "B" } }
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
-            // Trigger first synchronous update (heuristic meta)
             capturedCallback!(snapshots);
-
-            expect(onUpdate).toHaveBeenLastCalledWith({
-                data: snapshots,
-                meta: {
-                    total: 2,
-                    limit: 10,
-                    offset: 5,
-                    hasMore: false,
-                    estimated: true
-                }
-            });
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
 
             expect(client.count).toHaveBeenCalledWith({ limit: 10, offset: 5 });
-            // Second emission has authoritative meta (no estimated flag)
-            expect(onUpdate).toHaveBeenCalledTimes(2);
-            expect(onUpdate).toHaveBeenLastCalledWith({
+            // Single emission with authoritative meta
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+            expect(onUpdate).toHaveBeenCalledWith({
                 data: snapshots,
                 meta: {
                     total: 100,
@@ -420,7 +414,7 @@ values: { title: "B" } }
             });
         });
 
-        it("listen deduplicates when count matches the heuristic estimate", async () => {
+        it("listen fires once even when count matches heuristic", async () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
@@ -431,8 +425,6 @@ values: { title: "B" } }
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            // Return a count that matches the heuristic: 2 snapshots, limit 20 → heuristic total=2, hasMore=false
-            // Authoritative: count=2, hasMore=(0 + 2 < 2)=false → same as heuristic
             client.count = jest.fn().mockResolvedValue(2);
 
             const onUpdate = jest.fn();
@@ -445,7 +437,10 @@ values: { title: "B" } }
 
             capturedCallback!(snapshots);
 
-            // First emission with estimated flag
+            // Wait for count promise to resolve
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            // Single emission — count matched the heuristic
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
                 data: snapshots,
@@ -453,19 +448,12 @@ values: { title: "B" } }
                     total: 2,
                     limit: 20,
                     offset: 0,
-                    hasMore: false,
-                    estimated: true
+                    hasMore: false
                 }
             });
-
-            // Wait for count promise to resolve
-            await new Promise(resolve => setTimeout(resolve, 0));
-
-            // No second emission — count matched the heuristic
-            expect(onUpdate).toHaveBeenCalledTimes(1);
         });
 
-        it("listen keeps estimated flag standing when count rejects", async () => {
+        it("listen falls back to heuristic meta when count rejects", async () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockImplementation((_props, cb: Function) => {
@@ -487,7 +475,10 @@ values: { title: "B" } }
 
             capturedCallback!(snapshots);
 
-            // First emission with estimated flag
+            // Wait for count rejection to settle
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            // Single emission with heuristic meta, no estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
                 data: snapshots,
@@ -495,16 +486,9 @@ values: { title: "B" } }
                     total: 1,
                     limit: 20,
                     offset: 0,
-                    hasMore: false,
-                    estimated: true
+                    hasMore: false
                 }
             });
-
-            // Wait for count rejection to settle
-            await new Promise(resolve => setTimeout(resolve, 0));
-
-            // No second emission, no unhandled rejection
-            expect(onUpdate).toHaveBeenCalledTimes(1);
         });
 
         it("listenById passes correct parameters to ws.listenOne", () => {

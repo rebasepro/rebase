@@ -11,7 +11,7 @@ Le colonne aggiuntive ti permettono di visualizzare dati calcolati o derivati ne
 ## Definizione di Colonne Aggiuntive
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     additionalFields: [
         {
@@ -51,7 +51,7 @@ const ordersCollection: EntityCollection = {
 
 ## Passi Successivi
 
-- **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
+- **[Azioni Entità](/docs/frontend/snapshot-actions)** — Pulsanti di azione personalizzati
 - **[Campi Personalizzati](/docs/frontend/custom-fields)** — Campi modulo personalizzati
 
 ---

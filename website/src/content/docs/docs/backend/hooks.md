@@ -1,12 +1,12 @@
 ---
 title: Global Backend Hooks
 sidebar_label: Global Hooks
-description: Apply cross-cutting lifecycle callbacks to every collection at the server level using EntityCallbacks.
+description: Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.
 ---
 
 ## Overview
 
-Rebase provides two levels of entity lifecycle callbacks — both use the same `EntityCallbacks` type from `@rebasepro/types`:
+Rebase provides two levels of snapshot lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
 
 - **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
 - **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.data`).
@@ -32,12 +32,12 @@ import { initializeRebaseBackend } from "@rebasepro/server-core";
 const instance = await initializeRebaseBackend({
     // ... other config
     callbacks: {
-        afterRead({ entity, context }) {
-            // Runs after every entity read, across all collections
-            return entity;
+        afterRead({ row, context }) {
+            // Runs after every snapshot read, across all collections
+            return row;
         },
         beforeSave({ values, context }) {
-            // Runs before every entity save
+            // Runs before every snapshot save
             return values;
         }
     }
@@ -46,18 +46,18 @@ const instance = await initializeRebaseBackend({
 
 ---
 
-## `EntityCallbacks` Type
+## `CollectionCallbacks` Type
 
 ```typescript
-import type { EntityCallbacks } from "@rebasepro/types";
+import type { CollectionCallbacks } from "@rebasepro/types";
 
-type EntityCallbacks = {
-    afterRead?(props):   Entity;          // Transform entity before returning to caller
-    beforeSave?(props):  Partial<Values>; // Modify values before writing to DB
-    afterSave?(props):   void;            // Side-effects after successful save
-    afterSaveError?(props): void;         // Side-effects after a failed save
-    beforeDelete?(props): boolean | void; // Return false or throw to block deletion
-    afterDelete?(props): void;            // Side-effects after successful deletion
+type CollectionCallbacks = {
+    afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
+    beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
+    afterSave?(props):   void;                      // Side-effects after successful save
+    afterSaveError?(props): void;                   // Side-effects after a failed save
+    beforeDelete?(props): boolean | void;           // Return false or throw to block deletion
+    afterDelete?(props): void;                      // Side-effects after successful deletion
 };
 ```
 
@@ -73,11 +73,11 @@ Each callback receives a single props object. Common fields:
 |-------|------|------------|
 | `collection` | `ResolvedCollection` | All callbacks |
 | `path` | `string` | All callbacks |
-| `entity` | `Entity` | `afterRead`, `beforeDelete`, `afterDelete` |
-| `entityId` | `string` | `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
-| `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `previousValues` | `EntityValues` (optional) | `afterSave`, `afterSaveError` |
-| `status` | `"new" \| "existing"` | `afterSave`, `afterSaveError` |
+| `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
+| `id` | `string` | `beforeSave` (optional), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `values` | `SnapshotValues` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `previousValues` | `SnapshotValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | All callbacks |
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.), or is `undefined` for public requests.
@@ -119,7 +119,7 @@ Each callback receives a single props object. Common fields:
 ## Blocking vs. Async Semantics
 
 - **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 error response. The database write never happens.
-- **`afterRead`** — blocking. The returned entity (or transformed entity) is what the caller receives.
+- **`afterRead`** — blocking. The returned row (or transformed row) is what the caller receives.
 - **`afterSave`, `afterDelete`, `afterSaveError`** — run after the transaction commits. They do not block the HTTP response.
 
 ---
@@ -136,18 +136,12 @@ import { initializeRebaseBackend } from "@rebasepro/server-core";
 const instance = await initializeRebaseBackend({
     // ... other config
     callbacks: {
-        afterRead({ entity, context }) {
+        afterRead({ row, context }) {
             const isAdmin = context.user?.roles?.includes("admin");
-            if (!isAdmin && entity.values.email) {
-                return {
-                    ...entity,
-                    values: {
-                        ...entity.values,
-                        email: "********"
-                    }
-                };
+            if (!isAdmin && row.email) {
+                return { ...row, email: "********" };
             }
-            return entity;
+            return row;
         }
     }
 });
@@ -163,9 +157,9 @@ import { initializeRebaseBackend } from "@rebasepro/server-core";
 const instance = await initializeRebaseBackend({
     // ... other config
     callbacks: {
-        afterDelete({ collection, entityId, context }) {
+        afterDelete({ collection, id, context }) {
             console.log(
-                `[AUDIT] User ${context.user?.uid} deleted ${collection.slug}/${entityId}`
+                `[AUDIT] User ${context.user?.uid} deleted ${collection.slug}/${id}`
             );
         }
     }

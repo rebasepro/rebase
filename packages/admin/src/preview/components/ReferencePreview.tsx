@@ -1,13 +1,13 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import * as React from "react";
 
 import { Snapshot, SnapshotReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useSnapshotFetch, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useFetch, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
-import { SnapshotPreview, SnapshotPreviewContainer } from "../../components/SnapshotPreview";
+import { RecordPreviewBinding, SnapshotPreviewContainer } from "../../components/RecordPreviewBinding";
 import { useCollectionRegistryController } from "../../index";
 import { getSnapshotTitlePropertyKey } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
@@ -59,7 +59,7 @@ function ReferencePreviewInternalInner({
     includeId = true,
     textOnly,
     collection
-}: ReferencePreviewProps & { collection?: SnapshotCollection }) {
+}: ReferencePreviewProps & { collection?: CollectionConfig }) {
     const ResolvedMissingReference = useComponentOverride("Snapshot.MissingReference", DefaultMissingReference);
 
     if (!collection) {
@@ -124,17 +124,17 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     hover,
     textOnly
 }: ReferencePreviewProps & {
-    collection: SnapshotCollection<M>
+    collection: CollectionConfig<M>
 }) {
 
-    const ResolvedSnapshotPreview = useComponentOverride("Snapshot.Preview", SnapshotPreview);
+    const ResolvedRecordPreview = useComponentOverride("RecordPreview", RecordPreviewBinding);
     const customizationController = useCustomizationController();
 
     const {
         snapshot,
         dataLoading,
         dataLoadingError
-    } = useSnapshotFetch({
+    } = useFetch({
         path: reference.path,
         snapshotId: reference.id,
         collection,
@@ -202,7 +202,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         return <span className="truncate">{displayValue}</span>;
     }
 
-    return <ResolvedSnapshotPreview size={size}
+    return <ResolvedRecordPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}
         snapshot={usedSnapshot}

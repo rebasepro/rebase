@@ -17,13 +17,13 @@ import type { WhereFilterOp, FilterValues, FilterPreset, OrderByTuple } from "./
 
 /**
  * Base interface containing all driver-agnostic collection properties.
- * Use {@link PostgresCollection} or {@link FirebaseCollection} for
- * driver-specific type safety, or {@link SnapshotCollection} when you
+ * Use {@link PostgresCollectionConfig} or {@link FirebaseCollectionConfig} for
+ * driver-specific type safety, or {@link CollectionConfig} when you
  * need to handle any collection regardless of backend.
  *
  * @group Models
  */
-export interface BaseSnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
+export interface BaseCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
      * You can set an alias that will be used internally instead of the collection name.
@@ -56,7 +56,7 @@ export interface BaseSnapshotCollection<M extends Record<string, unknown> = Reco
      *
      * Custom drivers can set this directly to expose child collections to the UI.
      */
-    childCollections?: () => SnapshotCollection<Record<string, unknown>>[];
+    childCollections?: () => CollectionConfig<Record<string, unknown>>[];
 
 
     /**
@@ -81,8 +81,8 @@ export interface BaseSnapshotCollection<M extends Record<string, unknown> = Reco
      * The database engine backing this collection (`"postgres"`, `"firestore"`,
      * `"mongodb"`, or a custom id).
      *
-     * On concrete collection types ({@link PostgresCollection},
-     * {@link FirebaseCollection}, {@link MongoDBCollection}) this is a literal
+     * On concrete collection types ({@link PostgresCollectionConfig},
+     * {@link FirebaseCollectionConfig}, {@link MongoDBCollectionConfig}) this is a literal
      * discriminant. On the base type it is optional and gets stamped
      * automatically during collection normalization from the registered
      * {@link DataSourceDefinition}.
@@ -470,7 +470,7 @@ export interface BaseSnapshotCollection<M extends Record<string, unknown> = Reco
      *
      * @example
      * ```tsx
-     * const productsCollection: PostgresCollection = {
+     * const productsCollection: PostgresCollectionConfig = {
      *     name: "Products",
      *     slug: "products",
      *     table: "products",
@@ -491,13 +491,13 @@ export interface BaseSnapshotCollection<M extends Record<string, unknown> = Reco
  * A collection backed by PostgreSQL (or any SQL database).
  * Adds support for SQL-style relations (JOINs) and Row Level Security.
  *
- * Use this type instead of {@link SnapshotCollection} when you want
+ * Use this type instead of {@link CollectionConfig} when you want
  * compile-time safety that only SQL-relevant fields appear.
  *
  * @group Models
  */
-export interface PostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseSnapshotCollection<M, USER> {
+export interface PostgresCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
+    extends BaseCollectionConfig<M, USER> {
     properties: PostgresProperties;
 
     /**
@@ -546,13 +546,13 @@ export interface PostgresCollection<M extends Record<string, unknown> = Record<s
  * A collection backed by Firebase / Firestore.
  * Adds support for subcollections (nested document collections).
  *
- * Use this type instead of {@link SnapshotCollection} when you want
+ * Use this type instead of {@link CollectionConfig} when you want
  * compile-time safety that only Firestore-relevant fields appear.
  *
  * @group Models
  */
-export interface FirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseSnapshotCollection<M, USER> {
+export interface FirebaseCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
+    extends BaseCollectionConfig<M, USER> {
     /**
      * The database engine for this collection. Must be set to `"firestore"`.
      */
@@ -571,7 +571,7 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
      *
      * @example
      * ```typescript
-     * const fsCustomer: FirebaseCollection = {
+     * const fsCustomer: FirebaseCollectionConfig = {
      *     slug: "fs_customer",        // URL: /c/fs_customer
      *     path: "customer",           // Firestore path: customer
      *     name: "Customers (Firestore)",
@@ -587,19 +587,19 @@ export interface FirebaseCollection<M extends Record<string, unknown> = Record<s
      * collections. The collections added here will be displayed when opening
      * the side dialog of a snapshot.
      */
-    subcollections?: () => SnapshotCollection<Record<string, unknown>>[];
+    subcollections?: () => CollectionConfig<Record<string, unknown>>[];
 }
 
 /**
  * A collection backed by MongoDB.
  *
- * Use this type instead of {@link SnapshotCollection} when you want
+ * Use this type instead of {@link CollectionConfig} when you want
  * compile-time safety that only MongoDB-relevant fields appear.
  *
  * @group Models
  */
-export interface MongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseSnapshotCollection<M, USER> {
+export interface MongoDBCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
+    extends BaseCollectionConfig<M, USER> {
 
     /**
      * The database engine for this collection. Must be set to `"mongodb"`.
@@ -619,7 +619,7 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
      *
      * @example
      * ```typescript
-     * const mongoCustomer: MongoDBCollection = {
+     * const mongoCustomer: MongoDBCollectionConfig = {
      *     slug: "mongo_customer",      // URL: /c/mongo_customer
      *     path: "customer",            // MongoDB collection: customer
      *     name: "Customers (MongoDB)",
@@ -633,25 +633,25 @@ export interface MongoDBCollection<M extends Record<string, unknown> = Record<st
 
 /**
  * A collection backed by any data source.
- * This is a discriminated union — use {@link PostgresCollection},
- * {@link FirebaseCollection}, or {@link MongoDBCollection} for
+ * This is a discriminated union — use {@link PostgresCollectionConfig},
+ * {@link FirebaseCollectionConfig}, or {@link MongoDBCollectionConfig} for
  * driver-specific type safety.
  *
  * @group Models
  */
-export type SnapshotCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
-    | PostgresCollection<M, USER>
-    | FirebaseCollection<M, USER>
-    | MongoDBCollection<M, USER>;
+export type CollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
+    | PostgresCollectionConfig<M, USER>
+    | FirebaseCollectionConfig<M, USER>
+    | MongoDBCollectionConfig<M, USER>;
 
 /**
  * Type guard for PostgreSQL collections.
  * Returns true if the collection uses the Postgres engine (or the default engine).
  * @group Models
  */
-export function isPostgresCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: SnapshotCollection<M, USER>
-): collection is PostgresCollection<M, USER> {
+export function isPostgresCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
+    collection: CollectionConfig<M, USER>
+): collection is PostgresCollectionConfig<M, USER> {
     return !collection.engine || collection.engine === "postgres";
 }
 
@@ -659,9 +659,9 @@ export function isPostgresCollection<M extends Record<string, unknown> = Record<
  * Type guard for Firebase / Firestore collections.
  * @group Models
  */
-export function isFirebaseCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: SnapshotCollection<M, USER>
-): collection is FirebaseCollection<M, USER> {
+export function isFirebaseCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
+    collection: CollectionConfig<M, USER>
+): collection is FirebaseCollectionConfig<M, USER> {
     return collection.engine === "firestore";
 }
 
@@ -669,9 +669,9 @@ export function isFirebaseCollection<M extends Record<string, unknown> = Record<
  * Type guard for MongoDB collections.
  * @group Models
  */
-export function isMongoDBCollection<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: SnapshotCollection<M, USER>
-): collection is MongoDBCollection<M, USER> {
+export function isMongoDBCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
+    collection: CollectionConfig<M, USER>
+): collection is MongoDBCollectionConfig<M, USER> {
     return collection.engine === "mongodb";
 }
 
@@ -681,12 +681,12 @@ export function isMongoDBCollection<M extends Record<string, unknown> = Record<s
  * otherwise falls back to `slug`.
  */
 export function getCollectionDataPath<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: SnapshotCollection<M, USER>
+    collection: CollectionConfig<M, USER>
 ): string {
-    if (isFirebaseCollection(collection) && collection.path) {
+    if (isFirebaseCollectionConfig(collection) && collection.path) {
         return collection.path;
     }
-    if (isMongoDBCollection(collection) && collection.path) {
+    if (isMongoDBCollectionConfig(collection) && collection.path) {
         return collection.path;
     }
     return collection.slug;
@@ -703,9 +703,9 @@ export function getCollectionDataPath<M extends Record<string, unknown> = Record
  * @group Models
  */
 export function getDeclaredSubcollections<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: SnapshotCollection<M, USER>
-): (() => SnapshotCollection<Record<string, unknown>>[]) | undefined {
-    return (collection as FirebaseCollection<M, USER>).subcollections;
+    collection: CollectionConfig<M, USER>
+): (() => CollectionConfig<Record<string, unknown>>[]) | undefined {
+    return (collection as FirebaseCollectionConfig<M, USER>).subcollections;
 }
 
 
@@ -740,7 +740,7 @@ export type ViewMode = "list" | "table" | "cards" | "kanban";
  *
  * @group Models
  */
-export interface CollectionActionsProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends SnapshotCollection<M> = SnapshotCollection<M>> {
+export interface CollectionActionsProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends CollectionConfig<M> = CollectionConfig<M>> {
     /**
      * Full collection path of this snapshot. This is the full path, like
      * `users/1234/addresses`
@@ -806,7 +806,7 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
 
 /**
  * Use this controller to retrieve the selected snapshots or modify them in
- * an {@link SnapshotCollection}
+ * an {@link CollectionConfig}
  * @group Models
  */
 export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
@@ -893,16 +893,16 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
 }
 
 
-export type InferCollectionType<S extends SnapshotCollection> = S extends SnapshotCollection<infer M> ? M : never;
+export type InferCollectionConfigType<S extends CollectionConfig> = S extends CollectionConfig<infer M> ? M : never;
 
 /**
- * Used in the {@link SnapshotCollection#defaultSelectedView} to define the default
+ * Used in the {@link CollectionConfig#defaultSelectedView} to define the default
  * @group Models
  */
 export type DefaultSelectedViewBuilder = (params: DefaultSelectedViewParams) => string | undefined;
 
 /**
- * Used in the {@link SnapshotCollection#defaultSelectedView} to define the default
+ * Used in the {@link CollectionConfig#defaultSelectedView} to define the default
  * @group Models
  */
 export type DefaultSelectedViewParams = {

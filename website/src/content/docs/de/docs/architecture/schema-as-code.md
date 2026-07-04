@@ -61,7 +61,7 @@ TypeScript Collections
 Gegeben diese Sammlung:
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     table: "products",
     properties: {

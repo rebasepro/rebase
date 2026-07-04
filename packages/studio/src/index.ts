@@ -6,7 +6,7 @@ export {
     StudioBridgeProvider,
     StudioBridgeContext,
     useStudioCollectionRegistry,
-    useStudioSideSnapshotController,
+    useStudioSidePanelController,
     useStudioUrlController,
     useStudioNavigationState,
     useStudioBreadcrumbs

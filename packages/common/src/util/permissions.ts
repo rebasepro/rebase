@@ -1,4 +1,4 @@
-import { Snapshot, SnapshotCollection, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { Snapshot, CollectionConfig, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
 
@@ -83,7 +83,7 @@ function resolveTriState(value: TriState, onUnknown: UnknownResolution): boolean
  *   for optimistic UI gating; enforcement callers should pass `"deny"`.
  */
 export function checkOperation<M extends Record<string, unknown>, USER extends User>(
-    collection: SnapshotCollection<M>,
+    collection: CollectionConfig<M>,
     authContext: AuthContext<USER>,
     snapshot: Snapshot<M> | null,
     targetOperation: SecurityOperation,
@@ -129,7 +129,7 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 
 export function canReadCollection<M extends Record<string, unknown>, USER extends User>
     (
-        collection: SnapshotCollection<M>,
+        collection: CollectionConfig<M>,
         authContext: AuthContext<USER>
     ): boolean {
     return checkOperation(collection, authContext, null, "select");
@@ -137,7 +137,7 @@ export function canReadCollection<M extends Record<string, unknown>, USER extend
 
 export function canEditSnapshot<M extends Record<string, unknown>, USER extends User>
     (
-        collection: SnapshotCollection<M>,
+        collection: CollectionConfig<M>,
         authContext: AuthContext<USER>,
         path: string,
         snapshot: Snapshot<M> | null
@@ -147,7 +147,7 @@ export function canEditSnapshot<M extends Record<string, unknown>, USER extends 
 
 export function canCreateSnapshot<M extends Record<string, unknown>, USER extends User>
     (
-        collection: SnapshotCollection<M>,
+        collection: CollectionConfig<M>,
         authContext: AuthContext<USER>,
         path: string,
         snapshot: Snapshot<M> | null
@@ -157,7 +157,7 @@ export function canCreateSnapshot<M extends Record<string, unknown>, USER extend
 
 export function canDeleteSnapshot<M extends Record<string, unknown>, USER extends User>
     (
-        collection: SnapshotCollection<M>,
+        collection: CollectionConfig<M>,
         authContext: AuthContext<USER>,
         path: string,
         snapshot: Snapshot<M> | null

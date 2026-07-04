@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import chalk from "chalk";
 import { logger } from "@rebasepro/server-core";
-import type { SnapshotCollection, Relation } from "@rebasepro/types";
+import type { CollectionConfig, Relation } from "@rebasepro/types";
 
 const getHelpersDirname = () => {
     try {
@@ -58,14 +58,14 @@ export function resolveLocalBin(binName: string): string | null {
     return null;
 }
 
-export async function getTableIncludesFromCollections(collections: SnapshotCollection[]): Promise<string[]> {
+export async function getTableIncludesFromCollections(collections: CollectionConfig[]): Promise<string[]> {
     const { getTableName, resolveCollectionRelations } = await import("@rebasepro/common");
-    const { isPostgresCollection } = await import("@rebasepro/types");
+    const { isPostgresCollectionConfig } = await import("@rebasepro/types");
 
     const includes: string[] = [];
     for (const col of collections) {
         const tableName = getTableName(col);
-        const schema = isPostgresCollection(col) && col.schema ? col.schema : "public";
+        const schema = isPostgresCollectionConfig(col) && col.schema ? col.schema : "public";
         if (tableName) {
             includes.push(`${schema}.${tableName}`);
         }
@@ -75,7 +75,7 @@ export async function getTableIncludesFromCollections(collections: SnapshotColle
             if (relation.through) {
                 const junctionTableName = relation.through.table;
                 const targetCollection = relation.target();
-                const targetSchema = isPostgresCollection(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
+                const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
                 includes.push(`${targetSchema}.${junctionTableName}`);
             }
         }
@@ -86,7 +86,7 @@ export async function getTableIncludesFromCollections(collections: SnapshotColle
 
 export async function getTableIncludes(collectionsPath: string): Promise<string[]> {
     const resolvedPath = path.resolve(collectionsPath);
-    const collections: SnapshotCollection[] = [];
+    const collections: CollectionConfig[] = [];
     if (fs.existsSync(resolvedPath)) {
         const stats = fs.statSync(resolvedPath);
         if (stats.isDirectory()) {

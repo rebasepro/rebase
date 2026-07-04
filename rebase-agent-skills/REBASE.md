@@ -22,7 +22,7 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 | **Collection Editor** | AST-backed visual schema editing |
 | **Custom Functions** | Auto-mounted Hono route files |
 | **Cron Jobs** | Auto-scheduled background jobs |
-| **Entity History** | Audit trails with diff viewer |
+| **Snapshot History** | Audit trails with diff viewer |
 | **Data Enhancement** | AI-powered autofill plugin |
 
 ## Core Philosophy
@@ -30,7 +30,7 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 ### Schema-as-Code
 Collections are defined as standalone TypeScript files (e.g., `config/collections/posts.ts`). This preserves rich configuration — validation, callbacks, enum definitions, relations — while enabling both visual and code-based editing.
 
-### Entity Callbacks
+### Collection Callbacks
 Collections support lifecycle hooks (`beforeSave`, `afterSave`, `afterRead`, `beforeDelete`, `afterDelete`) for business logic, data synchronization, and side effects. **Use callbacks instead of raw SQL triggers or external scripts.**
 
 ### Inline Relations
@@ -56,7 +56,7 @@ Relations are defined **directly on the property** using `type: "relation"` with
 
 For specific topics, see:
 - `rebase-basics` — Setup, CLI, MCP tools, project structure
-- `rebase-collections` — Collection schemas, properties, relations, callbacks, entity actions
+- `rebase-collections` — Collection schemas, properties, relations, callbacks, snapshot actions
 - `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
 - `rebase-auth` — Authentication, roles, RLS policies
 - `rebase-studio` — Visual admin panel, collection editor, custom views

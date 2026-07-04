@@ -68,7 +68,7 @@ interface RebaseBackendConfig {
     basePath?: string;        // Préfixe de route (par défaut : "/api")
 
     // Collections
-    collections?: EntityCollection[];  // Vos définitions de collection
+    collections?: CollectionConfig[];  // Vos définitions de collection
     collectionsDir?: string;  // Charger automatiquement les collections depuis un répertoire
 
     // Bootstrappers (Bases de données, Authentification, Temps réel, etc.)

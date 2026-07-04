@@ -1,6 +1,6 @@
 import React from "react";
 import type { SnapshotReference } from "../types/snapshots";
-import type { SnapshotCollection } from "../types/collections";
+import type { CollectionConfig } from "../types/collections";
 
 
 /**
@@ -248,7 +248,7 @@ export interface NavigationEntry {
     name: string;
     slug: string;
     type: "collection" | "view" | "admin";
-    collection?: SnapshotCollection;
+    collection?: CollectionConfig;
     view?: AppView;
     description?: string;
     group: string;

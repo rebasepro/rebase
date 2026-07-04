@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "../types/collections";
+import type { CollectionConfig } from "../types/collections";
 import type { SnapshotReference } from "../types/snapshots";
 
 /**
@@ -7,7 +7,7 @@ import type { SnapshotReference } from "../types/snapshots";
  */
 export type CollectionRegistryController<
     DB = Record<string, unknown>,
-    EC extends SnapshotCollection = SnapshotCollection
+    EC extends CollectionConfig = CollectionConfig
 > = {
 
     /**
@@ -16,7 +16,7 @@ export type CollectionRegistryController<
      * Each of the navigation entries in this field
      * generates an entry in the main menu.
      */
-    collections?: SnapshotCollection[];
+    collections?: CollectionConfig[];
 
     /**
      * Is the registry ready to be used

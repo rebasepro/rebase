@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { SnapshotCollection, isPostgresCollection, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
+import { CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/sdk-generator";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
@@ -124,9 +124,9 @@ export function getExpectedColumnType(prop: Property): string | null {
 
 // ── Collection loading ───────────────────────────────────────────────────
 
-export async function loadCollections(collectionsPath: string): Promise<SnapshotCollection[]> {
+export async function loadCollections(collectionsPath: string): Promise<CollectionConfig[]> {
     const resolvedPath = path.resolve(collectionsPath);
-    const collections: SnapshotCollection[] = [];
+    const collections: CollectionConfig[] = [];
 
     const stats = fs.statSync(resolvedPath);
 
@@ -171,7 +171,7 @@ export async function loadCollections(collectionsPath: string): Promise<Snapshot
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────
 
 export async function checkCollectionsVsSchema(
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     schemaFilePath: string
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];
@@ -189,7 +189,7 @@ issues };
     }
 
     // Re-generate schema in-memory and compare with file on disk
-    const postgresCollections = collections.filter(isPostgresCollection);
+    const postgresCollections = collections.filter(isPostgresCollectionConfig);
     if (postgresCollections.length === 0) {
         return { passed: true,
 issues };
@@ -230,7 +230,7 @@ issues };
 }
 
 export async function checkCollectionsVsSdk(
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     sdkFilePath: string
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];
@@ -299,7 +299,7 @@ interface DbEnumValue {
 }
 
 export async function checkCollectionsVsDatabase(
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     databaseUrl: string
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];
@@ -314,7 +314,7 @@ export async function checkCollectionsVsDatabase(
         "public",
         "rebase",
         ...collections
-            .filter(isPostgresCollection)
+            .filter(isPostgresCollectionConfig)
             .map(c => c.schema)
             .filter((s): s is string => !!s)
     ]));
@@ -404,7 +404,7 @@ export async function checkCollectionsVsDatabase(
 
         // ── Compare each collection against the database ─────────────────
 
-        const postgresCollections = collections.filter(isPostgresCollection);
+        const postgresCollections = collections.filter(isPostgresCollectionConfig);
 
         for (const collection of postgresCollections) {
             const tableName = getTableName(collection);

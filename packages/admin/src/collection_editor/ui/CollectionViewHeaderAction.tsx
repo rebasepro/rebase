@@ -1,5 +1,5 @@
 import { useTranslation } from "@rebasepro/core";
-import { SnapshotCollection, SnapshotTableController, Property } from "@rebasepro/types";
+import { CollectionConfig, SnapshotTableController, Property } from "@rebasepro/types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 import React from "react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -18,7 +18,7 @@ export function CollectionViewHeaderAction({
     onHover: boolean,
     path: string,
     parentCollectionSlugs: string[], parentSnapshotIds: string[],
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     tableController: SnapshotTableController;
 }) {
 

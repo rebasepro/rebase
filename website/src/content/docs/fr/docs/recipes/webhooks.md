@@ -11,7 +11,7 @@ Utilisez les callbacks `afterSave` et `afterDelete` pour notifier les services e
 ## Notification Slack sur Nouvelle Commande
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

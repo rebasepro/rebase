@@ -1,4 +1,4 @@
-import type { SnapshotCollection, UrlController, SideSnapshotController, NavigateOptions } from "@rebasepro/types";
+import type { CollectionConfig, UrlController, SidePanelController, NavigateOptions } from "@rebasepro/types";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
 export {
@@ -24,7 +24,7 @@ export function navigateToSnapshot({
     path,
     selectedTab,
     defaultValues,
-    sideSnapshotController,
+    sidePanelController,
     onClose,
     navigation,
     replace
@@ -32,7 +32,7 @@ export function navigateToSnapshot({
 
     {
         openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
-        collection?: SnapshotCollection;
+        collection?: CollectionConfig;
         snapshotId?: string | number;
         selectedTab?: string;
         copy?: boolean;
@@ -40,13 +40,13 @@ export function navigateToSnapshot({
          * Pre-populate the new snapshot form with these values.
          * Only applied when snapshotId is not set (i.e. "new" mode).
          *
-         * Side panel: passed through SnapshotSidePanelProps → SnapshotEditView.
+         * Side panel: passed through SidePanelBindingProps → EditViewBinding.
          * Full screen: carried via React Router location.state so the route
          * component can read it on mount without polluting the URL.
          */
         defaultValues?: Record<string, unknown>;
         path: string;
-        sideSnapshotController: SideSnapshotController;
+        sidePanelController: SidePanelController;
         onClose?: () => void;
         navigation: UrlController;
         replace?: boolean;
@@ -55,7 +55,7 @@ export function navigateToSnapshot({
     if (openSnapshotMode === "side_panel" || openSnapshotMode === "dialog") {
 
 
-        sideSnapshotController.open({
+        sidePanelController.open({
             snapshotId,
             path: path,
             copy,

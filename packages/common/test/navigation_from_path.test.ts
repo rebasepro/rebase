@@ -1,7 +1,7 @@
 import { getNavigationEntriesFromPath } from "../src/util/navigation_from_path";
-import { SnapshotCollection, FirebaseCollection, SnapshotCustomView } from "@rebasepro/types";
+import { CollectionConfig, FirebaseCollectionConfig, SnapshotCustomView } from "@rebasepro/types";
 
-function makeCollection(overrides: Record<string, any> = {}): SnapshotCollection {
+function makeCollection(overrides: Record<string, any> = {}): CollectionConfig {
     const base = {
         name: "Products",
         slug: "products",
@@ -9,7 +9,7 @@ function makeCollection(overrides: Record<string, any> = {}): SnapshotCollection
         properties: {},
         ...overrides
     };
-    return base as SnapshotCollection;
+    return base as CollectionConfig;
 }
 
 describe("getNavigationEntriesFromPath", () => {

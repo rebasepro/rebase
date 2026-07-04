@@ -1,4 +1,4 @@
-import type { NavigationEntry, SnapshotCollection } from "@rebasepro/types";
+import type { NavigationEntry, CollectionConfig } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
 import { IconButton, StarIcon, Tooltip } from "@rebasepro/ui";

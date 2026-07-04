@@ -1,11 +1,11 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import * as React from "react";
 
 import { Snapshot, SnapshotRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useSnapshotFetch, ErrorView, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
-import { SnapshotPreview, SnapshotPreviewContainer } from "../../components";
+import { RecordPreviewBinding, SnapshotPreviewContainer } from "../../components";
 import { useCollectionRegistryController } from "../../index";
 import { getSnapshotTitlePropertyKey } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
@@ -92,7 +92,7 @@ function RelationPreviewInternalInner({
     includeId = true,
     textOnly,
     collection
-}: RelationPreviewProps & { collection?: SnapshotCollection }) {
+}: RelationPreviewProps & { collection?: CollectionConfig }) {
     const ResolvedMissingReference = useComponentOverride("Snapshot.MissingReference", DefaultMissingReference);
 
     if (!collection) {
@@ -154,19 +154,19 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     hover,
     textOnly
 }: RelationPreviewProps & {
-    collection: SnapshotCollection<M>
+    collection: CollectionConfig<M>
 }) {
 
     // CMS wire format embeds relation data as { id, path, values }
     const passedSnapshot = relation.data as Snapshot<M> | undefined;
-    const ResolvedSnapshotPreview = useComponentOverride("Snapshot.Preview", SnapshotPreview);
+    const ResolvedRecordPreview = useComponentOverride("RecordPreview", RecordPreviewBinding);
     const customizationController = useCustomizationController();
 
     const {
         snapshot,
         dataLoading,
         dataLoadingError
-    } = useSnapshotFetch({
+    } = useFetch({
         path: relation.path,
         snapshotId: passedSnapshot ? undefined : relation.id,
         collection,
@@ -234,7 +234,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         return <span className="truncate">{displayValue}</span>;
     }
 
-    return <ResolvedSnapshotPreview size={size}
+    return <ResolvedRecordPreview size={size}
         previewKeys={previewProperties}
         disabled={disabled}
         snapshot={usedSnapshot}

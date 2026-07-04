@@ -1,6 +1,6 @@
 /**
  * API generation infrastructure for Rebase
- * Automatically generates REST APIs from SnapshotCollection definitions
+ * Automatically generates REST APIs from CollectionConfig definitions
  */
 
 export * from "./rest";

@@ -4,12 +4,12 @@ import {
     parsePropertyFromServer,
     serializeDataToServer
 } from "../src/data-transformer";
-import type { Property, Properties, SnapshotCollection } from "@rebasepro/types";
+import type { Property, Properties, CollectionConfig } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
 // ─────────────────────────────────────────────────────────────
-function makeCollection(slug: string, properties: Properties): SnapshotCollection {
+function makeCollection(slug: string, properties: Properties): CollectionConfig {
     return {
         name: slug,
         slug,
@@ -17,7 +17,7 @@ function makeCollection(slug: string, properties: Properties): SnapshotCollectio
         collectionType: "postgres",
         tableName: slug,
         properties
-    } as unknown as SnapshotCollection;
+    } as unknown as CollectionConfig;
 }
 
 // ─────────────────────────────────────────────────────────────

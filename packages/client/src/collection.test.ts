@@ -197,8 +197,42 @@ hasMore: false }
             const client = createCollectionClient(transport, "posts");
             const result = await client.update("1", { title: "Updated" } as Record<string, unknown>);
 
-            expect(result.id).toBe("1");
+            expect(result!.id).toBe("1");
             expect((result as Record<string, unknown>).title).toBe("Updated");
+        });
+
+        it("should return undefined for 404", async () => {
+            const { RebaseApiError } = await import("./transport");
+            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+                new RebaseApiError(404, "Not Found")
+            );
+
+            const client = createCollectionClient(transport, "posts");
+            const result = await client.update("999", { title: "Nope" } as Record<string, unknown>);
+            expect(result).toBeUndefined();
+        });
+    });
+
+    describe("delete()", () => {
+        it("should return undefined for 404", async () => {
+            const { RebaseApiError } = await import("./transport");
+            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+                new RebaseApiError(404, "Not Found")
+            );
+
+            const client = createCollectionClient(transport, "posts");
+            const result = await client.delete("999");
+            expect(result).toBeUndefined();
+        });
+
+        it("should propagate non-404 errors", async () => {
+            const { RebaseApiError } = await import("./transport");
+            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
+                new RebaseApiError(500, "Internal Server Error")
+            );
+
+            const client = createCollectionClient(transport, "posts");
+            await expect(client.delete("1")).rejects.toThrow("Internal Server Error");
         });
     });
 

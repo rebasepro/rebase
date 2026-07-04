@@ -1,4 +1,4 @@
-import { SnapshotCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -19,7 +19,7 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
     return toSnakeCase(propName);
 };
 
-const getPrimaryKeyProp = (collection: SnapshotCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
+const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
@@ -52,7 +52,7 @@ isUuid: isUuid ?? false };
  * Returns the property key (the Drizzle object key) if found, or the original
  * column name as a fallback.
  */
-const resolvePropertyKeyForColumn = (collection: SnapshotCollection, column: string): string => {
+const resolvePropertyKeyForColumn = (collection: CollectionConfig, column: string): string => {
     if (!collection.properties) return column;
     for (const [propKey, prop] of Object.entries(collection.properties)) {
         const p = prop as Property;
@@ -68,15 +68,15 @@ const resolvePropertyKeyForColumn = (collection: SnapshotCollection, column: str
     return column;
 };
 
-const isNumericId = (collection: SnapshotCollection): boolean => {
+const isNumericId = (collection: CollectionConfig): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
 };
 
-const getPrimaryKeyName = (collection: SnapshotCollection): string => {
+const getPrimaryKeyName = (collection: CollectionConfig): string => {
     return getPrimaryKeyProp(collection).name;
 };
 
-const isIdProperty = (propName: string, prop: Property, collection: SnapshotCollection): boolean => {
+const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;
 
     // We only fallback to "id" if NO property is explicitly marked with `isId: true` or a generator string
@@ -84,7 +84,7 @@ const isIdProperty = (propName: string, prop: Property, collection: SnapshotColl
     return !hasExplicitId && propName === "id";
 };
 
-const getDrizzleColumn = (propName: string, prop: Property, collection: SnapshotCollection, collections: SnapshotCollection[]): string | null => {
+const getDrizzleColumn = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string | null => {
 
     const colName = resolveColumnName(propName, prop);
     let columnDefinition: string;
@@ -243,7 +243,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Snapshot
                 return null;
             }
 
-            let targetCollection: SnapshotCollection;
+            let targetCollection: CollectionConfig;
             try {
                 targetCollection = relation.target();
             } catch {
@@ -342,7 +342,7 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
  * - operations[] array: generates one policy per operation
  * - Combinations: roles + ownerField, roles + raw SQL, etc.
  */
-const generatePolicyCode = (collection: SnapshotCollection, rule: SecurityRule, index: number): string => {
+const generatePolicyCode = (collection: CollectionConfig, rule: SecurityRule, index: number): string => {
     const tableName = getTableName(collection);
     // Resolve operations: operations[] takes precedence over operation (singular)
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
@@ -364,7 +364,7 @@ const generatePolicyCode = (collection: SnapshotCollection, rule: SecurityRule, 
 /**
  * Generates a single pgPolicy() call for one specific operation.
  */
-const generateSinglePolicyCode = (collection: SnapshotCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+const generateSinglePolicyCode = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
     const mode = rule.mode ?? "permissive";
 
     // Determine which clauses this operation needs:
@@ -421,8 +421,8 @@ const generateSinglePolicyCode = (collection: SnapshotCollection, rule: Security
  */
 const computeSharedRelationName = (
     rel: Relation,
-    sourceCollection: SnapshotCollection,
-    _collections: SnapshotCollection[]
+    sourceCollection: CollectionConfig,
+    _collections: CollectionConfig[]
 ): string => {
     const fallback = rel.relationName ?? toSnakeCase(rel.target().slug);
 
@@ -487,7 +487,7 @@ const computeSharedRelationName = (
 };
 
 // --- Main Schema Generation Logic ---
-export const generateSchema = async (collections: SnapshotCollection[], stripPolicies = false): Promise<string> => {
+export const generateSchema = async (collections: CollectionConfig[], stripPolicies = false): Promise<string> => {
     let schemaContent = "// This file is auto-generated by the Rebase Drizzle generator. Do not edit manually.\n\n";
 
 
@@ -516,7 +516,7 @@ export const generateSchema = async (collections: SnapshotCollection[], stripPol
     if (hasBinary) pgCoreImports.push("customType");
 
     const uniqueSchemas = Array.from(new Set(
-        collections.map(c => isPostgresCollection(c) ? c.schema : undefined).filter(Boolean)
+        collections.map(c => isPostgresCollectionConfig(c) ? c.schema : undefined).filter(Boolean)
     ));
     if (uniqueSchemas.length > 0) {
         pgCoreImports.push("pgSchema");
@@ -537,10 +537,10 @@ export const generateSchema = async (collections: SnapshotCollection[], stripPol
     const exportedRelationVars: string[] = [];
 
     const allTablesToGenerate = new Map<string, {
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         isJunction?: boolean,
         relation?: Relation,
-        sourceCollection?: SnapshotCollection
+        sourceCollection?: CollectionConfig
     }>();
 
     // 1. Generate Enums
@@ -581,7 +581,7 @@ export const generateSchema = async (collections: SnapshotCollection[], stripPol
                         collection: {
                             table: junctionTableName,
                             properties: {}
-                        } as SnapshotCollection,
+                        } as CollectionConfig,
                         isJunction: true,
                         relation: relation,
                         sourceCollection: collection
@@ -602,7 +602,7 @@ export const generateSchema = async (collections: SnapshotCollection[], stripPol
         const tableVarName = getTableVarName(tableName);
         if (isJunction && relation && sourceCollection && relation.through) {
             const targetCollection = relation.target();
-            const schema = (isPostgresCollection(targetCollection) ? targetCollection.schema : undefined) || (isPostgresCollection(sourceCollection) ? sourceCollection.schema : undefined);
+            const schema = (isPostgresCollectionConfig(targetCollection) ? targetCollection.schema : undefined) || (isPostgresCollectionConfig(sourceCollection) ? sourceCollection.schema : undefined);
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             const {
@@ -625,7 +625,7 @@ export const generateSchema = async (collections: SnapshotCollection[], stripPol
             schemaContent += `    pk: primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] })\n`;
             schemaContent += "}));\n\n";
         } else if (!isJunction) {
-            const schema = isPostgresCollection(collection) ? collection.schema : undefined;
+            const schema = isPostgresCollectionConfig(collection) ? collection.schema : undefined;
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             schemaContent += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;

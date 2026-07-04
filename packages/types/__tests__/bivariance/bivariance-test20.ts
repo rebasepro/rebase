@@ -6,11 +6,11 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
     readonly dependencies?: Extract<keyof M, string> | (string & {})[];
 }
 
-export interface PostgresCollection<M extends Record<string, unknown>> {
+export interface PostgresCollectionConfig<M extends Record<string, unknown>> {
     readonly additionalFields?: readonly AdditionalFieldDelegate<M>[]; // Array also must be readonly
 }
 
-declare let specificColl: PostgresCollection<{ id: string, name: string }>;
-declare let genericRecordColl: PostgresCollection<Record<string, unknown>>;
+declare let specificColl: PostgresCollectionConfig<{ id: string, name: string }>;
+declare let genericRecordColl: PostgresCollectionConfig<Record<string, unknown>>;
 
 genericRecordColl = specificColl; // Should succeed

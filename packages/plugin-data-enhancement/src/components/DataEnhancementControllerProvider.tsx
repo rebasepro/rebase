@@ -12,7 +12,7 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { useUrlController } from "@rebasepro/admin";
-import { DataDriver, Snapshot, SnapshotCollection, PluginFormActionProps } from "@rebasepro/types";
+import { DataDriver, Snapshot, CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
 import { enhanceDataAPIStream, fetchSnapshotPromptSuggestion } from "../api";
 import { getAppendableSuggestion } from "../utils/suggestions";
 import { getSimplifiedProperties } from "../utils/properties";
@@ -27,7 +27,7 @@ type DataEnhancementControllerProviderProps = {
 
     getConfigForPath?: (props: {
         path: string,
-        collection: SnapshotCollection
+        collection: CollectionConfig
     }) => boolean;
 
     host?: string;

@@ -21,7 +21,7 @@
  */
 
 import type { DataDriver } from "../controllers/data_driver";
-import type { SnapshotCollection } from "./collections";
+import type { CollectionConfig } from "./collections";
 import type {
     CollectionRegistryInterface,
     DatabaseAdmin,
@@ -115,7 +115,7 @@ export interface DatabaseAdapter {
  */
 export interface DatabaseAdapterInitConfig {
     /** Registered collection definitions. */
-    collections: SnapshotCollection[];
+    collections: CollectionConfig[];
     /** The shared collection registry to register into. */
     collectionRegistry: CollectionRegistryInterface;
 }

@@ -1,4 +1,4 @@
-import { DataDriver, DeleteProps, SnapshotCollection, SnapshotReference, FetchCollectionProps, FetchOneProps, FilterCombination, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, DeleteProps, CollectionConfig, SnapshotReference, FetchCollectionProps, FetchOneProps, FilterCombination, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
 import { User } from "@firebase/auth";
 import {
     collection as collectionClause,
@@ -62,7 +62,7 @@ export interface FirestoreDataDriverProps {
 
 export type FirestoreIndexesBuilder = (params: {
     path: string,
-    collection: SnapshotCollection<any>,
+    collection: CollectionConfig<any>,
 }) => FilterCombination<string>[] | undefined
 
 export type FirestoreDataDriver = DataDriver & {
@@ -70,7 +70,7 @@ export type FirestoreDataDriver = DataDriver & {
     initTextSearch: (props: {
         path: string,
         databaseId?: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     }) => Promise<boolean>,
 }
 
@@ -256,7 +256,7 @@ export function useFirestoreDriver({
     const initTextSearch = useCallback(async (props: {
         path: string,
         databaseId?: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     }) => {
         console.debug("Init text search controller", searchControllerRef.current, props.path);
         if (!searchControllerRef.current) {
@@ -282,7 +282,7 @@ export function useFirestoreDriver({
      * @param orderBy
      * @param order
      * @return Function to cancel subscription
-     * @see useCollectionFetch if you need this functionality implemented as a hook
+     * @see useCollection if you need this functionality implemented as a hook
      * @group Firestore
      */
     const fetchCollection = useCallback(async <M extends Record<string, any>>({
@@ -328,7 +328,7 @@ export function useFirestoreDriver({
      * @param order
      * @param onUpdate
      * @return Function to cancel subscription
-     * @see useCollectionFetch if you need this functionality implemented as a hook
+     * @see useCollection if you need this functionality implemented as a hook
      * @group Firestore
      */
     const listenCollection = useCallback(<M extends Record<string, any>>(
@@ -510,7 +510,7 @@ export function useFirestoreDriver({
         name: string,
         value: unknown,
         id?: string | number,
-        collection?: SnapshotCollection<any>
+        collection?: CollectionConfig<any>
     ): Promise<boolean> => {
 
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
@@ -549,7 +549,7 @@ export function useFirestoreDriver({
         sortBy
     }: {
         path: string,
-        collection: SnapshotCollection<any>,
+        collection: CollectionConfig<any>,
         filterValues: FilterValues<any>,
         sortBy?: [string, "asc" | "desc"],
     }): boolean => {
@@ -768,7 +768,7 @@ function buildTextSearchControllerWithLocalSearch({
         init: async (props: {
             path: string,
             databaseId?: string,
-            collection?: SnapshotCollection
+            collection?: CollectionConfig
         }) => {
             const b = await textSearchController.init(props);
             if (b) {

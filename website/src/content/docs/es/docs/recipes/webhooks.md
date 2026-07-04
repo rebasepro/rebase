@@ -11,7 +11,7 @@ Utiliza las devoluciones de llamada `afterSave` y `afterDelete` para notificar a
 ## Notificación de Slack sobre un Nuevo Pedido
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

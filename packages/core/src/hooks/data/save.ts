@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { Snapshot, SnapshotStatus, SnapshotValues, RebaseContext } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 
@@ -10,7 +10,7 @@ export type SaveSnapshotWithCallbacksProps<M extends Record<string, unknown>> = 
     values: Partial<SnapshotValues<M>>;
     snapshotId?: string | number;
     previousValues?: Partial<SnapshotValues<M>>;
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
     status: SnapshotStatus;
     afterSave?: (updatedSnapshot: Snapshot<M>) => void,
     afterSaveError?: (e: Error) => void
@@ -47,7 +47,7 @@ export async function saveSnapshotWithCallbacks<M extends Record<string, unknown
     afterSave,
     afterSaveError
 }: SaveSnapshotWithCallbacksProps<M> & {
-    collection: SnapshotCollection,
+    collection: CollectionConfig,
     data: RebaseData,
     context: RebaseContext,
 }

@@ -1,4 +1,4 @@
-import { SnapshotCollection, PostgresCollection } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { getEffectiveSecurityRules } from "../src/schema/auth-default-policies";
 
@@ -6,7 +6,7 @@ describe("auth collection default RLS policies", () => {
     const adminWrite = "string_to_array(auth.roles(), ',') && ARRAY['admin']";
 
     it("injects admin write policies (permissive grant + restrictive gate) when an auth collection has no security rules", () => {
-        const collection: PostgresCollection = {
+        const collection: PostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -28,7 +28,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("keeps an author's permissive owner write rule but the restrictive gate still blocks non-admins", () => {
-        const collection: PostgresCollection = {
+        const collection: PostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -64,7 +64,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("can be opted out with disableDefaultAuthPolicies", () => {
-        const collection: PostgresCollection = {
+        const collection: PostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -77,7 +77,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("leaves non-auth collections untouched", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             slug: "products",
             table: "products",
             name: "Products",

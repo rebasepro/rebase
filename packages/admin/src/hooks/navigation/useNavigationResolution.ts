@@ -3,15 +3,15 @@ import type {
     AppViewsBuilder,
     AuthCollectionConfig,
     SnapshotAction,
-    SnapshotCollection,
-    SnapshotCollectionsBuilder,
+    CollectionConfig,
+    CollectionConfigsBuilder,
     RebaseContext,
     RebasePlugin,
     UserCreationResult
 } from "@rebasepro/types";
 import { type AuthController, type User, type RebaseData } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
-import { resetPasswordAction } from "../../components/common/default_snapshot_actions";
+import { resetPasswordAction } from "../../components/common/default_record_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
 import React from "react";
 
@@ -23,7 +23,7 @@ function isRebaseContext(ctx: unknown): ctx is RebaseContext {
     return typeof ctx === "object" && ctx !== null && "dialogsController" in ctx;
 }
 
-export function filterOutNotAllowedCollections(resolvedCollections: SnapshotCollection[], authController: AuthController): SnapshotCollection[] {
+export function filterOutNotAllowedCollections(resolvedCollections: CollectionConfig[], authController: AuthController): CollectionConfig[] {
     return resolvedCollections
         .filter((c) => canReadCollection(c, authController))
         .map((c) => {
@@ -35,8 +35,8 @@ export function filterOutNotAllowedCollections(resolvedCollections: SnapshotColl
         });
 }
 
-export function applyPluginModifyCollection(resolvedCollections: SnapshotCollection[], modifyCollection: (collection: SnapshotCollection) => SnapshotCollection): SnapshotCollection[] {
-    return resolvedCollections.map((collection): SnapshotCollection => {
+export function applyPluginModifyCollection(resolvedCollections: CollectionConfig[], modifyCollection: (collection: CollectionConfig) => CollectionConfig): CollectionConfig[] {
+    return resolvedCollections.map((collection): CollectionConfig => {
         const modifiedCollection = modifyCollection(collection);
         if (modifiedCollection.childCollections) {
             return {
@@ -59,7 +59,7 @@ export function applyPluginModifyCollection(resolvedCollections: SnapshotCollect
  *
  * Skips injection if the collection already has the action/callback present.
  */
-function injectAuthCollectionConfig(collections: SnapshotCollection[]): SnapshotCollection[] {
+function injectAuthCollectionConfig(collections: CollectionConfig[]): CollectionConfig[] {
     return collections.map((collection) => {
         const authProp = collection.auth;
         if (!authProp) return collection;
@@ -150,12 +150,12 @@ function injectAuthCollectionConfig(collections: SnapshotCollection[]): Snapshot
 }
 
 export async function resolveCollections(
-    collections: undefined | SnapshotCollection[] | SnapshotCollectionsBuilder,
+    collections: undefined | CollectionConfig[] | CollectionConfigsBuilder,
     authController: AuthController,
     data: RebaseData,
     plugins: RebasePlugin[] | undefined
-): Promise<SnapshotCollection[]> {
-    let resolvedCollections: SnapshotCollection[] = [];
+): Promise<CollectionConfig[]> {
+    let resolvedCollections: CollectionConfig[] = [];
     if (typeof collections === "function") {
         resolvedCollections = await collections({
             user: authController.user,

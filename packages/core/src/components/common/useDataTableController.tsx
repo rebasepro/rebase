@@ -1,10 +1,10 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
-import { populateSnapshotFetchCache } from "../../hooks/data/useSnapshotFetch";
+import { populateFetchCache } from "../../hooks/data/useFetch";
 import { Snapshot, SnapshotReference, SnapshotRelation, SnapshotTableController, FilterValues, RebaseContext, SelectedCellProps, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
@@ -18,7 +18,7 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
     /**
      * The collection that is represented by this config.
      */
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
     /**
      * List of snapshots that will be displayed on top, no matter the ordering.
      * This is used for reference fields selection
@@ -42,7 +42,7 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
 }
 
 /**
- * Use this hook to build a controller for the {@link SnapshotCollectionTable}.
+ * Use this hook to build a controller for the {@link DataCollectionTable}.
  * This controller is bound to data in a path in your specified driver.
  *
  * Note that you can build your own hook returning a {@link SnapshotTableController}
@@ -236,7 +236,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
             // Pre-populate the snapshot fetch cache so that navigating to an
             // snapshot detail view renders instantly with cached data.
-            populateSnapshotFetchCache(path, snapshots);
+            populateFetchCache(path, snapshots);
         };
 
         const onError = (error: Error) => {

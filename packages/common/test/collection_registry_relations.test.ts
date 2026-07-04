@@ -1,6 +1,6 @@
 import {
-    SnapshotCollection,
-    PostgresCollection,
+    CollectionConfig,
+    PostgresCollectionConfig,
     RelationProperty,
     MapProperty,
     ArrayProperty,
@@ -11,7 +11,7 @@ import { resolveRelationProperty } from "../src/util/resolutions";
 
 // ── Fixtures ──────────────────────────────────────────────────────────
 
-function makeTagsCollection(): PostgresCollection {
+function makeTagsCollection(): PostgresCollectionConfig {
     return {
         name: "Tags",
         slug: "tags",
@@ -24,7 +24,7 @@ isId: "increment" },
     };
 }
 
-function makeAuthorsCollection(): PostgresCollection {
+function makeAuthorsCollection(): PostgresCollectionConfig {
     return {
         name: "Authors",
         slug: "authors",
@@ -43,9 +43,9 @@ isId: "increment" },
  * This is the new API that should "just work".
  */
 function makePostsWithInlineRelations(
-    tagsCol: PostgresCollection,
-    authorsCol: PostgresCollection
-): PostgresCollection {
+    tagsCol: PostgresCollectionConfig,
+    authorsCol: PostgresCollectionConfig
+): PostgresCollectionConfig {
     return {
         name: "Blog posts",
         slug: "posts",
@@ -77,9 +77,9 @@ isId: "increment" },
  * The properties use `relationName` + `collectionPath` instead of inline `target`.
  */
 function makePostsWithExplicitRelations(
-    tagsCol: PostgresCollection,
-    authorsCol: PostgresCollection
-): PostgresCollection {
+    tagsCol: PostgresCollectionConfig,
+    authorsCol: PostgresCollectionConfig
+): PostgresCollectionConfig {
     return {
         name: "Blog posts (legacy)",
         slug: "posts-legacy",
@@ -134,8 +134,8 @@ describe("Layer 1 – extractRelationsFromProperties", () => {
         const normalized = registry.normalizeCollection({ ...posts });
 
         // After normalization, the collection should have `relations[]` populated
-        expect((normalized as PostgresCollection).relations).toBeDefined();
-        const relations = (normalized as PostgresCollection).relations!;
+        expect((normalized as PostgresCollectionConfig).relations).toBeDefined();
+        const relations = (normalized as PostgresCollectionConfig).relations!;
         expect(relations.length).toBeGreaterThanOrEqual(2);
 
         const authorRel = relations.find((r) => r.relationName === "author");
@@ -158,7 +158,7 @@ describe("Layer 1 – extractRelationsFromProperties", () => {
 
         const registry = new CollectionRegistry();
         const normalized = registry.normalizeCollection({ ...posts });
-        const relations = (normalized as PostgresCollection).relations!;
+        const relations = (normalized as PostgresCollectionConfig).relations!;
 
         // The explicit relations should be present (author_rel, tags_rel)
         expect(relations.find((r) => r.relationName === "author_rel")).toBeDefined();
@@ -211,7 +211,7 @@ describe("Layer 2 – normalizeProperty stamps relation metadata", () => {
 
     it("stamps relation on nested map properties", () => {
         const tags = makeTagsCollection();
-        const posts: PostgresCollection = {
+        const posts: PostgresCollectionConfig = {
             name: "Posts",
             slug: "posts-nested",
             table: "posts_nested",
@@ -326,7 +326,7 @@ describe("Layer 4 – collection.relations[] populated from inline config", () =
         const posts = makePostsWithInlineRelations(tags, authors);
 
         const registry = new CollectionRegistry([tags, authors, posts]);
-        const stored = registry.get("posts") as PostgresCollection;
+        const stored = registry.get("posts") as PostgresCollectionConfig;
 
         expect(stored.relations).toBeDefined();
         expect(stored.relations!.length).toBeGreaterThanOrEqual(2);
@@ -346,7 +346,7 @@ describe("Layer 4 – collection.relations[] populated from inline config", () =
         const posts = makePostsWithInlineRelations(tags, authors);
 
         const registry = new CollectionRegistry([tags, authors, posts]);
-        const stored = registry.get("posts") as PostgresCollection;
+        const stored = registry.get("posts") as PostgresCollectionConfig;
         const tagsProp = stored.properties.tags as RelationProperty;
 
         // resolveRelationProperty should find the relation because:
@@ -364,7 +364,7 @@ describe("Layer 4 – collection.relations[] populated from inline config", () =
         const posts = makePostsWithInlineRelations(tags, authors);
 
         const registry = new CollectionRegistry([tags, authors, posts]);
-        const stored = registry.get("posts") as PostgresCollection;
+        const stored = registry.get("posts") as PostgresCollectionConfig;
 
         // Simulate a scenario where property.relation was stripped (e.g. by serialization)
         const strippedProp: RelationProperty = {
@@ -414,7 +414,7 @@ describe("Layer 5 – idempotent re-registration", () => {
         registry.registerMultiple([tags, authors, posts]);
 
         // Modify the posts collection — change tags cardinality to "one"
-        const modifiedPosts: PostgresCollection = {
+        const modifiedPosts: PostgresCollectionConfig = {
             ...posts,
             properties: {
                 ...posts.properties,
@@ -441,7 +441,7 @@ describe("Layer 5 – idempotent re-registration", () => {
 
 describe("Layer 6 – circular dependency resilience", () => {
     it("handles mutual references between collections (posts ↔ tags)", () => {
-        const tags: PostgresCollection = {
+        const tags: PostgresCollectionConfig = {
             name: "Tags",
             slug: "tags",
             table: "tags",
@@ -454,7 +454,7 @@ isId: "increment" },
             relations: []
         };
 
-        const posts: PostgresCollection = {
+        const posts: PostgresCollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -492,14 +492,14 @@ isId: "increment" },
         expect(postTagsProp.relation!.cardinality).toBe("many");
 
         // Tags should have posts relation
-        const storedTags = registry.get("tags") as PostgresCollection;
+        const storedTags = registry.get("tags") as PostgresCollectionConfig;
         expect(storedTags).toBeDefined();
         expect(storedTags.relations).toBeDefined();
         expect(storedTags.relations!.find((r) => r.relationName === "posts")).toBeDefined();
     });
 
     it("resolves string target slugs correctly when registering collections", () => {
-        const posts: PostgresCollection = {
+        const posts: PostgresCollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -516,7 +516,7 @@ isId: "increment" },
             }
         };
 
-        const authors: PostgresCollection = {
+        const authors: PostgresCollectionConfig = {
             name: "Authors",
             slug: "authors",
             table: "authors",
@@ -529,7 +529,7 @@ isId: "increment" },
 
         const registry = new CollectionRegistry([posts, authors]);
 
-        const storedPosts = registry.get("posts") as PostgresCollection;
+        const storedPosts = registry.get("posts") as PostgresCollectionConfig;
         expect(storedPosts).toBeDefined();
 
         const authorProp = storedPosts.properties.author as RelationProperty;
@@ -551,7 +551,7 @@ describe("Layer 7 – mixed inline + explicit relations", () => {
     it("inline properties and explicit relations[] coexist without conflict", () => {
         const tags = makeTagsCollection();
         const authors = makeAuthorsCollection();
-        const categories: PostgresCollection = {
+        const categories: PostgresCollectionConfig = {
             name: "Categories",
             slug: "categories",
             table: "categories",
@@ -562,7 +562,7 @@ isId: "increment" },
             }
         };
 
-        const posts: PostgresCollection = {
+        const posts: PostgresCollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -605,7 +605,7 @@ isId: "increment" },
         };
 
         const registry = new CollectionRegistry([tags, authors, categories, posts]);
-        const stored = registry.get("posts") as PostgresCollection;
+        const stored = registry.get("posts") as PostgresCollectionConfig;
         expect(stored).toBeDefined();
 
         // Check inline tags relation
@@ -656,7 +656,7 @@ describe("Layer 8 – property.relation is truthy for table binding selection", 
 
     it("all keys of the Relation object are present and valid", () => {
         const tags = makeTagsCollection();
-        const posts: PostgresCollection = {
+        const posts: PostgresCollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -702,7 +702,7 @@ isId: "increment" },
 
 describe("Layer 9 – nested relation config (property.relation.target)", () => {
     it("extracts relation when target is inside property.relation instead of inline", () => {
-        const customers: PostgresCollection = {
+        const customers: PostgresCollectionConfig = {
             name: "Customers",
             slug: "customers",
             table: "customers",
@@ -713,7 +713,7 @@ isId: "increment" },
             }
         };
 
-        const orders: PostgresCollection = {
+        const orders: PostgresCollectionConfig = {
             name: "Orders",
             slug: "orders",
             table: "orders",
@@ -740,7 +740,7 @@ isId: "increment" },
         const normalized = registry.normalizeCollection({ ...orders });
 
         // The relation should have been extracted into relations[]
-        const relations = (normalized as PostgresCollection).relations!;
+        const relations = (normalized as PostgresCollectionConfig).relations!;
         expect(relations).toBeDefined();
         const customerRel = relations.find((r) => r.relationName === "customer");
         expect(customerRel).toBeDefined();
@@ -756,7 +756,7 @@ isId: "increment" },
     });
 
     it("inline target on property takes precedence over nested relation.target", () => {
-        const customers: PostgresCollection = {
+        const customers: PostgresCollectionConfig = {
             name: "Customers",
             slug: "customers",
             table: "customers",
@@ -766,7 +766,7 @@ isId: "increment" }
             }
         };
 
-        const orders: PostgresCollection = {
+        const orders: PostgresCollectionConfig = {
             name: "Orders",
             slug: "orders",
             table: "orders",
@@ -793,7 +793,7 @@ isId: "increment" },
 
         const registry = new CollectionRegistry();
         const normalized = registry.normalizeCollection({ ...orders });
-        const relations = (normalized as PostgresCollection).relations!;
+        const relations = (normalized as PostgresCollectionConfig).relations!;
         const customerRel = relations.find((r) => r.relationName === "customer");
         expect(customerRel).toBeDefined();
         // Inline takes precedence: cardinality should be "one", not "many"
@@ -809,7 +809,7 @@ isId: "increment" },
 
 describe("Layer 10 – recursive _registerRecursively with deep chains", () => {
     it("does not crash when normalized subcollections differ from raw subcollections", () => {
-        const products: PostgresCollection = {
+        const products: PostgresCollectionConfig = {
             name: "Products",
             slug: "products",
             table: "products",
@@ -820,7 +820,7 @@ isId: "increment" },
             }
         };
 
-        const orderItems: PostgresCollection = {
+        const orderItems: PostgresCollectionConfig = {
             name: "Order Items",
             slug: "order_items",
             table: "order_items",
@@ -850,7 +850,7 @@ isId: "increment" },
             }
         };
 
-        const orders: PostgresCollection = {
+        const orders: PostgresCollectionConfig = {
             name: "Orders",
             slug: "orders",
             table: "orders",
@@ -870,7 +870,7 @@ isId: "increment" },
             ]
         };
 
-        const customers: PostgresCollection = {
+        const customers: PostgresCollectionConfig = {
             name: "Customers",
             slug: "customers",
             table: "customers",
@@ -908,7 +908,7 @@ isId: "increment" },
     });
 
     it("registers all collections in the chain via single-register path", () => {
-        const products: PostgresCollection = {
+        const products: PostgresCollectionConfig = {
             name: "Products",
             slug: "products",
             table: "products",
@@ -919,7 +919,7 @@ isId: "increment" },
             }
         };
 
-        const orderItems: PostgresCollection = {
+        const orderItems: PostgresCollectionConfig = {
             name: "Order Items",
             slug: "order_items",
             table: "order_items",
@@ -936,7 +936,7 @@ isId: "increment" },
             }
         };
 
-        const orders: PostgresCollection = {
+        const orders: PostgresCollectionConfig = {
             name: "Orders",
             slug: "orders",
             table: "orders",
@@ -979,7 +979,7 @@ describe("Regression – normalizeCollection sanitizes relations (derived fields
         const posts = makePostsWithInlineRelations(tags, authors);
 
         const registry = new CollectionRegistry();
-        const normalized = registry.normalizeCollection({ ...posts }) as PostgresCollection;
+        const normalized = registry.normalizeCollection({ ...posts }) as PostgresCollectionConfig;
         const tagsRel = normalized.relations!.find(r => r.relationName === "tags");
 
         expect(tagsRel).toBeDefined();
@@ -1011,7 +1011,7 @@ describe("Regression – normalizeCollection sanitizes relations (derived fields
         const posts = makePostsWithInlineRelations(tags, authors);
 
         const registry = new CollectionRegistry();
-        const normalized = registry.normalizeCollection({ ...posts }) as PostgresCollection;
+        const normalized = registry.normalizeCollection({ ...posts }) as PostgresCollectionConfig;
         const authorRel = normalized.relations!.find(r => r.relationName === "author");
 
         expect(authorRel).toBeDefined();
@@ -1035,7 +1035,7 @@ describe("Regression – normalizeCollection sanitizes relations (derived fields
         const tags = makeTagsCollection();
         const authors = makeAuthorsCollection();
 
-        const postsWithExplicitThrough: PostgresCollection = {
+        const postsWithExplicitThrough: PostgresCollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -1059,7 +1059,7 @@ isId: "increment" },
         };
 
         const registry = new CollectionRegistry();
-        const normalized = registry.normalizeCollection({ ...postsWithExplicitThrough }) as PostgresCollection;
+        const normalized = registry.normalizeCollection({ ...postsWithExplicitThrough }) as PostgresCollectionConfig;
         const tagsRel = normalized.relations!.find(r => r.relationName === "tags");
 
         expect(tagsRel!.through!.table).toBe("custom_junction");
@@ -1075,7 +1075,7 @@ isId: "increment" },
         const registry = new CollectionRegistry();
         registry.registerMultiple([posts, tags, authors]);
 
-        const stored = registry.get("posts") as PostgresCollection;
+        const stored = registry.get("posts") as PostgresCollectionConfig;
         expect(stored).toBeDefined();
 
         // collection.relations[] must have through

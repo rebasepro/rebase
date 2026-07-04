@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { Snapshot, CollectionCallbacks, RebaseContext, User } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 
@@ -7,7 +7,7 @@ import { RebaseData } from "@rebasepro/types";
  */
 export type DeleteSnapshotWithCallbacksProps<M extends Record<string, any>, USER extends User = User> = {
     snapshot: Snapshot<M>;
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
     callbacks?: CollectionCallbacks<M, USER>;
     onDeleteSuccess?: (snapshot: Snapshot<M>) => void;
     onDeleteFailure?: (snapshot: Snapshot<M>, e: Error) => void;
@@ -37,7 +37,7 @@ export async function deleteSnapshotWithCallbacks<M extends Record<string, any>,
     onDeleteFailure,
     context
 }: DeleteSnapshotWithCallbacksProps<M> & {
-    collection: SnapshotCollection<M>,
+    collection: CollectionConfig<M>,
     data: RebaseData,
     context: RebaseContext<USER>
 }

@@ -5,7 +5,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
-import type { SnapshotCollection, Snapshot } from "@rebasepro/types";
+import type { CollectionConfig, Snapshot } from "@rebasepro/types";
 
 type MockTx = { execute: jest.Mock };
 type MockUser = { uid: string; email?: string; roles?: unknown[] };
@@ -145,7 +145,7 @@ email: "test@example.com" };
 
             await authDelegate.fetchCollection({ path: "test_collection",
 collection: { slug: "test",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             expect(mockDb.transaction).toHaveBeenCalled();
         });
@@ -164,7 +164,7 @@ email: "test@example.com" };
 
             await authDelegate.fetchCollection({ path: "test",
 collection: { slug: "test",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             expect(mockDb.transaction).toHaveBeenCalled();
             expect(mockTx.execute).toHaveBeenCalled();
@@ -189,7 +189,7 @@ roles: ["admin", "editor"] };
 
             await authDelegate.fetchCollection({ path: "test",
 collection: { slug: "test",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             expect(mockTx.execute).toHaveBeenCalledTimes(1);
             const sqlCall = mockTx.execute.mock.calls[0][0];
@@ -213,7 +213,7 @@ roles: [{ id: "admin" }, { id: "editor" }] };
 
             await authDelegate.fetchCollection({ path: "test",
 collection: { slug: "test",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             expect(mockTx.execute).toHaveBeenCalledTimes(1);
             const sqlCall = mockTx.execute.mock.calls[0][0];
@@ -236,7 +236,7 @@ properties: {} } as unknown as SnapshotCollection });
 
             await authDelegate.fetchCollection({ path: "test",
 collection: { slug: "test",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             expect(mockDb.transaction).toHaveBeenCalledTimes(1);
 
@@ -262,7 +262,7 @@ properties: {} } as unknown as SnapshotCollection });
 
             await authDelegate.fetchCollection({ path: "test",
 collection: { slug: "test",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             const transactionCallback = (mockDb.transaction as jest.Mock).mock.calls[0][0];
             const mockTx: MockTx = { execute: jest.fn() };
@@ -305,7 +305,7 @@ email: "test@example.com" });
             await authDelegate.save({ path: "test",
 id: "123",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" });
 
             // Ensure transaction was called
@@ -336,7 +336,7 @@ status: "new" });
             await expect(authDelegate.save({ path: "test",
 id: "123",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" })).rejects.toThrow("Transaction failed");
 
             // Ensure notification was NOT flushed
@@ -369,7 +369,7 @@ status: "new" })).rejects.toThrow("Transaction failed");
             const result = await authDelegate.save({ path: "test",
 id: "buggy-123",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" });
 
             expect(result).toEqual({ id: "success" });
@@ -408,12 +408,12 @@ row: {} as unknown as Record<string, unknown> });
                 authDelegate.save({ path: "scope-1",
 id: "1",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" }),
                 authDelegate.save({ path: "scope-2",
 id: "2",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" })
             ]);
 
@@ -458,7 +458,7 @@ authContext: undefined });
             });
 
             const unsub = authDelegate.listenCollection({ path: "test",
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
 
             expect(unsub).toBe(mockUnsubscribe);
@@ -479,7 +479,7 @@ authContext: undefined });
 
             const unsub = authDelegate.listenOne({ path: "test",
 id: "123",
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
 
             expect(unsub).toBe(mockUnsubscribe);
@@ -492,7 +492,7 @@ roles: [] });
             mockRealtimeService.subscriptions.clear();
             jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => mockUnsubscribe);
             const unsub = authDelegate.listenCollection({ path: "empty-test",
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
             expect(unsub).toBe(mockUnsubscribe);
         });
@@ -506,7 +506,7 @@ authContext: undefined });
                 return mockUnsubscribe;
             });
             authDelegate.listenCollection({ path: "test",
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
             // authContext should NOT be injected because clientId !== 'driver'
             expect(mockRealtimeService.subscriptions.get("sub-ext").authContext).toBeUndefined();
@@ -566,7 +566,7 @@ email: "hacker@evil.com" };
 
             await authDelegate.fetchCollection({ path: "x",
 collection: { slug: "x",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             // The SQL template tag should have the userId as a parameter value, not embedded in the SQL string
             const sqlObj = mockTx.execute.mock.calls[0][0];
@@ -592,7 +592,7 @@ roles: ['role"with"quotes', "role,with,commas", "rôle-spécial"] };
 
             await authDelegate.fetchCollection({ path: "x",
 collection: { slug: "x",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             const serialized = JSON.stringify(mockTx.execute.mock.calls[0][0]);
             // The JWT should be valid JSON.stringify output containing the roles
@@ -614,7 +614,7 @@ roles: [{ name: "viewer" }, 42, null] };
 
             await authDelegate.fetchCollection({ path: "x",
 collection: { slug: "x",
-properties: {} } as unknown as SnapshotCollection });
+properties: {} } as unknown as CollectionConfig });
 
             const serialized = JSON.stringify(mockTx.execute.mock.calls[0][0]);
             // Objects without id → String({name:'viewer'}) = "[object Object]", 42 → "42", null → "null"
@@ -659,7 +659,7 @@ email: "c@test.com" } as MockUser);
             const authDelegate = await delegate.withAuth({ uid: "counter",
 email: "c@test.com" } as MockUser);
             const result = await authDelegate.count({ path: "items",
-collection: {} as unknown as SnapshotCollection });
+collection: {} as unknown as CollectionConfig });
 
             expect(mockDb.transaction).toHaveBeenCalled();
             expect(result).toBe(42);
@@ -708,12 +708,12 @@ row: {} as unknown as Record<string, unknown> });
             await authDelegate.save({ path: "call-1",
 id: "1",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" });
             await authDelegate.save({ path: "call-2",
 id: "2",
 values: {},
-collection: {} as unknown as SnapshotCollection,
+collection: {} as unknown as CollectionConfig,
 status: "new" });
 
             // Each call should have flushed exactly 1 notification, not accumulated

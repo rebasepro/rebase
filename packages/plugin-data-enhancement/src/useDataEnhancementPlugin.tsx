@@ -1,6 +1,6 @@
 import React from "react";
 
-import { SnapshotCollection, RebasePlugin, User } from "@rebasepro/types";
+import { CollectionConfig, RebasePlugin, User } from "@rebasepro/types";
 import { DataEnhancementControllerProvider } from "./components/DataEnhancementControllerProvider";
 import { FormEnhanceAction } from "./components/FormEnhanceAction";
 
@@ -21,7 +21,7 @@ export interface DataEnhancementPluginProps {
      */
     getConfigForPath?: (props: {
         path: string,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         user: User | null
     }) => boolean;
 

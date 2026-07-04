@@ -1,12 +1,12 @@
 ---
-title: Entity History
-sidebar_label: Entity History
-description: Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after snapshot.
+title: Snapshot History
+sidebar_label: Snapshot History
+description: Track every change to your snapshots with a full audit trail — who changed what, when, and the complete before/after snapshot.
 ---
 
 ## Overview
 
-Entity history records a snapshot of entity values on every create, update, and delete. This gives you a full audit trail with diffs.
+Snapshot history records a snapshot of snapshot values on every create, update, and delete. This gives you a full audit trail with diffs.
 
 ## Enabling History
 
@@ -25,7 +25,7 @@ Or with custom retention settings:
 
 ```typescript
 history: {
-    maxEntries: 200,     // Per entity, oldest pruned first (default: 200)
+    maxEntries: 200,     // Per snapshot, oldest pruned first (default: 200)
     ttlDays: 90          // Entries older than this are pruned (default: 90)
 }
 ```
@@ -35,7 +35,7 @@ history: {
 Mark which collections should track history:
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     history: true,       // Enable for this collection
     properties: { /* ... */ }
@@ -44,10 +44,10 @@ const ordersCollection: EntityCollection = {
 
 ## How It Works
 
-1. The backend creates a `rebase.entity_history` table automatically.
+1. The backend creates a `rebase.snapshot_history` table automatically.
 2. On every create, update, or delete, a snapshot is recorded with:
-   - Entity ID, collection slug, and table name
-   - The full entity values (before and after)
+   - Snapshot ID, collection slug, and table name
+   - The full snapshot values (before and after)
    - Timestamp and user ID
    - Operation type (`create`, `update`, `delete`)
    - An array of `changed_fields` showing which columns were modified
@@ -62,23 +62,23 @@ To avoid recording redundant logs where fields are saved but no values change, t
 ### Non-Blocking Post-Save Pruning
 
 Unlike traditional systems that rely entirely on slow periodic batch scripts, Rebase enforces your retention policies continuously:
-- Right after an entity is saved or deleted, the server schedules an **inline asynchronous sweep** in a non-blocking, fire-and-forget promise.
-- This sweep immediately checks retention limits for that specific entity ID and prunes older entries exceeding `maxEntries` or `ttlDays`.
+- Right after a snapshot is saved or deleted, the server schedules an **inline asynchronous sweep** in a non-blocking, fire-and-forget promise.
+- This sweep immediately checks retention limits for that specific snapshot ID and prunes older entries exceeding `maxEntries` or `ttlDays`.
 
 ## REST Endpoint
 
 ```
-GET /api/data/:slug/:entityId/history
+GET /api/data/:slug/:snapshotId/history
 ```
 
-Returns a list of history entries for a specific entity, ordered by most recent first:
+Returns a list of history entries for a specific snapshot, ordered by most recent first:
 
 ```json
 {
     "data": [
         {
             "id": 42,
-            "entity_id": "123",
+            "snapshot_id": "123",
             "collection_slug": "orders",
             "operation": "update",
             "values": { "status": "shipped", "total": 99.99 },
@@ -94,15 +94,15 @@ Returns a list of history entries for a specific entity, ordered by most recent 
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `maxEntries` | 200 | Maximum entries retained per individual entity ID. Oldest entries are deleted. |
+| `maxEntries` | 200 | Maximum entries retained per individual snapshot ID. Oldest entries are deleted. |
 | `ttlDays` | 90 | Entries older than this duration (in days) are deleted. |
 
 ### Pruning Lifecycle Mechanics
 
-1. **Inline Pruning (Continuous)**: Executed asynchronously immediately after any CRUD operation. It prunes entries for the active entity using a sub-select query with an `OFFSET` equivalent to your `maxEntries` setting, deleting everything beyond that threshold.
+1. **Inline Pruning (Continuous)**: Executed asynchronously immediately after any CRUD operation. It prunes entries for the active snapshot using a sub-select query with an `OFFSET` equivalent to your `maxEntries` setting, deleting everything beyond that threshold.
 2. **Global Pruning (Periodic)**: A background cleanup cron sweep (`pruneExpired`) runs every **6 hours** to evaluate global `ttlDays` thresholds and clean up orphaned logs across all collections.
 
 ## Next Steps
 
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Snapshot Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Backend Overview](/docs/backend)** — Full backend configuration

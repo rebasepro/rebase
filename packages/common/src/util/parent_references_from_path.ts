@@ -1,10 +1,10 @@
-import { SnapshotCollection, SnapshotReference } from "@rebasepro/types";
+import { CollectionConfig, SnapshotReference } from "@rebasepro/types";
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "./resolutions";
 
 export function getParentReferencesFromPath(props: {
     path: string,
-    collections: SnapshotCollection[] | undefined,
+    collections: CollectionConfig[] | undefined,
     currentFullPath?: string,
 }): SnapshotReference[] {
 
@@ -21,7 +21,7 @@ export function getParentReferencesFromPath(props: {
     for (let i = 0; i < subpathCombinations.length; i++) {
         const subpathCombination = subpathCombinations[i];
 
-        const collection: SnapshotCollection | undefined = collections && collections.find((entry) => entry.slug === subpathCombination);
+        const collection: CollectionConfig | undefined = collections && collections.find((entry) => entry.slug === subpathCombination);
 
         // If we find a collection, we add the reference and continue
         if (collection) {

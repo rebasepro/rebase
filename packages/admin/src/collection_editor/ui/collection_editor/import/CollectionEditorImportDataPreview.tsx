@@ -1,8 +1,8 @@
 import { useCollectionRegistryController } from "../../../_cms_internals";
 import { convertDataToSnapshot, ImportConfig } from "../../../_cms_internals";
 import { useAuthController } from "@rebasepro/core";
-import { SnapshotCollectionTable } from "../../../../components/SnapshotCollectionTable/SnapshotCollectionTable";
-import { useSelectionController } from "../../../../components/SnapshotCollectionView/useSelectionController";
+import { CollectionTableBinding } from "../../../../components/CollectionTableBinding/CollectionTableBinding";
+import { useSelectionController } from "../../../../components/CollectionViewBinding/useSelectionController";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { Properties } from "@rebasepro/types";
 import { useEffect, useState } from "react";
@@ -42,7 +42,7 @@ export function CollectionEditorImportDataPreview({
     if (loading)
         return <CircularProgressCenter/>
 
-    return <SnapshotCollectionTable
+    return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
             <Typography variant={"caption"}>Snapshots with the same id will be overwritten</Typography>

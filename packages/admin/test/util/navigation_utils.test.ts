@@ -13,7 +13,7 @@ import {
     navigateToSnapshot
 } from "../../src/util/navigation_utils";
 
-import type { SnapshotCollection, SideSnapshotController, UrlController } from "@rebasepro/types";
+import type { CollectionConfig, SidePanelController, UrlController } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
 // removeInitialSlash
@@ -130,7 +130,7 @@ describe("getCollectionPathsCombinations", () => {
 // resolveCollectionPathIds
 // ---------------------------------------------------------------------------
 describe("resolveCollectionPathIds", () => {
-    const collections: SnapshotCollection[] = [
+    const collections: CollectionConfig[] = [
         {
             id: "products",
             name: "Products",
@@ -158,7 +158,7 @@ describe("resolveCollectionPathIds", () => {
                 }
             ]
         }
-    ] as SnapshotCollection[];
+    ] as CollectionConfig[];
 
     it("returns empty string for empty path", () => {
         expect(resolveCollectionPathIds("", collections)).toBe("");
@@ -201,7 +201,7 @@ describe("resolveCollectionPathIds", () => {
 // getCollectionBySlugWithin
 // ---------------------------------------------------------------------------
 describe("getCollectionBySlugWithin", () => {
-    const collections: SnapshotCollection[] = [
+    const collections: CollectionConfig[] = [
         {
             id: "products",
             name: "Products",
@@ -226,7 +226,7 @@ describe("getCollectionBySlugWithin", () => {
             slug: "users",
             properties: {}
         }
-    ] as SnapshotCollection[];
+    ] as CollectionConfig[];
 
     it("finds a top-level collection by slug", () => {
         const result = getCollectionBySlugWithin("products", collections);
@@ -268,11 +268,11 @@ describe("navigateToSnapshot", () => {
         navigate: mockNavigate
     } as unknown as UrlController;
 
-    const mockSideSnapshotController = {
+    const mockSidePanelController = {
         open: jest.fn(),
         close: jest.fn(),
         replace: jest.fn()
-    } as unknown as SideSnapshotController;
+    } as unknown as SidePanelController;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -283,11 +283,11 @@ describe("navigateToSnapshot", () => {
             openSnapshotMode: "side_panel",
             snapshotId: "abc",
             path: "products",
-            sideSnapshotController: mockSideSnapshotController,
+            sidePanelController: mockSidePanelController,
             navigation: mockNavigation
         });
 
-        expect(mockSideSnapshotController.open).toHaveBeenCalledWith(
+        expect(mockSidePanelController.open).toHaveBeenCalledWith(
             expect.objectContaining({
                 snapshotId: "abc",
                 path: "products",
@@ -302,12 +302,12 @@ describe("navigateToSnapshot", () => {
             openSnapshotMode: "full_screen",
             snapshotId: "abc",
             path: "products",
-            sideSnapshotController: mockSideSnapshotController,
+            sidePanelController: mockSidePanelController,
             navigation: mockNavigation
         });
 
         expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc", undefined);
-        expect(mockSideSnapshotController.open).not.toHaveBeenCalled();
+        expect(mockSidePanelController.open).not.toHaveBeenCalled();
     });
 
     it("appends selectedTab to full_screen URL", () => {
@@ -316,7 +316,7 @@ describe("navigateToSnapshot", () => {
             snapshotId: "abc",
             path: "products",
             selectedTab: "details",
-            sideSnapshotController: mockSideSnapshotController,
+            sidePanelController: mockSidePanelController,
             navigation: mockNavigation
         });
 
@@ -328,7 +328,7 @@ describe("navigateToSnapshot", () => {
             openSnapshotMode: "full_screen",
             snapshotId: undefined,
             path: "products",
-            sideSnapshotController: mockSideSnapshotController,
+            sidePanelController: mockSidePanelController,
             navigation: mockNavigation
         });
 
@@ -341,7 +341,7 @@ describe("navigateToSnapshot", () => {
             snapshotId: "abc",
             path: "products",
             copy: true,
-            sideSnapshotController: mockSideSnapshotController,
+            sidePanelController: mockSidePanelController,
             navigation: mockNavigation
         });
 
@@ -353,7 +353,7 @@ describe("navigateToSnapshot", () => {
             openSnapshotMode: "full_screen",
             snapshotId: "abc",
             path: "products",
-            sideSnapshotController: mockSideSnapshotController,
+            sidePanelController: mockSidePanelController,
             navigation: mockNavigation,
             replace: true
         });

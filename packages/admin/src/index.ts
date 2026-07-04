@@ -9,26 +9,26 @@ export * from "./routes";
 
 // Components — explicitly listed to avoid conflicts with ./types re-exports
 export {
-    SnapshotView,
-    SnapshotSelectionTable,
+    RecordViewBinding,
+    SelectionTableBinding,
     SelectableTable,
     SelectableTableContext,
-    SnapshotCollectionView,
-    SnapshotCollectionViewActions,
-    SnapshotCollectionCardView,
-    SnapshotCard,
+    CollectionViewBinding,
+    CollectionViewActions,
+    CollectionCardViewBinding,
+    RecordCardBinding,
     useSelectionController,
     PropertyConfigBadge,
     PropertyIdCopyTooltip,
-    SnapshotCollectionTable,
-    SnapshotCollectionRowActions,
+    CollectionTableBinding,
+    CollectionRowActions,
     VirtualTableInput,
     ArrayContainer,
     type ArrayEntryParams,
     ReferenceWidget,
     SearchIconsView,
     FieldCaption,
-    SnapshotPreview,
+    RecordPreviewBinding,
     getFieldConfig,
     getFieldId,
     getDefaultFieldConfig,
@@ -38,7 +38,7 @@ export {
     copySnapshotAction,
     deleteSnapshotAction,
     resetPasswordAction,
-    SideSnapshotProvider,
+    SidePanelProvider,
     Scaffold,
     AppBar,
     Drawer,
@@ -57,8 +57,8 @@ export {
     CollectionPanel
 } from "./components";
 export type {
-    SnapshotViewProps,
-    SnapshotSelectionProps,
+    RecordViewBindingProps,
+    SelectionProps,
     SelectableTableProps,
     CollectionPanelProps
 } from "./components";

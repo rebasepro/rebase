@@ -6,7 +6,7 @@
  */
 
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
-import { FilterValues, DataRepository, SnapshotCollection, SnapshotReference } from "@rebasepro/types";
+import { FilterValues, DataRepository, CollectionConfig, SnapshotReference } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
 import { logger } from "@rebasepro/server-core";
 
@@ -199,7 +199,7 @@ export class MongoDataService implements DataRepository {
             startAfter?: any;
             searchString?: string;
             databaseId?: string;
-            collection?: SnapshotCollection;
+            collection?: CollectionConfig;
             rawQuery?: Filter<Document>;
         } = {}
     ): Promise<Record<string, unknown>[]> {
@@ -248,7 +248,7 @@ export class MongoDataService implements DataRepository {
             order?: "desc" | "asc";
             limit?: number;
             databaseId?: string;
-            collection?: SnapshotCollection;
+            collection?: CollectionConfig;
             rawQuery?: Filter<Document>;
         } = {}
     ): Promise<Record<string, unknown>[]> {

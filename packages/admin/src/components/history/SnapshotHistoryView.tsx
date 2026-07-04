@@ -7,7 +7,7 @@ import { SnapshotHistoryEntry } from "./SnapshotHistoryEntry";
 import { useSnackbarController, useAuthController } from "@rebasepro/core";
 import { ConfirmationDialog } from "@rebasepro/core";
 import { useState } from "react";
-import { useSnapshotHistory } from "../../index";
+import { useHistory } from "../../index";
 
 /**
  * Snapshot history tab view. Shows a paginated list of snapshot revisions
@@ -32,7 +32,7 @@ export function SnapshotHistoryView<M extends Record<string, unknown>>({
         hasMore,
         loadMore,
         revert
-    } = useSnapshotHistory({
+    } = useHistory({
         slug,
         snapshotId,
         enabled: !!snapshotId,

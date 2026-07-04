@@ -63,17 +63,31 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
 
         async update(id: string | number, data: Partial<M>) {
-            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
-                method: "PUT",
-                body: JSON.stringify(data)
-            });
-            return raw as M;
+            try {
+                const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
+                    method: "PUT",
+                    body: JSON.stringify(data)
+                });
+                return raw as M;
+            } catch (err) {
+                if (err instanceof RebaseApiError && err.status === 404) {
+                    return undefined;
+                }
+                throw err;
+            }
         },
 
         async delete(id: string | number) {
-            return transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
-                method: "DELETE"
-            });
+            try {
+                return await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
+                    method: "DELETE"
+                });
+            } catch (err) {
+                if (err instanceof RebaseApiError && err.status === 404) {
+                    return undefined;
+                }
+                throw err;
+            }
         },
 
         async count(params?: FindParams): Promise<number> {
@@ -134,46 +148,51 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // WS client already delivers flat rows — just cast
                     const rows = incomingRows as M[];
 
-                    // Immediately fire update with heuristic metadata
-                    const estimatedTotal = rows.length;
-                    const estimatedHasMore = rows.length >= requestedLimit;
-                    onUpdate({
-                        data: rows,
-                        meta: {
-                            total: estimatedTotal,
-                            limit: requestedLimit,
-                            offset,
-                            hasMore: estimatedHasMore,
-                            estimated: true
-                        }
-                    });
+                    // Heuristic metadata (used as fallback if count call fails)
+                    const heuristicTotal = rows.length;
+                    const heuristicHasMore = rows.length >= requestedLimit;
 
-                    // Asynchronously fetch the actual count from the server to get accurate total/hasMore
+                    // Try to get authoritative count; fall back to heuristic
                     if (client.count) {
                         client.count(params)
                             .then((total) => {
                                 if (active && currentUpdateId === lastUpdateId) {
-                                    const authoritativeHasMore = offset + rows.length < total;
-
-                                    // Dedupe: skip if the estimate was already correct
-                                    if (total === estimatedTotal && authoritativeHasMore === estimatedHasMore) {
-                                        return;
-                                    }
-
                                     onUpdate({
                                         data: rows,
                                         meta: {
                                             total,
                                             limit: requestedLimit,
                                             offset,
-                                            hasMore: authoritativeHasMore
+                                            hasMore: offset + rows.length < total
                                         }
                                     });
                                 }
                             })
                             .catch(() => {
-                                // Count failed — estimated meta stands; not a subscription error
+                                // Count failed — use heuristic meta
+                                if (active && currentUpdateId === lastUpdateId) {
+                                    onUpdate({
+                                        data: rows,
+                                        meta: {
+                                            total: heuristicTotal,
+                                            limit: requestedLimit,
+                                            offset,
+                                            hasMore: heuristicHasMore
+                                        }
+                                    });
+                                }
                             });
+                    } else {
+                        // No count method — fire immediately with heuristic meta
+                        onUpdate({
+                            data: rows,
+                            meta: {
+                                total: heuristicTotal,
+                                limit: requestedLimit,
+                                offset,
+                                hasMore: heuristicHasMore
+                            }
+                        });
                     }
                 },
                 onError

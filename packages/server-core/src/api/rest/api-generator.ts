@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { AuthAdapter, DataDriver, SnapshotCollection, getCollectionDataPath } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
@@ -13,14 +13,14 @@ import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
  * Supports `include` query parameter for eager-loading relations via Drizzle.
  */
 export class RestApiGenerator {
-    private collections: SnapshotCollection[];
+    private collections: CollectionConfig[];
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
 
     private authAdapter?: AuthAdapter;
 
     constructor(
-        collections: SnapshotCollection[],
+        collections: CollectionConfig[],
         driver: DataDriver,
         authAdapter?: AuthAdapter
     ) {
@@ -84,7 +84,7 @@ export class RestApiGenerator {
     /**
      * Create REST routes for a collection using existing Rebase patterns
      */
-    private createCollectionRoutes(collection: SnapshotCollection): void {
+    private createCollectionRoutes(collection: CollectionConfig): void {
         const basePath = `/${collection.slug}`;
         const resolvedCollection = collection;
 
@@ -555,7 +555,7 @@ id };
     /**
      * Fetch raw collection data without Snapshot wrapper (fallback for non-Postgres)
      */
-    private async fetchRawCollection(driver: DataDriver, collection: SnapshotCollection, queryOptions: QueryOptions, searchString?: string) {
+    private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string) {
         const snapshots = await driver.fetchCollection({
             path: getCollectionDataPath(collection),
             collection,
@@ -574,7 +574,7 @@ id };
     /**
      * Count raw snapshots for a collection
      */
-    private async countRawSnapshots(driver: DataDriver, collection: SnapshotCollection, queryOptions: QueryOptions, searchString?: string): Promise<number> {
+    private async countRawSnapshots(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string): Promise<number> {
         return driver.count ? await driver.count({
             path: getCollectionDataPath(collection),
             collection,
@@ -586,7 +586,7 @@ id };
     /**
      * Fetch single snapshot raw data without Snapshot wrapper (fallback)
      */
-    private async fetchRawSnapshot(driver: DataDriver, collection: SnapshotCollection, id: string) {
+    private async fetchRawSnapshot(driver: DataDriver, collection: CollectionConfig, id: string) {
         const snapshot = await driver.fetchOne({
             path: getCollectionDataPath(collection),
             id,

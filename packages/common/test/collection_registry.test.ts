@@ -1,9 +1,9 @@
-import { SnapshotCollection, RelationProperty, MapProperty } from "@rebasepro/types";
+import { CollectionConfig, RelationProperty, MapProperty } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 
 describe("CollectionRegistry Dual-Layer Store", () => {
     it("preserves un-mutated definitions when resolving relations", () => {
-        const postsCollection: SnapshotCollection = {
+        const postsCollection: CollectionConfig = {
             id: "posts",
             name: "Posts",
             path: "posts", // `get()` resolves against table or slug!
@@ -13,7 +13,7 @@ describe("CollectionRegistry Dual-Layer Store", () => {
             }
         };
 
-        const rawAuthorsCollection: SnapshotCollection = {
+        const rawAuthorsCollection: CollectionConfig = {
             id: "authors",
             name: "Authors",
             path: "authors",

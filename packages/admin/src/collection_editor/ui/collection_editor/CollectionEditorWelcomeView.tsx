@@ -2,7 +2,7 @@ import { AIIcon } from "@rebasepro/core";
 ;
 import React, { useState } from "react";
 ;
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import {
     Button,
     Card,
@@ -43,7 +43,7 @@ export function CollectionEditorWelcomeView({
     onImportFromTable
 }: {
     path: string;
-    parentCollection?: SnapshotCollection;
+    parentCollection?: CollectionConfig;
     onContinue: (importData?: object[], propertiesOrder?: string[]) => void;
     existingCollectionPaths?: string[];
     generateCollection?: CollectionGenerationCallback;
@@ -61,7 +61,7 @@ export function CollectionEditorWelcomeView({
         setFieldValue,
         setValues,
         submitCount
-    } = useFormex<SnapshotCollection>();
+    } = useFormex<CollectionConfig>();
 
     const [jsonImportOpen, setJsonImportOpen] = useState(false);
     const [importingTable, setImportingTable] = useState<string | null>(null);

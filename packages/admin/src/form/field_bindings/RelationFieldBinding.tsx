@@ -1,10 +1,10 @@
-import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
+import { useSelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
 import { Snapshot, getCollectionDataPath, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { SnapshotPreviewContainer } from "../../components/SnapshotPreview";
+import { SnapshotPreviewContainer } from "../../components/RecordPreviewBinding";
 import { ErrorView, IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, normalizeToSnapshotRelation, resolveRelationProperty } from "@rebasepro/common";
@@ -120,7 +120,7 @@ function SingleRelationFieldBinding({
         setValue(e ? getRelationFrom(e) : null);
     }, [setValue]);
 
-    const referenceDialogController = useSnapshotSelectionDialog({
+    const referenceDialogController = useSelectionDialog({
         multiselect: false,
         path: getCollectionDataPath(collection),
         collection,

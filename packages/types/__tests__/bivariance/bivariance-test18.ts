@@ -8,11 +8,11 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
     dependencies?: Extract<keyof M, string> | (string & {})[];
 }
 
-export interface PostgresCollection<M extends Record<string, unknown>> {
+export interface PostgresCollectionConfig<M extends Record<string, unknown>> {
     additionalFields?: AdditionalFieldDelegate<M>[];
 }
 
-declare let specificColl: PostgresCollection<{ id: string, name: string }>;
-declare let genericRecordColl: PostgresCollection<Record<string, unknown>>;
+declare let specificColl: PostgresCollectionConfig<{ id: string, name: string }>;
+declare let genericRecordColl: PostgresCollectionConfig<Record<string, unknown>>;
 
 genericRecordColl = specificColl; // Should succeed

@@ -10,7 +10,7 @@ import {
     DataDriver,
     DeleteProps,
     Snapshot,
-    SnapshotCollection,
+    CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
     ListenCollectionProps,
@@ -78,7 +78,7 @@ export class MongoDriver implements DataDriver {
      * Used by AuthenticatedMongoDriver to apply callbacks after RLS filtering.
      */
     resolveCollectionCallbacks<M extends Record<string, unknown>>(
-        collection: SnapshotCollection<M> | undefined,
+        collection: CollectionConfig<M> | undefined,
         path: string
     ) {
         if (!collection && !path) return { collection: undefined,
@@ -88,8 +88,8 @@ propertyCallbacks: undefined };
         const registryCollection = this.registry?.getCollectionByPath(path);
         const resolvedCollection = registryCollection
             ? ({ ...collection,
-...registryCollection } as SnapshotCollection<M>)
-            : (collection as SnapshotCollection<M>);
+...registryCollection } as CollectionConfig<M>)
+            : (collection as CollectionConfig<M>);
 
         const callbacks = resolvedCollection?.callbacks;
         const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -126,7 +126,7 @@ propertyCallbacks: undefined };
             orderBy,
             order,
             searchString,
-            collection: collection as SnapshotCollection
+            collection: collection as CollectionConfig
         });
 
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
@@ -143,7 +143,7 @@ propertyCallbacks: undefined };
                 let fetched = row;
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -151,7 +151,7 @@ propertyCallbacks: undefined };
                 }
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -159,7 +159,7 @@ propertyCallbacks: undefined };
                 }
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -245,7 +245,7 @@ propertyCallbacks: undefined };
             let processedRow: Record<string, unknown> = row;
             if (globalCallbacks?.afterRead) {
                 processedRow = await globalCallbacks.afterRead({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     row: processedRow,
                     context: contextForCallback
@@ -253,7 +253,7 @@ propertyCallbacks: undefined };
             }
             if (callbacks?.afterRead) {
                 processedRow = await callbacks.afterRead({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     row: processedRow,
                     context: contextForCallback
@@ -261,7 +261,7 @@ propertyCallbacks: undefined };
             }
             if (propertyCallbacks?.afterRead) {
                 processedRow = await propertyCallbacks.afterRead({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     row: processedRow,
                     context: contextForCallback
@@ -346,7 +346,7 @@ propertyCallbacks: undefined };
         if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
             if (globalCallbacks?.beforeSave) {
                 const result = await globalCallbacks.beforeSave({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     id,
                     values: updatedValues,
@@ -359,7 +359,7 @@ propertyCallbacks: undefined };
 
             if (callbacks?.beforeSave) {
                 const result = await callbacks.beforeSave({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     id,
                     values: updatedValues,
@@ -372,7 +372,7 @@ propertyCallbacks: undefined };
 
             if (propertyCallbacks?.beforeSave) {
                 const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     id,
                     values: updatedValues,
@@ -405,7 +405,7 @@ propertyCallbacks: undefined };
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
                 if (globalCallbacks?.afterRead) {
                     savedRow = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -413,7 +413,7 @@ propertyCallbacks: undefined };
                 }
                 if (callbacks?.afterRead) {
                     savedRow = await callbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -421,7 +421,7 @@ propertyCallbacks: undefined };
                 }
                 if (propertyCallbacks?.afterRead) {
                     savedRow = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -435,7 +435,7 @@ propertyCallbacks: undefined };
             if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
                 if (globalCallbacks?.afterSave) {
                     await globalCallbacks.afterSave({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: savedId,
                         values: savedValues,
@@ -446,7 +446,7 @@ propertyCallbacks: undefined };
                 }
                 if (callbacks?.afterSave) {
                     await callbacks.afterSave({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: savedId,
                         values: savedValues as Partial<M>,
@@ -457,7 +457,7 @@ propertyCallbacks: undefined };
                 }
                 if (propertyCallbacks?.afterSave) {
                     await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: savedId,
                         values: savedValues,
@@ -494,7 +494,7 @@ propertyCallbacks: undefined };
             if (callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: id || "unknown",
                         values: updatedValues,
@@ -505,7 +505,7 @@ propertyCallbacks: undefined };
                 }
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: id || "unknown",
                         values: updatedValues,
@@ -542,7 +542,7 @@ propertyCallbacks: undefined };
             let preventDefault = false;
             if (globalCallbacks?.beforeDelete) {
                 const result = await globalCallbacks.beforeDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: row.path,
                     id: row.id,
                     row: callbackRow,
@@ -554,7 +554,7 @@ propertyCallbacks: undefined };
             }
             if (callbacks?.beforeDelete) {
                 const result = await callbacks.beforeDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: row.path,
                     id: row.id,
                     row: callbackRow,
@@ -566,7 +566,7 @@ propertyCallbacks: undefined };
             }
             if (propertyCallbacks?.beforeDelete) {
                 const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: row.path,
                     id: row.id,
                     row: callbackRow,
@@ -586,7 +586,7 @@ propertyCallbacks: undefined };
         if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
             if (globalCallbacks?.afterDelete) {
                 await globalCallbacks.afterDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: row.path,
                     id: row.id,
                     row: callbackRow,
@@ -595,7 +595,7 @@ propertyCallbacks: undefined };
             }
             if (callbacks?.afterDelete) {
                 await callbacks.afterDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: row.path,
                     id: row.id,
                     row: callbackRow,
@@ -604,7 +604,7 @@ propertyCallbacks: undefined };
             }
             if (propertyCallbacks?.afterDelete) {
                 await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: row.path,
                     id: row.id,
                     row: callbackRow,
@@ -638,7 +638,7 @@ propertyCallbacks: undefined };
         name: string,
         value: any,
         id?: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     ): Promise<boolean> {
         return this.dataService.checkUniqueField(path, name, value, id);
     }
@@ -646,7 +646,7 @@ propertyCallbacks: undefined };
     /**
      * Generate a new row ID
      */
-    generateId(path: string, collection?: SnapshotCollection): string {
+    generateId(path: string, collection?: CollectionConfig): string {
         return this.dataService.generateId();
     }
 
@@ -750,7 +750,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
                 let fetched = row;
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path: props.path,
                         row: fetched,
                         context: contextForCallback
@@ -758,7 +758,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
                 }
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path: props.path,
                         row: fetched,
                         context: contextForCallback
@@ -766,7 +766,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
                 }
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path: props.path,
                         row: fetched,
                         context: contextForCallback
@@ -796,7 +796,7 @@ roles: this.user.roles ?? [] };
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const row = await this.delegate.fetchOne(props);
         if (row) {
-            const authorized = checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(row, props.path), "select", { onUnknown: "deny" });
+            const authorized = checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(row, props.path), "select", { onUnknown: "deny" });
             if (!authorized) {
                 return undefined;
             }
@@ -824,14 +824,14 @@ roles: this.user.roles ?? [] };
             const existing = await this.delegate.fetchOne({ path: props.path,
 id: props.id,
 collection: resolvedCollection });
-            if (!existing || !checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(existing, props.path), "update", { onUnknown: "deny" })) {
+            if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(existing, props.path), "update", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
             const tempSnapshot = { id: props.id || "new",
 path: props.path,
 values: props.values } as Snapshot;
-            if (!checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, tempSnapshot, "insert", { onUnknown: "deny" })) {
+            if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, tempSnapshot, "insert", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         }
@@ -842,7 +842,7 @@ values: props.values } as Snapshot;
         });
 
         // After save / withCheck rules verification
-        if (!checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(saved, props.path), props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
+        if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(saved, props.path), props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -855,7 +855,7 @@ values: props.values } as Snapshot;
         const existing = await this.delegate.fetchOne({ path: props.row.path,
 id: props.row.id,
 collection: resolvedCollection });
-        if (!existing || !checkOperation(resolvedCollection as SnapshotCollection, { user: this.user }, rowToSnapshotForCheck(existing, props.row.path), "delete", { onUnknown: "deny" })) {
+        if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(existing, props.row.path), "delete", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -867,12 +867,12 @@ collection: resolvedCollection });
         name: string,
         value: any,
         id?: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     ): Promise<boolean> {
         return this.delegate.checkUniqueField(path, name, value, id, collection);
     }
 
-    generateId(path: string, collection?: SnapshotCollection): string {
+    generateId(path: string, collection?: CollectionConfig): string {
         return this.delegate.generateId(path, collection);
     }
 
@@ -1041,7 +1041,7 @@ function getMongoFilterForRule(rule: SecurityRule, user: User): Filter<Document>
 }
 
 function buildMongoFilterFromSecurityRules<M extends Record<string, any>>(
-    collection: SnapshotCollection<M> | undefined,
+    collection: CollectionConfig<M> | undefined,
     user: User,
     targetOperation: "select" | "insert" | "update" | "delete"
 ): Filter<Document> | null {

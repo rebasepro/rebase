@@ -521,12 +521,12 @@ is_nullable: "NO" }),
     });
 
     describe("import generation", () => {
-        it("always imports PostgresCollection", () => {
+        it("always imports PostgresCollectionConfig", () => {
             const meta = makeSimpleTable("t", [mkCol("t", "id", { data_type: "uuid",
 udt_name: "uuid",
 is_nullable: "NO" })]);
             const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-            expect(result).toContain('import { PostgresCollection } from "@rebasepro/types"');
+            expect(result).toContain('import { PostgresCollectionConfig } from "@rebasepro/types"');
         });
 
         it("does not duplicate imports for multiple relations to same table", () => {

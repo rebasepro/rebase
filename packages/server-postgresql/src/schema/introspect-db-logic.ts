@@ -527,7 +527,7 @@ export function generateCollectionFile(
     const singular = singularize(collectionName);
     const icon = getIconForTable(tableName);
 
-    const imports = new Set<string>(['import { PostgresCollection } from "@rebasepro/types";']);
+    const imports = new Set<string>(['import { PostgresCollectionConfig } from "@rebasepro/types";']);
 
     let propsOutput = "";
     let relationsOutput = "";
@@ -819,7 +819,7 @@ export function generateCollectionFile(
     const collectionVarName = toCollectionVarName(tableName);
     const fileContent = `${Array.from(imports).join("\n")}
 
-const ${collectionVarName}: PostgresCollection = {
+const ${collectionVarName}: PostgresCollectionConfig = {
     name: "${collectionName}",
     singularName: "${singular}",
     slug: "${tableName}",

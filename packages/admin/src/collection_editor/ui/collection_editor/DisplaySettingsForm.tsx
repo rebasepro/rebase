@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { SnapshotCollection, Property } from "@rebasepro/types";
+import { CollectionConfig, Property } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -39,7 +39,7 @@ export function DisplaySettingsForm({
         setFieldValue,
         handleChange,
         submitCount
-    } = useFormex<SnapshotCollection>();
+    } = useFormex<CollectionConfig>();
 
     const [orderPropertyDialogOpen, setOrderPropertyDialogOpen] = useState(false);
 

@@ -95,17 +95,17 @@ await initializeRebaseBackend({
 - **REST API** routes at `/api/data/*` — auto-generated CRUD for each collection
 - **Auth** routes at `/api/auth/*` — signup, login, refresh, Google OAuth
 - **Storage** routes at `/api/storage/*` — file upload/download
-- **WebSocket** server — real-time entity sync via Postgres LISTEN/NOTIFY
-- **History** — audit trail recording on every entity change
+- **WebSocket** server — real-time snapshot sync via Postgres LISTEN/NOTIFY
+- **History** — audit trail recording on every snapshot change
 
 ## Collections (`config/collections/`)
 
 Collections are the **single source of truth** for your data model. They are defined as TypeScript and consumed by both the frontend (for UI generation) and the backend (for schema generation and API routing).
 
 ```typescript title="config/collections/products.ts"
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: EntityCollection = {
+export const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     table: "products",

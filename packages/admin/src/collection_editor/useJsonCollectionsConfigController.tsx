@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EngineProperties, SnapshotCollection, NavigationGroupMapping, Property } from "@rebasepro/types";
+import type { EngineProperties, CollectionConfig, NavigationGroupMapping, Property } from "@rebasepro/types";
 import type {
     CollectionsConfigController,
     SaveCollectionParams,
@@ -10,8 +10,8 @@ import type {
     UpdatePropertiesOrderParams,
     UpdateKanbanColumnsOrderParams,
 } from "./types/config_controller";
-import type { JsonCollectionStore, SerializableCollection } from "./serializable_types";
-import { toSerializableCollection, toSerializableProperty, fromSerializableCollection } from "./serializable_utils";
+import type { JsonCollectionStore, SerializableCollectionConfig } from "./serializable_types";
+import { toSerializableCollectionConfig, toSerializableProperty, fromSerializableCollectionConfig } from "./serializable_utils";
 
 export interface UseJsonCollectionsConfigControllerOptions {
     /**
@@ -55,7 +55,7 @@ export function useJsonCollectionsConfigController({
     readOnly = false,
     autoLoad = true,
 }: UseJsonCollectionsConfigControllerOptions): CollectionsConfigController {
-    const [collections, setCollections] = useState<SnapshotCollection[]>([]);
+    const [collections, setCollections] = useState<CollectionConfig[]>([]);
     const [loading, setLoading] = useState(autoLoad);
     const [navigationEntries, setNavigationEntries] = useState<NavigationGroupMapping[]>([]);
 
@@ -75,7 +75,7 @@ export function useJsonCollectionsConfigController({
                     storeRef.current.loadNavigationEntries?.() ?? Promise.resolve([]),
                 ]);
                 if (cancelled) return;
-                setCollections(serialized.map(fromSerializableCollection));
+                setCollections(serialized.map(fromSerializableCollectionConfig));
                 setNavigationEntries(navEntries);
             } catch (e) {
                 console.error("useJsonCollectionsConfigController: failed to load collections", e);
@@ -92,15 +92,15 @@ export function useJsonCollectionsConfigController({
     /**
      * Update local state and persist a collection to the store.
      */
-    const persistCollection = useCallback(async (collection: SnapshotCollection) => {
-        const serializable = toSerializableCollection(collection);
+    const persistCollection = useCallback(async (collection: CollectionConfig) => {
+        const serializable = toSerializableCollectionConfig(collection);
         await storeRef.current.save(collection.slug, serializable);
     }, []);
 
     /**
      * Find collection by id (slug).
      */
-    const getCollection = useCallback((id: string): SnapshotCollection => {
+    const getCollection = useCallback((id: string): CollectionConfig => {
         const found = collections.find(c => c.slug === id);
         if (found) return found;
         throw new Error(`Collection "${id}" not found`);
@@ -111,7 +111,7 @@ export function useJsonCollectionsConfigController({
     const saveCollection = useCallback(async <M extends Record<string, unknown>>(
         { id, collectionData }: SaveCollectionParams<M>
     ) => {
-        const collection = collectionData as SnapshotCollection;
+        const collection = collectionData as CollectionConfig;
         await persistCollection(collection);
         setCollections(prev => {
             const idx = prev.findIndex(c => c.slug === id);
@@ -132,7 +132,7 @@ export function useJsonCollectionsConfigController({
             const idx = prev.findIndex(c => c.slug === lookupId);
             if (idx < 0) return prev;
 
-            const merged = { ...prev[idx], ...collectionData } as SnapshotCollection;
+            const merged = { ...prev[idx], ...collectionData } as CollectionConfig;
             const next = [...prev];
             next[idx] = merged;
 
@@ -177,7 +177,7 @@ export function useJsonCollectionsConfigController({
             }
 
             const next = [...prev];
-            next[idx] = collection as SnapshotCollection;
+            next[idx] = collection as CollectionConfig;
 
             persistCollection(next[idx]).catch(e =>
                 console.error("useJsonCollectionsConfigController: failed to save property", e)
@@ -204,7 +204,7 @@ export function useJsonCollectionsConfigController({
             }
 
             const next = [...prev];
-            next[idx] = collection as SnapshotCollection;
+            next[idx] = collection as CollectionConfig;
 
             persistCollection(next[idx]).catch(e =>
                 console.error("useJsonCollectionsConfigController: failed to delete property", e)
@@ -221,7 +221,7 @@ export function useJsonCollectionsConfigController({
         const updated = {
             ...collection,
             propertiesOrder: newPropertiesOrder,
-        } as SnapshotCollection;
+        } as CollectionConfig;
 
         setCollections(prev => {
             const idx = prev.findIndex(c => c.slug === collection.slug);

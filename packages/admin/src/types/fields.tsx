@@ -1,7 +1,7 @@
 import { InferPropertyType } from "@rebasepro/types";
 import { Snapshot } from "@rebasepro/types";
 import { FormexController } from "./components/formex";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { Property } from "@rebasepro/types";
 
 export type DefaultFieldConfig =
@@ -190,7 +190,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     /**
      * Collection of the snapshot being modified
      */
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
 
     /**
      * Snapshot id, it can be undefined if it's a new snapshot

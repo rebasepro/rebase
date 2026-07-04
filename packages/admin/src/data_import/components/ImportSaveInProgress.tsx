@@ -1,11 +1,11 @@
 import { useData } from "@rebasepro/core";
-import { Snapshot, SnapshotCollection } from "@rebasepro/types";
+import { Snapshot, CollectionConfig } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";
 import { useEffect, useRef, useState } from "react";
 import { ImportConfig } from "../types";
 
-export function ImportSaveInProgress<C extends SnapshotCollection<any>>
+export function ImportSaveInProgress<C extends CollectionConfig<any>>
     ({
         path,
         importConfig,
@@ -95,7 +95,7 @@ export function ImportSaveInProgress<C extends SnapshotCollection<any>>
 }
 
 function saveDataBatch(dataClient: RebaseData,
-    collection: SnapshotCollection,
+    collection: CollectionConfig,
     path: string,
     data: Partial<Snapshot<any>>[],
     offset = 0,

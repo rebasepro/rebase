@@ -12,7 +12,7 @@ pnpm add @rebasepro/admin
 
 ## What This Package Does
 
-`@rebasepro/admin` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, entity editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/core` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
+`@rebasepro/admin` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, snapshot editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/core` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
 
 ## Key Exports
 
@@ -34,31 +34,31 @@ pnpm add @rebasepro/admin
 | `AdminModeSyncer` | Syncs admin/content mode state |
 | `CollectionPanel` | Standalone collection browser panel |
 
-### Entity & Collection Views
+### Snapshot & Collection Views
 
 | Export | Description |
 |---|---|
-| `EntityView` | Full entity detail/edit view |
-| `EntityCollectionView` | Primary collection list view (table + toolbar) |
-| `EntityCollectionTable` | Virtualized spreadsheet table for a collection |
-| `EntityCollectionCardView` | Card/grid layout for a collection |
-| `EntityCard` | Individual entity card |
-| `EntityCollectionViewActions` | Toolbar actions (filters, search, create) |
-| `EntityCollectionRowActions` | Per-row action buttons |
-| `EntitySelectionTable` | Table for multi-entity selection dialogs |
+| `SnapshotCustomView` | Full snapshot detail/edit view |
+| `DataCollectionView` | Primary collection list view (table + toolbar) |
+| `DataCollectionTable` | Virtualized spreadsheet table for a collection |
+| `SnapshotCollectionCardView` | Card/grid layout for a collection |
+| `SnapshotCard` | Individual snapshot card |
+| `DataCollectionViewActions` | Toolbar actions (filters, search, create) |
+| `SnapshotCollectionRowActions` | Per-row action buttons |
+| `SnapshotSelectionTable` | Table for multi-snapshot selection dialogs |
 | `SelectableTable` | Generic selectable table component |
-| `EntityPreview` | Compact entity preview widget |
+| `SnapshotPreview` | Compact snapshot preview widget |
 | `VirtualTableInput` | Inline-edit input rendered inside the virtual table |
 | `ArrayContainer` | Renders array/repeated property fields |
 | `ReferenceWidget` | Reference (foreign key) picker widget |
 
-### Entity Actions
+### Snapshot Actions
 
 | Export | Description |
 |---|---|
-| `editEntityAction` | Built-in action to open an entity for editing |
-| `copyEntityAction` | Built-in action to duplicate an entity |
-| `deleteEntityAction` | Built-in action to delete an entity |
+| `editSnapshotAction` | Built-in action to open a snapshot for editing |
+| `copySnapshotAction` | Built-in action to duplicate a snapshot |
+| `deleteSnapshotAction` | Built-in action to delete a snapshot |
 | `resetPasswordAction` | Action to reset a user's password |
 
 ### Hooks
@@ -66,10 +66,10 @@ pnpm add @rebasepro/admin
 | Export | Description |
 |---|---|
 | `useApp` | Access the app-level context (navigation, mode, config) |
-| `useSideEntityController` | Open/close entity side panels programmatically |
-| `useEntitySelectionDialog` | Launch a multi-entity selection dialog |
+| `useSidePanelController` | Open/close snapshot side panels programmatically |
+| `useSelectionDialog` | Launch a multi-snapshot selection dialog |
 | `useSelectionController` | Row selection state for tables |
-| `useEntityHistory` | Entity change history and version revert |
+| `useHistory` | Snapshot change history and version revert |
 | `useBreadcrumbsController` | Breadcrumb navigation state |
 | `useCMSContext` | Access the CMS-level context |
 | `useResolvedNavigationFrom` | Resolve navigation tree from collection configs |
@@ -108,9 +108,9 @@ import { RichTextEditor } from "@rebasepro/admin/editor";
 | `getIconForWidget` / `getIconForProperty` | Get the display icon for a property or widget |
 | `getPropertyInPath` / `getResolvedPropertyInPath` | Navigate nested property paths |
 | `getPropertiesWithPropertiesOrder` | Apply display ordering to properties |
-| `getEntityPreviewKeys` / `getEntityTitlePropertyKey` | Determine preview/title fields |
+| `getSnapshotPreviewKeys` / `getSnapshotTitlePropertyKey` | Determine preview/title fields |
 | `isReferenceProperty` / `isRelationProperty` | Property type guards |
-| `mergeEntityActions` / `resolveEntityAction` / `resolveEntityView` | Action & view resolution |
+| `mergeSnapshotActions` / `resolveSnapshotAction` / `resolveSnapshotView` | Action & view resolution |
 | Path helpers | `addInitialSlash`, `removeInitialSlash`, `removeTrailingSlash`, etc. |
 
 ## Quick Start

@@ -101,9 +101,9 @@ await initializeRebaseBackend({
 Collections sind die **einzige Quelle der Wahrheit** für Ihr Datenmodell. Sie werden als TypeScript definiert und sowohl vom Frontend (für die UI-Generierung) als auch vom Backend (für die Schema-Generierung und das API-Routing) konsumiert.
 
 ```typescript title="config/collections/products.ts"
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: EntityCollection = {
+export const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     table: "products",

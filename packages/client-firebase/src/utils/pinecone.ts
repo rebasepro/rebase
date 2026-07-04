@@ -1,6 +1,6 @@
 import { User as FirebaseUser } from "@firebase/auth";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
 const DEFAULT_SERVER = "https://api.rebase.pro";
 
@@ -60,7 +60,7 @@ export function buildPineconeSearchController({
 
         const init = (props: {
             path: string,
-            collection?: SnapshotCollection
+            collection?: CollectionConfig
         }) => {
             // do nothing
             return Promise.resolve(isPathSupported(props.path));

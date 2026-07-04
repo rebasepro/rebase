@@ -1,5 +1,5 @@
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { Button, CopyIcon, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import React from "react";
 import JSON5 from "json5";
@@ -12,12 +12,12 @@ export function GetCodeDialog({
     collection,
     onOpenChange,
     open
-}: { onOpenChange: (open: boolean) => void, collection: SnapshotCollection, open: boolean }) {
+}: { onOpenChange: (open: boolean) => void, collection: CollectionConfig, open: boolean }) {
 
     const snackbarController = useSafeSnackbarController();
 
     const code = collection
-        ? "import { SnapshotCollection } from \"@rebasepro/core\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:SnapshotCollection = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
+        ? "import { CollectionConfig } from \"@rebasepro/core\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:CollectionConfig = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
         : "No collection selected";
     return <Dialog open={open}
         onOpenChange={onOpenChange}
@@ -78,7 +78,7 @@ export function GetCodeDialog({
     </Dialog>;
 }
 
-function collectionToCode(collection: SnapshotCollection): object {
+function collectionToCode(collection: CollectionConfig): object {
 
     const propertyCleanup = (value: unknown): unknown => {
         if (value === undefined || value === null) {

@@ -9,7 +9,7 @@ description: Définissez des politiques de sécurité au niveau des lignes (Row 
 Les règles de sécurité vous permettent de définir des politiques de **sécurité au niveau des lignes (RLS)** pour vos tables PostgreSQL directement dans vos définitions de collection. Lorsque le schéma Drizzle est généré, Rebase crée les instructions `CREATE POLICY` correspondantes.
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     table: "posts",
     properties: { /* ... */ },
@@ -202,7 +202,7 @@ Un besoin courant est de permettre aux **utilisateurs non authentifiés** de sou
 ### Recommandé : `access: "public"` avec `withCheck`
 
 ```typescript
-const contactMessagesCollection: EntityCollection = {
+const contactMessagesCollection: CollectionConfig = {
     slug: "contact_messages",
     securityRules: [
         // Tout le monde peut soumettre un message de contact
@@ -223,7 +223,7 @@ Le raccourci `access: "public"` génère une politique qui autorise l'opération
 ### Pour la Capture de Leads / Inscriptions
 
 ```typescript
-const leadSignupsCollection: EntityCollection = {
+const leadSignupsCollection: CollectionConfig = {
     slug: "lead_magnet_signups",
     securityRules: [
         // Autoriser les insertions anonymes

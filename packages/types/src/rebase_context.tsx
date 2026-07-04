@@ -81,9 +81,9 @@ export type RebaseContext<USER extends User = User, AuthControllerType extends A
     sideDialogsController?: import("./controllers/side_dialogs_controller").SideDialogsController;
 
     /**
-     * Controller to open the side dialog displaying snapshot forms
+     * Controller to open the side panel displaying snapshot forms
      */
-    sideSnapshotController?: import("./controllers/side_snapshot_controller").SideSnapshotController;
+    sidePanelController?: import("./controllers/side_panel_controller").SidePanelController;
 
     /**
      * Controller resolving URLs in the CMS

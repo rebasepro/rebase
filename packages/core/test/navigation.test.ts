@@ -3,10 +3,10 @@
 
 import { expect, it } from "@jest/globals";
 import { siteConfig } from "./test_site_config";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { buildCollection, buildProperty, getCollectionBySlugWithin, resolveCollectionPathIds, getNavigationEntriesFromPath } from "@rebasepro/common";
 
-const collections = siteConfig.collections as SnapshotCollection[];
+const collections = siteConfig.collections as CollectionConfig[];
 
 describe("Resolving paths test", () => {
     it("collection view matches ok", () => {

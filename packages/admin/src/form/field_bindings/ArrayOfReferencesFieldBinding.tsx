@@ -1,5 +1,5 @@
-import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
-import type { SnapshotCollection } from "@rebasepro/types";
+import { useSelectionDialog } from "../../hooks/useSelectionDialog";
+import type { CollectionConfig } from "@rebasepro/types";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
@@ -56,7 +56,7 @@ export function ArrayOfReferencesFieldBinding({
     });
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: SnapshotCollection | undefined = useMemo(() => {
+    const collection: CollectionConfig | undefined = useMemo(() => {
         return ofProperty.path ? collectionRegistryController.getCollection(ofProperty.path) : undefined;
     }, [ofProperty.path]);
 
@@ -69,7 +69,7 @@ export function ArrayOfReferencesFieldBinding({
         setValue(refs);
     }, [setValue]);
 
-    const referenceDialogController = useSnapshotSelectionDialog({
+    const referenceDialogController = useSelectionDialog({
         multiselect: true,
         path: ofProperty.path,
         collection,

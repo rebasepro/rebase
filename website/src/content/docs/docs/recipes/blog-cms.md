@@ -16,9 +16,9 @@ Build a blog backend with:
 ### Authors
 
 ```typescript
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const authorsCollection: EntityCollection = {
+export const authorsCollection: CollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",
@@ -57,7 +57,7 @@ export const authorsCollection: EntityCollection = {
 ### Categories
 
 ```typescript
-export const categoriesCollection: EntityCollection = {
+export const categoriesCollection: CollectionConfig = {
     slug: "categories",
     name: "Categories",
     singularName: "Category",
@@ -91,7 +91,7 @@ export const categoriesCollection: EntityCollection = {
 ### Articles
 
 ```typescript
-export const articlesCollection: EntityCollection = {
+export const articlesCollection: CollectionConfig = {
     slug: "articles",
     name: "Articles",
     singularName: "Article",
@@ -211,7 +211,7 @@ You now have a fully functional blog CMS with:
 - Draft → Review → Published workflow
 - Auto-generated URL slugs
 - RLS policies limiting authors to their own posts
-- Full audit trail via entity history
+- Full audit trail via snapshot history
 
 ## Querying from the SDK
 
@@ -230,7 +230,7 @@ for (const article of articles) {
     console.log(article.values.title);
     console.log(article.values.author?.name);    // Hydrated relation
     console.log(article.values.author_id);       // Scalar FK
-    console.log(article.values.categories);      // Array of related entities
+    console.log(article.values.categories);      // Array of related snapshots
 }
 ```
 

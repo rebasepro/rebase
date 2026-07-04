@@ -1,10 +1,10 @@
 import type { AuthController } from "../controllers/auth";
 import type { RebaseData } from "../controllers/data";
 import type { User } from "../users";
-import type { SnapshotCollection } from "./collections";
+import type { CollectionConfig } from "./collections";
 import type { AppView } from "../controllers/navigation";
 
-export type SnapshotCollectionsBuilder<EC extends SnapshotCollection = SnapshotCollection> = (params: {
+export type CollectionConfigsBuilder<EC extends CollectionConfig = CollectionConfig> = (params: {
     user: User | null,
     authController: AuthController,
     data: RebaseData

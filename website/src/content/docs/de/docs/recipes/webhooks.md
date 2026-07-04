@@ -11,7 +11,7 @@ Verwenden Sie die Callbacks `afterSave` und `afterDelete`, um externe Dienste zu
 ## Slack-Benachrichtigung bei neuer Bestellung
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

@@ -1,5 +1,5 @@
-import { useSnapshotSelectionDialog } from "../hooks/useSnapshotSelectionDialog";
-import type { SnapshotCollection } from "@rebasepro/types";
+import { useSelectionDialog } from "../hooks/useSelectionDialog";
+import type { CollectionConfig } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 
 import { Snapshot, SnapshotReference, FilterValues } from "@rebasepro/types";
@@ -55,7 +55,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
 
     const collectionRegistryController = useCollectionRegistryController();
 
-    const collection: SnapshotCollection | undefined = useMemo(() => {
+    const collection: CollectionConfig | undefined = useMemo(() => {
         return collectionRegistryController.getCollection(path);
     }, [path, collectionRegistryController.getCollection]);
 
@@ -83,7 +83,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
         }
     }, [disabled, onReferenceSelected]);
 
-    const referenceDialogController = useSnapshotSelectionDialog({
+    const referenceDialogController = useSelectionDialog({
         multiselect,
         path,
         collection,

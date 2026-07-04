@@ -8,7 +8,7 @@
 
 import {
     Snapshot,
-    SnapshotCollection,
+    CollectionConfig,
     FilterValues,
     WhereFilterOp,
     DatabaseConnection,

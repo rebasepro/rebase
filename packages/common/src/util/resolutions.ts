@@ -1,7 +1,7 @@
 import {
     ArrayProperty,
     AuthController,
-    SnapshotCollection,
+    CollectionConfig,
     EnumValueConfig,
     EnumValues,
     NumberProperty,
@@ -341,7 +341,7 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 }
 
 
-export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: SnapshotCollection<M>): SnapshotCollection<Record<string, unknown>>[] {
+export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: CollectionConfig<M>): CollectionConfig<Record<string, unknown>>[] {
     if (collection.childCollections) {
         return collection.childCollections() ?? [];
     }
@@ -371,7 +371,7 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
                 }
             }
 
-            const baseOverrides: Partial<SnapshotCollection> = { slug: relationKey };
+            const baseOverrides: Partial<CollectionConfig> = { slug: relationKey };
             if (customName) {
                 baseOverrides.name = customName;
                 baseOverrides.singularName = customName;
@@ -379,8 +379,8 @@ export function getSubcollections<M extends Record<string, unknown> = Record<str
 
             const targetWithOverrides = { ...target,
 ...baseOverrides };
-            return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as SnapshotCollection<Record<string, unknown>>;
-        }).filter((c: SnapshotCollection<Record<string, unknown>> | undefined): c is SnapshotCollection<Record<string, unknown>> => Boolean(c));
+            return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as CollectionConfig<Record<string, unknown>>;
+        }).filter((c: CollectionConfig<Record<string, unknown>> | undefined): c is CollectionConfig<Record<string, unknown>> => Boolean(c));
     }
 
     return [];

@@ -11,7 +11,7 @@ Les colonnes supplémentaires vous permettent d'afficher des données calculées
 ## Définir des colonnes supplémentaires
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     additionalFields: [
         {
@@ -51,7 +51,7 @@ const ordersCollection: EntityCollection = {
 
 ## Prochaines étapes
 
-- **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
+- **[Actions d'entité](/docs/frontend/snapshot-actions)** — Boutons d'action personnalisés
 - **[Champs personnalisés](/docs/frontend/custom-fields)** — Champs de formulaire personnalisés
 
 ---

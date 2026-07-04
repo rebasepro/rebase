@@ -145,4 +145,26 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
     it("collection() still works without a dictionary", () => {
         expect(() => client.data.collection("anything")).not.toThrow();
     });
+
+    it("emits a one-shot console.warn on first untyped access", () => {
+        const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            // Create a fresh client so the warning flag is reset
+            const freshClient = createRebaseClient({
+                baseUrl: "http://localhost:3000",
+            });
+            (freshClient.data as Record<string, unknown>)["firstAccess"];
+            expect(warnSpy).toHaveBeenCalledTimes(1);
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining("[Rebase] Untyped data access detected")
+            );
+
+            // Second access should NOT warn again
+            warnSpy.mockClear();
+            (freshClient.data as Record<string, unknown>)["secondAccess"];
+            expect(warnSpy).not.toHaveBeenCalled();
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
 });

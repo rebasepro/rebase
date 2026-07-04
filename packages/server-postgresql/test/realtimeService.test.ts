@@ -1,7 +1,7 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
 const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 1,
 path: "posts",
@@ -26,7 +26,7 @@ class MockWebSocket {
     constructor() {}
 }
 
-const mockPostsCollection: SnapshotCollection = {
+const mockPostsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

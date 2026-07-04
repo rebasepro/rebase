@@ -11,7 +11,7 @@ Rebase collections are the core building blocks of your data model. They define 
 
 ### Collections
 
-A collection is defined as a TypeScript object implementing the `PostgresCollection` interface from `@rebasepro/types`. Each collection maps to a database table (via the `table` property) and generates:
+A collection is defined as a TypeScript object implementing the `PostgresCollectionConfig` interface from `@rebasepro/types`. Each collection maps to a database table (via the `table` property) and generates:
 - Full CRUD REST endpoints at `/api/data/{slug}`
 - Optional GraphQL queries and mutations
 - Admin panel views (table, forms, cards, kanban, list)
@@ -44,7 +44,7 @@ Properties define the fields of your collection. Rebase supports these built-in 
 | Junction tables | Yes (many-to-many) | No |
 | Multi-hop joins | Yes (`joinPath`) | No |
 | Inverse lookups | Yes (`direction: "inverse"`) | No |
-| Where to use | **PostgresCollection** | FirebaseCollection or legacy |
+| Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig or legacy |
 | Stored value | FK column(s) managed by framework | `{ id, path }` object or string |
 
 **Use `relation` for all new Postgres collections.** The `reference` type exists for backward compatibility with Firestore-style collections.
@@ -58,9 +58,9 @@ Collections are defined as standalone TypeScript files under `config/collections
 ## Defining a Collection
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const productsCollection: PostgresCollection = {
+const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -181,7 +181,7 @@ export default productsCollection;
 | `callbacks` | `CollectionCallbacks<M, USER>` | — | Lifecycle hooks (see Collection Callbacks section) |
 | `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
 | `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
-| `childCollections` | `() => SnapshotCollection[]` | — | Nested child collections (populated automatically) |
+| `childCollections` | `() => CollectionConfig[]` | — | Nested child collections (populated automatically) |
 | `overrides` | `SnapshotOverrides` | — | Override data source or storage source |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
@@ -710,10 +710,10 @@ Relations are defined **directly on the property** using `type: "relation"`. The
 ### Many-to-One (Owning)
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 import authorsCollection from "./authors";
 
-const postsCollection: PostgresCollection = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -762,7 +762,7 @@ comments: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `target` | `string \| (() => SnapshotCollection \| string)` | — | Target collection (use a function for lazy resolution to avoid circular imports) |
+| `target` | `string \| (() => CollectionConfig \| string)` | — | Target collection (use a function for lazy resolution to avoid circular imports) |
 | `cardinality` | `"one" \| "many"` | `"one"` | Whether this references one or many records |
 | `direction` | `"owning" \| "inverse"` | `"owning"` | Which side owns the FK or junction table |
 | `localKey` | `string` | auto-inferred | Column on THIS table storing the FK (e.g. `"author_id"`) |
@@ -773,7 +773,7 @@ comments: {
 | `inverseRelationName` | `string` | — | Name of the corresponding relation on the target collection |
 | `onDelete` | `OnAction` | — | Cascade rule on delete |
 | `onUpdate` | `OnAction` | — | Cascade rule on update |
-| `overrides` | `Partial<SnapshotCollection>` | — | Override target collection config when rendered as subcollection tab |
+| `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
 | `fixedFilter` | `FilterValues` | — | Filter applied when selecting related snapshots |
 | `includeId` | `boolean` | `true` | Show snapshot ID in the reference preview |
 | `includeSnapshotLink` | `boolean` | `true` | Show link to open the related snapshot |
@@ -878,7 +878,7 @@ customer: {
 | `USER` | `User` | User type — extends the base `User` type with custom fields |
 
 ```typescript
-import { PostgresCollection, CollectionCallbacks } from "@rebasepro/types";
+import { PostgresCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 
 interface Product {
     name: string;
@@ -925,11 +925,11 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 > **IMPORTANT FOR AGENTS:** `rebase.data` calls (used in cron jobs, afterSave side-effects, custom functions) go through the full middleware pipeline with the service key, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
 >
 > ```typescript
-> afterRead: async ({ snapshot, context }) => {
+> afterRead: async ({ row, context }) => {
 >     // Server-side reads (cron jobs, admin) see real values
->     if (context.user?.roles?.includes("admin")) return snapshot;
+>     if (context.user?.roles?.includes("admin")) return row;
 >     // End-user reads get masked values
->     return { ...snapshot, values: { ...snapshot.values, email: "***@***.***" } };
+>     return { ...row, email: "***@***.***" };
 > }
 > ```
 
@@ -938,7 +938,7 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 ### Callback Example
 
 ```typescript
-const jobSubmissionsCollection: PostgresCollection = {
+const jobSubmissionsCollection: PostgresCollectionConfig = {
     name: "Job Submissions",
     slug: "job_submissions",
     table: "job_submissions",
@@ -955,38 +955,35 @@ const jobSubmissionsCollection: PostgresCollection = {
         },
 
         // Runs AFTER saving — trigger side effects, sync other collections
-        afterSave: async ({ values, snapshotId, previousValues, context }) => {
+        afterSave: async ({ values, id, previousValues, context }) => {
             if (values.status === "approved" && previousValues?.status !== "approved") {
                 await context.data.jobs.create({
                     title: values.title,
                     description: values.description,
                     company_id: values.company_id,
                     status: "published",
-                    source_submission_id: snapshotId,
+                    source_submission_id: id,
                 });
             }
         },
 
         // Runs BEFORE deleting — block or validate
-        beforeDelete: async ({ snapshot }) => {
-            if (snapshot.values.status === "published") {
+        beforeDelete: async ({ row }) => {
+            if (row.status === "published") {
                 throw new Error("Cannot delete published submissions");
             }
         },
 
         // Runs AFTER deleting — cleanup related data
-        afterDelete: async ({ snapshotId, context }) => {
-            console.log(`Submission ${snapshotId} deleted`);
+        afterDelete: async ({ id, context }) => {
+            console.log(`Submission ${id} deleted`);
         },
 
         // Runs AFTER reading — transform for display
-        afterRead: async ({ snapshot }) => {
+        afterRead: async ({ row }) => {
             return {
-                ...snapshot,
-                values: {
-                    ...snapshot.values,
-                    displayName: `${snapshot.values.title} (${snapshot.values.company_name})`
-                }
+                ...row,
+                displayName: `${row.title} (${row.company_name})`
             };
         }
     },
@@ -1001,7 +998,7 @@ const jobSubmissionsCollection: PostgresCollection = {
 | `beforeSave` | Before write to DB (after validation) | Modified `values` (`Partial<SnapshotValues<M>>`) | Yes (throw to block) |
 | `afterSave` | After successful write | `void` | No |
 | `afterSaveError` | After a failed write | `void` | No |
-| `afterRead` | After reading from DB | Modified `snapshot` (`Snapshot<M>`) | No |
+| `afterRead` | After reading from DB | Modified row (`Record<string, unknown>`) | No |
 | `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw to block) |
 | `afterDelete` | After successful deletion | `void` | No |
 
@@ -1012,10 +1009,10 @@ const jobSubmissionsCollection: PostgresCollection = {
 | Prop | Type | Description |
 |------|------|-------------|
 | `values` | `Partial<SnapshotValues<M>>` | Snapshot values being saved |
-| `snapshotId` | `string \| number` (optional in `beforeSave`) | Snapshot ID (`undefined` for new snapshots in `beforeSave`) |
+| `id` | `string \| number` (optional in `beforeSave`) | Snapshot ID (`undefined` for new snapshots in `beforeSave`) |
 | `previousValues` | `Partial<SnapshotValues<M>> \| undefined` | Previous values (for updates) |
 | `status` | `SnapshotStatus` | `"new"`, `"existing"`, or `"copy"` |
-| `collection` | `SnapshotCollection<M>` | The collection definition |
+| `collection` | `CollectionConfig<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context with `client`, `data`, `storageSource`, `user` |
 
@@ -1023,8 +1020,8 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `snapshot` | `Snapshot<M>` | The fetched snapshot |
-| `collection` | `SnapshotCollection<M>` | The collection definition |
+| `row` | `Record<string, unknown>` | The fetched row (flat — `{ id, ...columns }`) |
+| `collection` | `CollectionConfig<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context |
 
@@ -1032,9 +1029,9 @@ const jobSubmissionsCollection: PostgresCollection = {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `snapshot` | `Snapshot<M>` | The snapshot being deleted |
-| `snapshotId` | `string \| number` | Snapshot ID |
-| `collection` | `SnapshotCollection<M>` | The collection definition |
+| `row` | `Record<string, unknown>` | The row being deleted (flat — `{ id, ...columns }`) |
+| `id` | `string \| number` | Snapshot ID |
+| `collection` | `CollectionConfig<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context |
 
@@ -1077,7 +1074,7 @@ title: {
 Add an `snapshotActions` array to any collection definition:
 
 ```typescript
-const jobSubmissionsCollection: PostgresCollection = {
+const jobSubmissionsCollection: PostgresCollectionConfig = {
     name: "Job Submissions",
     slug: "job_submissions",
     table: "job_submissions",
@@ -1134,9 +1131,9 @@ The `onClick` and `isEnabled` handlers receive:
 | `snapshot` | `Snapshot<M> \| undefined` | The current snapshot |
 | `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
 | `path` | `string \| undefined` | Collection path |
-| `collection` | `SnapshotCollection<M> \| undefined` | Collection definition |
+| `collection` | `CollectionConfig<M> \| undefined` | Collection definition |
 | `formContext` | `FormContext \| undefined` | Form state (when called from a form) |
-| `sideSnapshotController` | `SideSnapshotController \| undefined` | Side panel control |
+| `sideSnapshotController` | `SidePanelController \| undefined` | Side panel control |
 | `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
 | `openSnapshotMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the snapshot form is opened |
@@ -1167,7 +1164,7 @@ const snapshotViews = [
 <RebaseCMS collections={collections} snapshotViews={snapshotViews}/>
 
 // Per-collection reference in collection definition
-const postsCollection: PostgresCollection = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -1216,9 +1213,9 @@ You can override built-in UI components for a specific collection by adding a `c
 Only collection-scoped components can be overridden here. App-level components (such as `Shell.AppBar` or `HomePage`) must be overridden globally at the `<Rebase>` root.
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const productsCollection: PostgresCollection = {
+const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     slug: "products",
     table: "products",
@@ -1264,9 +1261,9 @@ You can mark a collection as an authentication collection by setting the `auth` 
 This is the collection used for user credentials, password hashing, and user management. Rebase auto-injects required auth actions (like resetting passwords) and routes them through this config.
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const customUsersCollection: PostgresCollection = {
+const customUsersCollection: PostgresCollectionConfig = {
     name: "Members",
     slug: "members",
     table: "members",
@@ -1330,7 +1327,7 @@ location: {
 Collections support **Row Level Security** via the `securityRules` array. This generates PostgreSQL RLS policies:
 
 ```typescript
-const postsCollection: PostgresCollection = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",

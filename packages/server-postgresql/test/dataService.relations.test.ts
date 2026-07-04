@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -47,7 +47,7 @@ describe("DataService - Relation Types Tests", () => {
     };
 
     // Collection definitions for testing different relation types
-    const customersCollection: SnapshotCollection = {
+    const customersCollection: CollectionConfig = {
         slug: "customers",
         name: "Customers",
         table: "customers",
@@ -79,7 +79,7 @@ relationName: "profile" }
         idField: "id"
     };
 
-    const ordersCollection: SnapshotCollection = {
+    const ordersCollection: CollectionConfig = {
         slug: "orders",
         name: "Orders",
         table: "orders",
@@ -114,7 +114,7 @@ relationName: "products" }
         idField: "id"
     };
 
-    const productsCollection: SnapshotCollection = {
+    const productsCollection: CollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -126,7 +126,7 @@ relationName: "products" }
         idField: "id"
     };
 
-    const userProfilesCollection: SnapshotCollection = {
+    const userProfilesCollection: CollectionConfig = {
         slug: "user_profiles",
         name: "User Profiles",
         table: "user_profiles",
@@ -549,7 +549,7 @@ __type: "relation" }
         // This is the Post -> Author relationship
 
         describe("ONE + owning + joinPath", () => {
-            const postsWithAuthorViaJoinPath: SnapshotCollection = {
+            const postsWithAuthorViaJoinPath: CollectionConfig = {
                 slug: "posts_jp",
                 name: "Posts with JoinPath",
                 table: "posts",
@@ -674,7 +674,7 @@ name: "John Doe" }]);
         });
 
         describe("ONE + inverse + joinPath", () => {
-            const authorsWithProfileViaJoinPath: SnapshotCollection = {
+            const authorsWithProfileViaJoinPath: CollectionConfig = {
                 slug: "authors_jp",
                 name: "Authors with Profile via JoinPath",
                 table: "authors",
@@ -757,7 +757,7 @@ total: 500 }]);
         });
 
         describe("MANY + owning + joinPath", () => {
-            const postsWithTagsViaJoinPath: SnapshotCollection = {
+            const postsWithTagsViaJoinPath: CollectionConfig = {
                 slug: "posts_tags_jp",
                 name: "Posts with Tags via JoinPath",
                 table: "posts",
@@ -859,7 +859,7 @@ name: "Big Customer" }]);
         });
 
         describe("MANY + inverse + through", () => {
-            const productsWithOrdersInverse: SnapshotCollection = {
+            const productsWithOrdersInverse: CollectionConfig = {
                 slug: "products_orders",
                 name: "Products with Orders Inverse",
                 table: "products",
@@ -930,7 +930,7 @@ name: "Popular Product" }]);
         });
 
         describe("MANY + inverse + joinPath", () => {
-            const tagsWithPostsViaJoinPath: SnapshotCollection = {
+            const tagsWithPostsViaJoinPath: CollectionConfig = {
                 slug: "tags_posts_jp",
                 name: "Tags with Posts via JoinPath",
                 table: "tags",

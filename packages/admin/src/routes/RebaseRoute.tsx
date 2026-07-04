@@ -1,10 +1,10 @@
-import type { SnapshotCollection, ViewMode } from "@rebasepro/types";
+import type { CollectionConfig, ViewMode } from "@rebasepro/types";
 import { Blocker, useBlocker, useLocation } from "react-router-dom";
-import { SnapshotEditView } from "../components/SnapshotEditView";
-import { SnapshotDetailView } from "../components/SnapshotDetailView";
+import { EditViewBinding } from "../components/EditViewBinding";
+import { DetailViewBinding } from "../components/DetailViewBinding";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SnapshotCollectionView } from "../components";
+import { CollectionViewBinding } from "../components";
 import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride } from "@rebasepro/core";
 import { UnsavedChangesDialog } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
@@ -20,7 +20,7 @@ export function RebaseRoute() {
     const urlController = useUrlController();
     const breadcrumbs = useBreadcrumbsController();
     const userConfigPersistence = useUserConfigurationPersistence();
-    const ResolvedCollectionView = useComponentOverride("Collection.View", SnapshotCollectionView);
+    const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
 
     const hash = location.hash;
     const isSidePanel = hash.includes("#side");
@@ -82,7 +82,7 @@ export function RebaseRoute() {
     }
 
     if (navigationEntries.length === 1 && navigationEntries[0].type === "collection") {
-        let collection: SnapshotCollection<any> | undefined;
+        let collection: CollectionConfig<any> | undefined;
         collection = collectionRegistry.getCollection(navigationEntries[0].id);
         if (!collection)
             collection = collectionRegistry.getCollection(navigationEntries[0].slug);
@@ -104,7 +104,7 @@ export function RebaseRoute() {
     if (isSidePanel) {
         const lastCollectionEntry = [...navigationEntries].reverse().find((entry) => entry.type === "collection");
         if (lastCollectionEntry) {
-            let collection: SnapshotCollection<any> | undefined;
+            let collection: CollectionConfig<any> | undefined;
             const firstEntry = navigationEntries[0] as NavigationViewCollectionInternal<any>;
             collection = collectionRegistry.getCollection(firstEntry.id);
             if (!collection)
@@ -140,7 +140,7 @@ export function RebaseRoute() {
         lastSnapshotEntry?.type === "snapshot" &&
         (navigationEntries.length === 2 || navigationEntries.length === 3)
     ) {
-        let collection: SnapshotCollection<any> | undefined;
+        let collection: CollectionConfig<any> | undefined;
         collection = collectionRegistry.getCollection(firstCollectionEntry.id);
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
@@ -345,7 +345,7 @@ function SnapshotFullScreenRoute({
 
     if (isDetailMode) {
         return <>
-            <SnapshotDetailView
+            <DetailViewBinding
                 key={collection.slug + "_view_" + snapshotId}
                 snapshotId={snapshotId}
                 collection={collection}
@@ -372,7 +372,7 @@ function SnapshotFullScreenRoute({
     }
 
     return <>
-        <SnapshotEditView
+        <EditViewBinding
             key={collection.slug + "_" + (isNew ? "new" : (isCopy ? snapshotId + "_copy" : snapshotId))}
             snapshotId={isNew ? undefined : snapshotId}
             collection={collection}

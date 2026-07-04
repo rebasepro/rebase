@@ -1,8 +1,8 @@
-import type { AppView, SnapshotCollection, NavigationResult, RebasePlugin, NavigationStateController, UrlController, NavigationGroupMapping } from "@rebasepro/types";
+import type { AppView, CollectionConfig, NavigationResult, RebasePlugin, NavigationStateController, UrlController, NavigationGroupMapping } from "@rebasepro/types";
 import { useCallback, useMemo, useRef } from "react";
 
 import { AuthController, RebaseData, CollectionRegistryController, User } from "@rebasepro/types";
-import type { SnapshotCollectionsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/types";
+import type { CollectionConfigsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 
 
@@ -10,9 +10,9 @@ import { useResolvedCollections } from "./useResolvedCollections";
 import { useResolvedViews } from "./useResolvedViews";
 import { useTopLevelNavigation } from "./useTopLevelNavigation";
 
-export type BuildNavigationStateProps<EC extends SnapshotCollection, USER extends User> = {
+export type BuildNavigationStateProps<EC extends CollectionConfig, USER extends User> = {
     authController: AuthController<USER>;
-    collections?: EC[] | SnapshotCollectionsBuilder<EC>;
+    collections?: EC[] | CollectionConfigsBuilder<EC>;
     views?: AppView[] | AppViewsBuilder;
     adminViews?: AppView[] | AppViewsBuilder;
     data: RebaseData;
@@ -37,7 +37,7 @@ export type BuildNavigationStateProps<EC extends SnapshotCollection, USER extend
  *
  * The NavigationStateController type is preserved as a public API.
  */
-export function useBuildNavigationStateController<EC extends SnapshotCollection, USER extends User>(
+export function useBuildNavigationStateController<EC extends CollectionConfig, USER extends User>(
     props: BuildNavigationStateProps<EC, USER>
 ): NavigationStateController {
 

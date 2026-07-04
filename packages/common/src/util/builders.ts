@@ -2,16 +2,16 @@ import {
     ArrayProperty,
     BooleanProperty,
     DateProperty,
-    SnapshotCollection,
-    FirebaseCollection,
+    CollectionConfig,
+    FirebaseCollectionConfig,
     FirebaseProperties,
     GeopointProperty,
     InferSnapshotType,
     MapProperty,
-    MongoDBCollection,
+    MongoDBCollectionConfig,
     MongoProperties,
     NumberProperty,
-    PostgresCollection,
+    PostgresCollectionConfig,
     PostgresProperties,
     Property,
     ReferenceProperty,
@@ -33,8 +33,8 @@ export function buildCollection<
     M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User>
     (
-        collection: SnapshotCollection<M, USER>
-    ): SnapshotCollection<M, USER> {
+        collection: CollectionConfig<M, USER>
+    ): CollectionConfig<M, USER> {
     return collection;
 }
 
@@ -72,8 +72,8 @@ export function defineCollection<
     const P extends PostgresProperties,
     USER extends User = User
 >(
-    collection: Omit<PostgresCollection<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
-): PostgresCollection<InferSnapshotType<P>, USER> & { properties: P };
+    collection: Omit<PostgresCollectionConfig<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
+): PostgresCollectionConfig<InferSnapshotType<P>, USER> & { properties: P };
 
 /**
  * Define a Firestore-backed collection with full type inference.
@@ -83,8 +83,8 @@ export function defineCollection<
     const P extends FirebaseProperties,
     USER extends User = User
 >(
-    collection: Omit<FirebaseCollection<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
-): FirebaseCollection<InferSnapshotType<P>, USER> & { properties: P };
+    collection: Omit<FirebaseCollectionConfig<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
+): FirebaseCollectionConfig<InferSnapshotType<P>, USER> & { properties: P };
 
 /**
  * Define a MongoDB-backed collection with full type inference.
@@ -94,16 +94,16 @@ export function defineCollection<
     const P extends MongoProperties,
     USER extends User = User
 >(
-    collection: Omit<MongoDBCollection<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
-): MongoDBCollection<InferSnapshotType<P>, USER> & { properties: P };
+    collection: Omit<MongoDBCollectionConfig<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
+): MongoDBCollectionConfig<InferSnapshotType<P>, USER> & { properties: P };
 
 /**
  * Implementation — delegates to the correct overload at the type level.
  * At runtime this is a plain identity function.
  */
 export function defineCollection(
-    collection: SnapshotCollection
-): SnapshotCollection {
+    collection: CollectionConfig
+): CollectionConfig {
     return collection;
 }
 

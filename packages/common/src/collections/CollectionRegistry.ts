@@ -2,7 +2,7 @@ import {
     ArrayProperty,
     CollectionCallbacks,
     EngineProperties,
-    SnapshotCollection,
+    CollectionConfig,
     getDataSourceCapabilities,
     getDeclaredSubcollections,
     NumberProperty,
@@ -57,22 +57,22 @@ export class CollectionRegistry {
     }
 
     // Normalized runtime layer (used by Data Grid / UI)
-    private collectionsByTableName = new Map<string, SnapshotCollection>();
-    private collectionsBySlug = new Map<string, SnapshotCollection>();
-    private rootCollections: SnapshotCollection[] = [];
-    private cachedCollectionsList: SnapshotCollection[] | null = null;
+    private collectionsByTableName = new Map<string, CollectionConfig>();
+    private collectionsBySlug = new Map<string, CollectionConfig>();
+    private rootCollections: CollectionConfig[] = [];
+    private cachedCollectionsList: CollectionConfig[] | null = null;
 
     // Raw configuration layer (used by Collection Editor AST generator)
-    private rawCollectionsByTableName = new Map<string, SnapshotCollection>();
-    private rawCollectionsBySlug = new Map<string, SnapshotCollection>();
-    private rawRootCollections: SnapshotCollection[] = [];
-    private cachedRawCollectionsList: SnapshotCollection[] | null = null;
+    private rawCollectionsByTableName = new Map<string, CollectionConfig>();
+    private rawCollectionsBySlug = new Map<string, CollectionConfig>();
+    private rawRootCollections: CollectionConfig[] = [];
+    private cachedRawCollectionsList: CollectionConfig[] | null = null;
 
     // Snapshot of raw input for idempotency check — compared BEFORE normalization
     // to avoid the issue where normalization creates new objects that always fail equality.
     private lastRawInputSnapshot: ReturnType<typeof removeFunctions>[] | null = null;
 
-    constructor(collections?: SnapshotCollection[], dataSources?: DataSourceRegistry) {
+    constructor(collections?: CollectionConfig[], dataSources?: DataSourceRegistry) {
         if (dataSources) this.dataSources = dataSources;
         if (collections) {
             this.registerMultiple(collections);
@@ -110,7 +110,7 @@ export class CollectionRegistry {
      * snapshot. Only re-normalizes and re-registers when the raw input actually changed.
      * @param collections
      */
-    registerMultiple(collections: SnapshotCollection[]): boolean {
+    registerMultiple(collections: CollectionConfig[]): boolean {
         // Compare raw input BEFORE normalization to detect actual changes.
         // This avoids the old issue where normalization creates new objects
         // that always fail deep-equal even when the source data is identical.
@@ -169,7 +169,7 @@ export class CollectionRegistry {
         return true;
     }
 
-    register(collection: SnapshotCollection, rawCollection?: SnapshotCollection) {
+    register(collection: CollectionConfig, rawCollection?: CollectionConfig) {
         const raw = rawCollection ? deepClone(rawCollection) : deepClone(collection);
 
         this.rootCollections.push(collection);
@@ -178,7 +178,7 @@ export class CollectionRegistry {
         this._registerRecursively(collection, raw);
     }
 
-    private _registerRecursively(collection: SnapshotCollection, rawCollection: SnapshotCollection) {
+    private _registerRecursively(collection: CollectionConfig, rawCollection: CollectionConfig) {
         if (this.collectionsByTableName.has(getTableName(collection))) {
             return;
         }
@@ -207,11 +207,11 @@ export class CollectionRegistry {
         }
     }
 
-    public normalizeCollection(collection: SnapshotCollection): SnapshotCollection {
+    public normalizeCollection(collection: CollectionConfig): CollectionConfig {
         // Work on a shallow copy to avoid mutating the caller's reference.
         // This is critical for idempotency (the raw input must not be changed)
         // and for preventing mutation of module-level collection singletons.
-        const result = { ...collection } as SnapshotCollection;
+        const result = { ...collection } as CollectionConfig;
 
         // 0. Resolve and stamp `dataSource` and `engine` on the normalized copy.
         //    After this block every normalized collection has both fields set,
@@ -378,7 +378,7 @@ export class CollectionRegistry {
         return newProperty;
     }
 
-    get(path: string): SnapshotCollection | undefined {
+    get(path: string): CollectionConfig | undefined {
         // First try slug lookup
         const bySlug = this.collectionsBySlug.get(path);
         if (bySlug) return bySlug;
@@ -398,7 +398,7 @@ export class CollectionRegistry {
      * Gets the pristine, un-normalized collection exactly as it was provided.
      * Useful for the AST editor so it doesn't accidentally serialize injected metadata back to disk.
      */
-    getRaw(path: string): SnapshotCollection | undefined {
+    getRaw(path: string): CollectionConfig | undefined {
         const bySlug = this.rawCollectionsBySlug.get(path);
         if (bySlug) return bySlug;
 
@@ -416,7 +416,7 @@ export class CollectionRegistry {
      * Get collection by resolving multi-segment paths through relations
      * e.g., "authors/70/posts" resolves to the posts collection
      */
-    getCollectionByPath(collectionPath: string): SnapshotCollection | undefined {
+    getCollectionByPath(collectionPath: string): CollectionConfig | undefined {
         // Handle simple single collection path
         if (!collectionPath.includes("/")) {
             return this.get(collectionPath);
@@ -467,14 +467,14 @@ export class CollectionRegistry {
         return currentCollection;
     }
 
-    getCollections(): SnapshotCollection[] {
+    getCollections(): CollectionConfig[] {
         if (!this.cachedCollectionsList) {
             this.cachedCollectionsList = Array.from(this.collectionsByTableName.values());
         }
         return this.cachedCollectionsList;
     }
 
-    getRawCollections(): SnapshotCollection[] {
+    getRawCollections(): CollectionConfig[] {
         if (!this.cachedRawCollectionsList) {
             this.cachedRawCollectionsList = Array.from(this.rawCollectionsByTableName.values());
         }
@@ -486,9 +486,9 @@ export class CollectionRegistry {
      * information about the collections and snapshot IDs along the path
      */
     resolvePathToCollections(path: string): {
-        collections: SnapshotCollection[],
+        collections: CollectionConfig[],
         snapshotIds: (string | number)[],
-        finalCollection: SnapshotCollection
+        finalCollection: CollectionConfig
     } {
         const pathSegments = path.split("/").filter(p => p);
 
@@ -500,7 +500,7 @@ export class CollectionRegistry {
             throw new Error(`Invalid collection path: ${path}. It must have an odd number of segments.`);
         }
 
-        const collections: SnapshotCollection[] = [];
+        const collections: CollectionConfig[] = [];
         const snapshotIds: (string | number)[] = [];
 
         // Start with the first collection
@@ -519,12 +519,12 @@ export class CollectionRegistry {
 
             if (i + 1 < pathSegments.length) {
                 const subcollectionSlug = pathSegments[i + 1];
-                const subcollections: SnapshotCollection[] | undefined = getSubcollections(currentCollection);
+                const subcollections: CollectionConfig[] | undefined = getSubcollections(currentCollection);
                 if (!subcollections || subcollections.length === 0) {
                     throw new Error(`No subcollections found for ${currentCollection.slug} in path: ${path}`);
                 }
 
-                const subcollection: SnapshotCollection | undefined = subcollections.find(c => c.slug === subcollectionSlug);
+                const subcollection: CollectionConfig | undefined = subcollections.find(c => c.slug === subcollectionSlug);
                 if (!subcollection) {
                     throw new Error(`Subcollection '${subcollectionSlug}' not found in ${currentCollection.slug}`);
                 }

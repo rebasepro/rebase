@@ -9,7 +9,7 @@ description: Define Row Level Security policies for your collections using conve
 Security rules let you define **Row Level Security (RLS)** policies for your PostgreSQL tables directly in your collection definitions. When the Drizzle schema is generated, Rebase creates the corresponding `CREATE POLICY` statements.
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     table: "posts",
     properties: { /* ... */ },
@@ -202,7 +202,7 @@ A common need is allowing **unauthenticated users** to submit data — contact f
 ### Recommended: `access: "public"` with `withCheck`
 
 ```typescript
-const contactMessagesCollection: EntityCollection = {
+const contactMessagesCollection: CollectionConfig = {
     slug: "contact_messages",
     securityRules: [
         // Anyone can submit a contact message
@@ -223,7 +223,7 @@ The `access: "public"` shortcut generates a policy that allows the operation wit
 ### For Lead Capture / Signups
 
 ```typescript
-const leadSignupsCollection: EntityCollection = {
+const leadSignupsCollection: CollectionConfig = {
     slug: "lead_magnet_signups",
     securityRules: [
         // Allow anonymous inserts
@@ -272,5 +272,5 @@ Avoid the legacy pattern of checking `string_to_array(auth.roles(), ',')` for an
 ## Next Steps
 
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Snapshot Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints

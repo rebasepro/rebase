@@ -8,8 +8,149 @@ title: Changelog
 
 ### Breaking
 
+- **Entity → Snapshot vocabulary rename** — The `Entity` noun has been removed from the entire public API surface. Every type, hook, component, prop, config key, and wire-protocol message that previously used "entity" now uses "snapshot" (or, in backend callbacks, the flat database term "row"). This is a search-and-replace-level migration for consumers — no behavioral changes. The full rename map follows.
+
+  **Types (`@rebasepro/types`)**
+
+  | Old Name | New Name |
+  |----------|----------|
+  | `Entity<M>` | `Snapshot<M>` |
+  | `CollectionConfig<M>` | `CollectionConfig<M>` |
+  | `CollectionCallbacks<M>` | `CollectionCallbacks<M>` |
+  | `EntityValues<M>` | `SnapshotValues<M>` |
+  | `EntityStatus` | `SnapshotStatus` |
+  | `EntityReference` | `SnapshotReference` |
+  | `EntityView` | `SnapshotCustomView` |
+  | `EntityAction<M>` | `SnapshotAction<M>` |
+  | `EntityActionClickProps<M>` | `SnapshotActionClickProps<M>` |
+  | `EntityFormProps` | `SnapshotFormProps` |
+  | `EntitySidePanelProps` | `SnapshotSidePanelProps` |
+  | `SideEntityController` | `SideSnapshotController` |
+  | `EntitySelectionProps` | `SnapshotSelectionProps` |
+  | `EntityPreview` | `SnapshotPreview` |
+  | `DataCollectionView` | `DataCollectionView` |
+  | `EntityCard` | `SnapshotCard` |
+  | `EntitySelectionTable` | `SnapshotSelectionTable` |
+
+  **Collection config props**
+
+  | Old Prop | New Prop |
+  |----------|----------|
+  | `entityViews` | `snapshotViews` |
+  | `entityActions` | `snapshotActions` |
+  | `openEntityMode` | `openSnapshotMode` |
+  | `includeEntityLink` | `includeSnapshotLink` |
+  | `entityId` (in panel props) | `snapshotId` |
+
+  **React hooks & components (`@rebasepro/admin`)**
+
+  | Old Name | New Name |
+  |----------|----------|
+  | `useSideEntityController()` | `useSidePanel()` |
+  | `useEntitySelectionDialog()` | `useSelectionDialog()` |
+  | `SideEntityProvider` | `SideSnapshotProvider` |
+  | `mergeEntityActions()` | `mergeSnapshotActions()` |
+  | `resolveEntityAction()` | `resolveSnapshotAction()` |
+  | `resolveEntityView()` | `resolveSnapshotView()` |
+  | `editEntityAction` | `editSnapshotAction` |
+  | `copyEntityAction` | `copySnapshotAction` |
+  | `deleteEntityAction` | `deleteSnapshotAction` |
+
+  **Callback API (`CollectionCallbacks`)** — beyond the rename, the parameter shapes changed:
+
+  | Old Param | New Param | Notes |
+  |-----------|-----------|-------|
+  | `entity` (in `afterRead`) | `row` | Now a flat `Record<string, unknown>`, not a `Snapshot<M>` wrapper |
+  | `entityId` (in save/delete) | `id` | `string \| number` |
+  | `previousEntity` | `previousValues` | `Partial<SnapshotValues<M>>` |
+  | `afterCreate` / `afterUpdate` | `afterSave` | Use `status: "new" \| "existing"` to distinguish |
+
+  Migration example:
+  ```diff
+  -import type { CollectionCallbacks } from "@rebasepro/types";
+  -const callbacks: CollectionCallbacks = {
+  -    afterRead: ({ entity }) => {
+  -        return { ...entity, values: { ...entity.values, email: "***" } };
+  -    },
+  -    afterCreate: ({ entity }) => { /* ... */ },
+  -    beforeDelete: ({ entityId }) => { /* ... */ },
+  +import type { CollectionCallbacks } from "@rebasepro/types";
+  +const callbacks: CollectionCallbacks = {
+  +    afterRead: ({ row }) => {
+  +        return { ...row, email: "***" };
+  +    },
+  +    afterSave: ({ id, status }) => { if (status === "new") { /* ... */ } },
+  +    beforeDelete: ({ id }) => { /* ... */ },
+  };
+  ```
+
+  **WebSocket wire protocol**
+
+  | Old Message Type | New Message Type |
+  |-----------------|-----------------|
+  | `FETCH_ENTITY` | `FETCH_ONE` |
+  | `SAVE_ENTITY` | `SAVE` |
+  | `DELETE_ENTITY` | `DELETE` |
+  | `COUNT_ENTITIES` | `COUNT` |
+  | `subscribe_entity` | `subscribe_one` |
+  | `collection_entity_patch` | `collection_patch` |
+
+  **Database schema**
+
+  | Old Name | New Name |
+  |----------|----------|
+  | `rebase.entity_history` (table) | `rebase.snapshot_history` |
+  | `entity_id` (column) | `snapshot_id` |
+  | `rebase_entity_changes` (PG NOTIFY channel) | `rebase_snapshot_changes` |
+
 - **Unified `<Rebase>` data props** — Removed the `data` and `driver` props. There are now exactly two ways to provide data: `client` (server transport) and `dataSources` (everything else). A `dataSources` entry keyed `"(default)"` with a `driver` replaces `client.data` as the default source — this is how a fully client-side app (e.g. Firestore-only via `RebaseFirebaseApp`) is wired. Migration: `driver={x}` → `dataSources={[{ key: "(default)", engine: "firestore", driver: x }]}`; `data={x}` had no known users (custom backends implement `DataDriver`, now the documented integration SPI).
 - **Deterministic default-source resolution** — The default data source resolves as: `"(default)"`-keyed entry with driver → `client.data` → the sole registered source. Several sources without an explicit default now throw instead of silently picking the first object entry (order-dependent).
+
+- **Side-panel / Edit-view / Collection-view component rename** — Renames mechanically-generated "Snapshot" component names to descriptive, role-based names. Components bound to Rebase core data use the `Binding` suffix. This is a search-and-replace migration — no behavioral changes.
+
+  **Types (`@rebasepro/types`)**
+
+  | Old Name | New Name |
+  |----------|----------|
+  | `SnapshotSidePanelProps` | `SidePanelBindingProps` |
+  | `sideSnapshotController` (on `RebaseContext`) | `sidePanelController` |
+  | `sideSnapshotController` (on `SnapshotActionClickProps`) | `sidePanelController` |
+  | `"Snapshot.FormActions"` (override key) | `"EditView.FormActions"` |
+  | `"Snapshot.DetailView"` (override key) | `"DetailView"` |
+  | `"Snapshot.Preview"` (override key) | `"RecordPreview"` |
+
+  **Components (`@rebasepro/admin`)**
+
+  | Old Name | New Name |
+  |----------|----------|
+  | `SideSnapshotProvider` | `SidePanelProvider` |
+  | `SnapshotSidePanel` | `SidePanelBinding` |
+  | `SnapshotEditView` | `EditViewBinding` |
+  | `SnapshotEditViewFormActions` | `EditFormActions` |
+  | `SnapshotDetailView` | `DetailViewBinding` |
+  | `SnapshotView` | `RecordViewBinding` |
+  | `SnapshotPreview` | `RecordPreviewBinding` |
+  | `SnapshotJsonPreview` | `JsonPreviewBinding` |
+  | `DataCollectionView` | `CollectionViewBinding` |
+  | `SnapshotCollectionBoardView` | `CollectionBoardViewBinding` |
+  | `SnapshotCollectionCardView` | `CollectionCardViewBinding` |
+  | `SnapshotCollectionListView` | `CollectionListViewBinding` |
+  | `DataCollectionViewActions` | `CollectionViewActions` |
+  | `DataCollectionViewStartActions` | `CollectionViewStartActions` |
+  | `DataCollectionTable` | `CollectionTableBinding` |
+  | `SnapshotCollectionRowActions` | `CollectionRowActions` |
+  | `SnapshotSelectionTable` | `SelectionTableBinding` |
+  | `SnapshotBoardCard` | `BoardCardBinding` |
+  | `SnapshotCard` | `RecordCardBinding` |
+  | `useSnapshotPreviewSlots` | `usePreviewSlots` |
+  | `SideSnapshotControllerContext` | `SidePanelControllerContext` |
+
+  **Bridge key (`@rebasepro/core`)**
+
+  | Old Key | New Key |
+  |---------|---------|
+  | `"sideSnapshotController"` | `"sidePanelController"` |
+  | `sideSnapshotController` (on `StudioBridge`) | `sidePanelController` |
 
 ### Features & Improvements
 
@@ -25,7 +166,7 @@ title: Changelog
 
 ### Cleanup
 
-- **Removed** — Six unused FireCMS-legacy builder identity functions (`buildProperties`, `buildPropertiesOrBuilder`, `buildEnum`, `buildEnumValueConfig`, `buildEntityCallbacks`, `buildAdditionalFieldDelegate`). Migration: remove the wrapper call — they were identity functions, so the object literal is the same value.
+- **Removed** — Six unused FireCMS-legacy builder identity functions (`buildProperties`, `buildPropertiesOrBuilder`, `buildEnum`, `buildEnumValueConfig`, `buildCollectionCallbacks`, `buildAdditionalFieldDelegate`). Migration: remove the wrapper call — they were identity functions, so the object literal is the same value.
 - **Deprecated** — `buildCollection` / `buildProperty` in favor of `defineCollection`. Both are marked `@deprecated` and will be removed before 1.0.
 - **Removed** — Unused `<Rebase apiKey>` prop (it was never consumed by the component).
 - **Fixed** — Duplicated sentences in `propertiesOrder` JSDoc; rewrote `subcollection:` description to cover both Firestore and Postgres.

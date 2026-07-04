@@ -5,14 +5,14 @@ description: Real-time data synchronization, broadcast channels, and presence tr
 ---
 
 Rebase includes a built-in realtime engine that pushes data changes to connected clients over WebSocket.
-When any record is created, updated, or deleted, every subscriber watching that collection or entity receives the update instantly — no polling required.
+When any record is created, updated, or deleted, every subscriber watching that collection or snapshot receives the update instantly — no polling required.
 
 ## How It Works
 
 The realtime pipeline has three stages:
 
 1. **Database trigger** — A mutation hits the PostgreSQL database (via REST API, SDK, or Studio).
-2. **Server fan-out** — The Rebase server detects the change and fans it out to every active WebSocket subscription that matches the affected collection or entity.
+2. **Server fan-out** — The Rebase server detects the change and fans it out to every active WebSocket subscription that matches the affected collection or snapshot.
 3. **Client callback** — The client SDK fires your `onUpdate` callback with the fresh data.
 
 ```
@@ -22,7 +22,7 @@ The realtime pipeline has three stages:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to broadcast changes across server instances. This is handled automatically — a dedicated PostgreSQL connection listens on the `rebase_entity_changes` channel and relays updates to local subscribers.
+For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to broadcast changes across server instances. This is handled automatically — a dedicated PostgreSQL connection listens on the `rebase_snapshot_changes` channel and relays updates to local subscribers.
 
 ### Zero Configuration
 
@@ -33,7 +33,7 @@ Realtime is enabled out of the box. There is no flag to flip or service to start
 The Rebase client SDK exposes two subscription methods on every collection accessor:
 
 - **`listen()`** — Subscribe to an entire collection (with optional filters).
-- **`listenById()`** — Subscribe to a single entity by its ID.
+- **`listenById()`** — Subscribe to a single snapshot by its ID.
 
 Both methods return an **unsubscribe function** you call to stop receiving updates.
 
@@ -55,7 +55,7 @@ const unsubscribe = client.data.products.listen(
 ```
 
 The callback receives a `FindResponse<M>` containing:
-- `data` — Array of `Entity<M>` objects.
+- `data` — Array of `Snapshot<M>` objects.
 - `meta` — Pagination info (`total`, `limit`, `offset`, `hasMore`).
 
 ### Subscribing to a Collection with Filters
@@ -77,16 +77,16 @@ const unsubscribe = client.data.products.listen(
 
 The server respects these filters — only matching records are included in updates.
 
-### Subscribing to a Single Entity
+### Subscribing to a Single Snapshot
 
 Use `listenById()` to watch a specific record:
 
 ```typescript
 const unsubscribe = client.data.products.listenById(
   "product-123",
-  (entity) => {
-    if (entity) {
-      console.log("Product updated:", entity.values);
+  (snapshot) => {
+    if (snapshot) {
+      console.log("Product updated:", snapshot.values);
     } else {
       console.log("Product was deleted");
     }
@@ -97,7 +97,7 @@ const unsubscribe = client.data.products.listenById(
 );
 ```
 
-The callback receives `Entity<M> | undefined`. A value of `undefined` means the entity was deleted.
+The callback receives `Snapshot<M> | undefined`. A value of `undefined` means the snapshot was deleted.
 
 ### Unsubscribing
 
@@ -143,9 +143,9 @@ The `.listen()` method on the query builder is only available when the `RebaseCl
 
 Rebase uses a two-phase update strategy for collection subscriptions to combine extreme speed with absolute correctness:
 
-1. **Phase 1 — Instant entity patch:** When a single entity changes (created, updated, deleted), the server immediately pushes a lightweight `collection_entity_patch` message containing the modified entity values directly to subscribers. The client merges this into its cached collection data for near-instant cross-tab feedback — bypassing the database entirely for sub-millisecond perceived updates.
+1. **Phase 1 — Instant snapshot patch:** When a single snapshot changes (created, updated, deleted), the server immediately pushes a lightweight `collection_patch` message containing the modified snapshot values directly to subscribers. The client merges this into its cached collection data for near-instant cross-tab feedback — bypassing the database entirely for sub-millisecond perceived updates.
 
-2. **Phase 2 — Debounced RLS refetch:** After a short delay of **300ms** (`REFETCH_DEBOUNCE_MS`), the server performs an authoritative database refetch of the collection matching your original filters and sort order. This is critical because field mutations might alter the entity's visibility (e.g. if its status changed and no longer matches a `where` filter).
+2. **Phase 2 — Debounced RLS refetch:** After a short delay of **300ms** (`REFETCH_DEBOUNCE_MS`), the server performs an authoritative database refetch of the collection matching your original filters and sort order. This is critical because field mutations might alter the snapshot's visibility (e.g. if its status changed and no longer matches a `where` filter).
    
    To maintain strict security boundaries, this refetch query is executed inside a transaction setting the transaction-local variables `app.user_id` and `app.user_roles` mapped from the subscriber's `SubscriptionAuthContext`. This ensures PostgreSQL Row-Level Security (RLS) constraints are evaluated correctly under the client's auth session, and only the records the user is authorized to see are sent in the final `collection_update`.
 
@@ -271,7 +271,7 @@ Because connection poolers like **pgBouncer** do not support the persistent conn
 
 ### Notification Mechanics & Payload Layout
 
-When an entity is modified on Instance A, it broadcasts a notification on the `rebase_entity_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
+When a snapshot is modified on Instance A, it broadcasts a notification on the `rebase_snapshot_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
 
 ```json
 {
@@ -282,7 +282,7 @@ When an entity is modified on Instance A, it broadcasts a notification on the `r
 }
 ```
 
-*Note: `sid` represents the server's unique random instance ID generated at startup, `p` is the collection slug (path), and `eid` is the target entity ID.*
+*Note: `sid` represents the server's unique random instance ID generated at startup, `p` is the collection slug (path), and `eid` is the target snapshot ID.*
 
 - **Self-Filtering**: Upon receiving a message, each instance reads the `sid`. If it matches its own instance ID, the server discards the notification to prevent infinite routing loops.
 - **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch and relays the update to its locally connected WebSocket subscribers.
@@ -290,11 +290,11 @@ When an entity is modified on Instance A, it broadcasts a notification on the `r
 
 ## Pending Request Timeout
 
-To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ENTITY`, creating/updating `SAVE_ENTITY`, deletes `DELETE_ENTITY`, counts `COUNT_ENTITIES`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single snapshot fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
 
 If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
 
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_entity`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
 
 ## Next Steps
 

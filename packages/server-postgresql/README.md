@@ -10,7 +10,7 @@ pnpm add @rebasepro/server-postgresql
 
 ## What This Package Does
 
-Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for PostgreSQL. It provides connection pooling, a Drizzle-based data driver, Postgres LISTEN/NOTIFY realtime, auth table management, entity history, schema generation, branching, read replicas, and WebSocket support. Plug it into `@rebasepro/server-core` via `createPostgresAdapter()` or `createPostgresBootstrapper()`.
+Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for PostgreSQL. It provides connection pooling, a Drizzle-based data driver, Postgres LISTEN/NOTIFY realtime, auth table management, snapshot history, schema generation, branching, read replicas, and WebSocket support. Plug it into `@rebasepro/server-core` via `createPostgresAdapter()` or `createPostgresBootstrapper()`.
 
 ## Key Exports
 

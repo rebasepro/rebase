@@ -16,7 +16,7 @@ Every collection can be displayed in four view modes:
 ## Configuration
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     defaultViewMode: "table",            // Default view
     enabledViews: ["list", "table", "kanban"],    // Available views
@@ -32,7 +32,7 @@ const productsCollection: EntityCollection = {
 
 ![List View screenshot placeholder](/img/features/list-view.png)
 
-The list view is the classic, clean CMS default view mode, showing entities in a straightforward list format without the density of a spreadsheet.
+The list view is the classic, clean CMS default view mode, showing snapshots in a straightforward list format without the density of a spreadsheet.
 
 ## Table View
 
@@ -46,7 +46,7 @@ The default view is a high-performance virtualized spreadsheet with:
 - **Sorting** — Click column headers
 - **Text search** — Full-text search across string fields
 - **Filtering** — Per-column filters
-- **Multi-select** — Select entities for bulk actions
+- **Multi-select** — Select snapshots for bulk actions
 
 ### Row Height
 
@@ -67,7 +67,7 @@ Control row height with `defaultSize`:
 Configure a Kanban board by specifying which enum property to use as columns:
 
 ```typescript
-const tasksCollection: EntityCollection = {
+const tasksCollection: CollectionConfig = {
     slug: "tasks",
     defaultViewMode: "kanban",
     orderProperty: "sort_order",
@@ -97,10 +97,10 @@ Drag-and-drop between columns automatically updates the enum field and sort orde
 
 ![Cards View screenshot placeholder](/img/features/cards-view.png)
 
-Cards display entities as visual cards — useful for image-heavy content:
+Cards display snapshots as visual cards — useful for image-heavy content:
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     defaultViewMode: "cards",
     properties: {
@@ -116,5 +116,5 @@ const articlesCollection: EntityCollection = {
 
 ## Next Steps
 
-- **[Entity Views](/docs/frontend/entity-views)** — Custom tabs on entity forms
-- **[Entity Actions](/docs/frontend/entity-actions)** — Custom entity actions
+- **[Snapshot Views](/docs/frontend/snapshot-views)** — Custom tabs on snapshot forms
+- **[Snapshot Actions](/docs/frontend/snapshot-actions)** — Custom snapshot actions

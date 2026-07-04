@@ -11,7 +11,7 @@ Utilize os callbacks `afterSave` e `afterDelete` para notificar serviços extern
 ## Notificação do Slack em Novo Pedido
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

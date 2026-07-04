@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -15,7 +15,7 @@ dataType: "number" },
         _def: { tableName: "test_table" }
     };
 
-    const testCollection: SnapshotCollection = {
+    const testCollection: CollectionConfig = {
         slug: "test",
         name: "Test Collection",
         table: "test_table",

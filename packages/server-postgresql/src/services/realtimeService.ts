@@ -4,7 +4,7 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, SnapshotCollection, RebaseCallContext } from "@rebasepro/types";
+import { FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, CollectionConfig, RebaseCallContext } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
@@ -648,7 +648,7 @@ roles: activeAuth.roles })}, true)`);
                 // between the initial driver fetch and this RLS-bound refetch.
                 const registryCollection = this.registry.getCollectionByPath(notifyPath);
                 const resolvedCollection = collection ? { ...collection,
-...registryCollection } as SnapshotCollection : registryCollection as SnapshotCollection;
+...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
 
                 const callbacks = resolvedCollection?.callbacks;
                 const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -806,7 +806,7 @@ roles: activeAuth.roles })}, true)`);
                 if (processedSnapshot) {
                     const registryCollection = this.registry.getCollectionByPath(notifyPath);
                     const resolvedCollection = collection ? { ...collection,
-...registryCollection } as SnapshotCollection : registryCollection as SnapshotCollection;
+...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
 
                     const callbacks = resolvedCollection?.callbacks;
                     const globalCallbacks = this.registry?.getGlobalCallbacks();

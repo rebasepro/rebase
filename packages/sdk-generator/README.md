@@ -15,7 +15,7 @@ pnpm add @rebasepro/sdk-generator
 
 ## What This Package Does
 
-`@rebasepro/sdk-generator` takes an array of `EntityCollection` definitions and produces TypeScript type files that provide full autocompletion when used with `@rebasepro/client`. It handles property types, enums, relations, maps, arrays, geopoints, vectors, and validation-based optionality.
+`@rebasepro/sdk-generator` takes an array of `CollectionConfig` definitions and produces TypeScript type files that provide full autocompletion when used with `@rebasepro/client`. It handles property types, enums, relations, maps, arrays, geopoints, vectors, and validation-based optionality.
 
 This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than called directly.
 
@@ -37,8 +37,8 @@ This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than ca
 `generateSDK()` produces:
 
 1. **`database.types.ts`** — A `Database` interface where each collection slug is a key containing:
-   - `Row` — Full entity type (read operations)
-   - `Insert` — Type for creating entities (auto-ID fields are optional)
+   - `Row` — Full snapshot type (read operations)
+   - `Insert` — Type for creating snapshots (auto-ID fields are optional)
    - `Update` — All-optional partial type for updates
 
 2. **`README.md`** — Usage instructions (opt out with `includeReadme: false`)
@@ -63,9 +63,9 @@ This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than ca
 
 ```typescript
 import { generateSDK } from "@rebasepro/sdk-generator";
-import type { EntityCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
-const collections: EntityCollection[] = [/* your collections */];
+const collections: CollectionConfig[] = [/* your collections */];
 
 const files = generateSDK(collections);
 // files = [
@@ -81,5 +81,5 @@ for (const file of files) {
 ## Related Packages
 
 - `@rebasepro/client` — Consumes the generated types for typed API calls
-- `@rebasepro/types` — Provides `EntityCollection`, `Property`, and related type definitions
+- `@rebasepro/types` — Provides `CollectionConfig`, `Property`, and related type definitions
 - `@rebasepro/common` — Provides `resolveCollectionRelations` used during generation

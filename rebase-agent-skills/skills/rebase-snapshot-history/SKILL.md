@@ -49,9 +49,9 @@ history: { retention: 30 },
 On each collection that should be tracked, set `history: true`:
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 
-const productsCollection: PostgresCollection = {
+const productsCollection: PostgresCollectionConfig = {
     slug: "products",
     name: "Products",
     table: "products",
@@ -382,7 +382,7 @@ No additional configuration is needed — the History tab appears automatically 
 
 There is currently **no dedicated client SDK method** for snapshot history. History is accessed via the REST API directly (as shown in the endpoints section above).
 
-The Studio admin panel uses an internal `useSnapshotHistory` React hook that:
+The Studio admin panel uses an internal `useHistory` React hook that:
 - Fetches history from `GET /api/data/:slug/:snapshotId/history`
 - Supports pagination via offset-based loading
 - Provides a `revert()` function that calls `POST /api/data/:slug/:snapshotId/history/:historyId/revert`

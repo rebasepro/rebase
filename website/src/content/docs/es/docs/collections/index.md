@@ -15,9 +15,9 @@ Una **colección** es un objeto TypeScript que describe una tabla de base de dat
 - **Ganchos de ciclo de vida** — Callbacks para operaciones de creación, actualización, eliminación
 
 ```typescript
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: EntityCollection = {
+export const productsCollection: CollectionConfig = {
     slug: "products",              // URL path and API endpoint
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
@@ -120,13 +120,13 @@ export const productsCollection: EntityCollection = {
 
 | Propiedad | Tipo | Descripción |
 |----------|------|-------------|
-| `callbacks` | `EntityCallbacks` | Ganchos de ciclo de vida (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
+| `callbacks` | `CollectionCallbacks` | Ganchos de ciclo de vida (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
 | `entityActions` | `EntityAction[]` | Acciones personalizadas sobre entidades (archivar, publicar, etc.) |
 | `Actions` | `React.ComponentType` | Componente de acciones de barra de herramientas personalizado |
 | `entityViews` | `EntityCustomView[]` | Pestañas personalizadas en la vista de detalle de la entidad |
 | `additionalFields` | `AdditionalFieldDelegate[]` | Columnas calculadas/virtuales |
-| `childCollections` | `() => EntityCollection[]` | Colecciones hijas anidadas |
-| `subcollections` | `() => EntityCollection[]` | Colecciones anidadas (p. ej., pedido → artículos de línea) |
+| `childCollections` | `() => CollectionConfig[]` | Colecciones hijas anidadas |
+| `subcollections` | `() => CollectionConfig[]` | Colecciones anidadas (p. ej., pedido → artículos de línea) |
 | `exportable` | `boolean \| ExportConfig` | Habilitar exportación de datos |
 | `ownerId` | `string` | ID de usuario propietario (usado por plugins/código personalizado) |
 | `overrides` | `EntityOverrides` | Anulaciones para la vista de entidad |
@@ -138,7 +138,7 @@ export const productsCollection: EntityCollection = {
 Para colecciones dinámicas que cambian según el usuario o datos externos, use una función constructora:
 
 ```typescript
-const collectionsBuilder: EntityCollectionsBuilder = ({ user, authController }) => {
+const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
     const collections = [productsCollection];
 
     if (authController.extra?.role === "admin") {

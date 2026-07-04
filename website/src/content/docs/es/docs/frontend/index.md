@@ -163,7 +163,7 @@ Rebase utiliza **Tailwind CSS v4** y soporta modos claro/oscuro. Personaliza a t
 ## Próximos pasos
 
 - **[Campos Personalizados](/docs/frontend/custom-fields)** — Construye campos de formulario personalizados
-- **[Vistas de Entidad](/docs/frontend/entity-views)** — Agrega pestañas a los editores de entidades
+- **[Vistas de Entidad](/docs/frontend/snapshot-views)** — Agrega pestañas a los editores de entidades
 - **[Modos de Vista](/docs/frontend/view-modes)** — Lista, Tabla, Tarjetas, Kanban
 - **[Plugins](/docs/plugins)** — Extiende el framework
 ---

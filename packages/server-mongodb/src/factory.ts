@@ -6,7 +6,7 @@
  */
 
 import { Db, MongoClient } from "mongodb";
-import { DataDriver, SnapshotCollection } from "@rebasepro/types";
+import { DataDriver, CollectionConfig } from "@rebasepro/types";
 
 import { MongoDataService } from "./db/MongoDataService";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
@@ -25,7 +25,7 @@ export interface MongoBackendConfig extends BackendConfig {
     /** MongoDB client (for connection management) */
     client: MongoClient;
     /** Collections to register (optional, can be registered later) */
-    collections?: SnapshotCollection[];
+    collections?: CollectionConfig[];
     /** History retention configuration */
     historyRetention?: Partial<HistoryRetentionConfig>;
 }
@@ -56,27 +56,27 @@ export interface MongoBackendInstance extends BackendInstance {
  * Simple in-memory collection registry for MongoDB.
  */
 export class MongoCollectionRegistry implements CollectionRegistryInterface {
-    private collections = new Map<string, SnapshotCollection>();
+    private collections = new Map<string, CollectionConfig>();
     private _globalCallbacks?: any;
 
     /**
      * Register a collection
      */
-    register(collection: SnapshotCollection): void {
+    register(collection: CollectionConfig): void {
         this.collections.set(collection.name, collection);
     }
 
     /**
      * Get a collection by its path
      */
-    getCollectionByPath(path: string): SnapshotCollection | undefined {
+    getCollectionByPath(path: string): CollectionConfig | undefined {
         return this.collections.get(path);
     }
 
     /**
      * Get all registered collections
      */
-    getCollections(): SnapshotCollection[] {
+    getCollections(): CollectionConfig[] {
         return Array.from(this.collections.values());
     }
 

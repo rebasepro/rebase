@@ -30,7 +30,7 @@ L'assistant d'importation gère le mappage des colonnes, la conversion des types
 Activer/désactiver l'importation par collection :
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     // Import is enabled by default
     // To disable:

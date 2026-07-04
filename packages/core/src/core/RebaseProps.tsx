@@ -306,7 +306,7 @@ export type RebaseProps<USER extends User> = {
      *     client={client}
      *     components={{
      *         "Shell.AppBar": { Component: MyCustomAppBar },
-     *         "Snapshot.FormActions": {
+     *         "EditView.FormActions": {
      *             Component: MyFormActions,
      *             wrap: true
      *         }

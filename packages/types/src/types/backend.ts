@@ -1,4 +1,4 @@
-import type { SnapshotCollection, FilterValues, WhereFilterOp } from "./collections";
+import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
 
@@ -52,7 +52,7 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
     startAfter?: unknown;
     searchString?: string;
     databaseId?: string;
-    collection?: SnapshotCollection;
+    collection?: CollectionConfig;
 }
 
 /**
@@ -64,7 +64,7 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
     order?: "desc" | "asc";
     limit?: number;
     databaseId?: string;
-    collection?: SnapshotCollection;
+    collection?: CollectionConfig;
 }
 
 /**
@@ -314,17 +314,17 @@ export interface CollectionRegistryInterface {
     /**
      * Register a collection
      */
-    register(collection: SnapshotCollection): void;
+    register(collection: CollectionConfig): void;
 
     /**
      * Get a collection by its path
      */
-    getCollectionByPath(path: string): SnapshotCollection | undefined;
+    getCollectionByPath(path: string): CollectionConfig | undefined;
 
     /**
      * Get all registered collections
      */
-    getCollections(): SnapshotCollection[];
+    getCollections(): CollectionConfig[];
 
     /**
      * Get the currently registered global callbacks, if any.
@@ -346,7 +346,7 @@ export interface DataTransformer {
      */
     serializeToDatabase<M extends Record<string, unknown>>(
         snapshot: M,
-        collection: SnapshotCollection
+        collection: CollectionConfig
     ): Record<string, unknown>;
 
     /**
@@ -354,7 +354,7 @@ export interface DataTransformer {
      */
     deserializeFromDatabase<M extends Record<string, unknown>>(
         data: Record<string, unknown>,
-        collection: SnapshotCollection
+        collection: CollectionConfig
     ): Promise<M>;
 }
 

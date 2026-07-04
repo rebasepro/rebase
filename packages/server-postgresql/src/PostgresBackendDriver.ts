@@ -7,7 +7,7 @@ import {
     DatabaseAdmin,
     DataDriver,
     DeleteProps,
-    SnapshotCollection,
+    CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
     ListenCollectionProps,
@@ -143,7 +143,7 @@ export class PostgresBackendDriver implements DataDriver {
         } as unknown as RebaseCallContext;
     }
 
-    private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: SnapshotCollection<M> | undefined, path: string) {
+    private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: CollectionConfig<M> | undefined, path: string) {
         if (!collection && !path) return {
             collection: undefined,
             callbacks: undefined,
@@ -155,8 +155,8 @@ export class PostgresBackendDriver implements DataDriver {
             ? {
                 ...collection,
                 ...registryCollection
-            } as SnapshotCollection<M>
-            : collection as SnapshotCollection<M>;
+            } as CollectionConfig<M>
+            : collection as CollectionConfig<M>;
 
         const callbacks = resolvedCollection?.callbacks;
         const globalCallbacks = this.registry?.getGlobalCallbacks();
@@ -187,21 +187,21 @@ export class PostgresBackendDriver implements DataDriver {
         let out = row;
         if (globalCallbacks?.afterRead) {
             out = await globalCallbacks.afterRead({
-                collection: resolvedCollection as unknown as SnapshotCollection,
+                collection: resolvedCollection as unknown as CollectionConfig,
                 path, row: out, context: contextForCallback
-            });
+            }) ?? out;
         }
         if (callbacks?.afterRead) {
             out = await callbacks.afterRead({
-                collection: resolvedCollection as SnapshotCollection,
+                collection: resolvedCollection as CollectionConfig,
                 path, row: out, context: contextForCallback
             }) ?? out;
         }
         if (propertyCallbacks?.afterRead) {
             out = await propertyCallbacks.afterRead({
-                collection: resolvedCollection as unknown as SnapshotCollection,
+                collection: resolvedCollection as unknown as CollectionConfig,
                 path, row: out, context: contextForCallback
-            });
+            }) ?? out;
         }
         return out;
     }
@@ -238,10 +238,10 @@ export class PostgresBackendDriver implements DataDriver {
         const relationTargets: Record<string, { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }> = {};
         if (resolved.collection) {
             try {
-                const rels = resolveCollectionRelations(resolved.collection as SnapshotCollection);
+                const rels = resolveCollectionRelations(resolved.collection as CollectionConfig);
                 for (const [key, rel] of Object.entries(rels)) {
                     const target = typeof (rel as { target?: unknown }).target === "function"
-                        ? (rel as { target: () => SnapshotCollection }).target()
+                        ? (rel as { target: () => CollectionConfig }).target()
                         : undefined;
                     const targetPath = target?.slug;
                     if (!targetPath) continue;
@@ -322,7 +322,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -331,7 +331,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     fetched = await callbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -340,7 +340,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     fetched = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         row: fetched,
                         context: contextForCallback
@@ -441,7 +441,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 1. Global callbacks first
             if (globalCallbacks?.afterRead) {
                 row = await globalCallbacks.afterRead({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path,
                     row,
                     context: contextForCallback
@@ -450,7 +450,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.afterRead) {
                 row = await callbacks.afterRead({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     row,
                     context: contextForCallback
@@ -459,7 +459,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.afterRead) {
                 row = await propertyCallbacks.afterRead({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path,
                     row,
                     context: contextForCallback
@@ -547,7 +547,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 1. Global callbacks first
             if (globalCallbacks?.beforeSave) {
                 const result = await globalCallbacks.beforeSave({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path,
                     id,
                     values: updatedValues,
@@ -561,7 +561,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.beforeSave) {
                 const result = await callbacks.beforeSave({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path,
                     id,
                     values: updatedValues,
@@ -575,7 +575,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.beforeSave) {
                 const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path,
                     id,
                     values: updatedValues,
@@ -611,7 +611,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     savedRow = await globalCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -620,7 +620,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
                     savedRow = await callbacks.afterRead({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -629,7 +629,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterRead) {
                     savedRow = await propertyCallbacks.afterRead({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         row: savedRow,
                         context: contextForCallback
@@ -644,7 +644,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSave) {
                     await globalCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         id: savedId,
                         values: savedValues,
@@ -656,7 +656,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterSave) {
                     await callbacks.afterSave({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: savedId,
                         values: savedValues as Partial<M>,
@@ -668,7 +668,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSave) {
                     await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         id: savedId,
                         values: savedValues,
@@ -714,7 +714,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSaveError) {
                     await globalCallbacks.afterSaveError({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         id: id || "unknown",
                         values: updatedValues,
@@ -726,7 +726,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 2. Collection callbacks second
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
-                        collection: resolvedCollection as SnapshotCollection<M>,
+                        collection: resolvedCollection as CollectionConfig<M>,
                         path,
                         id: id || "unknown",
                         values: updatedValues,
@@ -738,7 +738,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as unknown as SnapshotCollection,
+                        collection: resolvedCollection as unknown as CollectionConfig,
                         path,
                         id: id || "unknown",
                         values: updatedValues,
@@ -775,7 +775,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 1. Global callbacks first
             if (globalCallbacks?.beforeDelete) {
                 const result = await globalCallbacks.beforeDelete({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path: targetPath,
                     id: row.id,
                     row: targetRow,
@@ -788,7 +788,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.beforeDelete) {
                 const result = await callbacks.beforeDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: targetPath,
                     id: row.id,
                     row: targetRow,
@@ -801,7 +801,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.beforeDelete) {
                 const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path: targetPath,
                     id: row.id,
                     row: targetRow,
@@ -826,7 +826,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 1. Global callbacks first
             if (globalCallbacks?.afterDelete) {
                 await globalCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path: targetPath,
                     id: row.id,
                     row: targetRow,
@@ -836,7 +836,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 2. Collection callbacks second
             if (callbacks?.afterDelete) {
                 await callbacks.afterDelete({
-                    collection: resolvedCollection as SnapshotCollection<M>,
+                    collection: resolvedCollection as CollectionConfig<M>,
                     path: targetPath,
                     id: row.id,
                     row: targetRow,
@@ -846,7 +846,7 @@ export class PostgresBackendDriver implements DataDriver {
             // 3. Property callbacks third
             if (propertyCallbacks?.afterDelete) {
                 await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as SnapshotCollection,
+                    collection: resolvedCollection as unknown as CollectionConfig,
                     path: targetPath,
                     id: row.id,
                     row: targetRow,
@@ -896,7 +896,7 @@ export class PostgresBackendDriver implements DataDriver {
         name: string,
         value: unknown,
         id?: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     ): Promise<boolean> {
         return this.dataService.checkUniqueField(
             path,
@@ -1364,7 +1364,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         name: string,
         value: unknown,
         id?: string,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     ): Promise<boolean> {
         return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, id, collection), { accessMode: "read only" });
     }

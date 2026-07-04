@@ -50,8 +50,8 @@ interface RebasePlugin {
 
     // Collection injection/modification
     collection?: {
-        injectCollections?: (params) => EntityCollection[];
-        modifyCollection?: (params) => EntityCollection;
+        injectCollections?: (params) => CollectionConfig[];
+        modifyCollection?: (params) => CollectionConfig;
     };
 }
 ```

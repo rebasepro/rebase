@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { DataDriver } from "../../types/src/controllers/data_driver";
-import { SnapshotCollection } from "../../types/src/types/collections";
+import { CollectionConfig } from "../../types/src/types/collections";
 
 describe("RestApiGenerator", () => {
     let mockDriver: jest.Mocked<DataDriver>;
-    let mockCollections: SnapshotCollection[];
+    let mockCollections: CollectionConfig[];
 
     beforeEach(() => {
         mockDriver = {

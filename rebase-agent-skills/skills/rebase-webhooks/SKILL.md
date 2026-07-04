@@ -361,7 +361,7 @@ The most common pattern is to wire the dispatcher into Rebase collection callbac
 
 ```typescript
 // backend/collections/orders.ts
-import type { SnapshotCollection, CollectionCallbacks } from "@rebasepro/types";
+import type { CollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 import { WebhookDispatcher } from "@rebasepro/server-core/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
@@ -377,34 +377,27 @@ dispatcher.setWebhooks([
 ]);
 
 const callbacks: CollectionCallbacks = {
-    afterCreate: async ({ snapshot, collection }) => {
+    afterSave: async ({ id, values, previousValues, status, collection }) => {
+        const event = status === "new" ? "INSERT" : "UPDATE";
         await dispatcher.onSnapshotChange(
             collection.path,
-            "INSERT",
-            snapshot.id,
-            snapshot
+            event,
+            String(id),
+            values,
+            status === "new" ? undefined : previousValues
         );
     },
-    afterUpdate: async ({ snapshot, previousSnapshot, collection }) => {
-        await dispatcher.onSnapshotChange(
-            collection.path,
-            "UPDATE",
-            snapshot.id,
-            snapshot,
-            previousSnapshot
-        );
-    },
-    afterDelete: async ({ snapshotId, collection }) => {
+    afterDelete: async ({ id, collection }) => {
         await dispatcher.onSnapshotChange(
             collection.path,
             "DELETE",
-            snapshotId,
+            String(id),
             null
         );
     },
 };
 
-const ordersCollection: SnapshotCollection = {
+const ordersCollection: CollectionConfig = {
     name: "Orders",
     path: "orders",
     callbacks,
@@ -519,9 +512,11 @@ Then import it from any callback or function:
 ```typescript
 import { dispatcher } from "../lib/webhooks";
 
-// In an collection callback:
-afterCreate: async ({ snapshot, collection }) => {
-    await dispatcher.onSnapshotChange(collection.path, "INSERT", snapshot.id, snapshot);
+// In a collection callback:
+afterSave: async ({ id, values, status, collection }) => {
+    if (status === "new") {
+        await dispatcher.onSnapshotChange(collection.path, "INSERT", String(id), values);
+    }
 },
 ```
 
@@ -535,7 +530,7 @@ Registers the list of webhooks to watch. Filters out any with `enabled: false`. 
 |-----------|------|-------------|
 | `webhooks` | `WebhookConfig[]` | Array of webhook configurations. |
 
-### `onSnapshotChange(table, event, snapshotId, snapshot, previousSnapshot?): Promise<WebhookDeliveryResult[]>`
+### `onSnapshotChange(table, event, id, snapshot, previousSnapshot?): Promise<WebhookDeliveryResult[]>`
 
 Checks all registered webhooks for matching `table` + `event`, and dispatches to each match.
 
@@ -543,7 +538,7 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 |-----------|------|-------------|
 | `table` | `string` | The database table name (e.g. `"orders"`). |
 | `event` | `"INSERT" \| "UPDATE" \| "DELETE"` | The type of snapshot change. |
-| `snapshotId` | `string` | The unique ID of the changed snapshot. |
+| `id` | `string` | The unique ID of the changed snapshot. |
 | `snapshot` | `Record<string, unknown> \| null` | The current snapshot data. May be `null` for deletes. |
 | `previousSnapshot` | `Record<string, unknown> \| null` | *(Optional)* The previous snapshot state. Only relevant for `UPDATE` events — included as `old_record` in the payload. |
 
@@ -592,9 +587,9 @@ for (const result of results) {
 If you don't want webhook delivery to block your API response, use fire-and-forget:
 
 ```typescript
-afterCreate: async ({ snapshot, collection }) => {
+afterSave: async ({ id, values, collection }) => {
     // Fire-and-forget — don't await
-    dispatcher.onSnapshotChange(collection.path, "INSERT", snapshot.id, snapshot)
+    dispatcher.onSnapshotChange(collection.path, "INSERT", String(id), values)
         .catch(err => console.error("Webhook dispatch error:", err));
 },
 ```

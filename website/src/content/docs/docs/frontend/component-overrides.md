@@ -55,16 +55,16 @@ function App() {
 To override components only for a specific collection, add a `components` object to its definition. This is useful for customizing empty states, cards, or detail views for particular models.
 
 ```typescript
-import { PostgresCollection } from "@rebasepro/types";
+import { PostgresCollectionConfig } from "@rebasepro/types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
-const productsCollection: PostgresCollection = {
+const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     slug: "products",
     table: "products",
     components: {
-        // Eject Mode: Replace the default entity form view
-        "Entity.Form": { Component: ProductCustomForm },
+        // Eject Mode: Replace the default snapshot form view
+        "Snapshot.Form": { Component: ProductCustomForm },
 
         // Wrap Mode: Wrap the empty state to add quick links
         "Collection.EmptyState": {
@@ -112,9 +112,9 @@ These components can be overridden globally (acting as defaults for all collecti
 | `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
 | `"Collection.EmptyState"` | `CollectionEmptyStateProps` | View shown when a collection is empty |
 | `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
-| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
-| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
-| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
-| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is missing |
+| `"Snapshot.Form"` | `SnapshotFormProps` | The detail form for creating/updating |
+| `"Snapshot.FormActions"` | `SnapshotFormActionsProps` | Form submission/cancel button bar |
+| `"Snapshot.DetailView"` | `SnapshotDetailViewProps` | Read-only detail view |
+| `"Snapshot.SidePanel"` | `SnapshotSidePanelProps` | The side panel container for form/detail |
+| `"Snapshot.Preview"` | `SnapshotPreviewProps` | Inline reference/relation chip preview |
+| `"Snapshot.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced snapshot is missing |

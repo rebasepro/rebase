@@ -1,6 +1,6 @@
 import { CollectionRegistry } from "@rebasepro/common";
 import { CollectionRegistryInterface } from "../db/interfaces";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
 /**
  * Backend-agnostic collection registry.
@@ -13,7 +13,7 @@ export class BackendCollectionRegistry extends CollectionRegistry implements Col
      * Maps from the collection's relation property names to the relation names.
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
-        const collection = this.getCollectionByPath(collectionPath) as (SnapshotCollection & { relations?: { relationName?: string, localKey?: string }[] }) | undefined;
+        const collection = this.getCollectionByPath(collectionPath) as (CollectionConfig & { relations?: { relationName?: string, localKey?: string }[] }) | undefined;
         if (!collection?.relations) return [];
         return collection.relations.map(r => (r.relationName || r.localKey || "") as string).filter(Boolean);
     }

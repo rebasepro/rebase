@@ -16,7 +16,7 @@ pnpm add @rebasepro/client
 - **Authentication** — email/password, Google, 10+ OAuth providers, session management, password reset
 - **Admin** — user CRUD for admins
 - **Storage** — file upload, download, delete, list
-- **Realtime** — WebSocket subscriptions for collection and entity changes
+- **Realtime** — WebSocket subscriptions for collection and snapshot changes
 - **Cron** — list, trigger, and manage cron jobs
 - **Custom functions** — invoke server-side Hono route functions
 - **Type-safe data proxy** — `client.data.products` auto-maps to the `products` collection
@@ -49,18 +49,18 @@ pnpm add @rebasepro/client
 | Method | Description |
 |---|---|
 | `find(params?)` | Query with pagination. Returns `FindResponse<M>` (`{ data, meta }`) |
-| `findById(id)` | Fetch a single entity. Returns `Entity<M> \| undefined` |
-| `create(data, id?)` | Create entity. Returns `Entity<M>` |
-| `update(id, data)` | Update entity. Returns `Entity<M>` |
-| `delete(id)` | Delete entity |
-| `count(params?)` | Count matching entities |
+| `findById(id)` | Fetch a single snapshot. Returns `Snapshot<M> \| undefined` |
+| `create(data, id?)` | Create snapshot. Returns `Snapshot<M>` |
+| `update(id, data)` | Update snapshot. Returns `Snapshot<M>` |
+| `delete(id)` | Delete snapshot |
+| `count(params?)` | Count matching snapshots |
 | `where(col, op, val)` | Start a fluent query — returns `QueryBuilder` |
 | `orderBy(col, dir?)` | Order results — returns `QueryBuilder` |
 | `limit(n)` / `offset(n)` | Pagination — returns `QueryBuilder` |
 | `search(str)` | Full-text search — returns `QueryBuilder` |
-| `include(...rels)` | Include related entities — returns `QueryBuilder` |
+| `include(...rels)` | Include related snapshots — returns `QueryBuilder` |
 | `listen(params, onUpdate, onError?)` | Realtime subscription (requires WebSocket) |
-| `listenById(id, onUpdate, onError?)` | Realtime single-entity subscription |
+| `listenById(id, onUpdate, onError?)` | Realtime single-snapshot subscription |
 
 ### Auth Module (`client.auth`)
 
@@ -119,7 +119,7 @@ pnpm add @rebasepro/client
 | `createCookieStorage(options?)` | Cookie-based auth storage adapter |
 | `createMemoryStorage()` | In-memory auth storage adapter |
 | `QueryBuilder` | Fluent query builder (also re-exported from `@rebasepro/common`) |
-| `Entity`, `FindResponse` | Re-exported from `@rebasepro/types` |
+| `Snapshot`, `FindResponse` | Re-exported from `@rebasepro/types` |
 
 ## Quick Start
 
@@ -159,6 +159,6 @@ const unsubscribe = client.data.products.listen(
 ## Related Packages
 
 - [`@rebasepro/common`](../common) — `QueryBuilder`, `buildRebaseData`, shared utilities
-- [`@rebasepro/types`](../types) — `Entity`, `FindResponse`, `CollectionAccessor`, etc.
+- [`@rebasepro/types`](../types) — `Snapshot`, `FindResponse`, `CollectionAccessor`, etc.
 - [`@rebasepro/utils`](../utils) — `toSnakeCase` and other helpers
 - [`@rebasepro/auth`](../auth) — React hook adapter that wraps `client.auth` for CMS integration

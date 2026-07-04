@@ -5,12 +5,12 @@ export interface AdditionalFieldDelegate<M> {
     Builder?(props: { snapshot: M }): React.ReactElement | null;
 }
 
-export interface PostgresCollection<M> {
+export interface PostgresCollectionConfig<M> {
     additionalFields?: AdditionalFieldDelegate<M>[];
 }
 
-declare let specificColl: PostgresCollection<{ id: string, name: string }>;
-declare let genericColl: PostgresCollection<any>; // wait, <any> is always assignable.
-declare let genericRecordColl: PostgresCollection<Record<string, unknown>>;
+declare let specificColl: PostgresCollectionConfig<{ id: string, name: string }>;
+declare let genericColl: PostgresCollectionConfig<any>; // wait, <any> is always assignable.
+declare let genericRecordColl: PostgresCollectionConfig<Record<string, unknown>>;
 
 genericRecordColl = specificColl; // Should succeed if Builder is bivariant!

@@ -5,7 +5,7 @@
  * class instances) from the original types in `@rebasepro/types`, making
  * them safe for `JSON.stringify()` / database storage.
  *
- * Use `toSerializableCollection` / `fromSerializableCollection` from
+ * Use `toSerializableCollectionConfig` / `fromSerializableCollectionConfig` from
  * `./serializable_utils` to convert between the original and serializable forms.
  *
  * @module
@@ -263,7 +263,7 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
 /**
  * JSON-serializable `RelationProperty`.
  * `target` is string-only (collection slug). The function variant
- * `() => SnapshotCollection` is not serializable.
+ * `() => CollectionConfig` is not serializable.
  */
 export interface SerializableRelationProperty extends SerializableBaseProperty {
     ui?: SerializableRelationUIConfig;
@@ -289,7 +289,7 @@ export interface SerializableRelationProperty extends SerializableBaseProperty {
     includeId?: boolean;
     includeSnapshotLink?: boolean;
     widget?: "select" | "dialog";
-    // overrides are dropped (can contain non-serializable SnapshotCollection fields)
+    // overrides are dropped (can contain non-serializable CollectionConfig fields)
     // relation (resolved Relation object) is dropped (runtime-only, contains function target)
 }
 
@@ -352,7 +352,7 @@ export type SerializableProperties = {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * JSON-serializable version of `SnapshotCollection` / `BaseSnapshotCollection`.
+ * JSON-serializable version of `CollectionConfig` / `BaseCollectionConfig`.
  *
  * Strips all non-serializable fields:
  * - Functions: `callbacks`, `childCollections`, `additionalFields`, `defaultSelectedView` (fn)
@@ -364,7 +364,7 @@ export type SerializableProperties = {
  *
  * Keeps all data-describing fields that the collection editor works with.
  */
-export interface SerializableCollection {
+export interface SerializableCollectionConfig {
     slug: string;
     name: string;
     singularName?: string;
@@ -452,10 +452,10 @@ export interface SerializableCollection {
  */
 export interface JsonCollectionStore {
     /** Load all persisted collections. */
-    load(): Promise<SerializableCollection[]>;
+    load(): Promise<SerializableCollectionConfig[]>;
 
     /** Save (create or update) a single collection by its slug. */
-    save(slug: string, data: SerializableCollection): Promise<void>;
+    save(slug: string, data: SerializableCollectionConfig): Promise<void>;
 
     /** Delete a collection by its slug. */
     delete(slug: string): Promise<void>;

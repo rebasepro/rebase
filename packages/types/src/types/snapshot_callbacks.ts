@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "./collections";
+import type { CollectionConfig } from "./collections";
 import type { SnapshotStatus, SnapshotValues } from "./snapshots";
 import type { User } from "../users";
 import type { RebaseCallContext } from "../rebase_context";
@@ -82,7 +82,7 @@ export interface AfterReadProps<M extends Record<string, unknown> = Record<strin
     /**
      * Collection of the snapshot
      */
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 
     /**
      * Full path of the CMS where this collection is being fetched.
@@ -129,7 +129,7 @@ export interface AfterSaveProps<M extends Record<string, unknown> = Record<strin
     /**
      * Resolved collection of the snapshot
      */
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 
     /**
      * Full path of the CMS where this snapshot is being saved.
@@ -172,7 +172,7 @@ export interface BeforeDeleteProps<M extends Record<string, unknown> = Record<st
     /**
      * collection of the snapshot being deleted
      */
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 
     /**
      * Path of the parent collection
@@ -204,7 +204,7 @@ export interface AfterDeleteProps<M extends Record<string, unknown> = Record<str
     /**
      * collection of the snapshot being deleted
      */
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
 
     /**
      * Path of the parent collection

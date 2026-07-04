@@ -1,7 +1,7 @@
 import type { Property, Snapshot } from "@rebasepro/types";
 import { CollectionSize, SelectedCellProps } from "@rebasepro/types";
 
-export type SnapshotCollectionTableController<M extends Record<string, unknown>> = {
+export type DataCollectionTableController<M extends Record<string, unknown>> = {
 
     /**
      * This cell is displayed as selected

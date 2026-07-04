@@ -1,4 +1,4 @@
-import { SnapshotCollection, DataDriver } from "@rebasepro/types";
+import { CollectionConfig, DataDriver } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { buildRebaseData } from "../src/data/buildRebaseData";
 import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
@@ -35,15 +35,15 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
     ];
     const dsRegistry = createDataSourceRegistry(definitions);
 
-    const products: SnapshotCollection = {
+    const products: CollectionConfig = {
         id: "products", name: "Products", path: "products", slug: "products",
         table: "products", properties: { title: { type: "string" } }
-    } as SnapshotCollection;
+    } as CollectionConfig;
 
-    const events: SnapshotCollection = {
+    const events: CollectionConfig = {
         id: "events", name: "Events", path: "events", slug: "events",
         dataSource: "analytics", properties: { title: { type: "string" } }
-    } as SnapshotCollection;
+    } as CollectionConfig;
 
     function buildRouted() {
         const registry = new CollectionRegistry([products, events], dsRegistry);

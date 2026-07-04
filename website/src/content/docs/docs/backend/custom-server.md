@@ -92,7 +92,7 @@ async function startServer() {
     // 4. Initialize the Driver and Services
     // Connects to Postgres, verifies connection, starts cross-instance listeners
     const { driver, realtimeProvider, internals } = await bootstrapper.initializeDriver({
-        collections: [] // Pass Rebase EntityCollections if using schema-as-code
+        collections: [] // Pass Rebase SnapshotCollections if using schema-as-code
     });
 
     // Access the underlying schema-aware Drizzle client if needed
@@ -115,7 +115,7 @@ async function startServer() {
         try {
             const result = await driver.saveEntity({
                 path: "products",
-                entity: req.body
+                snapshot: req.body
             });
             res.status(201).json({ success: true, data: result });
         } catch (error) {

@@ -16,9 +16,9 @@ Crie um backend de blog com:
 ### Autores
 
 ```typescript
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const authorsCollection: EntityCollection = {
+export const authorsCollection: CollectionConfig = {
     slug: "authors",
     name: "Autores",
     singularName: "Autor",
@@ -57,7 +57,7 @@ export const authorsCollection: EntityCollection = {
 ### Categorias
 
 ```typescript
-export const categoriesCollection: EntityCollection = {
+export const categoriesCollection: CollectionConfig = {
     slug: "categories",
     name: "Categorias",
     singularName: "Categoria",
@@ -91,7 +91,7 @@ export const categoriesCollection: EntityCollection = {
 ### Artigos
 
 ```typescript
-export const articlesCollection: EntityCollection = {
+export const articlesCollection: CollectionConfig = {
     slug: "articles",
     name: "Artigos",
     singularName: "Artigo",

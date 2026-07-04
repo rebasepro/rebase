@@ -1,6 +1,6 @@
 import {
     DeleteProps,
-    SnapshotCollection,
+    CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
     SaveProps,
@@ -867,7 +867,7 @@ options }
         return response.database;
     }
 
-    async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: SnapshotCollection): Promise<boolean> {
+    async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: CollectionConfig): Promise<boolean> {
         const response = await this.sendMessage({
             type: "CHECK_UNIQUE_FIELD",
             payload: {

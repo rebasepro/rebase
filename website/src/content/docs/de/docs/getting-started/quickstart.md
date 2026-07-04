@@ -83,9 +83,9 @@ Wenn Sie `http://localhost:5173` öffnen, sehen Sie den Anmeldebildschirm. Der *
 Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei:
 
 ```typescript title="config/collections/products.ts"
-import { EntityCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: EntityCollection = {
+export const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     singularName: "Product",

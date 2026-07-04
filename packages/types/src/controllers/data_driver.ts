@@ -1,6 +1,6 @@
 import type { CollectionRegistryController } from "./collection_registry";
 import type { SnapshotStatus, SnapshotValues } from "../types/snapshots";
-import type { SnapshotCollection, FilterValues } from "../types/collections";
+import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { RebaseContext } from "../rebase_context";
 
 
@@ -11,7 +11,7 @@ export interface FetchOneProps<M extends Record<string, unknown> = Record<string
     path: string;
     id: string | number;
     databaseId?: string;
-    collection?: SnapshotCollection<M>
+    collection?: CollectionConfig<M>
 }
 
 /**
@@ -45,7 +45,7 @@ export interface VectorSearchParams {
  */
 export interface FetchCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
     filter?: FilterValues<Extract<keyof M, string>>,
     limit?: number;
     offset?: number;
@@ -75,7 +75,7 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
     values: Partial<SnapshotValues<M>>;
     id?: string | number; // can be empty for new snapshots
     previousValues?: Partial<SnapshotValues<M>>;
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
     status: SnapshotStatus;
 }
 
@@ -84,13 +84,13 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
  */
 export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
     row: { id: string | number; path: string; values?: Partial<SnapshotValues<M>> };
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
 }
 
 export type FilterCombinationValidProps = {
     path: string;
     databaseId?: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     filterValues: FilterValues<string>;
     sortBy?: [string, "asc" | "desc"];
 };
@@ -181,7 +181,7 @@ export interface DataDriver {
         name: string,
         value: unknown,
         id?: string | number,
-        collection?: SnapshotCollection
+        collection?: CollectionConfig
     ): Promise<boolean>;
 
     /**
@@ -210,7 +210,7 @@ export interface DataDriver {
         context: RebaseContext,
         path: string,
         databaseId?: string,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         parentCollectionSlugs?: string[];
         parentSnapshotIds?: string[];
     }) => Promise<boolean>;

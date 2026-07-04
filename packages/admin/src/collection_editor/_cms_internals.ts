@@ -8,18 +8,18 @@
 export { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 export { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 export { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-export { useSideSnapshotController } from "../hooks/useSideSnapshotController";
+export { useSidePanel } from "../hooks/useSidePanel";
 export { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 
 // Components
 export { FieldCaption } from "../components/FieldCaption";
 export { SearchIconsView } from "../components/SearchIconsView";
 export { PropertyConfigBadge } from "../components/PropertyConfigBadge";
-export { SnapshotCollectionTable } from "../components/SnapshotCollectionTable";
+export { CollectionTableBinding } from "../components/CollectionTableBinding";
 export { VirtualTableInput } from "@rebasepro/ui";
 export { ArrayContainer } from "../components/ArrayContainer";
 export type { ArrayEntryParams } from "../components/ArrayContainer";
-export { useSelectionController } from "../components/SnapshotCollectionView/useSelectionController";
+export { useSelectionController } from "../components/CollectionViewBinding/useSelectionController";
 
 // Data import
 export { ImportFileUpload } from "../data_import/components/ImportFileUpload";

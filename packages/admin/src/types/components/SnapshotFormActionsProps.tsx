@@ -1,11 +1,11 @@
 import { Snapshot } from "@rebasepro/types";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { FormContext } from "../fields";
 import { FormexController } from "./formex";
 
 export interface SnapshotFormActionsProps {
     path: string;
-    collection: SnapshotCollection;
+    collection: CollectionConfig;
     snapshot?: Snapshot;
     layout: "bottom" | "side" | "responsive";
     savingError?: Error;

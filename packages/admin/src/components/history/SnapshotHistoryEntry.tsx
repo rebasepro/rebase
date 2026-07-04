@@ -1,4 +1,4 @@
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import type { Property } from "@rebasepro/types";
 import * as React from "react";
 
@@ -39,7 +39,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 export type SnapshotHistoryEntryProps = {
     size: PreviewSize;
     actions?: React.ReactNode;
-    collection?: SnapshotCollection;
+    collection?: CollectionConfig;
     hover?: boolean;
     entry: HistoryEntryData;
     onClick?: (e: React.SyntheticEvent) => void;

@@ -22,7 +22,7 @@ function MyComponent() {
     context.storageSource       // File operations
     context.authController      // Auth state
     context.navigation          // Navigation state
-    context.sideEntityController // Side panel control
+    context.sideSnapshotController // Side panel control
     context.snackbarController  // Toast notifications
 }
 ```
@@ -47,16 +47,16 @@ function UserMenu() {
 }
 ```
 
-## `useCollectionFetch`
+## `useCollection`
 
-Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
+Fetch and subscribe to a list of snapshots in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
 
 ```typescript
-import { useCollectionFetch } from "@rebasepro/core";
+import { useCollection } from "@rebasepro/core";
 import { productsCollection } from "../config/collections";
 
 function ProductList() {
-    const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollectionFetch({
+    const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollection({
         path: "products",
         collection: productsCollection,
         itemCount: 20,
@@ -86,8 +86,8 @@ function ProductList() {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | `string` | Absolute collection path (e.g., `"products"`). |
-| `collection` | `EntityCollection` | The collection definition object. |
-| `itemCount` | `number` | Optional. Number of entities to fetch (SQL limit). |
+| `collection` | `CollectionConfig` | The collection definition object. |
+| `itemCount` | `number` | Optional. Number of snapshots to fetch (SQL limit). |
 | `offset` | `number` | Optional. Number of items to skip. |
 | `page` | `number` | Optional. Page number (1-indexed), alternative to offset. |
 | `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
@@ -98,35 +98,35 @@ function ProductList() {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `data` | `Entity[]` | Array of fetched entities. |
+| `data` | `Snapshot[]` | Array of fetched snapshots. |
 | `dataLoading` | `boolean` | True if the initial load is in progress. |
 | `dataLoadingError` | `Error` | Error object if the fetch fails. |
 | `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
 | `totalCount` | `number` | Optional. The total count of records matching the filter in the database. |
 
-## `useEntityFetch`
+## `useFetch`
 
-Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
+Fetch and subscribe to a single snapshot by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
 
 ```typescript
 import { useEntityFetch } from "@rebasepro/core";
 import { productsCollection } from "../config/collections";
 
 function ProductDetail({ productId }) {
-    const { entity, dataLoading, dataLoadingError } = useEntityFetch({
+    const { snapshot, dataLoading, dataLoadingError } = useFetch({
         path: "products",
-        entityId: productId,
+        snapshotId: productId,
         collection: productsCollection
     });
 
     if (dataLoading) return <p>Loading product...</p>;
     if (dataLoadingError) return <p>Error: {dataLoadingError.message}</p>;
-    if (!entity) return <p>Product not found</p>;
+    if (!snapshot) return <p>Product not found</p>;
 
     return (
         <div>
-            <h1>{entity.values.name}</h1>
-            <p>{entity.values.description}</p>
+            <h1>{snapshot.values.name}</h1>
+            <p>{snapshot.values.description}</p>
         </div>
     );
 }
@@ -137,16 +137,16 @@ function ProductDetail({ productId }) {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | `string` | Absolute collection path. |
-| `entityId` | `string \| number` | The ID of the entity to fetch. |
-| `collection` | `EntityCollection` | The collection definition object. |
-| `useCache` | `boolean` | Optional. If `true` and entity is in cache, skips background refresh. (Default: `false`). |
+| `snapshotId` | `string \| number` | The ID of the snapshot to fetch. |
+| `collection` | `CollectionConfig` | The collection definition object. |
+| `useCache` | `boolean` | Optional. If `true` and snapshot is in cache, skips background refresh. (Default: `false`). |
 
 ### Caching Utilities
 
 Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
 
-- `populateEntityFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call).
-- `clearEntityFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
+- `populateFetchCache(path, snapshots)`: Pre-populates the cache with a list of snapshots (e.g. after a bulk action or custom API call).
+- `clearFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
 
 ## `usePermissions`
 
@@ -173,9 +173,9 @@ function CreateProductButton() {
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entities in the collection. |
-| `canEdit` | `(collection, path, entity) => boolean` | Checks if the user is allowed to edit the given entity. |
-| `canDelete` | `(collection, path, entity) => boolean` | Checks if the user is allowed to delete the given entity. |
+| `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create snapshots in the collection. |
+| `canEdit` | `(collection, path, snapshot) => boolean` | Checks if the user is allowed to edit the given snapshot. |
+| `canDelete` | `(collection, path, snapshot) => boolean` | Checks if the user is allowed to delete the given snapshot. |
 | `canRead` | `(collection) => boolean` | Checks if the user is allowed to read the collection. |
 
 ## `useClipboard`
@@ -218,21 +218,21 @@ function CopyButton({ text }) {
 | `clipboard` | `string` | The current copied text value. |
 | `clearClipboard` | `() => void` | Clears the clipboard. |
 
-## `useSideEntityController`
+## `useSidePanel`
 
-Programmatically open entities in a side panel:
+Programmatically open snapshots in a side panel:
 
 ```typescript
-import { useSideEntityController } from "@rebasepro/core";
+import { useSidePanel } from "@rebasepro/core";
 
 function OpenProductButton({ productId }) {
-    const sideEntityController = useSideEntityController();
+    const sidePanel = useSidePanel();
 
     return (
         <button onClick={() => {
-            sideEntityController.open({
+            sidePanel.open({
                 path: "products",
-                entityId: productId,
+                snapshotId: productId,
                 collection: productsCollection
             });
         }}>
@@ -246,9 +246,9 @@ Methods:
 
 | Method | Description |
 |--------|-------------|
-| `open({ path, entityId, collection })` | Open an entity in a side panel |
+| `open({ path, snapshotId, collection })` | Open a snapshot in a side panel |
 | `close()` | Close the current side panel |
-| `replace({ path, entityId, collection })` | Replace the current side panel content |
+| `replace({ path, snapshotId, collection })` | Replace the current side panel content |
 
 ## `useSnackbarController`
 
@@ -311,19 +311,19 @@ function ThemeToggle() {
 }
 ```
 
-## `useEntitySelectionDialog`
+## `useSelectionDialog`
 
-Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
+Open a side dialog for selecting snapshots from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
-import { useEntitySelectionDialog } from "@rebasepro/core";
+import { useSelectionDialog } from "@rebasepro/core";
 
 function SelectProduct() {
-    const selectionDialog = useEntitySelectionDialog({
+    const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
-        onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity);
+        onSingleSnapshotSelected: (snapshot) => {
+            console.log("Selected:", snapshot);
         }
     });
 
@@ -384,11 +384,11 @@ function CategorySelector({ onSelect }) {
 | Option | Type | Description |
 |--------|------|-------------|
 | `path` | `string` | Absolute collection path. |
-| `collection` | `EntityCollection` | Target collection definition. |
+| `collection` | `CollectionConfig` | Target collection definition. |
 | `fixedFilter` | `FilterValues` | Optional. Static filters to restrict search results. |
 | `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
-| `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
-| `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
+| `getLabelFromSnapshot` | `(snapshot) => string` | Optional. Customize the display label text. |
+| `getDescriptionFromSnapshot` | `(snapshot) => string` | Optional. Customize the description text. |
 
 ## `useUserSelector`
 

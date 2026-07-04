@@ -14,7 +14,7 @@ import {
     BootstrappedAuth,
     DatabaseAdmin,
     type DataDriver,
-    SnapshotCollection,
+    CollectionConfig,
     type HistoryConfig,
     InitializedDriver,
     RealtimeProvider
@@ -78,7 +78,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // config is passed from coordinator, we merge it with our internal pgConfig if needed
             // Currently config from init.ts is `{ collections, collectionRegistry }`
             const { collections, collectionRegistry } = config as {
-                collections?: SnapshotCollection[];
+                collections?: CollectionConfig[];
                 collectionRegistry?: unknown;
             };
 
@@ -293,7 +293,7 @@ table: checkName });
 
             // Resolve the auth collection from the explicit config.
             // This replaces the old `registry.getTable("users")` magic string lookup.
-            const authCollection = authConfig.collection as SnapshotCollection | undefined;
+            const authCollection = authConfig.collection as CollectionConfig | undefined;
 
             // ensureAuthTablesExist works with the collection abstraction — no Drizzle leakage.
             await ensureAuthTablesExist(db, authCollection);

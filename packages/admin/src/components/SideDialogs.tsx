@@ -4,7 +4,7 @@ import { useSideDialogsController } from "../hooks";
 import { Sheet, Dialog } from "@rebasepro/ui";
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
 import { ErrorBoundary } from "@rebasepro/ui";
-import type { SnapshotSidePanelProps } from "@rebasepro/types";
+import type { SidePanelBindingProps } from "@rebasepro/types";
 
 
 export type SideDialogController = {
@@ -41,7 +41,7 @@ export const useSideDialogContext = () => useContext<SideDialogController>(SideD
 
 /**
  * This is the component in charge of rendering the side dialogs used
- * for editing snapshots. Use the {@link useSideSnapshotController} to open
+ * for editing snapshots. Use the {@link useSidePanel} to open
  * and control the dialogs.
  * This component needs a parent {@link Rebase}
  * {@link useSideDialogsController}
@@ -146,7 +146,7 @@ function SideDialogView({
         setPendingClose
     }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, pendingClose]);
 
-    const additionalProps = panel?.additional as SnapshotSidePanelProps | undefined;
+    const additionalProps = panel?.additional as SidePanelBindingProps | undefined;
     const isDialogMode = additionalProps?.collection?.openSnapshotMode === "dialog";
 
     return (

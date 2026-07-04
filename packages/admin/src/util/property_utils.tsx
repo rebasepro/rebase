@@ -1,6 +1,6 @@
 
 import type { Properties } from "@rebasepro/types";
-import type { SnapshotCollection, MapProperty, Property, PropertyConfig } from "@rebasepro/types";
+import type { CollectionConfig, MapProperty, Property, PropertyConfig } from "@rebasepro/types";
 import React from "react";
 
 import { isPropertyBuilder } from "@rebasepro/common";
@@ -224,7 +224,7 @@ export function getPropertiesWithPropertiesOrder(properties: Properties, propert
     return result;
 }
 
-export function getDefaultPropertiesOrder(collection: SnapshotCollection): string[] {
+export function getDefaultPropertiesOrder(collection: CollectionConfig): string[] {
     if (collection.propertiesOrder) return collection.propertiesOrder;
     return [...Object.keys(collection.properties), ...(collection.additionalFields ?? []).map(field => field.key)];
 }

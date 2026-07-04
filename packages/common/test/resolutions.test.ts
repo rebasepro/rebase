@@ -3,7 +3,7 @@ import {
     resolveEnumValues,
     getSubcollections
 } from "../src/util/resolutions";
-import { SnapshotCollection, NumberProperty, StringProperty, EnumValueConfig } from "@rebasepro/types";
+import { CollectionConfig, NumberProperty, StringProperty, EnumValueConfig } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // resolvePropertyEnum
@@ -111,13 +111,13 @@ color: "red" }
 // ─────────────────────────────────────────────────────────────
 describe("getSubcollections", () => {
     it("returns subcollections from childCollections function", () => {
-        const subCol: SnapshotCollection = {
+        const subCol: CollectionConfig = {
             name: "Comments",
             slug: "comments",
             table: "comments",
             properties: {}
         };
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -130,7 +130,7 @@ describe("getSubcollections", () => {
     });
 
     it("returns empty array when no childCollections", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",
@@ -141,7 +141,7 @@ describe("getSubcollections", () => {
     });
 
     it("returns empty array when childCollections returns undefined", () => {
-        const collection: SnapshotCollection = {
+        const collection: CollectionConfig = {
             name: "Posts",
             slug: "posts",
             table: "posts",

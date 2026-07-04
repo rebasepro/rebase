@@ -5,10 +5,10 @@ import {
     getEnumVarName,
     getColumnName
 } from "../src/util/relations";
-import { SnapshotCollection, Relation } from "@rebasepro/types";
+import { CollectionConfig, Relation } from "@rebasepro/types";
 
 // Helper to create minimal collections
-function makeCollection(overrides: Partial<SnapshotCollection> = {}): SnapshotCollection {
+function makeCollection(overrides: Partial<CollectionConfig> = {}): CollectionConfig {
     return {
         name: "Source",
         slug: "source",
@@ -18,7 +18,7 @@ function makeCollection(overrides: Partial<SnapshotCollection> = {}): SnapshotCo
     };
 }
 
-function makeTargetCollection(overrides: Partial<SnapshotCollection> = {}): SnapshotCollection {
+function makeTargetCollection(overrides: Partial<CollectionConfig> = {}): CollectionConfig {
     return {
         name: "Target",
         slug: "target",

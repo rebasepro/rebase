@@ -1,5 +1,5 @@
-import { useSnapshotSelectionDialog } from "../../hooks/useSnapshotSelectionDialog";
-import type { SnapshotCollection } from "@rebasepro/types";
+import { useSelectionDialog } from "../../hooks/useSelectionDialog";
+import type { CollectionConfig } from "@rebasepro/types";
 import type { FieldProps } from "../../types/fields";
 import type { Property, ReferenceProperty } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
@@ -8,7 +8,7 @@ import { Snapshot, SnapshotReference } from "@rebasepro/types";
 import { ErrorView } from "@rebasepro/core";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { SnapshotPreviewContainer } from "../../components/SnapshotPreview";
+import { SnapshotPreviewContainer } from "../../components/RecordPreviewBinding";
 import { ReferencePreview } from "../../preview";
 import { IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
@@ -64,7 +64,7 @@ function ReferenceFieldBindingInternal({
     const validValue = refValue && typeof refValue === "object" && "isSnapshotReference" in refValue && refValue.isSnapshotReference();
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: SnapshotCollection | undefined = useMemo(() => {
+    const collection: CollectionConfig | undefined = useMemo(() => {
         return property.path ? collectionRegistryController.getCollection(property.path) : undefined;
     }, [property.path]);
 
@@ -77,7 +77,7 @@ function ReferenceFieldBindingInternal({
         setValue(ref);
     }, [setValue, propertyKey]);
 
-    const referenceDialogController = useSnapshotSelectionDialog({
+    const referenceDialogController = useSelectionDialog({
         multiselect: false,
         path: property.path,
         collection,

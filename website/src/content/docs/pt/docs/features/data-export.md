@@ -18,7 +18,7 @@ Exporte dados de qualquer coleção para o formato CSV ou JSON.
 ## Configuração
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     exportable: true,            // Enable (default: true)
     // Or with config:

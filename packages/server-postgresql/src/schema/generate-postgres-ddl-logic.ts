@@ -1,4 +1,4 @@
-import { SnapshotCollection, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollection, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
@@ -13,7 +13,7 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
     return toSnakeCase(propName);
 };
 
-const getPrimaryKeyProp = (collection: SnapshotCollection): { name: string, type: "string" | "number", isUuid: boolean } => {
+const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
@@ -30,15 +30,15 @@ const getPrimaryKeyProp = (collection: SnapshotCollection): { name: string, type
     return { name: "id", type: "string", isUuid: isUuid ?? false };
 };
 
-const isNumericId = (collection: SnapshotCollection): boolean => {
+const isNumericId = (collection: CollectionConfig): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
 };
 
-const getPrimaryKeyName = (collection: SnapshotCollection): string => {
+const getPrimaryKeyName = (collection: CollectionConfig): string => {
     return getPrimaryKeyProp(collection).name;
 };
 
-const isIdProperty = (propName: string, prop: Property, collection: SnapshotCollection): boolean => {
+const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;
     const hasExplicitId = Object.values(collection.properties ?? {}).some(p => "isId" in (p as unknown as object) && Boolean((p as unknown as Record<string, unknown>).isId));
     return !hasExplicitId && propName === "id";
@@ -61,7 +61,7 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
     return createHash("sha1").update(data).digest("hex").substring(0, 7);
 };
 
-const generatePolicyDdl = (collection: SnapshotCollection, rule: SecurityRule): string => {
+const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule): string => {
     const tableName = getTableName(collection);
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
@@ -78,8 +78,8 @@ const generatePolicyDdl = (collection: SnapshotCollection, rule: SecurityRule): 
     }).join("");
 };
 
-const generateSinglePolicyDdl = (collection: SnapshotCollection, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
-    const schema = isPostgresCollection(collection) && collection.schema ? collection.schema : "public";
+const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+    const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
     const tableName = getTableName(collection);
     const mode = (rule.mode ?? "permissive").toUpperCase();
     const operationUpper = operation.toUpperCase();
@@ -110,14 +110,14 @@ const generateSinglePolicyDdl = (collection: SnapshotCollection, rule: SecurityR
     return `${ddl};\n`;
 };
 
-const getSqlColumnType = (propName: string, prop: Property, collection: SnapshotCollection, collections: SnapshotCollection[]): string => {
+const getSqlColumnType = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string => {
     switch (prop.type) {
         case "string": {
             const stringProp = prop as StringProperty;
             if (stringProp.enum) {
                 const tableName = getTableName(collection);
                 const colName = resolveColumnName(propName, prop);
-                const schema = isPostgresCollection(collection) && collection.schema ? collection.schema : "public";
+                const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
                 return `"${schema}"."${tableName}_${colName}"`;
             }
             if (stringProp.isId === "uuid" || stringProp.columnType === "uuid") {
@@ -189,7 +189,7 @@ const getSqlColumnType = (propName: string, prop: Property, collection: Snapshot
             if (!relation || relation.direction !== "owning" || relation.cardinality !== "one") {
                 throw new Error(`Relation ${propName} is not an owning one-to-one/many-to-one relation`);
             }
-            let targetCollection: SnapshotCollection;
+            let targetCollection: CollectionConfig;
             try {
                 targetCollection = relation.target();
             } catch {
@@ -211,7 +211,7 @@ const getSqlColumnType = (propName: string, prop: Property, collection: Snapshot
 };
 
 export const generatePostgresDdl = async (
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     options: { includePolicies?: boolean } = { includePolicies: true }
 ): Promise<string> => {
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n\n";
@@ -219,7 +219,7 @@ export const generatePostgresDdl = async (
     // 1. Create custom schemas
     const uniqueSchemas = Array.from(new Set([
         "auth",
-        ...collections.map(c => isPostgresCollection(c) ? c.schema : undefined).filter(Boolean)
+        ...collections.map(c => isPostgresCollectionConfig(c) ? c.schema : undefined).filter(Boolean)
     ]));
     uniqueSchemas.forEach(schema => {
         if (schema) ddl += `CREATE SCHEMA IF NOT EXISTS "${schema}";\n`;
@@ -229,7 +229,7 @@ export const generatePostgresDdl = async (
     // 2. Generate Enums
     collections.forEach(collection => {
         const collectionTable = getTableName(collection);
-        const schema = isPostgresCollection(collection) && collection.schema ? collection.schema : "public";
+        const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
         Object.entries(collection.properties ?? {}).forEach(([propName, prop]) => {
             if (("enum" in prop) && (prop.type === "string" || prop.type === "number") && prop.enum) {
                 const enumDbName = `${collectionTable}_${resolveColumnName(propName, prop)}`;
@@ -247,10 +247,10 @@ export const generatePostgresDdl = async (
     if (ddl.endsWith(";\n")) ddl += "\n";
 
     const allTablesToGenerate = new Map<string, {
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         isJunction?: boolean,
         relation?: Relation,
-        sourceCollection?: SnapshotCollection
+        sourceCollection?: CollectionConfig
     }>();
 
     // Identify all tables
@@ -269,7 +269,7 @@ export const generatePostgresDdl = async (
                         collection: {
                             table: junctionTableName,
                             properties: {}
-                        } as SnapshotCollection,
+                        } as CollectionConfig,
                         isJunction: true,
                         relation: relation,
                         sourceCollection: collection
@@ -287,15 +287,15 @@ export const generatePostgresDdl = async (
         relation,
         sourceCollection
     }] of allTablesToGenerate.entries()) {
-        const schema = isPostgresCollection(collection) && collection.schema ? collection.schema : "public";
+        const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
         const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
 
         if (isJunction && relation && sourceCollection && relation.through) {
             const targetCollection = relation.target();
             const sourceTable = getTableName(sourceCollection);
             const targetTable = getTableName(targetCollection);
-            const sourceSchema = isPostgresCollection(sourceCollection) && sourceCollection.schema ? sourceCollection.schema : "public";
-            const targetSchema = isPostgresCollection(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
+            const sourceSchema = isPostgresCollectionConfig(sourceCollection) && sourceCollection.schema ? sourceCollection.schema : "public";
+            const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
             const { sourceColumn, targetColumn } = relation.through;
 
             const sourceColType = isNumericId(sourceCollection) ? "INTEGER" : (getPrimaryKeyProp(sourceCollection).isUuid ? "UUID" : "VARCHAR(255)");
@@ -331,7 +331,7 @@ export const generatePostgresDdl = async (
                         return;
                     }
 
-                    let targetCollection: SnapshotCollection;
+                    let targetCollection: CollectionConfig;
                     try {
                         targetCollection = relInfo.target();
                     } catch {
@@ -339,7 +339,7 @@ export const generatePostgresDdl = async (
                     }
 
                     const targetTable = getTableName(targetCollection);
-                    const targetSchema = isPostgresCollection(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
+                    const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
                     const targetId = getPrimaryKeyName(targetCollection);
                     const fkColType = getSqlColumnType(propName, prop, collection, collections);
                     
@@ -365,7 +365,7 @@ export const generatePostgresDdl = async (
                         columns.push(colDef);
                     } else {
                         const targetTable = getTableName(targetCollection);
-                        const targetSchema = isPostgresCollection(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
+                        const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
                         const targetId = getPrimaryKeyName(targetCollection);
                         const onDelete = required ? "CASCADE" : "SET NULL";
 
@@ -449,11 +449,11 @@ export const generatePostgresDdl = async (
     return ddl;
 };
 
-export const generatePostgresPoliciesDdl = (collections: SnapshotCollection[]): string => {
+export const generatePostgresPoliciesDdl = (collections: CollectionConfig[]): string => {
     let ddl = "-- This file contains RLS policies generated by Rebase. Applied separately from migrations.\n\n";
 
     const allTablesToGenerate = new Map<string, {
-        collection: SnapshotCollection
+        collection: CollectionConfig
     }>();
 
     for (const collection of collections) {
@@ -464,7 +464,7 @@ export const generatePostgresPoliciesDdl = (collections: SnapshotCollection[]): 
     }
 
     for (const [tableName, { collection }] of allTablesToGenerate.entries()) {
-        const schema = isPostgresCollection(collection) && collection.schema ? collection.schema : "public";
+        const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
         const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
 
         ddl += `ALTER TABLE "${schema}"."${baseTableName}" ENABLE ROW LEVEL SECURITY;\n`;

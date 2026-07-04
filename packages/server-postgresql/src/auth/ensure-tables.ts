@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server-core";
-import type { SnapshotCollection } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
 
 /**
@@ -11,7 +11,7 @@ import type { SnapshotCollection } from "@rebasepro/types";
  * @param collection — The collection that represents auth users.
  *                     When omitted, a default `rebase.users` table is created.
  */
-export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: SnapshotCollection): Promise<void> {
+export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: CollectionConfig): Promise<void> {
     logger.info("🔍 Checking auth tables...");
 
     try {

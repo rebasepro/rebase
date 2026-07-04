@@ -18,7 +18,7 @@ I callback ti consentono di agganciarti al ciclo di vita dell'entità per:
 ## Definire i Callback
 
 ```typescript
-const articlesCollection: EntityCollection = {
+const articlesCollection: CollectionConfig = {
     slug: "articles",
     callbacks: {
         beforeSave: async ({ values, entityId, status }) => {
@@ -342,7 +342,7 @@ afterSave: async ({ values, entityId, context }) => {
 Uno degli usi più potenti dei callback è la **sincronizzazione dei dati tra collezioni** utilizzando `context.data`:
 
 ```typescript
-const submissionsCollection: EntityCollection = {
+const submissionsCollection: CollectionConfig = {
     slug: "job_submissions",
     callbacks: {
         afterSave: async ({ values, entityId, previousValues, context }) => {

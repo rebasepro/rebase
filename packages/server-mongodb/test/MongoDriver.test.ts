@@ -7,7 +7,7 @@
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
 import { MongoDriver } from "../src/services/MongoDriver";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
 describe("MongoDriver", () => {
     let mongoServer: MongoMemoryServer;
@@ -15,7 +15,7 @@ describe("MongoDriver", () => {
     let db: Db;
     let delegate: MongoDriver;
 
-    const mockCollection: SnapshotCollection = {
+    const mockCollection: CollectionConfig = {
         name: "users",
         properties: {
             name: { dataType: "string" },
@@ -362,7 +362,7 @@ email: "test@example.com" },
             const beforeDeleteSpy = jest.fn();
             const afterDeleteSpy = jest.fn();
 
-            const collectionWithHooks: SnapshotCollection = {
+            const collectionWithHooks: CollectionConfig = {
                 name: "hooked_users",
                 properties: {
                     name: { dataType: "string" }

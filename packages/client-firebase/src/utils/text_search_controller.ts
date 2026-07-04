@@ -1,5 +1,5 @@
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 
 /**
  * Utility function to perform a text search in an external index,
@@ -20,7 +20,7 @@ export function buildExternalSearchController({
 
         const init = (props: {
             path: string,
-            collection?: SnapshotCollection
+            collection?: CollectionConfig
         }) => {
             return Promise.resolve(isPathSupported(props.path));
         }

@@ -9,7 +9,7 @@ description: Definieren Sie Row Level Security (RLS)-Richtlinien für Ihre Samml
 Sicherheitsregeln ermöglichen es Ihnen, **Row Level Security (RLS)**-Richtlinien für Ihre PostgreSQL-Tabellen direkt in Ihren Sammlungsdefinitionen zu definieren. Wenn das Drizzle-Schema generiert wird, erstellt Rebase die entsprechenden `CREATE POLICY`-Anweisungen.
 
 ```typescript
-const postsCollection: EntityCollection = {
+const postsCollection: CollectionConfig = {
     slug: "posts",
     table: "posts",
     properties: { /* ... */ },
@@ -202,7 +202,7 @@ Ein häufiges Bedürfnis ist es, **nicht authentifizierten Benutzern** das Über
 ### Empfohlen: `access: "public"` mit `withCheck`
 
 ```typescript
-const contactMessagesCollection: EntityCollection = {
+const contactMessagesCollection: CollectionConfig = {
     slug: "contact_messages",
     securityRules: [
         // Jeder kann eine Kontaktanfrage senden
@@ -223,7 +223,7 @@ Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohn
 ### Für Lead-Generierung / Anmeldungen
 
 ```typescript
-const leadSignupsCollection: EntityCollection = {
+const leadSignupsCollection: CollectionConfig = {
     slug: "lead_magnet_signups",
     securityRules: [
         // Anonyme Einfügungen erlauben

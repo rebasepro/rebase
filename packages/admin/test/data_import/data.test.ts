@@ -1,13 +1,13 @@
 import { describe, expect, test, jest } from "@jest/globals";
 import { flattenEntry, processValueMapping, convertDataToSnapshot } from "../../src/data_import/utils/data";
-import { AuthController, CollectionRegistryController, SnapshotReference, Property, Properties, Vector, SnapshotCollection } from "@rebasepro/types";
+import { AuthController, CollectionRegistryController, SnapshotReference, Property, Properties, Vector, CollectionConfig } from "@rebasepro/types";
 
 describe("Data Import Utility Functions", () => {
     const mockAuth = {} as AuthController;
     const mockNavigation = {
         getCollection: jest.fn().mockImplementation((path: string) => {
             if (path === "users") {
-                return { databaseId: "custom-db" } as SnapshotCollection<any>;
+                return { databaseId: "custom-db" } as CollectionConfig<any>;
             }
             return undefined;
         })

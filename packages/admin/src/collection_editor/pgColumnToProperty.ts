@@ -1,4 +1,4 @@
-import { SnapshotCollection, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, PostgresProperties } from "@rebasepro/types";
+import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, PostgresProperties } from "@rebasepro/types";
 import { prettifyIdentifier } from "@rebasepro/utils";
 
 /**
@@ -193,13 +193,13 @@ label: prettifyIdentifier(v) })),
 }
 
 /**
- * Builds a partial SnapshotCollection from PostgreSQL table metadata.
+ * Builds a partial CollectionConfig from PostgreSQL table metadata.
  * This is used when creating a new collection from an existing database table.
  */
 export function buildCollectionFromTableMetadata(
     tableName: string,
     metadata: TableMetadata
-): Partial<SnapshotCollection> {
+): Partial<CollectionConfig> {
     const properties: Record<string, Property> = {};
     const propertiesOrder: string[] = [];
     const relations: any[] = []; // In the builder/editor, target can be a string path before hydration

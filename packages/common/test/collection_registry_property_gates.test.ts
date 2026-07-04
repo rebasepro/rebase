@@ -1,8 +1,8 @@
 import {
-    SnapshotCollection,
-    PostgresCollection,
-    FirebaseCollection,
-    MongoDBCollection,
+    CollectionConfig,
+    PostgresCollectionConfig,
+    FirebaseCollectionConfig,
+    MongoDBCollectionConfig,
     ReferenceProperty,
     RelationProperty,
     StringProperty
@@ -12,7 +12,7 @@ import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 describe("CollectionRegistry — engine-specific property gates", () => {
 
     it("registers and retrieves a Postgres collection with relation properties", () => {
-        const postsCollection: SnapshotCollection = {
+        const postsCollection: CollectionConfig = {
             id: "posts",
             name: "Posts",
             path: "posts",
@@ -22,7 +22,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
             }
         };
 
-        const authorsCollection: PostgresCollection = {
+        const authorsCollection: PostgresCollectionConfig = {
             id: "authors",
             name: "Authors",
             slug: "authors",
@@ -55,7 +55,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("registers and retrieves a Firestore collection with reference properties", () => {
-        const fsCollection: FirebaseCollection = {
+        const fsCollection: FirebaseCollectionConfig = {
             id: "articles",
             name: "Articles",
             slug: "articles",
@@ -80,7 +80,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("registers and retrieves a MongoDB collection with reference properties", () => {
-        const mongoCollection: MongoDBCollection = {
+        const mongoCollection: MongoDBCollectionConfig = {
             id: "comments",
             name: "Comments",
             slug: "comments",
@@ -105,7 +105,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("handles a mixed-engine registry with Postgres, Firestore, and MongoDB collections", () => {
-        const pgCol: PostgresCollection = {
+        const pgCol: PostgresCollectionConfig = {
             id: "users",
             name: "Users",
             slug: "users",
@@ -115,7 +115,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
             }
         };
 
-        const fsCol: FirebaseCollection = {
+        const fsCol: FirebaseCollectionConfig = {
             id: "docs",
             name: "Docs",
             slug: "docs",
@@ -126,7 +126,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
             }
         };
 
-        const mongoCol: MongoDBCollection = {
+        const mongoCol: MongoDBCollectionConfig = {
             id: "logs",
             name: "Logs",
             slug: "logs",
@@ -150,7 +150,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("StringProperty does not carry a reference field after normalization", () => {
-        const col: SnapshotCollection = {
+        const col: CollectionConfig = {
             id: "items",
             name: "Items",
             path: "items",
@@ -175,7 +175,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
     });
 
     it("preserves raw collection data when using narrowed Postgres types", () => {
-        const postsCollection: SnapshotCollection = {
+        const postsCollection: CollectionConfig = {
             id: "posts",
             name: "Posts",
             path: "posts",
@@ -185,7 +185,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
             }
         };
 
-        const col: PostgresCollection = {
+        const col: PostgresCollectionConfig = {
             id: "categories",
             name: "Categories",
             slug: "categories",

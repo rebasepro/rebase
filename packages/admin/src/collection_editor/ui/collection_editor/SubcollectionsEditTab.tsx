@@ -5,7 +5,7 @@ import {
     useCustomizationController
 } from "@rebasepro/core";
 import { resolveSnapshotView } from "../../_cms_internals";
-import { SnapshotCollection, SnapshotCustomView, User } from "@rebasepro/types";
+import { CollectionConfig, SnapshotCustomView, User } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 import {
     Alert,
@@ -37,8 +37,8 @@ export function SubcollectionsEditTab({
     getUser,
     parentCollectionSlugs
 }: {
-    collection: SnapshotCollection,
-    parentCollection?: SnapshotCollection,
+    collection: CollectionConfig,
+    parentCollection?: CollectionConfig,
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
     getUser?: (uid: string) => User | null;
@@ -59,9 +59,9 @@ export function SubcollectionsEditTab({
     const {
         values,
         setFieldValue
-    } = useFormex<SnapshotCollection>();
+    } = useFormex<CollectionConfig>();
 
-    const [subcollections, setSubcollections] = React.useState<SnapshotCollection[]>(getSubcollections(collection) ?? []);
+    const [subcollections, setSubcollections] = React.useState<CollectionConfig[]>(getSubcollections(collection) ?? []);
     const resolvedSnapshotViews = values.snapshotViews?.filter(e => typeof e === "string")
         .map(e => resolveSnapshotView(e, contextSnapshotViews))
         .filter(Boolean) as SnapshotCustomView[] ?? [];

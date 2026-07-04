@@ -30,7 +30,7 @@ La procedura guidata di importazione gestisce la mappatura delle colonne, la coe
 Abilita/disabilita l'importazione per collezione:
 
 ```typescript
-const productsCollection: EntityCollection = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     // Import is enabled by default
     // To disable:

@@ -13,10 +13,10 @@
  * annotations: if a line compiles when it shouldn't, tsc reports an error.
  */
 import type {
-    PostgresCollection,
-    FirebaseCollection,
-    MongoDBCollection,
-    SnapshotCollection,
+    PostgresCollectionConfig,
+    FirebaseCollectionConfig,
+    MongoDBCollectionConfig,
+    CollectionConfig,
     PostgresProperties,
     FirebaseProperties,
     MongoProperties,
@@ -28,10 +28,10 @@ import type {
 
 describe("Engine-specific property type gates", () => {
 
-    describe("PostgresCollection", () => {
+    describe("PostgresCollectionConfig", () => {
 
         it("accepts RelationProperty in properties", () => {
-            const col: PostgresCollection = {
+            const col: PostgresCollectionConfig = {
                 slug: "pg_test",
                 name: "PG Test",
                 table: "pg_test",
@@ -61,10 +61,10 @@ describe("Engine-specific property type gates", () => {
         });
     });
 
-    describe("FirebaseCollection", () => {
+    describe("FirebaseCollectionConfig", () => {
 
         it("accepts ReferenceProperty in properties", () => {
-            const col: FirebaseCollection = {
+            const col: FirebaseCollectionConfig = {
                 slug: "fs_test",
                 name: "FS Test",
                 driver: "firestore",
@@ -92,10 +92,10 @@ describe("Engine-specific property type gates", () => {
         });
     });
 
-    describe("MongoDBCollection", () => {
+    describe("MongoDBCollectionConfig", () => {
 
         it("accepts ReferenceProperty in properties", () => {
-            const col: MongoDBCollection = {
+            const col: MongoDBCollectionConfig = {
                 slug: "mongo_test",
                 name: "Mongo Test",
                 driver: "mongodb",
@@ -147,30 +147,30 @@ describe("Engine-specific property type gates", () => {
         });
     });
 
-    describe("SnapshotCollection union", () => {
+    describe("CollectionConfig union", () => {
 
         it("is the union of all three engine-specific types", () => {
-            const pgCol: PostgresCollection = {
+            const pgCol: PostgresCollectionConfig = {
                 slug: "pg",
                 name: "PG",
                 table: "pg",
                 properties: { title: { type: "string" } }
             };
-            const fsCol: FirebaseCollection = {
+            const fsCol: FirebaseCollectionConfig = {
                 slug: "fs",
                 name: "FS",
                 driver: "firestore",
                 properties: { title: { type: "string" } }
             };
-            const mongoCol: MongoDBCollection = {
+            const mongoCol: MongoDBCollectionConfig = {
                 slug: "mongo",
                 name: "Mongo",
                 driver: "mongodb",
                 properties: { title: { type: "string" } }
             };
 
-            // All three should be assignable to SnapshotCollection
-            const collections: SnapshotCollection[] = [pgCol, fsCol, mongoCol];
+            // All three should be assignable to CollectionConfig
+            const collections: CollectionConfig[] = [pgCol, fsCol, mongoCol];
             expect(collections).toHaveLength(3);
         });
     });

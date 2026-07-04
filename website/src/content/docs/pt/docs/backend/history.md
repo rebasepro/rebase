@@ -35,7 +35,7 @@ history: {
 Marque quais coleções devem rastrear o histórico:
 
 ```typescript
-const ordersCollection: EntityCollection = {
+const ordersCollection: CollectionConfig = {
     slug: "orders",
     history: true,       // Ativar para esta coleção
     properties: { /* ... */ }

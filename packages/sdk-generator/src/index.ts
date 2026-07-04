@@ -4,7 +4,7 @@
  * Generates a purely typed Typescript database definition.
  */
 
-import { SnapshotCollection } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
 import { generateTypedefs } from "./generate-types";
 
 export { generateTypedefs } from "./generate-types";
@@ -25,7 +25,7 @@ export interface GenerateSDKOptions {
 }
 
 export function generateSDK(
-    collections: SnapshotCollection[],
+    collections: CollectionConfig[],
     options: GenerateSDKOptions = {}
 ): GeneratedFile[] {
     const files: GeneratedFile[] = [];

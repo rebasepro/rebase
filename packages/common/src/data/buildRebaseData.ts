@@ -148,8 +148,7 @@ values: {} as Record<string, unknown> }
                                 total: snapshots.length,
                                 limit,
                                 offset,
-                                hasMore: snapshots.length >= limit,
-                                estimated: true
+                                hasMore: snapshots.length >= limit
                             }
                         });
                     },
@@ -387,7 +386,9 @@ function toSnapshotAccessor<M extends Record<string, unknown>>(
             return rowToSnapshot<M>(await sdk.create(data as Partial<M>, id), slug);
         },
         async update(id: string | number, data: Partial<SnapshotValues<M>>): Promise<Snapshot<M>> {
-            return rowToSnapshot<M>(await sdk.update(id, data as Partial<M>), slug);
+            const row = await sdk.update(id, data as Partial<M>);
+            if (!row) throw new Error(`Update returned no data for id ${id}`);
+            return rowToSnapshot<M>(row, slug);
         },
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);

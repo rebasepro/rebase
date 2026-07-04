@@ -12,7 +12,7 @@ pnpm add @rebasepro/client-postgresql
 
 ## What This Package Does
 
-This package provides a `DataDriver` implementation that bridges Rebase's data layer to a PostgreSQL backend through `@rebasepro/client`'s WebSocket client. It supports full CRUD, realtime collection/entity listeners, unique field validation, entity counting, and admin operations (SQL execution, branch management, table introspection).
+This package provides a `DataDriver` implementation that bridges Rebase's data layer to a PostgreSQL backend through `@rebasepro/client`'s WebSocket client. It supports full CRUD, realtime collection/snapshot listeners, unique field validation, snapshot counting, and admin operations (SQL execution, branch management, table introspection).
 
 ## Key Exports
 
@@ -26,14 +26,14 @@ This package provides a `DataDriver` implementation that bridges Rebase's data l
 
 | Method | Description |
 |---|---|
-| `fetchCollection(props)` | Fetch a list of entities with filtering, sorting, pagination, and search |
-| `fetchEntity(props)` | Fetch a single entity by path and ID |
-| `saveEntity(props)` | Create or update an entity |
-| `deleteEntity(props)` | Delete an entity |
-| `checkUniqueField(path, name, value, entityId?, collection?)` | Check if a field value is unique |
-| `countEntities(props)` | Count entities matching filter criteria |
+| `fetchCollection(props)` | Fetch a list of snapshots with filtering, sorting, pagination, and search |
+| `fetchSnapshot(props)` | Fetch a single snapshot by path and ID |
+| `saveSnapshot(props)` | Create or update a snapshot |
+| `deleteSnapshot(props)` | Delete a snapshot |
+| `checkUniqueField(path, name, value, snapshotId?, collection?)` | Check if a field value is unique |
+| `countSnapshots(props)` | Count snapshots matching filter criteria |
 | `listenCollection(props)` | Subscribe to realtime collection updates. Returns an unsubscribe function |
-| `listenEntity(props)` | Subscribe to realtime entity updates. Returns an unsubscribe function |
+| `listenSnapshot(props)` | Subscribe to realtime snapshot updates. Returns an unsubscribe function |
 | `isFilterCombinationValid()` | Always returns `true` — PostgreSQL supports complex filter combinations |
 
 ### Admin Methods (`driver.admin`)
@@ -71,4 +71,4 @@ function App() {
 ## Related Packages
 
 - `@rebasepro/client` — Provides `RebaseWebSocketClient` used for communication
-- `@rebasepro/types` — Shared types (`DataDriver`, `Entity`, `EntityCollection`, etc.)
+- `@rebasepro/types` — Shared types (`DataDriver`, `Snapshot`, `CollectionConfig`, etc.)

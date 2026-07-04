@@ -1,6 +1,6 @@
 import React from "react";
 import type { Snapshot, SnapshotValues } from "./snapshots";
-import type { SnapshotCollection } from "./collections";
+import type { CollectionConfig } from "./collections";
 import type { FormexController } from "./formex";
 import type { ComponentRef } from "./component_ref";
 
@@ -37,7 +37,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     /**
      * Collection of the snapshot being modified
      */
-    collection?: SnapshotCollection<M>;
+    collection?: CollectionConfig<M>;
 
     /**
      * Snapshot id, it can be undefined if it's a new snapshot
@@ -105,7 +105,7 @@ export type FormViewConfig<M extends Record<string, unknown> = Record<string, un
 };
 
 export interface SnapshotCustomViewParams<M extends Record<string, unknown> = Record<string, unknown>> {
-    collection: SnapshotCollection<M>;
+    collection: CollectionConfig<M>;
     snapshot?: Snapshot<M>;
     modifiedValues?: SnapshotValues<M>;
     formContext: FormContext<M>;

@@ -1,18 +1,18 @@
-import { SnapshotCollection, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { CollectionConfig, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { generateForeignKeyName } from "@rebasepro/utils";
 
 export function sanitizeRelation(
     relation: Partial<Relation>,
-    sourceCollection: SnapshotCollection,
-    resolveCollection?: (slugOrTable: string) => SnapshotCollection | undefined
+    sourceCollection: CollectionConfig,
+    resolveCollection?: (slugOrTable: string) => CollectionConfig | undefined
 ): Relation {
     if (!relation.target) {
         throw new Error("Relation is missing a `target` collection.");
     }
 
     const rawTarget = relation.target;
-    let targetCollection: SnapshotCollection | undefined;
+    let targetCollection: CollectionConfig | undefined;
 
     if (typeof rawTarget === "string") {
         if (resolveCollection) {
@@ -20,7 +20,7 @@ export function sanitizeRelation(
         }
         if (!targetCollection) {
             targetCollection = { slug: rawTarget,
-name: rawTarget } as SnapshotCollection;
+name: rawTarget } as CollectionConfig;
         }
     } else if (typeof rawTarget === "function") {
         const evaluated = rawTarget();
@@ -30,13 +30,13 @@ name: rawTarget } as SnapshotCollection;
             }
             if (!targetCollection) {
                 targetCollection = { slug: evaluated,
-name: evaluated } as SnapshotCollection;
+name: evaluated } as CollectionConfig;
             }
         } else {
             targetCollection = evaluated;
         }
     } else if (rawTarget && typeof rawTarget === "object") {
-        targetCollection = rawTarget as SnapshotCollection;
+        targetCollection = rawTarget as CollectionConfig;
     }
 
     if (!targetCollection) {
@@ -198,10 +198,10 @@ name: evaluated } as SnapshotCollection;
 }
 
 /** WeakMap cache — same collection instance always yields the same relation map. */
-const _resolvedRelationsCache = new WeakMap<SnapshotCollection, Record<string, Relation>>();
+const _resolvedRelationsCache = new WeakMap<CollectionConfig, Record<string, Relation>>();
 
 export function resolveCollectionRelations(
-    collection: SnapshotCollection
+    collection: CollectionConfig
 ): Record<string, Relation> {
     const cached = _resolvedRelationsCache.get(collection);
     if (cached) return cached;
@@ -275,7 +275,7 @@ export function resolvePropertyRelation({
 }: {
     propertyKey: string;
     property: Property;
-    sourceCollection: SnapshotCollection;
+    sourceCollection: CollectionConfig;
 }): Relation | undefined {
     if (property.type !== "relation") return undefined;
 
@@ -304,7 +304,7 @@ export function resolvePropertyRelation({
     return undefined;
 }
 
-export function getTableName(collection: SnapshotCollection): string {
+export function getTableName(collection: CollectionConfig): string {
     if (getDataSourceCapabilities(collection.engine).supportsRelations) {
         return collection.table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
     }

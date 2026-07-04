@@ -171,6 +171,6 @@ properties: {
 
 ## Próximos Passos
 
-- **[Visualizações de Entidade](/docs/frontend/entity-views)** — Abas personalizadas no editor de entidade
-- **[Ações de Entidade](/docs/frontend/entity-actions)** — Botões de ação personalizados
+- **[Visualizações de Entidade](/docs/frontend/snapshot-views)** — Abas personalizadas no editor de entidade
+- **[Ações de Entidade](/docs/frontend/snapshot-actions)** — Botões de ação personalizados
 - **[Colunas Adicionais](/docs/frontend/additional-columns)** — Colunas de tabela calculadas

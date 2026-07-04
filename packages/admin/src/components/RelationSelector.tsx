@@ -25,9 +25,9 @@ import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Snapshot, SnapshotRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
-import { SnapshotPreviewData } from "./SnapshotPreview";
+import { RecordPreviewBindingData } from "./RecordPreviewBinding";
 import { useData, useRelationSelector } from "@rebasepro/core";
-import { useSideSnapshotController } from "../hooks/useSideSnapshotController";
+import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToSnapshotRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";
 
@@ -91,7 +91,7 @@ export const RelationSelector = React.forwardRef<
 
         const collection = relation.target();
         const dataClient = useData();
-        const sideSnapshotController = useSideSnapshotController();
+        const sidePanelController = useSidePanel();
         const multiple = relation.cardinality === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -487,11 +487,11 @@ relation } as RelationItem;
                                                     <div key={String(item.id)}
                                                         className="flex flex-row items-center gap-1 truncate">
                                                         {item.data ? (
-                                                            <SnapshotPreviewData size={"medium"}
+                                                            <RecordPreviewBindingData size={"medium"}
                                                                 snapshot={item.data}
                                                                 includeSnapshotLink={false}
                                                                 includeId={false}
-                                                                onSideSnapshotClick={closePopover}
+                                                                onSidePanelClick={closePopover}
                                                             />
                                                         ) : (
                                                             <span className="text-sm truncate">{item.label}</span>
@@ -506,7 +506,7 @@ relation } as RelationItem;
                                                     className={cls("flex flex-row items-center gap-1 truncate")}
                                                 >
                                                     {item.data ? (
-                                                        <SnapshotPreviewData size={"smallest"} snapshot={item.data}
+                                                        <RecordPreviewBindingData size={"smallest"} snapshot={item.data}
                                                             includeSnapshotLink={false}
                                                             includeId={false}/>
                                                     ) : (
@@ -543,7 +543,7 @@ relation } as RelationItem;
                                                     e.preventDefault();
                                                     const snapshot = selectedItems[0].data!;
                                                     setIsPopoverOpen(false);
-                                                    sideSnapshotController.open({
+                                                    sidePanelController.open({
                                                         snapshotId: snapshot.id,
                                                         path: snapshot.path,
                                                         collection,
@@ -668,7 +668,7 @@ relation } as RelationItem;
                                                     {item.data ? (
                                                         <div
                                                             className="flex flex-row items-center gap-2 min-w-0 w-full">
-                                                            <SnapshotPreviewData
+                                                            <RecordPreviewBindingData
                                                                 size={multiple ? "smallest" : "medium"}
                                                                 snapshot={item.data}
                                                                 includeId={false}

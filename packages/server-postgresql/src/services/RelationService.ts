@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
-import { SnapshotCollection, FilterValues, Relation } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, Relation } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -89,7 +89,7 @@ export class RelationService {
      * Fetch rows using join paths for complex relations
      */
     async fetchSnapshotsUsingJoins<M extends Record<string, unknown>>(
-        parentCollection: SnapshotCollection,
+        parentCollection: CollectionConfig,
         parentId: string | number,
         relation: Relation,
         options: {
@@ -688,7 +688,7 @@ export class RelationService {
      */
     async updateRelationsUsingJoins<M extends Record<string, unknown>>(
         tx: DrizzleClient,
-        collection: SnapshotCollection,
+        collection: CollectionConfig,
         id: string | number,
         relationValues: Partial<M>
     ) {
@@ -859,7 +859,7 @@ export class RelationService {
      */
     async updateInverseRelations(
         tx: DrizzleClient,
-        sourceCollection: SnapshotCollection,
+        sourceCollection: CollectionConfig,
         sourceSnapshotId: string | number,
         inverseRelationUpdates: Array<{
             relationKey: string;
@@ -973,9 +973,9 @@ export class RelationService {
      */
     private async updateInverseJoinPathRelation(
         tx: DrizzleClient,
-        sourceCollection: SnapshotCollection,
+        sourceCollection: CollectionConfig,
         sourceSnapshotId: string | number,
-        targetCollection: SnapshotCollection,
+        targetCollection: CollectionConfig,
         relation: Relation,
         newValue: unknown
     ) {
@@ -1083,9 +1083,9 @@ export class RelationService {
      */
     private async updateManyToManyInverseRelation(
         tx: DrizzleClient,
-        sourceCollection: SnapshotCollection,
+        sourceCollection: CollectionConfig,
         sourceSnapshotId: string | number,
-        targetCollection: SnapshotCollection,
+        targetCollection: CollectionConfig,
         relation: Relation,
         newValue: unknown,
         junctionInfo: { table: string; sourceColumn: string; targetColumn: string }
@@ -1140,7 +1140,7 @@ export class RelationService {
      */
     async updateJoinPathOneToOneRelations(
         tx: DrizzleClient,
-        parentCollection: SnapshotCollection,
+        parentCollection: CollectionConfig,
         parentId: string | number,
         updates: Array<{
             relationKey: string;
@@ -1221,7 +1221,7 @@ export class RelationService {
      * Resolve joinPath write mapping for one-to-one relations
      */
     resolveJoinPathWriteMapping(
-        parentCollection: SnapshotCollection,
+        parentCollection: CollectionConfig,
         relation: Relation
     ): { targetFKColName: string; parentSourceColName: string } {
         if (!relation.joinPath || relation.joinPath.length === 0) {
@@ -1259,7 +1259,7 @@ parentSourceColName };
         tx: DrizzleClient,
         newSnapshotId: string | number,
         junctionTableInfo: {
-            parentCollection: SnapshotCollection;
+            parentCollection: CollectionConfig;
             parentId: string | number;
             relation: Relation;
             relationKey: string;

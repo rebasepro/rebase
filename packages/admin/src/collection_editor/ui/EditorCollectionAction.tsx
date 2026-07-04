@@ -1,6 +1,6 @@
 import { useCollectionRegistryController } from "../_cms_internals";
 import { useAuthController, useTranslation } from "@rebasepro/core";
-import { SnapshotCollection, CollectionActionsProps } from "@rebasepro/types";
+import { CollectionConfig, CollectionActionsProps } from "@rebasepro/types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -38,7 +38,7 @@ export function EditorCollectionAction({
                     path,
                     parentCollectionSlugs,
 parentSnapshotIds,
-                    parentCollection: parentCollection as SnapshotCollection,
+                    parentCollection: parentCollection as CollectionConfig,
                     existingSnapshots: tableController?.data ?? []
                 })
                 : undefined}>

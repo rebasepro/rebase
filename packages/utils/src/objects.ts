@@ -91,7 +91,7 @@ export function clone<T>(value: T): T {
 /**
  * Deep clone a value, preserving function references and class instances.
  * Unlike structuredClone, this handles objects that contain functions
- * (e.g. SnapshotCollection with target(), childCollections(), callbacks).
+ * (e.g. CollectionConfig with target(), childCollections(), callbacks).
  */
 export function deepClone<T>(value: T): T {
     if (value === null || value === undefined) return value;

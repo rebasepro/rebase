@@ -6,10 +6,10 @@ import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/for
 import { ConfirmationDialog } from "@rebasepro/core";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { SnapshotCollection, Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
+import { CollectionConfig, Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
 import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
-import { toSerializableProperty, toSerializableCollection } from "../../serializable_utils";
-import type { SerializableProperty, SerializableCollection } from "../../serializable_types";
+import { toSerializableProperty, toSerializableCollectionConfig } from "../../serializable_utils";
+import type { SerializableProperty, SerializableCollectionConfig } from "../../serializable_types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import {
     AlertTriangleIcon,
@@ -91,9 +91,9 @@ export type PropertyFormProps = {
         metadata: Record<string, unknown>;
         onMetadataChange: (key: string, value: unknown) => void;
         property: SerializableProperty;
-        collection: SerializableCollection;
+        collection: SerializableCollectionConfig;
     }) => React.ReactNode;
-    collectionValues?: SnapshotCollection;
+    collectionValues?: CollectionConfig;
 
 };
 
@@ -368,7 +368,7 @@ function PropertyEditFormFields({
     propertyTypePresets?: PropertyTypePreset[];
     hiddenPropertyTypes?: PropertyType[];
     renderExtraPropertyFields?: PropertyFormProps["renderExtraPropertyFields"];
-    collectionValues?: SnapshotCollection;
+    collectionValues?: CollectionConfig;
 
 } & FormexController<PropertyWithId>) {
 
@@ -612,7 +612,7 @@ function PropertyEditFormFields({
                                 } as PropertyWithId);
                             },
                             property: toSerializableProperty(values as Property),
-                            collection: toSerializableCollection(collectionValues),
+                            collection: toSerializableCollectionConfig(collectionValues),
                         })}
                     </div>
                 )}

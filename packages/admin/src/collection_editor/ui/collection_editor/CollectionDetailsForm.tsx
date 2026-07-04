@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
-import { SnapshotCollection, Property } from "@rebasepro/types";
+import { CollectionConfig, Property } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -42,7 +42,7 @@ export function CollectionDetailsForm({
     isNewCollection: boolean,
     existingPaths?: string[];
     existingIds?: string[];
-    parentCollection?: SnapshotCollection;
+    parentCollection?: CollectionConfig;
     parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
     expandKanban?: boolean;
 }) {
@@ -57,7 +57,7 @@ export function CollectionDetailsForm({
         setFieldTouched,
         isSubmitting,
         submitCount
-    } = useFormex<SnapshotCollection>();
+    } = useFormex<CollectionConfig>();
 
     const collectionEditor = useCollectionEditorController();
 

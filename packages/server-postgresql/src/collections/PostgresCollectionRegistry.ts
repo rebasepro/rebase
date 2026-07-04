@@ -1,5 +1,5 @@
 import { CollectionRegistry } from "@rebasepro/common";
-import { type SnapshotCollection, type Relation, getDataSourceCapabilities } from "@rebasepro/types";
+import { type CollectionConfig, type Relation, getDataSourceCapabilities } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { CollectionRegistryInterface } from "../interfaces";
@@ -42,7 +42,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
     /**
      * Finds collections assigned to a specific data source that do not have a registered table.
      */
-    getCollectionsWithoutTables(dataSourceKey = "(default)"): SnapshotCollection[] {
+    getCollectionsWithoutTables(dataSourceKey = "(default)"): CollectionConfig[] {
         const collections = this.getCollections().filter(
             c => c.dataSource === dataSourceKey || (!c.dataSource && dataSourceKey === "(default)")
         );
