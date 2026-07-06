@@ -223,7 +223,7 @@ function CollectionView({ slug, label }: { slug: string; label: string }) {
   const [page, setPage] = useState(1);
   const { data, meta, loading, refetch } = useCollection(slug, { limit: 15,
 page });
-  const [editingSnapshot, setEditingSnapshot] = useState<any>(null);
+  const [editingEntity, setEditingEntity] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
 
@@ -235,7 +235,7 @@ type }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
   }, []);
 
-  // Derive columns from first snapshot's values
+  // Derive columns from first entity's values
   const columns = data.length > 0 ? Object.keys(data[0].values).slice(0, 6) : [];
 
   const handleDelete = async (id: string | number) => {
@@ -258,7 +258,7 @@ type }]);
         await client.data.collection(slug).create(values);
         toast("Record created");
       }
-      setEditingSnapshot(null);
+      setEditingEntity(null);
       setShowCreate(false);
       refetch();
     } catch (err: any) {
@@ -304,16 +304,16 @@ type }]);
                 </td>
               </tr>
             )}
-            {!loading && data.map((snapshot) => (
-              <tr key={snapshot.id}>
-                <td className="cell-id">{snapshot.id}</td>
+            {!loading && data.map((entity) => (
+              <tr key={entity.id}>
+                <td className="cell-id">{entity.id}</td>
                 {columns.map((col) => (
-                  <td key={col}>{renderCellValue(snapshot.values[col], col)}</td>
+                  <td key={col}>{renderCellValue(entity.values[col], col)}</td>
                 ))}
                 <td>
                   <div className="btn-group">
-                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingSnapshot(snapshot)}>Edit</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(snapshot.id)}>✕</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingEntity(entity)}>Edit</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(entity.id)}>✕</button>
                   </div>
                 </td>
               </tr>
@@ -330,13 +330,13 @@ type }]);
         )}
       </div>
 
-      {(editingSnapshot || showCreate) && (
-        <SnapshotDialog
-          snapshot={editingSnapshot}
+      {(editingEntity || showCreate) && (
+        <EntityDialog
+          snapshot={editingEntity}
           slug={slug}
-          columns={editingSnapshot ? Object.keys(editingSnapshot.values) : columns}
+          columns={editingEntity ? Object.keys(editingEntity.values) : columns}
           onSave={handleSave}
-          onClose={() => { setEditingSnapshot(null); setShowCreate(false); }}
+          onClose={() => { setEditingEntity(null); setShowCreate(false); }}
         />
       )}
 
@@ -357,26 +357,26 @@ function renderCellValue(value: any, col: string): React.ReactNode {
 }
 
 // ===== Snapshot Dialog =====
-function SnapshotDialog({
+function EntityDialog({
   snapshot,
   slug,
   columns,
   onSave,
   onClose
 }: {
-  snapshot: any | null;
+  entity: any | null;
   slug: string;
   columns: string[];
   onSave: (values: Record<string, any>, id?: string | number) => Promise<void>;
   onClose: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, any>>(snapshot?.values ?? {});
+  const [values, setValues] = useState<Record<string, any>>(entity?.values ?? {});
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await onSave(values, snapshot?.id);
+    await onSave(values, entity?.id);
     setSaving(false);
   };
 
@@ -384,7 +384,7 @@ function SnapshotDialog({
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
-          <h3 className="dialog-title">{snapshot ? `Edit #${snapshot.id}` : `New ${slug}`}</h3>
+          <h3 className="dialog-title">{entity ? `Edit #${entity.id}` : `New ${slug}`}</h3>
           <button className="btn btn-icon btn-secondary" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -426,7 +426,7 @@ function SnapshotDialog({
           <div className="dialog-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? <span className="spinner"/> : snapshot ? "Save Changes" : "Create"}
+              {saving ? <span className="spinner"/> : entity ? "Save Changes" : "Create"}
             </button>
           </div>
         </form>

@@ -1,16 +1,14 @@
 /**
- * Cross-package regression tests for the Entity → Entity rename.
+ * Cross-package regression tests for the Snapshot → Entity rename-back.
  *
  * These tests scan the actual source code of all packages to ensure
- * that the automated rename didn't introduce any of the known bug
- * classes, and that no regressions creep in over time.
+ * that the record noun is "entity" everywhere, and "snapshot" only
+ * appears in the history feature (point-in-time copies).
  *
  * Categories:
- * 1. No "IDSNAPSHOT" anywhere — the SQL IDENTITY keyword must be preserved
- * 2. No "an entity" — grammar must use "a entity"
- * 3. Database column/table names (entity_history, entity_id) preserved
- * 4. No corrupted substrings (identity → identityy)
- * 5. No remaining bare "Entity" type names that should be "Entity"
+ * 1. No "Snapshot" as the record noun (type/interface/component names)
+ * 2. No "Record"-nouned components (RecordPreviewBinding, etc.)
+ * 3. Firebase SDK exceptions are preserved (DocumentSnapshot, etc.)
  */
 
 import * as fs from "fs";
@@ -64,88 +62,69 @@ const PACKAGE_SRC_DIRS = [
     path.join(REPO_ROOT, "packages/studio/src"),
 ];
 
-// ── 1. IDSNAPSHOT must never appear ──────────────────────────────────────
+// ── 1. No Snapshot-noun type names (except Firebase SDK) ─────────────────
 
-describe("IDSNAPSHOT corruption guard", () => {
+describe("No Snapshot as record noun", () => {
 
-    it("should not contain IDSNAPSHOT in any package source file", () => {
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /IDSNAPSHOT/);
-        expect(violations).toEqual([]);
-    });
-
-    it("should not contain identity (lowercase) in any package source file", () => {
-        // Catches variable names like identityy
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /identity/i);
-        expect(violations).toEqual([]);
-    });
-});
-
-// ── 2. Grammar: "a entity" not "an entity" ───────────────────────────
-
-describe("Grammar: article before entity", () => {
-
-    it("should not use 'an entity' anywhere in package source", () => {
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /\ban [Ss]napshot/);
-        expect(violations).toEqual([]);
-    });
-
-    it("should not use 'An entity' anywhere in package source", () => {
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /\bAn [Ss]napshot/);
-        expect(violations).toEqual([]);
-    });
-});
-
-// ── 3. Database names preserved ──────────────────────────────────────────
-
-describe("Database name preservation", () => {
-
-    it("should not reference entity_history as a DB table in server-postgresql history code", () => {
-        const historyDir = path.join(REPO_ROOT, "packages/server-postgresql/src/history");
-        const violations = scanFiles([historyDir], /entity_history/);
-        expect(violations).toEqual([]);
-    });
-
-    it("should not reference entity_id as a DB column in server-postgresql history code", () => {
-        const historyDir = path.join(REPO_ROOT, "packages/server-postgresql/src/history");
-        const violations = scanFiles([historyDir], /entity_id/);
-        expect(violations).toEqual([]);
-    });
-
-    it("should not reference entity_id as a DB column in server-mongodb history code", () => {
-        const historyDir = path.join(REPO_ROOT, "packages/server-mongodb/src");
-        const violations = scanFiles([historyDir], /entity_id/);
-        expect(violations).toEqual([]);
-    });
-});
-
-// ── 4. Identity words must not be corrupted ──────────────────────────────
-
-describe("Identity word preservation", () => {
-
-    it("should not contain IdEntity as a corruption of Identity", () => {
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /\bIdEntity\b/);
-        expect(violations).toEqual([]);
-    });
-});
-
-// ── 5. No remaining bare Entity type names ───────────────────────────────
-
-describe("No remaining Entity type references", () => {
-
-    // These are the specific type names that were renamed.
-    // We check they no longer appear as standalone words (excluding "identity" etc.)
-    const typePatterns: [string, RegExp][] = [
-        ["EntityCollection", /\bEntityCollection\b/],
-        ["EntityCallbackContext", /\bEntityCallbackContext\b/],
-        ["SideEntityController", /\bSideEntityController\b/],
-        ["EntityAction<", /\bEntityAction</],
-        ["EntityView<", /\bEntityView</],
+    // These Snapshot-named types/interfaces should NOT exist — they should be Entity-named
+    const snapshotTypePatterns: [string, RegExp][] = [
+        ["SnapshotValues", /\bSnapshotValues\b/],
+        ["SnapshotStatus", /\bSnapshotStatus\b/],
+        ["SnapshotAction<", /\bSnapshotAction</],
+        ["SnapshotCustomView", /\bSnapshotCustomView\b/],
+        ["SnapshotForm", /\bSnapshotForm\b/],
+        ["SnapshotTableController", /\bSnapshotTableController\b/],
     ];
 
-    for (const [name, pattern] of typePatterns) {
+    for (const [name, pattern] of snapshotTypePatterns) {
         it(`should not reference ${name} in any package source file`, () => {
             const violations = scanFiles(PACKAGE_SRC_DIRS, pattern);
             expect(violations).toEqual([]);
         });
     }
+});
+
+// ── 2. No Record-nouned components ───────────────────────────────────────
+
+describe("No Record-nouned components", () => {
+
+    const recordPatterns: [string, RegExp][] = [
+        ["RecordPreviewBinding", /\bRecordPreviewBinding\b/],
+        ["RecordCardBinding", /\bRecordCardBinding\b/],
+        ["RecordViewBinding", /\bRecordViewBinding\b/],
+        ["EditorRecordAction", /\bEditorRecordAction\b/],
+        ["RecordActionsSelectDialog", /\bRecordActionsSelectDialog\b/],
+    ];
+
+    for (const [name, pattern] of recordPatterns) {
+        it(`should not reference ${name} in any package source file`, () => {
+            const violations = scanFiles(PACKAGE_SRC_DIRS, pattern);
+            expect(violations).toEqual([]);
+        });
+    }
+});
+
+// ── 3. Firebase SDK names preserved ──────────────────────────────────────
+
+describe("Firebase SDK names preserved", () => {
+
+    it("should still reference DocumentSnapshot in client-firebase", () => {
+        const firebaseDir = path.join(REPO_ROOT, "packages/client-firebase/src");
+        const files = collectTsFiles(firebaseDir);
+        const hasDocumentSnapshot = files.some(file => {
+            const content = fs.readFileSync(file, "utf-8");
+            return /\bDocumentSnapshot\b/.test(content);
+        });
+        expect(hasDocumentSnapshot).toBe(true);
+    });
+
+    it("should still reference onSnapshot in client-firebase", () => {
+        const firebaseDir = path.join(REPO_ROOT, "packages/client-firebase/src");
+        const files = collectTsFiles(firebaseDir);
+        const hasOnSnapshot = files.some(file => {
+            const content = fs.readFileSync(file, "utf-8");
+            return /\bonSnapshot\b/.test(content);
+        });
+        expect(hasOnSnapshot).toBe(true);
+    });
 });

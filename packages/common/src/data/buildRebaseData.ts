@@ -37,7 +37,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
-            const filter = params?.where ? deserializeFilter(params.where as any) : undefined;
+            const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
             const limit = params?.limit ?? 20;
             const offset = params?.offset ?? 0;
 
@@ -121,7 +121,7 @@ values: {} as Record<string, unknown> }
 
         count: driver.count
             ? async (params?: FindParams): Promise<number> => {
-                const filter = params?.where ? deserializeFilter(params.where as any) : undefined;
+                const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
                 return driver.count!({
                     path: slug,
                     filter

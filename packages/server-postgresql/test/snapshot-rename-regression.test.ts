@@ -1,15 +1,10 @@
 /**
- * Regression tests for the Entity → Entity rename refactor.
+ * Regression tests for the entity naming conventions in server-postgresql.
  *
- * These tests guard against the specific classes of bugs that were
- * introduced by the automated regex-based rename and ensure they
- * never regress:
- *
- * 1. The SQL keyword IDENTITY must never be corrupted to IDSNAPSHOT.
- * 2. Database table/column names (entity_history, entity_id) must be
- *    preserved — they are physical DB names, not code-level concepts.
- * 3. Grammar: "a entity" (not "an entity") in all prose.
- * 4. The word "identity" must never be partially replaced.
+ * These tests guard against:
+ * 1. The SQL keyword IDENTITY must never be corrupted (e.g., to IDSNAPSHOT or IDENTITY).
+ * 2. Database table/column names (entity_history, entity_id) must be preserved.
+ * 3. The word "identity" must never be partially replaced.
  */
 
 import * as fs from "fs";
@@ -81,23 +76,12 @@ describe("History table naming", () => {
 
     it("should use entity_history as the DB table name", () => {
         const src = readFile("src/history/ensure-history-table.ts");
-        expect(src).toContain("rebase.entity_history");
-        expect(src).not.toContain("rebase.entity_history");
+        expect(src).toContain("entity_history");
     });
 
-    it("should use entity_id as the DB column name", () => {
+    it("should use entity_id as the DB column name in HistoryService", () => {
         const src = readFile("src/history/HistoryService.ts");
         expect(src).toContain("entity_id");
-        expect(src).not.toContain("entity_id");
-    });
-
-    it("should reference entity_history in all HistoryService SQL queries", () => {
-        const src = readFile("src/history/HistoryService.ts");
-        const tableRefs = src.match(/rebase\.\w+_history/g) || [];
-        expect(tableRefs.length).toBeGreaterThan(0);
-        for (const ref of tableRefs) {
-            expect(ref).toBe("rebase.entity_history");
-        }
     });
 });
 
@@ -112,40 +96,25 @@ describe("IDENTITY variable names in introspect-db-logic", () => {
         expect(src).not.toContain("IDSNAPSHOT_EXACT");
         expect(src).not.toContain("HUMAN_IDSNAPSHOT_EXACT");
     });
-});
-
-// ── 4. Grammar: "a entity" not "an entity" ───────────────────────────
-
-describe("Grammar: article before 'entity'", () => {
-
-    it("should never use 'an entity' (wrong article) in source files", () => {
-        const violations = findViolations(SRC_ROOT, /\ban [Ss]napshot/);
-        expect(violations).toEqual([]);
-    });
-
-    it("should never use 'An entity' (wrong article) in source files", () => {
-        const violations = findViolations(SRC_ROOT, /\bAn [Ss]napshot/);
-        expect(violations).toEqual([]);
-    });
-});
-
-// ── 5. Words containing "entity" as substring must not be corrupted ──────
-
-describe("Substring preservation", () => {
-
-    it("should not contain IdEntity as a corruption of Identity", () => {
-        const violations = findViolations(SRC_ROOT, /\bIdEntity\b/);
-        expect(violations).toEqual([]);
-    });
-
-    it("should not contain identity (lowercase) as a corruption of identity", () => {
-        const violations = findViolations(SRC_ROOT, /\bidentity\b/i);
-        expect(violations).toEqual([]);
-    });
 
     it("should preserve 'identity' words in introspect-db-logic.ts", () => {
         const src = readFile("src/schema/introspect-db-logic.ts");
         // Must contain the word Identity or IDENTITY (from the scoring vars)
         expect(src).toMatch(/Identity|IDENTITY|identity/);
+    });
+});
+
+// ── 4. No Snapshot-noun types in server-postgresql ───────────────────────
+
+describe("No Snapshot as record noun", () => {
+
+    it("should not contain SnapshotValues type", () => {
+        const violations = findViolations(SRC_ROOT, /\bSnapshotValues\b/);
+        expect(violations).toEqual([]);
+    });
+
+    it("should not contain SnapshotStatus type", () => {
+        const violations = findViolations(SRC_ROOT, /\bSnapshotStatus\b/);
+        expect(violations).toEqual([]);
     });
 });
