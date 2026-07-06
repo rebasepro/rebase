@@ -106,13 +106,13 @@ app.get("/", async (c) => {
 
     // Access the data driver to query collections
     const driver = c.get("driver");
-    const entitys = await driver.fetchCollection("products", {
+    const entities = await driver.fetchCollection("products", {
         limit: 1000,
         orderBy: "created_at",
         order: "desc"
     });
 
-    return c.json({ data: entitys });
+    return c.json({ data: entities });
 });
 
 export default app;

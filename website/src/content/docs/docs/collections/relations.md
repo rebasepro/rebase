@@ -9,7 +9,7 @@ description: Define one-to-one, one-to-many, and many-to-many SQL relations betw
 Relations define how collections are connected at the database level. They enable Rebase to:
 
 - Render **relation picker fields** in entity forms
-- Resolve **related entitys** when displaying previews
+- Resolve **related entities** when displaying previews
 - Generate **foreign key constraints** in the Drizzle schema
 - Support **cascade delete/update** behaviors
 
@@ -201,7 +201,7 @@ joinPath: [
 
 ## Cascade Rules
 
-Control what happens when related entitys are updated or deleted:
+Control what happens when related entities are updated or deleted:
 
 ```typescript
 relations: [
@@ -226,7 +226,7 @@ relations: [
 
 ## Fetching Relations in the SDK
 
-When querying data through the Rebase Client SDK, relations are **not** included by default. Use the `include()` method to request related entitys alongside the primary data.
+When querying data through the Rebase Client SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
 
 ### Include specific relations
 

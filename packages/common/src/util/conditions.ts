@@ -227,7 +227,7 @@ export function applyPropertyConditions(
     // VALUE CONDITIONS
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Apply default value for new entitys
+    // Apply default value for new entities
     if (context.isNew && conditions.defaultValue !== undefined) {
         result.defaultValue = evaluateCondition(conditions.defaultValue, context) as Property["defaultValue"];
     }

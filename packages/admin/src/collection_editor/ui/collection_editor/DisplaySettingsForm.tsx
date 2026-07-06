@@ -273,7 +273,7 @@ hideFromCollection: true }
                                 value={values.sideDialogWidth ?? ""}
                                 label={"Side dialog width"}/>
                             <FieldCaption>
-                                Optionally define the width (in pixels) of entitys side dialog. Default is 768px
+                                Optionally define the width (in pixels) of entities side dialog. Default is 768px
                             </FieldCaption>
                         </div>
 

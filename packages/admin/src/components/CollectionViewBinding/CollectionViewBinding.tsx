@@ -138,7 +138,7 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
 /**
  * This component is in charge of binding a driver path with an {@link CollectionConfig}
  * where it's configuration is defined. It includes an infinite scrolling table
- * and a 'Add' new entitys button,
+ * and a 'Add' new entities button,
  *
  * This component is the default one used for displaying entity collections
  * and is in charge of generating all the specific actions and customization
@@ -151,7 +151,7 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
  * If you need a lower level implementation with more granular options, you
  * can use {@link CollectionTableBinding}.
  *
- * If you need a generic table that is not bound to the driver or entitys and
+ * If you need a generic table that is not bound to the driver or entities and
  * properties at all, you can check {@link VirtualTable}
  *
  * @param path
@@ -202,16 +202,16 @@ const CollectionViewBindingInner = React.memo(
             collectionRef.current = collection;
         }, [collection]);
 
-        const canCreateEntitys = canCreate(collection, path);
+        const canCreateEntities = canCreate(collection, path);
         const [highlightedEntity, setHighlightedEntity] = useState<Entity<M> | undefined>(undefined);
         const [deleteEntityClicked, setDeleteEntityClicked] = React.useState<Entity<M> | Entity<M>[] | undefined>(undefined);
 
         const [lastDeleteTimestamp, setLastDeleteTimestamp] = React.useState<number>(0);
 
-        // Track recently deleted entitys for optimistic Kanban count updates
-        const [deletedEntitys, setDeletedEntitys] = React.useState<Entity<M>[]>([]);
+        // Track recently deleted entities for optimistic Kanban count updates
+        const [deletedEntities, setDeletedEntities] = React.useState<Entity<M>[]>([]);
 
-        // number of entitys in the collection (undefined = loading)
+        // number of entities in the collection (undefined = loading)
         const [docsCount, setDocsCount] = useState<number | null | undefined>(null);
 
         // Optimistic state for column order to prevent UI flickering during persistence
@@ -322,8 +322,8 @@ const CollectionViewBindingInner = React.memo(
         const selectionController = useSelectionController<M>();
         const usedSelectionController = collection.selectionController ?? selectionController;
         const {
-            selectedEntitys,
-            setSelectedEntitys
+            selectedEntities,
+            setSelectedEntities
         } = usedSelectionController;
 
         const tableController = useDataTableController<M>({
@@ -407,25 +407,25 @@ const CollectionViewBindingInner = React.memo(
             analyticsController.onAnalyticsEvent?.("multiple_delete_dialog_open", {
                 path: path
             });
-            setDeleteEntityClicked(selectedEntitys);
+            setDeleteEntityClicked(selectedEntities);
         };
 
         const internalOnEntityDelete = (_path: string, entity: Entity<M>) => {
             analyticsController.onAnalyticsEvent?.("single_entity_deleted", {
                 path: path
             });
-            setSelectedEntitys((selectedEntitys) => selectedEntitys.filter((e) => e.id !== entity.id));
-            setDeletedEntitys(prev => [...prev, entity]);
+            setSelectedEntities((selectedEntities) => selectedEntities.filter((e) => e.id !== entity.id));
+            setDeletedEntities(prev => [...prev, entity]);
             setLastDeleteTimestamp(Date.now());
         };
 
-        const internalOnMultipleEntitysDelete = (_path: string, entitys: Entity<M>[]) => {
-            analyticsController.onAnalyticsEvent?.("multiple_entitys_deleted", {
+        const internalOnMultipleEntitiesDelete = (_path: string, entities: Entity<M>[]) => {
+            analyticsController.onAnalyticsEvent?.("multiple_entities_deleted", {
                 path: path
             });
-            setSelectedEntitys([]);
+            setSelectedEntities([]);
             setDeleteEntityClicked(undefined);
-            setDeletedEntitys(prev => [...prev, ...entitys]);
+            setDeletedEntities(prev => [...prev, ...entities]);
             setLastDeleteTimestamp(Date.now());
         };
 
@@ -451,7 +451,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
 parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
-            canCreate: canCreateEntitys,
+            canCreate: canCreateEntities,
             onNewClick
         });
 
@@ -721,7 +721,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             frozen?: boolean
         }) => {
 
-            const isSelected = Boolean(usedSelectionController.selectedEntitys.find(e => e.id == entity.id && e.path == entity.path));
+            const isSelected = Boolean(usedSelectionController.selectedEntities.find(e => e.id == entity.id && e.path == entity.path));
             const customEntityActions = (collection.entityActions ?? EMPTY_ARRAY)
                 .map(action => resolveEntityAction(action, customizationController.entityActions))
                 .filter(Boolean) as EntityAction<M>[];
@@ -760,8 +760,8 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             updateCountRef.current(path, docsCount);
         }, [docsCount, path]);
 
-        // EntitysCount fetches count and updates breadcrumb - no visual rendering needed here
-        const countFetcher = <EntitysCount
+        // EntitiesCount fetches count and updates breadcrumb - no visual rendering needed here
+        const countFetcher = <EntitiesCount
             path={path}
             collection={collection}
             filter={tableController.filterValues}
@@ -891,7 +891,7 @@ parentEntityIds,
         const emptyComponent = pluginEmptyStates.length > 0
             ? <>{pluginEmptyStates}</>
             : <ResolvedEmptyState
-                canCreate={canCreateEntitys && !isFilteredOrSorted}
+                canCreate={canCreateEntities && !isFilteredOrSorted}
                 onNewClick={onNewClick}
                 isSearching={isSearching}
                 searchString={tableController.searchString ?? ""}
@@ -911,7 +911,7 @@ parentEntityIds,
                     path={path}
                     relativePath={getCollectionDataPath(collection)}
                     selectionController={usedSelectionController}
-                    collectionEntitysCount={docsCount ?? undefined}
+                    collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
@@ -927,7 +927,7 @@ parentEntityIds,
                         relativePath={getCollectionDataPath(collection)}
                         selectionController={usedSelectionController}
                         selectionEnabled={activeSelectionEnabled}
-                        collectionEntitysCount={docsCount ?? undefined}
+                        collectionEntitiesCount={docsCount ?? undefined}
                         compact={isCompact}
                     >
                         {pluginToolbarWidgets}
@@ -945,8 +945,8 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
-                deletedEntitys={deletedEntitys}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                deletedEntities={deletedEntities}
                 emptyComponent={emptyComponent}
             />
         ) : viewMode === "cards" ? (
@@ -957,7 +957,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                 onScroll={tableController.onScroll}
                 initialScroll={tableController.initialScroll}
                 size={cardSize}
@@ -971,7 +971,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                 size={listSize}
                 emptyComponent={emptyComponent}
                 getActionsForEntity={getActionsForEntity}
@@ -993,7 +993,7 @@ parentEntityIds,
                 tableRowActionsBuilder={tableRowActionsBuilder}
                 uniqueFieldValidator={uniqueFieldValidator}
                 selectionController={usedSelectionController}
-                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                 defaultSize={tableSize}
                 properties={resolvedCollection.properties}
                 getPropertyFor={getPropertyFor}
@@ -1043,7 +1043,7 @@ parentEntityIds,
                         onNewClick={onNewClick}
                         selectionController={usedSelectionController}
                         selectionEnabled={selectionEnabled}
-                        highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
+                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                         onScroll={tableController.onScroll}
                         initialScroll={tableController.initialScroll}
                         size={listSize}
@@ -1102,7 +1102,7 @@ parentEntityIds,
                                     onEntityClick={onEntityClick}
                                     selectionController={usedSelectionController}
                                     selectionEnabled={selectionEnabled}
-                                    highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
+                                    highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                                     size={listSize}
                                     emptyComponent={emptyComponent}
                                     selectedEntityId={selectedEntityIdProp}
@@ -1175,13 +1175,13 @@ parentEntityIds,
 
                 {deleteEntityClicked &&
                     <DeleteEntityDialog
-                        entityOrEntitysToDelete={deleteEntityClicked}
+                        entityOrEntitiesToDelete={deleteEntityClicked}
                         path={path}
                         collection={collection}
                         callbacks={collection.callbacks}
                         open={Boolean(deleteEntityClicked)}
                         onEntityDelete={internalOnEntityDelete}
-                        onMultipleEntitysDelete={internalOnMultipleEntitysDelete}
+                        onMultipleEntitiesDelete={internalOnMultipleEntitiesDelete}
                         onClose={() => setDeleteEntityClicked(undefined)}/>}
 
             </div>
@@ -1232,7 +1232,7 @@ export const CollectionViewBinding = React.memo(
 ) as React.FunctionComponent<CollectionViewBindingProps<any>>;
 
 /**
- * Default empty state shown when a collection has no entitys.
+ * Default empty state shown when a collection has no entities.
  * Used as the fallback for the `"Collection.EmptyState"` component override.
  *
  * @internal
@@ -1279,7 +1279,7 @@ function DefaultCollectionEmptyState({
  */
 const inflightCountRequests = new Map<string, Promise<number>>();
 
-function EntitysCount({
+function EntitiesCount({
     path,
     collection,
     filter,

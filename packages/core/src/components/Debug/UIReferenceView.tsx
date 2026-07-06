@@ -713,7 +713,7 @@ selected: true }, { name: "Tags" }].map(c => (
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">SearchBar</Typography>
-                            <SearchBar placeholder="Search entitys…"/>
+                            <SearchBar placeholder="Search entities…"/>
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Skeleton</Typography>

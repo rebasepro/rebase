@@ -509,7 +509,7 @@ using: "status = 'draft'" }
 
     // ─── Section 10: UI Enablability (null entity = optimistic) ─────────────────
 
-    describe("UI enablability with null entitys", () => {
+    describe("UI enablability with null entities", () => {
 
         test("39. Create: role-gated rule → disabled for non-matching user", () => {
             const collection = createMockCollection([{ operation: "insert",
@@ -646,7 +646,7 @@ mode: "permissive" }
             expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(false);
         });
 
-        test("52. Admin can delete anything, author only their own entitys", () => {
+        test("52. Admin can delete anything, author only their own entities", () => {
             const collection = createMockCollection([
                 { operation: "delete",
 roles: ["admin"] },

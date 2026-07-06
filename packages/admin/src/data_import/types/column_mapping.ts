@@ -12,8 +12,8 @@ export type ImportConfig = {
     importData: object[];
     setImportData: React.Dispatch<React.SetStateAction<object[]>>;
 
-    entitys: Entity<any>[];
-    setEntitys: React.Dispatch<React.SetStateAction<Entity<any>[]>>;
+    entities: Entity<any>[];
+    setEntities: React.Dispatch<React.SetStateAction<Entity<any>[]>>;
 
     // mapping of the column name in the import file to the property key in the data model
     headersMapping: Record<string, string | null>;

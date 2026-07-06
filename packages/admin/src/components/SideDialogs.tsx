@@ -41,7 +41,7 @@ export const useSideDialogContext = () => useContext<SideDialogController>(SideD
 
 /**
  * This is the component in charge of rendering the side dialogs used
- * for editing entitys. Use the {@link useSidePanel} to open
+ * for editing entities. Use the {@link useSidePanel} to open
  * and control the dialogs.
  * This component needs a parent {@link Rebase}
  * {@link useSideDialogsController}

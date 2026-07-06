@@ -41,7 +41,7 @@ export interface QueryFilter {
 }
 
 /**
- * Options for fetching a collection of entitys
+ * Options for fetching a collection of entities
  */
 export interface FetchCollectionOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -56,7 +56,7 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
 }
 
 /**
- * Options for searching entitys
+ * Options for searching entities
  */
 export interface SearchOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -68,7 +68,7 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
 }
 
 /**
- * Options for counting entitys
+ * Options for counting entities
  */
 export interface CountOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -143,7 +143,7 @@ export type ConditionBuilderStatic<T = unknown> = {
 
 /**
  * Abstract entity repository interface.
- * Handles all CRUD operations for entitys in the database.
+ * Handles all CRUD operations for entities in the database.
  *
  * Implementations should handle:
  * - Entity serialization/deserialization
@@ -161,7 +161,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown> | undefined>;
 
     /**
-     * Fetch a collection of entitys with optional filtering, ordering, and pagination
+     * Fetch a collection of entities with optional filtering, ordering, and pagination
      */
     fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -169,7 +169,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Search entitys by text
+     * Search entities by text
      */
     searchRows<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -178,7 +178,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Count entitys in a collection
+     * Count entities in a collection
      */
     count<M extends Record<string, unknown>>(
         collectionPath: string,

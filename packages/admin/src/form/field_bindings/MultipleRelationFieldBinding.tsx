@@ -55,15 +55,15 @@ export function MultipleRelationFieldBinding({
     const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
     const collection = relation.target();
 
-    const onMultipleEntitysSelected = useCallback((entitys: Entity<Record<string, unknown>>[]) => {
-        setValue(entitys.map(e => getRelationFrom(e)));
+    const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
+        setValue(entities.map(e => getRelationFrom(e)));
     }, [setValue]);
 
     const referenceDialogController = useSelectionDialog({
         multiselect: true,
         path: getCollectionDataPath(collection),
         collection,
-        onMultipleEntitysSelected,
+        onMultipleEntitiesSelected,
         selectedEntityIds,
         fixedFilter: property.fixedFilter
     }

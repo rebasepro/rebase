@@ -24,7 +24,7 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
 
     const savingRef = useRef<boolean>(false);
 
-    const [processedEntitys, setProcessedEntitys] = useState<number>(0);
+    const [processedEntities, setProcessedEntities] = useState<number>(0);
 
     function save() {
 
@@ -37,10 +37,10 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
             dataClient,
             collection,
             path,
-            importConfig.entitys,
+            importConfig.entities,
             0,
             25,
-            setProcessedEntitys
+            setProcessedEntities
         ).then(() => {
             onImportSuccess(collection);
             savingRef.current = false;
@@ -82,7 +82,7 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
             </Typography>
 
             <Typography variant={"body2"}>
-                {processedEntitys}/{importConfig.entitys.length} entitys saved
+                {processedEntities}/{importConfig.entities.length} entities saved
             </Typography>
 
             <Typography variant={"caption"}>

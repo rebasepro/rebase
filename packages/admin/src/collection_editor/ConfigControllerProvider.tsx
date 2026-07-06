@@ -97,7 +97,7 @@ export const ConfigControllerProvider = React.memo(
             },
             copyFrom?: CollectionConfig,
             redirect: boolean,
-            existingEntitys?: Entity[],
+            existingEntities?: Entity[],
             pathSuggestions?: string[];
             initialView?: "general" | "display" | "properties";
             expandKanban?: boolean;
@@ -113,7 +113,7 @@ export const ConfigControllerProvider = React.memo(
             path?: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
 
-            existingEntitys?: Entity[];
+            existingEntities?: Entity[];
             collection?: CollectionConfig;
         }>();
 
@@ -123,7 +123,7 @@ export const ConfigControllerProvider = React.memo(
             path,
             parentCollectionSlugs, parentEntityIds,
             parentCollection,
-            existingEntitys,
+            existingEntities,
             initialView,
             expandKanban
         }: {
@@ -131,7 +131,7 @@ export const ConfigControllerProvider = React.memo(
             path?: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
             parentCollection?: CollectionConfig,
-            existingEntitys?: Entity[],
+            existingEntities?: Entity[],
             initialView?: "general" | "display" | "properties",
             expandKanban?: boolean
         }) => {
@@ -148,7 +148,7 @@ parentEntityIds,
                 isNewCollection: false,
                 parentCollection,
                 redirect: false,
-                existingEntitys,
+                existingEntities,
                 pathSuggestions,
                 initialView,
                 expandKanban
@@ -162,7 +162,7 @@ parentEntityIds,
             currentPropertiesOrder,
             parentCollectionSlugs, parentEntityIds,
             collection,
-            existingEntitys
+            existingEntities
         }: {
             propertyKey?: string,
             property?: Property,
@@ -170,7 +170,7 @@ parentEntityIds,
             editedCollectionId: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
             collection: CollectionConfig,
-            existingEntitys?: Entity[]
+            existingEntities?: Entity[]
         }) => {
             console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentEntityIds, collection);
             onAnalyticsEvent?.("edit_property", {
@@ -193,7 +193,7 @@ parentEntityIds,
                 parentCollectionSlugs,
 parentEntityIds,
 
-                existingEntitys,
+                existingEntities,
                 collection
             });
         }, [onAnalyticsEvent]);
@@ -288,11 +288,11 @@ parentEntityIds,
                 autoUpdateId: !currentPropertyDialog.propertyKey,
                 autoOpenTypeSelect: !currentPropertyDialog.propertyKey,
                 inArray: false,
-                getData: currentPropertyDialog.existingEntitys || (getData && currentPropertyDialog.editedCollectionId)
+                getData: currentPropertyDialog.existingEntities || (getData && currentPropertyDialog.editedCollectionId)
                     ? async () => {
                         let data: object[] = [];
-                        if (currentPropertyDialog.existingEntitys) {
-                            data = currentPropertyDialog.existingEntitys.map(e => e.values);
+                        if (currentPropertyDialog.existingEntities) {
+                            data = currentPropertyDialog.existingEntities.map(e => e.values);
                         }
                         if (getData && currentPropertyDialog.editedCollectionId) {
                             console.debug("Get data for property, path:", currentPropertyDialog.editedCollectionId);

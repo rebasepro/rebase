@@ -11,7 +11,7 @@ description: Guide for sending outbound HTTP webhooks on entity changes in a Reb
 
 ## Overview
 
-Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notifications when entitys change. It handles:
+Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notifications when entities change. It handles:
 
 - **Table + event matching** — Only dispatches to webhooks whose `table` and `events` match
 - **HMAC-SHA256 signing** — Optional payload signing for receiver verification

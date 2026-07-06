@@ -243,7 +243,7 @@ export interface RebaseTranslations {
     table_view: string;
     cards_view: string;
     kanban_view: string;
-    choose_how_entitys_displayed_default: string;
+    choose_how_entities_displayed_default: string;
 
     document_view: string;
     side_panel: string;
@@ -340,7 +340,7 @@ export interface RebaseTranslations {
 
     enum_form_dialog: string;
     imported_data_preview: string;
-    entitys_with_same_id_overwritten: string;
+    entities_with_same_id_overwritten: string;
     collection_editor: string;
     properties_in_this_group: string;
     data_property_mapping: string;
@@ -355,12 +355,12 @@ export interface RebaseTranslations {
     role: string;
     name_of_this_role: string;
     id_of_this_role: string;
-    create_entitys: string;
-    read_entitys: string;
-    update_entitys: string;
-    delete_entitys: string;
+    create_entities: string;
+    read_entities: string;
+    update_entities: string;
+    delete_entities: string;
     all_collections: string;
-    create_entitys_in_collections: string;
+    create_entities_in_collections: string;
     access_all_data_in_every_collection: string;
     update_data_in_any_collection: string;
     delete_data_in_any_collection: string;
@@ -394,7 +394,7 @@ export interface RebaseTranslations {
     create_user: string;
 
     filters: string;
-    multiple_entitys: string;
+    multiple_entities: string;
     unsaved_changes: string;
     so_empty: string;
     no_results: string;
@@ -436,7 +436,7 @@ export interface RebaseTranslations {
     error_saving_data: string;
     retry: string;
     saving_data: string;
-    entitys_saved: string;
+    entities_saved: string;
     do_not_close_tab: string;
     import: string;
     import_data: string;
@@ -446,7 +446,7 @@ export interface RebaseTranslations {
     save_data: string;
     use_column_as_id: string;
     do_not_import_property: string;
-    entitys_will_be_overwritten: string;
+    entities_will_be_overwritten: string;
     data_imported_successfully: string;
 
     // data export
@@ -497,8 +497,8 @@ export interface RebaseTranslations {
     drag_drop_file: string;
 
     multiple_deleted: string;
-    some_entitys_deleted: string;
-    error_deleting_entitys: string;
+    some_entities_deleted: string;
+    error_deleting_entities: string;
     deleted: string;
 
     select_reference: string;

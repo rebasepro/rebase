@@ -291,13 +291,13 @@ describe("FetchService – cursor pagination combined with filters", () => {
     it("should return empty array when no results match cursor + filter", async () => {
         (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve([]));
 
-        const entitys = await dataService.fetchCollection("items", {
+        const entities = await dataService.fetchCollection("items", {
             filter: { name: ["==", "nonexistent"] },
             startAfter: { id: 1 },
             limit: 10
         });
 
-        expect(entitys).toEqual([]);
+        expect(entities).toEqual([]);
     });
 });
 
@@ -319,7 +319,7 @@ describe("FetchService – count", () => {
         jest.restoreAllMocks();
     });
 
-    it("should count entitys with no filters", async () => {
+    it("should count entities with no filters", async () => {
         // The count query resolves to [{ count: 42 }]
         (db as unknown as Record<string, jest.Mock>).then = jest.fn(
             (resolve: (v: unknown[]) => void) => resolve([{ count: 42 }])
@@ -332,7 +332,7 @@ describe("FetchService – count", () => {
         expect(db.from).toHaveBeenCalled();
     });
 
-    it("should count entitys with a filter", async () => {
+    it("should count entities with a filter", async () => {
         (db as unknown as Record<string, jest.Mock>).then = jest.fn(
             (resolve: (v: unknown[]) => void) => resolve([{ count: 7 }])
         );
@@ -426,7 +426,7 @@ describe("PersistService – deleteAll", () => {
 
     it("should not invoke any per-entity callbacks (beforeDelete/afterDelete)", async () => {
         // deleteAll directly calls db.delete(table) — it does NOT iterate
-        // over individual entitys and therefore MUST NOT trigger any
+        // over individual entities and therefore MUST NOT trigger any
         // beforeDelete / afterDelete lifecycle hooks.
         //
         // We verify this by ensuring only a single db.delete call is made
@@ -436,7 +436,7 @@ describe("PersistService – deleteAll", () => {
 
         await dataService.deleteAll("items");
 
-        // Only one delete call, no selects to fetch individual entitys
+        // Only one delete call, no selects to fetch individual entities
         expect(db.delete).toHaveBeenCalledTimes(1);
         expect(selectSpy).not.toHaveBeenCalled();
     });

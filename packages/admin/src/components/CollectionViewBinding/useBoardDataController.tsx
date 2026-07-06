@@ -29,15 +29,15 @@ function shallowEqualValues(
  * Data state for a single board column
  */
 export interface BoardColumnData<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Entitys loaded for this column */
-    entitys: Entity<M>[];
+    /** Entities loaded for this column */
+    entities: Entity<M>[];
     /** Whether the column is currently loading data */
     loading: boolean;
     /** Whether there are more items to load */
     hasMore: boolean;
     /** Error if loading failed */
     error?: Error;
-    /** Total count of entitys in this column */
+    /** Total count of entities in this column */
     totalCount?: number;
 }
 
@@ -76,7 +76,7 @@ export interface UseBoardDataControllerProps<M extends Record<string, unknown> =
     orderProperty?: string;
     /** Number of items to load per page per column */
     pageSize?: number;
-    /** Text search string to filter entitys */
+    /** Text search string to filter entities */
     searchString?: string;
     /** Additional filter values */
     filterValues?: FilterValues<string>;
@@ -136,7 +136,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         const initial: Record<string, BoardColumnData<M>> = {};
         columns.forEach(col => {
             initial[col] = {
-                entitys: [],
+                entities: [],
                 loading: true,
                 hasMore: true,
                 error: undefined,
@@ -228,7 +228,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             setColumnData(prev => ({
                 ...prev,
                 [column]: {
-                    entitys: [],
+                    entities: [],
                     loading: false,
                     hasMore: false,
                     error: undefined,
@@ -257,14 +257,14 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         }));
 
         // onUpdate callback
-        const onUpdate = async (entitys: Entity<M>[]) => {
+        const onUpdate = async (entities: Entity<M>[]) => {
             // Skip updates if we're cleaning up
             if (isCleaningUpRef.current) return;
 
             const pendingMap = pendingItemsRef.current;
 
-            // Apply pending updates to incoming entitys
-            const mergedEntitys = entitys.map(e => {
+            // Apply pending updates to incoming entities
+            const mergedEntities = entities.map(e => {
                 const pending = pendingMap[String(e.id)];
                 if (pending) {
                     // Check if DB entity has caught up to the expected column and order
@@ -293,20 +293,20 @@ values: { ...e.values,
                 return e;
             });
 
-            // Add any pending items that belong to this column but aren't in the incoming entitys yet
+            // Add any pending items that belong to this column but aren't in the incoming entities yet
             // (e.g. backend hasn't moved them to this column yet)
             Object.values(pendingMap).forEach(pending => {
                 if (pending.expectedValues[currentColumnProperty] === column) {
-                    if (!mergedEntitys.some(e => String(e.id) === String(pending.entity.id))) {
-                        mergedEntitys.push(pending.entity);
+                    if (!mergedEntities.some(e => String(e.id) === String(pending.entity.id))) {
+                        mergedEntities.push(pending.entity);
                     }
                 }
             });
 
-            // Always filter in memory to only show entitys that belong to this specific column.
+            // Always filter in memory to only show entities that belong to this specific column.
             // This is required because text search returns all matches, and collection_entity_patch
-            // may contain entitys that have just been moved out of this column.
-            let processed = mergedEntitys.filter(e => e.values?.[currentColumnProperty] === column);
+            // may contain entities that have just been moved out of this column.
+            let processed = mergedEntities.filter(e => e.values?.[currentColumnProperty] === column);
 
             // Sort locally if orderProperty is defined. This ensures that collection_entity_patch
             // insertions (which prepend by default in websocket.ts) are correctly placed.
@@ -350,16 +350,16 @@ values: { ...e.values,
                 }
             }
 
-            const newHasMore = entitys.length >= itemCount;
+            const newHasMore = entities.length >= itemCount;
 
             // Compare with current state — skip update if identical to avoid UI flash
             setColumnData(prev => {
                 const existing = prev[column];
-                if (existing && !existing.loading && existing.entitys.length === processed.length) {
+                if (existing && !existing.loading && existing.entities.length === processed.length) {
                     // Quick structural equality check: same IDs in same order with same values
                     let identical = true;
                     for (let i = 0; i < processed.length; i++) {
-                        const a = existing.entitys[i];
+                        const a = existing.entities[i];
                         const b = processed[i];
                         if (a.id !== b.id) {
                             identical = false;
@@ -381,7 +381,7 @@ values: { ...e.values,
                 return {
                     ...prev,
                     [column]: {
-                        entitys: processed,
+                        entities: processed,
                         loading: false,
                         hasMore: newHasMore,
                         error: undefined,
@@ -400,7 +400,7 @@ values: { ...e.values,
                 ...prev,
                 [column]: {
                     ...prev[column],
-                    entitys: [],
+                    entities: [],
                     loading: false,
                     hasMore: false,
                     error
@@ -585,12 +585,12 @@ values: { ...e.values,
             const updated = { ...prev };
             let itemToMove: Entity<M> | undefined;
 
-            const sourceEntitys = [...(updated[sourceColumn]?.entitys || [])];
-            const itemIndex = sourceEntitys.findIndex(e => String(e.id) === itemId);
+            const sourceEntities = [...(updated[sourceColumn]?.entities || [])];
+            const itemIndex = sourceEntities.findIndex(e => String(e.id) === itemId);
 
             if (itemIndex !== -1) {
-                itemToMove = sourceEntitys[itemIndex];
-                sourceEntitys.splice(itemIndex, 1);
+                itemToMove = sourceEntities[itemIndex];
+                sourceEntities.splice(itemIndex, 1);
             }
 
             if (itemToMove) {
@@ -610,15 +610,15 @@ values: { ...e.values,
                     expectedValues: newValuesMerged
                 };
 
-                const targetEntitys = sourceColumn === targetColumn ? sourceEntitys : [...(updated[targetColumn]?.entitys || [])];
+                const targetEntities = sourceColumn === targetColumn ? sourceEntities : [...(updated[targetColumn]?.entities || [])];
 
-                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetEntitys.length) {
-                    targetEntitys.splice(newIndex, 0, updatedEntity);
+                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetEntities.length) {
+                    targetEntities.splice(newIndex, 0, updatedEntity);
                 } else {
-                    targetEntitys.push(updatedEntity);
+                    targetEntities.push(updatedEntity);
                     if (orderPropertyRef.current) {
                         const orderProp = orderPropertyRef.current;
-                        targetEntitys.sort((a, b) => {
+                        targetEntities.sort((a, b) => {
                             const valA = a.values?.[orderProp] as string | undefined | null;
                             const valB = b.values?.[orderProp] as string | undefined | null;
 
@@ -637,7 +637,7 @@ values: { ...e.values,
 
                 updated[sourceColumn] = {
                     ...updated[sourceColumn],
-                    entitys: sourceColumn === targetColumn ? targetEntitys : sourceEntitys,
+                    entities: sourceColumn === targetColumn ? targetEntities : sourceEntities,
                     totalCount: sourceColumn === targetColumn
                         ? updated[sourceColumn].totalCount
                         : Math.max(0, (updated[sourceColumn].totalCount ?? 0) - 1)
@@ -646,7 +646,7 @@ values: { ...e.values,
                 if (sourceColumn !== targetColumn) {
                     updated[targetColumn] = {
                         ...updated[targetColumn],
-                        entitys: targetEntitys,
+                        entities: targetEntities,
                         totalCount: (updated[targetColumn].totalCount ?? 0) + 1
                     };
                 }

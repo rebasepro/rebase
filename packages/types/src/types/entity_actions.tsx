@@ -1,5 +1,5 @@
 import React from "react";
-import type { Entity } from "./entitys";
+import type { Entity } from "./entities";
 import type { CollectionConfig, SelectionController } from "./collections";
 import type { FormContext } from "./entity_views";
 import type { User } from "../users";

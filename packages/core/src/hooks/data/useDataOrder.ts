@@ -2,25 +2,25 @@ import { Entity } from "@rebasepro/types";
 
 export interface DataOrderProps<M extends Record<string, any>> {
     data: Entity<M>[];
-    entitysDisplayedFirst?: Entity<M>[];
+    entitiesDisplayedFirst?: Entity<M>[];
 }
 
 /**
- * This hook is used to have some entitys at the beginning of data.
+ * This hook is used to have some entities at the beginning of data.
  * @param path
- * @param entitysDisplayedFirst
+ * @param entitiesDisplayedFirst
  * @group Hooks and utilities
  */
 export function useDataOrder<M extends Record<string, any>>(
     {
         data,
-        entitysDisplayedFirst
+        entitiesDisplayedFirst
     }: DataOrderProps<M>): Entity<M>[] {
 
-    if (!entitysDisplayedFirst)
+    if (!entitiesDisplayedFirst)
         return data;
 
-    const displayedFirstId = new Set(entitysDisplayedFirst.map((e) => e.id));
-    return [...entitysDisplayedFirst, ...data.filter((e) => !displayedFirstId.has(e.id))];
+    const displayedFirstId = new Set(entitiesDisplayedFirst.map((e) => e.id));
+    return [...entitiesDisplayedFirst, ...data.filter((e) => !displayedFirstId.has(e.id))];
 
 }

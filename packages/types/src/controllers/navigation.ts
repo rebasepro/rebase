@@ -1,5 +1,5 @@
 import React from "react";
-import type { EntityReference } from "../types/entitys";
+import type { EntityReference } from "../types/entities";
 import type { CollectionConfig } from "../types/collections";
 
 

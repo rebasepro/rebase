@@ -32,7 +32,7 @@ export const useRebaseContext = <USER extends User = User, AuthControllerType ex
     const authController = useAuthController<USER, AuthControllerType>();
     // `context.data` is the flat SDK view — identical in shape to the backend
     // `context.data` and the frontend SDK client, so callbacks behave the same
-    // everywhere. The admin CMS reads Entitys via `useData()` directly.
+    // everywhere. The admin CMS reads Entities via `useData()` directly.
     const entityData = useData();
     const data = React.useMemo(() => wrapAsSdkData(entityData), [entityData]);
     const storageSource = useStorageSource();

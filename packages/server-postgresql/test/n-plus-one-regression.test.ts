@@ -5,7 +5,7 @@
  * uses O(1) SQL queries instead of one query per entity.
  *
  * Root cause of the original bug:
- *   `batchFetchRelatedEntitys` for owning relations was passing parent
+ *   `batchFetchRelatedEntities` for owning relations was passing parent
  *   entity IDs (post IDs) to the query instead of the FK values (author IDs).
  *   This meant `WHERE authors.id IN (1,2,3,...50)` used post IDs — completely
  *   wrong. The fix reads FK values from the parent table first, then queries
@@ -91,7 +91,7 @@ function generateMockAuthors(count: number): Array<{ id: number; name: string }>
 }
 
 // ─── Tests ────────────────────────────────────────────────────────
-describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", () => {
+describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", () => {
     let registry: PostgresCollectionRegistry;
     let selectCallCount: number;
 
@@ -186,7 +186,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", ()
         const postIds = mockPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedEntitys(
+        const results = await relationService.batchFetchRelatedEntities(
             "posts",
             postIds,
             "author",
@@ -202,7 +202,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", ()
         //   - Or N queries (one per entity)
         expect(selectCallCount).toBe(2);
 
-        console.log(`[N+1 Regression] ${NUM_POSTS} posts: batchFetchRelatedEntitys used ${selectCallCount} queries`);
+        console.log(`[N+1 Regression] ${NUM_POSTS} posts: batchFetchRelatedEntities used ${selectCallCount} queries`);
     });
 
     it("should correctly map each post to its author via FK values", async () => {
@@ -215,7 +215,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", ()
         const postIds = mockPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedEntitys(
+        const results = await relationService.batchFetchRelatedEntities(
             "posts",
             postIds,
             "author",
@@ -246,7 +246,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", ()
         const postIds = nullFkPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedEntitys(
+        const results = await relationService.batchFetchRelatedEntities(
             "posts",
             postIds,
             "author",
@@ -258,7 +258,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", ()
         expect(results.size).toBe(0);
     });
 
-    it("should deduplicate FK values when multiple entitys share the same relation target", async () => {
+    it("should deduplicate FK values when multiple entities share the same relation target", async () => {
         // All 50 posts point to author 1
         const sameAuthorPosts = Array.from({ length: NUM_POSTS }, (_, i) => ({
             id: i + 1,
@@ -275,7 +275,7 @@ name: "Shared Author" }];
         const postIds = sameAuthorPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedEntitys(
+        const results = await relationService.batchFetchRelatedEntities(
             "posts",
             postIds,
             "author",
@@ -301,7 +301,7 @@ name: "Shared Author" }];
 
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedEntitys(
+        const results = await relationService.batchFetchRelatedEntities(
             "posts",
             [],
             "author",

@@ -338,7 +338,7 @@ import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
 const hooks: BackendHooks = {
     data: {
         // ── READ SECURITY ──
-        // Filter entitys based on user role and ownership
+        // Filter entities based on user role and ownership
         afterRead(slug, entity, ctx) {
             const user = ctx.requestUser;
 

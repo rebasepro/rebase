@@ -3,7 +3,7 @@
  *
  * Covers the remaining risk areas identified by gap analysis:
  *
- * 1. 🔴 ID type coercion in batchFetchRelatedEntitys (single-cardinality)
+ * 1. 🔴 ID type coercion in batchFetchRelatedEntities (single-cardinality)
  *    — parsedParentIds.includes(parentId) used strict ===, silently dropping
  *    all inverse results when Drizzle returned string IDs for numeric PKs.
  *    Fixed by using Set<string> + String() normalization.
@@ -198,10 +198,10 @@ function createMockDb(resolveResults: () => unknown[]) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 1. ID type coercion in batchFetchRelatedEntitys (single cardinality)
+// 1. ID type coercion in batchFetchRelatedEntities (single cardinality)
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("batchFetchRelatedEntitys: ID type coercion (single cardinality)", () => {
+describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () => {
     let registry: PostgresCollectionRegistry;
 
     beforeEach(() => {
@@ -248,7 +248,7 @@ author_id: "2" }
         const relation = authorsCollection.relations![0] as Relation;
 
         // Pass numeric parent IDs — parseIdValues will return numbers
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "authors", [1, 2], "posts", relation
         );
 
@@ -272,7 +272,7 @@ author_id: 1 }
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "authors", [1], "posts", relation
         );
 
@@ -294,7 +294,7 @@ author_id: "2" } // string
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "authors", [1, 2], "posts", relation
         );
 
@@ -313,7 +313,7 @@ author_id: "999" }
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "authors", [1, 2], "posts", relation
         );
 
@@ -369,7 +369,7 @@ author_id: "1" }
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "authors_inr", [1], "posts", relation
         );
 
@@ -667,7 +667,7 @@ to: "id" } }
 // 4. Owning direction batch relation loading (tasks → client pattern)
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("batchFetchRelatedEntitys: owning direction (FK-based)", () => {
+describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
     let registry: PostgresCollectionRegistry;
 
     // Mock collections simulating tasks → clients owning relation
@@ -792,7 +792,7 @@ email: "f@test.com" }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "tasks", [taskUuid], "client", relation
         );
 
@@ -829,7 +829,7 @@ email: "f@test.com" }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "tasks", [task1, task2], "client", relation
         );
 
@@ -850,7 +850,7 @@ fkValue: null }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedEntitys(
+        const results = await service.batchFetchRelatedEntities(
             "tasks", [task1], "client", relation
         );
 
@@ -967,7 +967,7 @@ email: "acme@corp.com" }
         const wsMessage = {
             type: "collection_update",
             subscriptionId: "sub-123",
-            entitys: [
+            entities: [
                 {
                     id: "task-1",
                     path: "tasks",
@@ -989,7 +989,7 @@ status: "completed" }
         const parsed = JSON.parse(json, rebaseReviver);
 
         // Both tasks should have correctly hydrated client relations
-        for (const entity of parsed.entitys) {
+        for (const entity of parsed.entities) {
             const clientRel = entity.values.client;
             expect(clientRel).toBeInstanceOf(EntityRelation);
             expect(clientRel.data).toBeDefined();

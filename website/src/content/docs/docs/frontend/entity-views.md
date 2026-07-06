@@ -9,7 +9,7 @@ description: Add custom tabs and views to entity detail pages for previews, anal
 Entity views let you add custom **tabs** to the entity detail page alongside the default form. Use them for:
 
 - Live **previews** (website preview, rendered content)
-- **Related data** views (order items, child entitys)
+- **Related data** views (order items, child entities)
 - **Analytics** or charts
 - **Custom editors** (rich text, map editors)
 
@@ -62,7 +62,7 @@ function ArticlePreview({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity` | The saved entity (null for new entitys) |
+| `entity` | `Entity` | The saved entity (null for new entities) |
 | `modifiedValues` | `EntityValues` | Current unsaved form values (live as user types) |
 | `formContext` | `FormContext` | Full form context |
 | `collection` | `CollectionConfig` | Collection definition |

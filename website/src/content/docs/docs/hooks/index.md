@@ -49,7 +49,7 @@ function UserMenu() {
 
 ## `useCollection`
 
-Fetch and subscribe to a list of entitys in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
+Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
 
 ```typescript
 import { useCollection } from "@rebasepro/core";
@@ -87,7 +87,7 @@ function ProductList() {
 |-----------|------|-------------|
 | `path` | `string` | Absolute collection path (e.g., `"products"`). |
 | `collection` | `CollectionConfig` | The collection definition object. |
-| `itemCount` | `number` | Optional. Number of entitys to fetch (SQL limit). |
+| `itemCount` | `number` | Optional. Number of entities to fetch (SQL limit). |
 | `offset` | `number` | Optional. Number of items to skip. |
 | `page` | `number` | Optional. Page number (1-indexed), alternative to offset. |
 | `filterValues` | `FilterValues` | Optional. Query filters. Supports shorthand equality, tuples `[op, val]`, and PostgREST operator strings. |
@@ -98,7 +98,7 @@ function ProductList() {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `data` | `Entity[]` | Array of fetched entitys. |
+| `data` | `Entity[]` | Array of fetched entities. |
 | `dataLoading` | `boolean` | True if the initial load is in progress. |
 | `dataLoadingError` | `Error` | Error object if the fetch fails. |
 | `noMoreToLoad` | `boolean` | True if there are no more records beyond the current page/limit. |
@@ -145,7 +145,7 @@ function ProductDetail({ productId }) {
 
 Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
 
-- `populateFetchCache(path, entitys)`: Pre-populates the cache with a list of entitys (e.g. after a bulk action or custom API call).
+- `populateFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call).
 - `clearFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
 
 ## `usePermissions`
@@ -173,7 +173,7 @@ function CreateProductButton() {
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entitys in the collection. |
+| `canCreate` | `(collection, path) => boolean` | Checks if the user is allowed to create entities in the collection. |
 | `canEdit` | `(collection, path, entity) => boolean` | Checks if the user is allowed to edit the given entity. |
 | `canDelete` | `(collection, path, entity) => boolean` | Checks if the user is allowed to delete the given entity. |
 | `canRead` | `(collection) => boolean` | Checks if the user is allowed to read the collection. |
@@ -220,7 +220,7 @@ function CopyButton({ text }) {
 
 ## `useSidePanel`
 
-Programmatically open entitys in a side panel:
+Programmatically open entities in a side panel:
 
 ```typescript
 import { useSidePanel } from "@rebasepro/core";
@@ -313,7 +313,7 @@ function ThemeToggle() {
 
 ## `useSelectionDialog`
 
-Open a side dialog for selecting entitys from a collection. This is the same hook used internally when a relation property is rendered:
+Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/core";

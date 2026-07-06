@@ -1,7 +1,7 @@
 ---
 title: Entity History
 sidebar_label: Entity History
-description: Track every change to your entitys with a full audit trail — who changed what, when, and the complete before/after entity.
+description: Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after entity.
 ---
 
 ## Overview

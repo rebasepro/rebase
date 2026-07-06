@@ -52,7 +52,7 @@ export function FormEnhanceAction({
         loadingPrompts.current = true;
         const prompts = status === "new"
             ? (await getSamplePrompts(collection.singularName ?? collection.name, instructions)).prompts
-            : getPromptsForExistingEntitys(collection.properties);
+            : getPromptsForExistingEntities(collection.properties);
 
         const recentPromptsFromStorage = getRecentPromptsFromStorage(storageKey);
         const recentPrompts = recentPromptsFromStorage.map(prompt => prompt.prompt);
@@ -220,7 +220,7 @@ export function FormEnhanceAction({
     );
 }
 
-function getPromptsForExistingEntitys(properties: Properties): SamplePrompt[] {
+function getPromptsForExistingEntities(properties: Properties): SamplePrompt[] {
 
     const multilineProperties = Object.values(properties).filter((p: Property) => {
         if (isPropertyBuilder(p)) {

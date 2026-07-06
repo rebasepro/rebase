@@ -94,8 +94,8 @@ The `FindResponse<M>` contains:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `data` | `Entity<M>[]` | Array of matching entitys |
-| `meta.total` | `number` | Number of entitys returned |
+| `data` | `Entity<M>[]` | Array of matching entities |
+| `meta.total` | `number` | Number of entities returned |
 | `meta.limit` | `number` | Requested limit |
 | `meta.offset` | `number` | Requested offset |
 | `meta.hasMore` | `boolean` | Whether more records exist beyond limit |
@@ -302,7 +302,7 @@ ws.onmessage = (event) => {
         case "collection_update":
             // Full collection data after refetch
             console.log("Collection:", message.subscriptionId);
-            console.log("Entitys:", message.entitys); // Entity[]
+            console.log("Entities:", message.entities); // Entity[]
             break;
 
         case "entity_update":
@@ -346,7 +346,7 @@ ws.onmessage = (event) => {
 | `FETCH_ENTITY` | `FetchEntityProps` | One-shot entity fetch |
 | `SAVE_ENTITY` | `SaveEntityProps` | Create or update a entity |
 | `DELETE_ENTITY` | `DeleteEntityProps` | Delete a entity |
-| `COUNT_ENTITIES` | `FetchCollectionProps` | Count entitys matching criteria |
+| `COUNT_ENTITIES` | `FetchCollectionProps` | Count entities matching criteria |
 | `CHECK_UNIQUE_FIELD` | `{ path, name, value, entityId?, collection? }` | Check field uniqueness |
 
 ### Server → Client
@@ -355,14 +355,14 @@ ws.onmessage = (event) => {
 |------|-----------|-------------|
 | `AUTH_SUCCESS` | `{ requestId, payload: { userId, roles } }` | Authentication successful |
 | `AUTH_ERROR` | `{ requestId, payload: { error: { message, code } } }` | Authentication failed |
-| `collection_update` | `{ subscriptionId, entitys }` | Full collection data (authoritative refetch) |
+| `collection_update` | `{ subscriptionId, entities }` | Full collection data (authoritative refetch) |
 | `entity_update` | `{ subscriptionId, entity }` | Single entity data (entity or `null` if deleted) |
 | `collection_entity_patch` | `{ subscriptionId, entityId, entity }` | Instant single-entity patch for a collection subscription |
 | `broadcast` | `{ channel, event, payload }` | Broadcast from another channel member |
 | `presence_state` | `{ channel, presences }` | Full presence entity |
 | `presence_diff` | `{ channel, joins, leaves }` | Incremental presence update |
 | `ERROR` | `{ requestId?, payload: { error: { message, code } } }` | General error |
-| `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { entitys } }` | Response to FETCH_COLLECTION |
+| `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { entities } }` | Response to FETCH_COLLECTION |
 | `FETCH_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to FETCH_ENTITY |
 | `SAVE_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to SAVE_ENTITY |
 | `DELETE_ENTITY_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to DELETE_ENTITY |
@@ -676,7 +676,7 @@ The server coalesces rapid entity mutations into a single database refetch using
 |----------|-------|-------------|
 | `REFETCH_DEBOUNCE_MS` | `300` ms | Debounce window for collection and entity refetches |
 
-If 10 entitys change within 300ms, only **one** database query is executed for each affected subscription.
+If 10 entities change within 300ms, only **one** database query is executed for each affected subscription.
 
 ### Presence Cleanup
 

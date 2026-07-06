@@ -9,7 +9,7 @@ import * as util from "util";
 const testCollection = buildCollection({
     slug: "test_entity",
     table: "test_entity",
-    name: "Test entitys",
+    name: "Test entities",
     properties: {
         mainSaturation: {
             name: "Main saturation",

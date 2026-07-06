@@ -10,7 +10,7 @@ import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 
 // Mock types matching the actual implementation
 interface BoardColumnData<M extends Record<string, any> = Record<string, any>> {
-    entitys: Array<{ id: string; values: M; path: string }>;
+    entities: Array<{ id: string; values: M; path: string }>;
     loading: boolean;
     hasMore: boolean;
     error?: Error;
@@ -29,19 +29,19 @@ describe("useBoardDataController types and logic", () => {
     describe("BoardColumnData interface", () => {
         it("should have correct shape for a column's data state", () => {
             const columnData: BoardColumnData = {
-                entitys: [],
+                entities: [],
                 loading: false,
                 hasMore: true,
                 error: undefined
             };
 
-            expect(columnData.entitys).toEqual([]);
+            expect(columnData.entities).toEqual([]);
             expect(columnData.loading).toBe(false);
             expect(columnData.hasMore).toBe(true);
             expect(columnData.error).toBeUndefined();
         });
 
-        it("should support entitys with typed values", () => {
+        it("should support entities with typed values", () => {
             interface TaskEntity {
                 title: string;
                 status: string;
@@ -49,7 +49,7 @@ describe("useBoardDataController types and logic", () => {
             }
 
             const columnData: BoardColumnData<TaskEntity> = {
-                entitys: [
+                entities: [
                     { id: "1",
 values: { title: "Task 1",
 status: "todo",
@@ -65,15 +65,15 @@ path: "tasks/2" }
                 hasMore: false
             };
 
-            expect(columnData.entitys).toHaveLength(2);
-            expect(columnData.entitys[0].values.title).toBe("Task 1");
-            expect(columnData.entitys[1].values.order).toBe(1);
+            expect(columnData.entities).toHaveLength(2);
+            expect(columnData.entities[0].values.title).toBe("Task 1");
+            expect(columnData.entities[1].values.order).toBe(1);
         });
 
         it("should handle error state", () => {
             const error = new Error("Failed to load data");
             const columnData: BoardColumnData = {
-                entitys: [],
+                entities: [],
                 loading: false,
                 hasMore: false,
                 error
@@ -92,13 +92,13 @@ path: "tasks/2" }
 
             const controller: BoardDataController<Record<string, unknown>, "todo" | "in_progress" | "done"> = {
                 columnData: {
-                    todo: { entitys: [],
+                    todo: { entities: [],
 loading: false,
 hasMore: true },
-                    in_progress: { entitys: [],
+                    in_progress: { entities: [],
 loading: true,
 hasMore: true },
-                    done: { entitys: [],
+                    done: { entities: [],
 loading: false,
 hasMore: false }
                 },
@@ -125,13 +125,13 @@ hasMore: false }
 
         it("should report aggregate loading state correctly", () => {
             const columnData = {
-                col1: { entitys: [],
+                col1: { entities: [],
 loading: false,
 hasMore: false },
-                col2: { entitys: [],
+                col2: { entities: [],
 loading: false,
 hasMore: false },
-                col3: { entitys: [],
+                col3: { entities: [],
 loading: false,
 hasMore: false }
             };
@@ -151,11 +151,11 @@ hasMore: false }
             const error2 = new Error("Error in column 2");
 
             const columnData = {
-                col1: { entitys: [],
+                col1: { entities: [],
 loading: false,
 hasMore: false,
 error: error1 },
-                col2: { entitys: [],
+                col2: { entities: [],
 loading: false,
 hasMore: false,
 error: error2 }
@@ -223,19 +223,19 @@ done: 30 };
             const pageSize = 30;
 
             // Scenario 1: Less items than limit = no more to load
-            const entitys1 = Array(25).fill({ id: "test",
+            const entities1 = Array(25).fill({ id: "test",
 values: {} });
-            expect(entitys1.length >= pageSize).toBe(false);
+            expect(entities1.length >= pageSize).toBe(false);
 
             // Scenario 2: Exactly limit items = might have more
-            const entitys2 = Array(30).fill({ id: "test",
+            const entities2 = Array(30).fill({ id: "test",
 values: {} });
-            expect(entitys2.length >= pageSize).toBe(true);
+            expect(entities2.length >= pageSize).toBe(true);
 
             // Scenario 3: More items (edge case) = definitely has more
-            const entitys3 = Array(31).fill({ id: "test",
+            const entities3 = Array(31).fill({ id: "test",
 values: {} });
-            expect(entitys3.length >= pageSize).toBe(true);
+            expect(entities3.length >= pageSize).toBe(true);
         });
     });
 
@@ -298,7 +298,7 @@ in_progress: 30 };
 
         it("should initialize column data state for new columns", () => {
             const existingData: Record<string, BoardColumnData> = {
-                todo: { entitys: [{ id: "1",
+                todo: { entities: [{ id: "1",
 values: {},
 path: "x" }],
 loading: false,
@@ -310,7 +310,7 @@ hasMore: true }
             newColumns.forEach(col => {
                 if (!(col in updated)) {
                     updated[col] = {
-                        entitys: [],
+                        entities: [],
                         loading: true,
                         hasMore: true,
                         error: undefined
@@ -318,8 +318,8 @@ hasMore: true }
                 }
             });
 
-            expect(updated.todo.entitys).toHaveLength(1); // Preserved
-            expect(updated.in_progress.entitys).toHaveLength(0); // New
+            expect(updated.todo.entities).toHaveLength(1); // Preserved
+            expect(updated.in_progress.entities).toHaveLength(0); // New
             expect(updated.in_progress.loading).toBe(true); // New starts loading
         });
     });

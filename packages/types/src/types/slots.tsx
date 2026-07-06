@@ -1,6 +1,6 @@
 import React from "react";
 import type { CollectionActionsProps, EntityTableController, SelectionController, CollectionConfig } from "./collections";
-import type { Entity } from "./entitys";
+import type { Entity } from "./entities";
 import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
 import type { Property } from "./properties";
 import type { RebaseContext } from "../rebase_context";

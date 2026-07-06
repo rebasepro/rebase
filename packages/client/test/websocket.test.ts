@@ -811,9 +811,9 @@ id: "1" }, jest.fn());
     });
 
     // -----------------------------------------------------------------------
-    // mergeEntitys structural equality and normalization
+    // mergeEntities structural equality and normalization
     // -----------------------------------------------------------------------
-    describe("mergeEntitys structural equality and normalization", () => {
+    describe("mergeEntities structural equality and normalization", () => {
         it("preserves row reference if only relation .data changes", () => {
             const client = createClient();
             jest.runAllTimers();
@@ -1010,11 +1010,11 @@ title: "New" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const updatedEntitys = onUpdate.mock.calls[0][0];
-            expect(updatedEntitys).toHaveLength(2);
-            expect(updatedEntitys[0]).toEqual({ id: "1",
+            const updatedEntities = onUpdate.mock.calls[0][0];
+            expect(updatedEntities).toHaveLength(2);
+            expect(updatedEntities[0]).toEqual({ id: "1",
 title: "New" });
-            expect(updatedEntitys[1]).toEqual({ id: "2",
+            expect(updatedEntities[1]).toEqual({ id: "2",
 title: "Two" });
         });
 

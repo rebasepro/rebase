@@ -619,9 +619,9 @@ roles: ["anon"] };
                 await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
 roles: activeAuth.roles })}, true)`);
                 const txEntityService = new DataService(tx, this.registry);
-                let fetchedEntitys;
+                let fetchedEntities;
                 if (collectionRequest.searchString) {
-                    fetchedEntitys = await txEntityService.searchRows(
+                    fetchedEntities = await txEntityService.searchRows(
                         notifyPath,
                         collectionRequest.searchString,
                         {
@@ -633,7 +633,7 @@ roles: activeAuth.roles })}, true)`);
                         }
                     );
                 } else {
-                    fetchedEntitys = await txEntityService.fetchCollection(notifyPath, {
+                    fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
                         filter: collectionRequest.filter as FilterValues<string>,
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
@@ -662,7 +662,7 @@ roles: activeAuth.roles },
                         data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                     } as unknown as RebaseCallContext;
 
-                    return await Promise.all(fetchedEntitys.map(async (fetchedRow) => {
+                    return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
                         let processedEntity = fetchedRow;
                         // 1. Global callbacks first
                         if (globalCallbacks?.afterRead) {
@@ -695,7 +695,7 @@ roles: activeAuth.roles },
                     }));
                 }
 
-                return fetchedEntitys;
+                return fetchedEntities;
             });
         }
 

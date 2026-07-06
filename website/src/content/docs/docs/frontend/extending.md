@@ -93,7 +93,7 @@ Custom views that appear as tabs in the entity detail page. Can be defined globa
 
 **Scope:** entity.
 
-Custom action buttons on individual entitys (publish, archive, clone, etc.). Can be defined globally or per-collection.
+Custom action buttons on individual entities (publish, archive, clone, etc.). Can be defined globally or per-collection.
 
 → [Entity Actions](/docs/frontend/entity-actions)
 
@@ -101,7 +101,7 @@ Custom action buttons on individual entitys (publish, archive, clone, etc.). Can
 
 **Scope:** collection.
 
-Toolbar-level React components that receive `CollectionActionsProps` (selected entitys, table controller, collection context). Rendered in the collection toolbar alongside built-in actions.
+Toolbar-level React components that receive `CollectionActionsProps` (selected entities, table controller, collection context). Rendered in the collection toolbar alongside built-in actions.
 
 **Relationship with `collection.actions` slot:** Both are additive — `Actions` components render first in the toolbar, then slot contributions from `collection.actions`. They do not replace each other.
 

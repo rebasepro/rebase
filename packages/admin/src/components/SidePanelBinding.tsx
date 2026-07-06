@@ -16,7 +16,7 @@ import { resolveDefaultSelectedView } from "@rebasepro/common";
 
 /**
  * This is the component in charge of rendering the side dialog used
- * for editing entitys. Use the {@link useSidePanel} to open
+ * for editing entities. Use the {@link useSidePanel} to open
  * and control the dialogs.
  * This component needs a parent {@link Rebase}
  * {@link useSidePanel}
@@ -92,7 +92,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     const [showEditInPanel, setShowEditInPanel] = useState(selectedTab === "edit");
     const isDetailMode = collection?.defaultEntityAction === "view" && !showEditInPanel && Boolean(entityId);
 
-    // Reset edit mode when switching entitys
+    // Reset edit mode when switching entities
     useEffect(() => {
         setShowEditInPanel(selectedTab === "edit");
     }, [entityId, selectedTab]);

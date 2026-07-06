@@ -1,5 +1,5 @@
 import React from "react";
-import type { Entity, EntityValues } from "./entitys";
+import type { Entity, EntityValues } from "./entities";
 import type { CollectionConfig } from "./collections";
 import type { FormexController } from "./formex";
 import type { ComponentRef } from "./component_ref";

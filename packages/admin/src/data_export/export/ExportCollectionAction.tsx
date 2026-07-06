@@ -27,19 +27,19 @@ import {
     RadioGroupItem,
     Tooltip
 } from "@rebasepro/ui";
-import { downloadEntitysExport } from "./export";
+import { downloadEntitiesExport } from "./export";
 
 const DOCS_LIMIT = 500;
 
 export function ExportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
     path,
-    collectionEntitysCount,
+    collectionEntitiesCount,
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
 }: CollectionActionsProps<M, USER, CollectionConfig<M>> & {
-    exportAllowed?: (props: { collectionEntitysCount: number, path: string, collection: CollectionConfig }) => boolean;
+    exportAllowed?: (props: { collectionEntitiesCount: number, path: string, collection: CollectionConfig }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
 }) {
@@ -59,7 +59,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const dataClient = useData();
 
     const canExport = !exportAllowed || exportAllowed({
-        collectionEntitysCount: collectionEntitysCount ?? 0,
+        collectionEntitiesCount: collectionEntitiesCount ?? 0,
         path,
         collection
     });
@@ -77,13 +77,13 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setOpen(false);
     }, [setOpen]);
 
-    const fetchAdditionalFields = useCallback(async (entitys: Entity<M>[]) => {
+    const fetchAdditionalFields = useCallback(async (entities: Entity<M>[]) => {
 
         const additionalExportFields = exportConfig?.additionalFields;
         const additionalFields = collection.additionalFields;
 
         const resolvedExportColumnsValues: Record<string, any>[] = additionalExportFields
-            ? await Promise.all(entitys.map(async (entity) => {
+            ? await Promise.all(entities.map(async (entity) => {
                 return (await Promise.all(additionalExportFields.map(async (column) => {
                     return {
                         [column.key]: await column.builder({
@@ -97,7 +97,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             : [];
 
         const resolvedColumnsValues: Record<string, any>[] = additionalFields
-            ? await Promise.all(entitys.map(async (entity) => {
+            ? await Promise.all(entities.map(async (entity) => {
                 return (await Promise.all(additionalFields
                     .map(async (field) => {
                         if (!field.value)
@@ -142,7 +142,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                         };
                     })
                     : data;
-                downloadEntitysExport({
+                downloadEntitiesExport({
                     data: dataWithDefaults,
                     additionalData,
                     properties: collection.properties,
@@ -193,10 +193,10 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 <div>{t("download_table_csv")}</div>
 
-                {collectionEntitysCount !== undefined && collectionEntitysCount > DOCS_LIMIT &&
+                {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT &&
                     <Alert color={"warning"}>
                         <div>
-                            {t("large_number_of_documents", { count: collectionEntitysCount.toString() })}
+                            {t("large_number_of_documents", { count: collectionEntitiesCount.toString() })}
                         </div>
                     </Alert>}
 

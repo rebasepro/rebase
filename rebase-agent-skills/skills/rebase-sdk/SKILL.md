@@ -247,7 +247,7 @@ const result = await rebase.data.posts
 | `.limit(n)` | Limit number of results |
 | `.offset(n)` | Skip first `n` results |
 | `.search(term)` | Full-text search |
-| `.include(...relations)` | Include related entitys |
+| `.include(...relations)` | Include related entities |
 | `.find()` | Execute the query |
 | `.listen(callback, errorCallback?)` | Subscribe to realtime updates |
 

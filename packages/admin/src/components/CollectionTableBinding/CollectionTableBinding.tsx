@@ -56,7 +56,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         getPropertyFor,
         onValueChange,
         selectionController,
-        highlightedEntitys,
+        highlightedEntities,
         onEntityClick,
         onColumnResize,
         initialScroll,
@@ -87,9 +87,9 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
     const ref = useRef<HTMLDivElement>(null);
 
     const largeLayout = useLargeLayout();
-    const selectedEntitys = useMemo(() => {
-        return (selectionController?.selectedEntitys?.length > 0 ? selectionController?.selectedEntitys : highlightedEntitys)?.filter(Boolean);
-    }, [selectionController?.selectedEntitys, highlightedEntitys]);
+    const selectedEntities = useMemo(() => {
+        return (selectionController?.selectedEntities?.length > 0 ? selectionController?.selectedEntities : highlightedEntities)?.filter(Boolean);
+    }, [selectionController?.selectedEntities, highlightedEntities]);
 
     const context: RebaseContext<USER> = useRebaseContext<USER>();
 
@@ -368,7 +368,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 inlineEditing={inlineEditing}
                 cellRenderer={cellRenderer}
                 onEntityClick={onEntityClick}
-                highlightedRow={useCallback((entity: Entity<M>) => Boolean(selectedEntitys?.find(e => e.id === entity.id && e.path === entity.path)), [selectedEntitys])}
+                highlightedRow={useCallback((entity: Entity<M>) => Boolean(selectedEntities?.find(e => e.id === entity.id && e.path === entity.path)), [selectedEntities])}
                 tableController={tableController}
                 onValueChange={onValueChange}
                 initialScroll={initialScroll}
@@ -380,7 +380,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 endAdornment={endAdornment}
                 AddColumnComponent={AddColumnComponent}
                 onColumnsOrderChange={onColumnsOrderChange}
-                extraData={useMemo(() => ({ selectedEntityIds: selectedEntitys?.map(e => e.id) }), [selectedEntitys])}/>
+                extraData={useMemo(() => ({ selectedEntityIds: selectedEntities?.map(e => e.id) }), [selectedEntities])}/>
 
         </div>
     );

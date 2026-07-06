@@ -120,7 +120,7 @@ export class DataService implements DataRepository {
     /**
      * Fetch rows related to a parent row
      */
-    async fetchRelatedEntitys<M extends Record<string, unknown>>(
+    async fetchRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
@@ -134,7 +134,7 @@ export class DataService implements DataRepository {
             databaseId?: string;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        const rows = await this.fetchService.getRelationService().fetchRelatedEntitys<M>(
+        const rows = await this.fetchService.getRelationService().fetchRelatedEntities<M>(
             parentCollectionPath,
             parentId,
             relationKey,

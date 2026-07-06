@@ -257,8 +257,8 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                 where: { [name]: ["==", value] },
                 limit: 2
             });
-            const otherEntitys = entityId ? data.filter(e => e.id !== entityId) : data;
-            return otherEntitys.length === 0;
+            const otherEntities = entityId ? data.filter(e => e.id !== entityId) : data;
+            return otherEntities.length === 0;
         } catch (e: unknown) {
             console.error("Error checking unique field", e);
             return true;

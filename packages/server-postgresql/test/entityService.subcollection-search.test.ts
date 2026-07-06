@@ -453,8 +453,8 @@ tag_id: 19 }
         });
     });
 
-    describe("fetchRelatedEntitys with search", () => {
-        it("should pass search parameters correctly to fetchEntitysUsingJoins", async () => {
+    describe("fetchRelatedEntities with search", () => {
+        it("should pass search parameters correctly to fetchEntitiesUsingJoins", async () => {
             const mockResults = [
                 { id: 1,
 title: "Mental Health Post",
@@ -465,8 +465,8 @@ tag_id: 19 }
             const mockQueryBuilder = createMockQueryBuilder(mockResults);
             db.select.mockReturnValue(mockQueryBuilder as unknown as ReturnType<typeof db.select>);
 
-            // Test fetchRelatedEntitys directly with search
-            const result = await dataService.fetchRelatedEntitys("tags", 19, "posts", {
+            // Test fetchRelatedEntities directly with search
+            const result = await dataService.fetchRelatedEntities("tags", 19, "posts", {
                 searchString: "mental",
                 limit: 20
             });

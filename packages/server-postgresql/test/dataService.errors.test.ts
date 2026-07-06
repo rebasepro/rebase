@@ -167,8 +167,8 @@ name: "Test" };
 
         it("should reject single segment paths (not nested)", async () => {
             // Single collection paths should work fine, but let's test the path parsing logic
-            const entitys = await dataService.fetchCollection("test", {});
-            expect(entitys).toBeDefined(); // Should work for single collection
+            const entities = await dataService.fetchCollection("test", {});
+            expect(entities).toBeDefined(); // Should work for single collection
         });
 
         it("should reject empty path segments", async () => {
@@ -220,26 +220,26 @@ name: "Updated" }]);
             }));
             db.orderBy.mockResolvedValue(largeResultSet);
 
-            const entitys = await dataService.fetchCollection("test", {});
+            const entities = await dataService.fetchCollection("test", {});
 
-            expect(entitys).toHaveLength(1000);
-            expect(entitys[0].name).toBe("Entity 0");
-            expect(entitys[999].name).toBe("Entity 999");
+            expect(entities).toHaveLength(1000);
+            expect(entities[0].name).toBe("Entity 0");
+            expect(entities[999].name).toBe("Entity 999");
         });
 
         it("should handle pagination correctly for large datasets", async () => {
-            const mockEntitys = Array(50).fill(0).map((_, i) => ({
+            const mockEntities = Array(50).fill(0).map((_, i) => ({
                 id: i + 1,
                 name: `Entity ${i + 1}`
             }));
             // Override the then method to return our mock data for this specific test
-            (db as any).then = jest.fn((resolve) => resolve(mockEntitys.slice(0, 20)));
+            (db as any).then = jest.fn((resolve) => resolve(mockEntities.slice(0, 20)));
 
-            const entitys = await dataService.fetchCollection("test", {
+            const entities = await dataService.fetchCollection("test", {
                 limit: 20
             });
 
-            expect(entitys).toHaveLength(20);
+            expect(entities).toHaveLength(20);
             expect(db.limit).toHaveBeenCalledWith(20);
         });
     });

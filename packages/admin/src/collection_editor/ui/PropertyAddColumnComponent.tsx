@@ -38,7 +38,7 @@ export function PropertyAddColumnComponent({
 parentEntityIds,
                         currentPropertiesOrder: getDefaultPropertiesOrder(collection),
                         collection,
-                        existingEntitys: tableController.data
+                        existingEntities: tableController.data
                     });
                 } : undefined}>
                 <PlusIcon/>

@@ -1,11 +1,11 @@
 ---
 name: rebase-entity-history
-description: Guide for tracking and reverting entity changes with Rebase's built-in history/audit-log system. Use this skill when the user needs entity versioning, change tracking, audit logs, reverting to previous versions, or understanding how history entitys work.
+description: Guide for tracking and reverting entity changes with Rebase's built-in history/audit-log system. Use this skill when the user needs entity versioning, change tracking, audit logs, reverting to previous versions, or understanding how history entities work.
 ---
 
 # Rebase Entity History
 
-Rebase includes a built-in entity history system that records entitys of every create, update, and delete operation. History entries are stored in a dedicated PostgreSQL table and exposed via REST API endpoints. The Studio admin panel provides a visual history tab with one-click revert.
+Rebase includes a built-in entity history system that records entities of every create, update, and delete operation. History entries are stored in a dedicated PostgreSQL table and exposed via REST API endpoints. The Studio admin panel provides a visual history tab with one-click revert.
 
 > **IMPORTANT FOR AGENTS:** Entity history requires **two** things to be enabled: (1) the global `history` flag in the backend config, AND (2) `history: true` on each individual collection. If either is missing, no history is recorded for that collection.
 
@@ -310,7 +310,7 @@ CREATE INDEX IF NOT EXISTS idx_history_time
 
 ### Storage Characteristics
 
-- **Values are stored as JSONB** — full entitys, not diffs. This makes revert simple and reliable but uses more storage.
+- **Values are stored as JSONB** — full entities, not diffs. This makes revert simple and reliable but uses more storage.
 - **All collections share one table** — the `table_name` column distinguishes between collections.
 - **Entity IDs are stored as text** — regardless of the original column type.
 - **Indexes** cover `(table_name, entity_id)` and `(table_name, entity_id, updated_at DESC)` for fast per-entity lookups.
@@ -350,7 +350,7 @@ This sets the `ttlDays` value. The `maxEntries` default of `200` is currently no
 
 ### Global Pruning
 
-The `HistoryService` also exposes a `pruneExpired()` method for global TTL-based cleanup (deletes expired entries across ALL entitys in one sweep). This is intended to be called periodically — e.g., from a cron job:
+The `HistoryService` also exposes a `pruneExpired()` method for global TTL-based cleanup (deletes expired entries across ALL entities in one sweep). This is intended to be called periodically — e.g., from a cron job:
 
 ```typescript
 // In a cron job handler (e.g., backend/src/crons/prune-history.ts)
@@ -462,7 +462,7 @@ console.log(`Server running at http://localhost:${env.PORT}`);
 
 ### Storage Growth
 
-- Each history entry stores **full JSONB entitys** of both current and previous values. For entitys with large text fields or complex nested structures, this can grow quickly.
+- Each history entry stores **full JSONB entities** of both current and previous values. For entities with large text fields or complex nested structures, this can grow quickly.
 - Default retention limits: **200 entries per entity** and **90 days TTL**. Adjust these based on your use case.
 - All collections share the single `rebase.entity_history` table — monitor its size with:
 

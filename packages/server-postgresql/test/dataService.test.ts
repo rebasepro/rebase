@@ -306,7 +306,7 @@ describe("DataService", () => {
     });
 
     describe("fetchCollectionFromPath", () => {
-        it("should fetch related entitys from a nested path", async () => {
+        it("should fetch related entities from a nested path", async () => {
             const mockRelatedPosts = [
                 { id: 1,
 title: "Post by John",
@@ -315,7 +315,7 @@ author_id: 1 },
 title: "Another Post by John",
 author_id: 1 }
             ];
-            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockRelatedPosts),
@@ -324,13 +324,13 @@ author_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("authors/1/posts", {});
+            const entities = await dataService.fetchCollection("authors/1/posts", {});
 
             // The service should have been called to get the 'authors' collection definition.
             expect(collectionRegistry.getCollectionByPath).toHaveBeenCalledWith("authors");
             // For inverse relations like authors->posts, no join is needed as it uses a WHERE clause on the foreign key
-            expect(entitys).toHaveLength(2);
-            expect(entitys[0].title).toBe("Post by John");
+            expect(entities).toHaveLength(2);
+            expect(entities[0].title).toBe("Post by John");
         });
     });
 });
@@ -680,7 +680,7 @@ name: "Test User" };
             expect(entity).toBeUndefined();
         });
 
-        it("should handle entitys with null relation fields", async () => {
+        it("should handle entities with null relation fields", async () => {
             const mockTask = { id: 1,
 title: "Task 1",
 project_id: null,
@@ -690,7 +690,7 @@ assignee_id: null };
             const entity = await dataService.fetchOne("tasks", 1);
 
             // When foreign keys are null, the DataService may still create relation objects
-            // if it finds related entitys through other means. The actual behavior depends
+            // if it finds related entities through other means. The actual behavior depends
             // on the relation resolution logic, so we should check if they are either
             // undefined or have the expected structure
             if (entity?.project) {
@@ -775,7 +775,7 @@ project_id: 1 },
 title: "Task 2",
 project_id: 1 }
             ];
-            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockTasks),
@@ -784,10 +784,10 @@ project_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("users/1/companies/1/projects/1/tasks", {});
+            const entities = await dataService.fetchCollection("users/1/companies/1/projects/1/tasks", {});
 
             expect(collectionRegistry.getCollectionByPath).toHaveBeenCalledWith("users");
-            expect(entitys).toHaveLength(2);
+            expect(entities).toHaveLength(2);
         });
 
         it("should handle self-referencing relations", async () => {
@@ -799,7 +799,7 @@ parent_id: 1 },
 name: "Subcategory 2",
 parent_id: 1 }
             ];
-            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockCategories),
                 limit: jest.fn().mockReturnValue({
@@ -807,9 +807,9 @@ parent_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("categories/1/children", {});
+            const entities = await dataService.fetchCollection("categories/1/children", {});
 
-            expect(entitys).toHaveLength(2);
+            expect(entities).toHaveLength(2);
         });
 
         it("should throw error for invalid path format", async () => {
@@ -908,7 +908,7 @@ __type: "relation" }
         it("should handle deletion of non-existent entity gracefully", async () => {
             db.returning.mockResolvedValue([]);
 
-            // The service doesn't throw for non-existent entitys
+            // The service doesn't throw for non-existent entities
             await dataService.delete("users", 999);
 
             expect(db.delete).toHaveBeenCalled();
@@ -925,10 +925,10 @@ description: "Test description" }
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockResults));
 
-            const entitys = await dataService.searchRows("projects", "Searchable", {});
+            const entities = await dataService.searchRows("projects", "Searchable", {});
 
-            expect(entitys).toHaveLength(1);
-            expect(entitys[0].title).toBe("Searchable Project");
+            expect(entities).toHaveLength(1);
+            expect(entities[0].title).toBe("Searchable Project");
         });
 
         it("should combine search with filters", async () => {
@@ -940,11 +940,11 @@ status: "active" }
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockResults));
 
-            const entitys = await dataService.searchRows("projects", "Active", {
+            const entities = await dataService.searchRows("projects", "Active", {
                 filter: { status: ["==", "active"] }
             });
 
-            expect(entitys).toHaveLength(1);
+            expect(entities).toHaveLength(1);
         });
     });
 

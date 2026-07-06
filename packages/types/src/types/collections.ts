@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction } from "react";
-import type { Entity, EntityStatus, EntityValues } from "./entitys";
+import type { Entity, EntityStatus, EntityValues } from "./entities";
 import type { CollectionCallbacks } from "./entity_callbacks";
 
 import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, MongoProperties } from "./properties";
@@ -50,7 +50,7 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     description?: string;
 
     /**
-     * Child collections nested under entitys of this collection.
+     * Child collections nested under entities of this collection.
      * Populated automatically during normalization from driver-specific fields
      * (e.g. Firebase `subcollections`, Postgres `relations` with many-cardinality).
      *
@@ -220,9 +220,9 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     propertiesOrder?: (Extract<keyof M, string> | (string & {}) | string | `subcollection:${string}`)[];
 
     /**
-     * If enabled, content is loaded in batches. If `false` all entitys in the
+     * If enabled, content is loaded in batches. If `false` all entities in the
      * collection are loaded. This means that when reaching the end of the
-     * collection, the CMS will load more entitys.
+     * collection, the CMS will load more entities.
      * You can specify a number to specify the pagination size (50 by default)
      * Defaults to `true`
      */
@@ -240,7 +240,7 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 
     /**
      * Pass your own selection controller if you want to control selected
-     * entitys externally.
+     * entities externally.
      * @see useSelectionController
      */
     selectionController?: SelectionController<M>;
@@ -282,7 +282,7 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 
     /**
      * Default sort applied to this collection.
-     * When setting this prop, entitys will have a default order
+     * When setting this prop, entities will have a default order
      * applied in the collection.
      * e.g. `sort: ["order", "asc"]`
      */
@@ -301,7 +301,7 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 
     /**
      * Can the elements in this collection be edited inline in the collection
-     * view. Even when inline editing is disabled, entitys can still be
+     * view. Even when inline editing is disabled, entities can still be
      * edited in the side panel (subject to `securityRules`).
      */
     inlineEditing?: boolean;
@@ -397,9 +397,9 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 
     /**
      * Default view mode for displaying this collection.
-     * - "table": Display entitys in a table with inline editing (default)
-     * - "cards": Display entitys as a grid of cards with thumbnails
-     * - "kanban": Display entitys in a Kanban board grouped by a property
+     * - "table": Display entities in a table with inline editing (default)
+     * - "cards": Display entities as a grid of cards with thumbnails
+     * - "kanban": Display entities in a Kanban board grouped by a property
      * Defaults to "table".
      */
     defaultViewMode?: ViewMode;
@@ -430,7 +430,7 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     readonly orderProperty?: Extract<keyof M, string> | (string & {});
 
     /**
-     * Actions that can be performed on the entitys in this collection.
+     * Actions that can be performed on the entities in this collection.
      */
     entityActions?: EntityAction<M, USER>[];
 
@@ -717,7 +717,7 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
     /**
      * Property key to use for Kanban board columns.
      * Must reference a string property with `enum` values defined.
-     * Entitys will be grouped into columns based on this property's value.
+     * Entities will be grouped into columns based on this property's value.
      * The column order is determined by the order of `enum` values in the property.
      */
     columnProperty: Extract<keyof M, string> | (string & {});
@@ -764,8 +764,8 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
     collection: EC;
 
     /**
-     * Use this controller to get the selected entitys and to update the
-     * selected entitys state.
+     * Use this controller to get the selected entities and to update the
+     * selected entities state.
      */
     selectionController: SelectionController<M>;
 
@@ -781,10 +781,10 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
     context: RebaseContext<USER>;
 
     /**
-     * Count of the entitys in this collection.
+     * Count of the entities in this collection.
      * undefined means the count is still loading.
      */
-    collectionEntitysCount?: number;
+    collectionEntitiesCount?: number;
 
     /**
      * Programmatically open the new-document form for this collection,
@@ -805,14 +805,14 @@ export interface CollectionActionsProps<M extends Record<string, unknown> = Reco
 }
 
 /**
- * Use this controller to retrieve the selected entitys or modify them in
+ * Use this controller to retrieve the selected entities or modify them in
  * an {@link CollectionConfig}
  * @group Models
  */
 export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
-    selectedEntitys: Entity<M>[];
-    setSelectedEntitys(entitys: Entity<M>[]): void;
-    setSelectedEntitys(action: (prev: Entity<M>[]) => Entity<M>[]): void;
+    selectedEntities: Entity<M>[];
+    setSelectedEntities(entities: Entity<M>[]): void;
+    setSelectedEntities(action: (prev: Entity<M>[]) => Entity<M>[]): void;
     isEntitySelected(entity: Entity<M>): boolean;
     toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
 }

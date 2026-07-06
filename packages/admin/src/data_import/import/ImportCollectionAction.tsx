@@ -391,7 +391,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
             "TEMP_PATH",
             importConfig.defaultValues
         ));
-        importConfig.setEntitys(mappedData);
+        importConfig.setEntities(mappedData);
     }, []);
 
     const selectionController = useSelectionController();
@@ -399,10 +399,10 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
     return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Entitys with the same id will be overwritten</Typography>
+            <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
         </div>}
         tableController={{
-            data: importConfig.entitys,
+            data: importConfig.entities,
             dataLoading: false,
             noMoreToLoad: false
         }}

@@ -776,7 +776,7 @@ active: true });
         expect(invalid.success).toBe(false);
     });
 
-    it("skips auto-generated id fields for new entitys", async () => {
+    it("skips auto-generated id fields for new entities", async () => {
         const properties: Properties = {
             id: {
                 type: "string",
@@ -789,13 +789,13 @@ active: true });
             } as StringProperty
         };
 
-        // For new entitys (entityId undefined), auto-id fields are skipped entirely
+        // For new entities (entityId undefined), auto-id fields are skipped entirely
         const schema = getEntitySchema(undefined, properties);
         const result = await schema.safeParseAsync({ title: "Test" });
         expect(result.success).toBe(true);
     });
 
-    it("validates id field for existing entitys", async () => {
+    it("validates id field for existing entities", async () => {
         const properties: Properties = {
             id: {
                 type: "string",
@@ -808,7 +808,7 @@ active: true });
             } as StringProperty
         };
 
-        // For existing entitys, id is required since isId=true
+        // For existing entities, id is required since isId=true
         const schema = getEntitySchema("existing-entity", properties);
         const result = await schema.safeParseAsync({ id: "",
 title: "Test" });

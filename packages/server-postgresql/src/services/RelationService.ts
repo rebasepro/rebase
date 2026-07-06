@@ -59,7 +59,7 @@ export class RelationService {
     /**
      * Fetch rows related to a parent row through a specific relation
      */
-    async fetchRelatedEntitys<M extends Record<string, unknown>>(
+    async fetchRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
@@ -82,13 +82,13 @@ export class RelationService {
             throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
         }
 
-        return this.fetchEntitysUsingJoins<M>(parentCollection, parentId, relation, options);
+        return this.fetchEntitiesUsingJoins<M>(parentCollection, parentId, relation, options);
     }
 
     /**
      * Fetch rows using join paths for complex relations
      */
-    async fetchEntitysUsingJoins<M extends Record<string, unknown>>(
+    async fetchEntitiesUsingJoins<M extends Record<string, unknown>>(
         parentCollection: CollectionConfig,
         parentId: string | number,
         relation: Relation,
@@ -244,7 +244,7 @@ export class RelationService {
     /**
      * Count related rows for a parent row
      */
-    async countRelatedEntitys<M extends Record<string, unknown>>(
+    async countRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
@@ -298,7 +298,7 @@ export class RelationService {
     /**
      * Batch fetch related rows for multiple parent rows to avoid N+1 queries
      */
-    async batchFetchRelatedEntitys(
+    async batchFetchRelatedEntities(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
@@ -505,7 +505,7 @@ export class RelationService {
      * Returns a Map<parentId, RelatedRow[]> instead of Map<parentId, RelatedRow>.
      * Uses a single SQL query with IN clause to avoid N+1.
      */
-    async batchFetchRelatedEntitysMany(
+    async batchFetchRelatedEntitiesMany(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
@@ -581,7 +581,7 @@ export class RelationService {
         if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
             const junctionTable = this.registry.getTable(relation.through.table);
             if (!junctionTable) {
-                logger.warn(`[batchFetchRelatedEntitysMany] Junction table '${relation.through.table}' not found`);
+                logger.warn(`[batchFetchRelatedEntitiesMany] Junction table '${relation.through.table}' not found`);
                 return new Map();
             }
 
@@ -589,7 +589,7 @@ export class RelationService {
             const targetJunctionCol = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionCol || !targetJunctionCol) {
-                logger.warn(`[batchFetchRelatedEntitysMany] Junction columns not found in '${relation.through.table}'`);
+                logger.warn(`[batchFetchRelatedEntitiesMany] Junction columns not found in '${relation.through.table}'`);
                 return new Map();
             }
 

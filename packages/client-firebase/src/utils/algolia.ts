@@ -2,7 +2,7 @@ import { buildExternalSearchController } from "./text_search_controller";
 
 /**
  * Utility function to perform a text search in an algolia index,
- * returning the ids of the entitys.
+ * returning the ids of the entities.
  * @param client The algolia client
  * @param indexName
  * @param query

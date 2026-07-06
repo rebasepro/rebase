@@ -39,7 +39,7 @@ export function CollectionViewHeaderAction({
                         parentCollectionSlugs,
 parentEntityIds,
                         collection,
-                        existingEntitys: tableController.data ?? []
+                        existingEntities: tableController.data ?? []
                     });
                 }}
                 size={"small"}>

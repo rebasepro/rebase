@@ -1,14 +1,14 @@
 ---
 title: Entity Callbacks
 sidebar_label: Callbacks
-description: Use lifecycle callbacks to run custom logic when entitys are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
+description: Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 ---
 
 ## Overview
 
 Callbacks let you hook into the entity lifecycle to:
 
-- **Sync data between collections** — copy or move entitys across tables on status changes
+- **Sync data between collections** — copy or move entities across tables on status changes
 - **Transform data** before saving (computed fields, slugification)
 - **Validate** business rules beyond schema validation
 - **Trigger side effects** after writes (send emails, sync APIs, update caches)
@@ -67,7 +67,7 @@ Called before a entity is written to the database. Return the modified values.
 ```typescript
 beforeSave: async ({
     values,       // Entity values
-    id,           // Entity ID (null for new entitys)
+    id,           // Entity ID (null for new entities)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context
@@ -96,7 +96,7 @@ Called after a successful save. Use for side effects.
 afterSave: async ({
     values,         // Saved values
     id,             // Entity ID
-    previousValues, // Previous values (null for new entitys)
+    previousValues, // Previous values (null for new entities)
     status,         // "new" | "existing" | "copy"
     context
 }) => {
@@ -125,7 +125,7 @@ afterSaveError: async ({
 
 ### `afterRead`
 
-Called after reading entitys from the database. Transform the data for display.
+Called after reading entities from the database. Transform the data for display.
 
 ```typescript
 afterRead: async ({
@@ -214,12 +214,12 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Query entitys with filters, sorting, and pagination |
+| `.find()` | `find(params?: FindParams) → FindResponse` | Query entities with filters, sorting, and pagination |
 | `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
 | `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
 | `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
 | `.delete()` | `delete(id: string \| number) → void` | Delete a entity |
-| `.count()` | `count(params?: FindParams) → number` | Count matching entitys |
+| `.count()` | `count(params?: FindParams) → number` | Count matching entities |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
 
@@ -254,7 +254,7 @@ afterSave: async ({ values, context }) => {
 }
 ```
 
-### Creating Entitys
+### Creating Entities
 
 ```typescript
 afterSave: async ({ values, entityId, previousValues, context }) => {
@@ -369,7 +369,7 @@ Other cross-collection patterns:
 - **Cascade delete**: Use `afterDelete` to remove related records in child collections
 - **Denormalization**: Use `afterSave` to update summary fields in a parent collection
 - **Audit logging**: Use `afterSave` / `afterDelete` to write to an audit log collection
-- **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entitys
+- **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entities
 
 ## Full Context Reference
 

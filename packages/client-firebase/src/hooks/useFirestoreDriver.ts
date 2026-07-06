@@ -223,7 +223,7 @@ export function useFirestoreDriver({
             }
 
             const rows: Record<string, unknown>[] = [];
-            const addedEntitysSet = new Set<string | number>();
+            const addedEntitiesSet = new Set<string | number>();
             subscriptions = (ids ?? [])
                 .map((id) => {
                     return listenOne({
@@ -232,13 +232,13 @@ export function useFirestoreDriver({
                         onUpdate: (row: Record<string, unknown> | null) => {
                             const incomingId = row?.id as string | number | undefined;
                             if (row && incomingId !== undefined) {
-                                if (!addedEntitysSet.has(incomingId)) {
-                                    addedEntitysSet.add(incomingId);
+                                if (!addedEntitiesSet.has(incomingId)) {
+                                    addedEntitiesSet.add(incomingId);
                                     rows.push(row);
                                     onUpdate(rows);
                                 }
                             } else {
-                                addedEntitysSet.delete(id);
+                                addedEntitiesSet.delete(id);
                                 onUpdate([...rows.filter(r => r.id !== id)])
                             }
                         }
@@ -272,7 +272,7 @@ export function useFirestoreDriver({
     }, []);
 
     /**
-     * Fetch entitys in a Firestore path
+     * Fetch entities in a Firestore path
      * @param path
      * @param collection
      * @param filter
@@ -316,7 +316,7 @@ export function useFirestoreDriver({
     }, [buildQuery]);
 
     /**
-     * Listen to a entitys in a given path
+     * Listen to a entities in a given path
      * @param path
      * @param collection
      * @param onError

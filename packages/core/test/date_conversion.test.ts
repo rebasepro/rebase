@@ -61,7 +61,7 @@ describe("Date-to-String Conversion Bug", () => {
             expect(typeof result.updated_on).not.toBe("string");
         });
 
-        it("should preserve Date objects when updating existing entitys", () => {
+        it("should preserve Date objects when updating existing entities", () => {
             const existingDate = new Date("2025-01-01T10:00:00Z");
             const inputValues = {
                 title: "Existing Document",

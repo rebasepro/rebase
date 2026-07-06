@@ -348,7 +348,7 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const entitys: Entity[] = [
+            const entities: Entity[] = [
                 { id: "1",
 path: "posts",
 values: { title: "A" } },
@@ -356,7 +356,7 @@ values: { title: "A" } },
 path: "posts",
 values: { title: "B" } }
             ];
-            capturedCallback!(entitys);
+            capturedCallback!(entities);
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -364,7 +364,7 @@ values: { title: "B" } }
             // Single emission — no estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entitys,
+                data: entities,
                 meta: {
                     total: 2,
                     limit: 20,
@@ -390,12 +390,12 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!({ limit: 10, offset: 5 }, onUpdate);
 
-            const entitys: Entity[] = [
+            const entities: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
-            capturedCallback!(entitys);
+            capturedCallback!(entities);
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -404,7 +404,7 @@ values: { title: "B" } }
             // Single emission with authoritative meta
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entitys,
+                data: entities,
                 meta: {
                     total: 100,
                     limit: 10,
@@ -430,12 +430,12 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const entitys: Entity[] = [
+            const entities: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
-            capturedCallback!(entitys);
+            capturedCallback!(entities);
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -443,7 +443,7 @@ values: { title: "B" } }
             // Single emission — count matched the heuristic
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entitys,
+                data: entities,
                 meta: {
                     total: 2,
                     limit: 20,
@@ -469,11 +469,11 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const entitys: Entity[] = [
+            const entities: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } }
             ];
 
-            capturedCallback!(entitys);
+            capturedCallback!(entities);
 
             // Wait for count rejection to settle
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -481,7 +481,7 @@ values: { title: "B" } }
             // Single emission with heuristic meta, no estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: entitys,
+                data: entities,
                 meta: {
                     total: 1,
                     limit: 20,

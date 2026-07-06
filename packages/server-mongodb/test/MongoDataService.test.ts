@@ -267,75 +267,75 @@ status: "pending" }
             await db.collection("users").insertMany(users);
         });
 
-        it("should fetch all entitys in a collection", async () => {
-            const entitys = await dataService.fetchCollection("users", {});
-            expect(entitys).toHaveLength(5);
+        it("should fetch all entities in a collection", async () => {
+            const entities = await dataService.fetchCollection("users", {});
+            expect(entities).toHaveLength(5);
         });
 
         it("should apply limit", async () => {
-            const entitys = await dataService.fetchCollection("users", { limit: 2 });
-            expect(entitys).toHaveLength(2);
+            const entities = await dataService.fetchCollection("users", { limit: 2 });
+            expect(entities).toHaveLength(2);
         });
 
         it("should apply ordering (ascending)", async () => {
-            const entitys = await dataService.fetchCollection("users", {
+            const entities = await dataService.fetchCollection("users", {
                 orderBy: "age",
                 order: "asc"
             });
 
-            const ages = entitys.map(e => e.age);
+            const ages = entities.map(e => e.age);
             expect(ages).toEqual([25, 28, 30, 35, 40]);
         });
 
         it("should apply ordering (descending)", async () => {
-            const entitys = await dataService.fetchCollection("users", {
+            const entities = await dataService.fetchCollection("users", {
                 orderBy: "age",
                 order: "desc"
             });
 
-            const ages = entitys.map(e => e.age);
+            const ages = entities.map(e => e.age);
             expect(ages).toEqual([40, 35, 30, 28, 25]);
         });
 
         it("should apply equality filter", async () => {
-            const entitys = await dataService.fetchCollection("users", {
+            const entities = await dataService.fetchCollection("users", {
                 filter: { status: ["==", "active"] }
             });
 
-            expect(entitys).toHaveLength(3);
-            entitys.forEach(e => expect(e.status).toBe("active"));
+            expect(entities).toHaveLength(3);
+            entities.forEach(e => expect(e.status).toBe("active"));
         });
 
         it("should apply greater than filter", async () => {
-            const entitys = await dataService.fetchCollection("users", {
+            const entities = await dataService.fetchCollection("users", {
                 filter: { age: [">", 30] }
             });
 
-            expect(entitys).toHaveLength(2);
-            entitys.forEach(e => expect(e.age).toBeGreaterThan(30));
+            expect(entities).toHaveLength(2);
+            entities.forEach(e => expect(e.age).toBeGreaterThan(30));
         });
 
         it("should apply combined filters", async () => {
-            const entitys = await dataService.fetchCollection("users", {
+            const entities = await dataService.fetchCollection("users", {
                 filter: {
                     status: ["==", "active"],
                     age: [">=", 30]
                 }
             });
 
-            expect(entitys).toHaveLength(2);
-            entitys.forEach(e => {
+            expect(entities).toHaveLength(2);
+            entities.forEach(e => {
                 expect(e.status).toBe("active");
                 expect(e.age).toBeGreaterThanOrEqual(30);
             });
         });
 
         it("should return empty array for no matches", async () => {
-            const entitys = await dataService.fetchCollection("users", {
+            const entities = await dataService.fetchCollection("users", {
                 filter: { status: ["==", "nonexistent"] }
             });
 
-            expect(entitys).toEqual([]);
+            expect(entities).toEqual([]);
         });
     });
 
@@ -369,7 +369,7 @@ status: "pending" }
             ]);
         });
 
-        it("should count all entitys", async () => {
+        it("should count all entities", async () => {
             const count = await dataService.count("users", {});
             expect(count).toBe(3);
         });

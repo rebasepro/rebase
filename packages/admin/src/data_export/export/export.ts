@@ -6,7 +6,7 @@ interface Header {
     label: string;
 }
 
-export interface DownloadEntitysExportParams<M extends Record<string, unknown>> {
+export interface DownloadEntitiesExportParams<M extends Record<string, unknown>> {
     data: Entity<M>[];
     additionalData: Record<string, unknown>[] | undefined;
     properties: Properties;
@@ -18,7 +18,7 @@ export interface DownloadEntitysExportParams<M extends Record<string, unknown>> 
     dateExportType: "timestamp" | "string";
 }
 
-export function downloadEntitysExport<M extends Record<string, unknown>>({
+export function downloadEntitiesExport<M extends Record<string, unknown>>({
     data,
     additionalData,
     properties,
@@ -28,7 +28,7 @@ export function downloadEntitysExport<M extends Record<string, unknown>>({
     additionalHeaders,
     exportType,
     dateExportType
-}: DownloadEntitysExportParams<M>
+}: DownloadEntitiesExportParams<M>
 ) {
 
     console.debug("Downloading export", {

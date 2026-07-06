@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "./collections";
-import type { EntityStatus, EntityValues } from "./entitys";
+import type { EntityStatus, EntityValues } from "./entities";
 import type { User } from "../users";
 import type { RebaseCallContext } from "../rebase_context";
 

@@ -2,7 +2,7 @@ import {
     normalizeToEntityRelation,
     getRelationFrom,
     traverseValueProperty
-} from "../src/util/entitys";
+} from "../src/util/entities";
 import { EntityRelation, Property } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────

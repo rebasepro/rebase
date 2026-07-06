@@ -165,7 +165,7 @@ rebase generate-sdk
 
 **What it does:**
 - Reads collections from `config/collections/` (supports `index.ts` barrel exports or individual files)
-- Generates TypeScript types for all entitys in `generated/sdk/`
+- Generates TypeScript types for all entities in `generated/sdk/`
 - Produces a `database.types.ts` file for use with `createRebaseClient<Database>()`
 
 **Options:**

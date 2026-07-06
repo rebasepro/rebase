@@ -19,7 +19,7 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
     parentCollectionSlugs: string[], parentEntityIds: string[];
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
-    collectionEntitysCount?: number;
+    collectionEntitiesCount?: number;
     /**
      * Resolved properties from the collection for the filters dialog
      */
@@ -35,7 +35,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     path,
     selectionController,
     tableController,
-    collectionEntitysCount,
+    collectionEntitiesCount,
     resolvedProperties,
     compact,
     openNewDocument
@@ -67,7 +67,7 @@ parentEntityIds,
         selectionController,
         context,
         tableController,
-        collectionEntitysCount,
+        collectionEntitiesCount,
         openNewDocument
     };
 

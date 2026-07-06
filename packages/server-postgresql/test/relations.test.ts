@@ -632,17 +632,17 @@ relationName: "categories" }
 
         it("should handle circular references", async () => {
             const aCollection: CollectionConfig = {
-                slug: "a_entitys",
-                table: "a_entitys",
-                name: "A Entitys",
+                slug: "a_entities",
+                table: "a_entities",
+                name: "A Entities",
                 properties: {
                     name: { type: "string" },
-                    b_entitys: { type: "relation",
-relationName: "b_entitys" }
+                    b_entities: { type: "relation",
+relationName: "b_entities" }
                 },
                 relations: [
                     {
-                        relationName: "b_entitys",
+                        relationName: "b_entities",
                         target: () => bCollection,
                         cardinality: "many",
                         direction: "inverse",
@@ -652,9 +652,9 @@ relationName: "b_entitys" }
             };
 
             const bCollection: CollectionConfig = {
-                slug: "b_entitys",
-                table: "b_entitys",
-                name: "B Entitys",
+                slug: "b_entities",
+                table: "b_entities",
+                name: "B Entities",
                 properties: {
                     name: { type: "string" },
                     a_entity: { type: "relation",
@@ -676,12 +676,12 @@ relationName: "a_entity" }
 
             // Should handle circular references without infinite loops
             // The 'owning' relation on bCollection should correctly generate the FK
-            expect(cleanResult).toContain("export const aEntitys = pgTable(\"a_entitys\"");
-            expect(cleanResult).toContain("export const bEntitys = pgTable(\"b_entitys\"");
-            expect(cleanResult).toContain("a_entity_id: varchar(\"a_entity_id\").references(() => aEntitys.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("export const aEntities = pgTable(\"a_entities\"");
+            expect(cleanResult).toContain("export const bEntities = pgTable(\"b_entities\"");
+            expect(cleanResult).toContain("a_entity_id: varchar(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
-            expect(cleanResult).toContain("\"b_entitys\": many(bEntitys, { relationName: \"b_entitys_a_entity_id\" })");
-            expect(cleanResult).toContain("\"a_entity\": one(aEntitys, { fields: [bEntitys.a_entity_id], references: [aEntitys.id], relationName: \"b_entitys_a_entity_id\" })");
+            expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_a_entity_id\" })");
+            expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.a_entity_id], references: [aEntities.id], relationName: \"b_entities_a_entity_id\" })");
         });
     });
 });

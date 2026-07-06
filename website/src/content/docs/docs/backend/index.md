@@ -176,7 +176,7 @@ The REST API is auto-generated from your collections. Every collection gets thes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List entitys (with filter, sort, limit, search) |
+| `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
 | `PUT` | `/api/data/:slug/:id` | Update a entity |

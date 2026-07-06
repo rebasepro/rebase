@@ -88,7 +88,7 @@ export class RestApiGenerator {
         const basePath = `/${collection.slug}`;
         const resolvedCollection = collection;
 
-        // GET /collection/count - Count entitys (with optional filters)
+        // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
@@ -96,11 +96,11 @@ export class RestApiGenerator {
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const driver = this.getScopedDriver(c);
 
-            const total = await this.countRawEntitys(driver, resolvedCollection, queryOptions, searchString);
+            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
             return c.json({ count: total });
         });
 
-        // GET /collection - List entitys
+        // GET /collection - List entities
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
@@ -111,7 +111,7 @@ export class RestApiGenerator {
             const fetchService = driver.restFetchService;
 
             // Use include-aware path when available
-            const entitys = fetchService
+            const entities = fetchService
                 ? await fetchService.fetchCollectionForRest(
                     collection.slug,
                     {
@@ -127,15 +127,15 @@ export class RestApiGenerator {
                 )
                 : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
 
-            const total = await this.countRawEntitys(driver, resolvedCollection, queryOptions, searchString);
+            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
             return c.json({
-                data: entitys,
+                data: entities,
                 meta: {
                     total,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    hasMore: (queryOptions.offset || 0) + entitys.length < total
+                    hasMore: (queryOptions.offset || 0) + entities.length < total
                 }
             });
         });
@@ -388,7 +388,7 @@ id };
 
 
             if (parsed.id === "count") {
-                // GET /parent/:parentId/child/count — count child entitys
+                // GET /parent/:parentId/child/count — count child entities
                 const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
@@ -410,11 +410,11 @@ id };
 
                 return c.json(entity);
             } else {
-                // GET /parent/:parentId/child — list entitys
+                // GET /parent/:parentId/child — list entities
                 const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                const entitys = await driver.fetchCollection({
+                const entities = await driver.fetchCollection({
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
                     limit: queryOptions.limit,
@@ -427,15 +427,15 @@ id };
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
                     searchString
-                }) : entitys.length;
+                }) : entities.length;
 
                 return c.json({
-                    data: entitys,
+                    data: entities,
                     meta: {
                         total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: (queryOptions.offset || 0) + entitys.length < total
+                        hasMore: (queryOptions.offset || 0) + entities.length < total
                     }
                 });
             }
@@ -556,7 +556,7 @@ id };
      * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
     private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string) {
-        const entitys = await driver.fetchCollection({
+        const entities = await driver.fetchCollection({
             path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
@@ -568,13 +568,13 @@ id };
             vectorSearch: queryOptions.vectorSearch
         });
 
-        return entitys;
+        return entities;
     }
 
     /**
-     * Count raw entitys for a collection
+     * Count raw entities for a collection
      */
-    private async countRawEntitys(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string): Promise<number> {
+    private async countRawEntities(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string): Promise<number> {
         return driver.count ? await driver.count({
             path: getCollectionDataPath(collection),
             collection,

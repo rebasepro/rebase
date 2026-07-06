@@ -32,7 +32,7 @@ export type CollectionListViewBindingProps<M extends Record<string, unknown> = R
     onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedEntitys?: Entity<M>[];
+    highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;
 
     /**
@@ -62,7 +62,7 @@ export type CollectionListViewBindingProps<M extends Record<string, unknown> = R
     path?: string;
 
     /**
-     * How entitys open when an action triggers navigation.
+     * How entities open when an action triggers navigation.
      */
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 };
@@ -265,7 +265,7 @@ year: diffDays > 365 ? "numeric" : undefined });
 }
 
 /**
- * Classic CMS list view for displaying entitys.
+ * Classic CMS list view for displaying entities.
  * Designed to be the most familiar, stereotypical CMS content management view:
  * - Clean rows with checkbox, icon/avatar, title, metadata, and actions
  * - Column-sortable headers
@@ -277,7 +277,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     onEntityClick,
     selectionController,
     selectionEnabled = true,
-    highlightedEntitys,
+    highlightedEntities,
     emptyComponent,
 
     size = "m",
@@ -506,8 +506,8 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     }, [selectionController]);
 
     const isEntityHighlighted = useCallback((entity: Entity<M>) => {
-        return highlightedEntitys?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
-    }, [highlightedEntitys]);
+        return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
+    }, [highlightedEntities]);
 
     // ── Compute list-view-visible actions per entity ──
     const getListViewActions = useCallback((entity: Entity<M>): EntityAction[] => {
@@ -522,8 +522,8 @@ customEntityActions });
 
     const rowClasses = getRowClasses(size);
 
-    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntitys.map(e => e.id)), [selectionController?.selectedEntitys]);
-    const highlightedIds = useMemo(() => new Set(highlightedEntitys?.map(e => e.id)), [highlightedEntitys]);
+    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntities.map(e => e.id)), [selectionController?.selectedEntities]);
+    const highlightedIds = useMemo(() => new Set(highlightedEntities?.map(e => e.id)), [highlightedEntities]);
 
     const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
         handleSelectionChange(entity, selected);

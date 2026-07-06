@@ -1,5 +1,5 @@
 import type { CollectionRegistryController } from "./collection_registry";
-import type { EntityStatus, EntityValues } from "../types/entitys";
+import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { RebaseContext } from "../rebase_context";
 
@@ -73,7 +73,7 @@ export type ListenCollectionProps<M extends Record<string, unknown> = Record<str
 export interface SaveProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
     values: Partial<EntityValues<M>>;
-    id?: string | number; // can be empty for new entitys
+    id?: string | number; // can be empty for new entities
     previousValues?: Partial<EntityValues<M>>;
     collection?: CollectionConfig<M>;
     status: EntityStatus;
@@ -162,7 +162,7 @@ export interface DataDriver {
     delete<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteProps<M>): Promise<void>;
 
     /**
-     * Delete all entitys from a collection.
+     * Delete all entities from a collection.
      * @param path Collection path
      */
     deleteAll?(path: string): Promise<void>;
@@ -185,7 +185,7 @@ export interface DataDriver {
     ): Promise<boolean>;
 
     /**
-     * Count the number of entitys in a collection
+     * Count the number of entities in a collection
      */
     count?<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number>;
 
@@ -260,7 +260,7 @@ export interface DataDriver {
  */
 export interface RestFetchService {
     /**
-     * Fetch a collection of flattened entitys with optional relation includes.
+     * Fetch a collection of flattened entities with optional relation includes.
      */
     fetchCollectionForRest(
         collectionPath: string,

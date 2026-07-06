@@ -22,7 +22,7 @@ export function CollectionEditorImportDataPreview({
     const registry = useCollectionRegistryController();
     const [loading, setLoading] = useState<boolean>(false);
 
-    async function loadEntitys() {
+    async function loadEntities() {
         const mappedData = importConfig.importData.map(d => convertDataToEntity(authController,
             registry,
             d,
@@ -31,11 +31,11 @@ export function CollectionEditorImportDataPreview({
             properties,
             "TEMP_PATH",
             importConfig.defaultValues));
-        importConfig.setEntitys(mappedData);
+        importConfig.setEntities(mappedData);
     }
 
     useEffect(() => {
-        loadEntitys().finally(() => setLoading(false));
+        loadEntities().finally(() => setLoading(false));
     }, []);
 
     const selectionController = useSelectionController();
@@ -45,10 +45,10 @@ export function CollectionEditorImportDataPreview({
     return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Entitys with the same id will be overwritten</Typography>
+            <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
         </div>}
         tableController={{
-            data: importConfig.entitys,
+            data: importConfig.entities,
             dataLoading: false,
             noMoreToLoad: false
         }}

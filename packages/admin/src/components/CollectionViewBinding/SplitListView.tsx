@@ -21,7 +21,7 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
     onNewClick?: () => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedEntitys?: Entity<M>[];
+    highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;
     onScroll?: (props: {
         scrollDirection: "forward" | "backward";
@@ -94,7 +94,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     onNewClick: externalOnNewClick,
     selectionController,
     selectionEnabled = true,
-    highlightedEntitys,
+    highlightedEntities,
     emptyComponent,
     onScroll,
     initialScroll,
@@ -153,7 +153,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     });
                 });
             }
-            // If already entered (switching entitys), keep "entered"
+            // If already entered (switching entities), keep "entered"
         } else {
             // Closing
             if (animationPhase === "entered" || animationPhase === "entering") {

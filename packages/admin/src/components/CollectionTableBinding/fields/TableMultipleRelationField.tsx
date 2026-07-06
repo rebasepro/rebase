@@ -51,8 +51,8 @@ export const TableMultipleRelationFieldInternal = React.memo(
 
         const value = Array.isArray(internalValue) ? internalValue : [];
 
-        const onMultipleEntitysSelected = useCallback((entitys: Entity<any>[]) => {
-            updateValue(entitys.map(e => getRelationFrom(e)));
+        const onMultipleEntitiesSelected = useCallback((entities: Entity<any>[]) => {
+            updateValue(entities.map(e => getRelationFrom(e)));
         }, [updateValue]);
 
         const selectedEntityIds = value.map((ref) => ref.id);
@@ -61,7 +61,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
             multiselect: true,
             path: getCollectionDataPath(collection),
             collection,
-            onMultipleEntitysSelected,
+            onMultipleEntitiesSelected,
             selectedEntityIds,
             fixedFilter
         }

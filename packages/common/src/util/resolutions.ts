@@ -15,7 +15,7 @@ import {
 } from "@rebasepro/types";
 
 type PropertyConfig = { property: unknown; [key: string]: unknown };
-import { isPropertyBuilder } from "./entitys";
+import { isPropertyBuilder } from "./entities";
 import { enumToObjectEntries } from "./enums";
 import { DEFAULT_ONE_OF_TYPE } from "./common";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";

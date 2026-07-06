@@ -19,7 +19,7 @@ export interface CollectionProps<M extends Record<string, any>> {
     collection: CollectionConfig<M>
 
     /**
-     * Number of entitys to fetch
+     * Number of entities to fetch
      */
     itemCount?: number;
 
@@ -105,11 +105,11 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
 
         setDataLoading(true);
 
-        const onEntitysUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean; total?: number } }) => {
-            const entitys = res.data;
+        const onEntitiesUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean; total?: number } }) => {
+            const entities = res.data;
             setDataLoading(false);
             setDataLoadingError(undefined);
-            setData(entitys.map(e => ({
+            setData(entities.map(e => ({
                 ...e
             })));
             setNoMoreToLoad(!res.meta.hasMore);
@@ -145,7 +145,7 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, (res) => onEntitysUpdate({ data: res.data as Entity<M>[],
+            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onError);
         } else {
             accessor.find({
@@ -157,7 +157,7 @@ meta: res.meta }), onError);
                 searchString,
                 include: includeParams
             })
-                .then((res) => onEntitysUpdate({ data: res.data as Entity<M>[],
+                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }))
                 .catch(onError);
             return () => {

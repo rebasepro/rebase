@@ -460,7 +460,7 @@ type CollectionPanelProps = {
     title?: string | false;                 // Title above the collection (false = hide)
     viewMode?: ViewMode;                    // Force view mode (table, card, etc.)
     sort?: [string, "asc" | "desc"];        // Override sort
-    limit?: number;                         // Max entitys to display
+    limit?: number;                         // Max entities to display
     updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     className?: string;                     // Container CSS class

@@ -25,9 +25,9 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
                 where: { [name]: ["==", value] }
             });
 
-            const conflictingEntitys = res.data;
-            const isUnique = conflictingEntitys.length === 0 ||
-                (conflictingEntitys.length === 1 && conflictingEntitys[0].id === entityId);
+            const conflictingEntities = res.data;
+            const isUnique = conflictingEntities.length === 0 ||
+                (conflictingEntities.length === 1 && conflictingEntities[0].id === entityId);
 
             return isUnique;
         },

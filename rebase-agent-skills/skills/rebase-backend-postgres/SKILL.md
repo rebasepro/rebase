@@ -514,7 +514,7 @@ const backend = await initializeRebaseBackend({
 
 When enabled:
 - The bootstrapper auto-creates a `rebase.entity_history` table
-- Every `INSERT`, `UPDATE`, `DELETE` is recorded with before/after entitys
+- Every `INSERT`, `UPDATE`, `DELETE` is recorded with before/after entities
 - History is queryable via the `/:slug/:entityId/history` REST endpoint
 
 ## Health Check

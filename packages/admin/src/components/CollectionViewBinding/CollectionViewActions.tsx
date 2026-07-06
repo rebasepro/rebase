@@ -25,7 +25,7 @@ export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     onMultipleDeleteClick: () => void;
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
-    collectionEntitysCount?: number;
+    collectionEntitiesCount?: number;
     compact?: boolean;
     children?: React.ReactNode;
     openNewDocument: (defaultValues?: Record<string, unknown>) => void;
@@ -41,7 +41,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     path,
     selectionController,
     tableController,
-    collectionEntitysCount,
+    collectionEntitiesCount,
     compact,
     children,
     openNewDocument
@@ -57,7 +57,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     const collectionEditorController = useCollectionEditorController();
     const hasCollectionEditor = Boolean(collectionEditorController?.editCollection);
 
-    const selectedEntitys = selectionController.selectedEntitys;
+    const selectedEntities = selectionController.selectedEntities;
 
     const addButton = canCreate(collection, path) &&
         onNewClick && (largeLayout && !compact
@@ -87,18 +87,18 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
         const button = largeLayout && !compact
             ? <Button
                 variant={"text"}
-                disabled={!(selectedEntitys?.length) || !multipleDeleteEnabled}
+                disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
                 startIcon={<Trash2Icon size={iconSize.small}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
                 className="lg:w-20"
             >
-                ({selectedEntitys?.length})
+                ({selectedEntities?.length})
             </Button>
             : <IconButton
                 size={"small"}
                 color={"primary"}
-                disabled={!(selectedEntitys?.length) || !multipleDeleteEnabled}
+                disabled={!(selectedEntities?.length) || !multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
                 <Trash2Icon size={iconSize.small}/>
             </IconButton>;
@@ -118,7 +118,7 @@ parentEntityIds,
         selectionController,
         context,
         tableController,
-        collectionEntitysCount,
+        collectionEntitiesCount,
         openNewDocument
     };
 

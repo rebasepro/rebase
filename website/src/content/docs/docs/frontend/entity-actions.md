@@ -1,12 +1,12 @@
 ---
 title: Entity Actions
 sidebar_label: Entity Actions
-description: Add custom action buttons to entitys for archiving, publishing, exporting, cloning, and more.
+description: Add custom action buttons to entities for archiving, publishing, exporting, cloning, and more.
 ---
 
 ## Overview
 
-Entity actions are custom buttons that appear on individual entitys. Use them for operations like publishing, archiving, cloning, or triggering external workflows.
+Entity actions are custom buttons that appear on individual entities. Use them for operations like publishing, archiving, cloning, or triggering external workflows.
 
 ## Defining Entity Actions
 
@@ -48,7 +48,7 @@ const articlesCollection: CollectionConfig = {
 
 ## Collection Actions
 
-For toolbar-level actions that work on the collection or selected entitys:
+For toolbar-level actions that work on the collection or selected entities:
 
 ```tsx
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {

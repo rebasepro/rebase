@@ -151,7 +151,7 @@ export const deleteEntityAction: EntityAction = {
                 if (!collection || !path)
                     throw new Error("deleteEntityAction: Collection is undefined");
                 return <DeleteEntityDialog
-                    entityOrEntitysToDelete={entity}
+                    entityOrEntitiesToDelete={entity}
                     path={path}
                     collection={collection}
                     callbacks={collection.callbacks}
@@ -160,7 +160,7 @@ export const deleteEntityAction: EntityAction = {
                         context?.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
                             path
                         });
-                        selectionController?.setSelectedEntitys(selectionController.selectedEntitys.filter(e => e.id !== entity.id));
+                        selectionController?.setSelectedEntities(selectionController.selectedEntities.filter(e => e.id !== entity.id));
                         onCollectionChange?.();
                         // In full-screen mode, navigateBack would go to the deleted entity's
                         // detail URL, which no longer exists. Navigate to the parent collection instead.

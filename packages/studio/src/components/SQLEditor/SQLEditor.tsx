@@ -1024,7 +1024,7 @@ role: selectedRole });
         // Only collections that have a PK column in the result set can be opened
         const actionableCollections = matchedCollections.filter(mc => mc.pkColumn && resultColumnKeys.includes(mc.pkColumn));
 
-        // For each row, determine which entitys can be opened
+        // For each row, determine which entities can be opened
         const getRowEntityActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
             if (!rowData) return [];
             return actionableCollections

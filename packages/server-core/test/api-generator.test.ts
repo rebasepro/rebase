@@ -74,7 +74,7 @@ describe("RestApiGenerator", () => {
     }
 
     describe("Core Collection Routes", () => {
-        it("list entitys - GET /api/users", async () => {
+        it("list entities - GET /api/users", async () => {
             const app = createApp();
             mockDriver.fetchCollection.mockResolvedValue([
                 { id: "1",

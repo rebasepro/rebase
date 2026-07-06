@@ -11,7 +11,7 @@ import type { ComponentOverrideMap } from "../types/component_overrides";
 export type CustomizationController = {
 
     /**
-     * Builder for generating utility links for entitys
+     * Builder for generating utility links for entities
      */
     entityLinkBuilder?: EntityLinkBuilder;
 
@@ -26,7 +26,7 @@ export type CustomizationController = {
     resolvedSlots: SlotContribution[];
 
     /**
-     * List of additional custom views for entitys.
+     * List of additional custom views for entities.
      * You can use the key to reference the custom view in
      * the `entityViews` prop of a collection.
      *
@@ -35,7 +35,7 @@ export type CustomizationController = {
     entityViews?: EntityCustomView[];
 
     /**
-     * List of actions that can be performed on entitys.
+     * List of actions that can be performed on entities.
      * These actions are displayed in the entity view and in the collection view.
      * You can later reuse these actions in the `entityActions` prop of a collection,
      * by specifying the `key` of the action.

@@ -20,10 +20,10 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
      */
     collection: CollectionConfig<M>;
     /**
-     * List of entitys that will be displayed on top, no matter the ordering.
+     * List of entities that will be displayed on top, no matter the ordering.
      * This is used for reference fields selection
      */
-    entitysDisplayedFirst?: Entity<M>[];
+    entitiesDisplayedFirst?: Entity<M>[];
 
     lastDeleteTimestamp?: number;
 
@@ -51,7 +51,7 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
  * @param path
  * @param collection
  * @param scrollRestoration
- * @param entitysDisplayedFirst
+ * @param entitiesDisplayedFirst
  * @param lastDeleteTimestamp
  * @param fixedFilterFromProps
  * @param updateUrl
@@ -61,7 +61,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         path,
         collection,
         scrollRestoration,
-        entitysDisplayedFirst,
+        entitiesDisplayedFirst,
         lastDeleteTimestamp: _lastDeleteTimestamp,
         fixedFilter: fixedFilterFromProps,
         updateUrl
@@ -204,13 +204,13 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         setDataLoading(true);
 
-        const onEntitysUpdate = async (entitys: Entity<M>[]) => {
+        const onEntitiesUpdate = async (entities: Entity<M>[]) => {
             if (collection.callbacks?.afterRead) {
                 try {
                     // afterRead operates on flat rows; unwrap the Entity view-model
                     // before invoking and re-wrap the processed row after.
-                    entitys = await Promise.all(
-                        entitys.map(async (entity) => {
+                    entities = await Promise.all(
+                        entities.map(async (entity) => {
                             const processedRow = await collection.callbacks!.afterRead!({
                                 collection,
                                 path,
@@ -228,15 +228,15 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             }
             setDataLoading(false);
             setDataLoadingError(undefined);
-            setRawData(entitys.map(e => ({
+            setRawData(entities.map(e => ({
                 ...e
                 // values: sanitizeData(e.values, resolvedCollection.properties)
             })));
-            setNoMoreToLoad(!itemCount || entitys.length < itemCount);
+            setNoMoreToLoad(!itemCount || entities.length < itemCount);
 
             // Pre-populate the entity fetch cache so that navigating to an
             // entity detail view renders instantly with cached data.
-            populateFetchCache(path, entitys);
+            populateFetchCache(path, entities);
         };
 
         const onError = (error: Error) => {
@@ -260,7 +260,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 limit: itemCount,
                 orderBy: orderByParams,
                 searchString
-            }, (res) => onEntitysUpdate(res.data as Entity<M>[]), onError);
+            }, (res) => onEntitiesUpdate(res.data as Entity<M>[]), onError);
         } else {
             accessor.find({
                 where: whereParams,
@@ -268,7 +268,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 orderBy: orderByParams,
                 searchString
             })
-                .then((res) => onEntitysUpdate(res.data as Entity<M>[]))
+                .then((res) => onEntitiesUpdate(res.data as Entity<M>[]))
                 .catch(onError);
             unsubscribe = () => undefined;
         }
@@ -279,7 +279,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const orderedData = useDataOrder({
         data: rawData,
-        entitysDisplayedFirst
+        entitiesDisplayedFirst
     });
 
     // hack to fix Firestore listeners firing with incomplete data

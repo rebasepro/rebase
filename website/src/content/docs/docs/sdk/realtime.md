@@ -59,7 +59,7 @@ listen(
 
 When `listen()` fires, it emits updates in up to two phases:
 
-1. **Immediate (estimated):** The first callback fires instantly with the entitys and heuristic pagination metadata (`total` = number of returned entitys, `hasMore` = whether the count equals the requested limit). This emission carries `meta.estimated: true`.
+1. **Immediate (estimated):** The first callback fires instantly with the entities and heuristic pagination metadata (`total` = number of returned entities, `hasMore` = whether the count equals the requested limit). This emission carries `meta.estimated: true`.
 
 2. **Authoritative (optional):** An async count query runs in the background. If the authoritative `total` or `hasMore` differs from the estimate, a second callback fires with corrected metadata and **no** `estimated` flag. If the values match, the second emission is skipped entirely — your callback fires only once.
 

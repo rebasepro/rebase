@@ -31,7 +31,7 @@ export function getEntitySchema<M extends Record<string, unknown>>(
             const isStringOrNumber = property.type === "string" || property.type === "number";
             const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
             if (entityId === undefined && isIdAndAuto) {
-                return; // Skip validation for auto-generated IDs on new entitys
+                return; // Skip validation for auto-generated IDs on new entities
             }
             shape[name] = mapPropertyToZod({
                 property: property as Property,

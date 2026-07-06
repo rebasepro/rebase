@@ -19,7 +19,7 @@ Both features are enabled by default on all collections and can be configured or
 3. Select or drag-and-drop your file
 4. Map file columns to collection properties
 5. Preview the data and resolve any validation errors
-6. Click **Import** to save all entitys
+6. Click **Import** to save all entities
 
 ### Supported Formats
 

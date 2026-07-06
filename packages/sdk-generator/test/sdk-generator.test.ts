@@ -30,7 +30,7 @@ describe("Utils", () => {
             expect(toPascalCase("private_notes")).toBe("PrivateNotes");
         });
         it("handles already PascalCase input", () => {
-            expect(toPascalCase("TestEntitys")).toBe("Testentitys"); // Note: toPascalCase implementation lowercases follow-up chars per word split
+            expect(toPascalCase("TestEntities")).toBe("Testentities"); // Note: toPascalCase implementation lowercases follow-up chars per word split
         });
         it("handles kebab-case", () => {
             expect(toPascalCase("private-notes")).toBe("PrivateNotes");

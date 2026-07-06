@@ -50,14 +50,14 @@ export type CollectionBoardViewBindingProps<M extends Record<string, unknown> = 
     onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedEntitys?: Entity<M>[];
+    highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;
-    /** Called when entitys are deleted - used for optimistic count updates */
-    deletedEntitys?: Entity<M>[];
+    /** Called when entities are deleted - used for optimistic count updates */
+    deletedEntities?: Entity<M>[];
 };
 
 /**
- * Kanban board view for displaying entitys grouped by a string enum property.
+ * Kanban board view for displaying entities grouped by a string enum property.
  */
 export function CollectionBoardViewBinding<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
@@ -69,9 +69,9 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
     onEntityClick,
     selectionController,
     selectionEnabled = true,
-    highlightedEntitys,
+    highlightedEntities,
     emptyComponent,
-    deletedEntitys
+    deletedEntities
 }: CollectionBoardViewBindingProps<M>) {
     const customizationController = useCustomizationController();
     const context = useRebaseContext();
@@ -180,16 +180,16 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
     const dataLoading = boardDataController.loading;
     const dataLoadingError = boardDataController.error;
 
-    // Track previously processed deleted entitys to avoid double-counting
+    // Track previously processed deleted entities to avoid double-counting
     const processedDeletedRef = useRef<Set<string>>(new Set());
 
-    // Optimistic update for column counts when entitys are deleted
+    // Optimistic update for column counts when entities are deleted
     useEffect(() => {
-        if (!deletedEntitys || deletedEntitys.length === 0) return;
+        if (!deletedEntities || deletedEntities.length === 0) return;
 
-        // Calculate column deltas from deleted entitys
+        // Calculate column deltas from deleted entities
         const deltas: Record<string, number> = {};
-        deletedEntitys.forEach(entity => {
+        deletedEntities.forEach(entity => {
             // Skip if we've already processed this entity
             if (processedDeletedRef.current.has(String(entity.id))) return;
             processedDeletedRef.current.add(String(entity.id));
@@ -203,25 +203,25 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
         if (Object.keys(deltas).length > 0) {
             boardDataController.decrementColumnCounts(deltas);
         }
-    }, [deletedEntitys, columnProperty, boardDataController]);
+    }, [deletedEntities, columnProperty, boardDataController]);
 
-    // Build all entitys from all columns for operations that need the full list
-    const allEntitys = useMemo(() => {
-        const entitys: Entity<M>[] = [];
+    // Build all entities from all columns for operations that need the full list
+    const allEntities = useMemo(() => {
+        const entities: Entity<M>[] = [];
         const seenIds = new Set<string>();
         columns.forEach(col => {
             const colData = boardDataController.columnData[col];
-            if (colData?.entitys) {
-                colData.entitys.forEach((entity: Entity<M>) => {
+            if (colData?.entities) {
+                colData.entities.forEach((entity: Entity<M>) => {
                     const idStr = String(entity.id);
                     if (!seenIds.has(idStr)) {
                         seenIds.add(idStr);
-                        entitys.push(entity);
+                        entities.push(entity);
                     }
                 });
             }
         });
-        return entitys;
+        return entities;
     }, [boardDataController.columnData, columns]);
 
     const allowColumnReorder = useMemo(() => {
@@ -297,12 +297,12 @@ parentEntityIds,
         if (!orderProperty || dataLoading) return false;
         // Use collection-level count detection
         if (missingOrderCount > 0) return true;
-        // Fallback to checking loaded entitys
-        return allEntitys.some((entity: Entity<M>) => {
+        // Fallback to checking loaded entities
+        return allEntities.some((entity: Entity<M>) => {
             const orderValue = entity.values?.[orderProperty];
             return orderValue === undefined || orderValue === null;
         });
-    }, [allEntitys, orderProperty, dataLoading, missingOrderCount]);
+    }, [allEntities, orderProperty, dataLoading, missingOrderCount]);
 
     // Create a lookup map of entity ID → column from boardDataController data
     // This ensures items stay in the column they were fetched for, not re-evaluated from entity.values
@@ -310,8 +310,8 @@ parentEntityIds,
         const map: Record<string, string> = {};
         columns.forEach(col => {
             const colData = boardDataController.columnData[col];
-            if (colData?.entitys) {
-                colData.entitys.forEach((entity: Entity<M>) => {
+            if (colData?.entities) {
+                colData.entities.forEach((entity: Entity<M>) => {
                     map[String(entity.id)] = col;
                 });
             }
@@ -319,13 +319,13 @@ parentEntityIds,
         return map;
     }, [columns, boardDataController.columnData]);
 
-    // Convert entitys to board items per column (data already sorted by orderProperty from controller)
+    // Convert entities to board items per column (data already sorted by orderProperty from controller)
     const boardItems: BoardItem<Entity<M>>[] = useMemo(() => {
-        return allEntitys.map((entity: Entity<M>) => ({
+        return allEntities.map((entity: Entity<M>) => ({
             id: String(entity.id),
             data: entity
         }));
-    }, [allEntitys]);
+    }, [allEntities]);
 
     // Column loading state from the board data controller
     const columnLoadingState: ColumnLoadingState = useMemo(() => {
@@ -335,7 +335,7 @@ parentEntityIds,
             state[col] = {
                 loading: colData?.loading ?? true,
                 hasMore: colData?.hasMore ?? false,
-                itemCount: colData?.entitys?.length ?? 0,
+                itemCount: colData?.entities?.length ?? 0,
                 totalCount: colData?.totalCount
             };
         });
@@ -363,7 +363,7 @@ parentEntityIds,
         analyticsController
     });
 
-    // Backfill order values for all entitys
+    // Backfill order values for all entities
     const handleBackfill = useCallback(async () => {
         if (!orderProperty) {
             return;
@@ -374,22 +374,22 @@ parentEntityIds,
         setBackfillLoading(true);
 
         try {
-            // Fetch ALL documents from collection (not relying on loaded entitys)
+            // Fetch ALL documents from collection (not relying on loaded entities)
             const allDocsRes = await dataClient.collection(fullPath).find({
                 limit: 10000 // Fetch all
             });
             const allDocs = allDocsRes.data as Entity<M>[];
 
-            // Find entitys missing order property
-            const entitysToUpdate = allDocs.filter((entity: Entity<M>) => {
+            // Find entities missing order property
+            const entitiesToUpdate = allDocs.filter((entity: Entity<M>) => {
                 const orderValue = entity.values?.[orderProperty];
                 return orderValue === undefined || orderValue === null;
             });
 
-            // Generate string fractional keys for all entitys that need them
-            const keys = generateNKeysBetween(null, null, entitysToUpdate.length);
+            // Generate string fractional keys for all entities that need them
+            const keys = generateNKeysBetween(null, null, entitiesToUpdate.length);
             const updates: Promise<void>[] = [];
-            entitysToUpdate.forEach((entity: Entity<M>, index: number) => {
+            entitiesToUpdate.forEach((entity: Entity<M>, index: number) => {
                 const updatedValues = setIn({ ...entity.values }, orderProperty, keys[index]);
 
                 const saveProps: SaveEntityWithCallbacksProps<Record<string, unknown>> = {
@@ -534,7 +534,7 @@ parentEntityIds,
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* Error banner - only show when no data loaded */}
-            {hasError && allEntitys.length === 0 && (
+            {hasError && allEntities.length === 0 && (
                 <div
                     className="flex items-center gap-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
                     <Typography variant="body2" className="text-red-700 dark:text-red-300 flex-1">

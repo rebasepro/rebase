@@ -120,7 +120,7 @@ description: "Whether more records exist beyond this page" }
 
         const dataPath = `/data/${slug}`;
 
-        // ── GET /data/{slug} — List entitys ──────────────────────────
+        // ── GET /data/{slug} — List entities ──────────────────────────
         paths[dataPath] = {
             get: {
                 tags: [collection.name],
@@ -180,7 +180,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
                 ],
                 responses: {
                     200: {
-                        description: "Paginated list of entitys",
+                        description: "Paginated list of entities",
                         content: {
                             "application/json": {
                                 schema: {

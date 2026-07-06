@@ -1,6 +1,6 @@
 ---
 name: rebase-admin
-description: Guide for navigating the Rebase admin CMS, opening entitys in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access CMS-specific controllers.
+description: Guide for navigating the Rebase admin CMS, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access CMS-specific controllers.
 ---
 
 # Rebase Admin (`@rebasepro/admin`)
@@ -26,7 +26,7 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 
 ---
 
-## 1. Opening Entitys in the Side Drawer
+## 1. Opening Entities in the Side Drawer
 
 Use `useSidePanel()` to open, replace, or close entity side panels (the sliding drawer that shows entity forms).
 
@@ -308,7 +308,7 @@ type CollectionPanelProps = {
     /** Override sort: [fieldName, direction] */
     sort?: [string, "asc" | "desc"];
 
-    /** Max entitys to display */
+    /** Max entities to display */
     limit?: number;
 
     /** Sync filter/sort with URL params (default: false) */
@@ -356,7 +356,7 @@ type CollectionPanelProps = {
 
 ## 5. Entity Selection Dialog
 
-Use `useSelectionDialog()` to open a side dialog for selecting entitys (same mechanism used by reference fields).
+Use `useSelectionDialog()` to open a side dialog for selecting entities (same mechanism used by reference fields).
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/admin";
@@ -760,7 +760,7 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `EntityCard` | Card representation of a entity |
 | `SideDialogs` | Side dialog container |
 | `SideEntityProvider` | Context provider for side entity controller |
-| `EntitySelectionTable` | Table for selecting entitys |
+| `EntitySelectionTable` | Table for selecting entities |
 | `Scaffold` | Layout scaffold component |
 | `AppBar` | Top app bar |
 | `Drawer` / `DefaultDrawer` | Sidebar drawer |

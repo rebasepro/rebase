@@ -18,7 +18,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | Base Path | Purpose |
 |-----------|---------|
 | `/api/data/{slug}` | Collection CRUD (auto-generated) |
-| `/api/data/{slug}/count` | Count matching entitys |
+| `/api/data/{slug}/count` | Count matching entities |
 | `/api/data/{parent}/{parentId}/{child}` | Subcollection routes |
 | `/api/auth/*` | Authentication (login, register, refresh, OAuth) |
 | `/api/admin/*` | User & role management |
@@ -39,8 +39,8 @@ All data routes are mounted under `/api/data/`. Other route categories:
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|
-| `GET` | `/api/data/{slug}` | List entitys (with filtering, sorting, pagination) | `200` |
-| `GET` | `/api/data/{slug}/count` | Count matching entitys (with optional filters) | `200` |
+| `GET` | `/api/data/{slug}` | List entities (with filtering, sorting, pagination) | `200` |
+| `GET` | `/api/data/{slug}/count` | Count matching entities (with optional filters) | `200` |
 | `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
 | `POST` | `/api/data/{slug}` | Create a new entity | `201` |
 | `PUT` | `/api/data/{slug}/:id` | Update a entity | `200` |
@@ -52,8 +52,8 @@ For collections with relations, Rebase generates nested routes automatically. Th
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|
-| `GET` | `/api/data/{parent}/{parentId}/{child}` | List child entitys | `200` |
-| `GET` | `/api/data/{parent}/{parentId}/{child}/count` | Count child entitys | `200` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}` | List child entities | `200` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}/count` | Count child entities | `200` |
 | `GET` | `/api/data/{parent}/{parentId}/{child}/:id` | Get a single child entity | `200` |
 | `POST` | `/api/data/{parent}/{parentId}/{child}` | Create a child entity | `201` |
 | `PUT` | `/api/data/{parent}/{parentId}/{child}/:id` | Update a child entity | `200` |
@@ -479,7 +479,7 @@ The type name is derived from `collection.singularName` (spaces removed) or by r
 | Query | Arguments | Returns | Description |
 |-------|-----------|---------|-------------|
 | `{typeName}` (lowercase) | `id: String!` | `{TypeName}` | Get single entity |
-| `{collection.slug}` | `limit: Int = 20`, `offset: Int = 0`, `where: String`, `orderBy: String` | `[{TypeName}]` | List entitys |
+| `{collection.slug}` | `limit: Int = 20`, `offset: Int = 0`, `where: String`, `orderBy: String` | `[{TypeName}]` | List entities |
 
 **Mutations:**
 

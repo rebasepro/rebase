@@ -230,7 +230,7 @@ for (const article of articles) {
     console.log(article.values.title);
     console.log(article.values.author?.name);    // Hydrated relation
     console.log(article.values.author_id);       // Scalar FK
-    console.log(article.values.categories);      // Array of related entitys
+    console.log(article.values.categories);      // Array of related entities
 }
 ```
 

@@ -110,7 +110,7 @@ const { data } = await client.data.products
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
 | `.search(text)` | Full-text search | `.search("laptop")` |
-| `.include(...relations)` | Include related entitys | `.include("author", "tags")` |
+| `.include(...relations)` | Include related entities | `.include("author", "tags")` |
 | `.find()` | Execute the query | Returns `FindResponse<M>` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
@@ -200,7 +200,7 @@ const { data } = await client.data.products
 
 ## Fetching Relations
 
-Relations can be included so that related entitys are returned alongside the primary data, instead of just their foreign key IDs.
+Relations can be included so that related entities are returned alongside the primary data, instead of just their foreign key IDs.
 
 ### Using `include()` (Fluent)
 

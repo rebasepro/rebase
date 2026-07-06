@@ -39,7 +39,7 @@ export function EditorCollectionAction({
                     parentCollectionSlugs,
 parentEntityIds,
                     parentCollection: parentCollection as CollectionConfig,
-                    existingEntitys: tableController?.data ?? []
+                    existingEntities: tableController?.data ?? []
                 })
                 : undefined}>
             <SettingsIcon/>

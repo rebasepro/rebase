@@ -1,4 +1,4 @@
-import type { Entity } from "../types/entitys";
+import type { Entity } from "../types/entities";
 import type { CollectionConfig } from "../types/collections";
 
 /**
@@ -35,7 +35,7 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     width?: number | string;
 
     /**
-     * Collection representing the entitys of this view.
+     * Collection representing the entities of this view.
      * If you leave it blank it will be induced by your navigation
      */
     collection?: CollectionConfig<M>;

@@ -92,7 +92,7 @@ export const productsCollection: CollectionConfig = {
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entitys open for editing |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
@@ -122,7 +122,7 @@ export const productsCollection: CollectionConfig = {
 | Property | Type | Description |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Lifecycle hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Custom actions on entitys (archive, publish, etc.) |
+| `entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
 | `Actions` | `React.ComponentType` | Custom toolbar actions component |
 | `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
 | `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |

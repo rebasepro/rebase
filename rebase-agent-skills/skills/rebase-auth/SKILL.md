@@ -1113,7 +1113,7 @@ interface BackendHooks {
 | `beforeDelete` | `(userId, context) => void` | Throw to prevent deletion. |
 | `afterDelete` | `(userId, context) => void` | After user deleted. |
 
-### DataHooks (All Collection Entitys)
+### DataHooks (All Collection Entities)
 
 | Hook | Signature | Description |
 |---|---|---|

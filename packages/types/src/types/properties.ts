@@ -1,6 +1,6 @@
 import type { ComponentRef } from "./component_ref";
 
-import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entitys";
+import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
 import type { JoinStep, OnAction, Relation } from "./relations";
 import type { CollectionConfig, FilterValues } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
@@ -276,7 +276,7 @@ export interface StringProperty extends BaseProperty {
     ui?: StringUIConfig;
     type: "string";
     /**
-     * Default value for new entitys. Must be a string.
+     * Default value for new entities. Must be a string.
      */
     defaultValue?: string;
     /**
@@ -299,7 +299,7 @@ export interface StringProperty extends BaseProperty {
      * 'cuid' -> Drizzle `.default(sql\`cuid()\`)`
      * Or any other random string to act as a raw SQL default expression: e.g. `nanoid()`
      *
-     * On the UI side, the field automatically gets disabled on new entitys if a string strategy is provided.
+     * On the UI side, the field automatically gets disabled on new entities if a string strategy is provided.
      */
     isId?: boolean | "manual" | "uuid" | "cuid" | string;
     /**
@@ -346,7 +346,7 @@ export interface NumberProperty extends BaseProperty {
     ui?: NumberUIConfig;
     type: "number";
     /**
-     * Default value for new entitys. Must be a number.
+     * Default value for new entities. Must be a number.
      */
     defaultValue?: number;
     /**
@@ -385,7 +385,7 @@ export interface BooleanProperty extends BaseProperty {
     ui?: BaseUIConfig;
     type: "boolean";
     /**
-     * Default value for new entitys. Must be a boolean.
+     * Default value for new entities. Must be a boolean.
      */
     defaultValue?: boolean;
     /**
@@ -405,7 +405,7 @@ export interface VectorProperty extends BaseProperty {
     ui?: VectorUIConfig;
     type: "vector";
     /**
-     * Default value for new entitys.
+     * Default value for new entities.
      */
     defaultValue?: Vector;
     dimensions: number;
@@ -418,7 +418,7 @@ export interface VectorProperty extends BaseProperty {
 export interface BinaryProperty extends BaseProperty {
     type: "binary";
     /**
-     * Default value for new entitys. Must be a base64-encoded string.
+     * Default value for new entities. Must be a base64-encoded string.
      */
     defaultValue?: string;
     validation?: PropertyValidationSchema;
@@ -438,7 +438,7 @@ export interface DateProperty extends BaseProperty {
     ui?: DateUIConfig;
     type: "date";
     /**
-     * Default value for new entitys. Must be a Date.
+     * Default value for new entities. Must be a Date.
      */
     defaultValue?: Date;
     /**
@@ -475,7 +475,7 @@ export interface GeopointProperty extends BaseProperty {
     ui?: BaseUIConfig;
     type: "geopoint";
     /**
-     * Default value for new entitys. Must be a GeoPoint.
+     * Default value for new entities. Must be a GeoPoint.
      */
     defaultValue?: GeoPoint;
     /**
@@ -511,7 +511,7 @@ export interface ReferenceProperty extends BaseProperty {
     ui?: ReferenceUIConfig;
     type: "reference";
     /**
-     * Default value for new entitys. Must be a EntityReference.
+     * Default value for new entities. Must be a EntityReference.
      */
     defaultValue?: EntityReference;
     /**
@@ -532,7 +532,7 @@ export interface ReferenceProperty extends BaseProperty {
      */
     path?: string;
     /**
-     * Allow selection of entitys that pass the given filter only.
+     * Allow selection of entities that pass the given filter only.
      * e.g. `fixedFilter: { age: [">=", 18] }`
      */
     fixedFilter?: FilterValues<string>;
@@ -575,7 +575,7 @@ export interface RelationProperty extends BaseProperty {
     ui?: RelationUIConfig;
     type: "relation";
     /**
-     * Default value for new entitys. Must be a EntityRelation or array of EntityRelation.
+     * Default value for new entities. Must be a EntityRelation or array of EntityRelation.
      */
     defaultValue?: EntityRelation | EntityRelation[];
     /**
@@ -685,7 +685,7 @@ export interface RelationProperty extends BaseProperty {
     // ─── UI configuration ───
 
     /**
-     * Allow selection of entitys that pass the given filter only.
+     * Allow selection of entities that pass the given filter only.
      * e.g. `fixedFilter: { age: [">=", 18] }`
      */
     fixedFilter?: FilterValues<string>;
@@ -718,7 +718,7 @@ export interface ArrayProperty extends BaseProperty {
     ui?: ArrayUIConfig;
     type: "array";
     /**
-     * Default value for new entitys. Must be an array.
+     * Default value for new entities. Must be an array.
      */
     defaultValue?: unknown[];
     /**
@@ -802,7 +802,7 @@ export interface MapProperty extends BaseProperty {
     ui?: MapUIConfig;
     type: "map";
     /**
-     * Default value for new entitys. Must be a record/object.
+     * Default value for new entities. Must be a record/object.
      */
     defaultValue?: Record<string, unknown>;
     /**
@@ -1330,7 +1330,7 @@ export interface PropertyConditions {
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Dynamic default value for new entitys.
+     * Dynamic default value for new entities.
      * Should evaluate to a value of the appropriate type for the field.
      * Only applied when entityId is empty (new entity).
      */
@@ -1443,7 +1443,7 @@ export interface ConditionContext {
     path: string;
 
     /**
-     * Entity ID. Undefined for new entitys.
+     * Entity ID. Undefined for new entities.
      */
     entityId?: string;
 

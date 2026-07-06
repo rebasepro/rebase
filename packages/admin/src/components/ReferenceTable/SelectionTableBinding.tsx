@@ -61,15 +61,15 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     onSingleEntitySelected?(entity: Entity<any> | null): void;
 
     /**
-     * If `multiselect` is set to `true`, you will get the selected entitys
+     * If `multiselect` is set to `true`, you will get the selected entities
      * in this callback.
-     * @param entitys
+     * @param entities
      * @callback
      */
-    onMultipleEntitysSelected?(entitys: Entity<any>[]): void;
+    onMultipleEntitiesSelected?(entities: Entity<any>[]): void;
 
     /**
-     * Allow selection of entitys that pass the given filter only.
+     * Allow selection of entities that pass the given filter only.
      */
     fixedFilter?: FilterValues<string>;
 
@@ -79,14 +79,14 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     description?: React.ReactNode;
 
     /**
-     * Maximum number of entitys that can be selected.
+     * Maximum number of entities that can be selected.
      */
     maxSelection?: number;
 
 }
 
 /**
- * This component allows to select entitys from a given collection.
+ * This component allows to select entities from a given collection.
  * You probably want to open this dialog as a side view using {@link useSelectionTableBinding}
  * @group Components
  */
@@ -103,7 +103,7 @@ export function SelectionTableBinding<M extends Record<string, unknown>>(
 function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     {
         onSingleEntitySelected,
-        onMultipleEntitysSelected,
+        onMultipleEntitiesSelected,
         multiselect,
         collection,
         path: pathInput,
@@ -122,12 +122,12 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
 
     const dataClient = useData();
 
-    const [entitysDisplayedFirst, setEntitysDisplayedFirst] = useState<Entity<any>[]>([]);
+    const [entitiesDisplayedFirst, setEntitiesDisplayedFirst] = useState<Entity<any>[]>([]);
 
     const selectionController = useSelectionController();
 
     // Track whether the selection has been initialized to avoid
-    // firing onMultipleEntitysSelected during the initial mount/fetch.
+    // firing onMultipleEntitiesSelected during the initial mount/fetch.
     const selectionInitializedRef = useRef(false);
 
     // Propagate selection changes to the parent callback.
@@ -135,10 +135,10 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     // we always send the correct, non-stale selection to the parent.
     useEffect(() => {
         if (!selectionInitializedRef.current) return;
-        if (onMultipleEntitysSelected) {
-            onMultipleEntitysSelected(selectionController.selectedEntitys);
+        if (onMultipleEntitiesSelected) {
+            onMultipleEntitiesSelected(selectionController.selectedEntities);
         }
-    }, [selectionController.selectedEntitys]);
+    }, [selectionController.selectedEntities]);
 
     /**
      * Fetch initially selected ids
@@ -151,30 +151,30 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 selectedEntityIds.map((entityId) =>
                     dataClient.collection(path).findById(entityId))
                 )
-                .then((entitys) => {
+                .then((entities) => {
                     if (!unmounted) {
-                        const result = entitys.filter((e): e is Entity<any> => !!e);
-                        selectionController.setSelectedEntitys(result);
-                        setEntitysDisplayedFirst(result);
+                        const result = entities.filter((e): e is Entity<any> => !!e);
+                        selectionController.setSelectedEntities(result);
+                        setEntitiesDisplayedFirst(result);
                         // Mark initialized after the initial fetch completes
                         selectionInitializedRef.current = true;
                     }
                 });
         } else {
-            selectionController.setSelectedEntitys([]);
-            setEntitysDisplayedFirst([]);
+            selectionController.setSelectedEntities([]);
+            setEntitiesDisplayedFirst([]);
             selectionInitializedRef.current = true;
         }
         return () => {
             unmounted = true;
         };
-    }, [dataClient, path, selectedEntityIdsProp, collection, selectionController.setSelectedEntitys]);
+    }, [dataClient, path, selectedEntityIdsProp, collection, selectionController.setSelectedEntities]);
 
     const onClear = () => {
         analyticsController.onAnalyticsEvent?.("reference_selection_clear", {
             path
         });
-        selectionController.setSelectedEntitys([]);
+        selectionController.setSelectedEntities([]);
         if (!multiselect && onSingleEntitySelected) {
             onSingleEntitySelected(null);
         }
@@ -190,19 +190,19 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
             sideDialogContext.close(false);
         } else {
             // For multiselect, delegate to the selection controller's toggle.
-            // The useEffect above will propagate the change to onMultipleEntitysSelected.
+            // The useEffect above will propagate the change to onMultipleEntitiesSelected.
             analyticsController.onAnalyticsEvent?.("reference_selection_toggle", {
                 path,
                 entityId: entity.id
             });
-            const selectedEntitys = selectionController.selectedEntitys;
-            if (selectedEntitys.map((e) => e.id).indexOf(entity.id) > -1) {
-                selectionController.setSelectedEntitys(
-                    selectedEntitys.filter((item: Entity<any>) => item.id !== entity.id)
+            const selectedEntities = selectionController.selectedEntities;
+            if (selectedEntities.map((e) => e.id).indexOf(entity.id) > -1) {
+                selectionController.setSelectedEntities(
+                    selectedEntities.filter((item: Entity<any>) => item.id !== entity.id)
                 );
             } else {
-                if (maxSelection && selectedEntitys.length >= maxSelection) return;
-                selectionController.setSelectedEntitys([...selectedEntitys, entity]);
+                if (maxSelection && selectedEntities.length >= maxSelection) return;
+                selectionController.setSelectedEntities([...selectedEntities, entity]);
             }
         }
     }, [multiselect, onSingleEntitySelected, analyticsController, path, sideDialogContext, selectionController, maxSelection]);
@@ -217,7 +217,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
             collection,
             updateUrl: true,
             onUpdate: ({ entity }) => {
-                setEntitysDisplayedFirst([entity, ...entitysDisplayedFirst]);
+                setEntitiesDisplayedFirst([entity, ...entitiesDisplayedFirst]);
                 onEntityClick(entity);
             },
             closeOnSave: true
@@ -235,8 +235,8 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         width: number,
         frozen?: boolean
     }) => {
-        const selectedEntitys = selectionController.selectedEntitys;
-        const isSelected = selectedEntitys && selectedEntitys.map(e => e.id).indexOf(entity.id) > -1;
+        const selectedEntities = selectionController.selectedEntities;
+        const isSelected = selectedEntities && selectedEntities.map(e => e.id).indexOf(entity.id) > -1;
         return <CollectionRowActions
             width={width}
             frozen={frozen}
@@ -262,7 +262,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     const tableController = useDataTableController<M>({
         path,
         collection,
-        entitysDisplayedFirst,
+        entitiesDisplayedFirst,
         fixedFilter,
         updateUrl: false
     });
@@ -272,7 +272,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         <div className="flex flex-col h-full">
 
             <div className="grow">
-                {entitysDisplayedFirst &&
+                {entitiesDisplayedFirst &&
                     <CollectionTableBinding
                         additionalFields={collection.additionalFields}
                         displayedColumnIds={displayedColumnIds}

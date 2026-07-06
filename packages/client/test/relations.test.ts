@@ -234,7 +234,7 @@ describe("find() — one-to-many relation response", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
-    it("preserves array of related entitys", async () => {
+    it("preserves array of related entities", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,

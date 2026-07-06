@@ -1,4 +1,4 @@
-import type { Entity } from "./entitys";
+import type { Entity } from "./entities";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
 

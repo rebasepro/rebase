@@ -90,8 +90,8 @@ export const TableReferenceFieldInternal = React.memo(
             updateValue(entity ? getReferenceFrom(entity) : null);
         }, [updateValue]);
 
-        const onMultipleEntitysSelected = useCallback((entitys: Entity<any>[]) => {
-            updateValue(entitys.map((e) => getReferenceFrom(e)));
+        const onMultipleEntitiesSelected = useCallback((entities: Entity<any>[]) => {
+            updateValue(entities.map((e) => getReferenceFrom(e)));
         }, [updateValue]);
 
         const selectedEntityIds = internalValue
@@ -104,7 +104,7 @@ export const TableReferenceFieldInternal = React.memo(
             multiselect,
             path,
             collection,
-            onMultipleEntitysSelected,
+            onMultipleEntitiesSelected,
             onSingleEntitySelected,
             selectedEntityIds,
             fixedFilter

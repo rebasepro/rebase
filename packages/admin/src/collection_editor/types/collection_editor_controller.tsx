@@ -12,7 +12,7 @@ export interface CollectionEditorController {
         path?: string,
         parentCollectionSlugs: string[], parentEntityIds: string[],
         parentCollection?: CollectionConfig,
-        existingEntitys?: Entity<any>[],
+        existingEntities?: Entity<any>[],
         /**
          * Initial view to open: "general", "display", or "properties"
          */
@@ -48,7 +48,7 @@ export interface CollectionEditorController {
         editedCollectionId: string,
         parentCollectionSlugs: string[], parentEntityIds: string[],
         collection: CollectionConfig,
-        existingEntitys: Entity<any>[]
+        existingEntities: Entity<any>[]
     }) => void;
 
     /**

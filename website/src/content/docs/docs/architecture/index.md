@@ -73,7 +73,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 
 | Package | Role | Used By |
 |---------|------|---------|
-| `@rebasepro/types` | TypeScript interfaces for collections, properties, entitys, plugins | Everything |
+| `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
 | `@rebasepro/server-core` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
 | `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/core` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |

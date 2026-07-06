@@ -469,8 +469,8 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const wireEntitys = (message.rows || []) as unknown as Record<string, unknown>[];
-                    const incomingRows = wireEntitys;
+                    const wireEntities = (message.rows || []) as unknown as Record<string, unknown>[];
+                    const incomingRows = wireEntities;
 
                     // Structural merge: preserve cached row references for rows
                     // whose values haven't changed. This prevents downstream React components

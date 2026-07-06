@@ -14,10 +14,10 @@ import type { CollectionDataController } from "@rebasepro/ui";
  * flat row `M` carrying its real primary key, so unwrapping is just `.values` —
  * no `id`/`path` merge (those are view-model metadata, not row columns).
  */
-function flattenEntitys<M extends Record<string, unknown>>(
-    entitys: Entity<M>[]
+function flattenEntities<M extends Record<string, unknown>>(
+    entities: Entity<M>[]
 ): M[] {
-    return entitys.map(entity => entity.values);
+    return entities.map(entity => entity.values);
 }
 
 /**
@@ -35,7 +35,7 @@ export function useCollectionDataController<M extends Record<string, unknown>>(
     tableController: EntityTableController<M>
 ): CollectionDataController<M> {
     const flatData = useMemo(
-        () => flattenEntitys(tableController.data),
+        () => flattenEntities(tableController.data),
         [tableController.data]
     );
 

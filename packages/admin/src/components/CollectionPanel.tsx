@@ -42,7 +42,7 @@ export type CollectionPanelProps = {
     sort?: [string, "asc" | "desc"];
 
     /**
-     * Maximum number of entitys to display.
+     * Maximum number of entities to display.
      */
     limit?: number;
 

@@ -141,14 +141,14 @@ values: {} as Record<string, unknown> }
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString,
-                    onUpdate: (entitys) => {
+                    onUpdate: (entities) => {
                         onUpdate({
-                            data: entitys.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
+                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
                             meta: {
-                                total: entitys.length,
+                                total: entities.length,
                                 limit,
                                 offset,
-                                hasMore: entitys.length >= limit
+                                hasMore: entities.length >= limit
                             }
                         });
                     },

@@ -26,7 +26,7 @@ export type AnalyticsEvent =
     | "single_delete_dialog_open"
     | "multiple_delete_dialog_open"
     | "single_entity_deleted"
-    | "multiple_entitys_deleted"
+    | "multiple_entities_deleted"
 
     | "drawer_navigate_to_home"
     | "drawer_navigate_to_collection"

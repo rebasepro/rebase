@@ -62,14 +62,14 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect((updated as any).values).toBeUndefined();
     });
 
-    it("buildRebaseData.find() returns Entitys — the admin CMS view-model", async () => {
+    it("buildRebaseData.find() returns Entities — the admin CMS view-model", async () => {
         const data = buildRebaseData(createMockDriver());
-        const { data: entitys } = await data.products.find();
+        const { data: entities } = await data.products.find();
 
-        expect(entitys).toHaveLength(1);
-        expect(entitys[0].id).toBe("p1");
-        expect(entitys[0].path).toBe("products");
-        expect(entitys[0].values.name).toBe("Widget");
+        expect(entities).toHaveLength(1);
+        expect(entities[0].id).toBe("p1");
+        expect(entities[0].path).toBe("products");
+        expect(entities[0].values.name).toBe("Widget");
     });
 
     it("the flat SDK row and the Entity's .values carry the same fields", async () => {
@@ -101,7 +101,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect((rows[0] as any).values).toBeUndefined();
     });
 
-    it("realtime listen(): flat SDK delivers flat rows, admin delivers Entitys", () => {
+    it("realtime listen(): flat SDK delivers flat rows, admin delivers Entities", () => {
         const driver = createMockDriver({
             listenCollection: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate([{ ...PRODUCT }]); return () => {}; }),
             listenOne: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate({ ...PRODUCT }); return () => {}; })

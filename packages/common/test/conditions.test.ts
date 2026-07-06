@@ -536,7 +536,7 @@ roles: ["admin"] },
     });
 
     describe("applyPropertyConditions — defaultValue condition", () => {
-        it("should set defaultValue for new entitys", () => {
+        it("should set defaultValue for new entities", () => {
             const context: ConditionContext = {
                 values: {},
                 previousValues: {},
@@ -565,7 +565,7 @@ roles: [] },
             expect(result.defaultValue).toBe("draft");
         });
 
-        it("should NOT set defaultValue for existing entitys", () => {
+        it("should NOT set defaultValue for existing entities", () => {
             const context: ConditionContext = {
                 values: { status: "published" },
                 previousValues: {},

@@ -83,7 +83,7 @@ describe("buildRebaseData", () => {
     // ── find ────────────────────────────────────────────────
     describe("CollectionAccessor.find", () => {
         it("delegates to driver.fetchCollection", async () => {
-            // The driver returns flat rows; the accessor wraps them into Entitys
+            // The driver returns flat rows; the accessor wraps them into Entities
             const mockRows = [
                 { id: "1",
 name: "Camera" }
@@ -165,13 +165,13 @@ price: "gte.100" }
         });
 
         it("sets hasMore based on entity count vs limit", async () => {
-            const entitys = Array.from({ length: 20 }, (_, i) => ({
+            const entities = Array.from({ length: 20 }, (_, i) => ({
                 id: String(i),
                 path: "products",
                 values: {}
             }));
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(entitys),
+                fetchCollection: jest.fn().mockResolvedValue(entities),
                 // When count is available, hasMore is based on
                 // total vs offset+fetched. 100 > 0+20 → hasMore=true.
                 count: jest.fn().mockResolvedValue(100)
@@ -182,7 +182,7 @@ price: "gte.100" }
             expect(result.meta.hasMore).toBe(true);
             expect(result.meta.total).toBe(100);
 
-            const partial = entitys.slice(0, 5);
+            const partial = entities.slice(0, 5);
             (driver.fetchCollection as jest.Mock).mockResolvedValue(partial);
             // 5 returned, total still 100 → offset 0 + 5 < 100 → hasMore=true
             // but typically the driver returns fewer when near the end

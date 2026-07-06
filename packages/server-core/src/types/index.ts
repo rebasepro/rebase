@@ -15,7 +15,7 @@ import {
 // Subscription types
 export interface ListenCollectionRequest<M extends Record<string, unknown> = Record<string, unknown>> extends FetchCollectionProps<M> {
   subscriptionId: string;
-  onUpdate: (entitys: Entity<M>[]) => void;
+  onUpdate: (entities: Entity<M>[]) => void;
   onError?: (error: Error) => void;
 }
 

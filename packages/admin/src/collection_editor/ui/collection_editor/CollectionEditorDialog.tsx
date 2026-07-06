@@ -93,7 +93,7 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
     getUser?: (uid: string) => User | null;
     getData?: (path: string, parentPaths: string[]) => Promise<object[]>;
     parentCollection?: CollectionConfig;
-    existingEntitys?: Entity<any>[];
+    existingEntities?: Entity<any>[];
     /**
      * Initial view to open when editing: "general", "display", or "properties".
      * For new collections, this is ignored.
@@ -324,7 +324,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     setCollection,
     initialValues,
     propertyConfigs,
-    existingEntitys,
+    existingEntities,
     initialView: initialViewProp,
     expandKanban,
     generateCollection,
@@ -622,8 +622,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const resolvedPath = !pathError ? urlController.resolveDatabasePathsFrom(updatedFullPath) : undefined;
     const getDataWithPath = resolvedPath && getData ? async () => {
         const data = await getData!(resolvedPath, parentPaths ?? []);
-        if (existingEntitys) {
-            const existingData = existingEntitys.map(e => e.values);
+        if (existingEntities) {
+            const existingData = existingEntities.map(e => e.values);
             data.push(...existingData);
         }
         return data;

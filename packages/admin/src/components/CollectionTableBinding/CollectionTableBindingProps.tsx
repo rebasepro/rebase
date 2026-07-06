@@ -17,14 +17,14 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
         style?: React.CSSProperties;
 
         /**
-         * Display these entitys as selected
+         * Display these entities as selected
          */
         selectionController: SelectionController<M>;
 
         /**
-         * List of entitys that will be displayed as selected;
+         * List of entities that will be displayed as selected;
          */
-        highlightedEntitys?: Entity<M>[];
+        highlightedEntities?: Entity<M>[];
 
         /**
          * Override the title in the toolbar

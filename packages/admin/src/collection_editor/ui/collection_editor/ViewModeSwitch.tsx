@@ -49,6 +49,6 @@ export function ViewModeSwitch({
                 ]}
             />
         </div>
-        <Typography variant={"caption"} color={"secondary"} className={"ml-3.5"}>Choose how entitys should be displayed by default</Typography>
+        <Typography variant={"caption"} color={"secondary"} className={"ml-3.5"}>Choose how entities should be displayed by default</Typography>
     </div>
 }

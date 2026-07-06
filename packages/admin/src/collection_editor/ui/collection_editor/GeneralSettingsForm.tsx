@@ -165,7 +165,7 @@ export function GeneralSettingsForm({
                                 value={values.singularName ?? ""}
                                 label={"Singular name"}/>
                             <FieldCaption error={showErrors && Boolean(errors.singularName)}>
-                                {showErrors && Boolean(errors.singularName) ? errors.singularName : "Optionally define a singular name for your entitys"}
+                                {showErrors && Boolean(errors.singularName) ? errors.singularName : "Optionally define a singular name for your entities"}
                             </FieldCaption>
                         </div>
 

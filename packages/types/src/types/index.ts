@@ -1,4 +1,4 @@
-export * from "./entitys";
+export * from "./entities";
 export * from "./filter-operators";
 export * from "./chips";
 

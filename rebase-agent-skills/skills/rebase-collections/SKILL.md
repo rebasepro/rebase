@@ -145,7 +145,7 @@ export default productsCollection;
 | `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
 | `defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
 | `enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
-| `openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entitys open when clicked |
+| `openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
 | `defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
 | `kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
 | `propertiesOrder` | `string[]` | — | Field display order in forms and table |
@@ -251,7 +251,7 @@ All property types share these base options:
 | `description` | `string` | — | Help text displayed under the field |
 | `columnName` | `string` | auto from key | Explicit DB column name (bypasses snake_case conversion) |
 | `validation` | `PropertyValidationSchema` | — | Validation rules (see below) |
-| `defaultValue` | `unknown` | — | Default value for new entitys |
+| `defaultValue` | `unknown` | — | Default value for new entities |
 | `propertyConfig` | `string` | — | Reuse a globally defined property config by key |
 | `dynamicProps` | `(props) => Partial<Property>` | — | Dynamic property overrides based on entity values |
 | `conditions` | `PropertyConditions` | — | JSON Logic-based declarative conditions |
@@ -643,7 +643,7 @@ Every property supports a `validation` object with these common options:
 |--------|------|-----------|-------------|
 | `required` | `boolean` | All | Field is mandatory |
 | `requiredMessage` | `string` | All | Custom error message when required validation fails |
-| `unique` | `boolean` | All | Value must be unique across all entitys |
+| `unique` | `boolean` | All | Value must be unique across all entities |
 | `uniqueInArray` | `boolean` | All | Value must be unique within parent array |
 | `min` | `number \| Date` | String (length), Number, Date, Array (count) | Minimum value/length/count/date |
 | `max` | `number \| Date` | String (length), Number, Date, Array (count) | Maximum value/length/count/date |
@@ -774,7 +774,7 @@ comments: {
 | `onDelete` | `OnAction` | — | Cascade rule on delete |
 | `onUpdate` | `OnAction` | — | Cascade rule on update |
 | `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
-| `fixedFilter` | `FilterValues` | — | Filter applied when selecting related entitys |
+| `fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
 | `includeId` | `boolean` | `true` | Show entity ID in the reference preview |
 | `includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
 | `isId` | `boolean` | — | Mark as primary key |
@@ -866,7 +866,7 @@ customer: {
 
 ## Collection Callbacks (Lifecycle Hooks)
 
-> **IMPORTANT FOR AGENTS**: Collections support **lifecycle callbacks** that let you run custom logic when entitys are created, updated, read, or deleted. Use these to **sync data between collections**, transform data, validate business rules, or trigger side effects. **Do NOT use raw SQL triggers, cron jobs, or external scripts** when a callback can solve the problem.
+> **IMPORTANT FOR AGENTS**: Collections support **lifecycle callbacks** that let you run custom logic when entities are created, updated, read, or deleted. Use these to **sync data between collections**, transform data, validate business rules, or trigger side effects. **Do NOT use raw SQL triggers, cron jobs, or external scripts** when a callback can solve the problem.
 
 ### Generic Type Parameters
 
@@ -1009,7 +1009,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
 | Prop | Type | Description |
 |------|------|-------------|
 | `values` | `Partial<EntityValues<M>>` | Entity values being saved |
-| `id` | `string \| number` (optional in `beforeSave`) | Entity ID (`undefined` for new entitys in `beforeSave`) |
+| `id` | `string \| number` (optional in `beforeSave`) | Entity ID (`undefined` for new entities in `beforeSave`) |
 | `previousValues` | `Partial<EntityValues<M>> \| undefined` | Previous values (for updates) |
 | `status` | `EntityStatus` | `"new"`, `"existing"`, or `"copy"` |
 | `collection` | `CollectionConfig<M>` | The collection definition |
@@ -1058,7 +1058,7 @@ title: {
 
 ### Common Use Cases
 
-- **Syncing data between collections** — Use `afterSave` to copy/move entitys from one collection to another (e.g., approved submissions → published jobs)
+- **Syncing data between collections** — Use `afterSave` to copy/move entities from one collection to another (e.g., approved submissions → published jobs)
 - **Computed fields** — Use `beforeSave` to generate slugs, timestamps, or derived values
 - **Validation** — Use `beforeSave` to enforce business rules beyond schema validation
 - **Notifications** — Use `afterSave` to send emails, Slack messages, or webhook calls
@@ -1174,7 +1174,7 @@ const postsCollection: PostgresCollectionConfig = {
 ```
 
 The `Builder` component receives:
-- `entity` — The saved entity (may be `undefined` for new entitys)
+- `entity` — The saved entity (may be `undefined` for new entities)
 - `modifiedValues` — Current unsaved form values
 - `formContext` — Form state and methods
 - `collection` — The collection definition

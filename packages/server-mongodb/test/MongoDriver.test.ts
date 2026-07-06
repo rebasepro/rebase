@@ -119,34 +119,34 @@ age: 35 }
             ]);
         });
 
-        it("should fetch all entitys", async () => {
-            const entitys = await delegate.fetchCollection({
+        it("should fetch all entities", async () => {
+            const entities = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection
             });
 
-            expect(entitys).toHaveLength(3);
+            expect(entities).toHaveLength(3);
         });
 
         it("should apply limit", async () => {
-            const entitys = await delegate.fetchCollection({
+            const entities = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection,
                 limit: 2
             });
 
-            expect(entitys).toHaveLength(2);
+            expect(entities).toHaveLength(2);
         });
 
         it("should apply ordering", async () => {
-            const entitys = await delegate.fetchCollection({
+            const entities = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection,
                 orderBy: "age",
                 order: "desc"
             });
 
-            const ages = entitys.map(e => e.age);
+            const ages = entities.map(e => e.age);
             expect(ages).toEqual([35, 30, 25]);
         });
     });
@@ -233,7 +233,7 @@ email: "test@example.com" },
             ]);
         });
 
-        it("should count all entitys", async () => {
+        it("should count all entities", async () => {
             const count = await delegate.count({
                 path: "users",
                 collection: mockCollection
@@ -295,8 +295,8 @@ email: "test@example.com" },
                 const unsubscribe = delegate.listenCollection({
                     path: "users",
                     collection: mockCollection,
-                    onUpdate: (entitys) => {
-                        expect(entitys).toHaveLength(2);
+                    onUpdate: (entities) => {
+                        expect(entities).toHaveLength(2);
                         unsubscribe();
                         done();
                     },

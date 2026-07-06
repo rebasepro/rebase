@@ -48,7 +48,7 @@ export function RebaseRoute() {
                     return ({
                         title: String(entry.entityId),
                         url: urlController.buildUrlCollectionPath(entry.path)
-                        // count: undefined (not applicable for entitys)
+                        // count: undefined (not applicable for entities)
                     });
                 } else if (entry.type === "custom_view") {
                     return ({
@@ -72,7 +72,7 @@ export function RebaseRoute() {
     }, [navigationEntries.map(entry => entry.path).join(",")]);
 
     if (isNew) {
-        // New entitys always use full-screen mode, even for split-layout collections
+        // New entities always use full-screen mode, even for split-layout collections
         return <EntityFullScreenRoute
             pathname={pathname}
             navigationEntries={navigationEntries}

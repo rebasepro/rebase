@@ -18,7 +18,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { downloadEntitysExport } from "./export";
+import { downloadEntitiesExport } from "./export";
 
 export type BasicExportActionProps = {
     data: Entity<any>[];
@@ -49,7 +49,7 @@ export function BasicExportAction({
     }, [setOpen]);
 
     const onOkClicked = useCallback(() => {
-        downloadEntitysExport({
+        downloadEntitiesExport({
             data,
             additionalData: [],
             properties,

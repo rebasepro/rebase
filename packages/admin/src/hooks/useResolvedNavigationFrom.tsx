@@ -97,7 +97,7 @@ entity };
             } else if (entry.type === "custom_view") {
                 return Promise.resolve(entry);
             } else {
-                throw Error("Unmapped element in useEntitysFromPath");
+                throw Error("Unmapped element in useEntitiesFromPath");
             }
         })
         .filter(v => Boolean(v)) as Promise<ResolvedNavigationEntry<any>>[];

@@ -1,4 +1,4 @@
-import { Entity, EntityValues } from "../types/entitys";
+import { Entity, EntityValues } from "../types/entities";
 import { WhereFilterOp, FilterValues, OrderByTuple } from "../types/filter-operators";
 
 export type WhereValue<T> = T | T[] | null;
@@ -56,7 +56,7 @@ export interface FindParams {
  * @group Data
  */
 export interface FindResponse<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Array of entitys matching the query */
+    /** Array of entities matching the query */
     data: Entity<M>[];
     /** Pagination metadata */
     meta: {

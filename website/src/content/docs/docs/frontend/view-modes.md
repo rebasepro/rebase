@@ -32,7 +32,7 @@ const productsCollection: CollectionConfig = {
 
 ![List View screenshot placeholder](/img/features/list-view.png)
 
-The list view is the classic, clean CMS default view mode, showing entitys in a straightforward list format without the density of a spreadsheet.
+The list view is the classic, clean CMS default view mode, showing entities in a straightforward list format without the density of a spreadsheet.
 
 ## Table View
 
@@ -46,7 +46,7 @@ The default view is a high-performance virtualized spreadsheet with:
 - **Sorting** — Click column headers
 - **Text search** — Full-text search across string fields
 - **Filtering** — Per-column filters
-- **Multi-select** — Select entitys for bulk actions
+- **Multi-select** — Select entities for bulk actions
 
 ### Row Height
 
@@ -97,7 +97,7 @@ Drag-and-drop between columns automatically updates the enum field and sort orde
 
 ![Cards View screenshot placeholder](/img/features/cards-view.png)
 
-Cards display entitys as visual cards — useful for image-heavy content:
+Cards display entities as visual cards — useful for image-heavy content:
 
 ```typescript
 const articlesCollection: CollectionConfig = {

@@ -19,13 +19,13 @@ export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
     }) => void,
     onMultipleReferenceSelected?: (params: {
         references: EntityReference[] | null,
-        entitys: Entity<M>[] | null
+        entities: Entity<M>[] | null
     }) => void,
     path: string,
     disabled?: boolean,
     previewProperties?: string[];
     /**
-     * Allow selection of entitys that pass the given filter only.
+     * Allow selection of entities that pass the given filter only.
      */
     fixedFilter?: FilterValues<string>;
     size: PreviewSize;
@@ -71,14 +71,14 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
         }
     }, [disabled, onReferenceSelected]);
 
-    const onMultipleEntitysSelected = useCallback((entitys: Entity<M>[]) => {
+    const onMultipleEntitiesSelected = useCallback((entities: Entity<M>[]) => {
         if (disabled)
             return;
         if (onMultipleReferenceSelected) {
-            const references = entitys ? entitys.map(e => getReferenceFrom(e)) : null;
+            const references = entities ? entities.map(e => getReferenceFrom(e)) : null;
             onMultipleReferenceSelected({
                 references,
-                entitys
+                entities
             });
         }
     }, [disabled, onReferenceSelected]);
@@ -88,7 +88,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
         path,
         collection,
         onSingleEntitySelected,
-        onMultipleEntitysSelected,
+        onMultipleEntitiesSelected,
         fixedFilter
     }
     );
@@ -96,7 +96,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
     const clearValue = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         if (multiselect) {
-            onMultipleEntitysSelected([]);
+            onMultipleEntitiesSelected([]);
         } else {
             onSingleEntitySelected(null);
         }

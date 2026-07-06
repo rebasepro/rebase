@@ -16,7 +16,7 @@ export type CollectionCardViewBindingProps<M extends Record<string, unknown> = R
     onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedEntitys?: Entity<M>[];
+    highlightedEntities?: Entity<M>[];
     emptyComponent?: React.ReactNode;
     onScroll?: (props: {
         scrollDirection: "forward" | "backward";
@@ -76,7 +76,7 @@ function getScrollParent(element: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * Card grid view for displaying entitys with infinite scroll.
+ * Card grid view for displaying entities with infinite scroll.
  * Alternative to the CollectionTableBinding for visual browsing.
  */
 export function CollectionCardViewBinding<M extends Record<string, unknown> = Record<string, unknown>>({
@@ -85,7 +85,7 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
     onEntityClick,
     selectionController,
     selectionEnabled = true,
-    highlightedEntitys,
+    highlightedEntities,
     emptyComponent,
     onScroll,
     initialScroll,
@@ -113,8 +113,8 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
         selectionController?.toggleEntitySelection(entity, selected);
     }, [selectionController]);
 
-    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntitys.map(e => e.id)), [selectionController?.selectedEntitys]);
-    const highlightedIds = useMemo(() => new Set(highlightedEntitys?.map(e => e.id)), [highlightedEntitys]);
+    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntities.map(e => e.id)), [selectionController?.selectedEntities]);
+    const highlightedIds = useMemo(() => new Set(highlightedEntities?.map(e => e.id)), [highlightedEntities]);
 
     const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
         handleSelectionChange(entity, selected);

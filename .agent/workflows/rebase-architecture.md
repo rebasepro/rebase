@@ -25,7 +25,7 @@ Collections support multiple view modes, configured via:
 - `enabledViews` — Array of enabled view modes: `"table"`, `"cards"`, `"kanban"`, `"list"`
 - `defaultViewMode` — The default view when opening the collection
 - `kanban` — Kanban board configuration: `{ columnProperty: "status" }`
-- `openEntityMode` — How entitys open: `"split"` (side-by-side), `"side_panel"` (right drawer), `"full_screen"` (full page)
+- `openEntityMode` — How entities open: `"split"` (side-by-side), `"side_panel"` (right drawer), `"full_screen"` (full page)
 
 ## 5. Frontend Composition API
 The frontend uses a declarative composition pattern:

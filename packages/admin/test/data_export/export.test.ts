@@ -13,7 +13,7 @@ describe("Export Utility Functions", () => {
     const birthDate = new Date("1990-01-01T00:00:00.000Z");
     const mockReference = new EntityReference({ id: "user-99", path: "users", databaseId: "custom" });
 
-    const mockEntitys: Entity<any>[] = [
+    const mockEntities: Entity<any>[] = [
         {
             id: "entity-1",
             path: "users",
@@ -47,7 +47,7 @@ describe("Export Utility Functions", () => {
             ];
 
             const result = getEntityCSVExportableData(
-                mockEntitys,
+                mockEntities,
                 undefined,
                 mockProperties,
                 headers,
@@ -67,7 +67,7 @@ describe("Export Utility Functions", () => {
             ];
 
             const result = getEntityCSVExportableData(
-                mockEntitys,
+                mockEntities,
                 undefined,
                 mockProperties,
                 headers,
@@ -93,7 +93,7 @@ describe("Export Utility Functions", () => {
             ];
 
             const result = getEntityCSVExportableData(
-                mockEntitys,
+                mockEntities,
                 additionalData,
                 mockProperties,
                 headers,
@@ -110,7 +110,7 @@ describe("Export Utility Functions", () => {
     describe("getEntityJsonExportableData", () => {
         test("should process and return processed objects array", () => {
             const result = getEntityJsonExportableData(
-                mockEntitys,
+                mockEntities,
                 undefined,
                 mockProperties,
                 "string"
@@ -141,7 +141,7 @@ describe("Export Utility Functions", () => {
             ];
 
             const result = getEntityJsonExportableData(
-                mockEntitys,
+                mockEntities,
                 additionalData,
                 mockProperties,
                 "string"

@@ -16,7 +16,7 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
      */
     path: string;
     /**
-     * The collection that represents the relation entitys
+     * The collection that represents the relation entities
      */
     collection: CollectionConfig<M>;
     /**
@@ -141,7 +141,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         // fixedFilter is already FilterValues — pass directly
         const whereParams = fixedFilter && Object.keys(fixedFilter).length > 0 ? fixedFilter : undefined;
 
-        const onEntitysUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
+        const onEntitiesUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
             const newItems = res.data.map((e) => entityToRelationItem(e));
             setItems(newItems);
             setHasMore(res.meta.hasMore);
@@ -164,7 +164,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
                 limit: limit,
                 orderBy: undefined,
                 searchString: currentSearch
-            }, (res) => onEntitysUpdate({ data: res.data as Entity<M>[],
+            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onErrorUpdate);
         } else {
             accessor.find({
@@ -174,7 +174,7 @@ meta: res.meta }), onErrorUpdate);
                 orderBy: undefined,
                 searchString: currentSearch
             })
-                .then((res) => onEntitysUpdate({ data: res.data as Entity<M>[],
+                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }))
                 .catch(onErrorUpdate);
             unsubscribe = () => {};

@@ -195,7 +195,7 @@ relationName: "user" }
     });
 
     describe("One-to-Many Relations (Inverse)", () => {
-        it("should fetch related entitys using foreign key where clause", async () => {
+        it("should fetch related entities using foreign key where clause", async () => {
             const mockOrders = [
                 { id: 1,
 total: 100,
@@ -204,7 +204,7 @@ customer_id: 1 },
 total: 200,
 customer_id: 1 }
             ];
-            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockOrders),
                 limit: jest.fn().mockReturnValue({
@@ -212,10 +212,10 @@ customer_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("customers/1/orders", {});
+            const entities = await dataService.fetchCollection("customers/1/orders", {});
 
-            expect(entitys).toHaveLength(2);
-            expect(entitys[0].total).toBe(100);
+            expect(entities).toHaveLength(2);
+            expect(entities[0].total).toBe(100);
             // Should use WHERE clause, not JOIN for simple inverse relations
             expect(db.where).toHaveBeenCalled();
         });
@@ -223,9 +223,9 @@ customer_id: 1 }
         it("should handle empty result sets", async () => {
             db.orderBy.mockResolvedValue([]);
 
-            const entitys = await dataService.fetchCollection("customers/999/orders", {});
+            const entities = await dataService.fetchCollection("customers/999/orders", {});
 
-            expect(entitys).toHaveLength(0);
+            expect(entities).toHaveLength(0);
         });
     });
 
@@ -294,10 +294,10 @@ price: 20 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("orders/1/products", {});
+            const entities = await dataService.fetchCollection("orders/1/products", {});
 
-            expect(entitys).toHaveLength(2);
-            expect(entitys[0].name).toBe("Product 1");
+            expect(entities).toHaveLength(2);
+            expect(entities[0].name).toBe("Product 1");
             // Should use JOIN for many-to-many relations
             expect(db.innerJoin).toHaveBeenCalled();
         });
@@ -341,10 +341,10 @@ user_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("customers/1/profile", {});
+            const entities = await dataService.fetchCollection("customers/1/profile", {});
 
-            expect(entitys).toHaveLength(1);
-            expect(entitys[0].bio).toBe("User bio");
+            expect(entities).toHaveLength(1);
+            expect(entities[0].bio).toBe("User bio");
         });
 
         it("should create one-to-one relations correctly", async () => {
@@ -380,7 +380,7 @@ __type: "relation" }
             db.returning.mockResolvedValue([{ id: 5 }]);
             // This mock is used by fetchOne after save which chains .where().limit()
             // NOTE: The mock returns customer_id: null, but due to how the DataService
-            // deserializes owning relations from saved entitys, it may still create a relation
+            // deserializes owning relations from saved entities, it may still create a relation
             // object. This test verifies that save works without providing a customer relation.
             db.limit.mockResolvedValue([{
                 id: 5,
@@ -414,13 +414,13 @@ name: "Product 1" }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("customers/1/orders/1/products", {});
+            const entities = await dataService.fetchCollection("customers/1/orders/1/products", {});
 
-            expect(entitys).toHaveLength(1);
+            expect(entities).toHaveLength(1);
             expect(collectionRegistry.getCollectionByPath).toHaveBeenCalledWith("customers");
         });
 
-        it("should apply filters on related entitys", async () => {
+        it("should apply filters on related entities", async () => {
             const mockOrders = [
                 { id: 1,
 total: 100,
@@ -434,15 +434,15 @@ customer_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("customers/1/orders", {
+            const entities = await dataService.fetchCollection("customers/1/orders", {
                 filter: { total: [">=", 100] }
             });
 
-            expect(entitys).toHaveLength(1);
+            expect(entities).toHaveLength(1);
             expect(db.where).toHaveBeenCalled();
         });
 
-        it("should order related entitys correctly", async () => {
+        it("should order related entities correctly", async () => {
             const mockOrders = [
                 { id: 2,
 total: 200,
@@ -459,12 +459,12 @@ customer_id: 1 }
                 })
             });
 
-            const entitys = await dataService.fetchCollection("customers/1/orders", {
+            const entities = await dataService.fetchCollection("customers/1/orders", {
                 orderBy: "total",
                 order: "desc"
             });
 
-            expect(entitys[0].total).toBe(200);
+            expect(entities[0].total).toBe(200);
             // where() is always called for relation queries
             expect(db.where).toHaveBeenCalled();
         });
@@ -605,7 +605,7 @@ author_id: 1 }]);
                 expect(db.transaction).toHaveBeenCalled();
             });
 
-            it("applies joinPath updates BEFORE main UPDATE on existing entitys to prevent stale data corruption", async () => {
+            it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
                 jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
@@ -853,7 +853,7 @@ name: "Big Customer" }]);
 
                 const entity = await dataService.save("customers", customerWithOrders);
 
-                // Should update FK on target entitys
+                // Should update FK on target entities
                 expect(db.transaction).toHaveBeenCalled();
             });
         });

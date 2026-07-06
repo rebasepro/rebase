@@ -64,8 +64,8 @@ export function ArrayOfReferencesFieldBinding({
         throw Error(`Couldn't find the corresponding collection for the path: ${ofProperty.path}`);
     }
 
-    const onMultipleEntitysSelected = useCallback((entitys: Entity<Record<string, unknown>>[]) => {
-        const refs = entitys.map(e => getReferenceFrom(e));
+    const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
+        const refs = entities.map(e => getReferenceFrom(e));
         setValue(refs);
     }, [setValue]);
 
@@ -73,7 +73,7 @@ export function ArrayOfReferencesFieldBinding({
         multiselect: true,
         path: ofProperty.path,
         collection,
-        onMultipleEntitysSelected,
+        onMultipleEntitiesSelected,
         selectedEntityIds,
         fixedFilter: ofProperty.fixedFilter
     }

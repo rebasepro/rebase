@@ -1,7 +1,7 @@
 import React, { PropsWithChildren } from "react";
 
 import type { CollectionConfig, CollectionActionsProps, EntityTableController, SelectionController } from "./collections";
-import type { EntityStatus } from "./entitys";
+import type { EntityStatus } from "./entities";
 import type { InferPropertyType, Property } from "./properties";
 import type { FormContext } from "./entity_views";
 import type { RebaseContext } from "../rebase_context";
@@ -261,10 +261,10 @@ export interface PluginLifecycle {
     onAuthStateChange?: (user: User | null) => void;
 
     /**
-     * Called when a collection's visible entitys change.
+     * Called when a collection's visible entities change.
      * Useful for analytics, caching, or cross-plugin coordination.
      */
-    onCollectionChange?: (slug: string, entitys: unknown[]) => void;
+    onCollectionChange?: (slug: string, entities: unknown[]) => void;
 }
 
 // ── Field Builder ─────────────────────────────────────────────────────

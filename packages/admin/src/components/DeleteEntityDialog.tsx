@@ -14,7 +14,7 @@ import { useCMSContext } from "../hooks";
 import { EntityViewBinding } from "./EntityViewBinding";
 
 export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
-    entityOrEntitysToDelete?: Entity<M> | Entity<M>[],
+    entityOrEntitiesToDelete?: Entity<M> | Entity<M>[],
     path: string,
     collection: CollectionConfig<M>
     open: boolean;
@@ -23,17 +23,17 @@ export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
 
     onEntityDelete?(path: string, entity: Entity<M>): void;
 
-    onMultipleEntitysDelete?(path: string, entitys: Entity<M>[]): void;
+    onMultipleEntitiesDelete?(path: string, entities: Entity<M>[]): void;
 }
 
 export function DeleteEntityDialog<M extends Record<string, unknown>>({
-    entityOrEntitysToDelete,
+    entityOrEntitiesToDelete,
     collection,
     onClose,
     open,
     callbacks,
     onEntityDelete,
-    onMultipleEntitysDelete,
+    onMultipleEntitiesDelete,
     path
 }: DeleteEntityDialogProps<M>) {
     const authController = useAuthController();
@@ -44,11 +44,11 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
     const [loading, setLoading] = useState(false);
 
     const context = useCMSContext();
-    const entityOrEntitys = Array.isArray(entityOrEntitysToDelete) && entityOrEntitysToDelete.length === 1
-        ? entityOrEntitysToDelete[0]
-        : entityOrEntitysToDelete;
+    const entityOrEntities = Array.isArray(entityOrEntitiesToDelete) && entityOrEntitiesToDelete.length === 1
+        ? entityOrEntitiesToDelete[0]
+        : entityOrEntitiesToDelete;
 
-    const multipleEntitys = Array.isArray(entityOrEntitys);
+    const multipleEntities = Array.isArray(entityOrEntities);
 
     const handleCancel = useCallback(() => {
         onClose();
@@ -81,17 +81,17 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
         }), [dataClient, collection, callbacks, onDeleteSuccess, onDeleteFailure, context]);
 
     const handleOk = useCallback(async () => {
-        if (entityOrEntitys) {
+        if (entityOrEntities) {
 
             setLoading(true);
 
-            if (multipleEntitys) {
-                Promise.all((entityOrEntitys as Entity<M>[]).map(performDelete)).then((results) => {
+            if (multipleEntities) {
+                Promise.all((entityOrEntities as Entity<M>[]).map(performDelete)).then((results) => {
 
                     setLoading(false);
 
-                    if (onMultipleEntitysDelete && entityOrEntitys)
-                        onMultipleEntitysDelete(path, entityOrEntitys as Entity<M>[]);
+                    if (onMultipleEntitiesDelete && entityOrEntities)
+                        onMultipleEntitiesDelete(path, entityOrEntities as Entity<M>[]);
 
                     if (results.every(Boolean)) {
                         snackbarController.open({
@@ -101,23 +101,23 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                     } else if (results.some(Boolean)) {
                         snackbarController.open({
                             type: "warning",
-                            message: t("some_entitys_deleted", { collection: collection.name })
+                            message: t("some_entities_deleted", { collection: collection.name })
                         });
                     } else {
                         snackbarController.open({
                             type: "error",
-                            message: t("error_deleting_entitys", { collection: collection.name })
+                            message: t("error_deleting_entities", { collection: collection.name })
                         });
                     }
                     onClose();
                 });
 
             } else {
-                performDelete(entityOrEntitys as Entity<M>).then((success) => {
+                performDelete(entityOrEntities as Entity<M>).then((success) => {
                     setLoading(false);
                     if (success) {
-                        if (onEntityDelete && entityOrEntitys)
-                            onEntityDelete(path, entityOrEntitys as Entity<M>);
+                        if (onEntityDelete && entityOrEntities)
+                            onEntityDelete(path, entityOrEntities as Entity<M>);
                         snackbarController.open({
                             type: "success",
                             message: t("deleted", { name: collection.singularName ?? collection.name })
@@ -127,13 +127,13 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 });
             }
         }
-    }, [entityOrEntitys, multipleEntitys, performDelete, onMultipleEntitysDelete, path, onClose, snackbarController, collection.name, onEntityDelete]);
+    }, [entityOrEntities, multipleEntities, performDelete, onMultipleEntitiesDelete, path, onClose, snackbarController, collection.name, onEntityDelete]);
 
     let content: React.ReactNode;
-    if (entityOrEntitys && multipleEntitys) {
-        content = <>{t("multiple_entitys")}</>;
+    if (entityOrEntities && multipleEntities) {
+        content = <>{t("multiple_entities")}</>;
     } else {
-        const entity = entityOrEntitys as Entity<M> | undefined;
+        const entity = entityOrEntities as Entity<M> | undefined;
         content = entity
             ? <EntityViewBinding
                 entity={entity}
@@ -142,13 +142,13 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             : <></>;
     }
 
-    const dialogTitle = multipleEntitys
+    const dialogTitle = multipleEntities
         ? <><b>{collection.name}</b>: {t("confirm_multiple_delete")}</>
         : t("delete_entity_confirm_title", { entityName: collection.singularName ?? collection.name });
 
     return (
         <Dialog
-            maxWidth={multipleEntitys ? "lg" : "2xl"}
+            maxWidth={multipleEntities ? "lg" : "2xl"}
             aria-labelledby="delete-dialog"
             open={open}
             onOpenChange={(open) => !open ? onClose() : undefined}
@@ -157,7 +157,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 {dialogTitle}
             </DialogTitle>
             <DialogContent fullHeight={true}>
-                {!multipleEntitys && <div className={"p-4"}>{content}</div>}
+                {!multipleEntities && <div className={"p-4"}>{content}</div>}
             </DialogContent>
             <DialogActions>
 

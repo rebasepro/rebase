@@ -243,9 +243,9 @@ hasMore: false }
             expect(client.count).toBeDefined();
         });
 
-        it("should pass the accessor.count truthiness check (used by EntitysCount component)", () => {
+        it("should pass the accessor.count truthiness check (used by EntitiesCount component)", () => {
             const client = createCollectionClient(transport, "products");
-            // The EntitysCount component does `if (accessor.count) { ... }`
+            // The EntitiesCount component does `if (accessor.count) { ... }`
             // This verifies that check would pass
             expect(!!client.count).toBe(true);
         });

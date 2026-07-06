@@ -108,8 +108,8 @@ export function ReferenceFilterField({
         updateFilter(operation, getReferenceFrom(entity));
     };
 
-    const onMultipleEntitysSelected = (entitys: Entity<Record<string, unknown>>[]) => {
-        updateFilter(operation, entitys.map(e => getReferenceFrom(e)));
+    const onMultipleEntitiesSelected = (entities: Entity<Record<string, unknown>>[]) => {
+        updateFilter(operation, entities.map(e => getReferenceFrom(e)));
     };
 
     const multiple = multipleSelectOperations.includes(operation);
@@ -119,7 +119,7 @@ export function ReferenceFilterField({
         path,
         collection,
         onSingleEntitySelected,
-        onMultipleEntitysSelected,
+        onMultipleEntitiesSelected,
         selectedEntityIds,
         onClose: () => {
             setHidden(false);

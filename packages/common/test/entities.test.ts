@@ -10,7 +10,7 @@ import {
     getReferenceFrom,
     traverseValuesProperties,
     traverseValueProperty
-} from "../src/util/entitys";
+} from "../src/util/entities";
 import {
     Property,
     EntityReference,
@@ -217,7 +217,7 @@ name: "Updated At",
 autoValue: "on_update" } as Property
     };
 
-    it("sets on_create and on_update for new entitys", () => {
+    it("sets on_create and on_update for new entities", () => {
         const result = updateDateAutoValues({
             inputValues: { title: "Test" },
             properties,
@@ -228,7 +228,7 @@ autoValue: "on_update" } as Property
         expect(result.updated_at).toBe(NOW);
     });
 
-    it("sets on_update but not on_create for existing entitys", () => {
+    it("sets on_update but not on_create for existing entities", () => {
         const existingDate = new Date("2023-01-01");
         const result = updateDateAutoValues({
             inputValues: { title: "Test",

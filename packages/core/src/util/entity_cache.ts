@@ -4,7 +4,7 @@ import { isObject, isPlainObject } from "@rebasepro/utils";
 // Define a unique prefix for entity keys in sessionStorage to avoid key collisions
 const LOCAL_STORAGE_PREFIX = "entity_cache::";
 
-// In-memory cache to store entitys for quick access
+// In-memory cache to store entities for quick access
 const entityCache: Map<string, object> = new Map();
 
 // Check `sessionStorage` availability once during initialization
@@ -93,7 +93,7 @@ function customReviver(_key: string, value: unknown): unknown {
     return value;
 }
 
-// Initialize the in-memory cache by loading entitys from `sessionStorage`
+// Initialize the in-memory cache by loading entities from `sessionStorage`
 if (isSessionStorageAvailable) {
     try {
         // Iterate over all keys in sessionStorage to find those with the specified prefix

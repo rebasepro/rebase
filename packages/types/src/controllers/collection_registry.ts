@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "../types/collections";
-import type { EntityReference } from "../types/entitys";
+import type { EntityReference } from "../types/entities";
 
 /**
  * Controller that provides access to the registered entity collections.

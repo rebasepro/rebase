@@ -5,7 +5,7 @@ import {
     Properties,
     Property
 } from "@rebasepro/types";
-import { isPropertyBuilder } from "./entitys";
+import { isPropertyBuilder } from "./entities";
 
 export function sortProperties<M extends Record<string, unknown>>(properties: Properties, propertiesOrder?: string[]): Properties {
     try {

@@ -1,4 +1,4 @@
-import { Entity } from "./entitys";
+import { Entity } from "./entities";
 
 /**
  * @group Models

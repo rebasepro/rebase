@@ -20,8 +20,8 @@ For each collection, the following endpoints are generated:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List entitys |
-| `GET` | `/api/data/:slug/count` | Count entitys |
+| `GET` | `/api/data/:slug` | List entities |
+| `GET` | `/api/data/:slug/count` | Count entities |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a entity |
 | `PUT` | `/api/data/:slug/:id` | Update a entity |
@@ -201,7 +201,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 
 ## Relation Inclusion
 
-Use the `include` parameter to embed related entitys:
+Use the `include` parameter to embed related entities:
 
 ```bash
 # Include specific relations

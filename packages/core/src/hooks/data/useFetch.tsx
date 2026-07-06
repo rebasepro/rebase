@@ -27,14 +27,14 @@ export interface FetchResult<M extends Record<string, any>> {
 const CACHE: Record<string, Entity<any> | undefined> = {};
 
 /**
- * Pre-populate the entity fetch cache with entitys loaded from a collection.
+ * Pre-populate the entity fetch cache with entities loaded from a collection.
  * This allows entity detail views to render instantly using cached data,
  * while the background fetch/listener brings in fresh data.
  * @param path - The collection path (e.g. "products")
- * @param entitys - Array of entitys to cache
+ * @param entities - Array of entities to cache
  */
-export function populateFetchCache<M extends Record<string, any>>(path: string, entitys: Entity<M>[]): void {
-    for (const entity of entitys) {
+export function populateFetchCache<M extends Record<string, any>>(path: string, entities: Entity<M>[]): void {
+    for (const entity of entities) {
         CACHE[`${path}/${entity.id}`] = entity;
     }
 }

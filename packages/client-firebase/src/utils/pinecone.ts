@@ -6,7 +6,7 @@ const DEFAULT_SERVER = "https://api.rebase.pro";
 
 /**
  * Utility function to perform a text search in an algolia index,
- * returning the ids of the entitys.
+ * returning the ids of the entities.
  * @param index
  * @param query
  * @group Firebase
