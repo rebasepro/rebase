@@ -106,8 +106,8 @@ export function useFirebaseStorageSource({
                         },
                         () => {
                             clearTimeoutIfExists();
-                            const fullPath = uploadTask.entity.ref.fullPath;
-                            const bucketName = uploadTask.entity.ref.bucket;
+                            const fullPath = uploadTask.snapshot.ref.fullPath;
+                            const bucketName = uploadTask.snapshot.ref.bucket;
                             resolve({
                                 key: fullPath,
                                 bucket: bucketName,

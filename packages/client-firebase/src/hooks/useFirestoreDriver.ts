@@ -15,7 +15,7 @@ import {
     getDocs,
     getFirestore,
     limit as limitClause,
-    onEntity,
+    onSnapshot,
     orderBy as orderByClause,
     Query,
     query,
@@ -170,7 +170,7 @@ export function useFirestoreDriver({
         const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
         const resolvedPath = path;
 
-        return onEntity(
+        return onSnapshot(
             doc(firestore, resolvedPath, String(id)),
             {
                 next: (docEntity) => {
@@ -378,7 +378,7 @@ export function useFirestoreDriver({
             resolvedPath
         });
         const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, limit, databaseId);
-        return onEntity(query,
+        return onSnapshot(query,
             {
                 next: (entity) => {
                     if (!searchString)
