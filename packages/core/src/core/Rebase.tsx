@@ -27,7 +27,7 @@ import { useBuildModeController } from "../hooks/useBuildModeController";
 import { useBuildAdminModeController } from "../hooks/useBuildAdminModeController";
 import { RebaseClientInstanceContext } from "../contexts/RebaseClientInstanceContext";
 import { DialogsProvider } from "../contexts/DialogsProvider";
-import { buildRebaseData, wrapAsSnapshotData, CollectionRegistry } from "@rebasepro/common";
+import { buildRebaseData, wrapAsEntityData, CollectionRegistry } from "@rebasepro/common";
 import { CustomizationControllerContext } from "../contexts/CustomizationControllerContext";
 import { AnalyticsContext } from "../contexts/AnalyticsContext";
 
@@ -49,7 +49,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
 
     const {
         children,
-        snapshotLinkBuilder,
+        entityLinkBuilder,
         userConfigPersistence,
         dateTimeFormat,
         locale,
@@ -64,8 +64,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         slots: directSlots = [],
         onAnalyticsEvent,
         propertyConfigs,
-        snapshotViews,
-        snapshotActions,
+        entityViews,
+        entityActions,
 
         effectiveRoleController,
         apiUrl,
@@ -147,8 +147,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         const registeredDefault = dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY];
         if (registeredDefault) return registeredDefault;
         // CMS boundary: the SDK client returns flat rows; wrap them into the
-        // Snapshot view-model the admin (`useData()`) renders.
-        if (client?.data) return wrapAsSnapshotData(client.data);
+        // Entity view-model the admin (`useData()`) renders.
+        if (client?.data) return wrapAsEntityData(client.data);
         const built = Object.values(dataSourcesValue.sources);
         if (built.length === 1) return built[0];
         if (built.length > 1) {
@@ -305,14 +305,14 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const customizationController: CustomizationController = useMemo(() => ({
         dateTimeFormat,
         locale,
-        snapshotLinkBuilder,
+        entityLinkBuilder,
         plugins,
         resolvedSlots,
-        snapshotViews: snapshotViews ?? [],
-        snapshotActions: snapshotActions ?? [],
+        entityViews: entityViews ?? [],
+        entityActions: entityActions ?? [],
         propertyConfigs: propertyConfigs ?? {},
         components: componentsProp
-    }), [dateTimeFormat, locale, snapshotLinkBuilder, plugins, resolvedSlots, snapshotViews, snapshotActions, propertyConfigs, componentsProp]);
+    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, entityActions, propertyConfigs, componentsProp]);
 
     const analyticsController = useMemo(() => ({
         onAnalyticsEvent

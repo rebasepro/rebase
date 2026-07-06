@@ -19,7 +19,7 @@ Both features are enabled by default on all collections and can be configured or
 3. Select or drag-and-drop your file
 4. Map file columns to collection properties
 5. Preview the data and resolve any validation errors
-6. Click **Import** to save all snapshots
+6. Click **Import** to save all entitys
 
 ### Supported Formats
 
@@ -125,16 +125,16 @@ const productsCollection: CollectionConfig = {
         additionalFields: [
             {
                 key: "computed_margin",
-                builder: ({ snapshot }) => {
-                    const price = snapshot.values.price as number;
-                    const cost = snapshot.values.cost as number;
+                builder: ({ entity }) => {
+                    const price = entity.values.price as number;
+                    const cost = entity.values.cost as number;
                     return String(price - cost);
                 }
             },
             {
                 key: "full_url",
-                builder: ({ snapshot }) => {
-                    return `https://mystore.com/products/${snapshot.id}`;
+                builder: ({ entity }) => {
+                    return `https://mystore.com/products/${entity.id}`;
                 }
             }
         ]
@@ -148,9 +148,9 @@ Each `additionalFields` entry has:
 | Property | Type | Description |
 |----------|------|-------------|
 | `key` | `string` | Column name in the export |
-| `builder` | `({ snapshot, context }) => string \| Promise<string>` | Function that computes the value |
+| `builder` | `({ entity, context }) => string \| Promise<string>` | Function that computes the value |
 
-The `builder` function receives the current `snapshot` and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
+The `builder` function receives the current `entity` and the `RebaseContext` (which includes the authenticated user), so you can compute values based on both data and permissions.
 
 ### Async Computed Fields
 
@@ -161,9 +161,9 @@ exportable: {
     additionalFields: [
         {
             key: "author_name",
-            builder: async ({ snapshot, context }) => {
+            builder: async ({ entity, context }) => {
                 const author = await context.data.users.findById(
-                    snapshot.values.author_id as string
+                    entity.values.author_id as string
                 );
                 return author?.values.displayName ?? "Unknown";
             }

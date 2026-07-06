@@ -4,7 +4,7 @@ import { BackendCollectionRegistry } from "../collections/BackendCollectionRegis
 import { ApiError, errorHandler } from "../api/errors";
 import { DataDriver } from "@rebasepro/types";
 /**
- * Create Hono routes for snapshot history.
+ * Create Hono routes for entity history.
  * Mounted at `{basePath}/data/:slug/:id/history`.
  */
 export interface HistoryService {
@@ -22,7 +22,7 @@ export function createHistoryRoutes(params: {
     router.onError(errorHandler);
 
     /**
-     * GET /:slug/:id/history - List history entries for a snapshot
+     * GET /:slug/:id/history - List history entries for a entity
      *
      * Query params:
      *   limit  (default 20)
@@ -68,7 +68,7 @@ export function createHistoryRoutes(params: {
     });
 
     /**
-     * POST /:slug/:id/history/:historyId/revert - Revert snapshot to a historical version
+     * POST /:slug/:id/history/:historyId/revert - Revert entity to a historical version
      *
      * This goes through the normal save path, so it creates its own history entry.
      */
@@ -96,10 +96,10 @@ export function createHistoryRoutes(params: {
             throw ApiError.notFound(`History entry '${historyId}' not found`);
         }
 
-        // Verify the history entry belongs to this snapshot (prevent cross-snapshot revert)
+        // Verify the history entry belongs to this entity (prevent cross-entity revert)
         const tableName = collection.slug;
-        if (historyEntry.snapshot_id !== String(id) || historyEntry.table_name !== tableName) {
-            throw ApiError.badRequest("History entry does not belong to this snapshot");
+        if (historyEntry.entity_id !== String(id) || historyEntry.table_name !== tableName) {
+            throw ApiError.badRequest("History entry does not belong to this entity");
         }
 
         if (!historyEntry.values) {
@@ -111,7 +111,7 @@ export function createHistoryRoutes(params: {
         const authDriver = c.get("driver") || driver;
         const path = collection.slug;
 
-        const savedSnapshot = await authDriver.save({
+        const savedEntity = await authDriver.save({
             path,
             id: String(id),
             values: historyEntry.values,
@@ -120,7 +120,7 @@ export function createHistoryRoutes(params: {
         });
 
         return c.json({
-            data: savedSnapshot,
+            data: savedEntity,
             meta: { reverted_from: historyId }
         });
     });

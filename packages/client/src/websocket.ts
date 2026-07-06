@@ -108,7 +108,7 @@ export class RebaseWebSocketClient {
 
     // Maps to quickly find subscription by backend subscription ID
     private backendToCollectionKey = new Map<string, string>();
-    private backendToSnapshotKey = new Map<string, string>();
+    private backendToEntityKey = new Map<string, string>();
 
 
     private pendingRequests = new Map<string, {
@@ -469,8 +469,8 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub) {
-                    const wireSnapshots = (message.rows || []) as unknown as Record<string, unknown>[];
-                    const incomingRows = wireSnapshots;
+                    const wireEntitys = (message.rows || []) as unknown as Record<string, unknown>[];
+                    const incomingRows = wireEntitys;
 
                     // Structural merge: preserve cached row references for rows
                     // whose values haven't changed. This prevents downstream React components
@@ -506,14 +506,14 @@ export class RebaseWebSocketClient {
             if (subscriptionKey) {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub && collectionSub.isInitialDataReceived && collectionSub.latestData) {
-                    const patchWireSnapshot = message.row ?? null;
-                    const patchSnapshotId = (message as unknown as { id: string }).id;
-                    const patchRow = patchWireSnapshot ? (patchWireSnapshot as unknown as Record<string, unknown>) : null;
+                    const patchWireEntity = message.row ?? null;
+                    const patchEntityId = (message as unknown as { id: string }).id;
+                    const patchRow = patchWireEntity ? (patchWireEntity as unknown as Record<string, unknown>) : null;
                     let updated: Record<string, unknown>[];
 
                     if (patchRow === null) {
                         // Row was deleted — remove it from the cached list
-                        updated = collectionSub.latestData.filter(e => String(e.id) !== String(patchSnapshotId));
+                        updated = collectionSub.latestData.filter(e => String(e.id) !== String(patchEntityId));
                     } else {
                         // Row was created or updated — merge into the cached list
                         const idx = collectionSub.latestData.findIndex(e => String(e.id) === String(patchRow.id));
@@ -548,19 +548,19 @@ export class RebaseWebSocketClient {
 
         // Handle subscription updates for row subscriptions
         if (subscriptionId && type === "single_update") {
-            const subscriptionKey = this.backendToSnapshotKey.get(subscriptionId);
+            const subscriptionKey = this.backendToEntityKey.get(subscriptionId);
             if (subscriptionKey) {
-                const snapshotSub = this.singleSubscriptions.get(subscriptionKey);
-                if (snapshotSub) {
-                    const wireSnapshot = message.row ?? null;
-                    const row = wireSnapshot ? (wireSnapshot as unknown as Record<string, unknown>) : null;
+                const entitySub = this.singleSubscriptions.get(subscriptionKey);
+                if (entitySub) {
+                    const wireEntity = message.row ?? null;
+                    const row = wireEntity ? (wireEntity as unknown as Record<string, unknown>) : null;
                     // Cache the latest data with optimizations
-                    snapshotSub.latestData = row;
-                    snapshotSub.lastUpdated = Date.now();
-                    snapshotSub.isInitialDataReceived = true;
+                    entitySub.latestData = row;
+                    entitySub.lastUpdated = Date.now();
+                    entitySub.isInitialDataReceived = true;
 
                     // Notify all callbacks for this subscription
-                    snapshotSub.callbacks.forEach(callback => {
+                    entitySub.callbacks.forEach(callback => {
                         try {
                             callback.onUpdate(row);
                         } catch (error) {
@@ -604,17 +604,17 @@ export class RebaseWebSocketClient {
                 }
             }
 
-            const snapshotKey = this.backendToSnapshotKey.get(subscriptionId);
-            if (snapshotKey) {
-                const snapshotSub = this.singleSubscriptions.get(snapshotKey);
-                if (snapshotSub) {
+            const entityKey = this.backendToEntityKey.get(subscriptionId);
+            if (entityKey) {
+                const entitySub = this.singleSubscriptions.get(entityKey);
+                if (entitySub) {
                     if (this.isAuthError(message)) {
                         this.resubscribeAfterAuthRefresh(
                             message,
-                            snapshotSub,
-                            snapshotKey,
+                            entitySub,
+                            entityKey,
                             "row",
-                            this.backendToSnapshotKey,
+                            this.backendToEntityKey,
                             "subscribe_one"
                         );
                         return;
@@ -622,7 +622,7 @@ export class RebaseWebSocketClient {
 
                     const { errorMessage, errorCode } = extractMessageError(message);
                     const error = new ApiError(errorMessage, errorMessage, errorCode);
-                    snapshotSub.callbacks.forEach(callback => {
+                    entitySub.callbacks.forEach(callback => {
                         if (callback.onError) {
                             callback.onError(error);
                         }
@@ -817,8 +817,8 @@ export class RebaseWebSocketClient {
             type: "FETCH_ONE",
             payload: props
         }) as { row?: Record<string, unknown> };
-        const wireSnapshot = response.row;
-        return wireSnapshot ?? undefined;
+        const wireEntity = response.row;
+        return wireEntity ?? undefined;
     }
 
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
@@ -1197,7 +1197,7 @@ onError });
                 if (callbackMap.size === 0) {
                     // No more callbacks, unsubscribe from backend
                     this.singleSubscriptions.delete(subscriptionKey);
-                    this.backendToSnapshotKey.delete(existingSubscription.backendSubscriptionId);
+                    this.backendToEntityKey.delete(existingSubscription.backendSubscriptionId);
                     if (this.isConnected && this.ws) {
                         this.sendMessage({
                             type: "unsubscribe",
@@ -1209,7 +1209,7 @@ onError });
         }
 
         // Create new subscription
-        const backendSubscriptionId = `snapshot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const backendSubscriptionId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const callbackMap = new Map<string, {
             onUpdate: (row: Record<string, unknown> | null) => void;
             onError?: (error: Error) => void;
@@ -1224,7 +1224,7 @@ onError });
         });
 
         // Add reverse lookup
-        this.backendToSnapshotKey.set(backendSubscriptionId, subscriptionKey);
+        this.backendToEntityKey.set(backendSubscriptionId, subscriptionKey);
 
         // Send subscription request to backend
         this.sendMessage({
@@ -1245,7 +1245,7 @@ onError });
                 callbacks.delete(callbackId);
                 if (callbacks.size === 0) {
                     this.singleSubscriptions.delete(subscriptionKey);
-                    this.backendToSnapshotKey.delete(subscription.backendSubscriptionId);
+                    this.backendToEntityKey.delete(subscription.backendSubscriptionId);
                     if (this.isConnected && this.ws) {
                         this.sendMessage({
                             type: "unsubscribe",
@@ -1290,11 +1290,11 @@ onError });
         // Re-subscribe row subscriptions
         for (const [key, sub] of this.singleSubscriptions.entries()) {
             const oldBackendId = sub.backendSubscriptionId;
-            const newBackendId = `snapshot_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const newBackendId = `entity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             sub.backendSubscriptionId = newBackendId;
 
-            this.backendToSnapshotKey.delete(oldBackendId);
-            this.backendToSnapshotKey.set(newBackendId, key);
+            this.backendToEntityKey.delete(oldBackendId);
+            this.backendToEntityKey.set(newBackendId, key);
 
             this.sendMessage({
                 type: "subscribe_one",

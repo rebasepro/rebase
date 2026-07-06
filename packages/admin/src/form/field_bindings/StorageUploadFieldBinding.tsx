@@ -76,8 +76,8 @@ export function StorageUploadFieldBinding({
         multipleFilesSupported,
         resolvedStorageSource
     } = useStorageUploadController({
-        snapshotValues: context.values,
-        snapshotId: context.snapshotId,
+        entityValues: context.values,
+        entityId: context.entityId,
         path: context.path,
         property,
         propertyKey,

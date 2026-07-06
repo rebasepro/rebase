@@ -234,7 +234,7 @@ describe("find() — one-to-many relation response", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
     beforeEach(() => ({ transport, mockRequest } = createMockTransport()));
 
-    it("preserves array of related snapshots", async () => {
+    it("preserves array of related entitys", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
@@ -846,13 +846,13 @@ describe("QueryBuilder operator mapping", () => {
 });
 
 // ==========================================================================
-// 17. CMS Snapshot Relation shape — the __type: "relation" format
-//     Backend's drizzleResultToSnapshot wraps relations as:
+// 17. CMS Entity Relation shape — the __type: "relation" format
+//     Backend's drizzleResultToEntity wraps relations as:
 //     { __type: "relation", id, path, data: { id, path, values } }
 //     But REST path (drizzleResultToRestRow) returns flat:
 //     { id, name, email, ... }
 //     The client SDK consumes the REST format. These tests verify
-//     both formats are handled by rowToSnapshot.
+//     both formats are handled by rowToEntity.
 // ==========================================================================
 describe("CMS relation shape — __type: 'relation' format", () => {
     let transport: Transport; let mockRequest: jest.Mock<Transport["request"]>;
@@ -877,9 +877,9 @@ email: "a@b.com" });
         expect(r.data[0].author.path).toBeUndefined();
     });
 
-    it("CMS snapshot format (__type:relation) also preserved as-is (passthrough)", async () => {
+    it("CMS entity format (__type:relation) also preserved as-is (passthrough)", async () => {
         // If the backend somehow returns CMS-format relations through REST,
-        // rowToSnapshot should still preserve them in values
+        // rowToEntity should still preserve them in values
         const c = createCollectionClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,

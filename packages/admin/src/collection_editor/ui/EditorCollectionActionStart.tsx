@@ -14,7 +14,7 @@ import { mergeDeep } from "@rebasepro/utils";
 
 export function EditorCollectionActionStart({
     path,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
 }: CollectionActionsProps) {
@@ -41,7 +41,7 @@ export function EditorCollectionActionStart({
                         ?.saveCollection({
                             id: collection.slug,
                             parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                             collectionData: mergeDeep(collection as CollectionConfig,
                                 {
                                     defaultFilter: tableController.filterValues ?? null,

@@ -158,9 +158,9 @@ export class PersistService {
                         (effectiveValues as Record<string, unknown>)[targetColumnName] = parsedParentId;
                         break;
                     } else {
-                        const nextSnapshotId = segments[i + 1];
+                        const nextEntityId = segments[i + 1];
                         currentCollection = relation.target();
-                        currentId = nextSnapshotId;
+                        currentId = nextEntityId;
                     }
                 }
             }
@@ -203,7 +203,7 @@ export class PersistService {
             const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
             const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
 
-            const snapshotData = sanitizeAndConvertDates(serializedResult.scalarData);
+            const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
 
             savedId = await this.db.transaction(async (tx) => {
                 let currentId: string | number;
@@ -224,11 +224,11 @@ export class PersistService {
                     }
 
                     // Only issue an UPDATE if there are scalar columns to set.
-                    // When the payload contains only relation data, snapshotData is
+                    // When the payload contains only relation data, entityData is
                     // empty after relation stripping and Drizzle throws "No values to set".
-                    const scalarKeys = Object.keys(snapshotData as Record<string, unknown>);
+                    const scalarKeys = Object.keys(entityData as Record<string, unknown>);
                     if (scalarKeys.length > 0) {
-                        const updateQuery = tx.update(table).set(snapshotData as Record<string, unknown>);
+                        const updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
                         const conditions = [];
                         for (const info of idInfoArray) {
                             const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
@@ -238,7 +238,7 @@ export class PersistService {
                         await updateQuery.where(and(...conditions));
                     }
                 } else {
-                    const dataForInsert = { ...(snapshotData as Record<string, unknown>) };
+                    const dataForInsert = { ...(entityData as Record<string, unknown>) };
 
                     // Strip empty primary keys so the database defaults (e.g. uuid_gen(), auto-increment) can trigger
                     for (const info of idInfoArray) {
@@ -283,9 +283,9 @@ export class PersistService {
         }
 
         // Fetch the updated/created row to return with proper relation objects
-        const finalSnapshot = await this.fetchService.fetchOne<M>(collection.slug, savedId, databaseId);
-        if (!finalSnapshot) throw new Error("Could not fetch row after save.");
-        return finalSnapshot;
+        const finalEntity = await this.fetchService.fetchOne<M>(collection.slug, savedId, databaseId);
+        if (!finalEntity) throw new Error("Could not fetch row after save.");
+        return finalEntity;
     }
 
     /**

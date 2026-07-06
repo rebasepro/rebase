@@ -5,21 +5,21 @@ import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { RelationPreview } from "../../../preview";
-import { CollectionSize, Snapshot, SnapshotRelation, FilterValues, Relation } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
 import { cls, PencilIcon } from "@rebasepro/ui";
-import { SnapshotPreviewContainer } from "../../RecordPreviewBinding";
-import { getRelationFrom, normalizeToSnapshotRelation } from "@rebasepro/common";
+import { EntityPreviewContainer } from "../../EntityPreviewBinding";
+import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";
 
 type TableRelationFieldProps = {
     name: string;
     disabled: boolean;
-    internalValue: SnapshotRelation | SnapshotRelation[] | undefined | null;
-    updateValue: (newValue: (SnapshotRelation | SnapshotRelation[] | null)) => void;
+    internalValue: EntityRelation | EntityRelation[] | undefined | null;
+    updateValue: (newValue: (EntityRelation | EntityRelation[] | null)) => void;
     size: CollectionSize;
     multiselect: boolean;
     previewProperties?: string[];
@@ -27,7 +27,7 @@ type TableRelationFieldProps = {
     relation: Relation;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
 };
 
 export function TableRelationField(props: TableRelationFieldProps) {
@@ -48,7 +48,7 @@ export function TableRelationField(props: TableRelationFieldProps) {
             relation={props.relation}
             fixedFilter={props.fixedFilter}
             includeId={props.includeId}
-            includeSnapshotLink={props.includeSnapshotLink}
+            includeEntityLink={props.includeEntityLink}
         />;
     }
 
@@ -72,18 +72,18 @@ export const TableRelationFieldInternal = React.memo(
             fixedFilter,
             collection,
             includeId,
-            includeSnapshotLink
+            includeEntityLink
         } = props;
 
-        const onSingleSnapshotSelected = useCallback((snapshot: Snapshot<any>) => {
-            updateValue(snapshot ? getRelationFrom(snapshot) : null);
+        const onSingleEntitySelected = useCallback((entity: Entity<any>) => {
+            updateValue(entity ? getRelationFrom(entity) : null);
         }, [updateValue]);
 
-        const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<any>[]) => {
-            updateValue(snapshots.map((e) => getRelationFrom(e)));
+        const onMultipleEntitysSelected = useCallback((entitys: Entity<any>[]) => {
+            updateValue(entitys.map((e) => getRelationFrom(e)));
         }, [updateValue]);
 
-        const selectedSnapshotIds = internalValue
+        const selectedEntityIds = internalValue
             ? (Array.isArray(internalValue)
                 ? internalValue.map((ref) => ref.id)
                 : internalValue.id ? [internalValue.id] : [])
@@ -93,9 +93,9 @@ export const TableRelationFieldInternal = React.memo(
             multiselect,
             path: getCollectionDataPath(collection),
             collection,
-            onMultipleSnapshotsSelected,
-            onSingleSnapshotSelected,
-            selectedSnapshotIds,
+            onMultipleEntitysSelected,
+            onSingleEntitySelected,
+            selectedEntityIds,
             fixedFilter
         }
         );
@@ -109,7 +109,7 @@ export const TableRelationFieldInternal = React.memo(
         const valueNotSet = !internalValue || (Array.isArray(internalValue) && internalValue.length === 0);
 
         const buildSingleRelationField = () => {
-            const normalizedRelation = normalizeToSnapshotRelation(internalValue);
+            const normalizedRelation = normalizeToEntityRelation(internalValue);
 
             if (normalizedRelation)
                 return <RelationPreview
@@ -119,14 +119,14 @@ export const TableRelationFieldInternal = React.memo(
                     hover={!disabled}
                     previewProperties={previewProperties}
                     includeId={includeId}
-                    includeSnapshotLink={includeSnapshotLink}
+                    includeEntityLink={includeEntityLink}
                 />;
             else
-                return <SnapshotPreviewContainer
+                return <EntityPreviewContainer
                     onClick={disabled ? undefined : handleOpen}
                     size={getPreviewSizeFrom(size)}>
                     <ErrorView title="Value is not a relation." error={"Click to edit"}/>
-                </SnapshotPreviewContainer>;
+                </EntityPreviewContainer>;
         };
 
         const buildMultipleRelationField = () => {
@@ -142,7 +142,7 @@ export const TableRelationFieldInternal = React.memo(
                                 hover={!disabled}
                                 previewProperties={previewProperties}
                                 includeId={includeId}
-                                includeSnapshotLink={includeSnapshotLink}
+                                includeEntityLink={includeEntityLink}
                             />
                         </div>
                     )
@@ -163,7 +163,7 @@ export const TableRelationFieldInternal = React.memo(
                 {internalValue && multiselect && buildMultipleRelationField()}
 
                 {valueNotSet &&
-                    <SnapshotPreviewContainer
+                    <EntityPreviewContainer
                         className={cls("px-3 py-2 text-sm font-medium flex items-center",
                             multiselect ? "gap-4" : "gap-6",
                             disabled
@@ -174,7 +174,7 @@ export const TableRelationFieldInternal = React.memo(
                         <PencilIcon
                             className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
-                    </SnapshotPreviewContainer>}
+                    </EntityPreviewContainer>}
 
             </div>
         );

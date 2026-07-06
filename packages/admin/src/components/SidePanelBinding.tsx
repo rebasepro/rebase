@@ -2,21 +2,21 @@ import type { CollectionConfig } from "@rebasepro/types";
 import type { SidePanelBindingProps } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { OnUpdateParams } from "../types/components/SnapshotFormProps";
+import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { IconButton, Maximize2Icon, XIcon } from "@rebasepro/ui";
 import { EditViewBinding } from "./EditViewBinding";
 import { DetailViewBinding } from "./DetailViewBinding";
 import { useSideDialogContext } from "./SideDialogs";
 import { useNavigate } from "react-router-dom";
-import { saveSnapshotToMemoryCache, useComponentOverride } from "@rebasepro/core";
+import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/core";
 import { useCollectionRegistryController, useSidePanel } from "../index";
 import { useUrlController } from "../index";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
 
 /**
  * This is the component in charge of rendering the side dialog used
- * for editing snapshots. Use the {@link useSidePanel} to open
+ * for editing entitys. Use the {@link useSidePanel} to open
  * and control the dialogs.
  * This component needs a parent {@link Rebase}
  * {@link useSidePanel}
@@ -27,7 +27,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     const {
         allowFullScreen = true,
         path,
-        snapshotId,
+        entityId,
         selectedTab,
         formProps
     } = props;
@@ -65,9 +65,9 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
         if (params.status !== "existing") {
             sidePanelController.replace({
                 path: params.path,
-                snapshotId: params.snapshotId,
+                entityId: params.entityId,
                 selectedTab: params.selectedTab,
-                updateUrl: collection?.openSnapshotMode !== "dialog",
+                updateUrl: collection?.openEntityMode !== "dialog",
                 collection: params.collection
             });
         }
@@ -83,19 +83,19 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
         return collectionRegistryController.getParentCollectionSlugs(path);
     }, [collectionRegistryController, path]);
 
-    const parentSnapshotIds = useMemo(() => {
-        return collectionRegistryController.getParentSnapshotIds(path);
+    const parentEntityIds = useMemo(() => {
+        return collectionRegistryController.getParentEntityIds(path);
     }, [collectionRegistryController, path]);
 
     const collection = collectionRegistryController.getCollection(path) ?? props.collection;
 
     const [showEditInPanel, setShowEditInPanel] = useState(selectedTab === "edit");
-    const isDetailMode = collection?.defaultSnapshotAction === "view" && !showEditInPanel && Boolean(snapshotId);
+    const isDetailMode = collection?.defaultEntityAction === "view" && !showEditInPanel && Boolean(entityId);
 
-    // Reset edit mode when switching snapshots
+    // Reset edit mode when switching entitys
     useEffect(() => {
         setShowEditInPanel(selectedTab === "edit");
-    }, [snapshotId, selectedTab]);
+    }, [entityId, selectedTab]);
 
     // One-time correction: when the side panel opens without the correct
     // selectedTab but the resolved collection (from the registry) has a
@@ -106,28 +106,28 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     const hasCorrectedDefaultView = useRef(false);
     useEffect(() => {
         hasCorrectedDefaultView.current = false;
-    }, [snapshotId]);
+    }, [entityId]);
     useEffect(() => {
         if (hasCorrectedDefaultView.current) return;
         if (selectedTab) return; // Already has a tab — no correction needed
-        if (!snapshotId || !collection?.defaultSelectedView) return;
+        if (!entityId || !collection?.defaultSelectedView) return;
 
         const effectiveDefault = resolveDefaultSelectedView(
             collection.defaultSelectedView,
             { status: "existing",
-snapshotId }
+entityId }
         );
         if (effectiveDefault && effectiveDefault !== "edit") {
             hasCorrectedDefaultView.current = true;
             sidePanelController.replace({
                 path,
-                snapshotId,
+                entityId,
                 selectedTab: effectiveDefault,
-                updateUrl: collection.openSnapshotMode !== "dialog",
+                updateUrl: collection.openEntityMode !== "dialog",
                 collection
             });
         }
-    }, [selectedTab, snapshotId, collection, path, sidePanelController]);
+    }, [selectedTab, entityId, collection, path, sidePanelController]);
 
     // Note: beforeunload is handled by useUnsavedChangesDialog in SideDialogView,
     // which listens to the same `blocked` state via SideDialogContext.
@@ -149,11 +149,11 @@ snapshotId }
                 {isDetailMode
                     ? <ResolvedDetailView
                         path={path}
-                        layout={collection?.openSnapshotMode === "dialog" ? "dialog" : "side_panel"}
+                        layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
                         collection={collection as CollectionConfig}
-                        snapshotId={snapshotId!}
+                        entityId={entityId!}
                         parentCollectionSlugs={parentCollectionSlugs}
-                        parentSnapshotIds={parentSnapshotIds}
+                        parentEntityIds={parentEntityIds}
                         onEditClick={() => setShowEditInPanel(true)}
                         barActions={({
                             status,
@@ -169,8 +169,8 @@ snapshotId }
                                     className="self-center"
                                     size={"small"}
                                     onClick={() => {
-                                        if (snapshotId) {
-                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${snapshotId}`);
+                                        if (entityId) {
+                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
                                             navigate(fullScreenUrl, { state: null });
                                         }
                                     }}>
@@ -178,17 +178,17 @@ snapshotId }
                                 </IconButton>}
                             </div>}
                         onTabChange={({
-                            snapshotId: tabSnapshotId,
+                            entityId: tabEntityId,
                             selectedTab,
                             collection: paramCollection
                         }) => {
-                            if (collection?.openSnapshotMode === "dialog" || paramCollection?.openSnapshotMode === "dialog") {
+                            if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
                                 return;
                             }
-                            if (tabSnapshotId) {
+                            if (tabEntityId) {
                                 sidePanelController.replace({
                                     path,
-                                    snapshotId: tabSnapshotId,
+                                    entityId: tabEntityId,
                                     selectedTab,
                                     updateUrl: true,
                                     collection: paramCollection ?? collection
@@ -198,9 +198,9 @@ snapshotId }
                     />
                     : <EditViewBinding
                         {...props}
-                        layout={collection?.openSnapshotMode === "dialog" ? "dialog" : "side_panel"}
+                        layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
                         collection={collection as CollectionConfig}
-                        parentCollectionSlugs={parentCollectionSlugs} parentSnapshotIds={parentSnapshotIds}
+                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                         onValuesModified={onValuesModified}
                         onSaved={onUpdate}
                         navigateBack={() => setShowEditInPanel(false)}
@@ -218,12 +218,12 @@ snapshotId }
                                     className="self-center"
                                     size={"small"}
                                     onClick={() => {
-                                        const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + snapshotId;
-                                        saveSnapshotToMemoryCache(key, values);
+                                        const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
+                                        saveEntityToMemoryCache(key, values);
                                         setBlocked(false);
                                         setBlockedNavigationMessage(undefined);
-                                        if (snapshotId) {
-                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${snapshotId}`);
+                                        if (entityId) {
+                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
                                             navigate(fullScreenUrl, { state: null });
                                         } else {
                                             const fullScreenUrl = urlController.buildUrlCollectionPath(path);
@@ -234,17 +234,17 @@ snapshotId }
                                 </IconButton>}
                             </div>}
                         onTabChange={({
-                            snapshotId: tabSnapshotId,
+                            entityId: tabEntityId,
                             selectedTab,
                             collection: paramCollection
                         }) => {
-                            if (collection?.openSnapshotMode === "dialog" || paramCollection?.openSnapshotMode === "dialog") {
+                            if (collection?.openEntityMode === "dialog" || paramCollection?.openEntityMode === "dialog") {
                                 return;
                             }
-                            if (tabSnapshotId) {
+                            if (tabEntityId) {
                                 sidePanelController.replace({
                                     path,
-                                    snapshotId: tabSnapshotId,
+                                    entityId: tabEntityId,
                                     selectedTab,
                                     updateUrl: true,
                                     collection: paramCollection ?? collection

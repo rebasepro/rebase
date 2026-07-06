@@ -1,11 +1,11 @@
-import type { ComponentRef, CollectionConfig, SnapshotCustomViewParams, FormViewConfig } from "@rebasepro/types";
+import type { ComponentRef, CollectionConfig, EntityCustomViewParams, FormViewConfig } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Snapshot, SnapshotStatus, getCollectionDataPath, Property } from "@rebasepro/types";
+import { Entity, EntityStatus, getCollectionDataPath, Property } from "@rebasepro/types";
 import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 
-import { CollectionViewBinding, RecordViewBinding } from "../components";
+import { CollectionViewBinding, EntityViewBinding } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
@@ -31,7 +31,7 @@ import {
     removeInitialAndTrailingSlashes,
     resolveDefaultSelectedView
 } from "@rebasepro/common";
-import { resolvedSelectedSnapshotView } from "../util/resolutions";
+import { resolvedSelectedEntityView } from "../util/resolutions";
 import {
     useCustomizationController,
     useFetch,
@@ -42,23 +42,23 @@ import {
 import { useUrlController, useCollectionRegistryController } from "../index";
 import { useNavigate } from "react-router-dom";
 import { getValueInPath } from "@rebasepro/utils";
-import { getSnapshotTitlePropertyKey, resolveTitleToString } from "../util/previews";
+import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";
 import { JsonPreviewBinding } from "../components/JsonPreviewBinding";
 
-const SnapshotHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.SnapshotHistoryView })));
+const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 
 import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
 
 export type BarActionsParams = {
     values: object,
-    status: SnapshotStatus,
+    status: EntityStatus,
     path: string,
-    snapshotId?: string | number;
+    entityId?: string | number;
 };
 
 export type OnTabChangeParams<M extends Record<string, unknown>> = {
     path: string;
-    snapshotId?: string | number;
+    entityId?: string | number;
     selectedTab?: string;
     collection: CollectionConfig<M>;
 };
@@ -66,10 +66,10 @@ export type OnTabChangeParams<M extends Record<string, unknown>> = {
 export interface DetailViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
     collection: CollectionConfig<M>;
-    snapshotId: string | number;
+    entityId: string | number;
     selectedTab?: string;
     parentCollectionSlugs: string[];
-    parentSnapshotIds: string[];
+    parentEntityIds: string[];
     onTabChange?: (props: OnTabChangeParams<M>) => void;
     onEditClick?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
@@ -77,17 +77,17 @@ export interface DetailViewBindingProps<M extends Record<string, unknown> = Reco
 }
 
 export function DetailViewBinding<M extends Record<string, unknown>>({
-    snapshotId,
+    entityId,
     ...props
 }: DetailViewBindingProps<M>) {
 
     const {
-        snapshot,
+        entity,
         dataLoading,
         dataLoadingError
     } = useFetch<M>({
         path: props.path,
-        snapshotId: snapshotId,
+        entityId: entityId,
         collection: props.collection,
         useCache: false
     });
@@ -98,17 +98,17 @@ export function DetailViewBinding<M extends Record<string, unknown>>({
         </CenteredView>;
     }
 
-    if (!dataLoading && !snapshot) {
+    if (!dataLoading && !entity) {
         return <CenteredView>
-            <Typography variant="label">Snapshot not found</Typography>
+            <Typography variant="label">Entity not found</Typography>
         </CenteredView>;
     }
 
     const content = (
         <DetailViewBindingInner<M>
             {...props}
-            snapshotId={snapshotId}
-            snapshot={snapshot}
+            entityId={entityId}
+            entity={entity}
             dataLoading={dataLoading}
         />
     );
@@ -125,19 +125,19 @@ export function DetailViewBinding<M extends Record<string, unknown>>({
 
 function DetailViewBindingInner<M extends Record<string, unknown>>({
     path,
-    snapshotId,
+    entityId,
     selectedTab: selectedTabProp,
     collection,
     parentCollectionSlugs,
-    parentSnapshotIds,
+    parentEntityIds,
     onTabChange,
     onEditClick,
-    snapshot,
+    entity,
     dataLoading,
     layout = "full_screen",
     barActions
 }: DetailViewBindingProps<M> & {
-    snapshot?: Snapshot<M>,
+    entity?: Entity<M>,
     dataLoading: boolean,
 }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
@@ -151,19 +151,19 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     const { canEdit: canEditHook } = usePermissions();
 
     const canEdit = useMemo(() => {
-        return snapshot ? canEditHook(collection, path, snapshot) : false;
-    }, [canEditHook, snapshot, collection, path]);
+        return entity ? canEditHook(collection, path, entity) : false;
+    }, [canEditHook, entity, collection, path]);
 
-    const [usedSnapshot, setUsedSnapshot] = useState<Snapshot<M> | undefined>(snapshot);
+    const [usedEntity, setUsedEntity] = useState<Entity<M> | undefined>(entity);
     useEffect(() => {
-        if (snapshot) setUsedSnapshot(snapshot);
-    }, [snapshot]);
+        if (entity) setUsedEntity(entity);
+    }, [entity]);
 
     const defaultSelectedView = useMemo(() => resolveDefaultSelectedView(
         collection.defaultSelectedView,
         { status: "existing",
-snapshotId }
-    ), [collection, snapshotId]);
+entityId }
+    ), [collection, entityId]);
 
     // Track whether the user has explicitly clicked a tab in this component
     // instance. See EditViewBindingInner for full explanation.
@@ -185,32 +185,32 @@ snapshotId }
 
     const subcollections = getSubcollections(collection).filter(c => !c.hideFromNavigation);
     const subcollectionsCount = subcollections?.length ?? 0;
-    const customViews = collection.snapshotViews ?? [];
+    const customViews = collection.entityViews ?? [];
     const customViewsCount = customViews?.length ?? 0;
     const includeJsonView = collection.includeJsonView === undefined ? true : collection.includeJsonView;
     const includeHistoryView = Boolean(collection.history);
     const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView || includeHistoryView;
 
     const {
-        resolvedSnapshotViews
-    } = resolvedSelectedSnapshotView(customViews, customizationController, undefined, canEdit);
+        resolvedEntityViews
+    } = resolvedSelectedEntityView(customViews, customizationController, undefined, canEdit);
 
     const validTabValues = useMemo(() => {
         const set = new Set<string>([
             MAIN_TAB_VALUE,
             ...(includeJsonView ? [JSON_TAB_VALUE] : []),
             ...(includeHistoryView ? [HISTORY_TAB_VALUE] : []),
-            ...resolvedSnapshotViews.map(v => v.key),
+            ...resolvedEntityViews.map(v => v.key),
             ...subcollections.map(s => s.slug)
         ]);
         return set;
-    }, [includeJsonView, includeHistoryView, resolvedSnapshotViews, subcollections]);
+    }, [includeJsonView, includeHistoryView, resolvedEntityViews, subcollections]);
 
     const activeTab = validTabValues.has(selectedTab) ? selectedTab : MAIN_TAB_VALUE;
 
     const {
-        selectedSnapshotView
-    } = resolvedSelectedSnapshotView(customViews, customizationController, activeTab, canEdit);
+        selectedEntityView
+    } = resolvedSelectedEntityView(customViews, customizationController, activeTab, canEdit);
 
     const mainViewVisible = activeTab === MAIN_TAB_VALUE;
 
@@ -220,17 +220,17 @@ snapshotId }
         mountedTabsRef.current.add(activeTab);
     }
 
-    // Read-only form context for custom snapshot views
+    // Read-only form context for custom entity views
     const readOnlyFormContext = useMemo<FormContext<M> | undefined>(() => {
-        if (!snapshotId) return undefined;
-        const formexStub = createFormexStub<M>(usedSnapshot?.values ?? {} as M);
+        if (!entityId) return undefined;
+        const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
         return {
-            snapshotId,
+            entityId,
             disabled: true,
             readOnly: true,
-            openSnapshotMode: layout,
+            openEntityMode: layout,
             status: "existing",
-            values: usedSnapshot?.values ?? ({} as M),
+            values: usedEntity?.values ?? ({} as M),
             setFieldValue: () => {
                 throw new Error("Cannot update values in read-only detail view");
             },
@@ -242,50 +242,50 @@ snapshotId }
             },
             collection,
             path,
-            snapshot: usedSnapshot,
+            entity: usedEntity,
             savingError: undefined,
             formex: formexStub
         };
-    }, [snapshotId, layout, usedSnapshot, collection, path]);
+    }, [entityId, layout, usedEntity, collection, path]);
 
     // Plugin slots
     const formActionTopProps: PluginFormActionProps = useMemo(() => ({
-        snapshotId,
+        entityId,
         parentCollectionSlugs,
-        parentSnapshotIds,
+        parentEntityIds,
         path,
         status: "existing",
         collection: collection!,
         context,
         formContext: readOnlyFormContext as FormContext<Record<string, unknown>> | undefined,
-        openSnapshotMode: layout,
+        openEntityMode: layout,
         disabled: true
-    }), [snapshotId, parentCollectionSlugs, parentSnapshotIds, path, collection, context, readOnlyFormContext, layout]);
+    }), [entityId, parentCollectionSlugs, parentEntityIds, path, collection, context, readOnlyFormContext, layout]);
     const pluginActionsTop = useSlot("form.actions.top", formActionTopProps);
 
     // Resolve formView.Builder if provided
     const formViewConfig = (collection as CollectionConfig<M> & { formView?: FormViewConfig<M> }).formView;
-    const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<SnapshotCustomViewParams>(formViewConfig.Builder as ComponentRef<SnapshotCustomViewParams>) : null;
+    const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
 
     // Title resolution
-    const titlePropertyKey = getSnapshotTitlePropertyKey(collection, customizationController.propertyConfigs);
-    const rawTitle = usedSnapshot?.values && titlePropertyKey ? getValueInPath(usedSnapshot.values, titlePropertyKey) : undefined;
+    const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+    const rawTitle = usedEntity?.values && titlePropertyKey ? getValueInPath(usedEntity.values, titlePropertyKey) : undefined;
     const title = rawTitle !== undefined && rawTitle !== null
         ? resolveTitleToString(rawTitle)
         : (collection.singularName ?? collection.name);
 
     // Non-action custom views
     const nonActionCustomViews = useMemo(() =>
-        resolvedSnapshotViews.filter(e => !e.includeActions),
-        [resolvedSnapshotViews]
+        resolvedEntityViews.filter(e => !e.includeActions),
+        [resolvedEntityViews]
     );
 
     const customViewsView = customViews && nonActionCustomViews
         .map((customView) => {
             if (!customView) return null;
-            const Builder = resolveComponentRef<SnapshotCustomViewParams>(customView.Builder);
+            const Builder = resolveComponentRef<EntityCustomViewParams>(customView.Builder);
             if (!Builder) return null;
-            if (!snapshotId) return null;
+            if (!entityId) return null;
 
             const isActive = activeTab === customView.key;
             const hasBeenMounted = mountedTabsRef.current.has(customView.key);
@@ -303,9 +303,9 @@ snapshotId }
                         {readOnlyFormContext && <Builder
                             collection={collection}
                             parentCollectionSlugs={parentCollectionSlugs}
-                            parentSnapshotIds={parentSnapshotIds}
-                            snapshot={usedSnapshot}
-                            modifiedValues={usedSnapshot?.values}
+                            parentEntityIds={parentEntityIds}
+                            entity={usedEntity}
+                            modifiedValues={usedEntity?.values}
                             formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
                         />}
                     </Suspense>
@@ -313,7 +313,7 @@ snapshotId }
             </div>;
         }).filter(Boolean);
 
-    const globalLoading = dataLoading && !usedSnapshot;
+    const globalLoading = dataLoading && !usedEntity;
 
     // JSON view
     const jsonTabMounted = mountedTabsRef.current.has(JSON_TAB_VALUE);
@@ -323,7 +323,7 @@ snapshotId }
         key={"json_view"}
         role="tabpanel">
         <ErrorBoundary>
-            <JsonPreviewBinding values={usedSnapshot?.values ?? {}} />
+            <JsonPreviewBinding values={usedEntity?.values ?? {}} />
         </ErrorBoundary>
     </div> : null;
 
@@ -334,11 +334,11 @@ snapshotId }
         role="tabpanel">
         <ErrorBoundary>
             <Suspense fallback={<CircularProgressCenter />}>
-                <SnapshotHistoryView
+                <EntityHistoryView
                     collection={collection}
-                    snapshot={usedSnapshot}
+                    entity={usedEntity}
                     formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
-                    modifiedValues={usedSnapshot?.values}
+                    modifiedValues={usedEntity?.values}
                 />
             </Suspense>
         </ErrorBoundary>
@@ -347,7 +347,7 @@ snapshotId }
     // Subcollection views
     const subCollectionsViews = subcollections && subcollections.map((subcollection) => {
         const subcollectionId = subcollection.slug;
-        const newFullPath = usedSnapshot ? `${path}/${usedSnapshot?.id}/${removeInitialAndTrailingSlashes(getCollectionDataPath(subcollection))}` : undefined;
+        const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(getCollectionDataPath(subcollection))}` : undefined;
 
         if (activeTab !== subcollectionId) return null;
         return (
@@ -357,17 +357,17 @@ snapshotId }
                 role="tabpanel">
                 {globalLoading && <CircularProgressCenter />}
                 {!globalLoading &&
-                    (usedSnapshot && newFullPath
+                    (usedEntity && newFullPath
                         ? <ResolvedCollectionView
                             path={newFullPath}
                             parentCollectionSlugs={[...parentCollectionSlugs, collection.slug]}
-                            parentSnapshotIds={[...parentSnapshotIds, String(usedSnapshot?.id)]}
+                            parentEntityIds={[...parentEntityIds, String(usedEntity?.id)]}
                             updateUrl={false}
                             {...subcollection}
-                            openSnapshotMode={layout} />
+                            openEntityMode={layout} />
                         : <div className="flex items-center justify-center w-full h-full p-3">
                             <Typography variant={"label"}>
-                                {t("save_snapshot_before_subcollections") ?? "You need to save your snapshot before adding additional collections"}
+                                {t("save_entity_before_subcollections") ?? "You need to save your entity before adding additional collections"}
                             </Typography>
                         </div>)
                 }
@@ -380,23 +380,23 @@ snapshotId }
         setSelectedTab(value);
         onTabChange?.({
             path,
-            snapshotId,
+            entityId,
             selectedTab: value === MAIN_TAB_VALUE ? undefined : value,
             collection
         });
-    }, [onTabChange, path, snapshotId, collection]);
+    }, [onTabChange, path, entityId, collection]);
 
     const propertyDetailView = () => {
         // formView.Builder replaces the default property display
-        if (FormViewBuilder && usedSnapshot) {
+        if (FormViewBuilder && usedEntity) {
             return <ErrorBoundary>
                 <Suspense fallback={<CircularProgressCenter />}>
                     <FormViewBuilder
                         collection={collection}
                         parentCollectionSlugs={parentCollectionSlugs}
-                        parentSnapshotIds={parentSnapshotIds}
-                        snapshot={usedSnapshot}
-                        modifiedValues={usedSnapshot?.values}
+                        parentEntityIds={parentEntityIds}
+                        entity={usedEntity}
+                        modifiedValues={usedEntity?.values}
                         formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
                     />
                 </Suspense>
@@ -405,8 +405,8 @@ snapshotId }
 
         return (
             <>
-                {usedSnapshot && <RecordViewBinding
-                    snapshot={usedSnapshot}
+                {usedEntity && <EntityViewBinding
+                    entity={usedEntity}
                     collection={collection}
                     path={path}
                 />}
@@ -421,7 +421,7 @@ snapshotId }
             <Tab
                 className="text-sm min-w-[90px]"
                 value={subcollection.slug}
-                key={`snapshot_detail_collection_tab_${subcollection.name}`}>
+                key={`entity_detail_collection_tab_${subcollection.name}`}>
                 <span className="flex items-center gap-1.5">
                     {icon}
                     {subcollection.name}
@@ -430,14 +430,14 @@ snapshotId }
         );
     });
 
-    const customViewTabsStart = resolvedSnapshotViews.filter(view => view.position === "start")
+    const customViewTabsStart = resolvedEntityViews.filter(view => view.position === "start")
         .map((view) => {
             const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
                     className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
                     value={view.key}
-                    key={`snapshot_detail_collection_tab_${view.name}`}>
+                    key={`entity_detail_collection_tab_${view.name}`}>
                     {view.tabComponent ?? (
                         <span className="flex items-center gap-1.5">
                             {icon}
@@ -447,14 +447,14 @@ snapshotId }
                 </Tab>
             );
         });
-    const customViewTabsEnd = resolvedSnapshotViews.filter(view => !view.position || view.position === "end")
+    const customViewTabsEnd = resolvedEntityViews.filter(view => !view.position || view.position === "end")
         .map((view) => {
             const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
                     className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
                     value={view.key}
-                    key={`snapshot_detail_collection_tab_${view.name}`}>
+                    key={`entity_detail_collection_tab_${view.name}`}>
                     {view.tabComponent ?? (
                         <span className="flex items-center gap-1.5">
                             {icon}
@@ -467,13 +467,13 @@ snapshotId }
 
     const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog";
 
-    const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split" || layout === "dialog") && snapshotId ? (
+    const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split" || layout === "dialog") && entityId ? (
         <Tooltip title={"Open full screen"}>
             <IconButton
                 size="small"
                 onClick={() => {
-                    const snapshotUrl = urlController.buildUrlCollectionPath(`${path}/${snapshotId}`);
-                    navigate(`${snapshotUrl}#full`);
+                    const entityUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                    navigate(`${entityUrl}#full`);
                 }}
             >
                 <Maximize2Icon size={iconSize.smallest} />
@@ -489,7 +489,7 @@ snapshotId }
             size="small"
             startIcon={<PencilIcon size={iconSize.smallest} />}
             onClick={onEditClick}>
-            {t("edit_snapshot")}
+            {t("edit_entity")}
         </Button>
     ) : null;
 
@@ -507,7 +507,7 @@ snapshotId }
                     ? "pt-4 pb-12 px-6 sm:px-8"
                     : "pt-12 pb-16 px-4 sm:px-8 md:px-10"
             )}>
-                {/* Title and snapshot path */}
+                {/* Title and entity path */}
                 <div className={"w-full flex flex-col items-start my-4 lg:my-6"}>
                     <div className="flex items-center justify-between w-full">
                         <Typography
@@ -521,7 +521,7 @@ snapshotId }
                     <Alert color={"base"} outerClassName={"w-full"} size={"small"}>
                         <code
                             className={"text-xs select-all text-text-secondary dark:text-text-secondary-dark"}>
-                            {usedSnapshot?.path ?? path}/{snapshotId}
+                            {usedEntity?.path ?? path}/{entityId}
                         </code>
                     </Alert>
                 </div>
@@ -546,7 +546,7 @@ snapshotId }
                     color="primary"
                     startIcon={<PencilIcon size={iconSize.small} />}
                     onClick={onEditClick}>
-                    {t("edit_snapshot")}
+                    {t("edit_entity")}
                 </Button>
             </div>}
         </div>
@@ -561,8 +561,8 @@ snapshotId }
 
             {barActions?.({
                 path,
-                snapshotId,
-                values: usedSnapshot?.values ?? {},
+                entityId,
+                values: usedEntity?.values ?? {},
                 status: "existing"
             })}
 
@@ -627,7 +627,7 @@ snapshotId }
                     status: "existing",
                     path,
                     collection,
-                    snapshot: usedSnapshot,
+                    entity: usedEntity,
                     context,
                     formContext: readOnlyFormContext
                 }}>

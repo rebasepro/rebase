@@ -10,7 +10,7 @@ import { useComponentOverride, CollectionComponentOverrideProvider } from "@reba
  *
  * This is a high-level, consumer-friendly wrapper around {@link CollectionViewBinding}
  * designed for embedding collection views inside custom pages (home pages,
- * dashboards, snapshot detail views, etc.).
+ * dashboards, entity detail views, etc.).
  *
  * At minimum, provide the `path` (collection slug). All other props are optional
  * overrides that take precedence over the collection's default configuration.
@@ -42,7 +42,7 @@ export type CollectionPanelProps = {
     sort?: [string, "asc" | "desc"];
 
     /**
-     * Maximum number of snapshots to display.
+     * Maximum number of entitys to display.
      */
     limit?: number;
 
@@ -53,9 +53,9 @@ export type CollectionPanelProps = {
     updateUrl?: boolean;
 
     /**
-     * Override the snapshot open mode when clicking a snapshot.
+     * Override the entity open mode when clicking a entity.
      */
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * Additional CSS class name for the container.
@@ -64,14 +64,14 @@ export type CollectionPanelProps = {
 
     /**
      * Any additional collection-level overrides (e.g. `previewProperties`,
-     * `enabledViews`, `snapshotActions`, `defaultFilter`, etc.).
+     * `enabledViews`, `entityActions`, `defaultFilter`, etc.).
      */
     collectionOverrides?: Partial<CollectionConfig>;
 };
 
 /**
  * A high-level, reusable wrapper for embedding a Rebase collection view
- * inside custom pages (dashboards, home pages, snapshot detail views, etc.).
+ * inside custom pages (dashboards, home pages, entity detail views, etc.).
  *
  * Usage:
  * ```tsx
@@ -129,7 +129,7 @@ export function CollectionPanel(props: CollectionPanelProps) {
         viewMode,
         sort,
         limit,
-        openSnapshotMode,
+        openEntityMode,
         className,
         collectionOverrides
     } = props;
@@ -144,14 +144,14 @@ export function CollectionPanel(props: CollectionPanelProps) {
         if (viewMode) propOverrides.defaultViewMode = viewMode;
         if (sort) propOverrides.sort = sort;
         if (limit) propOverrides.pagination = limit;
-        if (openSnapshotMode) propOverrides.openSnapshotMode = openSnapshotMode;
+        if (openEntityMode) propOverrides.openEntityMode = openEntityMode;
 
         return {
             ...registeredCollection,
             ...(collectionOverrides ?? {}),
             ...propOverrides
         } as CollectionConfig;
-    }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openSnapshotMode]);
+    }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openEntityMode]);
 
     if (!mergedCollection) {
         return (

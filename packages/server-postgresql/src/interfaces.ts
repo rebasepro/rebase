@@ -7,7 +7,7 @@
  */
 
 import {
-    Snapshot,
+    Entity,
     CollectionConfig,
     FilterValues,
     WhereFilterOp,

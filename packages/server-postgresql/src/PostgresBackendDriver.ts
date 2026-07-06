@@ -1286,10 +1286,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             })}, true)
             `);
 
-            const txSnapshotService = new DataService(tx, this.delegate.registry);
+            const txEntityService = new DataService(tx, this.delegate.registry);
             const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
-            txDelegate.dataService = txSnapshotService;
+            txDelegate.dataService = txEntityService;
             txDelegate._deferNotifications = true;
             txDelegate._pendingNotifications = pendingNotifications;
             txDelegate.client = this.delegate.client;

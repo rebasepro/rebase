@@ -375,7 +375,7 @@ import { Card, cls, cardSelectedMixin } from "@rebasepro/ui";
 </Card>
 ```
 
-The mixin applies a subtle primary-tinted background and a `ring-1` primary border, matching the Rebase selection style used in snapshot tables and multi-select UIs.
+The mixin applies a subtle primary-tinted background and a `ring-1` primary border, matching the Rebase selection style used in entity tables and multi-select UIs.
 
 ---
 
@@ -666,7 +666,7 @@ Before submitting UI code, verify you have NONE of these:
 | 21| `bg-primary/8` icon background pills                  | Icons are plain color, no background container         |
 | 22| Decorative arrow icons on cards                       | Cards are the affordance — no `ArrowRightIcon` needed  |
 
-> **IMPORTANT FOR AGENTS:** The internal `SnapshotCard` component (used for card-view in collection grids) uses `hover:-translate-y-0.5` and `hover:shadow-lg`, and the Studio home page uses per-section colored icons. These are **intentional exceptions** in Rebase's own codebase for specific contexts (rich media cards with thumbnails and the Studio admin landing page). **Do NOT copy these patterns** into custom views, home pages, or dashboard cards — they are reserved for these specific internal components.
+> **IMPORTANT FOR AGENTS:** The internal `EntityCard` component (used for card-view in collection grids) uses `hover:-translate-y-0.5` and `hover:shadow-lg`, and the Studio home page uses per-section colored icons. These are **intentional exceptions** in Rebase's own codebase for specific contexts (rich media cards with thumbnails and the Studio admin landing page). **Do NOT copy these patterns** into custom views, home pages, or dashboard cards — they are reserved for these specific internal components.
 
 ---
 

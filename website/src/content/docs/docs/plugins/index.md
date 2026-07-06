@@ -41,7 +41,7 @@ interface RebasePlugin {
         onCellValueChange?: (params) => void;
     };
 
-    // Snapshot form customization
+    // Entity form customization
     form?: {
         Actions?: React.ComponentType;
         provider?: { Component: React.ComponentType };

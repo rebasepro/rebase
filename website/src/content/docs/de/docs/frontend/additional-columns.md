@@ -51,7 +51,7 @@ const ordersCollection: CollectionConfig = {
 
 ## Nächste Schritte
 
-- **[Entity Actions](/docs/frontend/snapshot-actions)** — Benutzerdefinierte Aktionsschaltflächen
+- **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Custom Fields](/docs/frontend/custom-fields)** — Benutzerdefinierte Formularfelder
 
 ---

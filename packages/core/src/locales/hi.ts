@@ -12,7 +12,7 @@ export const hi: RebaseTranslations = {
     clear: "साफ़ करें",
     cancel: "रद्द करें (Cancel)",
 
-    // ─── Snapshot actions ──────────────────────────────────────────
+    // ─── Entity actions ──────────────────────────────────────────
     edit: "संपादित करें",
     copy: "कॉपी करें",
     delete: "हटाएं",
@@ -20,8 +20,8 @@ export const hi: RebaseTranslations = {
 
     // ─── Delete dialog ───────────────────────────────────────────
     delete_confirmation_title: "हटाएं?",
-    delete_confirmation_body: "इससे इकाई (snapshot) हटा दी जाएगी। क्या आप सुनिश्चित हैं?",
-    delete_multiple_confirmation_body: "इससे चयनित इकाइयां (snapshots) हटा दी जाएंगी। क्या आप सुनिश्चित हैं?",
+    delete_confirmation_body: "इससे इकाई (entity) हटा दी जाएगी। क्या आप सुनिश्चित हैं?",
+    delete_multiple_confirmation_body: "इससे चयनित इकाइयां (entitys) हटा दी जाएंगी। क्या आप सुनिश्चित हैं?",
 
     // ─── Unsaved-changes dialog ───────────────────────────────────
     unsaved_changes_title: "सहेजे नहीं गए परिवर्तन",
@@ -35,7 +35,7 @@ export const hi: RebaseTranslations = {
     // ─── Collection table / toolbar ──────────────────────────────
     search: "खोजें",
     find_by_id: "ID द्वारा खोजें",
-    find_snapshot_by_id: "ID द्वारा इकाई खोजें",
+    find_entity_by_id: "ID द्वारा इकाई खोजें",
     filter: "फ़िल्टर",
     filters: "फ़िल्टर",
     clear_filter: "फ़िल्टर साफ़ करें",
@@ -50,7 +50,7 @@ export const hi: RebaseTranslations = {
     no_results_search: "\"{{search}}\" के लिए कोई परिणाम नहीं मिला",
     add: "जोड़ें",
     remove: "हटाएं",
-    multiple_snapshots: "एकाधिक इकाइयां",
+    multiple_entitys: "एकाधिक इकाइयां",
     unsaved_changes: "आपके पास {{collectionName}} में सहेजे नहीं गए परिवर्तन हैं।",
     so_empty: "इतना खाली...",
     no_results: "लागू किए गए फ़िल्टर/सॉर्ट के साथ कोई परिणाम नहीं",
@@ -91,12 +91,12 @@ export const hi: RebaseTranslations = {
     data_type_not_supported: "डेटा प्रकार {{dataType}} अभी समर्थित नहीं है",
     passkey_error_unsupported: "आपका डिवाइस या ब्राउज़र पासकी का समर्थन नहीं करता है।",
 
-    // ─── Snapshot form feedback ─────────────────────────────────────
+    // ─── Entity form feedback ─────────────────────────────────────
     saved_correctly: "सफलतापूर्वक सहेजा गया",
     error_before_saving: "डेटा तैयार करने में त्रुटि",
     error_after_saving: "सहेजने के बाद की प्रक्रिया में त्रुटि",
-    error_saving_snapshot: "प्रविष्टि सहेजने में त्रुटि",
-    snapshot_does_not_exist: "यह प्रविष्टि डेटाबेस में मौजूद नहीं है",
+    error_saving_entity: "प्रविष्टि सहेजने में त्रुटि",
+    entity_does_not_exist: "यह प्रविष्टि डेटाबेस में मौजूद नहीं है",
     form_modified: "इस फ़ॉर्म में बदलाव किए गए हैं",
     form_in_sync: "वर्तमान फ़ॉर्म डेटाबेस के साथ सिंक में है",
     fix_errors_before_saving: "सहेजने से पहले हाइलाइट की गई त्रुटियों को ठीक करें",
@@ -117,9 +117,9 @@ export const hi: RebaseTranslations = {
     open_image_in_new_tab: "नई टैब में छवि खोलें",
     reference_not_set: "संदर्भ सेट नहीं है",
     reference_does_not_exist: "संदर्भ मौजूद नहीं है",
-    snapshot_not_found: "इकाई नहीं मिली",
+    entity_not_found: "इकाई नहीं मिली",
     file_not_found: "फ़ाइल नहीं मिली",
-    unsaved_changes_in_snapshot: "आपके पास इस इकाई में सहेजे नहीं गए परिवर्तन हैं।",
+    unsaved_changes_in_entity: "आपके पास इस इकाई में सहेजे नहीं गए परिवर्तन हैं।",
     delete_this_role: "यह भूमिका हटाएं",
     no_roles_yet: "आपके पास अभी तक कोई भूमिका नहीं है।",
     create_default_roles: "डिफ़ॉल्ट भूमिकाएँ बनाएँ",
@@ -186,7 +186,7 @@ export const hi: RebaseTranslations = {
     value_updated_elsewhere: "इस मान को कहीं और अपडेट किया गया है",
     add_property: "विशेषता (प्रॉपर्टी) जोड़ें",
     edit_name: "{{name}} संपादित करें",
-    this_snapshot_not_exist: "यह इकाई डेटाबेस में मौजूद नहीं है",
+    this_entity_not_exist: "यह इकाई डेटाबेस में मौजूद नहीं है",
     internal_error: "आंतरिक त्रुटि (Internal ERROR)",
 
     // ─── Rename group dialog ──────────────────────────────────────
@@ -201,7 +201,7 @@ export const hi: RebaseTranslations = {
     // ─── Navigation groups ────────────────────────────────────────
     views_group: "दृश्य",
 
-    // ─── Snapshot Edit View ─────────────────────────────────────────
+    // ─── Entity Edit View ─────────────────────────────────────────
     youd_need_to_save_before_additional_collections: "अतिरिक्त संग्रह जोड़ने से पहले आपको अपनी इकाई को सहेजना होगा",
 
     // ─── Not Found Page ───────────────────────────────────────────
@@ -214,7 +214,7 @@ export const hi: RebaseTranslations = {
     table_view: "तालिका",
     cards_view: "कार्ड्स",
     kanban_view: "कानबन",
-    choose_how_snapshots_displayed_default: "चुनें कि डिफ़ॉल्ट रूप से इकाइयां कैसे प्रदर्शित होनी चाहिए",
+    choose_how_entitys_displayed_default: "चुनें कि डिफ़ॉल्ट रूप से इकाइयां कैसे प्रदर्शित होनी चाहिए",
 
     document_view: "दस्तावेज़ दृश्य",
     side_panel: "साइड पैनल",
@@ -275,7 +275,7 @@ export const hi: RebaseTranslations = {
     more_info: "अतिरिक्त जानकारी",
     define_custom_actions_cli: "CLI के साथ अपलोड करके अपनी स्वयं की कस्टम कार्रवाइयां परिभाषित करें।",
     action_defined_in_code: "यह क्रिया कोड में कुंजी (key) के साथ परिभाषित की गई है",
-    add_custom_snapshot_action: "कस्टम इकाई कार्रवाई जोड़ें",
+    add_custom_entity_action: "कस्टम इकाई कार्रवाई जोड़ें",
     remove_this_action: "यह क्रिया हटाएँ?",
     remove_action_warning: "यह कोई डेटा नहीं हटाएगा, केवल CMS में कार्रवाई को हटाएगा",
 
@@ -284,7 +284,7 @@ export const hi: RebaseTranslations = {
     custom_views: "कस्टम दृश्य",
     define_custom_views_cli: "CLI के साथ अपलोड करके अपने स्वयं के कस्टम दृश्य परिभाषित करें।",
     view_defined_in_code: "यह दृश्य कोड में कुंजी (key) के साथ परिभाषित किया गया है",
-    add_custom_snapshot_view: "कस्टम इकाई दृश्य जोड़ें",
+    add_custom_entity_view: "कस्टम इकाई दृश्य जोड़ें",
     delete_this_subcollection: "इस उपसंग्रह को हटाएं?",
     remove_collection_warning: "यह कोई डेटा नहीं हटाएगा, केवल CMS में संग्रह को हटाएगा",
     remove_this_view: "यह दृश्य हटाएँ?",
@@ -311,7 +311,7 @@ export const hi: RebaseTranslations = {
 
     enum_form_dialog: "Enum फॉर्म डायलॉग",
     imported_data_preview: "आयात किए गए डेटा का पूर्वावलोकन",
-    snapshots_with_same_id_overwritten: "समान id वाली इकाइयों को अधिलेखित (overwritten) किया जाएगा",
+    entitys_with_same_id_overwritten: "समान id वाली इकाइयों को अधिलेखित (overwritten) किया जाएगा",
     collection_editor: "संग्रह संपादक",
     properties_in_this_group: "इस समूह में विशेषताएं",
     data_property_mapping: "डेटा संपत्ति मानचित्रण (मॅपिंग)",
@@ -325,12 +325,12 @@ export const hi: RebaseTranslations = {
     role: "भूमिका",
     name_of_this_role: "इस भूमिका का नाम",
     id_of_this_role: "इस भूमिका की ID",
-    create_snapshots: "इकाइयाँ बनाएँ",
-    read_snapshots: "इकाइयाँ पढ़ें",
-    update_snapshots: "इकाइयाँ अपडेट करें",
-    delete_snapshots: "इकाइयाँ हटाएँ",
+    create_entitys: "इकाइयाँ बनाएँ",
+    read_entitys: "इकाइयाँ पढ़ें",
+    update_entitys: "इकाइयाँ अपडेट करें",
+    delete_entitys: "इकाइयाँ हटाएँ",
     all_collections: "सभी संग्रह",
-    create_snapshots_in_collections: "संग्रहों में इकाइयाँ बनाएँ",
+    create_entitys_in_collections: "संग्रहों में इकाइयाँ बनाएँ",
     access_all_data_in_every_collection: "हर संग्रह में सभी डेटा तक पहुँचें",
     update_data_in_any_collection: "किसी भी संग्रह में डेटा अपडेट करें",
     delete_data_in_any_collection: "किसी भी संग्रह में डेटा हटाएँ",
@@ -386,7 +386,7 @@ export const hi: RebaseTranslations = {
     error_saving_data: "डेटा सहेजने में त्रुटि",
     retry: "पुनः प्रयास करें",
     saving_data: "डेटा सहेजा जा रहा है",
-    snapshots_saved: "इकाइयाँ सहेजी गईं",
+    entitys_saved: "इकाइयाँ सहेजी गईं",
     do_not_close_tab: "इस टैब को बंद न करें अन्यथा आयात बाधित हो जाएगा",
     import: "आयात (Import)",
     import_data: "डेटा आयात करें",
@@ -396,7 +396,7 @@ export const hi: RebaseTranslations = {
     save_data: "डेटा सहेजें",
     use_column_as_id: "इस कॉलम को ID के रूप में उपयोग करें",
     do_not_import_property: "इस विशेषता को आयात न करें",
-    snapshots_will_be_overwritten: "समान ID वाली इकाइयों को अधिलेखित (overwritten) किया जाएगा",
+    entitys_will_be_overwritten: "समान ID वाली इकाइयों को अधिलेखित (overwritten) किया जाएगा",
     data_imported_successfully: "डेटा सफलतापूर्वक आयात किया गया",
     export: "निर्यात (Export)",
     export_data: "डेटा निर्यात करें",
@@ -425,10 +425,10 @@ export const hi: RebaseTranslations = {
     kanban_order_not_configured: "खींचें-और-छोड़ें क्रमबद्धता कॉन्फ़िगर नहीं है। कार्ड की स्थिति बनाए रखने के लिए संग्रह सेटिंग्स में एक क्रम गुण सेट करें।",
     initialize: "प्रारंभ करें",
     confirm_multiple_delete: "एकाधिक विलोपन की पुष्टि करें?",
-    delete_snapshot_confirm_title: "क्या आप इस {{snapshotName}} को हटाना चाहेंगे?",
+    delete_entity_confirm_title: "क्या आप इस {{entityName}} को हटाना चाहेंगे?",
     multiple_deleted: "कई हटाए गए",
-    some_snapshots_deleted: "कुछ संस्थाएँ हटा दी गई हैं, लेकिन सभी नहीं",
-    error_deleting_snapshots: "संस्थाओं को हटाने में त्रुटि",
+    some_entitys_deleted: "कुछ संस्थाएँ हटा दी गई हैं, लेकिन सभी नहीं",
+    error_deleting_entitys: "संस्थाओं को हटाने में त्रुटि",
     deleted: "हटाया गया",
 
     /** Recently extracted strings for collection editor */
@@ -724,7 +724,7 @@ no_filter: "No filter",
     studio_sql_save_first_to_favorite: "Please save the snippet first before favoriting.",
     studio_sql_cms: "Collections:",
     studio_sql_cms_collections_tooltip: "Tables in this query that are mapped as CMS collections",
-    studio_sql_edit_snapshot: "Edit {{name}} #{{id}}",
+    studio_sql_edit_entity: "Edit {{name}} #{{id}}",
     studio_sql_sql_not_supported: "SQL execution not supported by this data source",
     studio_sql_fetch_error: "Failed to fetch connection options: {{message}}",
     studio_sql_unexpected_format: "Unexpected data format: {{type}}",
@@ -834,8 +834,8 @@ no_filter: "No filter",
     studio_editor_collection_start_tooltip: "Copy path or edit schema",
     studio_editor_collection_start_no_permission: "You don't have permission to modify this collection",
     studio_editor_collection_start_copied: "Copied!",
-    studio_editor_snapshot_tooltip: "Edit snapshot schema",
-    studio_editor_snapshot_no_permission: "You don't have permission to edit this snapshot",
+    studio_editor_entity_tooltip: "Edit entity schema",
+    studio_editor_entity_no_permission: "You don't have permission to edit this entity",
     studio_home_edit_collection: "Edit collection",
     studio_home_delete_collection: "Delete collection",
     studio_home_confirm_delete_title: "Delete collection?",
@@ -853,8 +853,8 @@ no_filter: "No filter",
     studio_collection_view_edit: "Edit",
     studio_editor_collection_disabled: "Collection editing is disabled",
     studio_editor_collection_edit: "Edit collection",
-    studio_editor_snapshot_save_first: "You need to save the document before changing the schema",
-    studio_editor_snapshot_edit_schema: "Edit schema for this form",
+    studio_editor_entity_save_first: "You need to save the document before changing the schema",
+    studio_editor_entity_edit_schema: "Edit schema for this form",
     studio_editor_collection_start_save_filter: "Save default filter and sort",
     studio_editor_collection_start_clear_filter: "Clear default filter and sort",
     studio_editor_collection_start_reset_filter: "Reset to default filter and sort",

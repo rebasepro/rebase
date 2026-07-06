@@ -12,8 +12,8 @@ export async function getFirestoreDataInPath(firebaseApp: FirebaseApp, path: str
     const firestore = getFirestore(firebaseApp);
     if (!parentPaths || parentPaths.length === 0) {
         const q = query(collection(firestore, path), limitClause(limit));
-        return getDocs(q).then((querySnapshot) => {
-            return querySnapshot.docs.map(doc => doc.data());
+        return getDocs(q).then((queryEntity) => {
+            return queryEntity.docs.map(doc => doc.data());
         });
     } else {
         let currentDocs: QueryDocumentSnapshot[] | undefined = undefined;

@@ -1,26 +1,26 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import { Snapshot, CollectionCallbacks, RebaseContext, User } from "@rebasepro/types";
+import { Entity, CollectionCallbacks, RebaseContext, User } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 
 /**
  * @group Hooks and utilities
  */
-export type DeleteSnapshotWithCallbacksProps<M extends Record<string, any>, USER extends User = User> = {
-    snapshot: Snapshot<M>;
+export type DeleteEntityWithCallbacksProps<M extends Record<string, any>, USER extends User = User> = {
+    entity: Entity<M>;
     collection?: CollectionConfig<M>;
     callbacks?: CollectionCallbacks<M, USER>;
-    onDeleteSuccess?: (snapshot: Snapshot<M>) => void;
-    onDeleteFailure?: (snapshot: Snapshot<M>, e: Error) => void;
+    onDeleteSuccess?: (entity: Entity<M>) => void;
+    onDeleteFailure?: (entity: Entity<M>, e: Error) => void;
 }
 
 /**
- * This function is in charge of deleting a snapshot.
+ * This function is in charge of deleting a entity.
  * It will run all the delete callbacks specified in the collection.
  * It is also possible to attach callbacks on save success or error, and callback
  * errors.
  *
  * @param data
- * @param snapshot
+ * @param entity
  * @param collection
  * @param callbacks
  * @param onDeleteSuccess
@@ -28,28 +28,28 @@ export type DeleteSnapshotWithCallbacksProps<M extends Record<string, any>, USER
  * @param context
  * @group Hooks and utilities
  */
-export async function deleteSnapshotWithCallbacks<M extends Record<string, any>, USER extends User>({
+export async function deleteEntityWithCallbacks<M extends Record<string, any>, USER extends User>({
     data,
-    snapshot,
+    entity,
     collection,
     callbacks,
     onDeleteSuccess,
     onDeleteFailure,
     context
-}: DeleteSnapshotWithCallbacksProps<M> & {
+}: DeleteEntityWithCallbacksProps<M> & {
     collection: CollectionConfig<M>,
     data: RebaseData,
     context: RebaseContext<USER>
 }
 ): Promise<boolean> {
 
-    console.debug("Deleting snapshot", snapshot.path, snapshot.id);
+    console.debug("Deleting entity", entity.path, entity.id);
 
-    return data.collection(snapshot.path).delete(snapshot.id).then(() => {
-        if (onDeleteSuccess) onDeleteSuccess(snapshot);
+    return data.collection(entity.path).delete(entity.id).then(() => {
+        if (onDeleteSuccess) onDeleteSuccess(entity);
         return true;
     }).catch((e) => {
-        if (onDeleteFailure) onDeleteFailure(snapshot, e);
+        if (onDeleteFailure) onDeleteFailure(entity, e);
         return false;
     });
 }

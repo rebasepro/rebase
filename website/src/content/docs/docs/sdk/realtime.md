@@ -59,7 +59,7 @@ listen(
 
 When `listen()` fires, it emits updates in up to two phases:
 
-1. **Immediate (estimated):** The first callback fires instantly with the snapshots and heuristic pagination metadata (`total` = number of returned snapshots, `hasMore` = whether the count equals the requested limit). This emission carries `meta.estimated: true`.
+1. **Immediate (estimated):** The first callback fires instantly with the entitys and heuristic pagination metadata (`total` = number of returned entitys, `hasMore` = whether the count equals the requested limit). This emission carries `meta.estimated: true`.
 
 2. **Authoritative (optional):** An async count query runs in the background. If the authoritative `total` or `hasMore` differs from the estimate, a second callback fires with corrected metadata and **no** `estimated` flag. If the values match, the second emission is skipped entirely — your callback fires only once.
 
@@ -82,16 +82,16 @@ client.data.products.listen(
 
 > **Tip:** If you don't need to distinguish between estimated and authoritative metadata, you can ignore the `estimated` flag — both emissions carry the same `data` array.
 
-## Subscribing to a Single Snapshot
+## Subscribing to a Single Entity
 
 Use `listenById()` to watch a specific record by its ID:
 
 ```typescript
 const unsubscribe = client.data.products.listenById(
     42,
-    (snapshot) => {
-        if (snapshot) {
-            console.log("Product changed:", snapshot.values.name);
+    (entity) => {
+        if (entity) {
+            console.log("Product changed:", entity.values.name);
         } else {
             console.log("Product was deleted");
         }
@@ -107,12 +107,12 @@ const unsubscribe = client.data.products.listenById(
 ```typescript
 listenById(
     id: string | number,
-    onUpdate: (snapshot: Snapshot<M> | undefined) => void,
+    onUpdate: (entity: Entity<M> | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-The callback receives `undefined` when the snapshot is deleted.
+The callback receives `undefined` when the entity is deleted.
 
 ## Fluent Query Builder
 

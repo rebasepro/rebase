@@ -1,6 +1,6 @@
 import type { AdditionalFieldDelegate } from "@rebasepro/types";
 import React, { useCallback, useMemo, useRef } from "react";
-import { CollectionSize, Snapshot, RebaseContext, User, Property } from "@rebasepro/types";
+import { CollectionSize, Entity, RebaseContext, User, Property } from "@rebasepro/types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { useRebaseContext, useLargeLayout } from "@rebasepro/core";
@@ -8,7 +8,7 @@ import { CellRendererParams, VirtualTableColumn } from "@rebasepro/ui";
 import { CollectionRowActions } from "./CollectionRowActions";
 import { CollectionTableToolbar } from "./internal/CollectionTableToolbar";
 import { CollectionTableBindingProps } from "./CollectionTableBindingProps";
-import { SnapshotTableCell } from "./internal/SnapshotTableCell";
+import { EntityTableCell } from "./internal/EntityTableCell";
 import { CustomFieldValidator } from "../../form/validation";
 import { renderSkeletonText } from "../../preview";
 import { propertiesToColumns } from "./column_utils";
@@ -33,7 +33,7 @@ import { getValueInPath } from "@rebasepro/utils";
  * options you see in collections in the top level navigation, you can
  * check {@link CollectionViewBinding}.
  *
- * The data displayed in the table is managed by a {@link SnapshotTableController}.
+ * The data displayed in the table is managed by a {@link EntityTableController}.
  * You can build the default, bound to a path in the driver, by using the hook
  * {@link useDataTableController}
  *
@@ -56,8 +56,8 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         getPropertyFor,
         onValueChange,
         selectionController,
-        highlightedSnapshots,
-        onSnapshotClick,
+        highlightedEntitys,
+        onEntityClick,
         onColumnResize,
         initialScroll,
         onScroll,
@@ -79,7 +79,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         emptyComponent,
         getIdColumnWidth,
         enablePopupIcon,
-        openSnapshotMode = "side_panel",
+        openEntityMode = "side_panel",
         onColumnsOrderChange,
         hideToolbar = false
     }: CollectionTableBindingProps<M>) {
@@ -87,9 +87,9 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
     const ref = useRef<HTMLDivElement>(null);
 
     const largeLayout = useLargeLayout();
-    const selectedSnapshots = useMemo(() => {
-        return (selectionController?.selectedSnapshots?.length > 0 ? selectionController?.selectedSnapshots : highlightedSnapshots)?.filter(Boolean);
-    }, [selectionController?.selectedSnapshots, highlightedSnapshots]);
+    const selectedEntitys = useMemo(() => {
+        return (selectionController?.selectedEntitys?.length > 0 ? selectionController?.selectedEntitys : highlightedEntitys)?.filter(Boolean);
+    }, [selectionController?.selectedEntitys, highlightedEntitys]);
 
     const context: RebaseContext<USER> = useRebaseContext<USER>();
 
@@ -132,10 +132,10 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         isDragging,
         isDraggable,
         frozen
-    }: CellRendererParams<Snapshot<M>>) => {
+    }: CellRendererParams<Entity<M>>) => {
 
-        const snapshot: Snapshot<M> | undefined = rowData;
-        if (!snapshot) return null;
+        const entity: Entity<M> | undefined = rowData;
+        if (!entity) return null;
 
         const propertyKey = column.key;
 
@@ -143,7 +143,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         let disabled: boolean = columnCustom?.disabled ?? false;
         const property = getPropertyFor?.({
             propertyKey,
-            snapshot
+            entity
         }) ?? columnCustom?.resolvedProperty;
         if (!property?.ui?.disabled) {
             disabled = false;
@@ -155,22 +155,22 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
         return (
             <ErrorBoundary>
-                {snapshot
+                {entity
                     ? <PropertyTableCell
-                        key={`property_table_cell_${snapshot.id}_${propertyKey}`}
+                        key={`property_table_cell_${entity.id}_${propertyKey}`}
                         readonly={!inlineEditing}
                         align={column.align ?? "left"}
                         propertyKey={propertyKey as string}
                         property={property}
-                        value={snapshot?.values ? getValueInPath(snapshot.values, propertyKey) : undefined}
+                        value={entity?.values ? getValueInPath(entity.values, propertyKey) : undefined}
                         customFieldValidator={customFieldValidator}
                         columnIndex={columnIndex}
                         width={column.width}
                         height={getRowHeight(size)}
-                        snapshot={snapshot}
+                        entity={entity}
                         disabled={disabled}
                         enablePopupIcon={enablePopupIcon}
-                        path={snapshot.path}
+                        path={entity.path}
                         sortableNodeRef={sortableNodeRef}
                         sortableStyle={sortableStyle}
                         sortableAttributes={sortableAttributes}
@@ -193,18 +193,18 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         isDragging,
         isDraggable,
         frozen
-    }: CellRendererParams<Snapshot<M>>) => {
+    }: CellRendererParams<Entity<M>>) => {
 
-        const snapshot: Snapshot<M> | undefined = rowData;
-        if (!snapshot) return null;
+        const entity: Entity<M> | undefined = rowData;
+        if (!entity) return null;
 
         const additionalField = additionalFieldsMap[column.key as string];
         const value = additionalField.dependencies
-            ? Object.entries(snapshot.values)
+            ? Object.entries(entity.values)
                 .filter(([key, value]) => additionalField.dependencies!.includes(key as Extract<keyof M, string>))
                 .reduce((a, b) => ({ ...a,
 ...b }), {})
-            : snapshot;
+            : entity;
 
         const Builder = additionalField.Builder;
         if (!Builder && !additionalField.value) {
@@ -212,17 +212,17 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         }
 
         const child: React.ReactNode = Builder
-            ? <Builder snapshot={snapshot} context={context}/>
+            ? <Builder entity={entity} context={context}/>
             : <>
                 {additionalField.value?.({
-                    snapshot,
+                    entity,
                     context: context as RebaseContext
                 })?.toString()}
             </>;
 
         return (
-            <SnapshotTableCell
-                key={`additional_table_cell_${snapshot.id}_${column.key}`}
+            <EntityTableCell
+                key={`additional_table_cell_${entity.id}_${column.key}`}
                 width={width}
                 size={size}
                 value={value}
@@ -242,7 +242,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 <ErrorBoundary>
                     {child}
                 </ErrorBoundary>
-            </SnapshotTableCell>
+            </EntityTableCell>
         );
 
     }, [size]);
@@ -295,7 +295,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             : collectionColumns) as VirtualTableColumn[]
     ], [idColumn, displayedColumnIds, collectionColumns]);
 
-    const cellRenderer = useCallback((props: CellRendererParams<Snapshot<M>>) => {
+    const cellRenderer = useCallback((props: CellRendererParams<Entity<M>>) => {
         const column = props.column;
         const columns = props.columns;
         const columnKey = column.key;
@@ -304,18 +304,18 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             if (props.columnIndex === 0) {
                 if (tableRowActionsBuilder)
                     return tableRowActionsBuilder({
-                        snapshot: props.rowData!,
+                        entity: props.rowData!,
                         size,
                         width: column.width,
                         frozen: column.frozen
                     });
                 else
-                    return <CollectionRowActions snapshot={props.rowData!}
+                    return <CollectionRowActions entity={props.rowData!}
                         width={column.width}
                         frozen={column.frozen}
                         isSelected={false}
                         size={size}
-                        openSnapshotMode={openSnapshotMode}
+                        openEntityMode={openEntityMode}
                         sortableNodeRef={props.sortableNodeRef}
                         sortableStyle={props.sortableStyle}
                         sortableAttributes={props.sortableAttributes}
@@ -330,7 +330,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             }
         } catch (e: unknown) {
             console.error("Error rendering cell", e);
-            return <SnapshotTableCell
+            return <EntityTableCell
                 size={size}
                 width={column.width}
                 savedTimestamp={undefined}
@@ -345,7 +345,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 isDraggable={props.isDraggable}
                 frozen={props.frozen}>
                 <ErrorView error={e instanceof Error ? e : new Error(String(e))}/>
-            </SnapshotTableCell>;
+            </EntityTableCell>;
         }
     }, [tableRowActionsBuilder, additionalCellRenderer, propertyCellRenderer, size]);
 
@@ -367,8 +367,8 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 size={size}
                 inlineEditing={inlineEditing}
                 cellRenderer={cellRenderer}
-                onSnapshotClick={onSnapshotClick}
-                highlightedRow={useCallback((snapshot: Snapshot<M>) => Boolean(selectedSnapshots?.find(e => e.id === snapshot.id && e.path === snapshot.path)), [selectedSnapshots])}
+                onEntityClick={onEntityClick}
+                highlightedRow={useCallback((entity: Entity<M>) => Boolean(selectedEntitys?.find(e => e.id === entity.id && e.path === entity.path)), [selectedEntitys])}
                 tableController={tableController}
                 onValueChange={onValueChange}
                 initialScroll={initialScroll}
@@ -380,7 +380,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 endAdornment={endAdornment}
                 AddColumnComponent={AddColumnComponent}
                 onColumnsOrderChange={onColumnsOrderChange}
-                extraData={useMemo(() => ({ selectedSnapshotIds: selectedSnapshots?.map(e => e.id) }), [selectedSnapshots])}/>
+                extraData={useMemo(() => ({ selectedEntityIds: selectedEntitys?.map(e => e.id) }), [selectedEntitys])}/>
 
         </div>
     );

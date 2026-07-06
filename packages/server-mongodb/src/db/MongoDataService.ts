@@ -6,7 +6,7 @@
  */
 
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
-import { FilterValues, DataRepository, CollectionConfig, SnapshotReference } from "@rebasepro/types";
+import { FilterValues, DataRepository, CollectionConfig, EntityReference } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
 import { logger } from "@rebasepro/server-core";
 
@@ -84,7 +84,7 @@ export class MongoDataService implements DataRepository {
             return value.map(v => this.convertFromMongoValue(v));
         }
 
-        // Handle stored SnapshotReference. New writes are tagged with the
+        // Handle stored EntityReference. New writes are tagged with the
         // `__type: "reference"` sentinel (see convertToMongoValue), which is
         // unambiguous. We also accept the legacy shape — an object whose ONLY
         // keys are `id` and `path` — so references written before the sentinel
@@ -96,7 +96,7 @@ export class MongoDataService implements DataRepository {
             const isTagged = value.__type === "reference" && "id" in value && "path" in value;
             const isLegacy = keys.length === 2 && keys.includes("id") && keys.includes("path");
             if (isTagged || isLegacy) {
-                return new SnapshotReference({
+                return new EntityReference({
                     id: value.id instanceof ObjectId ? value.id.toString() : String(value.id),
                     path: value.path,
                     driver: value.driver,
@@ -132,10 +132,10 @@ export class MongoDataService implements DataRepository {
     private convertToMongoValue(value: any): any {
         if (value === null || value === undefined) return value;
 
-        // Handle SnapshotReference. Persist with a `__type: "reference"` sentinel
+        // Handle EntityReference. Persist with a `__type: "reference"` sentinel
         // so it round-trips unambiguously, and preserve `driver`/`databaseId`
         // so cross-datasource pointers don't lose their target on write.
-        if (typeof value === "object" && value.isSnapshotReference?.()) {
+        if (typeof value === "object" && value.isEntityReference?.()) {
             const ref: Record<string, unknown> = {
                 __type: "reference",
                 id: ObjectId.isValid(value.id) ? new ObjectId(value.id) : value.id,
@@ -343,15 +343,15 @@ export class MongoDataService implements DataRepository {
         collectionPath: string,
         fieldName: string,
         value: any,
-        excludeSnapshotId?: string,
+        excludeEntityId?: string,
         _databaseId?: string
     ): Promise<boolean> {
         const collection = this.getCollection(collectionPath);
 
         const query: Filter<Document> = { [fieldName]: value };
 
-        if (excludeSnapshotId) {
-            const objectId = this.toObjectId(excludeSnapshotId);
+        if (excludeEntityId) {
+            const objectId = this.toObjectId(excludeEntityId);
             (query as Record<string, unknown>)._id = { $ne: objectId };
         }
 

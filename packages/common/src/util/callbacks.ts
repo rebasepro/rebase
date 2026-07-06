@@ -1,10 +1,10 @@
 import { CollectionCallbacks, Properties, RebaseCallContext } from "@rebasepro/types";
 
 /**
- * Context passed to snapshot lifecycle callbacks.
+ * Context passed to entity lifecycle callbacks.
  * @group Models
  */
-export type SnapshotCallbackContext = RebaseCallContext;
+export type EntityCallbackContext = RebaseCallContext;
 
 
 /**

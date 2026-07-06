@@ -46,7 +46,7 @@ function isStorageProperty(property: Property | undefined): boolean {
     return false;
 }
 
-export function getSnapshotPreviewKeys(
+export function getEntityPreviewKeys(
     authController: AuthController,
     targetCollection: CollectionConfig<any>,
     fields: Record<string, PropertyConfig>,
@@ -74,7 +74,7 @@ export function getSnapshotPreviewKeys(
     }
 }
 
-export function getSnapshotTitlePropertyKey<M extends Record<string, any>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+export function getEntityTitlePropertyKey<M extends Record<string, any>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }

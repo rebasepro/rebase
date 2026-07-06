@@ -1,6 +1,6 @@
 import { describe, expect, test, jest } from "@jest/globals";
-import { flattenEntry, processValueMapping, convertDataToSnapshot } from "../../src/data_import/utils/data";
-import { AuthController, CollectionRegistryController, SnapshotReference, Property, Properties, Vector, CollectionConfig } from "@rebasepro/types";
+import { flattenEntry, processValueMapping, convertDataToEntity } from "../../src/data_import/utils/data";
+import { AuthController, CollectionRegistryController, EntityReference, Property, Properties, Vector, CollectionConfig } from "@rebasepro/types";
 
 describe("Data Import Utility Functions", () => {
     const mockAuth = {} as AuthController;
@@ -92,22 +92,22 @@ describe("Data Import Utility Functions", () => {
             const refProp: Property = { type: "reference", path: "users" };
 
             // Reference with explicit DB name
-            const ref1 = processValueMapping(mockAuth, "my-db:::users/user-1", mockNavigation, refProp) as SnapshotReference;
-            expect(ref1).toBeInstanceOf(SnapshotReference);
+            const ref1 = processValueMapping(mockAuth, "my-db:::users/user-1", mockNavigation, refProp) as EntityReference;
+            expect(ref1).toBeInstanceOf(EntityReference);
             expect(ref1.id).toBe("user-1");
             expect(ref1.path).toBe("users");
             expect(ref1.databaseId).toBe("my-db");
 
             // Reference without DB name, resolving via navigation controller
-            const ref2 = processValueMapping(mockAuth, "users/user-2", mockNavigation, refProp) as SnapshotReference;
-            expect(ref2).toBeInstanceOf(SnapshotReference);
+            const ref2 = processValueMapping(mockAuth, "users/user-2", mockNavigation, refProp) as EntityReference;
+            expect(ref2).toBeInstanceOf(EntityReference);
             expect(ref2.id).toBe("user-2");
             expect(ref2.path).toBe("users");
             expect(ref2.databaseId).toBe("custom-db");
 
             // Reference pointing to default DB or fallback
-            const ref3 = processValueMapping(mockAuth, "(default):::posts/post-1", mockNavigation, refProp) as SnapshotReference;
-            expect(ref3).toBeInstanceOf(SnapshotReference);
+            const ref3 = processValueMapping(mockAuth, "(default):::posts/post-1", mockNavigation, refProp) as EntityReference;
+            expect(ref3).toBeInstanceOf(EntityReference);
             expect(ref3.id).toBe("post-1");
             expect(ref3.path).toBe("posts");
             expect(ref3.databaseId).toBeUndefined();
@@ -145,8 +145,8 @@ describe("Data Import Utility Functions", () => {
         });
     });
 
-    describe("convertDataToSnapshot", () => {
-        test("should map raw data into Snapshot structure and merge defaults", () => {
+    describe("convertDataToEntity", () => {
+        test("should map raw data into Entity structure and merge defaults", () => {
             const properties: Properties = {
                 firstName: { type: "string" },
                 age: { type: "number" },
@@ -168,7 +168,7 @@ describe("Data Import Utility Functions", () => {
                 isActive: true
             };
 
-            const snapshot = convertDataToSnapshot(
+            const entity = convertDataToEntity(
                 mockAuth,
                 mockNavigation,
                 rawData,
@@ -179,9 +179,9 @@ describe("Data Import Utility Functions", () => {
                 defaultValues
             );
 
-            expect(snapshot.id).toBe("12345");
-            expect(snapshot.path).toBe("users");
-            expect(snapshot.values).toEqual({
+            expect(entity.id).toBe("12345");
+            expect(entity.path).toBe("users");
+            expect(entity.values).toEqual({
                 firstName: "John",
                 age: 30,
                 isActive: true

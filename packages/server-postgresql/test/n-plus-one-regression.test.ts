@@ -2,11 +2,11 @@
  * N+1 Query Regression Test
  *
  * Validates that batch-loading of owning relations (e.g. posts → author)
- * uses O(1) SQL queries instead of one query per snapshot.
+ * uses O(1) SQL queries instead of one query per entity.
  *
  * Root cause of the original bug:
- *   `batchFetchRelatedSnapshots` for owning relations was passing parent
- *   snapshot IDs (post IDs) to the query instead of the FK values (author IDs).
+ *   `batchFetchRelatedEntitys` for owning relations was passing parent
+ *   entity IDs (post IDs) to the query instead of the FK values (author IDs).
  *   This meant `WHERE authors.id IN (1,2,3,...50)` used post IDs — completely
  *   wrong. The fix reads FK values from the parent table first, then queries
  *   the target table with correct FK values.
@@ -91,7 +91,7 @@ function generateMockAuthors(count: number): Array<{ id: number; name: string }>
 }
 
 // ─── Tests ────────────────────────────────────────────────────────
-describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", () => {
+describe("N+1 Query Regression: batchFetchRelatedEntitys (owning relations)", () => {
     let registry: PostgresCollectionRegistry;
     let selectCallCount: number;
 
@@ -186,7 +186,7 @@ describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", 
         const postIds = mockPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedSnapshots(
+        const results = await relationService.batchFetchRelatedEntitys(
             "posts",
             postIds,
             "author",
@@ -199,10 +199,10 @@ describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", 
         //
         // The old broken code would have done either:
         //   - 1 wrong query (WHERE authors.id IN (post_ids) — wrong IDs)
-        //   - Or N queries (one per snapshot)
+        //   - Or N queries (one per entity)
         expect(selectCallCount).toBe(2);
 
-        console.log(`[N+1 Regression] ${NUM_POSTS} posts: batchFetchRelatedSnapshots used ${selectCallCount} queries`);
+        console.log(`[N+1 Regression] ${NUM_POSTS} posts: batchFetchRelatedEntitys used ${selectCallCount} queries`);
     });
 
     it("should correctly map each post to its author via FK values", async () => {
@@ -215,7 +215,7 @@ describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", 
         const postIds = mockPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedSnapshots(
+        const results = await relationService.batchFetchRelatedEntitys(
             "posts",
             postIds,
             "author",
@@ -224,11 +224,11 @@ describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", 
 
         // Every post should have a resolved author
         for (const post of mockPosts) {
-            const authorSnapshot = results.get(String(post.id));
-            expect(authorSnapshot).toBeDefined();
-            expect(authorSnapshot!.path).toBe("authors");
+            const authorEntity = results.get(String(post.id));
+            expect(authorEntity).toBeDefined();
+            expect(authorEntity!.path).toBe("authors");
             // The author ID should match the FK value, not the post ID
-            expect(authorSnapshot!.id).toBe(String(post.author_id));
+            expect(authorEntity!.id).toBe(String(post.author_id));
         }
     });
 
@@ -246,7 +246,7 @@ describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", 
         const postIds = nullFkPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedSnapshots(
+        const results = await relationService.batchFetchRelatedEntitys(
             "posts",
             postIds,
             "author",
@@ -258,7 +258,7 @@ describe("N+1 Query Regression: batchFetchRelatedSnapshots (owning relations)", 
         expect(results.size).toBe(0);
     });
 
-    it("should deduplicate FK values when multiple snapshots share the same relation target", async () => {
+    it("should deduplicate FK values when multiple entitys share the same relation target", async () => {
         // All 50 posts point to author 1
         const sameAuthorPosts = Array.from({ length: NUM_POSTS }, (_, i) => ({
             id: i + 1,
@@ -275,7 +275,7 @@ name: "Shared Author" }];
         const postIds = sameAuthorPosts.map(p => p.id);
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedSnapshots(
+        const results = await relationService.batchFetchRelatedEntitys(
             "posts",
             postIds,
             "author",
@@ -287,10 +287,10 @@ name: "Shared Author" }];
 
         // All 50 posts should resolve to the same author
         for (const post of sameAuthorPosts) {
-            const authorSnapshot = results.get(String(post.id));
-            expect(authorSnapshot).toBeDefined();
-            expect(authorSnapshot!.id).toBe("1");
-            expect(authorSnapshot!.path).toBe("authors");
+            const authorEntity = results.get(String(post.id));
+            expect(authorEntity).toBeDefined();
+            expect(authorEntity!.id).toBe("1");
+            expect(authorEntity!.path).toBe("authors");
         }
     });
 
@@ -301,7 +301,7 @@ name: "Shared Author" }];
 
         const authorRelation = postsCollection.relations![0] as Relation;
 
-        const results = await relationService.batchFetchRelatedSnapshots(
+        const results = await relationService.batchFetchRelatedEntitys(
             "posts",
             [],
             "author",

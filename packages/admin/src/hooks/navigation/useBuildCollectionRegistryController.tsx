@@ -1,7 +1,7 @@
 import type { CollectionConfig, DataSourceDefinition } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
-import { SnapshotReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
+import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
 import { mergeDeep } from "@rebasepro/utils";
 
 export function useBuildCollectionRegistryController(props: {
@@ -31,7 +31,7 @@ export function useBuildCollectionRegistryController(props: {
         const pathSegments = cleanedPath.split("/");
 
         let collectionPath = pathSegments.join("/");
-        // If the path has an even number of segments, it points to a snapshot, so we get the parent collection
+        // If the path has an even number of segments, it points to a entity, so we get the parent collection
         if (pathSegments.length > 0 && pathSegments.length % 2 === 0) {
             collectionPath = pathSegments.slice(0, -1).join("/");
         }
@@ -85,7 +85,7 @@ export function useBuildCollectionRegistryController(props: {
         return registry.getRaw(pathSegments.join("/")) as CollectionConfig | undefined;
     }, []);
 
-    const getParentReferencesFromPath = useCallback((path: string): SnapshotReference[] => {
+    const getParentReferencesFromPath = useCallback((path: string): EntityReference[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) {
             return [];
@@ -131,7 +131,7 @@ export function useBuildCollectionRegistryController(props: {
         return result.map(r => getCollectionFromPaths(r)?.slug).filter(Boolean) as string[];
     }, []);
 
-    const getParentSnapshotIds = useCallback((path: string): string[] => {
+    const getParentEntityIds = useCallback((path: string): string[] => {
         const cleanedPath = removeInitialAndTrailingSlashes(path);
         const strings = cleanedPath.split("/");
         const evenPathSegments = strings.filter((_, i) => i % 2 !== 0);
@@ -174,7 +174,7 @@ export function useBuildCollectionRegistryController(props: {
         getRawCollection,
         getParentReferencesFromPath,
         getParentCollectionSlugs,
-        getParentSnapshotIds,
+        getParentEntityIds,
         convertIdsToPaths,
         collectionRegistryRef
     }), [
@@ -184,7 +184,7 @@ export function useBuildCollectionRegistryController(props: {
         getRawCollection,
         getParentReferencesFromPath,
         getParentCollectionSlugs,
-        getParentSnapshotIds,
+        getParentEntityIds,
         convertIdsToPaths
     ]);
 }

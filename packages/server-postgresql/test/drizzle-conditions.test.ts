@@ -75,7 +75,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
-                1, // parentSnapshotId (post ID)
+                1, // parentEntityId (post ID)
                 mockTagsTable, // targetTable
                 mockPostsTable, // parentTable
                 mockPostsTable.id, // parentIdColumn
@@ -88,7 +88,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
         });
 
-        it("should handle array of parent snapshot IDs for owning relation", () => {
+        it("should handle array of parent entity IDs for owning relation", () => {
             const relation: Relation = {
                 relationName: "tags",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
@@ -132,7 +132,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
-                20, // parentSnapshotId (tag ID)
+                20, // parentEntityId (tag ID)
                 mockPostsTable, // targetTable
                 mockTagsTable, // parentTable
                 mockTagsTable.id, // parentIdColumn
@@ -145,7 +145,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
         });
 
-        it("should handle array of parent snapshot IDs for inverse relation", () => {
+        it("should handle array of parent entity IDs for inverse relation", () => {
             const relation: Relation = {
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
@@ -459,7 +459,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const result = DrizzleConditionBuilder.buildRelationCountQuery(
                 mockBaseQuery,
                 relation,
-                1, // parentSnapshotId
+                1, // parentEntityId
                 mockTagsTable,
                 mockPostsTable,
                 mockPostsTable.id,
@@ -493,7 +493,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const result = DrizzleConditionBuilder.buildRelationCountQuery(
                 mockBaseQuery,
                 relation,
-                20, // parentSnapshotId (tag ID)
+                20, // parentEntityId (tag ID)
                 mockPostsTable,
                 mockTagsTable,
                 mockTagsTable.id,
@@ -531,7 +531,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const result = DrizzleConditionBuilder.buildRelationQuery(
                 mockBaseQuery,
                 relation,
-                1, // parentSnapshotId
+                1, // parentEntityId
                 mockTagsTable,
                 mockPostsTable,
                 mockPostsTable.id,
@@ -568,7 +568,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             const result = DrizzleConditionBuilder.buildRelationQuery(
                 mockBaseQuery,
                 relation,
-                20, // parentSnapshotId (tag ID)
+                20, // parentEntityId (tag ID)
                 mockPostsTable,
                 mockTagsTable,
                 mockTagsTable.id,

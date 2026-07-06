@@ -12,8 +12,8 @@ import {
     useSnackbarController
 } from "@rebasepro/core";
 import { useUrlController } from "@rebasepro/admin";
-import { DataDriver, Snapshot, CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
-import { enhanceDataAPIStream, fetchSnapshotPromptSuggestion } from "../api";
+import { DataDriver, Entity, CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
+import { enhanceDataAPIStream, fetchEntityPromptSuggestion } from "../api";
 import { getAppendableSuggestion } from "../utils/suggestions";
 import { getSimplifiedProperties } from "../utils/properties";
 import { useEditorAIController } from "../editor/useEditorAIController";
@@ -254,8 +254,8 @@ export function DataEnhancementControllerProvider({
                     apiKey,
                     properties,
                     path: resolvedPath,
-                    snapshotName: collection.singularName ?? collection.name,
-                    snapshotDescription: collection.description,
+                    entityName: collection.singularName ?? collection.name,
+                    entityDescription: collection.description,
 
                     firebaseToken,
                     onUpdate: (suggestions) => {
@@ -298,11 +298,11 @@ export function DataEnhancementControllerProvider({
         properties, host, apiKey, collection, updateSuggestedValues, appendValueDelta, displayNeededSubscriptionSnackbar, snackbarController
     ]);
 
-    const getSamplePrompts = useCallback(async (snapshotName: string, input?: string) => {
+    const getSamplePrompts = useCallback(async (entityName: string, input?: string) => {
         const firebaseToken = await authController.getAuthToken()
-        return fetchSnapshotPromptSuggestion({
+        return fetchEntityPromptSuggestion({
             host,
-            snapshotName,
+            entityName,
             firebaseToken,
             apiKey,
             input

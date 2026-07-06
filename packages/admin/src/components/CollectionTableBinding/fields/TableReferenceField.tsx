@@ -4,20 +4,20 @@ import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { ReferencePreview } from "../../../preview";
-import { CollectionSize, Snapshot, SnapshotReference, FilterValues } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityReference, FilterValues } from "@rebasepro/types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { useComponentOverride, ErrorView, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { cls, PencilIcon } from "@rebasepro/ui";
-import { SnapshotPreviewContainer } from "../../RecordPreviewBinding";
+import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useCollectionRegistryController } from "../../../index";
 
 type TableReferenceFieldProps = {
     name: string;
     disabled: boolean;
-    internalValue: SnapshotReference | SnapshotReference[] | undefined | null;
-    updateValue: (newValue: (SnapshotReference | SnapshotReference[] | null)) => void;
+    internalValue: EntityReference | EntityReference[] | undefined | null;
+    updateValue: (newValue: (EntityReference | EntityReference[] | null)) => void;
     size: CollectionSize;
     multiselect: boolean;
     previewProperties?: string[];
@@ -25,13 +25,13 @@ type TableReferenceFieldProps = {
     path: string;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
 };
 
 const DefaultMissingReference: React.FC<{ path: string }> = () => null;
 
 function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collection: CollectionConfig | undefined }) {
-    const ResolvedMissingReference = useComponentOverride("Snapshot.MissingReference", DefaultMissingReference);
+    const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
     const { path, collection } = props;
 
     if (!collection) {
@@ -83,18 +83,18 @@ export const TableReferenceFieldInternal = React.memo(
             fixedFilter,
             collection,
             includeId,
-            includeSnapshotLink
+            includeEntityLink
         } = props;
 
-        const onSingleSnapshotSelected = useCallback((snapshot: Snapshot<any>) => {
-            updateValue(snapshot ? getReferenceFrom(snapshot) : null);
+        const onSingleEntitySelected = useCallback((entity: Entity<any>) => {
+            updateValue(entity ? getReferenceFrom(entity) : null);
         }, [updateValue]);
 
-        const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<any>[]) => {
-            updateValue(snapshots.map((e) => getReferenceFrom(e)));
+        const onMultipleEntitysSelected = useCallback((entitys: Entity<any>[]) => {
+            updateValue(entitys.map((e) => getReferenceFrom(e)));
         }, [updateValue]);
 
-        const selectedSnapshotIds = internalValue
+        const selectedEntityIds = internalValue
             ? (Array.isArray(internalValue)
                 ? internalValue.map((ref) => ref.id)
                 : internalValue.id ? [internalValue.id] : [])
@@ -104,9 +104,9 @@ export const TableReferenceFieldInternal = React.memo(
             multiselect,
             path,
             collection,
-            onMultipleSnapshotsSelected,
-            onSingleSnapshotSelected,
-            selectedSnapshotIds,
+            onMultipleEntitysSelected,
+            onSingleEntitySelected,
+            selectedEntityIds,
             fixedFilter
         }
         );
@@ -120,23 +120,23 @@ export const TableReferenceFieldInternal = React.memo(
         const valueNotSet = !internalValue || (Array.isArray(internalValue) && internalValue.length === 0);
 
         const buildSingleReferenceField = () => {
-            if (internalValue && !Array.isArray(internalValue) && internalValue.isSnapshotReference && internalValue.isSnapshotReference())
+            if (internalValue && !Array.isArray(internalValue) && internalValue.isEntityReference && internalValue.isEntityReference())
                 return <ReferencePreview
                     onClick={disabled ? undefined : handleOpen}
                     size={getPreviewSizeFrom(size)}
-                    reference={internalValue as SnapshotReference}
+                    reference={internalValue as EntityReference}
                     hover={!disabled}
                     disabled={!path}
                     previewProperties={previewProperties}
                     includeId={includeId}
-                    includeSnapshotLink={includeSnapshotLink}
+                    includeEntityLink={includeEntityLink}
                 />;
             else
-                return <SnapshotPreviewContainer
+                return <EntityPreviewContainer
                     onClick={disabled ? undefined : handleOpen}
                     size={getPreviewSizeFrom(size)}>
                     <ErrorView title="Value is not a reference." error={"Click to edit"}/>
-                </SnapshotPreviewContainer>;
+                </EntityPreviewContainer>;
         };
 
         const buildMultipleReferenceField = () => {
@@ -153,7 +153,7 @@ export const TableReferenceFieldInternal = React.memo(
                                 disabled={!path}
                                 previewProperties={previewProperties}
                                 includeId={includeId}
-                                includeSnapshotLink={includeSnapshotLink}
+                                includeEntityLink={includeEntityLink}
                             />
                         </div>
                     )
@@ -174,7 +174,7 @@ export const TableReferenceFieldInternal = React.memo(
                 {internalValue && multiselect && buildMultipleReferenceField()}
 
                 {valueNotSet &&
-                    <SnapshotPreviewContainer
+                    <EntityPreviewContainer
                         className={cls("px-3 py-2 text-sm font-medium flex items-center",
                             multiselect ? "gap-4" : "gap-6",
                             disabled
@@ -185,7 +185,7 @@ export const TableReferenceFieldInternal = React.memo(
                         <PencilIcon
                             className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
-                    </SnapshotPreviewContainer>}
+                    </EntityPreviewContainer>}
 
             </div>
         );

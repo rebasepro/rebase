@@ -1,39 +1,39 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Snapshot, SelectionController } from "@rebasepro/types";
+import { Entity, SelectionController } from "@rebasepro/types";
 
 export function useSelectionController<M extends Record<string, unknown> = Record<string, unknown>>(
-    onSelectionChange?: (snapshot: Snapshot<M>, selected: boolean) => void
+    onSelectionChange?: (entity: Entity<M>, selected: boolean) => void
 ): SelectionController<M> {
 
-    const [selectedSnapshots, setSelectedSnapshots] = useState<Snapshot<M>[]>([]);
+    const [selectedEntitys, setSelectedEntitys] = useState<Entity<M>[]>([]);
 
     const onSelectionChangeRef = useRef(onSelectionChange);
     onSelectionChangeRef.current = onSelectionChange;
 
-    const toggleSnapshotSelection = useCallback((snapshot: Snapshot<M>, newSelectedState?: boolean) => {
-        setSelectedSnapshots(prev => {
-            const isSelected = Boolean(prev.find(e => e.id === snapshot.id && e.path === snapshot.path));
+    const toggleEntitySelection = useCallback((entity: Entity<M>, newSelectedState?: boolean) => {
+        setSelectedEntitys(prev => {
+            const isSelected = Boolean(prev.find(e => e.id === entity.id && e.path === entity.path));
             const shouldSelect = newSelectedState ?? !isSelected;
 
             if (shouldSelect && !isSelected) {
-                onSelectionChangeRef.current?.(snapshot, true);
-                return [...prev, snapshot];
+                onSelectionChangeRef.current?.(entity, true);
+                return [...prev, entity];
             } else if (!shouldSelect && isSelected) {
-                onSelectionChangeRef.current?.(snapshot, false);
-                return prev.filter((item: Snapshot<M>) => !(item.id === snapshot.id && item.path === snapshot.path));
+                onSelectionChangeRef.current?.(entity, false);
+                return prev.filter((item: Entity<M>) => !(item.id === entity.id && item.path === entity.path));
             }
             return prev;
         });
     }, []);
 
-    const isSnapshotSelected = useCallback((snapshot: Snapshot<M>) => {
-        return Boolean(selectedSnapshots.find(e => e.id === snapshot.id && e.path === snapshot.path));
-    }, [selectedSnapshots]);
+    const isEntitySelected = useCallback((entity: Entity<M>) => {
+        return Boolean(selectedEntitys.find(e => e.id === entity.id && e.path === entity.path));
+    }, [selectedEntitys]);
 
     return useMemo(() => ({
-        selectedSnapshots,
-        setSelectedSnapshots,
-        isSnapshotSelected,
-        toggleSnapshotSelection
-    }), [selectedSnapshots, setSelectedSnapshots, isSnapshotSelected, toggleSnapshotSelection]);
+        selectedEntitys,
+        setSelectedEntitys,
+        isEntitySelected,
+        toggleEntitySelection
+    }), [selectedEntitys, setSelectedEntitys, isEntitySelected, toggleEntitySelection]);
 }

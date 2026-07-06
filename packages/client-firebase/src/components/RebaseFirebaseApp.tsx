@@ -26,7 +26,7 @@ import {
     SidePanelProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { DEFAULT_DATA_SOURCE_KEY, Snapshot, PropertyConfig, RebaseContext } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY, Entity, PropertyConfig, RebaseContext } from "@rebasepro/types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";
@@ -53,7 +53,7 @@ const DEFAULT_SIGN_IN_OPTIONS = [
  * This is the default implementation of a Rebase app using the Firebase services
  * as a backend.
  * You can use this component as a full app, by specifying collections and
- * snapshot collections.
+ * entity collections.
  *
  * This component is in charge of initialising Firebase, with the given
  * configuration object.
@@ -227,7 +227,7 @@ export function RebaseFirebaseApp({
                             driver: firestoreDelegate
                         }]}
                         storageSource={storageSource}
-                        snapshotLinkBuilder={({ snapshot }: { snapshot: Snapshot<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${snapshot.path}/${snapshot.id}`}
+                        entityLinkBuilder={({ entity }: { entity: Entity<any> }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${entity.path}/${entity.id}`}
                         locale={locale}
                         onAnalyticsEvent={onAnalyticsEvent}
                         plugins={plugins}

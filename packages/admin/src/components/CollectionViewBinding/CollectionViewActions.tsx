@@ -3,7 +3,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import React, { lazy, Suspense } from "react";
 
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/core";
-import { CollectionActionsProps, SnapshotTableController, SelectionController } from "@rebasepro/types";
+import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/core";
@@ -19,13 +19,13 @@ export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: CollectionConfig<M>;
     path: string;
     relativePath: string;
-    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     selectionEnabled: boolean;
     onNewClick: () => void;
     onMultipleDeleteClick: () => void;
     selectionController: SelectionController<M>;
-    tableController: SnapshotTableController<M>;
-    collectionSnapshotsCount?: number;
+    tableController: EntityTableController<M>;
+    collectionEntitysCount?: number;
     compact?: boolean;
     children?: React.ReactNode;
     openNewDocument: (defaultValues?: Record<string, unknown>) => void;
@@ -34,14 +34,14 @@ export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
 export function CollectionViewActions<M extends Record<string, unknown>>({
     collection,
     relativePath,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     onNewClick,
     onMultipleDeleteClick,
     selectionEnabled,
     path,
     selectionController,
     tableController,
-    collectionSnapshotsCount,
+    collectionEntitysCount,
     compact,
     children,
     openNewDocument
@@ -57,12 +57,12 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     const collectionEditorController = useCollectionEditorController();
     const hasCollectionEditor = Boolean(collectionEditorController?.editCollection);
 
-    const selectedSnapshots = selectionController.selectedSnapshots;
+    const selectedEntitys = selectionController.selectedEntitys;
 
     const addButton = canCreate(collection, path) &&
         onNewClick && (largeLayout && !compact
             ? <Button
-                id={`add_snapshot_${path}`}
+                id={`add_entity_${path}`}
                 onClick={onNewClick}
                 startIcon={<PlusIcon size={iconSize.small}/>}
                 size="small"
@@ -71,7 +71,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                 Add {collection.singularName ?? collection.name}
             </Button>
             : <Button
-                id={`add_snapshot_${path}`}
+                id={`add_entity_${path}`}
                 onClick={onNewClick}
                 variant="filled"
                 color={compact ? "neutral" : "primary"}
@@ -87,18 +87,18 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
         const button = largeLayout && !compact
             ? <Button
                 variant={"text"}
-                disabled={!(selectedSnapshots?.length) || !multipleDeleteEnabled}
+                disabled={!(selectedEntitys?.length) || !multipleDeleteEnabled}
                 startIcon={<Trash2Icon size={iconSize.small}/>}
                 onClick={onMultipleDeleteClick}
                 color={"primary"}
                 className="lg:w-20"
             >
-                ({selectedSnapshots?.length})
+                ({selectedEntitys?.length})
             </Button>
             : <IconButton
                 size={"small"}
                 color={"primary"}
-                disabled={!(selectedSnapshots?.length) || !multipleDeleteEnabled}
+                disabled={!(selectedEntitys?.length) || !multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
                 <Trash2Icon size={iconSize.small}/>
             </IconButton>;
@@ -113,12 +113,12 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
         path,
         relativePath,
         parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
         collection,
         selectionController,
         context,
         tableController,
-        collectionSnapshotsCount,
+        collectionEntitysCount,
         openNewDocument
     };
 

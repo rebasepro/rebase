@@ -22,15 +22,15 @@ function getRelativeTimeString(date: Date): string {
 
 /**
  * Fetches the latest history entry from the backend API and displays
- * who last edited the snapshot and when.
+ * who last edited the entity and when.
  */
 export function LastEditedByIndicator({
     path,
-    snapshotId,
+    entityId,
     collection
 }: {
     path: string;
-    snapshotId: string;
+    entityId: string;
     collection: CollectionConfig;
 }) {
     const apiConfig = useApiConfig();
@@ -38,14 +38,14 @@ export function LastEditedByIndicator({
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
     const fetchLatest = useCallback(async () => {
-        if (!apiConfig?.apiUrl || !snapshotId || !collection.slug) return;
+        if (!apiConfig?.apiUrl || !entityId || !collection.slug) return;
 
         try {
             const token = await apiConfig.getAuthToken?.();
             const headers: Record<string, string> = {};
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const url = `${apiConfig.apiUrl}/api/data/${collection.slug}/${snapshotId}/history?limit=1&offset=0`;
+            const url = `${apiConfig.apiUrl}/api/data/${collection.slug}/${entityId}/history?limit=1&offset=0`;
             const response = await fetch(url, { headers });
 
             if (response.ok) {
@@ -58,7 +58,7 @@ export function LastEditedByIndicator({
             // Silently fail — this is a non-critical UI indicator
             console.debug("Failed to fetch latest history entry:", error);
         }
-    }, [apiConfig, snapshotId, collection.slug]);
+    }, [apiConfig, entityId, collection.slug]);
 
     useEffect(() => {
         fetchLatest();

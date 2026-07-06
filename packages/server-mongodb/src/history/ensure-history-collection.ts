@@ -8,7 +8,7 @@ export async function ensureHistoryCollectionExists(db: Db): Promise<void> {
         const history = db.collection("__rebase_history");
 
         // Index for finding history entries for a specific row
-        await history.createIndex({ snapshot_id: 1,
+        await history.createIndex({ entity_id: 1,
 table_name: 1,
 updated_at: -1 });
 

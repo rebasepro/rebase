@@ -251,7 +251,7 @@ export class FetchService {
             .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0)
             .map(async ([key, relation]) => {
                 try {
-                    const relatedRows = await this.relationService.fetchRelatedSnapshots(
+                    const relatedRows = await this.relationService.fetchRelatedEntitys(
                         collectionPath,
                         parsedId,
                         key,
@@ -301,7 +301,7 @@ export class FetchService {
                     return parsed[idInfo.fieldName] as string | number;
                 });
 
-                const resultMap = await this.relationService.batchFetchRelatedSnapshots(
+                const resultMap = await this.relationService.batchFetchRelatedEntitys(
                     collectionPath,
                     rowIds,
                     key,
@@ -359,7 +359,7 @@ export class FetchService {
                 });
 
                 if (relation.cardinality === "one") {
-                    const resultMap = await this.relationService.batchFetchRelatedSnapshots(
+                    const resultMap = await this.relationService.batchFetchRelatedEntitys(
                         collectionPath,
                         rowIds,
                         key,
@@ -381,7 +381,7 @@ export class FetchService {
                         }
                     }
                 } else if (relation.cardinality === "many") {
-                    const resultMap = await this.relationService.batchFetchRelatedSnapshotsMany(
+                    const resultMap = await this.relationService.batchFetchRelatedEntitysMany(
                         collectionPath,
                         rowIds,
                         key,
@@ -651,7 +651,7 @@ id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
             .filter(([key]) => propertyKeys.has(key))
             .map(async ([key, relation]) => {
                 if (relation.cardinality === "many") {
-                    const relatedRows = await this.relationService.fetchRelatedSnapshots(
+                    const relatedRows = await this.relationService.fetchRelatedEntitys(
                         collectionPath,
                         parsedId,
                         key,
@@ -663,7 +663,7 @@ id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
                 } else if (relation.cardinality === "one") {
                     if (values[key] == null) {
                         try {
-                            const relatedRows = await this.relationService.fetchRelatedSnapshots(
+                            const relatedRows = await this.relationService.fetchRelatedEntitys(
                                 collectionPath,
                                 parsedId,
                                 key,
@@ -891,7 +891,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
                 try {
                     const rowIds = rowsMissingRelation.map(item => item.rawRow[idInfo.fieldName] as string | number);
-                    const relationResults = await this.relationService.batchFetchRelatedSnapshots(
+                    const relationResults = await this.relationService.batchFetchRelatedEntitys(
                         collectionPath,
                         rowIds,
                         key,
@@ -918,7 +918,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             for (const [key, relation] of manyRelations) {
                 try {
                     const rowIds = parsedRows.map(item => item.rawRow[idInfo.fieldName] as string | number);
-                    const relationResults = await this.relationService.batchFetchRelatedSnapshotsMany(
+                    const relationResults = await this.relationService.batchFetchRelatedEntitysMany(
                         collectionPath,
                         rowIds,
                         key,
@@ -1024,7 +1024,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             }
 
             if (i === pathSegments.length - 1) {
-                const rows = await this.relationService.fetchRelatedSnapshots<M>(
+                const rows = await this.relationService.fetchRelatedEntitys<M>(
                     currentCollection.slug,
                     currentId,
                     relationKey,
@@ -1038,9 +1038,9 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             }
 
             if (i + 1 < pathSegments.length) {
-                const nextSnapshotId = pathSegments[i + 1];
+                const nextEntityId = pathSegments[i + 1];
                 currentCollection = relation.target();
-                currentId = nextSnapshotId;
+                currentId = nextEntityId;
             }
         }
 
@@ -1059,7 +1059,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         } = {}
     ): Promise<number> {
         if (collectionPath.includes("/")) {
-            return this.countSnapshotsFromPath<M>(collectionPath, options);
+            return this.countEntitysFromPath<M>(collectionPath, options);
         }
 
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -1093,7 +1093,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
     /**
      * Count rows from multi-segment path
      */
-    private async countSnapshotsFromPath<M extends Record<string, unknown>>(
+    private async countEntitysFromPath<M extends Record<string, unknown>>(
         path: string,
         options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
     ): Promise<number> {
@@ -1117,7 +1117,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             }
 
             if (i === pathSegments.length - 1) {
-                return this.relationService.countRelatedSnapshots(
+                return this.relationService.countRelatedEntitys(
                     currentCollection.slug,
                     currentId,
                     relationKey,
@@ -1141,7 +1141,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         collectionPath: string,
         fieldName: string,
         value: unknown,
-        excludeSnapshotId?: string,
+        excludeEntityId?: string,
         _databaseId?: string
     ): Promise<boolean> {
         if (value === undefined || value === null) return true;
@@ -1155,7 +1155,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
         if (!field) return true;
 
-        const parsedExcludeId = excludeSnapshotId ? parseIdValues(excludeSnapshotId, idInfoArray)[idInfo.fieldName] : undefined;
+        const parsedExcludeId = excludeEntityId ? parseIdValues(excludeEntityId, idInfoArray)[idInfo.fieldName] : undefined;
         const conditions = DrizzleConditionBuilder.buildUniqueFieldCondition(
             field,
             value,
@@ -1272,7 +1272,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         for (const [key, relation] of Object.entries(resolvedRelations)) {
             if (!propertyKeys.has(key) || !shouldInclude(key) || relation.cardinality !== "one") continue;
             try {
-                const batchResults = await this.relationService.batchFetchRelatedSnapshots(
+                const batchResults = await this.relationService.batchFetchRelatedEntitys(
                     collectionPath, rowIds, key, relation
                 );
                 for (const row of rows) {
@@ -1372,11 +1372,11 @@ id: related.id };
         if (result.length === 0) return null;
 
         const raw = result[0] as Record<string, unknown>;
-        const flatSnapshot: Record<string, unknown> = { ...raw,
+        const flatEntity: Record<string, unknown> = { ...raw,
 id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, idInfoArray) : String(raw[idInfo.fieldName]) };
 
         if (!include || include.length === 0) {
-            return flatSnapshot;
+            return flatEntity;
         }
 
         // Fallback relation population
@@ -1389,18 +1389,18 @@ id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, 
             if (!propertyKeys.has(key) || !shouldInclude(key)) continue;
 
             try {
-                const relatedRows = await this.relationService.fetchRelatedSnapshots(
+                const relatedRows = await this.relationService.fetchRelatedEntitys(
                     collectionPath, parsedId, key, {}
                 );
 
                 if (relation.cardinality === "one") {
                     if (relatedRows.length > 0) {
                         const e = relatedRows[0];
-                        flatSnapshot[key] = { id: e.id,
+                        flatEntity[key] = { id: e.id,
 ...e.values };
                     }
                 } else {
-                    flatSnapshot[key] = relatedRows.map(e => ({
+                    flatEntity[key] = relatedRows.map(e => ({
                         id: e.id,
 ...e.values
                     }));
@@ -1410,7 +1410,7 @@ id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, 
             }
         }
 
-        return flatSnapshot;
+        return flatEntity;
     }
 
     /**
@@ -1643,17 +1643,17 @@ id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
             return new Map();
         }
 
-        // Delegate to RelationService.batchFetchRelatedSnapshotsMany which
+        // Delegate to RelationService.batchFetchRelatedEntitysMany which
         // uses a single SQL query with IN(...) — O(1) instead of O(N).
         // RelationService returns RelatedRow shapes (id + path + values) — flatten to plain rows here.
-        const snapshotMap = await this.relationService.batchFetchRelatedSnapshotsMany(
+        const entityMap = await this.relationService.batchFetchRelatedEntitysMany(
             parentCollectionPath,
             parentIds,
             relationKey,
             relation
         );
         const flatMap = new Map<string, Record<string, unknown>[]>();
-        for (const [key, rows] of snapshotMap) {
+        for (const [key, rows] of entityMap) {
             flatMap.set(key, rows.map(e => ({ ...e.values, id: e.id })));
         }
         return flatMap;

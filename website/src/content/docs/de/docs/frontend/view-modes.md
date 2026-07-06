@@ -116,6 +116,6 @@ const articlesCollection: CollectionConfig = {
 
 ## Nächste Schritte
 
-- **[Entitätsansichten](/docs/frontend/snapshot-views)** — Benutzerdefinierte Tabs in Entitätsformularen
-- **[Entitätsaktionen](/docs/frontend/snapshot-actions)** — Benutzerdefinierte Entitätsaktionen
+- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs in Entitätsformularen
+- **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Entitätsaktionen
 ---

@@ -36,7 +36,7 @@ name: "Title" } as Property,
 name: "Count" } as Property
     };
 
-    it("returns a SerializedSnapshotData object with scalarData, not raw values", () => {
+    it("returns a SerializedEntityData object with scalarData, not raw values", () => {
         const result = serializeDataToServer(
             { title: "Hello",
 count: 5 },
@@ -76,7 +76,7 @@ count: 42 },
         expect(result.scalarData.count).toBe(42);
     });
 
-    it("handles null/undefined snapshot gracefully", () => {
+    it("handles null/undefined entity gracefully", () => {
         const result = serializeDataToServer(null as any, properties);
         // Object.entries(null) yields nothing → empty object
         expect(result.scalarData).toEqual({});

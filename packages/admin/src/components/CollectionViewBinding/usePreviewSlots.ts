@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import type { CollectionConfig, Property, RelationProperty } from "@rebasepro/types";
-import type { Snapshot, PropertyConfig, SnapshotRelation } from "@rebasepro/types";
-import { getSnapshotImagePreviewPropertyKey } from "@rebasepro/common";
-import { getSnapshotFromCache } from "@rebasepro/core";
-import { getSnapshotTitlePropertyKey, getSnapshotPreviewKeys } from "../../util/previews";
+import type { Entity, PropertyConfig, EntityRelation } from "@rebasepro/types";
+import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { getEntityFromCache } from "@rebasepro/core";
+import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/types";
 import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
@@ -13,7 +13,7 @@ import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
 
 /**
  * A resolved "slot" containing the property definition, key, and the
- * concrete value extracted from a snapshot.
+ * concrete value extracted from a entity.
  */
 export interface PreviewSlot {
     property: Property;
@@ -46,7 +46,7 @@ export interface RelationChipItem {
 export interface RelationChipSlot {
     /** The relation property definition */
     property: RelationProperty;
-    /** The property key on this snapshot (e.g. "author", "tags") */
+    /** The property key on this entity (e.g. "author", "tags") */
     propertyKey: string;
     /** The relation property's user-facing name (e.g. "Author", "Tags") */
     label: string;
@@ -59,13 +59,13 @@ export interface RelationChipSlot {
 }
 
 /**
- * Fixed set of preview slots resolved from any snapshot + collection.
+ * Fixed set of preview slots resolved from any entity + collection.
  *
  * Every view (list, card, board) consumes these same slots and decides
  * which ones to render and how.  This eliminates duplicated inference
  * logic across view components.
  */
-export interface SnapshotPreviewSlots {
+export interface EntityPreviewSlots {
     /** MEDIA — image thumbnail or `undefined` (view falls back to icon) */
     image: PreviewSlot | undefined;
     /** PRIMARY — title / name field */
@@ -78,15 +78,15 @@ export interface SnapshotPreviewSlots {
     status: PreviewSlot | undefined;
     /** META — date / timestamp */
     date: DatePreviewSlot | undefined;
-    /** Snapshot ID (always available) */
-    snapshotId: string | number;
+    /** Entity ID (always available) */
+    entityId: string | number;
 }
 
-// ── Collection-level slot resolution (snapshot-independent) ─────────────
+// ── Collection-level slot resolution (entity-independent) ─────────────
 
 /**
  * Resolved property keys per slot.  This is the expensive part (walks
- * all properties) so we memoize it at the collection level, not per snapshot.
+ * all properties) so we memoize it at the collection level, not per entity.
  */
 export interface CollectionSlotKeys {
     titleKey: string | undefined;
@@ -106,8 +106,8 @@ export function resolveCollectionSlotKeys(
     authController: AuthController,
     propertyConfigs: Record<string, PropertyConfig>
 ): CollectionSlotKeys {
-    const titleKey = getSnapshotTitlePropertyKey(collection, propertyConfigs);
-    const imageKey = getSnapshotImagePreviewPropertyKey(collection);
+    const titleKey = getEntityTitlePropertyKey(collection, propertyConfigs);
+    const imageKey = getEntityImagePreviewPropertyKey(collection);
 
     // Status: first string-enum that isn't the title
     let statusKey: string | undefined;
@@ -184,7 +184,7 @@ export function resolveCollectionSlotKeys(
     // When propertiesOrder is not set, also exclude relation keys (they render as chips).
     // Prefer string fields (especially multiline/description-like) over numbers.
     const excludeKeys = new Set([titleKey, imageKey, statusKey, dateKey, ...relationKeys]);
-    const previewKeys = getSnapshotPreviewKeys(authController, collection, propertyConfigs, undefined, 10)
+    const previewKeys = getEntityPreviewKeys(authController, collection, propertyConfigs, undefined, 10)
         .filter(k => !excludeKeys.has(k) && k !== "id");
 
     // When propertiesOrder is set, respect the developer-defined order (no re-sorting).
@@ -218,7 +218,7 @@ dateKey };
 function resolveImageSlot(
     collection: CollectionConfig<Record<string, unknown>>,
     imageKey: string,
-    snapshot: Snapshot<Record<string, unknown>>
+    entity: Entity<Record<string, unknown>>
 ): PreviewSlot | undefined {
     const imageProperty = collection.properties[imageKey];
     if (!imageProperty) return undefined;
@@ -228,7 +228,7 @@ function resolveImageSlot(
         ? (Array.isArray(ofProp) ? ofProp[0] : ofProp)
         : imageProperty;
 
-    const rawValue = getValueInPath(snapshot.values, imageKey);
+    const rawValue = getValueInPath(entity.values, imageKey);
     const resolvedValue = ofProp
         ? (((rawValue as unknown[]) ?? []).length > 0 ? (rawValue as unknown[])[0] : undefined)
         : rawValue;
@@ -274,7 +274,7 @@ function formatDateValue(value: unknown): string {
  * Memoized — only recomputes when the collection definition changes.
  *
  * Use this in the parent list/grid component, then pass the result to
- * `resolveSnapshotSlots` for each snapshot row.
+ * `resolveEntitySlots` for each entity row.
  */
 export function useCollectionSlotKeys(
     collection: CollectionConfig<Record<string, unknown>>,
@@ -287,28 +287,28 @@ export function useCollectionSlotKeys(
     );
 }
 
-// ── Pure function: snapshot-level slot resolution ───────────────────────
+// ── Pure function: entity-level slot resolution ───────────────────────
 
 /**
- * Resolve concrete slot values for a single snapshot.
+ * Resolve concrete slot values for a single entity.
  * This is a pure function (no hooks) so it can be called inside
  * `React.memo` render functions or loops without violating hook rules.
  */
-export function resolveSnapshotSlots(
-    snapshot: Snapshot<Record<string, unknown>>,
+export function resolveEntitySlots(
+    entity: Entity<Record<string, unknown>>,
     collection: CollectionConfig<Record<string, unknown>>,
     slotKeys: CollectionSlotKeys
-): SnapshotPreviewSlots {
+): EntityPreviewSlots {
     const { titleKey, imageKey, subtitleKey, relationKeys, statusKey, dateKey } = slotKeys;
 
     // Image
-    const image = imageKey ? resolveImageSlot(collection, imageKey, snapshot) : undefined;
+    const image = imageKey ? resolveImageSlot(collection, imageKey, entity) : undefined;
 
     // Title
     let title: PreviewSlot | undefined;
     if (titleKey) {
         const prop = collection.properties[titleKey] as Property | undefined;
-        const val = getValueInPath(snapshot.values, titleKey);
+        const val = getValueInPath(entity.values, titleKey);
         if (prop) title = { property: prop,
 propertyKey: titleKey,
 value: val };
@@ -318,7 +318,7 @@ value: val };
     let subtitle: PreviewSlot | undefined;
     if (subtitleKey) {
         const prop = collection.properties[subtitleKey] as Property | undefined;
-        const val = getValueInPath(snapshot.values, subtitleKey);
+        const val = getValueInPath(entity.values, subtitleKey);
         if (prop && val !== undefined && val !== null && val !== "") {
             subtitle = { property: prop,
 propertyKey: subtitleKey,
@@ -334,7 +334,7 @@ value: val };
         const prop = collection.properties[relKey] as RelationProperty | undefined;
         if (!prop || prop.type !== "relation") continue;
 
-        const val = getValueInPath(snapshot.values, relKey);
+        const val = getValueInPath(entity.values, relKey);
         if (val === undefined || val === null) continue;
 
         const items: RelationChipItem[] = [];
@@ -343,13 +343,13 @@ value: val };
         const isMany = prop.cardinality === "many" || prop.relation?.cardinality === "many";
 
         if (isMany && Array.isArray(val)) {
-            // cardinality:"many" → array of SnapshotRelation
+            // cardinality:"many" → array of EntityRelation
             totalCount = val.length;
             for (let i = 0; i < Math.min(val.length, MAX_CHIPS_PER_RELATION); i++) {
                 const rel = val[i];
                 if (rel && typeof rel === "object") {
-                    const displayName = resolveRelationDisplayName(rel as SnapshotRelation, prop);
-                    const id = (rel as SnapshotRelation).id ?? i;
+                    const displayName = resolveRelationDisplayName(rel as EntityRelation, prop);
+                    const id = (rel as EntityRelation).id ?? i;
                     if (displayName) {
                         items.push({ displayName,
 id });
@@ -357,13 +357,13 @@ id });
                 }
             }
         } else if (!isMany && val && typeof val === "object") {
-            // cardinality:"one" → single SnapshotRelation
+            // cardinality:"one" → single EntityRelation
             const obj = val as Record<string, unknown>;
             const isRelation = ("__type" in obj && obj.__type === "relation")
-                || (typeof obj.isSnapshotRelation === "function"
-                    && (obj.isSnapshotRelation as () => boolean)());
+                || (typeof obj.isEntityRelation === "function"
+                    && (obj.isEntityRelation as () => boolean)());
             if (isRelation) {
-                const relation = obj as unknown as SnapshotRelation;
+                const relation = obj as unknown as EntityRelation;
                 const displayName = resolveRelationDisplayName(relation, prop);
                 totalCount = 1;
                 if (displayName) {
@@ -392,7 +392,7 @@ id: relation.id });
     let status: PreviewSlot | undefined;
     if (statusKey) {
         const prop = collection.properties[statusKey] as Property | undefined;
-        const val = getValueInPath(snapshot.values, statusKey);
+        const val = getValueInPath(entity.values, statusKey);
         if (prop && val !== undefined && val !== null) {
             status = { property: prop,
 propertyKey: statusKey,
@@ -404,7 +404,7 @@ value: val };
     let date: DatePreviewSlot | undefined;
     if (dateKey) {
         const prop = collection.properties[dateKey] as Property | undefined;
-        const val = getValueInPath(snapshot.values, dateKey);
+        const val = getValueInPath(entity.values, dateKey);
         if (prop && val !== undefined && val !== null) {
             date = {
                 property: prop,
@@ -422,23 +422,23 @@ value: val };
         relations,
         status,
         date,
-        snapshotId: snapshot.id
+        entityId: entity.id
     };
 }
 
 // ── Relation display name resolution ─────────────────────────────────
 
 /**
- * Extract a human-readable display name from an eagerly-loaded SnapshotRelation.
+ * Extract a human-readable display name from an eagerly-loaded EntityRelation.
  * Uses the target collection's title property when available, otherwise
- * walks the snapshot values for the first short string.
+ * walks the entity values for the first short string.
  */
 function resolveRelationDisplayName(
-    relation: SnapshotRelation | Record<string, unknown>,
+    relation: EntityRelation | Record<string, unknown>,
     prop: RelationProperty
 ): string | undefined {
-    // Support both SnapshotRelation instances and plain objects
-    const data = "data" in relation ? (relation as SnapshotRelation).data : undefined;
+    // Support both EntityRelation instances and plain objects
+    const data = "data" in relation ? (relation as EntityRelation).data : undefined;
 
     // Resolve target collection from either `prop.relation.target()` or `prop.target()` (inline API)
     let targetCollection: CollectionConfig | undefined;
@@ -451,7 +451,7 @@ function resolveRelationDisplayName(
         // Target collection may not be resolvable
     }
 
-    // Helper: extract display name from snapshot values using the target collection
+    // Helper: extract display name from entity values using the target collection
     const extractDisplayName = (values: Record<string, unknown>): string | undefined => {
         if (targetCollection) {
             const targetTitleKey = targetCollection.titleProperty as string | undefined;
@@ -491,7 +491,7 @@ function resolveRelationDisplayName(
                 }
             }
         }
-        // Generic fallback: walk snapshot values for any short string.
+        // Generic fallback: walk entity values for any short string.
         for (const [, v] of Object.entries(values)) {
             if (typeof v === "string" && v.length > 0 && v.length < 200) {
                 return v;
@@ -508,13 +508,13 @@ function resolveRelationDisplayName(
 
     const id = "id" in relation ? relation.id : undefined;
 
-    // 2. Try the snapshot cache (sessionStorage) as a fallback
+    // 2. Try the entity cache (sessionStorage) as a fallback
     if (id !== undefined && targetCollection) {
         try {
             const slug = targetCollection.slug ?? ("table" in targetCollection ? targetCollection.table : undefined);
             if (slug) {
                 const cacheKey = `${slug}/${id}`;
-                const cached = getSnapshotFromCache(cacheKey) as { values?: Record<string, unknown> } | undefined;
+                const cached = getEntityFromCache(cacheKey) as { values?: Record<string, unknown> } | undefined;
                 if (cached?.values) {
                     const result = extractDisplayName(cached.values);
                     if (result) return result;

@@ -10,7 +10,7 @@ import {
 
 /**
  * SDK Query Builder — returns flat rows (`FindResult<M>`) instead of
- * Snapshot-wrapped results (`FindResponse<M>`).
+ * Entity-wrapped results (`FindResponse<M>`).
  *
  * @example
  * const { data } = await rebase.data.posts
@@ -97,7 +97,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     }
 
     /**
-     * Include related snapshots in the response.
+     * Include related entitys in the response.
      * Relations will be populated with full data instead of just IDs.
      *
      * @param relations - Relation names to include, or "*" for all.

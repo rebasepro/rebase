@@ -1,5 +1,5 @@
 import { useCollectionRegistryController } from "../../../_cms_internals";
-import { convertDataToSnapshot, ImportConfig } from "../../../_cms_internals";
+import { convertDataToEntity, ImportConfig } from "../../../_cms_internals";
 import { useAuthController } from "@rebasepro/core";
 import { CollectionTableBinding } from "../../../../components/CollectionTableBinding/CollectionTableBinding";
 import { useSelectionController } from "../../../../components/CollectionViewBinding/useSelectionController";
@@ -22,8 +22,8 @@ export function CollectionEditorImportDataPreview({
     const registry = useCollectionRegistryController();
     const [loading, setLoading] = useState<boolean>(false);
 
-    async function loadSnapshots() {
-        const mappedData = importConfig.importData.map(d => convertDataToSnapshot(authController,
+    async function loadEntitys() {
+        const mappedData = importConfig.importData.map(d => convertDataToEntity(authController,
             registry,
             d,
             importConfig.idColumn,
@@ -31,11 +31,11 @@ export function CollectionEditorImportDataPreview({
             properties,
             "TEMP_PATH",
             importConfig.defaultValues));
-        importConfig.setSnapshots(mappedData);
+        importConfig.setEntitys(mappedData);
     }
 
     useEffect(() => {
-        loadSnapshots().finally(() => setLoading(false));
+        loadEntitys().finally(() => setLoading(false));
     }, []);
 
     const selectionController = useSelectionController();
@@ -45,10 +45,10 @@ export function CollectionEditorImportDataPreview({
     return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Snapshots with the same id will be overwritten</Typography>
+            <Typography variant={"caption"}>Entitys with the same id will be overwritten</Typography>
         </div>}
         tableController={{
-            data: importConfig.snapshots,
+            data: importConfig.entitys,
             dataLoading: false,
             noMoreToLoad: false
         }}
@@ -60,7 +60,7 @@ export function CollectionEditorImportDataPreview({
             key: p,
             disabled: false
         }))}
-        openSnapshotMode={"side_panel"}
+        openEntityMode={"side_panel"}
         properties={properties}
         enablePopupIcon={false}/>
 

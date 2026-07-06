@@ -5,7 +5,7 @@ import {
     Properties,
     Property
 } from "@rebasepro/types";
-import { isPropertyBuilder } from "./snapshots";
+import { isPropertyBuilder } from "./entitys";
 
 export function sortProperties<M extends Record<string, unknown>>(properties: Properties, propertiesOrder?: string[]): Properties {
     try {
@@ -108,7 +108,7 @@ export function getLocalChangesBackup(collection: CollectionConfig) {
 }
 
 /**
- * Returns the primary keys for a snapshot collection by inspecting the properties
+ * Returns the primary keys for a entity collection by inspecting the properties
  * and finding any properties with `isId`.
  * Fallbacks to `["id"]` if no properties are marked as `isId: true`.
  * @param collection

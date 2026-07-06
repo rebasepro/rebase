@@ -2,7 +2,7 @@ import type { Properties } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
-import { CollectionActionsProps, SnapshotTableController, SelectionController } from "@rebasepro/types";
+import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { ArrowLeftIcon, Badge, Button, cls, FilterIcon, IconButton, Tooltip } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
@@ -16,10 +16,10 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
     collection: CollectionConfig<M>;
     path: string;
     relativePath: string;
-    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     selectionController: SelectionController<M>;
-    tableController: SnapshotTableController<M>;
-    collectionSnapshotsCount?: number;
+    tableController: EntityTableController<M>;
+    collectionEntitysCount?: number;
     /**
      * Resolved properties from the collection for the filters dialog
      */
@@ -31,11 +31,11 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
 export function CollectionViewStartActions<M extends Record<string, unknown>>({
     collection,
     relativePath,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     path,
     selectionController,
     tableController,
-    collectionSnapshotsCount,
+    collectionEntitysCount,
     resolvedProperties,
     compact,
     openNewDocument
@@ -62,12 +62,12 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
         path,
         relativePath,
         parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
         collection,
         selectionController,
         context,
         tableController,
-        collectionSnapshotsCount,
+        collectionEntitysCount,
         openNewDocument
     };
 

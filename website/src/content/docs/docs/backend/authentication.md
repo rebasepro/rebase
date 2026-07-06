@@ -204,7 +204,7 @@ const membersCollection: PostgresCollectionConfig = {
 
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
-      resetPassword: true // Or false to disable, or a custom SnapshotAction
+      resetPassword: true // Or false to disable, or a custom EntityAction
     }
   },
   properties: { ... }
@@ -300,7 +300,7 @@ export interface AuthAdapter {
   ): Promise<UserCreationPrepareResult>;
 
   finalizeUserCreation?(
-    snapshot: { id: string; values: Record<string, unknown> },
+    entity: { id: string; values: Record<string, unknown> },
     clearPassword?: string
   ): Promise<UserCreationFinalizeResult>;
 

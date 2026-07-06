@@ -116,7 +116,7 @@ const articlesCollection: CollectionConfig = {
 
 ## Prochaines étapes
 
-- **[Vues d'entités](/docs/frontend/snapshot-views)** — Onglets personnalisés sur les formulaires d'entités
-- **[Actions d'entités](/docs/frontend/snapshot-actions)** — Actions d'entités personnalisées
+- **[Vues d'entités](/docs/frontend/entity-views)** — Onglets personnalisés sur les formulaires d'entités
+- **[Actions d'entités](/docs/frontend/entity-actions)** — Actions d'entités personnalisées
 
 ---

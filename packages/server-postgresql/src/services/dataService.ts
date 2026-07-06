@@ -111,16 +111,16 @@ export class DataService implements DataRepository {
         collectionPath: string,
         fieldName: string,
         value: unknown,
-        excludeSnapshotId?: string,
+        excludeEntityId?: string,
         databaseId?: string
     ): Promise<boolean> {
-        return this.fetchService.checkUniqueField(collectionPath, fieldName, value, excludeSnapshotId, databaseId);
+        return this.fetchService.checkUniqueField(collectionPath, fieldName, value, excludeEntityId, databaseId);
     }
 
     /**
      * Fetch rows related to a parent row
      */
-    async fetchRelatedSnapshots<M extends Record<string, unknown>>(
+    async fetchRelatedEntitys<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
@@ -134,7 +134,7 @@ export class DataService implements DataRepository {
             databaseId?: string;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        const rows = await this.fetchService.getRelationService().fetchRelatedSnapshots<M>(
+        const rows = await this.fetchService.getRelationService().fetchRelatedEntitys<M>(
             parentCollectionPath,
             parentId,
             relationKey,

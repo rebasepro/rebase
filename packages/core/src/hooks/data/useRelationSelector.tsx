@@ -1,13 +1,13 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
-import { Snapshot, SnapshotRelation, FilterValues } from "@rebasepro/types";
+import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
 export interface RelationItem {
     id: string | number;
     label: string;
     description?: string;
-    data: Snapshot<any>;
-    relation: SnapshotRelation;
+    data: Entity<any>;
+    relation: EntityRelation;
 }
 
 export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
@@ -16,7 +16,7 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
      */
     path: string;
     /**
-     * The collection that represents the relation snapshots
+     * The collection that represents the relation entitys
      */
     collection: CollectionConfig<M>;
     /**
@@ -28,13 +28,13 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
      */
     pageSize?: number;
     /**
-     * Function to extract the label from a snapshot
+     * Function to extract the label from a entity
      */
-    getLabelFromSnapshot?: (snapshot: Snapshot<M>) => string;
+    getLabelFromEntity?: (entity: Entity<M>) => string;
     /**
-     * Function to extract the description from a snapshot
+     * Function to extract the description from a entity
      */
-    getDescriptionFromSnapshot?: (snapshot: Snapshot<M>) => string | undefined;
+    getDescriptionFromEntity?: (entity: Entity<M>) => string | undefined;
     /**
      * Property name to use as the secondary display field
      */
@@ -48,7 +48,7 @@ export interface RelationSelectorController {
     search: (searchString: string) => void;
     loadMore: () => void;
     hasMore: boolean;
-    snapshotToRelationItem: (snapshot: Snapshot<any>, relation: SnapshotRelation) => RelationItem;
+    entityToRelationItem: (entity: Entity<any>, relation: EntityRelation) => RelationItem;
 }
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -62,8 +62,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         collection,
         fixedFilter,
         pageSize = DEFAULT_PAGE_SIZE,
-        getLabelFromSnapshot,
-        getDescriptionFromSnapshot,
+        getLabelFromEntity,
+        getDescriptionFromEntity,
         descriptionProperty
     }: UseRelationSelectorProps<M>
 ): RelationSelectorController {
@@ -86,44 +86,44 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         setIsLoading(loading);
     }, []);
 
-    // Function to convert snapshot to RelationItem
-    const snapshotToRelationItem = useCallback((snapshot: Snapshot<M>, relation?: SnapshotRelation): RelationItem => {
+    // Function to convert entity to RelationItem
+    const entityToRelationItem = useCallback((entity: Entity<M>, relation?: EntityRelation): RelationItem => {
         let label: string;
         let description: string | undefined;
 
-        if (getLabelFromSnapshot) {
-            label = getLabelFromSnapshot(snapshot);
+        if (getLabelFromEntity) {
+            label = getLabelFromEntity(entity);
         } else {
             // Fallback: try common label properties
             const commonLabelProps = ["name", "title", "label", "displayName"];
             let foundProp: string | undefined;
 
-            if (snapshot.values) {
-                foundProp = commonLabelProps.find(prop => snapshot.values[prop] != null && snapshot.values[prop] !== "");
+            if (entity.values) {
+                foundProp = commonLabelProps.find(prop => entity.values[prop] != null && entity.values[prop] !== "");
             }
 
-            if (foundProp && snapshot.values[foundProp]) {
-                label = String(snapshot.values[foundProp]);
+            if (foundProp && entity.values[foundProp]) {
+                label = String(entity.values[foundProp]);
             } else {
-                // Ultimate fallback: use snapshot ID
-                label = String(snapshot.id);
+                // Ultimate fallback: use entity ID
+                label = String(entity.id);
             }
         }
 
-        if (getDescriptionFromSnapshot) {
-            description = getDescriptionFromSnapshot(snapshot);
-        } else if (descriptionProperty && snapshot.values && snapshot.values[descriptionProperty]) {
-            description = String(snapshot.values[descriptionProperty]);
+        if (getDescriptionFromEntity) {
+            description = getDescriptionFromEntity(entity);
+        } else if (descriptionProperty && entity.values && entity.values[descriptionProperty]) {
+            description = String(entity.values[descriptionProperty]);
         }
 
         return {
-            id: snapshot.id,
+            id: entity.id,
             label,
             description,
-            data: snapshot,
-            relation: relation ? relation : new SnapshotRelation(snapshot.id, path)
+            data: entity,
+            relation: relation ? relation : new EntityRelation(entity.id, path)
         };
-    }, [getLabelFromSnapshot, getDescriptionFromSnapshot, descriptionProperty]);
+    }, [getLabelFromEntity, getDescriptionFromEntity, descriptionProperty]);
 
     // Clean up any existing subscription
     const cleanupSubscription = useCallback(() => {
@@ -141,8 +141,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         // fixedFilter is already FilterValues — pass directly
         const whereParams = fixedFilter && Object.keys(fixedFilter).length > 0 ? fixedFilter : undefined;
 
-        const onSnapshotsUpdate = (res: { data: Snapshot<M>[], meta: { hasMore: boolean } }) => {
-            const newItems = res.data.map((e) => snapshotToRelationItem(e));
+        const onEntitysUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
+            const newItems = res.data.map((e) => entityToRelationItem(e));
             setItems(newItems);
             setHasMore(res.meta.hasMore);
             setLoading(false);
@@ -164,7 +164,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
                 limit: limit,
                 orderBy: undefined,
                 searchString: currentSearch
-            }, (res) => onSnapshotsUpdate({ data: res.data as Snapshot<M>[],
+            }, (res) => onEntitysUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onErrorUpdate);
         } else {
             accessor.find({
@@ -174,14 +174,14 @@ meta: res.meta }), onErrorUpdate);
                 orderBy: undefined,
                 searchString: currentSearch
             })
-                .then((res) => onSnapshotsUpdate({ data: res.data as Snapshot<M>[],
+                .then((res) => onEntitysUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }))
                 .catch(onErrorUpdate);
             unsubscribe = () => {};
         }
 
         unsubscribeRef.current = unsubscribe || null;
-    }, [dataClient, path, fixedFilter, limit, currentSearch, snapshotToRelationItem, cleanupSubscription, setLoading]);
+    }, [dataClient, path, fixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading]);
 
     // Search function with debouncing
     const search = useCallback((searchString: string) => {
@@ -229,6 +229,6 @@ meta: res.meta }))
         search,
         loadMore,
         hasMore,
-        snapshotToRelationItem
-    }), [items, isLoading, error, search, loadMore, hasMore, snapshotToRelationItem]);
+        entityToRelationItem
+    }), [items, isLoading, error, search, loadMore, hasMore, entityToRelationItem]);
 }

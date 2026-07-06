@@ -1,9 +1,9 @@
-import type { AdditionalFieldDelegate, SnapshotAction, CollectionConfig, Property } from "@rebasepro/types";
+import type { AdditionalFieldDelegate, EntityAction, CollectionConfig, Property } from "@rebasepro/types";
 import {
     CollectionSize,
-    Snapshot,
-    SnapshotReference,
-    SnapshotTableController,
+    Entity,
+    EntityReference,
+    EntityTableController,
     FilterValues,
     getCollectionDataPath,
     PartialCollectionConfig,
@@ -17,9 +17,9 @@ import { CollectionRowActions, CollectionTableBinding } from "../CollectionTable
 import { CollectionTableToolbar } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 import { getSubcollections } from "@rebasepro/common";
 import { useCollectionInlineEditor } from "./hooks/useCollectionInlineEditor";
-import { navigateToSnapshot } from "../../util/navigation_utils";
-import { mergeSnapshotActions } from "../../util/record_actions";
-import { resolveSnapshotAction } from "../../util/resolutions";
+import { navigateToEntity } from "../../util/navigation_utils";
+import { mergeEntityActions } from "../../util/entity_actions";
+import { resolveEntityAction } from "../../util/resolutions";
 import { getPropertyInPath } from "../../util/property_utils";
 import { ReferencePreview } from "../../preview";
 import {
@@ -62,10 +62,10 @@ import {
     VirtualTableColumn
 } from "@rebasepro/ui";
 import { getSubcollectionColumnId } from "../CollectionTableBinding/internal/common";
-import { copySnapshotAction, deleteSnapshotAction, editSnapshotAction } from "../common/default_record_actions";
+import { copyEntityAction, deleteEntityAction, editEntityAction } from "../common/default_entity_actions";
 import { PopupFormField } from "../CollectionTableBinding/internal/popup_field/PopupFormField";
 import { GetPropertyForProps } from "../CollectionTableBinding/CollectionTableBindingProps";
-import { DeleteSnapshotDialog } from "../DeleteSnapshotDialog";
+import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { useSelectionController } from "./useSelectionController";
 import { CollectionViewStartActions } from "./CollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
@@ -79,9 +79,9 @@ import {
 } from "../../index";
 
 const EMPTY_ARRAY: never[] = [];
-const DEFAULT_SNAPSHOT_OPEN_MODE = "split";
+const DEFAULT_ENTITY_OPEN_MODE = "split";
 
-function getOpenSnapshotMode(
+function getOpenEntityMode(
     viewMode: ViewMode,
     configuredMode?: "side_panel" | "full_screen" | "split" | "dialog"
 ): "side_panel" | "full_screen" | "split" | "dialog" {
@@ -108,7 +108,7 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     /**
      * If this is a subcollection, specify the parent collection ids.
      */
-    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     /**
      * Whether this is a subcollection or not.
      */
@@ -122,14 +122,14 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     updateUrl?: boolean;
 
     /**
-     * When provided, the split view will render this snapshot's detail panel.
-     * Used by the router to pass the snapshot ID from the URL path.
+     * When provided, the split view will render this entity's detail panel.
+     * Used by the router to pass the entity ID from the URL path.
      */
-    selectedSnapshotId?: string | number;
+    selectedEntityId?: string | number;
 
     /**
      * When provided, the split view will open this tab (e.g. a subcollection slug)
-     * in the snapshot detail panel. Used by the router to pass the subcollection from the URL.
+     * in the entity detail panel. Used by the router to pass the subcollection from the URL.
      */
     selectedTab?: string;
 
@@ -138,9 +138,9 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
 /**
  * This component is in charge of binding a driver path with an {@link CollectionConfig}
  * where it's configuration is defined. It includes an infinite scrolling table
- * and a 'Add' new snapshots button,
+ * and a 'Add' new entitys button,
  *
- * This component is the default one used for displaying snapshot collections
+ * This component is the default one used for displaying entity collections
  * and is in charge of generating all the specific actions and customization
  * of the lower level {@link CollectionTableBinding}
  *
@@ -151,7 +151,7 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
  * If you need a lower level implementation with more granular options, you
  * can use {@link CollectionTableBinding}.
  *
- * If you need a generic table that is not bound to the driver or snapshots and
+ * If you need a generic table that is not bound to the driver or entitys and
  * properties at all, you can check {@link VirtualTable}
  *
  * @param path
@@ -163,11 +163,11 @@ const CollectionViewBindingInner = React.memo(
     function CollectionViewBindingInner<M extends Record<string, unknown>>({
         path: pathProp,
 
-        parentCollectionSlugs, parentSnapshotIds,
+        parentCollectionSlugs, parentEntityIds,
         isSubCollection,
         className,
         updateUrl,
-        selectedSnapshotId: selectedSnapshotIdProp,
+        selectedEntityId: selectedEntityIdProp,
         selectedTab: selectedTabProp,
         ...collectionProp
     }: CollectionViewBindingProps<M>
@@ -202,16 +202,16 @@ const CollectionViewBindingInner = React.memo(
             collectionRef.current = collection;
         }, [collection]);
 
-        const canCreateSnapshots = canCreate(collection, path);
-        const [highlightedSnapshot, setHighlightedSnapshot] = useState<Snapshot<M> | undefined>(undefined);
-        const [deleteSnapshotClicked, setDeleteSnapshotClicked] = React.useState<Snapshot<M> | Snapshot<M>[] | undefined>(undefined);
+        const canCreateEntitys = canCreate(collection, path);
+        const [highlightedEntity, setHighlightedEntity] = useState<Entity<M> | undefined>(undefined);
+        const [deleteEntityClicked, setDeleteEntityClicked] = React.useState<Entity<M> | Entity<M>[] | undefined>(undefined);
 
         const [lastDeleteTimestamp, setLastDeleteTimestamp] = React.useState<number>(0);
 
-        // Track recently deleted snapshots for optimistic Kanban count updates
-        const [deletedSnapshots, setDeletedSnapshots] = React.useState<Snapshot<M>[]>([]);
+        // Track recently deleted entitys for optimistic Kanban count updates
+        const [deletedEntitys, setDeletedEntitys] = React.useState<Entity<M>[]>([]);
 
-        // number of snapshots in the collection (undefined = loading)
+        // number of entitys in the collection (undefined = loading)
         const [docsCount, setDocsCount] = useState<number | null | undefined>(null);
 
         // Optimistic state for column order to prevent UI flickering during persistence
@@ -222,17 +222,17 @@ const CollectionViewBindingInner = React.memo(
             setLocalPropertiesOrder(collection.propertiesOrder);
         }, [collection.propertiesOrder]);
 
-        const unselectNavigatedSnapshot = useCallback(() => {
-            const currentSelection = highlightedSnapshot;
+        const unselectNavigatedEntity = useCallback(() => {
+            const currentSelection = highlightedEntity;
             setTimeout(() => {
-                if (currentSelection === highlightedSnapshot)
-                    setHighlightedSnapshot(undefined);
+                if (currentSelection === highlightedEntity)
+                    setHighlightedEntity(undefined);
             }, 2400);
-        }, [highlightedSnapshot]);
+        }, [highlightedEntity]);
 
-        const checkInlineEditing = useCallback((snapshot?: Snapshot<M>): boolean => {
+        const checkInlineEditing = useCallback((entity?: Entity<M>): boolean => {
             const collection = collectionRef.current;
-            if (!canEdit(collection, path, snapshot ?? null)) {
+            if (!canEdit(collection, path, entity ?? null)) {
                 return false;
             }
             return collection.inlineEditing === undefined || collection.inlineEditing;
@@ -270,7 +270,7 @@ const CollectionViewBindingInner = React.memo(
             return defaultViewMode;
         });
 
-        const openSnapshotMode = getOpenSnapshotMode(viewMode, collection?.openSnapshotMode);
+        const openEntityMode = getOpenEntityMode(viewMode, collection?.openEntityMode);
 
         // Sync URL with current view on init (if view came from saved config)
         useEffect(() => {
@@ -322,8 +322,8 @@ const CollectionViewBindingInner = React.memo(
         const selectionController = useSelectionController<M>();
         const usedSelectionController = collection.selectionController ?? selectionController;
         const {
-            selectedSnapshots,
-            setSelectedSnapshots
+            selectedEntitys,
+            setSelectedEntitys
         } = usedSelectionController;
 
         const tableController = useDataTableController<M>({
@@ -336,7 +336,7 @@ const CollectionViewBindingInner = React.memo(
 
         const tableKey = React.useRef<string>(Math.random().toString(36));
         const popupCell = tableController.popupCell as {
-            snapshotId: string | number;
+            entityId: string | number;
             propertyKey: Extract<keyof M, string>;
             cellRect?: DOMRect;
         } | undefined;
@@ -345,94 +345,94 @@ const CollectionViewBindingInner = React.memo(
             tableController.setPopupCell?.(undefined);
         }, [tableController.setPopupCell]);
 
-        const onSnapshotClick = useCallback((clickedSnapshot: Snapshot<M>) => {
+        const onEntityClick = useCallback((clickedEntity: Entity<M>) => {
             const collection = collectionRef.current;
-            setHighlightedSnapshot(clickedSnapshot);
-            analyticsController.onAnalyticsEvent?.("edit_snapshot_clicked", {
-                path: clickedSnapshot.path,
-                snapshotId: clickedSnapshot.id
+            setHighlightedEntity(clickedEntity);
+            analyticsController.onAnalyticsEvent?.("edit_entity_clicked", {
+                path: clickedEntity.path,
+                entityId: clickedEntity.id
             });
 
             if (collection) {
-                addRecentId(collection.slug, clickedSnapshot.id);
+                addRecentId(collection.slug, clickedEntity.id);
             }
 
-            const snapshotPath = path ?? clickedSnapshot.path;
-            navigateToSnapshot({
+            const entityPath = path ?? clickedEntity.path;
+            navigateToEntity({
                 navigation: urlController,
-                path: snapshotPath,
+                path: entityPath,
                 sidePanelController,
-                openSnapshotMode,
+                openEntityMode,
                 collection,
-                snapshotId: clickedSnapshot.id,
-                replace: openSnapshotMode === "split" && selectedSnapshotIdProp !== undefined
+                entityId: clickedEntity.id,
+                replace: openEntityMode === "split" && selectedEntityIdProp !== undefined
             });
 
-        }, [sidePanelController, openSnapshotMode, selectedSnapshotIdProp, path, urlController, analyticsController]);
+        }, [sidePanelController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController]);
 
         const onNewClick = useCallback(() => {
             const collection = collectionRef.current;
-            analyticsController.onAnalyticsEvent?.("new_snapshot_click", {
+            analyticsController.onAnalyticsEvent?.("new_entity_click", {
                 path: path
             });
-            navigateToSnapshot({
-                openSnapshotMode,
+            navigateToEntity({
+                openEntityMode,
                 collection,
-                snapshotId: undefined,
+                entityId: undefined,
                 path: path,
                 sidePanelController,
                 navigation: urlController,
-                onClose: unselectNavigatedSnapshot
+                onClose: unselectNavigatedEntity
             })
         }, [path, sidePanelController]);
 
         const openNewDocument = useCallback((defaultValues?: Record<string, unknown>) => {
             const collection = collectionRef.current;
-            analyticsController.onAnalyticsEvent?.("new_snapshot_click", {
+            analyticsController.onAnalyticsEvent?.("new_entity_click", {
                 path: path
             });
-            navigateToSnapshot({
-                openSnapshotMode,
+            navigateToEntity({
+                openEntityMode,
                 collection,
-                snapshotId: undefined,
+                entityId: undefined,
                 defaultValues,
                 path: path,
                 sidePanelController,
                 navigation: urlController,
-                onClose: unselectNavigatedSnapshot
+                onClose: unselectNavigatedEntity
             });
-        }, [path, sidePanelController, openSnapshotMode, urlController, unselectNavigatedSnapshot]);
+        }, [path, sidePanelController, openEntityMode, urlController, unselectNavigatedEntity]);
 
         const onMultipleDeleteClick = () => {
             analyticsController.onAnalyticsEvent?.("multiple_delete_dialog_open", {
                 path: path
             });
-            setDeleteSnapshotClicked(selectedSnapshots);
+            setDeleteEntityClicked(selectedEntitys);
         };
 
-        const internalOnSnapshotDelete = (_path: string, snapshot: Snapshot<M>) => {
-            analyticsController.onAnalyticsEvent?.("single_snapshot_deleted", {
+        const internalOnEntityDelete = (_path: string, entity: Entity<M>) => {
+            analyticsController.onAnalyticsEvent?.("single_entity_deleted", {
                 path: path
             });
-            setSelectedSnapshots((selectedSnapshots) => selectedSnapshots.filter((e) => e.id !== snapshot.id));
-            setDeletedSnapshots(prev => [...prev, snapshot]);
+            setSelectedEntitys((selectedEntitys) => selectedEntitys.filter((e) => e.id !== entity.id));
+            setDeletedEntitys(prev => [...prev, entity]);
             setLastDeleteTimestamp(Date.now());
         };
 
-        const internalOnMultipleSnapshotsDelete = (_path: string, snapshots: Snapshot<M>[]) => {
-            analyticsController.onAnalyticsEvent?.("multiple_snapshots_deleted", {
+        const internalOnMultipleEntitysDelete = (_path: string, entitys: Entity<M>[]) => {
+            analyticsController.onAnalyticsEvent?.("multiple_entitys_deleted", {
                 path: path
             });
-            setSelectedSnapshots([]);
-            setDeleteSnapshotClicked(undefined);
-            setDeletedSnapshots(prev => [...prev, ...snapshots]);
+            setSelectedEntitys([]);
+            setDeleteEntityClicked(undefined);
+            setDeletedEntitys(prev => [...prev, ...entitys]);
             setLastDeleteTimestamp(Date.now());
         };
 
         const pluginAddColumnComponents = useSlot("collection.add-column", {
             path,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
             tableController
         });
@@ -440,7 +440,7 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
         const pluginToolbarWidgets = useSlot("collection.toolbar", {
             path,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection: collection,
             tableController: tableController,
             selectionController: usedSelectionController
@@ -449,16 +449,16 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
         const pluginEmptyStates = useSlot("collection.empty-state", {
             path,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection,
-            canCreate: canCreateSnapshots,
+            canCreate: canCreateEntitys,
             onNewClick
         });
 
         const pluginInsights = useSlot("collection.insights", {
             path,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection
         });
 
@@ -604,7 +604,7 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
 
         const getPropertyFor = useCallback(({
             propertyKey,
-            snapshot
+            entity
         }: GetPropertyForProps<M>) => {
             let property: Property | undefined = getPropertyInPath(collection.properties, propertyKey);
 
@@ -641,16 +641,16 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
                     name: subcollection.name,
                     width: 200,
                     dependencies: [],
-                    Builder: ({ snapshot }: { snapshot: Snapshot }) => (
+                    Builder: ({ entity }: { entity: Entity }) => (
                         <Button
                             className={"max-w-full truncate justify-start"}
                             startIcon={<ArrowRightToLineIcon size={iconSize.small}/>}
                             onClick={(event: React.MouseEvent) => {
                                 event.stopPropagation();
-                                navigateToSnapshot({
-                                    openSnapshotMode,
+                                navigateToEntity({
+                                    openEntityMode,
                                     collection,
-                                    snapshotId: snapshot.id,
+                                    entityId: entity.id,
                                     selectedTab: subcollection.slug,
                                     path: path,
                                     navigation: urlController,
@@ -675,79 +675,79 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
 
         const largeLayout = useLargeLayout();
 
-        const isSplitLayout = openSnapshotMode === "split";
-        const isCompact = isSplitLayout && selectedSnapshotIdProp !== undefined;
+        const isSplitLayout = openEntityMode === "split";
+        const isCompact = isSplitLayout && selectedEntityIdProp !== undefined;
         const activeSelectionEnabled = !isCompact && selectionEnabled;
 
-        const getActionsForSnapshot = useCallback(({
-            snapshot,
-            customSnapshotActions
+        const getActionsForEntity = useCallback(({
+            entity,
+            customEntityActions
         }: {
-            snapshot?: Snapshot<M>,
-            customSnapshotActions?: SnapshotAction[]
-        }): SnapshotAction[] => {
-            const deleteEnabled = snapshot ? canDelete(collection, path, snapshot) : true;
+            entity?: Entity<M>,
+            customEntityActions?: EntityAction[]
+        }): EntityAction[] => {
+            const deleteEnabled = entity ? canDelete(collection, path, entity) : true;
             const disableActions = collection.disableDefaultActions ?? [];
-            const actions: SnapshotAction[] = [];
+            const actions: EntityAction[] = [];
             if (!disableActions.includes("edit")) {
-                actions.push(editSnapshotAction);
+                actions.push(editEntityAction);
             }
             if (createEnabled && !disableActions.includes("copy"))
-                actions.push(copySnapshotAction);
+                actions.push(copyEntityAction);
             if (deleteEnabled && !disableActions.includes("delete"))
-                actions.push(deleteSnapshotAction);
-            if (customSnapshotActions)
-                return mergeSnapshotActions(actions, customSnapshotActions);
+                actions.push(deleteEntityAction);
+            if (customEntityActions)
+                return mergeEntityActions(actions, customEntityActions);
             return actions;
         }, [canDelete, collection, path, createEnabled]);
 
         const getIdColumnWidth = useCallback(() => {
-            const snapshotActions = getActionsForSnapshot({});
-            const collapsedActions = snapshotActions.filter(a => a.collapsed !== false);
-            const uncollapsedActions = snapshotActions.filter(a => a.collapsed === false);
+            const entityActions = getActionsForEntity({});
+            const collapsedActions = entityActions.filter(a => a.collapsed !== false);
+            const uncollapsedActions = entityActions.filter(a => a.collapsed === false);
             const actionsWidth = uncollapsedActions.length * (largeLayout ? 40 : 30);
             return (largeLayout ? (80 + actionsWidth) : (70 + actionsWidth)) + (collapsedActions.length > 0 ? (largeLayout ? 40 : 30) : 0);
-        }, [getActionsForSnapshot, largeLayout]);
+        }, [getActionsForEntity, largeLayout]);
 
         const tableRowActionsBuilder = useCallback(({
-            snapshot,
+            entity,
             size,
             width,
             frozen
         }: {
-            snapshot: Snapshot<any>,
+            entity: Entity<any>,
             size: CollectionSize,
             width: number,
             frozen?: boolean
         }) => {
 
-            const isSelected = Boolean(usedSelectionController.selectedSnapshots.find(e => e.id == snapshot.id && e.path == snapshot.path));
-            const customSnapshotActions = (collection.snapshotActions ?? EMPTY_ARRAY)
-                .map(action => resolveSnapshotAction(action, customizationController.snapshotActions))
-                .filter(Boolean) as SnapshotAction<M>[];
+            const isSelected = Boolean(usedSelectionController.selectedEntitys.find(e => e.id == entity.id && e.path == entity.path));
+            const customEntityActions = (collection.entityActions ?? EMPTY_ARRAY)
+                .map(action => resolveEntityAction(action, customizationController.entityActions))
+                .filter(Boolean) as EntityAction<M>[];
 
-            const actions = getActionsForSnapshot({
-                snapshot,
-                customSnapshotActions
+            const actions = getActionsForEntity({
+                entity,
+                customEntityActions
             });
 
             return (
                 <CollectionRowActions
-                    snapshot={snapshot}
+                    entity={entity}
                     width={width}
                     frozen={frozen}
                     isSelected={isSelected}
                     selectionEnabled={activeSelectionEnabled}
                     size={size}
-                    highlightSnapshot={setHighlightedSnapshot}
-                    unhighlightSnapshot={unselectNavigatedSnapshot}
+                    highlightEntity={setHighlightedEntity}
+                    unhighlightEntity={unselectNavigatedEntity}
                     collection={collection}
                     path={path}
                     actions={actions}
                     hideId={collection?.hideIdFromCollection}
                     onCollectionChange={updateLastDeleteTimestamp}
                     selectionController={usedSelectionController}
-                    openSnapshotMode={openSnapshotMode}
+                    openEntityMode={openEntityMode}
                 />
             );
 
@@ -760,8 +760,8 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
             updateCountRef.current(path, docsCount);
         }, [docsCount, path]);
 
-        // SnapshotsCount fetches count and updates breadcrumb - no visual rendering needed here
-        const countFetcher = <SnapshotsCount
+        // EntitysCount fetches count and updates breadcrumb - no visual rendering needed here
+        const countFetcher = <EntitysCount
             path={path}
             collection={collection}
             filter={tableController.filterValues}
@@ -792,9 +792,9 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
                 onHover,
                 path,
                 collection: collection as CollectionConfig,
-                tableController: tableController as SnapshotTableController,
+                tableController: tableController as EntityTableController,
                 parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY
+parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
             };
             return <>{headerActionContributions.map((s, i) => (
                 <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
@@ -838,7 +838,7 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY
                         plugin.hooks!.onColumnsReorder!({
                             fullPath: path,
                             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-                            parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY,
+                            parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                             collection,
                             newPropertiesOrder
                         });
@@ -849,7 +849,7 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY
             if (userConfigPersistence) {
                 onCollectionModifiedForUser(path, { propertiesOrder: newPropertiesOrder } as PartialCollectionConfig<M>);
             }
-        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionSlugs, parentSnapshotIds, userConfigPersistence, onCollectionModifiedForUser]);
+        }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionSlugs, parentEntityIds, userConfigPersistence, onCollectionModifiedForUser]);
 
         // Popover open state managed at parent level to prevent closing when view changes
         const [viewModePopoverOpen, setViewModePopoverOpen] = useState(false);
@@ -875,7 +875,7 @@ parentSnapshotIds: parentSnapshotIds ?? EMPTY_ARRAY
             path,
             collection,
             parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
             error: tableController.dataLoadingError as Error
         });
         const pluginErrorView = tableController.dataLoadingError && pluginErrorViews.length > 0
@@ -891,7 +891,7 @@ parentSnapshotIds,
         const emptyComponent = pluginEmptyStates.length > 0
             ? <>{pluginEmptyStates}</>
             : <ResolvedEmptyState
-                canCreate={canCreateSnapshots && !isFilteredOrSorted}
+                canCreate={canCreateEntitys && !isFilteredOrSorted}
                 onNewClick={onNewClick}
                 isSearching={isSearching}
                 searchString={tableController.searchString ?? ""}
@@ -905,19 +905,19 @@ parentSnapshotIds,
                 initialSearchText={tableController.searchString}
                 viewModeToggle={viewModeToggleElement}
                 actionsStart={<CollectionViewStartActions
-                    parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentSnapshotIds={parentSnapshotIds ?? EMPTY_ARRAY}
+                    parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentEntityIds={parentEntityIds ?? EMPTY_ARRAY}
                     collection={collection}
                     tableController={tableController}
                     path={path}
                     relativePath={getCollectionDataPath(collection)}
                     selectionController={usedSelectionController}
-                    collectionSnapshotsCount={docsCount ?? undefined}
+                    collectionEntitysCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
                 actions={
                     <ResolvedCollectionActions
-                        parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentSnapshotIds={parentSnapshotIds ?? EMPTY_ARRAY}
+                        parentCollectionSlugs={parentCollectionSlugs ?? EMPTY_ARRAY} parentEntityIds={parentEntityIds ?? EMPTY_ARRAY}
                         collection={collection}
                         tableController={tableController}
                         onMultipleDeleteClick={onMultipleDeleteClick}
@@ -927,7 +927,7 @@ parentSnapshotIds,
                         relativePath={getCollectionDataPath(collection)}
                         selectionController={usedSelectionController}
                         selectionEnabled={activeSelectionEnabled}
-                        collectionSnapshotsCount={docsCount ?? undefined}
+                        collectionEntitysCount={docsCount ?? undefined}
                         compact={isCompact}
                     >
                         {pluginToolbarWidgets}
@@ -940,13 +940,13 @@ parentSnapshotIds,
                 collection={collection}
                 tableController={tableController}
                 fullPath={path}
-                parentCollectionSlugs={parentCollectionSlugs} parentSnapshotIds={parentSnapshotIds}
+                parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                 columnProperty={selectedKanbanProperty}
-                onSnapshotClick={onSnapshotClick}
+                onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedSnapshots={highlightedSnapshot ? [highlightedSnapshot] : []}
-                deletedSnapshots={deletedSnapshots}
+                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
+                deletedEntitys={deletedEntitys}
                 emptyComponent={emptyComponent}
             />
         ) : viewMode === "cards" ? (
@@ -954,10 +954,10 @@ parentSnapshotIds,
                 key={`cards-view-${path}`}
                 collection={collection}
                 tableController={tableController}
-                onSnapshotClick={onSnapshotClick}
+                onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedSnapshots={highlightedSnapshot ? [highlightedSnapshot] : []}
+                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
                 onScroll={tableController.onScroll}
                 initialScroll={tableController.initialScroll}
                 size={cardSize}
@@ -968,15 +968,15 @@ parentSnapshotIds,
                 key={`list-view-${path}`}
                 collection={collection}
                 tableController={tableController}
-                onSnapshotClick={onSnapshotClick}
+                onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedSnapshots={highlightedSnapshot ? [highlightedSnapshot] : []}
+                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
                 size={listSize}
                 emptyComponent={emptyComponent}
-                getActionsForSnapshot={getActionsForSnapshot}
+                getActionsForEntity={getActionsForEntity}
                 path={path}
-                openSnapshotMode={openSnapshotMode}
+                openEntityMode={openEntityMode}
             />
         ) : (
             <ResolvedCollectionTable
@@ -987,13 +987,13 @@ parentSnapshotIds,
                 enablePopupIcon={true}
                 displayedColumnIds={displayedColumnIds}
                 onSizeChanged={onTableSizeChanged}
-                onSnapshotClick={onSnapshotClick}
+                onEntityClick={onEntityClick}
                 onColumnResize={onColumnResize}
                 onValueChange={onValueChange}
                 tableRowActionsBuilder={tableRowActionsBuilder}
                 uniqueFieldValidator={uniqueFieldValidator}
                 selectionController={usedSelectionController}
-                highlightedSnapshots={highlightedSnapshot ? [highlightedSnapshot] : []}
+                highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
                 defaultSize={tableSize}
                 properties={resolvedCollection.properties}
                 getPropertyFor={getPropertyFor}
@@ -1005,11 +1005,11 @@ parentSnapshotIds,
                 AdditionalHeaderWidget={buildAdditionalHeaderWidget}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}
-                additionalIDHeaderWidget={<SnapshotIdHeaderWidget
+                additionalIDHeaderWidget={<EntityIdHeaderWidget
                     path={path}
                     idPath={path}
                     collection={collection}/>}
-                openSnapshotMode={openSnapshotMode}
+                openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
         );
@@ -1031,7 +1031,7 @@ parentSnapshotIds,
 
                 {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
                     of viewMode. The toolbar + current view live in the left panel;
-                    the right panel (snapshot detail) shows/hides based on selection.
+                    the right panel (entity detail) shows/hides based on selection.
                     This keeps the toolbar's React tree position stable across view
                     mode switches, preventing the ViewModeToggle popover from flashing. */}
                 {isSplitLayout ? (
@@ -1039,29 +1039,29 @@ parentSnapshotIds,
                         key={`split-list-view-${path}`}
                         collection={collection}
                         tableController={tableController}
-                        onSnapshotClick={onSnapshotClick}
+                        onEntityClick={onEntityClick}
                         onNewClick={onNewClick}
                         selectionController={usedSelectionController}
                         selectionEnabled={selectionEnabled}
-                        highlightedSnapshots={highlightedSnapshot ? [highlightedSnapshot] : []}
+                        highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
                         onScroll={tableController.onScroll}
                         initialScroll={tableController.initialScroll}
                         size={listSize}
                         emptyComponent={emptyComponent}
                         path={path}
-                        parentCollectionSlugs={parentCollectionSlugs} parentSnapshotIds={parentSnapshotIds}
-                        selectedSnapshotId={selectedSnapshotIdProp}
+                        parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
+                        selectedEntityId={selectedEntityIdProp}
                         selectedTab={selectedTabProp}
                         toolbar={toolbarNode}
                     >
                         {/* When detail panel is open, left panel is always the list
-                            view — regardless of which view mode triggered the snapshot
+                            view — regardless of which view mode triggered the entity
                             click. When no detail, show the active view mode. */}
-                        {(selectedSnapshotIdProp !== undefined || viewMode === "list") ? (
+                        {(selectedEntityIdProp !== undefined || viewMode === "list") ? (
                             <div
                                 className={cls(
                                     "flex flex-col w-full",
-                                    selectedSnapshotIdProp === undefined
+                                    selectedEntityIdProp === undefined
                                         ? "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
                                         : ""
                                 )}
@@ -1070,7 +1070,7 @@ parentSnapshotIds,
                                 <div
                                     className={cls(
                                         "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
-                                        selectedSnapshotIdProp === undefined
+                                        selectedEntityIdProp === undefined
                                             ? "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
                                             : "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
                                     )}
@@ -1085,7 +1085,7 @@ parentSnapshotIds,
                                     <div
                                         className={cls(
                                             "grid transition-[grid-template-rows] duration-150 ease-out",
-                                            selectedSnapshotIdProp === undefined
+                                            selectedEntityIdProp === undefined
                                                 ? "grid-rows-[1fr]"
                                                 : "grid-rows-[0fr]"
                                         )}
@@ -1099,16 +1099,16 @@ parentSnapshotIds,
                                     key={`list-view-${path}`}
                                     collection={collection}
                                     tableController={tableController}
-                                    onSnapshotClick={onSnapshotClick}
+                                    onEntityClick={onEntityClick}
                                     selectionController={usedSelectionController}
                                     selectionEnabled={selectionEnabled}
-                                    highlightedSnapshots={highlightedSnapshot ? [highlightedSnapshot] : []}
+                                    highlightedEntitys={highlightedEntity ? [highlightedEntity] : []}
                                     size={listSize}
                                     emptyComponent={emptyComponent}
-                                    selectedSnapshotId={selectedSnapshotIdProp}
-                                    getActionsForSnapshot={getActionsForSnapshot}
+                                    selectedEntityId={selectedEntityIdProp}
+                                    getActionsForEntity={getActionsForEntity}
                                     path={path}
-                                    openSnapshotMode={openSnapshotMode}
+                                    openEntityMode={openEntityMode}
                                 />
                             </div>
                         ) : (
@@ -1126,7 +1126,7 @@ parentSnapshotIds,
                                 <div
                                     className={cls(
                                         "flex flex-col w-full",
-                                        selectedSnapshotIdProp === undefined
+                                        selectedEntityIdProp === undefined
                                             ? "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
                                             : ""
                                     )}
@@ -1134,7 +1134,7 @@ parentSnapshotIds,
                                     <div
                                         className={cls(
                                             "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
-                                            selectedSnapshotIdProp === undefined
+                                            selectedEntityIdProp === undefined
                                                 ? "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
                                                 : "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
                                         )}
@@ -1160,29 +1160,29 @@ parentSnapshotIds,
                 )}
 
                 {popupCell && <PopupFormField
-                    key={`popup_form_${popupCell?.propertyKey}_${popupCell?.snapshotId}`}
+                    key={`popup_form_${popupCell?.propertyKey}_${popupCell?.entityId}`}
                     open={Boolean(popupCell)}
                     onClose={onPopupClose}
                     cellRect={popupCell?.cellRect}
                     propertyKey={popupCell?.propertyKey}
                     collection={collection}
-                    snapshotId={popupCell.snapshotId}
+                    entityId={popupCell.entityId}
                     tableKey={tableKey.current}
                     customFieldValidator={uniqueFieldValidator}
                     path={path}
                     onCellValueChange={onValueChange}
                     container={containerRef.current}/>}
 
-                {deleteSnapshotClicked &&
-                    <DeleteSnapshotDialog
-                        snapshotOrSnapshotsToDelete={deleteSnapshotClicked}
+                {deleteEntityClicked &&
+                    <DeleteEntityDialog
+                        entityOrEntitysToDelete={deleteEntityClicked}
                         path={path}
                         collection={collection}
                         callbacks={collection.callbacks}
-                        open={Boolean(deleteSnapshotClicked)}
-                        onSnapshotDelete={internalOnSnapshotDelete}
-                        onMultipleSnapshotsDelete={internalOnMultipleSnapshotsDelete}
-                        onClose={() => setDeleteSnapshotClicked(undefined)}/>}
+                        open={Boolean(deleteEntityClicked)}
+                        onEntityDelete={internalOnEntityDelete}
+                        onMultipleEntitysDelete={internalOnMultipleEntitysDelete}
+                        onClose={() => setDeleteEntityClicked(undefined)}/>}
 
             </div>
         );
@@ -1190,7 +1190,7 @@ parentSnapshotIds,
         return mainContent;
     }, (a, b) => {
         return equal(a.path, b.path) &&
-            equal(a.parentCollectionSlugs, b.parentCollectionSlugs) && equal(a.parentSnapshotIds, b.parentSnapshotIds) &&
+            equal(a.parentCollectionSlugs, b.parentCollectionSlugs) && equal(a.parentEntityIds, b.parentEntityIds) &&
             equal(a.isSubCollection, b.isSubCollection) &&
             equal(a.className, b.className) &&
             equal(a.properties, b.properties) &&
@@ -1204,11 +1204,11 @@ parentSnapshotIds,
             equal(a.includeJsonView, b.includeJsonView) &&
             equal(a.additionalFields, b.additionalFields) &&
             equal(a.sideDialogWidth, b.sideDialogWidth) &&
-            equal(a.openSnapshotMode, b.openSnapshotMode) &&
+            equal(a.openEntityMode, b.openEntityMode) &&
             equal(a.exportable, b.exportable) &&
             equal(a.history, b.history) &&
             equal(a.fixedFilter, b.fixedFilter) &&
-            equal(a.selectedSnapshotId, b.selectedSnapshotId) &&
+            equal(a.selectedEntityId, b.selectedEntityId) &&
             equal(a.selectedTab, b.selectedTab);
     }) as React.FunctionComponent<CollectionViewBindingProps<any>>;
 
@@ -1232,7 +1232,7 @@ export const CollectionViewBinding = React.memo(
 ) as React.FunctionComponent<CollectionViewBindingProps<any>>;
 
 /**
- * Default empty state shown when a collection has no snapshots.
+ * Default empty state shown when a collection has no entitys.
  * Used as the fallback for the `"Collection.EmptyState"` component override.
  *
  * @internal
@@ -1279,7 +1279,7 @@ function DefaultCollectionEmptyState({
  */
 const inflightCountRequests = new Map<string, Promise<number>>();
 
-function SnapshotsCount({
+function EntitysCount({
     path,
     collection,
     filter,
@@ -1355,7 +1355,7 @@ function buildPropertyWidthOverwrite(key: string, width: number): PartialCollect
     return { properties: { [key]: { ui: { columnWidth: width } } } } as PartialCollectionConfig;
 }
 
-function SnapshotIdHeaderWidget({
+function EntityIdHeaderWidget({
     collection,
     path,
     idPath
@@ -1372,7 +1372,7 @@ function SnapshotIdHeaderWidget({
     const [recentIds, setRecentIds] = React.useState<string[]>(getRecentIds(collection.slug).map(String));
     const sidePanelController = useSidePanel();
 
-    const openSnapshotMode = collection?.openSnapshotMode ?? DEFAULT_SNAPSHOT_OPEN_MODE;
+    const openEntityMode = collection?.openEntityMode ?? DEFAULT_ENTITY_OPEN_MODE;
 
     return (
         <Tooltip title={!openPopup ? t("find_by_id") : undefined} asChild={false}>
@@ -1394,12 +1394,12 @@ function SnapshotIdHeaderWidget({
                             e.preventDefault();
                             if (!searchString) return;
                             setOpenPopup(false);
-                            const snapshotId = searchString.trim();
-                            setRecentIds(addRecentId(collection.slug, snapshotId).map(String));
-                            navigateToSnapshot({
-                                openSnapshotMode,
+                            const entityId = searchString.trim();
+                            setRecentIds(addRecentId(collection.slug, entityId).map(String));
+                            navigateToEntity({
+                                openEntityMode,
                                 collection,
-                                snapshotId,
+                                entityId,
                                 path,
 
                                 sidePanelController,
@@ -1411,7 +1411,7 @@ function SnapshotIdHeaderWidget({
                         <div className="flex p-2 w-full gap-2">
                             <TextField
                                 autoFocus={openPopup}
-                                placeholder={t("find_snapshot_by_id")}
+                                placeholder={t("find_entity_by_id")}
                                 size="small"
                                 onChange={(e) => {
                                     setSearchString(e.target.value);
@@ -1428,23 +1428,23 @@ function SnapshotIdHeaderWidget({
                     </form>
                     {recentIds && recentIds.length > 0 && <div className="flex flex-col gap-2 p-2">
                         {recentIds.map(id => (
-                            <ReferencePreview reference={new SnapshotReference({ id,
+                            <ReferencePreview reference={new EntityReference({ id,
 path })}
                                 key={id}
                                 hover={true}
                                 onClick={() => {
                                     setOpenPopup(false);
-                                    navigateToSnapshot({
-                                        openSnapshotMode,
+                                    navigateToEntity({
+                                        openEntityMode,
                                         collection,
-                                        snapshotId: id,
+                                        entityId: id,
                                         path,
 
                                         sidePanelController,
                                         navigation: urlController
                                     })
                                 }}
-                                includeSnapshotLink={false}
+                                includeEntityLink={false}
                                 size={"small"}/>
                         ))}
                     </div>}

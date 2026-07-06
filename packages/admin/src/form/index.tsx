@@ -1,8 +1,8 @@
-export { SnapshotForm } from "./SnapshotForm";
-export type { SnapshotFormProps, OnUpdateParams } from "../types/components/SnapshotFormProps";
+export { EntityForm } from "./EntityForm";
+export type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
 
-export { SnapshotFormBinding } from "./SnapshotFormBinding";
-export type { SnapshotFormBindingProps } from "./SnapshotFormBinding";
+export { EntityFormBinding } from "./EntityFormBinding";
+export type { EntityFormBindingProps } from "./EntityFormBinding";
 
 export { SelectFieldBinding } from "./field_bindings/SelectFieldBinding";
 export { MultiSelectFieldBinding } from "./field_bindings/MultiSelectFieldBinding";
@@ -31,6 +31,6 @@ export {
     extractTouchedValues,
     removeEmptyContainers,
     getChanges,
-    getInitialSnapshotValues,
+    getInitialEntityValues,
     zodToFormErrors
 } from "./form_utils";

@@ -88,7 +88,7 @@ export class RestApiGenerator {
         const basePath = `/${collection.slug}`;
         const resolvedCollection = collection;
 
-        // GET /collection/count - Count snapshots (with optional filters)
+        // GET /collection/count - Count entitys (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
@@ -96,11 +96,11 @@ export class RestApiGenerator {
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const driver = this.getScopedDriver(c);
 
-            const total = await this.countRawSnapshots(driver, resolvedCollection, queryOptions, searchString);
+            const total = await this.countRawEntitys(driver, resolvedCollection, queryOptions, searchString);
             return c.json({ count: total });
         });
 
-        // GET /collection - List snapshots
+        // GET /collection - List entitys
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
@@ -111,7 +111,7 @@ export class RestApiGenerator {
             const fetchService = driver.restFetchService;
 
             // Use include-aware path when available
-            const snapshots = fetchService
+            const entitys = fetchService
                 ? await fetchService.fetchCollectionForRest(
                     collection.slug,
                     {
@@ -127,20 +127,20 @@ export class RestApiGenerator {
                 )
                 : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
 
-            const total = await this.countRawSnapshots(driver, resolvedCollection, queryOptions, searchString);
+            const total = await this.countRawEntitys(driver, resolvedCollection, queryOptions, searchString);
 
             return c.json({
-                data: snapshots,
+                data: entitys,
                 meta: {
                     total,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    hasMore: (queryOptions.offset || 0) + snapshots.length < total
+                    hasMore: (queryOptions.offset || 0) + entitys.length < total
                 }
             });
         });
 
-        // GET /collection/:id - Get single snapshot
+        // GET /collection/:id - Get single entity
         this.router.get(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
@@ -150,18 +150,18 @@ export class RestApiGenerator {
             const fetchService = driver.restFetchService;
 
             // Use include-aware path when available
-            const snapshot = fetchService
+            const entity = fetchService
                 ? await fetchService.fetchOneForRest(collection.slug, String(id), queryOptions.include)
-                : await this.fetchRawSnapshot(driver, resolvedCollection, String(id));
+                : await this.fetchRawEntity(driver, resolvedCollection, String(id));
 
-            if (!snapshot) {
-                throw ApiError.notFound("Snapshot not found");
+            if (!entity) {
+                throw ApiError.notFound("Entity not found");
             }
 
-            return c.json(snapshot);
+            return c.json(entity);
         });
 
-        // POST /collection - Create snapshot
+        // POST /collection - Create entity
         this.router.post(basePath, async (c) => {
             try {
                 this.enforceApiKeyPermission(c, collection.slug);
@@ -180,7 +180,7 @@ export class RestApiGenerator {
                     const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
                     const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
 
-                    const snapshot = await driver.save({
+                    const entity = await driver.save({
                         path,
                         values: prepared.values,
                         collection: resolvedCollection,
@@ -192,13 +192,13 @@ export class RestApiGenerator {
 invitationSent: prepared.invitationSent }
                         : this.authAdapter.finalizeUserCreation
                             ? await this.authAdapter.finalizeUserCreation(
-                                { id: snapshot.id as string,
-values: snapshot.values as Record<string, unknown> },
+                                { id: entity.id as string,
+values: entity.values as Record<string, unknown> },
                                 prepared.clearPassword
                             )
                             : { invitationSent: false };
 
-                    const response = this.formatResponse(snapshot) as Record<string, unknown>;
+                    const response = this.formatResponse(entity) as Record<string, unknown>;
 
 
 
@@ -209,14 +209,14 @@ values: snapshot.values as Record<string, unknown> },
                     }, 201);
                 }
 
-                const snapshot = await driver.save({
+                const entity = await driver.save({
                     path,
                     values: body,
                     collection: resolvedCollection,
                     status: "new"
                 });
 
-                const response = this.formatResponse(snapshot);
+                const response = this.formatResponse(entity);
 
 
 
@@ -238,7 +238,7 @@ values: snapshot.values as Record<string, unknown> },
             }
         });
 
-        // PUT /collection/:id - Update snapshot
+        // PUT /collection/:id - Update entity
         this.router.put(`${basePath}/:id`, async (c) => {
             try {
                 this.enforceApiKeyPermission(c, collection.slug);
@@ -246,21 +246,21 @@ values: snapshot.values as Record<string, unknown> },
                 const driver = this.getScopedDriver(c);
 
 
-                const existingSnapshot = await driver.fetchOne({
+                const existingEntity = await driver.fetchOne({
                     path: getCollectionDataPath(collection),
                     id: String(id),
                     collection: resolvedCollection
                 });
 
-                if (!existingSnapshot) {
-                    throw ApiError.notFound("Snapshot not found");
+                if (!existingEntity) {
+                    throw ApiError.notFound("Entity not found");
                 }
 
                 let body = await c.req.json().catch(() => ({}));
 
 
 
-                const snapshot = await driver.save({
+                const entity = await driver.save({
                     path: getCollectionDataPath(collection),
                     id: String(id),
                     values: body,
@@ -268,7 +268,7 @@ values: snapshot.values as Record<string, unknown> },
                     status: "existing"
                 });
 
-                const response = this.formatResponse(snapshot);
+                const response = this.formatResponse(entity);
 
 
 
@@ -289,30 +289,30 @@ values: snapshot.values as Record<string, unknown> },
             }
         });
 
-        // DELETE /collection/:id - Delete snapshot
+        // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
             const driver = this.getScopedDriver(c);
 
 
-            const existingSnapshot = await driver.fetchOne({
+            const existingEntity = await driver.fetchOne({
                 path: getCollectionDataPath(collection),
                 id: String(id),
                 collection: resolvedCollection
             });
 
-            if (!existingSnapshot) {
-                throw ApiError.notFound("Snapshot not found");
+            if (!existingEntity) {
+                throw ApiError.notFound("Entity not found");
             }
 
 
 
             await driver.delete({
                 row: {
-                    id: existingSnapshot.id as string | number,
+                    id: existingEntity.id as string | number,
                     path: getCollectionDataPath(collection),
-                    values: existingSnapshot
+                    values: existingEntity
                 },
                 collection: resolvedCollection
             });
@@ -328,10 +328,10 @@ values: snapshot.values as Record<string, unknown> },
      *
      * Matches URL patterns like:
      *   GET    /authors/111094/posts          → list child collection
-     *   GET    /authors/111094/posts/43       → get child snapshot
-     *   POST   /authors/111094/posts          → create child snapshot
-     *   PUT    /authors/111094/posts/43       → update child snapshot
-     *   DELETE /authors/111094/posts/43       → delete child snapshot
+     *   GET    /authors/111094/posts/43       → get child entity
+     *   POST   /authors/111094/posts          → create child entity
+     *   PUT    /authors/111094/posts/43       → update child entity
+     *   DELETE /authors/111094/posts/43       → delete child entity
      *
      * The `:rest{.+}` regex param captures the full remainder of the URL
      * path (Hono v4 `*` wildcard does not populate `c.req.param("*")`).
@@ -361,7 +361,7 @@ values: snapshot.values as Record<string, unknown> },
             if (segments.some(s => RESERVED_SEGMENTS.has(s))) return null;
 
             // Odd segment count → collection path (parent/id/child or parent/id/child/id2/grandchild)
-            // Even segment count → snapshot path   (parent/id/child/id)
+            // Even segment count → entity path   (parent/id/child/id)
             if (segments.length % 2 === 1) {
                 return { collectionPath: segments.join("/") };
             } else {
@@ -371,7 +371,7 @@ id };
             }
         };
 
-        // GET /<subcollection-path> — list or get single snapshot
+        // GET /<subcollection-path> — list or get single entity
         // Use :rest{.+} instead of * because Hono v4's wildcard doesn't
         // capture into c.req.param("*") — it always returns undefined.
         this.router.get("/:parent/:parentId/:rest{.+}", async (c, next) => {
@@ -388,7 +388,7 @@ id };
 
 
             if (parsed.id === "count") {
-                // GET /parent/:parentId/child/count — count child snapshots
+                // GET /parent/:parentId/child/count — count child entitys
                 const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
@@ -401,20 +401,20 @@ id };
 
                 return c.json({ count: total });
             } else if (parsed.id) {
-                // GET /parent/:parentId/child/:id — single snapshot
-                const snapshot = await driver.fetchOne({
+                // GET /parent/:parentId/child/:id — single entity
+                const entity = await driver.fetchOne({
                     path: parsed.collectionPath,
                     id: parsed.id
                 });
-                if (!snapshot) throw ApiError.notFound("Snapshot not found");
+                if (!entity) throw ApiError.notFound("Entity not found");
 
-                return c.json(snapshot);
+                return c.json(entity);
             } else {
-                // GET /parent/:parentId/child — list snapshots
+                // GET /parent/:parentId/child — list entitys
                 const queryDict = c.req.queries();
                 const queryOptions = parseQueryOptions(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                const snapshots = await driver.fetchCollection({
+                const entitys = await driver.fetchCollection({
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
                     limit: queryOptions.limit,
@@ -427,21 +427,21 @@ id };
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
                     searchString
-                }) : snapshots.length;
+                }) : entitys.length;
 
                 return c.json({
-                    data: snapshots,
+                    data: entitys,
                     meta: {
                         total,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        hasMore: (queryOptions.offset || 0) + snapshots.length < total
+                        hasMore: (queryOptions.offset || 0) + entitys.length < total
                     }
                 });
             }
         });
 
-        // POST /<subcollection-path> — create snapshot
+        // POST /<subcollection-path> — create entity
         this.router.post("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
             if (!rest || rest === "undefined") return next();
@@ -457,20 +457,20 @@ id };
 
 
 
-            const snapshot = await driver.save({
+            const entity = await driver.save({
                 path: parsed.collectionPath,
                 values: body,
                 status: "new"
             });
 
-            const response = this.formatResponse(snapshot);
+            const response = this.formatResponse(entity);
 
 
 
             return c.json(response, 201);
         });
 
-        // PUT /<subcollection-path>/:id — update snapshot
+        // PUT /<subcollection-path>/:id — update entity
         this.router.put("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
             if (!rest || rest === "undefined") return next();
@@ -487,21 +487,21 @@ id };
 
 
 
-            const snapshot = await driver.save({
+            const entity = await driver.save({
                 path: parsed.collectionPath,
                 id: parsed.id,
                 values: body,
                 status: "existing"
             });
 
-            const response = this.formatResponse(snapshot);
+            const response = this.formatResponse(entity);
 
 
 
             return c.json(response);
         });
 
-        // DELETE /<subcollection-path>/:id — delete snapshot
+        // DELETE /<subcollection-path>/:id — delete entity
         this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {
             const rest = c.req.param("rest");
             if (!rest || rest === "undefined") return next();
@@ -514,20 +514,20 @@ id };
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
-            const existingSnapshot = await driver.fetchOne({
+            const existingEntity = await driver.fetchOne({
                 path: parsed.collectionPath,
                 id: parsed.id
             });
 
-            if (!existingSnapshot) throw ApiError.notFound("Snapshot not found");
+            if (!existingEntity) throw ApiError.notFound("Entity not found");
 
 
 
             await driver.delete({
                 row: {
-                    id: existingSnapshot.id as string | number,
+                    id: existingEntity.id as string | number,
                     path: parsed.collectionPath,
-                    values: existingSnapshot
+                    values: existingEntity
                 }
             });
 
@@ -553,10 +553,10 @@ id };
 
 
     /**
-     * Fetch raw collection data without Snapshot wrapper (fallback for non-Postgres)
+     * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
     private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string) {
-        const snapshots = await driver.fetchCollection({
+        const entitys = await driver.fetchCollection({
             path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
@@ -568,13 +568,13 @@ id };
             vectorSearch: queryOptions.vectorSearch
         });
 
-        return snapshots;
+        return entitys;
     }
 
     /**
-     * Count raw snapshots for a collection
+     * Count raw entitys for a collection
      */
-    private async countRawSnapshots(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string): Promise<number> {
+    private async countRawEntitys(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string): Promise<number> {
         return driver.count ? await driver.count({
             path: getCollectionDataPath(collection),
             collection,
@@ -584,16 +584,16 @@ id };
     }
 
     /**
-     * Fetch single snapshot raw data without Snapshot wrapper (fallback)
+     * Fetch single entity raw data without Entity wrapper (fallback)
      */
-    private async fetchRawSnapshot(driver: DataDriver, collection: CollectionConfig, id: string) {
-        const snapshot = await driver.fetchOne({
+    private async fetchRawEntity(driver: DataDriver, collection: CollectionConfig, id: string) {
+        const entity = await driver.fetchOne({
             path: getCollectionDataPath(collection),
             id,
             collection
         });
 
-        return snapshot ?? null;
+        return entity ?? null;
     }
 
 

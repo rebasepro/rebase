@@ -44,7 +44,7 @@ export type CMSContext<
  * core {@link RebaseContext} with CMS-specific controllers.
  *
  * Use this instead of `useRebaseContext()` in CMS components that
- * need to pass context to snapshot action callbacks, plugin slots,
+ * need to pass context to entity action callbacks, plugin slots,
  * or any consumer that expects CMS controllers on the context object.
  *
  * @group Hooks and utilities

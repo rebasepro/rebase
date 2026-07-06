@@ -6,11 +6,11 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } fro
 
 import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
 
-import { Snapshot, SnapshotValues } from "@rebasepro/types";
+import { Entity, EntityValues } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/formex";
 import { useDraggable } from "./useDraggable";
-import { CustomFieldValidator, getSnapshotSchema } from "../../../../form/validation";
+import { CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
 import { useWindowSize } from "./useWindowSize";
 import { getPropertyInPath } from "../../../../util/property_utils";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
@@ -21,7 +21,7 @@ import { isReadOnly } from "@rebasepro/common";
 interface PopupFormFieldProps<M extends Record<string, unknown>> {
     customFieldValidator?: CustomFieldValidator;
     path: string;
-    snapshotId: string | number;
+    entityId: string | number;
     tableKey: string;
     propertyKey?: Extract<keyof M, string>;
     collection?: CollectionConfig<any>;
@@ -44,7 +44,7 @@ export function PopupFormField<M extends Record<string, unknown>>(props: PopupFo
 
 export function PopupFormFieldLoading<M extends Record<string, unknown>>({
     tableKey,
-    snapshotId,
+    entityId,
     customFieldValidator,
     propertyKey,
     collection: inputCollection,
@@ -56,17 +56,17 @@ export function PopupFormFieldLoading<M extends Record<string, unknown>>({
     container
 }: PopupFormFieldProps<M>) {
     const dataClient = useData();
-    const [snapshot, setSnapshot] = useState<Snapshot<M> | undefined>(undefined);
+    const [entity, setEntity] = useState<Entity<M> | undefined>(undefined);
     useEffect(() => {
-        if (snapshotId && inputCollection) {
-            dataClient.collection(path).findById(snapshotId).then((result) => setSnapshot(result as Snapshot<M> | undefined));
+        if (entityId && inputCollection) {
+            dataClient.collection(path).findById(entityId).then((result) => setEntity(result as Entity<M> | undefined));
         }
-    }, [snapshotId, inputCollection, dataClient, path]);
+    }, [entityId, inputCollection, dataClient, path]);
 
-    if (!snapshot) return null;
+    if (!entity) return null;
     return <PopupFormFieldInternal {...{
         tableKey,
-        snapshotId,
+        entityId,
         customFieldValidator,
         propertyKey,
         collection: inputCollection,
@@ -76,12 +76,12 @@ export function PopupFormFieldLoading<M extends Record<string, unknown>>({
         onClose,
         onCellValueChange,
         container
-    }} snapshot={snapshot}/>;
+    }} entity={entity}/>;
 }
 
 export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     tableKey,
-    snapshotId,
+    entityId,
     customFieldValidator,
     propertyKey,
     collection,
@@ -91,9 +91,9 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     onClose,
     onCellValueChange,
     container,
-    snapshot
+    entity
 }: PopupFormFieldProps<M> & {
-    snapshot?: Snapshot<M>
+    entity?: Entity<M>
 }) {
 
     const rebaseContext = useRebaseContext();
@@ -168,7 +168,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         () => {
             initialPositionSet.current = false;
         },
-        [propertyKey, snapshot]
+        [propertyKey, entity]
     );
 
     useLayoutEffect(
@@ -195,14 +195,14 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     );
 
     const validationSchema = useMemo(() => {
-        if (!collection || !snapshotId) return;
-        return getSnapshotSchema(
-            snapshotId,
+        if (!collection || !entityId) return;
+        return getEntitySchema(
+            entityId,
             propertyKey && collection.properties[propertyKey as string]
                 ? { [propertyKey]: collection.properties[propertyKey as string] } as Properties
                 : {} as Properties,
             customFieldValidator);
-    }, [collection, snapshotId, propertyKey, customFieldValidator]);
+    }, [collection, entityId, propertyKey, customFieldValidator]);
 
     const adaptResize = useCallback(() => {
         // When the popup resizes, we want to re-evaluate its position
@@ -229,11 +229,11 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
 
     const saveValue = async (values: M) => {
         setSavingError(null);
-        if (collection && snapshot && onCellValueChange && propertyKey) {
+        if (collection && entity && onCellValueChange && propertyKey) {
             return onCellValueChange({
                 value: values[propertyKey as string],
                 propertyKey: propertyKey as string,
-                data: snapshot,
+                data: entity,
                 setError: setSavingError,
                 onValueUpdated: () => {
                 }
@@ -243,7 +243,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     };
 
     const formex = useCreateFormex<M>({
-        initialValues: (snapshot?.values ?? {}) as SnapshotValues<M>,
+        initialValues: (entity?.values ?? {}) as EntityValues<M>,
         validation: async (values) => {
             if (!validationSchema) return {};
             const result = await validationSchema.safeParseAsync(values);
@@ -274,7 +274,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
 
     const formContext: FormContext<M> = {
         collection: collection,
-        snapshotId,
+        entityId,
         values,
         path,
         setFieldValue,
@@ -282,7 +282,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         submit: handleSubmit,
         formex,
         status: "existing",
-        openSnapshotMode: "side_panel",
+        openEntityMode: "side_panel",
         disabled: false
     };
 
@@ -303,7 +303,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
 
     let internalForm = <>
         <div
-            key={`popup_form_${tableKey}_${snapshotId}_${propertyKey}`}
+            key={`popup_form_${tableKey}_${entityId}_${propertyKey}`}
             className="w-[700px] max-w-full max-h-[85vh]">
             <form
                 onSubmit={handleSubmit}
@@ -347,9 +347,9 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
                     status: "existing",
                     path,
                     collection,
-                    snapshot,
+                    entity,
                     context: rebaseContext,
-                    currentSnapshotId: snapshotId,
+                    currentEntityId: entityId,
                     formContext
                 }}>
                 {internalForm}
@@ -370,7 +370,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
 
     const draggable = (
         <div
-            key={`draggable_${propertyKey as string}_${snapshotId}_${open}`}
+            key={`draggable_${propertyKey as string}_${entityId}_${open}`}
             style={{
                 boxShadow: "0 0 0 2px rgba(128,128,128,0.2)"
             }}

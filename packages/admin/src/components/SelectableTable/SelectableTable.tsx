@@ -1,7 +1,7 @@
 import { createSelectionStore, AdminSelectedCell } from "./SelectionStore";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { CollectionSize, Snapshot, SnapshotRelation, SnapshotTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityRelation, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
 import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams, VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { enumToObjectEntries } from "@rebasepro/common";
 import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
@@ -24,15 +24,15 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
 
     columns: VirtualTableColumn[];
 
-    cellRenderer: (props: CellRendererParams<Snapshot<M>>) => React.ReactNode;
+    cellRenderer: (props: CellRendererParams<Entity<M>>) => React.ReactNode;
 
     /**
      * Builder for creating the buttons in each row
-     * @param snapshot
+     * @param entity
      * @param size
      */
     tableRowActionsBuilder?: (params: {
-        snapshot: Snapshot<M>,
+        entity: Entity<M>,
         size: CollectionSize,
         width: number,
         frozen?: boolean
@@ -41,7 +41,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
     /**
      * Callback when anywhere on the table is clicked
      */
-    onSnapshotClick?(snapshot: Snapshot<M>): void;
+    onEntityClick?(entity: Entity<M>): void;
 
     /**
      * Callback when a column is resized
@@ -56,9 +56,9 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
     /**
      * Controller holding the logic for the table
      * {@link useDataTableController}
-     * {@link SnapshotTableController}
+     * {@link EntityTableController}
      */
-    tableController: SnapshotTableController<M>;
+    tableController: EntityTableController<M>;
 
     filterable?: boolean;
 
@@ -68,7 +68,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
 
     fixedFilter?: FilterValues<keyof M extends string ? keyof M : never>;
 
-    highlightedRow?: (data: Snapshot<M>) => boolean;
+    highlightedRow?: (data: Entity<M>) => boolean;
 
     size?: CollectionSize;
 
@@ -118,7 +118,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
  * options you see in collections in the top level navigation, you can
  * check {@link CollectionViewBinding}.
  *
- * The data displayed in the table is managed by a {@link SnapshotTableController}.
+ * The data displayed in the table is managed by a {@link EntityTableController}.
  * You can build the default, bound to a path in the driver, by using the hook
  * {@link useDataTableController}
  *
@@ -131,7 +131,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     ({
         onValueChange,
         cellRenderer,
-        onSnapshotClick,
+        onEntityClick,
         onColumnResize,
         hoverRow = true,
         size = "m",
@@ -187,8 +187,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     const onRowClick = useCallback(({ rowData }: OnRowClickParams<Record<string, unknown>>) => {
         if (inlineEditing)
             return;
-        return onSnapshotClick && onSnapshotClick(rowData as unknown as Snapshot<M>);
-    }, [onSnapshotClick, inlineEditing]);
+        return onEntityClick && onEntityClick(rowData as unknown as Entity<M>);
+    }, [onEntityClick, inlineEditing]);
 
     const select = useCallback((cell?: SelectedCellProps<M>) => {
         setLocalSelectedCell(cell);
@@ -196,7 +196,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
             selectionStore.select({
                 ...cell,
                 columnKey: cell.propertyKey,
-                id: cell.snapshotId
+                id: cell.entityId
             } as AdminSelectedCell);
         } else {
             selectionStore.select(undefined);
@@ -255,8 +255,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                  <TableView
                     data={data as unknown as Record<string, unknown>[]}
                     columns={columns}
-                    cellRenderer={(props) => cellRenderer(props as unknown as CellRendererParams<Snapshot<M>>)}
-                    onRowClick={inlineEditing ? undefined : (onSnapshotClick ? onRowClick : undefined)}
+                    cellRenderer={(props) => cellRenderer(props as unknown as CellRendererParams<Entity<M>>)}
+                    onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}
                     onEndReached={loadNextPage}
                     onResetPagination={resetPagination}
                     error={dataLoadingError}
@@ -272,8 +272,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     onScroll={onScroll}
                     checkFilterCombination={checkFilterCombination}
                     createFilterField={filterable ? createFilterField : undefined}
-                    rowClassName={useCallback((snapshot: Record<string, unknown>) => {
-                        return highlightedRow?.(snapshot as unknown as Snapshot<M>) ? "bg-surface-accent-50 dark:!bg-surface-accent-900" : "";
+                    rowClassName={useCallback((entity: Record<string, unknown>) => {
+                        return highlightedRow?.(entity as unknown as Entity<M>) ? "bg-surface-accent-50 dark:!bg-surface-accent-900" : "";
                     }, [highlightedRow])}
                     className="grow"
                     emptyComponent={emptyComponent}
@@ -322,7 +322,7 @@ function createFilterField({
             hidden={hidden}
             setHidden={setHidden}/>;
     } else if (baseProperty.type === "relation" && baseProperty.relation) {
-        return <RelationFilterField value={filterValue as [VirtualTableWhereFilterOp, SnapshotRelation | SnapshotRelation[] | null]}
+        return <RelationFilterField value={filterValue as [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null]}
             setValue={setFilterValue}
             name={id as string}
             relation={baseProperty.relation}

@@ -163,7 +163,7 @@ Rebase utilise **Tailwind CSS v4** et prend en charge les modes clair/sombre. Pe
 ## Prochaines étapes
 
 - **[Champs personnalisés](/docs/frontend/custom-fields)** — Créez des champs de formulaire personnalisés
-- **[Vues d'entité](/docs/frontend/snapshot-views)** — Ajoutez des onglets aux éditeurs d'entités
+- **[Vues d'entité](/docs/frontend/entity-views)** — Ajoutez des onglets aux éditeurs d'entités
 - **[Modes d'affichage](/docs/frontend/view-modes)** — Liste, Tableau, Cartes, Kanban
 - **[Plugins](/docs/plugins)** — Étendez le framework
 ---

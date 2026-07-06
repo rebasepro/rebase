@@ -1,13 +1,13 @@
 import { HistoryIcon } from "@rebasepro/ui";
 import React from "react";
-import type { CustomizationController, SnapshotAction, SnapshotCustomView } from "@rebasepro/types";
+import type { CustomizationController, EntityAction, EntityCustomView } from "@rebasepro/types";
 
 /**
- * Built-in snapshot views that are resolved by token name.
+ * Built-in entity views that are resolved by token name.
  * These are always available without needing to be registered
- * in the customization controller's snapshotViews array.
+ * in the customization controller's entityViews array.
  */
-const BUILTIN_SNAPSHOT_VIEWS: Record<string, SnapshotCustomView> = {
+const BUILTIN_ENTITY_VIEWS: Record<string, EntityCustomView> = {
     "__rebase_history": {
         key: "__rebase_history",
         name: "History",
@@ -16,52 +16,52 @@ const BUILTIN_SNAPSHOT_VIEWS: Record<string, SnapshotCustomView> = {
     }
 };
 
-export function resolveSnapshotView(
-    snapshotView: string | SnapshotCustomView<any>,
-    contextSnapshotViews?: SnapshotCustomView<any>[]
-): SnapshotCustomView<any> | undefined {
-    if (typeof snapshotView === "string") {
+export function resolveEntityView(
+    entityView: string | EntityCustomView<any>,
+    contextEntityViews?: EntityCustomView<any>[]
+): EntityCustomView<any> | undefined {
+    if (typeof entityView === "string") {
         // Check built-in views first, then user-registered views
-        return BUILTIN_SNAPSHOT_VIEWS[snapshotView]
-            ?? contextSnapshotViews?.find((entry) => entry.key === snapshotView);
+        return BUILTIN_ENTITY_VIEWS[entityView]
+            ?? contextEntityViews?.find((entry) => entry.key === entityView);
     } else {
-        return snapshotView;
+        return entityView;
     }
 }
 
-export function resolveSnapshotAction<M extends Record<string, unknown>>(
-    snapshotAction: string | SnapshotAction<M>,
-    contextSnapshotActions?: SnapshotAction<M>[]
-): SnapshotAction<M> | undefined {
-    if (typeof snapshotAction === "string") {
-        return contextSnapshotActions?.find((entry) => entry.key === snapshotAction);
+export function resolveEntityAction<M extends Record<string, unknown>>(
+    entityAction: string | EntityAction<M>,
+    contextEntityActions?: EntityAction<M>[]
+): EntityAction<M> | undefined {
+    if (typeof entityAction === "string") {
+        return contextEntityActions?.find((entry) => entry.key === entityAction);
     } else {
-        return snapshotAction;
+        return entityAction;
     }
 }
 
-export function resolvedSelectedSnapshotView<M extends Record<string, unknown>>(
-    customViews: (string | SnapshotCustomView<M>)[] | undefined,
+export function resolvedSelectedEntityView<M extends Record<string, unknown>>(
+    customViews: (string | EntityCustomView<M>)[] | undefined,
     customizationController: CustomizationController,
     selectedTab?: string,
     _canEdit?: boolean
 ) {
-    const resolvedSnapshotViews = customViews
+    const resolvedEntityViews = customViews
         ? customViews
-              .map((e) => resolveSnapshotView(e, (customizationController as { snapshotViews?: SnapshotCustomView[] }).snapshotViews))
+              .map((e) => resolveEntityView(e, (customizationController as { entityViews?: EntityCustomView[] }).entityViews))
               .filter(Boolean)
-              .filter((e) => (e as SnapshotCustomView).key !== "__rebase_history") as SnapshotCustomView[]
+              .filter((e) => (e as EntityCustomView).key !== "__rebase_history") as EntityCustomView[]
         : [];
 
-    const selectedSnapshotView = resolvedSnapshotViews.find((e) => e.key === selectedTab);
+    const selectedEntityView = resolvedEntityViews.find((e) => e.key === selectedTab);
     const selectedSecondaryForm =
         customViews &&
-        resolvedSnapshotViews
+        resolvedEntityViews
             .filter((e) => e.includeActions)
             .find((e) => e.key === selectedTab);
     return {
-        resolvedSnapshotViews,
-        selectedSnapshotView,
+        resolvedEntityViews,
+        selectedEntityView,
         selectedSecondaryForm
     };
 }

@@ -398,7 +398,7 @@ env: cleanEnv });
         await dbClient.query("DROP TABLE IF EXISTS rebase.refresh_tokens CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.password_reset_tokens CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS rebase.app_config CASCADE");
-        await dbClient.query("DROP TABLE IF EXISTS rebase.snapshot_history CASCADE");
+        await dbClient.query("DROP TABLE IF EXISTS rebase.entity_history CASCADE");
         await dbClient.query("DROP SCHEMA IF EXISTS rebase CASCADE");
         await dbClient.query("DROP TABLE IF EXISTS __drizzle_migrations CASCADE");
         await dbClient.query("DROP TYPE IF EXISTS posts_status CASCADE");

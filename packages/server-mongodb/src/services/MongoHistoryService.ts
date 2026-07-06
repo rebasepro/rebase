@@ -66,7 +66,7 @@ export interface HistoryEntry {
     _id?: ObjectId;
     id: string;
     table_name: string;
-    snapshot_id: string;
+    entity_id: string;
     action: "create" | "update" | "delete";
     changed_fields: string[] | null;
     values: Record<string, unknown> | null;
@@ -127,7 +127,7 @@ export class MongoHistoryService {
             const entry: HistoryEntry = {
                 id: new ObjectId().toString(),
                 table_name: tableName,
-                snapshot_id: String(id),
+                entity_id: String(id),
                 action,
                 changed_fields: changedFields,
                 values: values || null,
@@ -151,12 +151,12 @@ export class MongoHistoryService {
         const collection = this.db.collection("__rebase_history");
 
         // 1. Enforce maxEntries
-        const count = await collection.countDocuments({ snapshot_id: id,
+        const count = await collection.countDocuments({ entity_id: id,
 table_name: tableName });
         if (count > this.retention.maxEntries) {
             const toDelete = count - this.retention.maxEntries;
             const oldestEntries = await collection
-                .find({ snapshot_id: id,
+                .find({ entity_id: id,
 table_name: tableName })
                 .sort({ updated_at: 1 })
                 .limit(toDelete)
@@ -173,7 +173,7 @@ table_name: tableName })
         cutoffDate.setDate(cutoffDate.getDate() - this.retention.ttlDays);
 
         await collection.deleteMany({
-            snapshot_id: id,
+            entity_id: id,
             table_name: tableName,
             updated_at: { $lt: cutoffDate }
         });

@@ -19,7 +19,7 @@ import { useAuthController, useBridgeRegistration } from "@rebasepro/core";
  * This provider bridges the two: place it inside the `<Rebase>` tree and
  * above any component that calls `useSidePanel()`.
  *
- * Also auto-registers the side snapshot controller and breadcrumbs into the
+ * Also auto-registers the side entity controller and breadcrumbs into the
  * self-assembling Studio bridge (when a StudioBridgeRegistryProvider is
  * mounted above in the tree).
  *
@@ -66,7 +66,7 @@ export function SidePanelProvider({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Internal component that auto-registers side snapshot and breadcrumbs
+ * Internal component that auto-registers side entity and breadcrumbs
  * into the Studio bridge. Must be a child of BreadcrumbsProvider.
  */
 function BridgeAutoRegistrar({ sidePanelController }: { sidePanelController: SidePanelController }) {

@@ -1,5 +1,5 @@
 import type { CollectionRegistryController } from "./collection_registry";
-import type { SnapshotStatus, SnapshotValues } from "../types/snapshots";
+import type { EntityStatus, EntityValues } from "../types/entitys";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { RebaseContext } from "../rebase_context";
 
@@ -72,18 +72,18 @@ export type ListenCollectionProps<M extends Record<string, unknown> = Record<str
  */
 export interface SaveProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    values: Partial<SnapshotValues<M>>;
-    id?: string | number; // can be empty for new snapshots
-    previousValues?: Partial<SnapshotValues<M>>;
+    values: Partial<EntityValues<M>>;
+    id?: string | number; // can be empty for new entitys
+    previousValues?: Partial<EntityValues<M>>;
     collection?: CollectionConfig<M>;
-    status: SnapshotStatus;
+    status: EntityStatus;
 }
 
 /**
  * @internal
  */
 export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
-    row: { id: string | number; path: string; values?: Partial<SnapshotValues<M>> };
+    row: { id: string | number; path: string; values?: Partial<EntityValues<M>> };
     collection?: CollectionConfig<M>;
 }
 
@@ -155,14 +155,14 @@ export interface DataDriver {
     save<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>>;
 
     /**
-     * Delete a snapshot
+     * Delete a entity
      * @param props
      * @return was the whole deletion flow successful
      */
     delete<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteProps<M>): Promise<void>;
 
     /**
-     * Delete all snapshots from a collection.
+     * Delete all entitys from a collection.
      * @param path Collection path
      */
     deleteAll?(path: string): Promise<void>;
@@ -174,7 +174,7 @@ export interface DataDriver {
      * @param value
      * @param id
      * @param collection
-     * @return `true` if there are no other fields besides the given snapshot
+     * @return `true` if there are no other fields besides the given entity
      */
     checkUniqueField(
         path: string,
@@ -185,7 +185,7 @@ export interface DataDriver {
     ): Promise<boolean>;
 
     /**
-     * Count the number of snapshots in a collection
+     * Count the number of entitys in a collection
      */
     count?<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number>;
 
@@ -212,7 +212,7 @@ export interface DataDriver {
         databaseId?: string,
         collection: CollectionConfig,
         parentCollectionSlugs?: string[];
-        parentSnapshotIds?: string[];
+        parentEntityIds?: string[];
     }) => Promise<boolean>;
 
     /**
@@ -260,7 +260,7 @@ export interface DataDriver {
  */
 export interface RestFetchService {
     /**
-     * Fetch a collection of flattened snapshots with optional relation includes.
+     * Fetch a collection of flattened entitys with optional relation includes.
      */
     fetchCollectionForRest(
         collectionPath: string,
@@ -279,7 +279,7 @@ export interface RestFetchService {
     ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Fetch a single flattened snapshot with optional relation includes.
+     * Fetch a single flattened entity with optional relation includes.
      */
     fetchOneForRest(
         collectionPath: string,

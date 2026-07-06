@@ -1,7 +1,7 @@
 import { useSelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
-import { Snapshot, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
+import { Entity, getCollectionDataPath, getDataSourceCapabilities } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
@@ -52,19 +52,19 @@ export function MultipleRelationFieldBinding({
             "Property relation is required for MultipleRelationFieldBinding"
         )
 
-    const selectedSnapshotIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
+    const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
     const collection = relation.target();
 
-    const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<Record<string, unknown>>[]) => {
-        setValue(snapshots.map(e => getRelationFrom(e)));
+    const onMultipleEntitysSelected = useCallback((entitys: Entity<Record<string, unknown>>[]) => {
+        setValue(entitys.map(e => getRelationFrom(e)));
     }, [setValue]);
 
     const referenceDialogController = useSelectionDialog({
         multiselect: true,
         path: getCollectionDataPath(collection),
         collection,
-        onMultipleSnapshotsSelected,
-        selectedSnapshotIds,
+        onMultipleEntitysSelected,
+        selectedEntityIds,
         fixedFilter: property.fixedFilter
     }
     );
@@ -92,7 +92,7 @@ export function MultipleRelationFieldBinding({
                 hover={!disabled}
                 relation={entryValue}
                 includeId={property.includeId}
-                includeSnapshotLink={property.includeSnapshotLink}
+                includeEntityLink={property.includeEntityLink}
             />
         );
     }, [relation, property.ui?.previewProperties, value]);

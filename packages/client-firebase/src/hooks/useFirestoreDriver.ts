@@ -1,4 +1,4 @@
-import { DataDriver, DeleteProps, CollectionConfig, SnapshotReference, FetchCollectionProps, FetchOneProps, FilterCombination, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterCombination, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
 import { User } from "@firebase/auth";
 import {
     collection as collectionClause,
@@ -15,7 +15,7 @@ import {
     getDocs,
     getFirestore,
     limit as limitClause,
-    onSnapshot,
+    onEntity,
     orderBy as orderByClause,
     Query,
     query,
@@ -139,7 +139,7 @@ export function useFirestoreDriver({
         return query(collectionReference, ...queryParams);
     }, [firebaseApp]);
 
-    const getAndBuildSnapshot = useCallback((path: string,
+    const getAndBuildEntity = useCallback((path: string,
         id: string | number,
         databaseId?: string
     ): Promise<Record<string, unknown> | undefined> => {
@@ -148,11 +148,11 @@ export function useFirestoreDriver({
         const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
 
         return getDoc(doc(firestore, path, String(id)))
-            .then((docSnapshot) => {
-                if (!docSnapshot.exists()) {
+            .then((docEntity) => {
+                if (!docEntity.exists()) {
                     return undefined;
                 }
-                return createRowFromDocument(docSnapshot);
+                return createRowFromDocument(docEntity);
             });
     }, [firebaseApp]);
 
@@ -170,11 +170,11 @@ export function useFirestoreDriver({
         const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
         const resolvedPath = path;
 
-        return onSnapshot(
+        return onEntity(
             doc(firestore, resolvedPath, String(id)),
             {
-                next: (docSnapshot) => {
-                    onUpdate(docSnapshot.exists() ? createRowFromDocument(docSnapshot) : null);
+                next: (docEntity) => {
+                    onUpdate(docEntity.exists() ? createRowFromDocument(docEntity) : null);
                 },
                 error: onError
             }
@@ -223,7 +223,7 @@ export function useFirestoreDriver({
             }
 
             const rows: Record<string, unknown>[] = [];
-            const addedSnapshotsSet = new Set<string | number>();
+            const addedEntitysSet = new Set<string | number>();
             subscriptions = (ids ?? [])
                 .map((id) => {
                     return listenOne({
@@ -232,13 +232,13 @@ export function useFirestoreDriver({
                         onUpdate: (row: Record<string, unknown> | null) => {
                             const incomingId = row?.id as string | number | undefined;
                             if (row && incomingId !== undefined) {
-                                if (!addedSnapshotsSet.has(incomingId)) {
-                                    addedSnapshotsSet.add(incomingId);
+                                if (!addedEntitysSet.has(incomingId)) {
+                                    addedEntitysSet.add(incomingId);
                                     rows.push(row);
                                     onUpdate(rows);
                                 }
                             } else {
-                                addedSnapshotsSet.delete(id);
+                                addedEntitysSet.delete(id);
                                 onUpdate([...rows.filter(r => r.id !== id)])
                             }
                         }
@@ -272,7 +272,7 @@ export function useFirestoreDriver({
     }, []);
 
     /**
-     * Fetch snapshots in a Firestore path
+     * Fetch entitys in a Firestore path
      * @param path
      * @param collection
      * @param filter
@@ -311,12 +311,12 @@ export function useFirestoreDriver({
         });
         const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, limit, databaseId);
 
-        const snapshot = await getDocs(query);
-        return snapshot.docs.map((doc) => createRowFromDocument(doc));
+        const entity = await getDocs(query);
+        return entity.docs.map((doc) => createRowFromDocument(doc));
     }, [buildQuery]);
 
     /**
-     * Listen to a snapshots in a given path
+     * Listen to a entitys in a given path
      * @param path
      * @param collection
      * @param onError
@@ -378,11 +378,11 @@ export function useFirestoreDriver({
             resolvedPath
         });
         const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, limit, databaseId);
-        return onSnapshot(query,
+        return onEntity(query,
             {
-                next: (snapshot) => {
+                next: (entity) => {
                     if (!searchString)
-                        onUpdate(snapshot.docs.map((doc) => createRowFromDocument(doc)));
+                        onUpdate(entity.docs.map((doc) => createRowFromDocument(doc)));
                 },
                 error: onError
             }
@@ -391,7 +391,7 @@ export function useFirestoreDriver({
     }, [buildQuery, firebaseApp, performTextSearch]);
 
     /**
-     * Retrieve a snapshot given a path and a collection
+     * Retrieve a entity given a path and a collection
      * @param path
      * @param id
      * @param collection
@@ -404,11 +404,11 @@ export function useFirestoreDriver({
     }: FetchOneProps<M>
     ): Promise<Record<string, unknown> | undefined> => {
         const resolvedPath = path;
-        return getAndBuildSnapshot(resolvedPath, id, collection?.databaseId);
-    }, [getAndBuildSnapshot]);
+        return getAndBuildEntity(resolvedPath, id, collection?.databaseId);
+    }, [getAndBuildEntity]);
 
     /**
-     * Save snapshot to the specified path. Note that Firestore does not allow
+     * Save entity to the specified path. Note that Firestore does not allow
      * undefined values.
      * @param path
      * @param id
@@ -448,7 +448,7 @@ export function useFirestoreDriver({
         const resolvedPath = path;
 
         const collectionReference: CollectionReference = collectionClause(firestore, path);
-        console.debug("Saving snapshot", {
+        console.debug("Saving entity", {
             path,
             id,
             values,
@@ -469,15 +469,15 @@ export function useFirestoreDriver({
                 };
             })
             .catch((error) => {
-                console.error("Error saving snapshot", error);
+                console.error("Error saving entity", error);
                 throw error;
 
             });
     }, [firebaseApp]);
 
     /**
-     * Delete a snapshot
-     * @param snapshot
+     * Delete a entity
+     * @param entity
      * @param collection
      * @group Firestore
      */
@@ -502,7 +502,7 @@ export function useFirestoreDriver({
      * @param value
      * @param property
      * @param id
-     * @return `true` if there are no other fields besides the given snapshot
+     * @return `true` if there are no other fields besides the given entity
      * @group Firestore
      */
     const checkUniqueField = useCallback(async (
@@ -522,8 +522,8 @@ export function useFirestoreDriver({
             return Promise.resolve(true);
         }
         const q = query(collectionClause(firestore, path), whereClause(name, "==", cmsToFirestoreModel(value, firestore)));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.filter(doc => doc.id !== id).length === 0;
+        const entity = await getDocs(q);
+        return entity.docs.filter(doc => doc.id !== id).length === 0;
 
     }, [firebaseApp]);
 
@@ -538,8 +538,8 @@ export function useFirestoreDriver({
         const databaseId = collection?.databaseId;
         const resolvedPath = path;
         const query = buildQuery(resolvedPath, filter, orderBy, order, undefined, undefined, databaseId);
-        const snapshot = await getCountFromServer(query);
-        return snapshot.data().count;
+        const entity = await getCountFromServer(query);
+        return entity.data().count;
     }, [firebaseApp]);
 
     const isFilterCombinationValid = useCallback(({
@@ -641,7 +641,7 @@ const createRowFromDocument = (
  * Rebase uses Javascript dates internally instead of Firestore timestamps.
  * This makes it easier to interact with the rest of the libraries and
  * bindings.
- * Also, Firestore references are replaced with {@link SnapshotReference}
+ * Also, Firestore references are replaced with {@link EntityReference}
  * @param data
  * @group Firestore
  */
@@ -672,7 +672,7 @@ value: (data as { toArray: () => number[] }).toArray() };
     }
     if (data instanceof DocumentReference) {
         const databaseId = (data?.firestore as unknown as { _databaseId?: { database?: string } })?._databaseId?.database;
-        return new SnapshotReference({ id: data.id,
+        return new EntityReference({ id: data.id,
             path: getCMSPathFromFirestorePath(data.path),
             databaseId });
     }
@@ -709,10 +709,10 @@ export function cmsToFirestoreModel(data: unknown, firestore: Firestore, inArray
         return null;
     } else if (Array.isArray(data)) {
         return (data as unknown[]).filter(v => v !== undefined).map(v => cmsToFirestoreModel(v, firestore, true));
-    } else if (typeof data === "object" && data !== null && "isSnapshotReference" in data && typeof (data as Record<string, unknown>).isSnapshotReference === "function" && (data as { isSnapshotReference: () => boolean }).isSnapshotReference()) {
-        const snapshotRef = data as SnapshotReference;
-        const targetFirestore = snapshotRef.databaseId ? getFirestore(firestore.app, snapshotRef.databaseId) : firestore;
-        return doc(targetFirestore, snapshotRef.path, snapshotRef.id);
+    } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
+        const entityRef = data as EntityReference;
+        const targetFirestore = entityRef.databaseId ? getFirestore(firestore.app, entityRef.databaseId) : firestore;
+        return doc(targetFirestore, entityRef.path, entityRef.id);
     } else if (data && typeof data === "object" && "__type" in data && (data as Record<string, unknown>).__type === "relation" && "path" in data && "id" in data) {
         const rel = data as { path: string; id: string | number };
         return doc(firestore, rel.path, String(rel.id));

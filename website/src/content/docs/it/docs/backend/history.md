@@ -1,12 +1,12 @@
 ---
 title: Cronologia Entità
 sidebar_label: Cronologia Entità
-description: Tieni traccia di ogni modifica alle tue entità con una traccia di audit completa — chi ha modificato cosa, quando, e lo snapshot completo prima/dopo.
+description: Tieni traccia di ogni modifica alle tue entità con una traccia di audit completa — chi ha modificato cosa, quando, e lo entity completo prima/dopo.
 ---
 
 ## Overview
 
-La cronologia delle entità registra uno snapshot dei valori delle entità ad ogni creazione, aggiornamento ed eliminazione. Questo ti fornisce una traccia di audit completa con differenze.
+La cronologia delle entità registra uno entity dei valori delle entità ad ogni creazione, aggiornamento ed eliminazione. Questo ti fornisce una traccia di audit completa con differenze.
 
 ## Enabling History
 
@@ -45,7 +45,7 @@ const ordersCollection: CollectionConfig = {
 ## Come funziona
 
 1. Il backend crea automaticamente una tabella `rebase.entity_history`
-2. Ad ogni creazione, aggiornamento o eliminazione, viene registrato uno snapshot con:
+2. Ad ogni creazione, aggiornamento o eliminazione, viene registrato uno entity con:
    - ID entità, slug della collezione e nome della tabella
    - I valori completi dell'entità (prima e dopo)
    - Timestamp e ID utente

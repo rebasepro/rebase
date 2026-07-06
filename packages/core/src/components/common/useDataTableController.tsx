@@ -5,7 +5,7 @@ import { useLocation } from "react-router-dom";
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { populateFetchCache } from "../../hooks/data/useFetch";
-import { Snapshot, SnapshotReference, SnapshotRelation, SnapshotTableController, FilterValues, RebaseContext, SelectedCellProps, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation, EntityTableController, FilterValues, RebaseContext, SelectedCellProps, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
 export const DEFAULT_PAGE_SIZE = 50;
@@ -20,10 +20,10 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
      */
     collection: CollectionConfig<M>;
     /**
-     * List of snapshots that will be displayed on top, no matter the ordering.
+     * List of entitys that will be displayed on top, no matter the ordering.
      * This is used for reference fields selection
      */
-    snapshotsDisplayedFirst?: Snapshot<M>[];
+    entitysDisplayedFirst?: Entity<M>[];
 
     lastDeleteTimestamp?: number;
 
@@ -45,13 +45,13 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
  * Use this hook to build a controller for the {@link DataCollectionTable}.
  * This controller is bound to data in a path in your specified driver.
  *
- * Note that you can build your own hook returning a {@link SnapshotTableController}
+ * Note that you can build your own hook returning a {@link EntityTableController}
  * if you would like to display different data.
  *
  * @param path
  * @param collection
  * @param scrollRestoration
- * @param snapshotsDisplayedFirst
+ * @param entitysDisplayedFirst
  * @param lastDeleteTimestamp
  * @param fixedFilterFromProps
  * @param updateUrl
@@ -61,12 +61,12 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         path,
         collection,
         scrollRestoration,
-        snapshotsDisplayedFirst,
+        entitysDisplayedFirst,
         lastDeleteTimestamp: _lastDeleteTimestamp,
         fixedFilter: fixedFilterFromProps,
         updateUrl
     }: DataTableControllerProps<M>)
-    : SnapshotTableController<M> {
+    : EntityTableController<M> {
 
     const {
         defaultFilter,
@@ -165,7 +165,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const context: RebaseContext<USER> = useRebaseContext();
 
-    const [rawData, setRawData] = useState<Snapshot<M>[]>(collectionScroll?.data ?? []);
+    const [rawData, setRawData] = useState<Entity<M>[]>(collectionScroll?.data ?? []);
 
     const onScroll = useCallback(({
         scrollOffset
@@ -204,21 +204,21 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         setDataLoading(true);
 
-        const onSnapshotsUpdate = async (snapshots: Snapshot<M>[]) => {
+        const onEntitysUpdate = async (entitys: Entity<M>[]) => {
             if (collection.callbacks?.afterRead) {
                 try {
-                    // afterRead operates on flat rows; unwrap the Snapshot view-model
+                    // afterRead operates on flat rows; unwrap the Entity view-model
                     // before invoking and re-wrap the processed row after.
-                    snapshots = await Promise.all(
-                        snapshots.map(async (snapshot) => {
+                    entitys = await Promise.all(
+                        entitys.map(async (entity) => {
                             const processedRow = await collection.callbacks!.afterRead!({
                                 collection,
                                 path,
-                                row: { id: snapshot.id, ...snapshot.values },
+                                row: { id: entity.id, ...entity.values },
                                 context
                             });
                             return {
-                                ...snapshot,
+                                ...entity,
                                 values: processedRow as M
                             };
                         }));
@@ -228,15 +228,15 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             }
             setDataLoading(false);
             setDataLoadingError(undefined);
-            setRawData(snapshots.map(e => ({
+            setRawData(entitys.map(e => ({
                 ...e
                 // values: sanitizeData(e.values, resolvedCollection.properties)
             })));
-            setNoMoreToLoad(!itemCount || snapshots.length < itemCount);
+            setNoMoreToLoad(!itemCount || entitys.length < itemCount);
 
-            // Pre-populate the snapshot fetch cache so that navigating to an
-            // snapshot detail view renders instantly with cached data.
-            populateFetchCache(path, snapshots);
+            // Pre-populate the entity fetch cache so that navigating to an
+            // entity detail view renders instantly with cached data.
+            populateFetchCache(path, entitys);
         };
 
         const onError = (error: Error) => {
@@ -260,7 +260,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 limit: itemCount,
                 orderBy: orderByParams,
                 searchString
-            }, (res) => onSnapshotsUpdate(res.data as Snapshot<M>[]), onError);
+            }, (res) => onEntitysUpdate(res.data as Entity<M>[]), onError);
         } else {
             accessor.find({
                 where: whereParams,
@@ -268,7 +268,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 orderBy: orderByParams,
                 searchString
             })
-                .then((res) => onSnapshotsUpdate(res.data as Snapshot<M>[]))
+                .then((res) => onEntitysUpdate(res.data as Entity<M>[]))
                 .catch(onError);
             unsubscribe = () => undefined;
         }
@@ -279,7 +279,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const orderedData = useDataOrder({
         data: rawData,
-        snapshotsDisplayedFirst
+        entitysDisplayedFirst
     });
 
     // hack to fix Firestore listeners firing with incomplete data
@@ -391,17 +391,17 @@ function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: [stri
                                 encodedValue = val.toISOString();
                             } else if (Array.isArray(val)) {
                                 encodedValue = JSON.stringify(val, (k, v) => {
-                                    if (v instanceof SnapshotRelation) {
+                                    if (v instanceof EntityRelation) {
                                         return encodeRelation(v);
                                     }
-                                    if (v instanceof SnapshotReference) {
+                                    if (v instanceof EntityReference) {
                                         return encodeReference(v);
                                     }
                                     return v;
                                 });
-                            } else if (val instanceof SnapshotRelation) {
+                            } else if (val instanceof EntityRelation) {
                                 encodedValue = encodeRelation(val);
-                            } else if (val instanceof SnapshotReference) {
+                            } else if (val instanceof EntityReference) {
                                 encodedValue = encodeReference(val);
                             }
                         }
@@ -462,15 +462,15 @@ function isDate(dateString: string): boolean {
     return date.toISOString() === dateString;
 }
 
-function encodeReference(val: SnapshotReference) {
+function encodeReference(val: EntityReference) {
     return `ref::${val.path}/${val.id}`;
 }
-function encodeRelation(val: SnapshotRelation) {
+function encodeRelation(val: EntityRelation) {
     return `rel::${val.path}/${val.id}`;
 }
 
-function decodeString(val: string): SnapshotReference | SnapshotRelation | Date | string {
-    let parsedFilterVal: SnapshotReference | SnapshotRelation | Date | string = val;
+function decodeString(val: string): EntityReference | EntityRelation | Date | string {
+    let parsedFilterVal: EntityReference | EntityRelation | Date | string = val;
     if (isDate(val)) {
         try {
             parsedFilterVal = new Date(val);
@@ -484,12 +484,12 @@ function decodeString(val: string): SnapshotReference | SnapshotRelation | Date 
                 if (typeof value === "string") {
                     if (value.startsWith("ref::")) {
                         const [path, id] = value.substring(5).split("/");
-                        return new SnapshotReference({ id,
+                        return new EntityReference({ id,
 path });
                     }
                     if (value.startsWith("rel::")) {
                         const [path, id] = value.substring(5).split("/");
-                        return new SnapshotRelation(id, path);
+                        return new EntityRelation(id, path);
                     }
                 }
                 return value;
@@ -502,12 +502,12 @@ path });
     if (typeof parsedFilterVal === "string") {
         if (parsedFilterVal.startsWith("ref::")) {
             const [path, id] = parsedFilterVal.substring(5).split("/");
-            return new SnapshotReference({ id,
+            return new EntityReference({ id,
 path });
         }
         if (parsedFilterVal.startsWith("rel::")) {
             const [path, id] = parsedFilterVal.substring(5).split("/");
-            return new SnapshotRelation(id, path);
+            return new EntityRelation(id, path);
         }
     }
     return parsedFilterVal;

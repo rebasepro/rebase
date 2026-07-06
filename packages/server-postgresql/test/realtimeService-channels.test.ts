@@ -463,8 +463,8 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             });
 
             // Trigger a refetch timer by notifying
-            const dummySnapshot = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
-            await service.notifyUpdate("posts", "1", dummySnapshot, undefined, false);
+            const dummyEntity = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
+            await service.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Remove client before the timer fires
             await service.removeClient("c1");
@@ -615,8 +615,8 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             });
 
             // Trigger a refetch debounce
-            const dummySnapshot = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
-            await service.notifyUpdate("posts", "1", dummySnapshot, undefined, false);
+            const dummyEntity = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
+            await service.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
             // Destroy before the timer fires
             await service.destroy();

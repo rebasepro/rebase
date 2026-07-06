@@ -9,7 +9,7 @@ import { Db } from "mongodb";
 import {
     DataDriver,
     DeleteProps,
-    Snapshot,
+    Entity,
     CollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
@@ -796,7 +796,7 @@ roles: this.user.roles ?? [] };
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
         const row = await this.delegate.fetchOne(props);
         if (row) {
-            const authorized = checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(row, props.path), "select", { onUnknown: "deny" });
+            const authorized = checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(row, props.path), "select", { onUnknown: "deny" });
             if (!authorized) {
                 return undefined;
             }
@@ -824,14 +824,14 @@ roles: this.user.roles ?? [] };
             const existing = await this.delegate.fetchOne({ path: props.path,
 id: props.id,
 collection: resolvedCollection });
-            if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(existing, props.path), "update", { onUnknown: "deny" })) {
+            if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(existing, props.path), "update", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
-            const tempSnapshot = { id: props.id || "new",
+            const tempEntity = { id: props.id || "new",
 path: props.path,
-values: props.values } as Snapshot;
-            if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, tempSnapshot, "insert", { onUnknown: "deny" })) {
+values: props.values } as Entity;
+            if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, tempEntity, "insert", { onUnknown: "deny" })) {
                 throw ApiError.forbidden("Forbidden");
             }
         }
@@ -842,7 +842,7 @@ values: props.values } as Snapshot;
         });
 
         // After save / withCheck rules verification
-        if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(saved, props.path), props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
+        if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(saved, props.path), props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -855,7 +855,7 @@ values: props.values } as Snapshot;
         const existing = await this.delegate.fetchOne({ path: props.row.path,
 id: props.row.id,
 collection: resolvedCollection });
-        if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToSnapshotForCheck(existing, props.row.path), "delete", { onUnknown: "deny" })) {
+        if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(existing, props.row.path), "delete", { onUnknown: "deny" })) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -906,10 +906,10 @@ collection: resolvedCollection });
 }
 
 /**
- * Wrap a flat row into the Snapshot shape expected by `checkOperation`,
+ * Wrap a flat row into the Entity shape expected by `checkOperation`,
  * which evaluates security rules against `row.values`.
  */
-function rowToSnapshotForCheck(row: Record<string, unknown>, path: string): Snapshot {
+function rowToEntityForCheck(row: Record<string, unknown>, path: string): Entity {
     return {
         id: row.id as string | number,
         path,

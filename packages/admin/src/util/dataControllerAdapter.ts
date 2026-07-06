@@ -1,27 +1,27 @@
 /**
- * Adapts an `SnapshotTableController<M>` (from @rebasepro/types) to a
+ * Adapts an `EntityTableController<M>` (from @rebasepro/types) to a
  * `CollectionDataController<T>` (from @rebasepro/ui), bridging the
- * snapshot-aware data layer to the headless collection view.
+ * entity-aware data layer to the headless collection view.
  */
 
 import { useMemo } from "react";
-import type { Snapshot, SnapshotTableController } from "@rebasepro/types";
+import type { Entity, EntityTableController } from "@rebasepro/types";
 import type { CollectionDataController } from "@rebasepro/ui";
 
 /**
- * Unwrap `Snapshot<M>` objects to flat rows for the headless view.
- * The snapshot system uses `{ id, path, values: M }`; `values` is already the
+ * Unwrap `Entity<M>` objects to flat rows for the headless view.
+ * The entity system uses `{ id, path, values: M }`; `values` is already the
  * flat row `M` carrying its real primary key, so unwrapping is just `.values` —
  * no `id`/`path` merge (those are view-model metadata, not row columns).
  */
-function flattenSnapshots<M extends Record<string, unknown>>(
-    snapshots: Snapshot<M>[]
+function flattenEntitys<M extends Record<string, unknown>>(
+    entitys: Entity<M>[]
 ): M[] {
-    return snapshots.map(snapshot => snapshot.values);
+    return entitys.map(entity => entity.values);
 }
 
 /**
- * React hook that adapts a SnapshotTableController to a CollectionDataController.
+ * React hook that adapts a EntityTableController to a CollectionDataController.
  *
  * Usage:
  * ```tsx
@@ -32,10 +32,10 @@ function flattenSnapshots<M extends Record<string, unknown>>(
  * ```
  */
 export function useCollectionDataController<M extends Record<string, unknown>>(
-    tableController: SnapshotTableController<M>
+    tableController: EntityTableController<M>
 ): CollectionDataController<M> {
     const flatData = useMemo(
-        () => flattenSnapshots(tableController.data),
+        () => flattenEntitys(tableController.data),
         [tableController.data]
     );
 

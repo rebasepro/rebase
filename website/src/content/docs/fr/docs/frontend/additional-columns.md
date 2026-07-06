@@ -51,7 +51,7 @@ const ordersCollection: CollectionConfig = {
 
 ## Prochaines étapes
 
-- **[Actions d'entité](/docs/frontend/snapshot-actions)** — Boutons d'action personnalisés
+- **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
 - **[Champs personnalisés](/docs/frontend/custom-fields)** — Champs de formulaire personnalisés
 
 ---

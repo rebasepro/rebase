@@ -2,7 +2,7 @@ import type { ArrayProperty, StringProperty } from "@rebasepro/types";
 import * as React from "react";
 import { useMemo } from "react";
 
-import { Snapshot, StorageConfig } from "@rebasepro/types";
+import { Entity, StorageConfig } from "@rebasepro/types";
 import { PreviewSize } from "../../../types";
 import { useDropzone } from "react-dropzone";
 import { PropertyPreview } from "../../../preview";
@@ -11,7 +11,7 @@ import { cls, IconButton, PencilIcon, Typography } from "@rebasepro/ui";
 import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController, StorageSourceContext } from "@rebasepro/core";
 import { getThumbnailMeasure } from "../../../preview/util";
 import { StorageUploadProgress } from "../../../form/components/StorageUploadProgress";
-import { SnapshotTableCellActions } from "../internal/SnapshotTableCellActions";
+import { EntityTableCellActions } from "../internal/EntityTableCellActions";
 
 const dropZoneClasses = "max-w-full box-border relative pt-[2px] items-center border border-transparent outline-hidden rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
 const activeDropClasses = "pt-0 border-2 border-solid"
@@ -34,7 +34,7 @@ export function TableStorageUpload(props: {
     selected: boolean;
     focused: boolean;
     property: StringProperty | ArrayProperty;
-    snapshot: Snapshot<Record<string, unknown>>;
+    entity: Entity<Record<string, unknown>>;
     path: string;
     previewSize: PreviewSize;
     openPopup?: (cellRect?: DOMRect) => void;
@@ -49,7 +49,7 @@ export function TableStorageUpload(props: {
         value,
         disabled,
         property,
-        snapshot,
+        entity,
         path,
         previewSize,
         updateValue
@@ -67,8 +67,8 @@ export function TableStorageUpload(props: {
         multipleFilesSupported,
         resolvedStorageSource
     } = useStorageUploadController({
-        snapshotValues: snapshot.values,
-        snapshotId: snapshot.id,
+        entityValues: entity.values,
+        entityId: entity.id,
         path,
         property: property as StringProperty,
         propertyKey,
@@ -92,7 +92,7 @@ export function TableStorageUpload(props: {
                 selected={selected}
                 property={property}
                 onChange={updateValue}
-                snapshot={snapshot}
+                entity={entity}
                 storagePathBuilder={storagePathBuilder}
                 storage={storage}
                 multipleFilesSupported={multipleFilesSupported}
@@ -115,7 +115,7 @@ interface StorageUploadProps {
     autoFocus: boolean;
     selected: boolean;
     disabled: boolean;
-    snapshot: Snapshot<Record<string, unknown>>;
+    entity: Entity<Record<string, unknown>>;
     previewSize: PreviewSize;
     storage: StorageConfig;
     onFilesAdded: (acceptedFiles: File[]) => void;
@@ -130,7 +130,7 @@ function StorageUpload({
     internalValue,
     setInternalValue,
     openPopup,
-    snapshot,
+    entity,
     selected,
     error,
     onChange,
@@ -236,7 +236,7 @@ function StorageUpload({
                             propertyKey={name}
                             property={renderProperty}
                             value={entry.storagePathOrDownloadUrl}
-                            snapshot={snapshot}
+                            entity={entity}
                             size={previewSize}/>
                     );
                 } else if (entry.file) {
@@ -267,7 +267,7 @@ function StorageUpload({
                 </Typography>
             </div>}
 
-            <SnapshotTableCellActions
+            <EntityTableCellActions
                 showError={showError}
                 disabled={disabled}
                 showExpandIcon={true}
@@ -279,7 +279,7 @@ function StorageUpload({
                     onClick={open}>
                     <PencilIcon className={"text-surface-500"}/>
                 </IconButton>
-            </SnapshotTableCellActions>
+            </EntityTableCellActions>
 
         </div>
     );
@@ -291,7 +291,7 @@ interface TableStorageItemPreviewProps {
     property: StringProperty;
     value: string,
     size: PreviewSize;
-    snapshot: Snapshot<Record<string, unknown>>;
+    entity: Entity<Record<string, unknown>>;
 }
 
 export function TableStorageItemPreview({
@@ -299,7 +299,7 @@ export function TableStorageItemPreview({
     property,
     value,
     size,
-    snapshot
+    entity
 }: TableStorageItemPreviewProps) {
 
     return (
@@ -313,7 +313,7 @@ export function TableStorageItemPreview({
                         propertyKey={propertyKey}
                         value={value}
                         property={property}
-                        // snapshot={snapshot}
+                        // entity={entity}
                         size={size}/>
                 </ErrorBoundary>
             }

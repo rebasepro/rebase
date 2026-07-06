@@ -5,7 +5,7 @@ import { removeUndefined } from "@rebasepro/utils";
 import {
     AuthController,
     DataDriver,
-    Snapshot,
+    Entity,
     User
 } from "@rebasepro/types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";

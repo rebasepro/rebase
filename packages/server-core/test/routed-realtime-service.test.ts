@@ -37,7 +37,7 @@ describe("createRoutedRealtimeService", () => {
         expect(pg.handleClientMessage).not.toHaveBeenCalled();
     });
 
-    it("routes subscribe_snapshot by path", async () => {
+    it("routes subscribe_entity by path", async () => {
         await routed.handleClientMessage("c1", { type: "subscribe_one", payload: { path: "products", subscriptionId: "s2" } });
         expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
         expect(mongo.handleClientMessage).not.toHaveBeenCalled();

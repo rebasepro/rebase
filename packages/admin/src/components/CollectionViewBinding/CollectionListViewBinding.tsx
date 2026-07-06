@@ -1,7 +1,7 @@
 
 import type { CollectionConfig, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Snapshot, SnapshotAction, SnapshotTableController, SelectionController } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityAction, EntityTableController, SelectionController } from "@rebasepro/types";
 import {
     Checkbox,
     Chip,
@@ -19,20 +19,20 @@ import {
     useCustomizationController
 } from "@rebasepro/core";
 import { useAnalyticsController } from "@rebasepro/core";
-import { getSnapshotPreviewKeys } from "../../util/previews";
+import { getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/core";
 import { getValueInPath } from "@rebasepro/utils";
-import { useCollectionSlotKeys, resolveSnapshotSlots, type CollectionSlotKeys } from "./usePreviewSlots";
+import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
 import { useCMSContext } from "../../hooks/useCMSContext";
-import { resolveSnapshotAction } from "../../util/resolutions";
+import { resolveEntityAction } from "../../util/resolutions";
 
 export type CollectionListViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: CollectionConfig<M>;
-    tableController: SnapshotTableController<M>;
-    onSnapshotClick?: (snapshot: Snapshot<M>) => void;
+    tableController: EntityTableController<M>;
+    onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedSnapshots?: Snapshot<M>[];
+    highlightedEntitys?: Entity<M>[];
     emptyComponent?: React.ReactNode;
 
     /**
@@ -45,16 +45,16 @@ export type CollectionListViewBindingProps<M extends Record<string, unknown> = R
      */
     size?: CollectionSize;
     /**
-     * ID of the currently selected/active snapshot. When set, the matching
+     * ID of the currently selected/active entity. When set, the matching
      * row is visually highlighted with a primary accent.
      */
-    selectedSnapshotId?: string | number;
+    selectedEntityId?: string | number;
 
     /**
-     * Callback to get snapshot actions for a given snapshot.
+     * Callback to get entity actions for a given entity.
      * Only actions with `showActionsInListView: true` will be rendered.
      */
-    getActionsForSnapshot?: (params: { snapshot?: Snapshot<M>, customSnapshotActions?: SnapshotAction[] }) => SnapshotAction[];
+    getActionsForEntity?: (params: { entity?: Entity<M>, customEntityActions?: EntityAction[] }) => EntityAction[];
 
     /**
      * Full path of the collection, used as context for action handlers.
@@ -62,9 +62,9 @@ export type CollectionListViewBindingProps<M extends Record<string, unknown> = R
     path?: string;
 
     /**
-     * How snapshots open when an action triggers navigation.
+     * How entitys open when an action triggers navigation.
      */
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 };
 
 type ListColumnDef = {
@@ -114,7 +114,7 @@ const OVERSCAN_COUNT = 8;
 const LOAD_MORE_THRESHOLD = 400;
 
 /** Stable empty array for when no list-view actions are available. */
-const EMPTY_LIST_VIEW_ACTIONS: SnapshotAction[] = [];
+const EMPTY_LIST_VIEW_ACTIONS: EntityAction[] = [];
 
 /**
  * Walk up the DOM from `element` to find the nearest scrollable ancestor.
@@ -156,8 +156,8 @@ function isComplexPropertyType(property: Property): boolean {
  * Render a complex value as a compact, single-line string.
  * - Arrays  → "Item, Item +3"
  * - Maps    → "4 fields"
- * - Refs    → snapshot ID
- * - Relations → snapshot ID or name
+ * - Refs    → entity ID
+ * - Relations → entity ID or name
  */
 function compactValueSummary(value: unknown, property: Property): string | null {
     if (value === undefined || value === null) return null;
@@ -215,7 +215,7 @@ function compactValueSummary(value: unknown, property: Property): string | null 
         if (typeof value === "string" || typeof value === "number") return String(value);
         if (value && typeof value === "object") {
             const obj = value as Record<string, unknown>;
-            // SnapshotRelation.data is a Snapshot: { id, path, values: { name, ... } }
+            // EntityRelation.data is a Entity: { id, path, values: { name, ... } }
             if (obj.data && typeof obj.data === "object") {
                 const data = obj.data as Record<string, unknown>;
                 const values = (data.values && typeof data.values === "object")
@@ -265,7 +265,7 @@ year: diffDays > 365 ? "numeric" : undefined });
 }
 
 /**
- * Classic CMS list view for displaying snapshots.
+ * Classic CMS list view for displaying entitys.
  * Designed to be the most familiar, stereotypical CMS content management view:
  * - Clean rows with checkbox, icon/avatar, title, metadata, and actions
  * - Column-sortable headers
@@ -274,17 +274,17 @@ year: diffDays > 365 ? "numeric" : undefined });
 export function CollectionListViewBinding<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
     tableController,
-    onSnapshotClick,
+    onEntityClick,
     selectionController,
     selectionEnabled = true,
-    highlightedSnapshots,
+    highlightedEntitys,
     emptyComponent,
 
     size = "m",
-    selectedSnapshotId,
-    getActionsForSnapshot,
+    selectedEntityId,
+    getActionsForEntity,
     path,
-    openSnapshotMode
+    openEntityMode
 }: CollectionListViewBindingProps<M>) {
     const authController = useAuthController();
     const customizationController = useCustomizationController();
@@ -335,7 +335,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
 
 
     const previewKeys = useMemo(
-        () => getSnapshotPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 10)
+        () => getEntityPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 10)
             .filter(key => key !== titlePropertyKey && key !== imagePropertyKey && key !== statusPropertyKey && key !== datePropertyKey),
         [authController, resolvedCollection, customizationController.propertyConfigs, titlePropertyKey, imagePropertyKey, statusPropertyKey, datePropertyKey]
     );
@@ -489,48 +489,48 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         ];
     }, [columns, containerWidth, selectionEnabled, showImage]);
 
-    const handleSnapshotClick = useCallback((snapshot: Snapshot<M>) => {
-        analyticsController.onAnalyticsEvent?.("snapshot_click", {
-            path: snapshot.path,
-            snapshotId: snapshot.id
+    const handleEntityClick = useCallback((entity: Entity<M>) => {
+        analyticsController.onAnalyticsEvent?.("entity_click", {
+            path: entity.path,
+            entityId: entity.id
         });
-        onSnapshotClick?.(snapshot);
-    }, [onSnapshotClick, analyticsController]);
+        onEntityClick?.(entity);
+    }, [onEntityClick, analyticsController]);
 
-    const handleSelectionChange = useCallback((snapshot: Snapshot<M>, selected: boolean) => {
-        selectionController?.toggleSnapshotSelection(snapshot, selected);
+    const handleSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        selectionController?.toggleEntitySelection(entity, selected);
     }, [selectionController]);
 
-    const isSnapshotSelected = useCallback((snapshot: Snapshot<M>) => {
-        return selectionController?.isSnapshotSelected(snapshot) ?? false;
+    const isEntitySelected = useCallback((entity: Entity<M>) => {
+        return selectionController?.isEntitySelected(entity) ?? false;
     }, [selectionController]);
 
-    const isSnapshotHighlighted = useCallback((snapshot: Snapshot<M>) => {
-        return highlightedSnapshots?.some(e => e.id === snapshot.id && e.path === snapshot.path) ?? false;
-    }, [highlightedSnapshots]);
+    const isEntityHighlighted = useCallback((entity: Entity<M>) => {
+        return highlightedEntitys?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
+    }, [highlightedEntitys]);
 
-    // ── Compute list-view-visible actions per snapshot ──
-    const getListViewActions = useCallback((snapshot: Snapshot<M>): SnapshotAction[] => {
-        if (!getActionsForSnapshot) return EMPTY_LIST_VIEW_ACTIONS;
-        const customSnapshotActions = (collection.snapshotActions ?? [])
-            .map(action => resolveSnapshotAction(action, customizationController.snapshotActions))
-            .filter(Boolean) as SnapshotAction<M>[];
-        const allActions = getActionsForSnapshot({ snapshot,
-customSnapshotActions });
+    // ── Compute list-view-visible actions per entity ──
+    const getListViewActions = useCallback((entity: Entity<M>): EntityAction[] => {
+        if (!getActionsForEntity) return EMPTY_LIST_VIEW_ACTIONS;
+        const customEntityActions = (collection.entityActions ?? [])
+            .map(action => resolveEntityAction(action, customizationController.entityActions))
+            .filter(Boolean) as EntityAction<M>[];
+        const allActions = getActionsForEntity({ entity,
+customEntityActions });
         return allActions.filter(a => a.showActionsInListView);
-    }, [getActionsForSnapshot, collection.snapshotActions, customizationController.snapshotActions]);
+    }, [getActionsForEntity, collection.entityActions, customizationController.entityActions]);
 
     const rowClasses = getRowClasses(size);
 
-    const selectedIds = useMemo(() => new Set(selectionController?.selectedSnapshots.map(e => e.id)), [selectionController?.selectedSnapshots]);
-    const highlightedIds = useMemo(() => new Set(highlightedSnapshots?.map(e => e.id)), [highlightedSnapshots]);
+    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntitys.map(e => e.id)), [selectionController?.selectedEntitys]);
+    const highlightedIds = useMemo(() => new Set(highlightedEntitys?.map(e => e.id)), [highlightedEntitys]);
 
-    const handleRowSelectionChange = useCallback((snapshot: Snapshot<M>, selected: boolean) => {
-        handleSelectionChange(snapshot, selected);
+    const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        handleSelectionChange(entity, selected);
     }, [handleSelectionChange]);
 
     return (
-        <ListView<Snapshot<M>>
+        <ListView<Entity<M>>
             data={data}
             dataLoading={dataLoading}
             noMoreToLoad={noMoreToLoad}
@@ -539,24 +539,24 @@ customSnapshotActions });
             setItemCount={setItemCount}
             pageSize={pageSize}
             paginationEnabled={paginationEnabled}
-            onItemClick={handleSnapshotClick}
+            onItemClick={handleEntityClick}
             selectedIds={selectedIds}
             highlightedIds={highlightedIds}
             selectionEnabled={selectionEnabled}
             emptyComponent={emptyComponent}
             size={size}
-            selectedSnapshotId={selectedSnapshotId}
-            renderRow={useCallback(({ item: snapshot, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
+            selectedEntityId={selectedEntityId}
+            renderRow={useCallback(({ item: entity, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
                 return (
                     <div
-                        key={snapshot.id}
+                        key={entity.id}
                         style={style}
                         className={className}
                     >
                         <ListRow
-                            snapshot={snapshot}
+                            entity={entity}
                             collection={resolvedCollection}
-                            onClick={handleSnapshotClick}
+                            onClick={handleEntityClick}
                             selected={selected}
                             highlighted={highlighted}
                             onSelectionChange={handleRowSelectionChange}
@@ -567,16 +567,16 @@ customSnapshotActions });
                             showImage={showImage}
                             size={size}
                             isLast={isLast}
-                            isActive={selectedSnapshotId !== undefined && snapshot.id === selectedSnapshotId}
-                            listViewActions={getListViewActions(snapshot)}
+                            isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                            listViewActions={getListViewActions(entity)}
                             context={context}
                             path={path}
                             selectionController={selectionController}
-                            openSnapshotMode={openSnapshotMode}
+                            openEntityMode={openEntityMode}
                         />
                     </div>
                 );
-            }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedSnapshotId, getListViewActions, context, path, selectionController, openSnapshotMode, handleRowSelectionChange, handleSnapshotClick])}
+            }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
         />
     );
 }
@@ -590,7 +590,7 @@ customSnapshotActions });
  * the column system for developer-defined table layouts.
  */
 const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
-    snapshot,
+    entity,
     collection,
     onClick,
     selected,
@@ -608,14 +608,14 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     context,
     path,
     selectionController,
-    openSnapshotMode
+    openEntityMode
 }: {
-    snapshot: Snapshot<M>;
+    entity: Entity<M>;
     collection: CollectionConfig<M>;
-    onClick?: (snapshot: Snapshot<M>) => void;
+    onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     highlighted?: boolean;
-    onSelectionChange?: (snapshot: Snapshot<M>, selected: boolean) => void;
+    onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
     columns: ListColumnDef[];
     slotKeys: CollectionSlotKeys;
@@ -624,15 +624,15 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     size: CollectionSize;
     isLast: boolean;
     isActive?: boolean;
-    listViewActions?: SnapshotAction[];
+    listViewActions?: EntityAction[];
     context?: ReturnType<typeof useCMSContext>;
     path?: string;
     selectionController?: SelectionController<M>;
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) {
     // ── Resolve slots (pure function, no hooks) ──
-    const slots = resolveSnapshotSlots(
-        snapshot as Snapshot<Record<string, unknown>>,
+    const slots = resolveEntitySlots(
+        entity as Entity<Record<string, unknown>>,
         collection as CollectionConfig<Record<string, unknown>>,
         slotKeys
     );
@@ -641,19 +641,19 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         // Cmd+click (Mac) or Ctrl+click (Windows) toggles selection
         if ((e.metaKey || e.ctrlKey) && selectionEnabled) {
             e.preventDefault();
-            onSelectionChange?.(snapshot, !selected);
+            onSelectionChange?.(entity, !selected);
             return;
         }
-        onClick?.(snapshot);
-    }, [snapshot, onClick, selected, selectionEnabled, onSelectionChange]);
+        onClick?.(entity);
+    }, [entity, onClick, selected, selectionEnabled, onSelectionChange]);
 
     const handleCheckboxClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
     }, []);
 
     const handleCheckboxChange = useCallback((checked: boolean) => {
-        onSelectionChange?.(snapshot, checked);
-    }, [snapshot, onSelectionChange]);
+        onSelectionChange?.(entity, checked);
+    }, [entity, onSelectionChange]);
 
     // Developer-defined column mode (listProperties is explicitly set)
     const useColumnMode = !!collection.listProperties && collection.listProperties.length > 0;
@@ -727,7 +727,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         </Typography>
                     ) : (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                            {snapshot.id}
+                            {entity.id}
                         </Typography>
                     )}
                 </div>
@@ -775,7 +775,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 /* ── COLUMN MODE (developer-defined listProperties) ── */
                 <>
                     {extraColumns.map((col) => {
-                        const value = getValueInPath(snapshot.values, col.key);
+                        const value = getValueInPath(entity.values, col.key);
 
                         if (col.isStatus || (col.property.type === "string" && "enum" in col.property)) {
                             return (
@@ -858,13 +858,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                                     e.stopPropagation();
                                     action.onClick({
                                         view: "collection",
-                                        snapshot,
+                                        entity,
                                         path,
                                         collection,
                                         context: context!,
                                         sidePanelController: context?.sidePanelController,
                                         selectionController,
-                                        openSnapshotMode: openSnapshotMode ?? collection?.openSnapshotMode ?? "full_screen"
+                                        openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
                                     });
                                 }}>
                                 {action.icon}
@@ -876,12 +876,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         </div>
     );
 }) as <M extends Record<string, unknown>>(props: {
-    snapshot: Snapshot<M>;
+    entity: Entity<M>;
     collection: CollectionConfig<M>;
-    onClick?: (snapshot: Snapshot<M>) => void;
+    onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     highlighted?: boolean;
-    onSelectionChange?: (snapshot: Snapshot<M>, selected: boolean) => void;
+    onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
     columns: ListColumnDef[];
     slotKeys: CollectionSlotKeys;
@@ -890,10 +890,10 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     size: CollectionSize;
     isLast: boolean;
     isActive?: boolean;
-    listViewActions?: SnapshotAction[];
+    listViewActions?: EntityAction[];
     context?: ReturnType<typeof useCMSContext>;
     path?: string;
     selectionController?: SelectionController<M>;
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) => React.ReactElement;
 

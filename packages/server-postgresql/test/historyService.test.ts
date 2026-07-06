@@ -126,7 +126,7 @@ tags: [{ id: 2 }] }
             expect(serializedSql).toContain("ARRAY[");
         });
 
-        it("should properly perform query during snapshot creation (insert)", async () => {
+        it("should properly perform query during entity creation (insert)", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
                 id: "1",

@@ -68,9 +68,9 @@ export class CollectionRegistry {
     private rawRootCollections: CollectionConfig[] = [];
     private cachedRawCollectionsList: CollectionConfig[] | null = null;
 
-    // Snapshot of raw input for idempotency check — compared BEFORE normalization
+    // Entity of raw input for idempotency check — compared BEFORE normalization
     // to avoid the issue where normalization creates new objects that always fail equality.
-    private lastRawInputSnapshot: ReturnType<typeof removeFunctions>[] | null = null;
+    private lastRawInputEntity: ReturnType<typeof removeFunctions>[] | null = null;
 
     constructor(collections?: CollectionConfig[], dataSources?: DataSourceRegistry) {
         if (dataSources) this.dataSources = dataSources;
@@ -107,15 +107,15 @@ export class CollectionRegistry {
      * Returns true if the collections have changed, false otherwise.
      *
      * Idempotent: compares the raw input (before normalization) against a stored
-     * snapshot. Only re-normalizes and re-registers when the raw input actually changed.
+     * entity. Only re-normalizes and re-registers when the raw input actually changed.
      * @param collections
      */
     registerMultiple(collections: CollectionConfig[]): boolean {
         // Compare raw input BEFORE normalization to detect actual changes.
         // This avoids the old issue where normalization creates new objects
         // that always fail deep-equal even when the source data is identical.
-        const rawSnapshot = collections.map(c => removeFunctions(c));
-        if (this.lastRawInputSnapshot && deepEqual(this.lastRawInputSnapshot, rawSnapshot)) {
+        const rawEntity = collections.map(c => removeFunctions(c));
+        if (this.lastRawInputEntity && deepEqual(this.lastRawInputEntity, rawEntity)) {
             return false;
         }
 
@@ -131,7 +131,7 @@ export class CollectionRegistry {
         const normalizedCollections = collections.map(c => this.normalizeCollection({ ...c }));
 
         // Phase 1: Register all top-level collections first (without recursion).
-        // This ensures that injected snapshotViews (e.g. History tab) are preserved.
+        // This ensures that injected entityViews (e.g. History tab) are preserved.
         // Without this, _registerRecursively could register a relation-target collection
         // (e.g. Tags from Posts.relations) using the raw module object (without injected views)
         // before the top-level Tags collection (with injected views) gets its turn.
@@ -163,8 +163,8 @@ export class CollectionRegistry {
             }
         });
 
-        // Store the snapshot for future comparisons
-        this.lastRawInputSnapshot = rawSnapshot;
+        // Store the entity for future comparisons
+        this.lastRawInputEntity = rawEntity;
 
         return true;
     }
@@ -460,7 +460,7 @@ export class CollectionRegistry {
 
             // If there are more segments, continue navigation
             if (i + 1 < pathSegments.length) {
-                // Skip snapshot ID segment
+                // Skip entity ID segment
             }
         }
 
@@ -483,11 +483,11 @@ export class CollectionRegistry {
 
     /**
      * Resolves a multi-segment path like "products/123/locales" and returns
-     * information about the collections and snapshot IDs along the path
+     * information about the collections and entity IDs along the path
      */
     resolvePathToCollections(path: string): {
         collections: CollectionConfig[],
-        snapshotIds: (string | number)[],
+        entityIds: (string | number)[],
         finalCollection: CollectionConfig
     } {
         const pathSegments = path.split("/").filter(p => p);
@@ -501,7 +501,7 @@ export class CollectionRegistry {
         }
 
         const collections: CollectionConfig[] = [];
-        const snapshotIds: (string | number)[] = [];
+        const entityIds: (string | number)[] = [];
 
         // Start with the first collection
         let currentCollection = this.get(pathSegments[0]);
@@ -512,10 +512,10 @@ export class CollectionRegistry {
 
         collections.push(currentCollection);
 
-        // Process the rest of the path in pairs (snapshotId, subcollectionSlug)
+        // Process the rest of the path in pairs (entityId, subcollectionSlug)
         for (let i = 1; i < pathSegments.length; i += 2) {
-            const snapshotId = pathSegments[i];
-            snapshotIds.push(snapshotId);
+            const entityId = pathSegments[i];
+            entityIds.push(entityId);
 
             if (i + 1 < pathSegments.length) {
                 const subcollectionSlug = pathSegments[i + 1];
@@ -535,7 +535,7 @@ export class CollectionRegistry {
 
         return {
             collections,
-            snapshotIds,
+            entityIds,
             finalCollection: currentCollection
         };
     }

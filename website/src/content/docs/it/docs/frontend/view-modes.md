@@ -116,5 +116,5 @@ const articlesCollection: CollectionConfig = {
 
 ## Passi Successivi
 
-- **[Visualizzazioni Entità](/docs/frontend/snapshot-views)** — Schede personalizzate sui moduli entità
-- **[Azioni Entità](/docs/frontend/snapshot-actions)** — Azioni entità personalizzate
+- **[Visualizzazioni Entità](/docs/frontend/entity-views)** — Schede personalizzate sui moduli entità
+- **[Azioni Entità](/docs/frontend/entity-actions)** — Azioni entità personalizzate

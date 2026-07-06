@@ -1,13 +1,13 @@
 import { useSelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/types";
-import { Snapshot, getCollectionDataPath, getDataSourceCapabilities, Relation } from "@rebasepro/types";
+import { Entity, getCollectionDataPath, getDataSourceCapabilities, Relation } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { SnapshotPreviewContainer } from "../../components/RecordPreviewBinding";
+import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ErrorView, IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
-import { getRelationFrom, normalizeToSnapshotRelation, resolveRelationProperty } from "@rebasepro/common";
+import { getRelationFrom, normalizeToEntityRelation, resolveRelationProperty } from "@rebasepro/common";
 import { cls } from "@rebasepro/ui";
 import { RelationPreview } from "../../preview";
 import { RelationSelector } from "../../components/RelationSelector";
@@ -55,7 +55,7 @@ function RelationSelectorBinding({
     relation,
     manyRelation
 }: FieldProps<RelationProperty> & { relation: Relation; manyRelation: boolean }) {
-    const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToSnapshotRelation(value) : null;
+    const normalizedSingle = (!manyRelation && value && !Array.isArray(value)) ? normalizeToEntityRelation(value) : null;
     const singleValue = normalizedSingle ?? null;
     const multipleValue = (manyRelation && Array.isArray(value)) ? value : [];
 
@@ -107,7 +107,7 @@ function SingleRelationFieldBinding({
     setValue,
     relation
 }: FieldProps<RelationProperty> & { relation: Relation | undefined }) {
-    const normalizedValue = value && !Array.isArray(value) ? normalizeToSnapshotRelation(value) : null;
+    const normalizedValue = value && !Array.isArray(value) ? normalizeToEntityRelation(value) : null;
     const validValue = !!normalizedValue;
 
     const collection = relation?.target();
@@ -116,7 +116,7 @@ function SingleRelationFieldBinding({
         throw Error(`Couldn't find the corresponding collection for the relation: ${propertyKey}`);
     }
 
-    const onSingleSnapshotSelected = useCallback((e: Snapshot<Record<string, unknown>> | null) => {
+    const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
         setValue(e ? getRelationFrom(e) : null);
     }, [setValue]);
 
@@ -124,8 +124,8 @@ function SingleRelationFieldBinding({
         multiselect: false,
         path: getCollectionDataPath(collection),
         collection,
-        onSingleSnapshotSelected,
-        selectedSnapshotIds: validValue && normalizedValue ? [normalizedValue.id] : undefined,
+        onSingleEntitySelected,
+        selectedEntityIds: validValue && normalizedValue ? [normalizedValue.id] : undefined,
         fixedFilter: property.fixedFilter
     });
 
@@ -157,12 +157,12 @@ function SingleRelationFieldBinding({
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
                     relation={usedRelation}
-                    includeSnapshotLink={property.includeSnapshotLink}
+                    includeEntityLink={property.includeEntityLink}
                     includeId={property.includeId}
                 />}
 
                 {!value && <div className="justify-center text-left">
-                    <SnapshotPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
+                    <EntityPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}
@@ -171,7 +171,7 @@ function SingleRelationFieldBinding({
                         <IconForView collectionOrView={collection}
                             className={"text-surface-300 dark:text-surface-600"}/>
                         {`Edit ${property.name}`.toUpperCase()}
-                    </SnapshotPreviewContainer>
+                    </EntityPreviewContainer>
                 </div>}
             </>}
 

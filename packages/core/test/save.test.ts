@@ -1,22 +1,22 @@
-import { saveSnapshotWithCallbacks } from "../src/hooks/data/save";
-import type { CollectionConfig, Snapshot, RebaseData, RebaseContext } from "@rebasepro/types";
+import { saveEntityWithCallbacks } from "../src/hooks/data/save";
+import type { CollectionConfig, Entity, RebaseData, RebaseContext } from "@rebasepro/types";
 
-describe("saveSnapshotWithCallbacks", () => {
+describe("saveEntityWithCallbacks", () => {
     const mockCollection: CollectionConfig = {
         slug: "test-collection",
         name: "Test",
         properties: {}
     } as CollectionConfig;
 
-    const mockSnapshot: Snapshot = {
-        id: "snapshot-1",
+    const mockEntity: Entity = {
+        id: "entity-1",
         path: "test-collection",
-        values: { name: "Test Snapshot" }
+        values: { name: "Test Entity" }
     };
 
     function createMockData(overrides?: Partial<{ create: jest.Mock; update: jest.Mock }>): RebaseData {
-        const createFn = overrides?.create ?? jest.fn().mockResolvedValue(mockSnapshot);
-        const updateFn = overrides?.update ?? jest.fn().mockResolvedValue(mockSnapshot);
+        const createFn = overrides?.create ?? jest.fn().mockResolvedValue(mockEntity);
+        const updateFn = overrides?.update ?? jest.fn().mockResolvedValue(mockEntity);
         return {
             collection: jest.fn().mockReturnValue({
                 create: createFn,
@@ -28,84 +28,84 @@ describe("saveSnapshotWithCallbacks", () => {
     const mockContext = {} as RebaseContext;
 
     it("should call create for status 'new'", async () => {
-        const createFn = jest.fn().mockResolvedValue(mockSnapshot);
+        const createFn = jest.fn().mockResolvedValue(mockEntity);
         const data = createMockData({ create: createFn });
 
-        await saveSnapshotWithCallbacks({
+        await saveEntityWithCallbacks({
             collection: mockCollection,
             path: "test-collection",
-            snapshotId: undefined,
-            values: { name: "New Snapshot" },
+            entityId: undefined,
+            values: { name: "New Entity" },
             previousValues: undefined,
             status: "new",
             data,
             context: mockContext
         });
 
-        expect(createFn).toHaveBeenCalledWith({ name: "New Snapshot" }, undefined);
+        expect(createFn).toHaveBeenCalledWith({ name: "New Entity" }, undefined);
     });
 
     it("should call create for status 'copy'", async () => {
-        const createFn = jest.fn().mockResolvedValue(mockSnapshot);
+        const createFn = jest.fn().mockResolvedValue(mockEntity);
         const data = createMockData({ create: createFn });
 
-        await saveSnapshotWithCallbacks({
+        await saveEntityWithCallbacks({
             collection: mockCollection,
             path: "test-collection",
-            snapshotId: "copy-id",
-            values: { name: "Copied Snapshot" },
+            entityId: "copy-id",
+            values: { name: "Copied Entity" },
             previousValues: undefined,
             status: "copy",
             data,
             context: mockContext
         });
 
-        expect(createFn).toHaveBeenCalledWith({ name: "Copied Snapshot" }, "copy-id");
+        expect(createFn).toHaveBeenCalledWith({ name: "Copied Entity" }, "copy-id");
     });
 
     it("should call update for status 'existing'", async () => {
-        const updateFn = jest.fn().mockResolvedValue(mockSnapshot);
+        const updateFn = jest.fn().mockResolvedValue(mockEntity);
         const data = createMockData({ update: updateFn });
 
-        await saveSnapshotWithCallbacks({
+        await saveEntityWithCallbacks({
             collection: mockCollection,
             path: "test-collection",
-            snapshotId: "snapshot-1",
-            values: { name: "Updated Snapshot" },
-            previousValues: { name: "Old Snapshot" },
+            entityId: "entity-1",
+            values: { name: "Updated Entity" },
+            previousValues: { name: "Old Entity" },
             status: "existing",
             data,
             context: mockContext
         });
 
-        expect(updateFn).toHaveBeenCalledWith("snapshot-1", { name: "Updated Snapshot" });
+        expect(updateFn).toHaveBeenCalledWith("entity-1", { name: "Updated Entity" });
     });
 
-    it("should throw if status is 'existing' and snapshotId is missing", async () => {
+    it("should throw if status is 'existing' and entityId is missing", async () => {
         const data = createMockData();
 
         await expect(
-            saveSnapshotWithCallbacks({
+            saveEntityWithCallbacks({
                 collection: mockCollection,
                 path: "test-collection",
-                snapshotId: undefined,
+                entityId: undefined,
                 values: { name: "Bad" },
                 previousValues: undefined,
                 status: "existing",
                 data,
                 context: mockContext
             })
-        ).rejects.toThrow("Snapshot id must be specified");
+        ).rejects.toThrow("Entity id must be specified");
     });
 
-    it("should NOT throw if status is 'new' and snapshotId is missing", async () => {
+    it("should NOT throw if status is 'new' and entityId is missing", async () => {
         const data = createMockData();
 
         await expect(
-            saveSnapshotWithCallbacks({
+            saveEntityWithCallbacks({
                 collection: mockCollection,
                 path: "test-collection",
-                snapshotId: undefined,
+                entityId: undefined,
                 values: { name: "New" },
                 previousValues: undefined,
                 status: "new",
@@ -115,14 +115,14 @@ describe("saveSnapshotWithCallbacks", () => {
         ).resolves.toBeDefined();
     });
 
-    it("should NOT throw if status is 'copy' and snapshotId is missing", async () => {
+    it("should NOT throw if status is 'copy' and entityId is missing", async () => {
         const data = createMockData();
 
         await expect(
-            saveSnapshotWithCallbacks({
+            saveEntityWithCallbacks({
                 collection: mockCollection,
                 path: "test-collection",
-                snapshotId: undefined,
+                entityId: undefined,
                 values: { name: "Copy" },
                 previousValues: undefined,
                 status: "copy",
@@ -136,10 +136,10 @@ describe("saveSnapshotWithCallbacks", () => {
         const afterSave = jest.fn();
         const data = createMockData();
 
-        await saveSnapshotWithCallbacks({
+        await saveEntityWithCallbacks({
             collection: mockCollection,
             path: "test-collection",
-            snapshotId: undefined,
+            entityId: undefined,
             values: { name: "New" },
             previousValues: undefined,
             status: "new",
@@ -148,7 +148,7 @@ describe("saveSnapshotWithCallbacks", () => {
             afterSave
         });
 
-        expect(afterSave).toHaveBeenCalledWith(mockSnapshot);
+        expect(afterSave).toHaveBeenCalledWith(mockEntity);
     });
 
     it("should call afterSaveError on failure", async () => {
@@ -158,10 +158,10 @@ describe("saveSnapshotWithCallbacks", () => {
         const data = createMockData({ create: createFn });
 
         await expect(
-            saveSnapshotWithCallbacks({
+            saveEntityWithCallbacks({
                 collection: mockCollection,
                 path: "test-collection",
-                snapshotId: undefined,
+                entityId: undefined,
                 values: { name: "Fail" },
                 previousValues: undefined,
                 status: "new",

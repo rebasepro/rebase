@@ -1,19 +1,19 @@
 import { getPropertyInPath } from "../../util";
-import { AuthController, Snapshot, CollectionConfig, SnapshotReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
+import { AuthController, Entity, CollectionConfig, EntityReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./file_to_json";
 import { getIn } from "@rebasepro/formex";
 import { inferTypeFromValue } from "@rebasepro/schema-inference";
 import { mergeDeep } from "@rebasepro/utils";
 
-export function convertDataToSnapshot(authController: AuthController,
+export function convertDataToEntity(authController: AuthController,
     navigation: CollectionRegistryController,
     data: Record<any, any>,
     idColumn: string | undefined,
     headersMapping: Record<string, string | null>,
     properties: Properties,
     path: string,
-    defaultValues: Record<string, any>): Snapshot<any> {
+    defaultValues: Record<string, any>): Entity<any> {
     const flatObject = flattenEntry(data);
     if (idColumn)
         delete flatObject[idColumn];
@@ -129,8 +129,8 @@ export function processValueMapping(authController: AuthController, value: any, 
             return value;
         }
     } else if (from === "string" && to === "reference" && typeof value === "string") {
-        // Parse optional database name in format: database_name:::path/to/snapshot
-        // or simple format: path/to/snapshot
+        // Parse optional database name in format: database_name:::path/to/entity
+        // or simple format: path/to/entity
         let databaseId: string | undefined = undefined;
         let referencePath = value;
 
@@ -142,9 +142,9 @@ export function processValueMapping(authController: AuthController, value: any, 
             referencePath = pathPart;
         }
 
-        // split value into path and snapshotId (snapshotId is the last part of the path, after the last /)
+        // split value into path and entityId (entityId is the last part of the path, after the last /)
         const path = referencePath.split("/").slice(0, -1).join("/");
-        const snapshotId = referencePath.split("/").slice(-1)[0];
+        const entityId = referencePath.split("/").slice(-1)[0];
 
         // If no explicit database was provided in the string, try to get it from the collection
         if (databaseId === undefined) {
@@ -152,7 +152,7 @@ export function processValueMapping(authController: AuthController, value: any, 
             databaseId = targetCollection?.databaseId;
         }
 
-        return new SnapshotReference({ id: snapshotId,
+        return new EntityReference({ id: entityId,
 path,
 databaseId });
 

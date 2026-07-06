@@ -82,12 +82,12 @@ dataType: "number" },
 
     describe("ID Type Validation", () => {
         it("should handle valid numeric ID strings", async () => {
-            const mockSnapshot = { id: 123,
+            const mockEntity = { id: 123,
 name: "Test" };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", "123");
-            expect(snapshot?.id).toBe("123");
+            const entity = await dataService.fetchOne("test", "123");
+            expect(entity?.id).toBe("123");
         });
 
         it("should throw error for invalid numeric ID", async () => {
@@ -97,21 +97,21 @@ name: "Test" };
         });
 
         it("should handle zero as valid ID", async () => {
-            const mockSnapshot = { id: 0,
+            const mockEntity = { id: 0,
 name: "Test" };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", 0);
-            expect(snapshot?.id).toBe("0");
+            const entity = await dataService.fetchOne("test", 0);
+            expect(entity?.id).toBe("0");
         });
 
         it("should handle negative numbers as valid ID", async () => {
-            const mockSnapshot = { id: -1,
+            const mockEntity = { id: -1,
 name: "Test" };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", -1);
-            expect(snapshot?.id).toBe("-1");
+            const entity = await dataService.fetchOne("test", -1);
+            expect(entity?.id).toBe("-1");
         });
     });
 
@@ -167,8 +167,8 @@ name: "Test" };
 
         it("should reject single segment paths (not nested)", async () => {
             // Single collection paths should work fine, but let's test the path parsing logic
-            const snapshots = await dataService.fetchCollection("test", {});
-            expect(snapshots).toBeDefined(); // Should work for single collection
+            const entitys = await dataService.fetchCollection("test", {});
+            expect(entitys).toBeDefined(); // Should work for single collection
         });
 
         it("should reject empty path segments", async () => {
@@ -180,9 +180,9 @@ name: "Test" };
 
     describe("Concurrent Operations", () => {
         it("should handle multiple simultaneous reads", async () => {
-            const mockSnapshot = { id: 1,
+            const mockEntity = { id: 1,
 name: "Test" };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
             const promises = Array(10).fill(0).map(() =>
                 dataService.fetchOne("test", 1)
@@ -216,37 +216,37 @@ name: "Updated" }]);
         it("should handle large result sets without memory issues", async () => {
             const largeResultSet = Array(1000).fill(0).map((_, i) => ({
                 id: i,
-                name: `Snapshot ${i}`
+                name: `Entity ${i}`
             }));
             db.orderBy.mockResolvedValue(largeResultSet);
 
-            const snapshots = await dataService.fetchCollection("test", {});
+            const entitys = await dataService.fetchCollection("test", {});
 
-            expect(snapshots).toHaveLength(1000);
-            expect(snapshots[0].name).toBe("Snapshot 0");
-            expect(snapshots[999].name).toBe("Snapshot 999");
+            expect(entitys).toHaveLength(1000);
+            expect(entitys[0].name).toBe("Entity 0");
+            expect(entitys[999].name).toBe("Entity 999");
         });
 
         it("should handle pagination correctly for large datasets", async () => {
-            const mockSnapshots = Array(50).fill(0).map((_, i) => ({
+            const mockEntitys = Array(50).fill(0).map((_, i) => ({
                 id: i + 1,
-                name: `Snapshot ${i + 1}`
+                name: `Entity ${i + 1}`
             }));
             // Override the then method to return our mock data for this specific test
-            (db as any).then = jest.fn((resolve) => resolve(mockSnapshots.slice(0, 20)));
+            (db as any).then = jest.fn((resolve) => resolve(mockEntitys.slice(0, 20)));
 
-            const snapshots = await dataService.fetchCollection("test", {
+            const entitys = await dataService.fetchCollection("test", {
                 limit: 20
             });
 
-            expect(snapshots).toHaveLength(20);
+            expect(entitys).toHaveLength(20);
             expect(db.limit).toHaveBeenCalledWith(20);
         });
     });
 
     describe("Data Integrity", () => {
         it("should validate required fields are present", async () => {
-            const incompleteSnapshot = {}; // Missing required fields
+            const incompleteEntity = {}; // Missing required fields
 
             db.returning.mockResolvedValue([{ id: 1 }]);
             db.limit.mockResolvedValue([{ id: 1,
@@ -254,28 +254,28 @@ name: null }]);
 
             // The service should handle validation at the collection level
             // This test verifies the service doesn't crash with incomplete data
-            const snapshot = await dataService.save("test", incompleteSnapshot);
-            expect(snapshot.id).toBe("1");
+            const entity = await dataService.save("test", incompleteEntity);
+            expect(entity.id).toBe("1");
         });
 
         it("should handle NULL values in database correctly", async () => {
-            const mockSnapshot = { id: 1,
+            const mockEntity = { id: 1,
 name: null };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", 1);
-            expect(snapshot?.name).toBeNull();
+            const entity = await dataService.fetchOne("test", 1);
+            expect(entity?.name).toBeNull();
         });
 
         it("should handle undefined values in input data", async () => {
-            const snapshotWithUndefined = { name: undefined };
+            const entityWithUndefined = { name: undefined };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
             db.limit.mockResolvedValue([{ id: 1,
 name: null }]);
 
-            const snapshot = await dataService.save("test", snapshotWithUndefined);
-            expect(snapshot.id).toBe("1");
+            const entity = await dataService.save("test", entityWithUndefined);
+            expect(entity.id).toBe("1");
         });
     });
 
@@ -285,36 +285,36 @@ name: null }]);
 
             // The service should handle this safely through parameterized queries
             // This test should not throw an error because of proper parameterization
-            const mockSnapshot = { id: 1,
+            const mockEntity = { id: 1,
 name: "Safe" };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", maliciousId);
-            expect(snapshot).toBeDefined(); // Should work safely
+            const entity = await dataService.fetchOne("test", maliciousId);
+            expect(entity).toBeDefined(); // Should work safely
         });
 
         it("should handle extremely long input values", async () => {
             const veryLongString = "a".repeat(10000);
-            const snapshotWithLongValue = { name: veryLongString };
+            const entityWithLongValue = { name: veryLongString };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
             db.limit.mockResolvedValue([{ id: 1,
 name: veryLongString }]);
 
-            const snapshot = await dataService.save("test", snapshotWithLongValue);
-            expect(snapshot.name).toBe(veryLongString);
+            const entity = await dataService.save("test", entityWithLongValue);
+            expect(entity.name).toBe(veryLongString);
         });
 
         it("should handle special characters in string values", async () => {
             const specialChars = "!@#$%^&*()_+-=[]{}|;':\",./<>?`~";
-            const snapshotWithSpecialChars = { name: specialChars };
+            const entityWithSpecialChars = { name: specialChars };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
             db.limit.mockResolvedValue([{ id: 1,
 name: specialChars }]);
 
-            const snapshot = await dataService.save("test", snapshotWithSpecialChars);
-            expect(snapshot.name).toBe(specialChars);
+            const entity = await dataService.save("test", entityWithSpecialChars);
+            expect(entity.name).toBe(specialChars);
         });
     });
 
@@ -329,12 +329,12 @@ name: specialChars }]);
             };
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(booleanCollection);
 
-            const mockSnapshot = { id: 1,
+            const mockEntity = { id: 1,
 active: false };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", 1);
-            expect(snapshot?.active).toBe(false);
+            const entity = await dataService.fetchOne("test", 1);
+            expect(entity?.active).toBe(false);
         });
 
         it("should handle zero values correctly", async () => {
@@ -347,21 +347,21 @@ active: false };
             };
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(numericCollection);
 
-            const mockSnapshot = { id: 1,
+            const mockEntity = { id: 1,
 count: 0 };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", 1);
-            expect(snapshot?.count).toBe(0);
+            const entity = await dataService.fetchOne("test", 1);
+            expect(entity?.count).toBe(0);
         });
 
         it("should handle empty string values correctly", async () => {
-            const mockSnapshot = { id: 1,
+            const mockEntity = { id: 1,
 name: "" };
-            db.limit.mockResolvedValue([mockSnapshot]);
+            db.limit.mockResolvedValue([mockEntity]);
 
-            const snapshot = await dataService.fetchOne("test", 1);
-            expect(snapshot?.name).toBe("");
+            const entity = await dataService.fetchOne("test", 1);
+            expect(entity?.name).toBe("");
         });
     });
 });

@@ -67,7 +67,7 @@ describe("ApiError", () => {
         });
 
         it("notFound → 404", () => {
-            const err = ApiError.notFound("Snapshot not found");
+            const err = ApiError.notFound("Entity not found");
             expect(err.statusCode).toBe(404);
             expect(err.code).toBe("NOT_FOUND");
         });

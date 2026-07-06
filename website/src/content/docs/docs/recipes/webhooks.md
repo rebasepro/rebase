@@ -1,7 +1,7 @@
 ---
 title: "Recipe: Webhook Integration"
 sidebar_label: Webhooks
-description: Use snapshot callbacks to send webhooks to external services when data changes.
+description: Use entity callbacks to send webhooks to external services when data changes.
 ---
 
 ## Overview
@@ -16,13 +16,13 @@ const ordersCollection: CollectionConfig = {
     name: "Orders",
     table: "orders",
     callbacks: {
-        afterSave: async ({ values, snapshotId, status }) => {
+        afterSave: async ({ values, entityId, status }) => {
             if (status === "new") {
                 await fetch(process.env.SLACK_WEBHOOK_URL!, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        text: `🛒 New order #${snapshotId}\nCustomer: ${values.customer_name}\nTotal: $${values.total}`
+                        text: `🛒 New order #${entityId}\nCustomer: ${values.customer_name}\nTotal: $${values.total}`
                     })
                 });
             }
@@ -36,7 +36,7 @@ const ordersCollection: CollectionConfig = {
 
 ```typescript
 callbacks: {
-    afterSave: async ({ values, snapshotId }) => {
+    afterSave: async ({ values, entityId }) => {
         // Sync product to Shopify
         await fetch("https://your-shop.myshopify.com/admin/api/2024-01/products.json", {
             method: "PUT",
@@ -55,11 +55,11 @@ callbacks: {
         });
     },
 
-    afterDelete: async ({ snapshotId, snapshot }) => {
+    afterDelete: async ({ entityId, entity }) => {
         // Remove from Shopify
-        if (snapshot.values.shopify_id) {
+        if (entity.values.shopify_id) {
             await fetch(
-                `https://your-shop.myshopify.com/admin/api/2024-01/products/${snapshot.values.shopify_id}.json`,
+                `https://your-shop.myshopify.com/admin/api/2024-01/products/${entity.values.shopify_id}.json`,
                 {
                     method: "DELETE",
                     headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN! }
@@ -76,19 +76,19 @@ Use `afterSaveError` to handle failures gracefully:
 
 ```typescript
 callbacks: {
-    afterSave: async ({ values, snapshotId }) => {
+    afterSave: async ({ values, entityId }) => {
         // This might fail
         await syncToExternalService(values);
     },
-    afterSaveError: async ({ snapshotId, error }) => {
+    afterSaveError: async ({ entityId, error }) => {
         // Log the error, send alert, or retry
-        console.error(`Webhook failed for snapshot ${snapshotId}:`, error);
-        await sendErrorAlert(snapshotId, error);
+        console.error(`Webhook failed for entity ${entityId}:`, error);
+        await sendErrorAlert(entityId, error);
     }
 }
 ```
 
 ## Next Steps
 
-- **[Snapshot Callbacks](/docs/collections/callbacks)** — Full callback reference
+- **[Entity Callbacks](/docs/collections/callbacks)** — Full callback reference
 - **[Blog CMS Recipe](/docs/recipes/blog-cms)** — Complete blog example

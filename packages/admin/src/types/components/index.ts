@@ -1,3 +1,3 @@
 export * from "./PropertyPreviewProps";
-export * from "./SnapshotFormProps";
-export * from "./SnapshotFormActionsProps";
+export * from "./EntityFormProps";
+export * from "./EntityFormActionsProps";

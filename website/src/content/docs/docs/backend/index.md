@@ -1,7 +1,7 @@
 ---
 title: Backend Overview
 sidebar_label: Backend
-description: The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and snapshot history — all initialized with a single function call.
+description: The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 ---
 
 ## Overview
@@ -12,7 +12,7 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 - **Authentication** — JWT tokens, Google OAuth, user/role management
 - **Storage** — File upload/download with local filesystem or S3
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
-- **Snapshot History** — Audit trail for every data change
+- **Entity History** — Audit trail for every data change
 - **Database Branching** — Instant, isolated database copies for dev/staging/testing
 - **Cron Jobs** — Scheduled background tasks with monitoring dashboard
 
@@ -51,7 +51,7 @@ After initialization, these routes are mounted:
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/collections` | Collection metadata endpoint |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PUT, DELETE) |
-| `/api/data/:slug/:id/history` | Snapshot change history (when enabled) |
+| `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
@@ -131,7 +131,7 @@ interface RebaseBackendConfig {
     // File storage
     storage?: BackendStorageConfig | Record<string, BackendStorageConfig>;
 
-    // Snapshot history
+    // Entity history
     history?: boolean | HistoryConfig;
 
     // OpenAPI/Swagger
@@ -164,7 +164,7 @@ instance.roleService         // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
-instance.historyService      // Snapshot history
+instance.historyService      // Entity history
 instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
 ```
 
@@ -176,11 +176,11 @@ The REST API is auto-generated from your collections. Every collection gets thes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List snapshots (with filter, sort, limit, search) |
-| `GET` | `/api/data/:slug/:id` | Get a single snapshot |
-| `POST` | `/api/data/:slug` | Create a new snapshot |
-| `PUT` | `/api/data/:slug/:id` | Update a snapshot |
-| `DELETE` | `/api/data/:slug/:id` | Delete a snapshot |
+| `GET` | `/api/data/:slug` | List entitys (with filter, sort, limit, search) |
+| `GET` | `/api/data/:slug/:id` | Get a single entity |
+| `POST` | `/api/data/:slug` | Create a new entity |
+| `PUT` | `/api/data/:slug/:id` | Update a entity |
+| `DELETE` | `/api/data/:slug/:id` | Delete a entity |
 
 ### Query Parameters
 
@@ -197,8 +197,8 @@ The REST API is auto-generated from your collections. Every collection gets thes
 
 The WebSocket server attaches to the same HTTP server and provides real-time subscriptions:
 
-- Subscribe to **collection changes** — get notified when any snapshot in a collection is created, updated, or deleted
-- Subscribe to **snapshot changes** — get notified when a specific snapshot changes
+- Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
+- Subscribe to **entity changes** — get notified when a specific entity changes
 - Automatic **reconnection** handling in the client SDK
 
 The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deployments, provide a `connectionString` in your `PostgresBootstrapper` to enable cross-instance broadcasting.
@@ -210,7 +210,7 @@ The backend includes an error handler that catches all exceptions and returns st
 ```json
 {
     "error": {
-        "message": "Snapshot not found",
+        "message": "Entity not found",
         "code": "not-found",
         "status": 404
     }
@@ -223,8 +223,8 @@ If initialization fails (e.g., database connection error), the server still star
 
 - **[Authentication](/docs/auth)** — JWT, Google OAuth, user management
 - **[Storage](/docs/storage)** — Local and S3 file storage
-- **[Snapshot Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
-- **[Snapshot History](/docs/backend/history)** — Audit trail
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
+- **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging

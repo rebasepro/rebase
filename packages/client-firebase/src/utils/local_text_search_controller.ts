@@ -1,4 +1,4 @@
-import { collection, getFirestore, onSnapshot, query } from "@firebase/firestore";
+import { collection, getFirestore, onEntity, query } from "@firebase/firestore";
 import Fuse from "fuse.js"
 
 import { FirebaseApp } from "@firebase/app";
@@ -47,13 +47,13 @@ export const localSearchControllerBuilder: FirestoreTextSearchControllerBuilder 
                 console.debug("Init local search controller", path);
                 const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
                 const col = collection(firestore, path);
-                listeners[path] = onSnapshot(query(col),
+                listeners[path] = onEntity(query(col),
                     {
-                        next: (snapshot) => {
-                            if (snapshot.metadata.fromCache && snapshot.metadata.hasPendingWrites) {
+                        next: (entity) => {
+                            if (entity.metadata.fromCache && entity.metadata.hasPendingWrites) {
                                 return;
                             }
-                            const docs = snapshot.docs.map(doc => ({
+                            const docs = entity.docs.map(doc => ({
                                 id: doc.id,
                                 ...doc.data()
                             }));

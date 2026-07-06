@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { useEffect, useState, useMemo } from "react";
-import { Snapshot, FilterValues, User } from "@rebasepro/types";
+import { Entity, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 /**
@@ -14,12 +14,12 @@ export interface CollectionProps<M extends Record<string, any>> {
     path: string;
 
     /**
-     * collection of the snapshot displayed by this collection
+     * collection of the entity displayed by this collection
      */
     collection: CollectionConfig<M>
 
     /**
-     * Number of snapshots to fetch
+     * Number of entitys to fetch
      */
     itemCount?: number;
 
@@ -53,7 +53,7 @@ export interface CollectionProps<M extends Record<string, any>> {
  * @group Hooks and utilities
  */
 export interface CollectionResult<M extends Record<string, any>> {
-    data: Snapshot<M>[];
+    data: Entity<M>[];
     dataLoading: boolean;
     noMoreToLoad: boolean;
     dataLoadingError?: Error;
@@ -94,7 +94,7 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
     // filterValues is already FilterValues — pass directly
     const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
 
-    const [data, setData] = useState<Snapshot<M>[]>([]);
+    const [data, setData] = useState<Entity<M>[]>([]);
 
     const [dataLoading, setDataLoading] = useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
@@ -105,11 +105,11 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
 
         setDataLoading(true);
 
-        const onSnapshotsUpdate = async (res: { data: Snapshot<M>[], meta: { hasMore: boolean; total?: number } }) => {
-            const snapshots = res.data;
+        const onEntitysUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean; total?: number } }) => {
+            const entitys = res.data;
             setDataLoading(false);
             setDataLoadingError(undefined);
-            setData(snapshots.map(e => ({
+            setData(entitys.map(e => ({
                 ...e
             })));
             setNoMoreToLoad(!res.meta.hasMore);
@@ -145,7 +145,7 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
                 orderBy: orderByParams,
                 searchString,
                 include: includeParams
-            }, (res) => onSnapshotsUpdate({ data: res.data as Snapshot<M>[],
+            }, (res) => onEntitysUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onError);
         } else {
             accessor.find({
@@ -157,7 +157,7 @@ meta: res.meta }), onError);
                 searchString,
                 include: includeParams
             })
-                .then((res) => onSnapshotsUpdate({ data: res.data as Snapshot<M>[],
+                .then((res) => onEntitysUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }))
                 .catch(onError);
             return () => {

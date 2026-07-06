@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import { getSnapshotCSVExportableData, getSnapshotJsonExportableData } from "../../src/data_export/export/export";
-import { Snapshot, Properties, SnapshotReference } from "@rebasepro/types";
+import { getEntityCSVExportableData, getEntityJsonExportableData } from "../../src/data_export/export/export";
+import { Entity, Properties, EntityReference } from "@rebasepro/types";
 
 describe("Export Utility Functions", () => {
     const mockProperties: Properties = {
@@ -11,11 +11,11 @@ describe("Export Utility Functions", () => {
     };
 
     const birthDate = new Date("1990-01-01T00:00:00.000Z");
-    const mockReference = new SnapshotReference({ id: "user-99", path: "users", databaseId: "custom" });
+    const mockReference = new EntityReference({ id: "user-99", path: "users", databaseId: "custom" });
 
-    const mockSnapshots: Snapshot<any>[] = [
+    const mockEntitys: Entity<any>[] = [
         {
-            id: "snapshot-1",
+            id: "entity-1",
             path: "users",
             values: {
                 name: "Alice",
@@ -25,7 +25,7 @@ describe("Export Utility Functions", () => {
             }
         },
         {
-            id: "snapshot-2",
+            id: "entity-2",
             path: "users",
             values: {
                 name: "Bob",
@@ -36,8 +36,8 @@ describe("Export Utility Functions", () => {
         }
     ];
 
-    describe("getSnapshotCSVExportableData", () => {
-        test("should format snapshot values correctly with date as string", () => {
+    describe("getEntityCSVExportableData", () => {
+        test("should format entity values correctly with date as string", () => {
             const headers = [
                 { label: "id", key: "id" },
                 { label: "name", key: "name" },
@@ -46,8 +46,8 @@ describe("Export Utility Functions", () => {
                 { label: "favoriteUser", key: "favoriteUser" }
             ];
 
-            const result = getSnapshotCSVExportableData(
-                mockSnapshots,
+            const result = getEntityCSVExportableData(
+                mockEntitys,
                 undefined,
                 mockProperties,
                 headers,
@@ -55,19 +55,19 @@ describe("Export Utility Functions", () => {
             );
 
             expect(result).toEqual([
-                ["snapshot-1", "Alice", 30, birthDate.toISOString(), "custom:::users/user-99"],
-                ["snapshot-2", "Bob", 25, birthDate.toISOString(), null]
+                ["entity-1", "Alice", 30, birthDate.toISOString(), "custom:::users/user-99"],
+                ["entity-2", "Bob", 25, birthDate.toISOString(), null]
             ]);
         });
 
-        test("should format snapshot values correctly with date as timestamp", () => {
+        test("should format entity values correctly with date as timestamp", () => {
             const headers = [
                 { label: "id", key: "id" },
                 { label: "birthDate", key: "birthDate" }
             ];
 
-            const result = getSnapshotCSVExportableData(
-                mockSnapshots,
+            const result = getEntityCSVExportableData(
+                mockEntitys,
                 undefined,
                 mockProperties,
                 headers,
@@ -75,8 +75,8 @@ describe("Export Utility Functions", () => {
             );
 
             expect(result).toEqual([
-                ["snapshot-1", birthDate.getTime()],
-                ["snapshot-2", birthDate.getTime()]
+                ["entity-1", birthDate.getTime()],
+                ["entity-2", birthDate.getTime()]
             ]);
         });
 
@@ -92,8 +92,8 @@ describe("Export Utility Functions", () => {
                 { extraColumn: "ExtraBob" }
             ];
 
-            const result = getSnapshotCSVExportableData(
-                mockSnapshots,
+            const result = getEntityCSVExportableData(
+                mockEntitys,
                 additionalData,
                 mockProperties,
                 headers,
@@ -101,16 +101,16 @@ describe("Export Utility Functions", () => {
             );
 
             expect(result).toEqual([
-                ["snapshot-1", "Alice", "ExtraAlice"],
-                ["snapshot-2", "Bob", "ExtraBob"]
+                ["entity-1", "Alice", "ExtraAlice"],
+                ["entity-2", "Bob", "ExtraBob"]
             ]);
         });
     });
 
-    describe("getSnapshotJsonExportableData", () => {
+    describe("getEntityJsonExportableData", () => {
         test("should process and return processed objects array", () => {
-            const result = getSnapshotJsonExportableData(
-                mockSnapshots,
+            const result = getEntityJsonExportableData(
+                mockEntitys,
                 undefined,
                 mockProperties,
                 "string"
@@ -118,14 +118,14 @@ describe("Export Utility Functions", () => {
 
             expect(result).toEqual([
                 {
-                    id: "snapshot-1",
+                    id: "entity-1",
                     name: "Alice",
                     age: 30,
                     birthDate: birthDate.toISOString(),
                     favoriteUser: "custom:::users/user-99"
                 },
                 {
-                    id: "snapshot-2",
+                    id: "entity-2",
                     name: "Bob",
                     age: 25,
                     birthDate: birthDate.toISOString(),
@@ -140,8 +140,8 @@ describe("Export Utility Functions", () => {
                 { extraJsonField: "data2" }
             ];
 
-            const result = getSnapshotJsonExportableData(
-                mockSnapshots,
+            const result = getEntityJsonExportableData(
+                mockEntitys,
                 additionalData,
                 mockProperties,
                 "string"
@@ -149,7 +149,7 @@ describe("Export Utility Functions", () => {
 
             expect(result).toEqual([
                 {
-                    id: "snapshot-1",
+                    id: "entity-1",
                     name: "Alice",
                     age: 30,
                     birthDate: birthDate.toISOString(),
@@ -157,7 +157,7 @@ describe("Export Utility Functions", () => {
                     extraJsonField: "data1"
                 },
                 {
-                    id: "snapshot-2",
+                    id: "entity-2",
                     name: "Bob",
                     age: 25,
                     birthDate: birthDate.toISOString(),

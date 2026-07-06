@@ -1,7 +1,7 @@
 ---
 title: Custom Fields
 sidebar_label: Custom Fields
-description: Build custom form fields for snapshot editing with full access to the form context, snapshot values, and Rebase hooks.
+description: Build custom form fields for entity editing with full access to the form context, entity values, and Rebase hooks.
 ---
 
 <video className="intro_video" loop autoPlay muted>
@@ -43,7 +43,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<stri
 | `showError` | `boolean` | Whether to display the error |
 | `isSubmitting` | `boolean` | Form is being saved |
 | `property` | `Property` | The property configuration |
-| `context` | `FormContext` | Full form context with all snapshot values |
+| `context` | `FormContext` | Full form context with all entity values |
 | `disabled` | `boolean` | Field is readonly |
 | `tableMode` | `boolean` | Rendering inside the spreadsheet (compact mode) |
 
@@ -99,7 +99,7 @@ properties: {
 
 ## Accessing Form Context
 
-Custom fields can access the full snapshot values:
+Custom fields can access the full entity values:
 
 ```tsx
 function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
@@ -171,6 +171,6 @@ properties: {
 
 ## Next Steps
 
-- **[Snapshot Views](/docs/frontend/snapshot-views)** — Custom tabs in the snapshot editor
-- **[Snapshot Actions](/docs/frontend/snapshot-actions)** — Custom action buttons
+- **[Entity Views](/docs/frontend/entity-views)** — Custom tabs in the entity editor
+- **[Entity Actions](/docs/frontend/entity-actions)** — Custom action buttons
 - **[Additional Columns](/docs/frontend/additional-columns)** — Computed table columns

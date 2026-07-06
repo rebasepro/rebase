@@ -3,7 +3,7 @@
  *
  * Covers the remaining risk areas identified by gap analysis:
  *
- * 1. 🔴 ID type coercion in batchFetchRelatedSnapshots (single-cardinality)
+ * 1. 🔴 ID type coercion in batchFetchRelatedEntitys (single-cardinality)
  *    — parsedParentIds.includes(parentId) used strict ===, silently dropping
  *    all inverse results when Drizzle returned string IDs for numeric PKs.
  *    Fixed by using Set<string> + String() normalization.
@@ -198,10 +198,10 @@ function createMockDb(resolveResults: () => unknown[]) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 1. ID type coercion in batchFetchRelatedSnapshots (single cardinality)
+// 1. ID type coercion in batchFetchRelatedEntitys (single cardinality)
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("batchFetchRelatedSnapshots: ID type coercion (single cardinality)", () => {
+describe("batchFetchRelatedEntitys: ID type coercion (single cardinality)", () => {
     let registry: PostgresCollectionRegistry;
 
     beforeEach(() => {
@@ -248,7 +248,7 @@ author_id: "2" }
         const relation = authorsCollection.relations![0] as Relation;
 
         // Pass numeric parent IDs — parseIdValues will return numbers
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "authors", [1, 2], "posts", relation
         );
 
@@ -272,7 +272,7 @@ author_id: 1 }
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "authors", [1], "posts", relation
         );
 
@@ -294,7 +294,7 @@ author_id: "2" } // string
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "authors", [1, 2], "posts", relation
         );
 
@@ -313,7 +313,7 @@ author_id: "999" }
         const service = new RelationService(db, registry);
         const relation = authorsCollection.relations![0] as Relation;
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "authors", [1, 2], "posts", relation
         );
 
@@ -369,7 +369,7 @@ author_id: "1" }
         const { db } = createMockDb(() => resultRows);
         const service = new RelationService(db, registry);
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "authors_inr", [1], "posts", relation
         );
 
@@ -667,7 +667,7 @@ to: "id" } }
 // 4. Owning direction batch relation loading (tasks → client pattern)
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("batchFetchRelatedSnapshots: owning direction (FK-based)", () => {
+describe("batchFetchRelatedEntitys: owning direction (FK-based)", () => {
     let registry: PostgresCollectionRegistry;
 
     // Mock collections simulating tasks → clients owning relation
@@ -783,7 +783,7 @@ columnName: "client_id" },
             // Query 1: FK lookup from tasks table
             () => [{ parentId: taskUuid,
 fkValue: clientUuid }],
-            // Query 2: Target snapshot from clients table
+            // Query 2: Target entity from clients table
             () => [{ id: clientUuid,
 name: "Francesco",
 email: "f@test.com" }]
@@ -792,19 +792,19 @@ email: "f@test.com" }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "tasks", [taskUuid], "client", relation
         );
 
         expect(results.size).toBe(1);
 
-        const clientSnapshot = results.get(taskUuid);
-        expect(clientSnapshot).toBeDefined();
-        expect(clientSnapshot!.id).toBe(clientUuid);
-        expect(clientSnapshot!.path).toBe("clients");
-        expect(clientSnapshot!.values).toBeDefined();
-        expect(clientSnapshot!.values.name).toBe("Francesco");
-        expect(clientSnapshot!.values.email).toBe("f@test.com");
+        const clientEntity = results.get(taskUuid);
+        expect(clientEntity).toBeDefined();
+        expect(clientEntity!.id).toBe(clientUuid);
+        expect(clientEntity!.path).toBe("clients");
+        expect(clientEntity!.values).toBeDefined();
+        expect(clientEntity!.values.name).toBe("Francesco");
+        expect(clientEntity!.values.email).toBe("f@test.com");
     });
 
     it("should handle multiple tasks pointing to the same client", async () => {
@@ -829,7 +829,7 @@ email: "f@test.com" }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "tasks", [task1, task2], "client", relation
         );
 
@@ -850,7 +850,7 @@ fkValue: null }]
         const service = new RelationService(db, registry);
         const relation = tasksCollection.properties.client as unknown as Relation;
 
-        const results = await service.batchFetchRelatedSnapshots(
+        const results = await service.batchFetchRelatedEntitys(
             "tasks", [task1], "client", relation
         );
 
@@ -864,7 +864,7 @@ fkValue: null }]
 // ═══════════════════════════════════════════════════════════════════════
 
 import { createRelationRefWithData } from "@rebasepro/common";
-import { SnapshotRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/types";
 
 // Inline reviver for test isolation (matches packages/client/src/reviver.ts)
 function rebaseReviver(_key: string, value: unknown): unknown {
@@ -872,8 +872,8 @@ function rebaseReviver(_key: string, value: unknown): unknown {
         const record = value as Record<string, unknown>;
         switch (record.__type) {
             case "relation":
-            case "SnapshotRelation":
-                return new SnapshotRelation(
+            case "EntityRelation":
+                return new EntityRelation(
                     record.id as string | number,
                     record.path as string,
                     record.data as any
@@ -887,7 +887,7 @@ function rebaseReviver(_key: string, value: unknown): unknown {
 
 describe("Relation data JSON round-trip", () => {
     it("should preserve relation data through JSON.stringify → JSON.parse with reviver", () => {
-        const clientSnapshot = {
+        const clientEntity = {
             id: "client-uuid-123",
             path: "clients",
             values: {
@@ -898,7 +898,7 @@ describe("Relation data JSON round-trip", () => {
         };
 
         // Server creates this
-        const ref = createRelationRefWithData(clientSnapshot.id, clientSnapshot.path, clientSnapshot as any);
+        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
 
         // Verify server-side structure
         expect(ref.__type).toBe("relation");
@@ -907,8 +907,8 @@ describe("Relation data JSON round-trip", () => {
         expect(ref.data).toBeDefined();
         expect(ref.data.values.name).toBe("Francesco");
 
-        // Simulate full snapshot with relation in values
-        const taskSnapshot = {
+        // Simulate full entity with relation in values
+        const taskEntity = {
             id: "task-uuid-456",
             path: "tasks",
             values: {
@@ -919,14 +919,14 @@ describe("Relation data JSON round-trip", () => {
         };
 
         // Server JSON.stringify for WebSocket
-        const json = JSON.stringify(taskSnapshot);
+        const json = JSON.stringify(taskEntity);
 
         // Client JSON.parse with reviver
         const parsed = JSON.parse(json, rebaseReviver);
 
-        // The client relation should be a SnapshotRelation instance
+        // The client relation should be a EntityRelation instance
         const clientRelation = parsed.values.client;
-        expect(clientRelation).toBeInstanceOf(SnapshotRelation);
+        expect(clientRelation).toBeInstanceOf(EntityRelation);
         expect(clientRelation.id).toBe("client-uuid-123");
         expect(clientRelation.path).toBe("clients");
 
@@ -937,7 +937,7 @@ describe("Relation data JSON round-trip", () => {
         expect(clientRelation.data.values.email).toBe("f@test.com");
     });
 
-    it("should handle snapshot with no relation data (stub)", () => {
+    it("should handle entity with no relation data (stub)", () => {
         const stubRef = { id: "client-uuid",
 path: "clients",
 __type: "relation" as const };
@@ -946,7 +946,7 @@ __type: "relation" as const };
         const parsed = JSON.parse(json, rebaseReviver);
 
         const clientRelation = parsed.values.client;
-        expect(clientRelation).toBeInstanceOf(SnapshotRelation);
+        expect(clientRelation).toBeInstanceOf(EntityRelation);
         expect(clientRelation.id).toBe("client-uuid");
 
         // data should be undefined for stubs
@@ -954,20 +954,20 @@ __type: "relation" as const };
     });
 
     it("should handle WebSocket collection_update message format", () => {
-        const clientSnapshot = {
+        const clientEntity = {
             id: "client-uuid",
             path: "clients",
             values: { name: "Acme Corp",
 email: "acme@corp.com" }
         };
 
-        const ref = createRelationRefWithData(clientSnapshot.id, clientSnapshot.path, clientSnapshot as any);
+        const ref = createRelationRefWithData(clientEntity.id, clientEntity.path, clientEntity as any);
 
         // Simulate full WebSocket message
         const wsMessage = {
             type: "collection_update",
             subscriptionId: "sub-123",
-            snapshots: [
+            entitys: [
                 {
                     id: "task-1",
                     path: "tasks",
@@ -989,9 +989,9 @@ status: "completed" }
         const parsed = JSON.parse(json, rebaseReviver);
 
         // Both tasks should have correctly hydrated client relations
-        for (const snapshot of parsed.snapshots) {
-            const clientRel = snapshot.values.client;
-            expect(clientRel).toBeInstanceOf(SnapshotRelation);
+        for (const entity of parsed.entitys) {
+            const clientRel = entity.values.client;
+            expect(clientRel).toBeInstanceOf(EntityRelation);
             expect(clientRel.data).toBeDefined();
             expect(clientRel.data.values.name).toBe("Acme Corp");
         }

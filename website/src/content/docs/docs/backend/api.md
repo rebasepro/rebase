@@ -20,12 +20,12 @@ For each collection, the following endpoints are generated:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List snapshots |
-| `GET` | `/api/data/:slug/count` | Count snapshots |
-| `GET` | `/api/data/:slug/:id` | Get a single snapshot |
-| `POST` | `/api/data/:slug` | Create a snapshot |
-| `PUT` | `/api/data/:slug/:id` | Update a snapshot |
-| `DELETE` | `/api/data/:slug/:id` | Delete a snapshot |
+| `GET` | `/api/data/:slug` | List entitys |
+| `GET` | `/api/data/:slug/count` | Count entitys |
+| `GET` | `/api/data/:slug/:id` | Get a single entity |
+| `POST` | `/api/data/:slug` | Create a entity |
+| `PUT` | `/api/data/:slug/:id` | Update a entity |
+| `DELETE` | `/api/data/:slug/:id` | Delete a entity |
 
 ### Subcollection Routes
 
@@ -43,7 +43,7 @@ DELETE /api/data/authors/42/posts/7       → delete the post
 
 To handle arbitrary nested subcollection depths, Rebase routes incoming requests using Hono's `:rest{.+}` parameter regex. The internal segment parsing engine analyzes paths by counting slash-separated segments:
 - **Odd segment count** (e.g., `authors/42/posts` -> 3 segments) represents a collection list request.
-- **Even segment count** (e.g., `authors/42/posts/7` -> 4 segments) represents an operation on a specific snapshot ID. The last segment is popped as the target `snapshotId`.
+- **Even segment count** (e.g., `authors/42/posts/7` -> 4 segments) represents an operation on a specific entity ID. The last segment is popped as the target `entityId`.
 
 The engine filters out reserved system namespaces (e.g., `history`) from the path segment analysis to prevent collisions with built-in endpoints.
 
@@ -163,7 +163,7 @@ List responses include pagination metadata:
 }
 ```
 
-Single snapshot responses return a flat object:
+Single entity responses return a flat object:
 
 ```json
 {
@@ -201,7 +201,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 
 ## Relation Inclusion
 
-Use the `include` parameter to embed related snapshots:
+Use the `include` parameter to embed related entitys:
 
 ```bash
 # Include specific relations

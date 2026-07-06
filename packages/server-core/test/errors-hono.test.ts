@@ -18,7 +18,7 @@ describe("Error Handler (Hono)", () => {
             throw ApiError.forbidden("Admin only", "FORBIDDEN");
         });
         app.get("/not-found", () => {
-            throw ApiError.notFound("Snapshot not found");
+            throw ApiError.notFound("Entity not found");
         });
         app.get("/conflict", () => {
             throw ApiError.conflict("Email already exists", "EMAIL_EXISTS");

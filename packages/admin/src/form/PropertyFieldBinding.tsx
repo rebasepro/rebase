@@ -102,7 +102,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                     property: property,
                     values: fieldProps.form.values,
                     path: context.path,
-                    snapshotId: context.snapshotId,
+                    entityId: context.entityId,
                     propertyConfigs: customizationController.propertyConfigs,
                     index,
                     authController
@@ -130,7 +130,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                         property: propertyConfig.property as Property,
                         values: fieldProps.form.values,
                         path: context.path,
-                        snapshotId: context.snapshotId,
+                        entityId: context.entityId,
                         propertyConfigs: customizationController.propertyConfigs,
                         index,
                         authController

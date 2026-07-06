@@ -43,7 +43,7 @@ export function CollectionDetailsForm({
     existingPaths?: string[];
     existingIds?: string[];
     parentCollection?: CollectionConfig;
-    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     expandKanban?: boolean;
 }) {
 
@@ -178,8 +178,8 @@ export function CollectionDetailsForm({
 
                     <LayoutModeSwitch
                         className={"col-span-12"}
-                        value={values.openSnapshotMode ?? "side_panel"}
-                        onChange={(value) => setFieldValue("openSnapshotMode", value)}/>
+                        value={values.openEntityMode ?? "side_panel"}
+                        onChange={(value) => setFieldValue("openEntityMode", value)}/>
 
                     <ViewModeSwitch
                         className={"col-span-12"}

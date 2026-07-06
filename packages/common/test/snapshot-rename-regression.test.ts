@@ -1,5 +1,5 @@
 /**
- * Cross-package regression tests for the Entity → Snapshot rename.
+ * Cross-package regression tests for the Entity → Entity rename.
  *
  * These tests scan the actual source code of all packages to ensure
  * that the automated rename didn't introduce any of the known bug
@@ -7,10 +7,10 @@
  *
  * Categories:
  * 1. No "IDSNAPSHOT" anywhere — the SQL IDENTITY keyword must be preserved
- * 2. No "an snapshot" — grammar must use "a snapshot"
+ * 2. No "an entity" — grammar must use "a entity"
  * 3. Database column/table names (entity_history, entity_id) preserved
- * 4. No corrupted substrings (identity → idsnapshoty)
- * 5. No remaining bare "Entity" type names that should be "Snapshot"
+ * 4. No corrupted substrings (identity → identityy)
+ * 5. No remaining bare "Entity" type names that should be "Entity"
  */
 
 import * as fs from "fs";
@@ -73,23 +73,23 @@ describe("IDSNAPSHOT corruption guard", () => {
         expect(violations).toEqual([]);
     });
 
-    it("should not contain idsnapshot (lowercase) in any package source file", () => {
-        // Catches variable names like idsnapshoty
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /idsnapshot/i);
+    it("should not contain identity (lowercase) in any package source file", () => {
+        // Catches variable names like identityy
+        const violations = scanFiles(PACKAGE_SRC_DIRS, /identity/i);
         expect(violations).toEqual([]);
     });
 });
 
-// ── 2. Grammar: "a snapshot" not "an snapshot" ───────────────────────────
+// ── 2. Grammar: "a entity" not "an entity" ───────────────────────────
 
-describe("Grammar: article before snapshot", () => {
+describe("Grammar: article before entity", () => {
 
-    it("should not use 'an snapshot' anywhere in package source", () => {
+    it("should not use 'an entity' anywhere in package source", () => {
         const violations = scanFiles(PACKAGE_SRC_DIRS, /\ban [Ss]napshot/);
         expect(violations).toEqual([]);
     });
 
-    it("should not use 'An snapshot' anywhere in package source", () => {
+    it("should not use 'An entity' anywhere in package source", () => {
         const violations = scanFiles(PACKAGE_SRC_DIRS, /\bAn [Ss]napshot/);
         expect(violations).toEqual([]);
     });
@@ -122,8 +122,8 @@ describe("Database name preservation", () => {
 
 describe("Identity word preservation", () => {
 
-    it("should not contain IdSnapshot as a corruption of Identity", () => {
-        const violations = scanFiles(PACKAGE_SRC_DIRS, /\bIdSnapshot\b/);
+    it("should not contain IdEntity as a corruption of Identity", () => {
+        const violations = scanFiles(PACKAGE_SRC_DIRS, /\bIdEntity\b/);
         expect(violations).toEqual([]);
     });
 });

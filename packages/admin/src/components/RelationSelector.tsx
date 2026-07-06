@@ -24,29 +24,29 @@ import {
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { Snapshot, SnapshotRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
-import { RecordPreviewBindingData } from "./RecordPreviewBinding";
+import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
+import { EntityPreviewBindingData } from "./EntityPreviewBinding";
 import { useData, useRelationSelector } from "@rebasepro/core";
 import { useSidePanel } from "../hooks/useSidePanel";
-import { normalizeToSnapshotRelation } from "@rebasepro/common";
+import { normalizeToEntityRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";
 
 export interface RelationItem {
     id: string | number;
     label: string;
     description?: string;
-    data?: Snapshot;
-    relation: SnapshotRelation;
+    data?: Entity;
+    relation: EntityRelation;
 }
 
 export interface RelationSelectorProps {
     className?: string;
     name?: string;
     id?: string;
-    value?: SnapshotRelation | SnapshotRelation[] | null;
-    /** Callback returning selected SnapshotRelation(s) */
+    value?: EntityRelation | EntityRelation[] | null;
+    /** Callback returning selected EntityRelation(s) */
 
-    onValueChange?: (updatedValue: SnapshotRelation | SnapshotRelation[] | undefined) => void;
+    onValueChange?: (updatedValue: EntityRelation | EntityRelation[] | undefined) => void;
     placeholder?: React.ReactNode;
     size?: "small" | "medium";
     useChips?: boolean;
@@ -102,7 +102,7 @@ export const RelationSelector = React.forwardRef<
         // Track IDs that were set via local user interaction (onItemClick / handleClear / handleRemoveItem).
         // When an incoming value change matches these IDs exactly, we skip async re-resolution.
         const localSelectionIdsRef = useRef<string | null>(null);
-        // Snapshot of selected IDs captured when the popover opens.
+        // Entity of selected IDs captured when the popover opens.
         // Used to sort the dropdown list so selected items appear at the top.
         // Stays stable for the entire popover session so items don't jump around.
         const pinnedIdsRef = useRef<Set<string> | null>(null);
@@ -113,7 +113,7 @@ export const RelationSelector = React.forwardRef<
             hasMore,
             search,
             loadMore,
-            snapshotToRelationItem
+            entityToRelationItem
         } = useRelationSelector({
             path: getCollectionDataPath(collection),
             collection,
@@ -141,8 +141,8 @@ export const RelationSelector = React.forwardRef<
         // so the effect only re-fires when the actual `value` identity changes.
         const dataClientRef = useRef(dataClient);
         dataClientRef.current = dataClient;
-        const snapshotToRelationItemRef = useRef(snapshotToRelationItem);
-        snapshotToRelationItemRef.current = snapshotToRelationItem;
+        const entityToRelationItemRef = useRef(entityToRelationItem);
+        entityToRelationItemRef.current = entityToRelationItem;
         const collectionSlugRef = useRef(collection.slug);
         collectionSlugRef.current = collection.slug;
 
@@ -155,18 +155,18 @@ export const RelationSelector = React.forwardRef<
         selectedItemsRef.current = selectedItems;
 
         // Normalize incoming values — plain { __type: "relation" } objects
-        // from the server are converted to proper SnapshotRelation instances.
+        // from the server are converted to proper EntityRelation instances.
         const rawArray = !value ? [] : Array.isArray(value) ? value : [value];
         const relationsArray = rawArray.map(rel => {
             if (typeof rel === "string" || typeof rel === "number") return rel;
-            return normalizeToSnapshotRelation(rel) ?? rel;
+            return normalizeToEntityRelation(rel) ?? rel;
         });
 
         // Build a fingerprint of the incoming value's IDs
         const incomingIds = relationsArray
             .map(rel => {
                 const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                return String(isPrimitive ? rel : (rel as SnapshotRelation).id);
+                return String(isPrimitive ? rel : (rel as EntityRelation).id);
             })
             .sort()
             .join(",");
@@ -174,7 +174,7 @@ export const RelationSelector = React.forwardRef<
         // CheckIcon if every relation already has embedded data
         const allHaveData = relationsArray.length > 0 && relationsArray.every(rel => {
             if (typeof rel === "string" || typeof rel === "number") return false;
-            return !!(rel as SnapshotRelation)?.data;
+            return !!(rel as EntityRelation)?.data;
         });
 
         const relationsArrayRef = useRef(relationsArray);
@@ -203,18 +203,18 @@ export const RelationSelector = React.forwardRef<
 
             let allCovered = true;
             const newResolvedItems: RelationItem[] = [];
-            const toRelationItem = snapshotToRelationItemRef.current;
+            const toRelationItem = entityToRelationItemRef.current;
             const slug = collectionSlugRef.current;
 
             for (const rel of currentRelationsArray) {
                 const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                const relId = String(isPrimitive ? rel : (rel as SnapshotRelation).id);
-                const hasEmbeddedData = !isPrimitive && !!(rel as SnapshotRelation).data;
+                const relId = String(isPrimitive ? rel : (rel as EntityRelation).id);
+                const hasEmbeddedData = !isPrimitive && !!(rel as EntityRelation).data;
 
                 if (hasEmbeddedData) {
-                    const r = rel as SnapshotRelation;
+                    const r = rel as EntityRelation;
                     // CMS wire format embeds relation data as { id, path, values }
-                    newResolvedItems.push(toRelationItem(r.data as unknown as Snapshot, r));
+                    newResolvedItems.push(toRelationItem(r.data as unknown as Entity, r));
                 } else if (currentSelectedMap.has(relId)) {
                     // We already have it in currentSelected
                     const existingItem = currentSelectedMap.get(relId)!;
@@ -244,23 +244,23 @@ export const RelationSelector = React.forwardRef<
             Promise.all(
                 currentRelationsArray.map(async (rel) => {
                     const isPrimitive = typeof rel === "string" || typeof rel === "number";
-                    const relId = isPrimitive ? rel : (rel as SnapshotRelation).id;
-                    const path = isPrimitive ? slug : (rel as SnapshotRelation).path;
-                    const relation = isPrimitive ? new SnapshotRelation(relId, path) : rel as SnapshotRelation;
+                    const relId = isPrimitive ? rel : (rel as EntityRelation).id;
+                    const path = isPrimitive ? slug : (rel as EntityRelation).path;
+                    const relation = isPrimitive ? new EntityRelation(relId, path) : rel as EntityRelation;
 
-                    if (!isPrimitive && (rel as SnapshotRelation).data) {
+                    if (!isPrimitive && (rel as EntityRelation).data) {
                         // CMS wire format embeds relation data as { id, path, values }
-                        return toRelationItem((rel as SnapshotRelation).data as unknown as Snapshot, relation);
+                        return toRelationItem((rel as EntityRelation).data as unknown as Entity, relation);
                     }
                     if (currentSelectedMap.has(String(relId))) {
                         return currentSelectedMap.get(String(relId))!;
                     }
 
                     try {
-                        const snapshot = await client.collection(path).findById(relId);
-                        if (snapshot) return toRelationItem(snapshot, relation);
+                        const entity = await client.collection(path).findById(relId);
+                        if (entity) return toRelationItem(entity, relation);
                     } catch (e) {
-                        console.warn("RelationSelector: could not fetch snapshot for relation", rel, e);
+                        console.warn("RelationSelector: could not fetch entity for relation", rel, e);
                     }
                     return { id: relId,
 label: String(relId),
@@ -487,9 +487,9 @@ relation } as RelationItem;
                                                     <div key={String(item.id)}
                                                         className="flex flex-row items-center gap-1 truncate">
                                                         {item.data ? (
-                                                            <RecordPreviewBindingData size={"medium"}
-                                                                snapshot={item.data}
-                                                                includeSnapshotLink={false}
+                                                            <EntityPreviewBindingData size={"medium"}
+                                                                entity={item.data}
+                                                                includeEntityLink={false}
                                                                 includeId={false}
                                                                 onSidePanelClick={closePopover}
                                                             />
@@ -506,8 +506,8 @@ relation } as RelationItem;
                                                     className={cls("flex flex-row items-center gap-1 truncate")}
                                                 >
                                                     {item.data ? (
-                                                        <RecordPreviewBindingData size={"smallest"} snapshot={item.data}
-                                                            includeSnapshotLink={false}
+                                                        <EntityPreviewBindingData size={"smallest"} entity={item.data}
+                                                            includeEntityLink={false}
                                                             includeId={false}/>
                                                     ) : (
                                                         <span className="text-sm truncate">{item.label}</span>
@@ -541,11 +541,11 @@ relation } as RelationItem;
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     e.preventDefault();
-                                                    const snapshot = selectedItems[0].data!;
+                                                    const entity = selectedItems[0].data!;
                                                     setIsPopoverOpen(false);
                                                     sidePanelController.open({
-                                                        snapshotId: snapshot.id,
-                                                        path: snapshot.path,
+                                                        entityId: entity.id,
+                                                        path: entity.path,
                                                         collection,
                                                         updateUrl: true
                                                     });
@@ -636,7 +636,7 @@ relation } as RelationItem;
                                     <CommandPrimitive.Group>
                                         {(() => {
                                             // Sort items so that initially-selected (pinned) items appear first.
-                                            // We use the snapshot taken when the popover opened so items don't
+                                            // We use the entity taken when the popover opened so items don't
                                             // jump around as the user checks/unchecks.
                                             const pinned = pinnedIdsRef.current;
                                             const sortedItems = pinned && pinned.size > 0
@@ -668,11 +668,11 @@ relation } as RelationItem;
                                                     {item.data ? (
                                                         <div
                                                             className="flex flex-row items-center gap-2 min-w-0 w-full">
-                                                            <RecordPreviewBindingData
+                                                            <EntityPreviewBindingData
                                                                 size={multiple ? "smallest" : "medium"}
-                                                                snapshot={item.data}
+                                                                entity={item.data}
                                                                 includeId={false}
-                                                                includeSnapshotLink={true}
+                                                                includeEntityLink={true}
                                                             />
                                                         </div>
                                                     ) : (

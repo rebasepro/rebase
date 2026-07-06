@@ -74,7 +74,7 @@ describe("RestApiGenerator", () => {
     }
 
     describe("Core Collection Routes", () => {
-        it("list snapshots - GET /api/users", async () => {
+        it("list entitys - GET /api/users", async () => {
             const app = createApp();
             mockDriver.fetchCollection.mockResolvedValue([
                 { id: "1",
@@ -94,7 +94,7 @@ limit: 10 })
             );
         });
 
-        it("get snapshot - GET /api/users/123", async () => {
+        it("get entity - GET /api/users/123", async () => {
             const app = createApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "123",
@@ -113,7 +113,7 @@ id: "123" })
             );
         });
 
-        it("create snapshot - POST /api/users", async () => {
+        it("create entity - POST /api/users", async () => {
             const app = createApp();
             mockDriver.save.mockResolvedValue(
                 { id: "new-1",
@@ -134,7 +134,7 @@ status: "new" })
             );
         });
 
-        it("update snapshot - PUT /api/users/123", async () => {
+        it("update entity - PUT /api/users/123", async () => {
             const app = createApp();
             mockDriver.fetchOne.mockResolvedValue({ id: "123" } as any);
             mockDriver.save.mockResolvedValue(
@@ -157,11 +157,11 @@ status: "existing" })
             );
         });
 
-        it("delete snapshot - DELETE /api/users/123", async () => {
+        it("delete entity - DELETE /api/users/123", async () => {
             const app = createApp();
-            const existingSnapshot = { id: "123",
+            const existingEntity = { id: "123",
 name: "Alice" } as any;
-            mockDriver.fetchOne.mockResolvedValue(existingSnapshot);
+            mockDriver.fetchOne.mockResolvedValue(existingEntity);
             mockDriver.delete.mockResolvedValue();
 
             const res = await app.request("/api/users/123", { method: "DELETE" });
@@ -172,7 +172,7 @@ name: "Alice" } as any;
                     row: expect.objectContaining({
                         id: "123",
                         path: "users",
-                        values: existingSnapshot
+                        values: existingEntity
                     })
                 })
             );
@@ -206,7 +206,7 @@ title: "Hello" }]);
             );
         });
 
-        it("get subcollection snapshot - GET /authors/123/posts/456", async () => {
+        it("get subcollection entity - GET /authors/123/posts/456", async () => {
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "456",
@@ -225,7 +225,7 @@ id: "456" })
             );
         });
 
-        it("create subcollection snapshot - POST /authors/123/posts", async () => {
+        it("create subcollection entity - POST /authors/123/posts", async () => {
             const app = createFlatApp();
             mockDriver.save.mockResolvedValue(
                 { id: "new-post",
@@ -245,7 +245,7 @@ status: "new" })
             );
         });
 
-        it("update subcollection snapshot - PUT /authors/123/posts/456", async () => {
+        it("update subcollection entity - PUT /authors/123/posts/456", async () => {
             const app = createFlatApp();
             mockDriver.save.mockResolvedValue(
                 { id: "456",
@@ -268,11 +268,11 @@ title: "Updated" } as any
             );
         });
 
-        it("delete subcollection snapshot - DELETE /authors/123/posts/456", async () => {
+        it("delete subcollection entity - DELETE /authors/123/posts/456", async () => {
             const app = createFlatApp();
-            const existingSnapshot = { id: "456",
+            const existingEntity = { id: "456",
 title: "Hello" } as any;
-            mockDriver.fetchOne.mockResolvedValue(existingSnapshot);
+            mockDriver.fetchOne.mockResolvedValue(existingEntity);
             mockDriver.delete.mockResolvedValue();
 
             const res = await app.request("/authors/123/posts/456", { method: "DELETE" });
@@ -283,7 +283,7 @@ title: "Hello" } as any;
                     row: expect.objectContaining({
                         id: "456",
                         path: "authors/123/posts",
-                        values: existingSnapshot
+                        values: existingEntity
                     })
                 })
             );
@@ -307,7 +307,7 @@ text: "Wow" }]);
             );
         });
 
-        it("deeply nested snapshot - GET /authors/123/posts/456/comments/789", async () => {
+        it("deeply nested entity - GET /authors/123/posts/456/comments/789", async () => {
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(
                 { id: "789",
@@ -455,7 +455,7 @@ title: "UUID" } as any
             );
         });
 
-        it("snapshot not found returns 404 for subcollection GET", async () => {
+        it("entity not found returns 404 for subcollection GET", async () => {
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(undefined);
 
@@ -496,7 +496,7 @@ title: "UUID" } as any
             expect(mockDriver.delete).not.toHaveBeenCalled();
         });
 
-        it("DELETE to non-existent snapshot returns 404", async () => {
+        it("DELETE to non-existent entity returns 404", async () => {
             const app = createFlatApp();
             mockDriver.fetchOne.mockResolvedValue(undefined);
             const res = await app.request("/authors/123/posts/456", { method: "DELETE" });

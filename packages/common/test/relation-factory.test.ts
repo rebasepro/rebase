@@ -37,27 +37,27 @@ __type: "relation" as const };
 // createRelationRefWithData
 // ─────────────────────────────────────────────────────────────
 describe("createRelationRefWithData", () => {
-    const snapshot = {
+    const entity = {
         id: "e1",
         path: "orders",
         values: { total: 100 }
     };
 
     it("includes data alongside the canonical fields", () => {
-        const ref = createRelationRefWithData("e1", "orders", snapshot as any);
+        const ref = createRelationRefWithData("e1", "orders", entity as any);
         expect(ref.__type).toBe("relation");
         expect(ref.id).toBe("e1");
         expect(ref.path).toBe("orders");
-        expect(ref.data).toBe(snapshot);
+        expect(ref.data).toBe(entity);
     });
 
     it("is structurally identical to a hand-written literal with data", () => {
-        const factory = createRelationRefWithData("e1", "orders", snapshot as any);
+        const factory = createRelationRefWithData("e1", "orders", entity as any);
         const manual = {
             id: "e1",
             path: "orders",
             __type: "relation" as const,
-            data: snapshot
+            data: entity
         };
         expect(factory).toEqual(manual);
     });

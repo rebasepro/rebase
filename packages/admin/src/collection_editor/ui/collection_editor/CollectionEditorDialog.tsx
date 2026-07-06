@@ -34,7 +34,7 @@ import {
 } from "@rebasepro/ui";
 import {
     EngineProperties,
-    Snapshot,
+    Entity,
     CollectionConfig,
     getDataSourceCapabilities,
     MapProperty,
@@ -52,7 +52,7 @@ import { CollectionPropertiesEditorForm } from "./CollectionPropertiesEditorForm
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionEditorWelcomeView } from "./CollectionEditorWelcomeView";
 import { CollectionInference } from "../../types/collection_inference";
-import { buildSnapshotPropertiesFromData } from "@rebasepro/schema-inference";
+import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
 import { CollectionEditorImportMapping } from "./import/CollectionEditorImportMapping";
 import { CollectionEditorImportDataPreview } from "./import/CollectionEditorImportDataPreview";
 import { cleanPropertiesFromImport } from "./import/clean_import_data";
@@ -80,7 +80,7 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
     copyFrom?: CollectionConfig;
     editedCollectionId?: string;
     path?: string; // full path of this particular collection, like `products/123/locales`
-    parentCollectionSlugs?: string[], parentSnapshotIds?: string[]; // path ids of the parent collection, like [`products`]
+    parentCollectionSlugs?: string[], parentEntityIds?: string[]; // path ids of the parent collection, like [`products`]
     handleClose: (collection?: CollectionConfig) => void;
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
@@ -93,7 +93,7 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
     getUser?: (uid: string) => User | null;
     getData?: (path: string, parentPaths: string[]) => Promise<object[]>;
     parentCollection?: CollectionConfig;
-    existingSnapshots?: Snapshot<any>[];
+    existingEntitys?: Entity<any>[];
     /**
      * Initial view to open when editing: "general", "display", or "properties".
      * For new collections, this is ignored.
@@ -243,7 +243,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         } catch (e) {
             console.error(e);
         }
-    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentSnapshotIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading, collections]);
+    }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading, collections]);
 
 
     const initialIcon = React.useMemo(() => coolIconKeys[Math.floor(Math.random() * coolIconKeys.length)], []);
@@ -307,7 +307,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     isNewCollection,
     configController,
     editedCollectionId,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     path,
     collectionInference,
     handleClose,
@@ -324,7 +324,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     setCollection,
     initialValues,
     propertyConfigs,
-    existingSnapshots,
+    existingEntitys,
     initialView: initialViewProp,
     expandKanban,
     generateCollection,
@@ -622,8 +622,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const resolvedPath = !pathError ? urlController.resolveDatabasePathsFrom(updatedFullPath) : undefined;
     const getDataWithPath = resolvedPath && getData ? async () => {
         const data = await getData!(resolvedPath, parentPaths ?? []);
-        if (existingSnapshots) {
-            const existingData = existingSnapshots.map(e => e.values);
+        if (existingEntitys) {
+            const existingData = existingEntitys.map(e => e.values);
             data.push(...existingData);
         }
         return data;
@@ -635,7 +635,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     function onImportDataSet(data: object[], propertiesOrder?: string[]) {
         importConfig?.setInUse(true);
-        buildSnapshotPropertiesFromData(data, getInferenceType)
+        buildEntityPropertiesFromData(data, getInferenceType)
             .then((properties: unknown) => {
                 const res = cleanPropertiesFromImport(properties as Properties);
 

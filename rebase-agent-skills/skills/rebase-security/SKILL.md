@@ -180,23 +180,23 @@ import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
 const hooks: BackendHooks = {
     data: {
         // Intercept ALL reads across ALL collections
-        afterRead(slug, snapshot, ctx) {
-            // Return snapshot to allow, return null to filter out
+        afterRead(slug, entity, ctx) {
+            // Return entity to allow, return null to filter out
         },
 
         // Intercept ALL writes across ALL collections
-        beforeSave(slug, values, snapshotId, ctx) {
+        beforeSave(slug, values, entityId, ctx) {
             // Return values to allow, throw to reject
         },
 
         // Intercept ALL deletes across ALL collections
-        beforeDelete(slug, snapshotId, ctx) {
+        beforeDelete(slug, entityId, ctx) {
             // Return void to allow, throw to reject
         },
 
         // Post-write side effects
-        afterSave(slug, snapshot, ctx) { /* fire-and-forget */ },
-        afterDelete(slug, snapshotId, ctx) { /* fire-and-forget */ },
+        afterSave(slug, entity, ctx) { /* fire-and-forget */ },
+        afterDelete(slug, entityId, ctx) { /* fire-and-forget */ },
     },
 };
 
@@ -213,19 +213,19 @@ await initializeRebaseBackend({
 
 ```typescript
 interface DataHooks {
-    afterRead?(slug: string, snapshot: Record<string, unknown>, context: BackendHookContext):
+    afterRead?(slug: string, entity: Record<string, unknown>, context: BackendHookContext):
         Record<string, unknown> | null | Promise<Record<string, unknown> | null>;
 
-    beforeSave?(slug: string, values: Record<string, unknown>, snapshotId: string | undefined, context: BackendHookContext):
+    beforeSave?(slug: string, values: Record<string, unknown>, entityId: string | undefined, context: BackendHookContext):
         Record<string, unknown> | Promise<Record<string, unknown>>;
 
-    afterSave?(slug: string, snapshot: Record<string, unknown>, context: BackendHookContext):
+    afterSave?(slug: string, entity: Record<string, unknown>, context: BackendHookContext):
         void | Promise<void>;
 
-    beforeDelete?(slug: string, snapshotId: string, context: BackendHookContext):
+    beforeDelete?(slug: string, entityId: string, context: BackendHookContext):
         void | Promise<void>;
 
-    afterDelete?(slug: string, snapshotId: string, context: BackendHookContext):
+    afterDelete?(slug: string, entityId: string, context: BackendHookContext):
         void | Promise<void>;
 }
 
@@ -239,7 +239,7 @@ interface BackendHookContext {
 
 | Hook | Can Block? | How to Block |
 |---|---|---|
-| `afterRead` | Yes | Return `null` to filter out the snapshot |
+| `afterRead` | Yes | Return `null` to filter out the entity |
 | `beforeSave` | Yes | Throw an error to abort the save |
 | `beforeDelete` | Yes | Throw an error to prevent deletion |
 | `afterSave` | No | Fire-and-forget (errors are caught and logged) |
@@ -338,32 +338,32 @@ import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
 const hooks: BackendHooks = {
     data: {
         // ── READ SECURITY ──
-        // Filter snapshots based on user role and ownership
-        afterRead(slug, snapshot, ctx) {
+        // Filter entitys based on user role and ownership
+        afterRead(slug, entity, ctx) {
             const user = ctx.requestUser;
 
             // Admins see everything
-            if (user?.roles.includes("admin")) return snapshot;
+            if (user?.roles.includes("admin")) return entity;
 
             // For the "orders" collection, users only see their own
             if (slug === "orders") {
-                if (snapshot.user_id !== user?.userId) return null;
+                if (entity.user_id !== user?.userId) return null;
             }
 
             // For "internal_notes", non-admins never see them
             if (slug === "internal_notes") return null;
 
-            return snapshot;
+            return entity;
         },
 
         // ── WRITE SECURITY ──
         // Validate and enforce ownership on creates/updates
-        beforeSave(slug, values, snapshotId, ctx) {
+        beforeSave(slug, values, entityId, ctx) {
             const user = ctx.requestUser;
             if (!user) throw ApiError.unauthorized("Authentication required");
 
             // Enforce ownership: stamp the user_id on creation
-            if (!snapshotId) {
+            if (!entityId) {
                 values.user_id = user.userId;
             }
 
@@ -378,14 +378,14 @@ const hooks: BackendHooks = {
 
         // ── DELETE SECURITY ──
         // Only admins can delete, or owners of their own records
-        beforeDelete(slug, snapshotId, ctx) {
+        beforeDelete(slug, entityId, ctx) {
             const user = ctx.requestUser;
             if (!user) throw ApiError.unauthorized("Authentication required");
 
             if (!user.roles.includes("admin")) {
-                // For non-admins, you may need to fetch the snapshot first
+                // For non-admins, you may need to fetch the entity first
                 // to verify ownership. Use Collection Callbacks for this pattern
-                // since they receive the full snapshot.
+                // since they receive the full entity.
                 throw ApiError.forbidden("Only admins can delete records");
             }
         },
@@ -395,7 +395,7 @@ const hooks: BackendHooks = {
 
 ### Strategy: Collection Callbacks for Ownership Checks
 
-Collection Callbacks receive the full snapshot data, making them ideal for ownership verification on deletes and updates:
+Collection Callbacks receive the full entity data, making them ideal for ownership verification on deletes and updates:
 
 ```typescript
 const ordersCollection: PostgresCollectionConfig = {
@@ -444,7 +444,7 @@ For maximum security, use both DataHooks and Collection Callbacks together:
 | Cross-cutting read filtering | DataHooks `afterRead` | Applies to ALL collections in one place |
 | Cross-cutting write validation | DataHooks `beforeSave` | Single enforcement point for all writes |
 | PII masking / field redaction | DataHooks `afterRead` | Cross-cutting, role-based |
-| Ownership checks on writes/deletes | Collection Callbacks | Has access to the full snapshot for comparison |
+| Ownership checks on writes/deletes | Collection Callbacks | Has access to the full entity for comparison |
 | Business rule validation | Collection Callbacks | Collection-specific, typed values |
 | Audit logging | DataHooks `afterSave` / `afterDelete` | Cross-cutting, fire-and-forget |
 
@@ -457,15 +457,15 @@ For maximum security, use both DataHooks and Collection Callbacks together:
 ```typescript
 const hooks: BackendHooks = {
     data: {
-        afterRead(slug, snapshot, ctx) {
-            if (ctx.requestUser?.roles.includes("admin")) return snapshot;
+        afterRead(slug, entity, ctx) {
+            if (ctx.requestUser?.roles.includes("admin")) return entity;
 
             // Mask sensitive fields across all collections
-            if (snapshot.email) snapshot.email = "***@***.***";
-            if (snapshot.phone) snapshot.phone = "***-***-****";
-            if (snapshot.ssn) snapshot.ssn = "***-**-****";
+            if (entity.email) entity.email = "***@***.***";
+            if (entity.phone) entity.phone = "***-***-****";
+            if (entity.ssn) entity.ssn = "***-**-****";
 
-            return snapshot;
+            return entity;
         },
     },
 };
@@ -476,18 +476,18 @@ const hooks: BackendHooks = {
 ```typescript
 const hooks: BackendHooks = {
     data: {
-        afterRead(slug, snapshot, ctx) {
+        afterRead(slug, entity, ctx) {
             const userTenantId = ctx.requestUser?.roles
                 .find(r => r.startsWith("tenant:"))
                 ?.replace("tenant:", "");
 
             if (!userTenantId) return null;
-            if (snapshot.tenant_id !== userTenantId) return null;
+            if (entity.tenant_id !== userTenantId) return null;
 
-            return snapshot;
+            return entity;
         },
 
-        beforeSave(slug, values, snapshotId, ctx) {
+        beforeSave(slug, values, entityId, ctx) {
             const userTenantId = ctx.requestUser?.roles
                 .find(r => r.startsWith("tenant:"))
                 ?.replace("tenant:", "");
@@ -495,16 +495,16 @@ const hooks: BackendHooks = {
             if (!userTenantId) throw ApiError.forbidden("No tenant assigned");
 
             // Stamp tenant on creation, prevent cross-tenant writes
-            if (!snapshotId) {
+            if (!entityId) {
                 values.tenant_id = userTenantId;
             }
 
             return values;
         },
 
-        beforeDelete(slug, snapshotId, ctx) {
+        beforeDelete(slug, entityId, ctx) {
             // Tenant isolation on deletes is best handled in Collection Callbacks
-            // where you have access to the snapshot's tenant_id
+            // where you have access to the entity's tenant_id
         },
     },
 };
@@ -516,7 +516,7 @@ const hooks: BackendHooks = {
 const hooks: BackendHooks = {
     data: {
         // Define which roles can access which collections
-        beforeSave(slug, values, snapshotId, ctx) {
+        beforeSave(slug, values, entityId, ctx) {
             const roleAccess: Record<string, string[]> = {
                 "financial_reports": ["admin", "finance"],
                 "hr_records": ["admin", "hr"],
@@ -535,7 +535,7 @@ const hooks: BackendHooks = {
             return values;
         },
 
-        afterRead(slug, snapshot, ctx) {
+        afterRead(slug, entity, ctx) {
             const roleAccess: Record<string, string[]> = {
                 "financial_reports": ["admin", "finance"],
                 "hr_records": ["admin", "hr"],
@@ -548,7 +548,7 @@ const hooks: BackendHooks = {
                 if (!allowedRoles.some(r => userRoles.includes(r))) return null;
             }
 
-            return snapshot;
+            return entity;
         },
     },
 };
@@ -559,7 +559,7 @@ const hooks: BackendHooks = {
 ```typescript
 const hooks: BackendHooks = {
     data: {
-        beforeDelete(slug, snapshotId, ctx) {
+        beforeDelete(slug, entityId, ctx) {
             const immutableCollections = ["audit_logs", "transactions", "invoices"];
             if (immutableCollections.includes(slug)) {
                 throw ApiError.forbidden(
@@ -568,9 +568,9 @@ const hooks: BackendHooks = {
             }
         },
 
-        beforeSave(slug, values, snapshotId, ctx) {
+        beforeSave(slug, values, entityId, ctx) {
             const appendOnlyCollections = ["audit_logs"];
-            if (appendOnlyCollections.includes(slug) && snapshotId) {
+            if (appendOnlyCollections.includes(slug) && entityId) {
                 throw ApiError.forbidden(
                     `Records in "${slug}" are append-only and cannot be updated.`
                 );

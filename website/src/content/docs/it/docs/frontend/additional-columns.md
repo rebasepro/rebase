@@ -51,7 +51,7 @@ const ordersCollection: CollectionConfig = {
 
 ## Passi Successivi
 
-- **[Azioni Entità](/docs/frontend/snapshot-actions)** — Pulsanti di azione personalizzati
+- **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
 - **[Campi Personalizzati](/docs/frontend/custom-fields)** — Campi modulo personalizzati
 
 ---

@@ -41,7 +41,7 @@ export interface QueryFilter {
 }
 
 /**
- * Options for fetching a collection of snapshots
+ * Options for fetching a collection of entitys
  */
 export interface FetchCollectionOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -56,7 +56,7 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
 }
 
 /**
- * Options for searching snapshots
+ * Options for searching entitys
  */
 export interface SearchOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -68,7 +68,7 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
 }
 
 /**
- * Options for counting snapshots
+ * Options for counting entitys
  */
 export interface CountOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
@@ -138,21 +138,21 @@ export type ConditionBuilderStatic<T = unknown> = {
 };
 
 // =============================================================================
-// SNAPSHOT REPOSITORY INTERFACES
+// ENTITY REPOSITORY INTERFACES
 // =============================================================================
 
 /**
- * Abstract snapshot repository interface.
- * Handles all CRUD operations for snapshots in the database.
+ * Abstract entity repository interface.
+ * Handles all CRUD operations for entitys in the database.
  *
  * Implementations should handle:
- * - Snapshot serialization/deserialization
+ * - Entity serialization/deserialization
  * - Relation resolution
  * - ID generation and conversion
  */
 export interface DataRepository {
     /**
-     * Fetch a single snapshot by ID
+     * Fetch a single entity by ID
      */
     fetchOne<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -161,7 +161,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown> | undefined>;
 
     /**
-     * Fetch a collection of snapshots with optional filtering, ordering, and pagination
+     * Fetch a collection of entitys with optional filtering, ordering, and pagination
      */
     fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -169,7 +169,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Search snapshots by text
+     * Search entitys by text
      */
     searchRows<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -178,7 +178,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown>[]>;
 
     /**
-     * Count snapshots in a collection
+     * Count entitys in a collection
      */
     count<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -186,7 +186,7 @@ export interface DataRepository {
     ): Promise<number>;
 
     /**
-     * Save a snapshot (create or update)
+     * Save a entity (create or update)
      */
     save<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -196,7 +196,7 @@ export interface DataRepository {
     ): Promise<Record<string, unknown>>;
 
     /**
-     * Delete a snapshot by ID
+     * Delete a entity by ID
      */
     delete(
         collectionPath: string,
@@ -211,7 +211,7 @@ export interface DataRepository {
         collectionPath: string,
         fieldName: string,
         value: unknown,
-        excludeSnapshotId?: string,
+        excludeEntityId?: string,
         databaseId?: string
     ): Promise<boolean>;
 
@@ -237,7 +237,7 @@ export interface CollectionSubscriptionConfig {
 }
 
 /**
- * Configuration for subscribing to a single snapshot
+ * Configuration for subscribing to a single entity
  */
 export interface SingleSubscriptionConfig {
     clientId: string;
@@ -247,7 +247,7 @@ export interface SingleSubscriptionConfig {
 
 /**
  * Abstract realtime provider interface.
- * Handles real-time subscriptions and notifications for snapshot changes.
+ * Handles real-time subscriptions and notifications for entity changes.
  */
 export interface RealtimeProvider {
     /**
@@ -260,7 +260,7 @@ export interface RealtimeProvider {
     ): void;
 
     /**
-     * Subscribe to single snapshot changes
+     * Subscribe to single entity changes
      */
     subscribeToOne(
         subscriptionId: string,
@@ -274,7 +274,7 @@ export interface RealtimeProvider {
     unsubscribe(subscriptionId: string): void;
 
     /**
-     * Notify all relevant subscribers of a snapshot update
+     * Notify all relevant subscribers of a entity update
      */
     notifyUpdate(
         path: string,
@@ -308,7 +308,7 @@ export interface RealtimeProvider {
 
 /**
  * Abstract collection registry interface.
- * Manages registration and lookup of snapshot collections.
+ * Manages registration and lookup of entity collections.
  */
 export interface CollectionRegistryInterface {
     /**
@@ -342,15 +342,15 @@ export interface CollectionRegistryInterface {
  */
 export interface DataTransformer {
     /**
-     * Transform snapshot data for storage in the database
+     * Transform entity data for storage in the database
      */
     serializeToDatabase<M extends Record<string, unknown>>(
-        snapshot: M,
+        entity: M,
         collection: CollectionConfig
     ): Record<string, unknown>;
 
     /**
-     * Transform database data back to snapshot format
+     * Transform database data back to entity format
      */
     deserializeFromDatabase<M extends Record<string, unknown>>(
         data: Record<string, unknown>,
@@ -587,9 +587,9 @@ export interface BackendConfig {
  */
 export interface BackendInstance extends BackendLifecycle {
     /**
-     * Snapshot repository for CRUD operations
+     * Entity repository for CRUD operations
      */
-    snapshotRepository: DataRepository;
+    entityRepository: DataRepository;
 
     /**
      * Realtime provider for subscriptions

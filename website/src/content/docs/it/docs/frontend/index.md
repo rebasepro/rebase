@@ -163,7 +163,7 @@ Rebase utilizza **Tailwind CSS v4** e supporta le modalità chiaro/scuro. Person
 ## Passi Successivi
 
 - **[Campi Personalizzati](/docs/frontend/custom-fields)** — Costruisci campi modulo personalizzati
-- **[Viste Entità](/docs/frontend/snapshot-views)** — Aggiungi schede agli editor di entità
+- **[Viste Entità](/docs/frontend/entity-views)** — Aggiungi schede agli editor di entità
 - **[Modalità di Vista](/docs/frontend/view-modes)** — Lista, Tabella, Schede, Kanban
 - **[Plugin](/docs/plugins)** — Estendi il framework
 

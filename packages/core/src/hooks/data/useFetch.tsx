@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { useEffect, useState, useMemo } from "react";
-import { Snapshot, RebaseContext, User } from "@rebasepro/types";
+import { Entity, RebaseContext, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { useRebaseContext } from "../useRebaseContext";
 
@@ -9,7 +9,7 @@ import { useRebaseContext } from "../useRebaseContext";
  */
 export interface FetchProps<M extends Record<string, any>, USER extends User = User> {
     path: string;
-    snapshotId?: string | number;
+    entityId?: string | number;
     databaseId?: string;
     collection: CollectionConfig<M, USER>;
     useCache?: boolean;
@@ -19,28 +19,28 @@ export interface FetchProps<M extends Record<string, any>, USER extends User = U
  * @group Hooks and utilities
  */
 export interface FetchResult<M extends Record<string, any>> {
-    snapshot?: Snapshot<M>,
+    entity?: Entity<M>,
     dataLoading: boolean,
     dataLoadingError?: Error
 }
 
-const CACHE: Record<string, Snapshot<any> | undefined> = {};
+const CACHE: Record<string, Entity<any> | undefined> = {};
 
 /**
- * Pre-populate the snapshot fetch cache with snapshots loaded from a collection.
- * This allows snapshot detail views to render instantly using cached data,
+ * Pre-populate the entity fetch cache with entitys loaded from a collection.
+ * This allows entity detail views to render instantly using cached data,
  * while the background fetch/listener brings in fresh data.
  * @param path - The collection path (e.g. "products")
- * @param snapshots - Array of snapshots to cache
+ * @param entitys - Array of entitys to cache
  */
-export function populateFetchCache<M extends Record<string, any>>(path: string, snapshots: Snapshot<M>[]): void {
-    for (const snapshot of snapshots) {
-        CACHE[`${path}/${snapshot.id}`] = snapshot;
+export function populateFetchCache<M extends Record<string, any>>(path: string, entitys: Entity<M>[]): void {
+    for (const entity of entitys) {
+        CACHE[`${path}/${entity.id}`] = entity;
     }
 }
 
 /**
- * Clear the snapshot fetch cache. Call this on auth state changes (e.g. logout)
+ * Clear the entity fetch cache. Call this on auth state changes (e.g. logout)
  * to prevent stale data from a previous session leaking into the next.
  */
 export function clearFetchCache(): void {
@@ -50,11 +50,11 @@ export function clearFetchCache(): void {
 }
 
 /**
- * This hook is used to fetch a snapshot.
+ * This hook is used to fetch a entity.
  * It gives real time updates if the driver supports it.
  * @param path
  * @param collection
- * @param snapshotId
+ * @param entityId
  * @param useCache
  * @group Hooks and utilities
  */
@@ -62,7 +62,7 @@ export function clearFetchCache(): void {
 export function useFetch<M extends Record<string, any>, USER extends User = User>(
     {
         path,
-        snapshotId,
+        entityId,
         collection,
         databaseId,
         useCache = false
@@ -75,66 +75,66 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
     // Seed initial state from the cache to avoid skeleton flashes.
     // Even when useCache is false, we show cached data instantly while
     // the background fetch/listener brings in fresh data.
-    const cacheKey = snapshotId ? `${path}/${snapshotId}` : undefined;
-    const cachedSnapshot = cacheKey ? CACHE[cacheKey] as Snapshot<M> | undefined : undefined;
+    const cacheKey = entityId ? `${path}/${entityId}` : undefined;
+    const cachedEntity = cacheKey ? CACHE[cacheKey] as Entity<M> | undefined : undefined;
 
-    const [snapshot, setSnapshot] = useState<Snapshot<M> | undefined>(cachedSnapshot);
-    const [dataLoading, setDataLoading] = useState<boolean>(!cachedSnapshot);
+    const [entity, setEntity] = useState<Entity<M> | undefined>(cachedEntity);
+    const [dataLoading, setDataLoading] = useState<boolean>(!cachedEntity);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
 
     useEffect(() => {
 
-        // Only show loading state if we have no cached snapshot to display
-        if (!CACHE[`${path}/${snapshotId}`]) {
+        // Only show loading state if we have no cached entity to display
+        if (!CACHE[`${path}/${entityId}`]) {
             setDataLoading(true);
         }
 
-        const onSnapshotUpdate = async (updatedSnapshot?: Snapshot<M> | null) => {
-            CACHE[`${path}/${snapshotId}`] = updatedSnapshot ?? undefined;
-            setSnapshot(updatedSnapshot ?? undefined);
+        const onEntityUpdate = async (updatedEntity?: Entity<M> | null) => {
+            CACHE[`${path}/${entityId}`] = updatedEntity ?? undefined;
+            setEntity(updatedEntity ?? undefined);
             setDataLoading(false);
             setDataLoadingError(undefined);
         };
 
         const onError = (error: Error) => {
-            console.error("ERROR fetching snapshot", error);
+            console.error("ERROR fetching entity", error);
             setDataLoading(false);
-            setSnapshot(undefined);
+            setEntity(undefined);
             setDataLoadingError(error);
         };
 
-        if (snapshotId && useCache && CACHE[`${path}/${snapshotId}`]) {
-            setSnapshot(CACHE[`${path}/${snapshotId}`]);
+        if (entityId && useCache && CACHE[`${path}/${entityId}`]) {
+            setEntity(CACHE[`${path}/${entityId}`]);
             setDataLoading(false);
             setDataLoadingError(undefined);
             // eslint-disable-next-line @typescript-eslint/no-empty-function
             return () => {
             };
-        } else if (snapshotId && path && collection) {
+        } else if (entityId && path && collection) {
             const accessor = dataClient.collection(path);
 
             if (accessor.listenById) {
-                return accessor.listenById(snapshotId, (snapshot) => onSnapshotUpdate(snapshot as Snapshot<M> | undefined), onError);
+                return accessor.listenById(entityId, (entity) => onEntityUpdate(entity as Entity<M> | undefined), onError);
             } else {
-                accessor.findById(snapshotId)
-                    .then((snapshot) => onSnapshotUpdate(snapshot as Snapshot<M> | undefined))
+                accessor.findById(entityId)
+                    .then((entity) => onEntityUpdate(entity as Entity<M> | undefined))
                     .catch(onError);
                 return () => {
                 };
             }
         }
-        // if no snapshotId is provided we do nothing
+        // if no entityId is provided we do nothing
         else {
-            onSnapshotUpdate(undefined);
+            onEntityUpdate(undefined);
             return () => {
             };
         }
-    }, [snapshotId, path, dataClient, collection, useCache, databaseId]);
+    }, [entityId, path, dataClient, collection, useCache, databaseId]);
 
     return useMemo(() => ({
-        snapshot,
+        entity,
         dataLoading,
         dataLoadingError
-    }), [snapshot, dataLoading, dataLoadingError]);
+    }), [entity, dataLoading, dataLoadingError]);
 
 }

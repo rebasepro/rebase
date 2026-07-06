@@ -9,20 +9,20 @@ export type CustomFieldValidator = (props: {
     name: string,
     value: unknown,
     property: Property,
-    snapshotId?: string | number,
+    entityId?: string | number,
     parentProperty?: MapProperty | ArrayProperty,
 }) => Promise<boolean>;
 
 interface PropertyContext<P extends Property> {
     property: P,
     parentProperty?: MapProperty | ArrayProperty,
-    snapshotId?: string | number,
+    entityId?: string | number,
     customFieldValidator?: CustomFieldValidator,
     name?: string
 }
 
-export function getSnapshotSchema<M extends Record<string, unknown>>(
-    snapshotId: string | number | undefined,
+export function getEntitySchema<M extends Record<string, unknown>>(
+    entityId: string | number | undefined,
     properties: Properties,
     customFieldValidator?: CustomFieldValidator): z.ZodObject<Record<string, ZodTypeAny>> {
     const shape: Record<string, ZodTypeAny> = {};
@@ -30,14 +30,14 @@ export function getSnapshotSchema<M extends Record<string, unknown>>(
         .forEach(([name, property]) => {
             const isStringOrNumber = property.type === "string" || property.type === "number";
             const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
-            if (snapshotId === undefined && isIdAndAuto) {
-                return; // Skip validation for auto-generated IDs on new snapshots
+            if (entityId === undefined && isIdAndAuto) {
+                return; // Skip validation for auto-generated IDs on new entitys
             }
             shape[name] = mapPropertyToZod({
                 property: property as Property,
                 customFieldValidator,
                 name,
-                snapshotId
+                entityId
             });
         });
     return z.object(shape).passthrough();
@@ -92,7 +92,7 @@ export function mapPropertyToZod(propertyContext: PropertyContext<Property>): Zo
 
 export function getZodMapObjectSchema({
     property,
-    snapshotId,
+    entityId,
     customFieldValidator,
     name
 }: PropertyContext<MapProperty>): ZodTypeAny {
@@ -107,7 +107,7 @@ export function getZodMapObjectSchema({
                     parentProperty: property as MapProperty,
                     customFieldValidator,
                     name: `${name}[${childName}]`,
-                    snapshotId
+                    entityId
                 });
             } catch (e: unknown) {
                 console.error(`Error creating validation schema for property ${childName}:`, e);
@@ -135,7 +135,7 @@ function getZodStringSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<StringProperty>): ZodTypeAny {
     let schema: ZodTypeAny = z.string().nullable().optional();
     const validation = property.validation;
@@ -218,7 +218,7 @@ function getZodNumberSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<NumberProperty>): ZodTypeAny {
     const validation = property.validation;
     // Accept number or null, coerce non-numbers to fail
@@ -280,7 +280,7 @@ function getZodGeoPointSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<GeopointProperty>): ZodTypeAny {
     let schema: ZodTypeAny = z.object({}).passthrough().nullable().optional();
     const validation = property.validation;
@@ -300,7 +300,7 @@ function getZodDateSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<DateProperty>): ZodTypeAny {
     if (property.autoValue) {
         return z.date().nullable().optional();
@@ -337,7 +337,7 @@ function getZodReferenceSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<ReferenceProperty>): ZodTypeAny {
     let schema: ZodTypeAny = z.object({}).passthrough().nullable().optional();
     const validation = property.validation;
@@ -359,7 +359,7 @@ function getZodRelationSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<RelationProperty>): ZodTypeAny {
     const isMany = property.relation?.cardinality === "many";
     let schema: ZodTypeAny = isMany
@@ -389,7 +389,7 @@ function getZodBooleanSchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<BooleanProperty>): ZodTypeAny {
     let schema: ZodTypeAny = z.boolean().nullable().optional();
     const validation = property.validation;
@@ -421,7 +421,7 @@ function getZodArraySchema({
     parentProperty,
     customFieldValidator,
     name,
-    snapshotId
+    entityId
 }: PropertyContext<ArrayProperty>): ZodTypeAny {
 
     let arraySchema: ZodTypeAny = z.array(z.any()).nullable().optional();
@@ -434,7 +434,7 @@ function getZodArraySchema({
                     zodProperties[`${name}[${index}]`] = mapPropertyToZod({
                         property: p as Property,
                         parentProperty: property,
-                        snapshotId
+                        entityId
                     });
                 } catch (e: unknown) {
                     console.error(`Error creating validation schema for array item ${index}:`, e);
@@ -468,7 +468,7 @@ function getZodArraySchema({
                 const ofSchema = mapPropertyToZod({
                     property: property.of,
                     parentProperty: property,
-                    snapshotId
+                    entityId
                 });
                 arraySchema = z.array(ofSchema).nullable().optional();
             } catch (e: unknown) {

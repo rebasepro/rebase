@@ -39,7 +39,7 @@ export function maskHandle(handle: string): string {
 }
 
 /**
- * Apply a set of field transforms to a snapshot's `values`, returning a new
+ * Apply a set of field transforms to a entity's `values`, returning a new
  * values object of the same shape. String fields are transformed by the
  * matching masker; any field mapped to `null` is cleared to an empty string
  * (used for image/URL fields). Non-string / absent fields are left untouched.

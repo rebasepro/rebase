@@ -10,7 +10,7 @@ import type { User } from "./users";
 
 
 /**
- * Context that is provided to snapshot callbacks (hooks).
+ * Context that is provided to entity callbacks (hooks).
  * It contains only the dependencies that are available in both the frontend and the backend.
  * @group Hooks and utilities
  */
@@ -18,7 +18,7 @@ export type RebaseCallContext<USER extends User = User> = {
 
     /**
      * The Rebase client instance.
-     * Available in all snapshot callbacks (beforeSave, afterSave, afterRead,
+     * Available in all entity callbacks (beforeSave, afterSave, afterRead,
      * beforeDelete, afterDelete) and in CollectionActionsProps via context.
      * Use it to call backend functions, access data, storage, etc.
      *
@@ -81,7 +81,7 @@ export type RebaseContext<USER extends User = User, AuthControllerType extends A
     sideDialogsController?: import("./controllers/side_dialogs_controller").SideDialogsController;
 
     /**
-     * Controller to open the side panel displaying snapshot forms
+     * Controller to open the side panel displaying entity forms
      */
     sidePanelController?: import("./controllers/side_panel_controller").SidePanelController;
 

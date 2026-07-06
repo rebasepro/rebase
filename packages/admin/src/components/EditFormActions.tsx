@@ -1,13 +1,13 @@
 
 import type { CollectionConfig } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
-import type { SnapshotAction, SnapshotActionClickProps, SidePanelController } from "@rebasepro/types";
+import type { EntityAction, EntityActionClickProps, SidePanelController } from "@rebasepro/types";
 import React, { useMemo } from "react";
-import { Snapshot, getCollectionDataPath, RebaseContext } from "@rebasepro/types";
-import type { SnapshotFormActionsProps } from "../types/components/SnapshotFormActionsProps";
-import { copySnapshotAction, deleteSnapshotAction } from "../components";
-import { mergeSnapshotActions } from "../util/record_actions";
-import { resolveSnapshotAction } from "../util/resolutions";
+import { Entity, getCollectionDataPath, RebaseContext } from "@rebasepro/types";
+import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
+import { copyEntityAction, deleteEntityAction } from "../components";
+import { mergeEntityActions } from "../util/entity_actions";
+import { resolveEntityAction } from "../util/resolutions";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
 import { AlertCircleIcon, iconSize } from "@rebasepro/ui";
 import {
@@ -24,18 +24,18 @@ import { useCMSContext } from "../index";
 export function EditFormActions({
     collection,
     path,
-    snapshot,
+    entity,
     layout,
     savingError,
     formex,
     disabled,
     status,
     pluginActions,
-    openSnapshotMode,
+    openEntityMode,
     showDefaultActions = true,
     navigateBack,
     formContext
-}: SnapshotFormActionsProps) {
+}: EntityFormActionsProps) {
 
     const { canCreate, canDelete } = usePermissions();
     const context = useCMSContext();
@@ -44,29 +44,29 @@ export function EditFormActions({
     const customizationController = useCustomizationController();
     const { t } = useTranslation();
 
-    const snapshotActions = useMemo((): SnapshotAction[] => {
-        const customSnapshotActions = (collection.snapshotActions ?? [])
-            .map(action => resolveSnapshotAction(action, customizationController.snapshotActions))
-            .filter(Boolean) as SnapshotAction[];
+    const entityActions = useMemo((): EntityAction[] => {
+        const customEntityActions = (collection.entityActions ?? [])
+            .map(action => resolveEntityAction(action, customizationController.entityActions))
+            .filter(Boolean) as EntityAction[];
         const createEnabled = canCreate(collection, path);
-        const deleteEnabled = snapshot ? canDelete(collection, path, snapshot) : false;
+        const deleteEnabled = entity ? canDelete(collection, path, entity) : false;
         const disableActions = collection.disableDefaultActions ?? [];
-        const actions: SnapshotAction[] = [];
+        const actions: EntityAction[] = [];
         if (createEnabled && !disableActions.includes("copy"))
-            actions.push(copySnapshotAction);
+            actions.push(copyEntityAction);
         if (deleteEnabled && !disableActions.includes("delete"))
-            actions.push(deleteSnapshotAction);
-        if (customSnapshotActions)
-            return mergeSnapshotActions(actions, customSnapshotActions);
+            actions.push(deleteEntityAction);
+        if (customEntityActions)
+            return mergeEntityActions(actions, customEntityActions);
         return actions;
-    }, [canCreate, canDelete, collection, path, customizationController.snapshotActions?.length, snapshot, collection.disableDefaultActions]);
+    }, [canCreate, canDelete, collection, path, customizationController.entityActions?.length, entity, collection.disableDefaultActions]);
 
-    const formActions = showDefaultActions ? snapshotActions.filter(a => a.includeInForm === undefined || a.includeInForm) : [];
+    const formActions = showDefaultActions ? entityActions.filter(a => a.includeInForm === undefined || a.includeInForm) : [];
 
     // HMR reload trigger
     const bottomActions = buildBottomActions({
         savingError,
-        snapshot,
+        entity,
         formActions,
         collection,
         context,
@@ -75,7 +75,7 @@ export function EditFormActions({
         status,
         sideDialogContext,
         pluginActions,
-        openSnapshotMode,
+        openEntityMode,
         navigateBack,
         formContext,
         formex,
@@ -85,7 +85,7 @@ export function EditFormActions({
 
     const sideActions = buildSideActions({
         savingError,
-        snapshot,
+        entity,
         formActions,
         collection,
         context,
@@ -94,7 +94,7 @@ export function EditFormActions({
         disabled,
         status,
         pluginActions,
-        openSnapshotMode,
+        openEntityMode,
         navigateBack,
         formContext,
         formex,
@@ -114,8 +114,8 @@ export function EditFormActions({
 
 type ActionsViewProps<M extends Record<string, unknown>> = {
     savingError: Error | undefined,
-    snapshot: Snapshot<M> | undefined,
-    formActions: SnapshotAction[],
+    entity: Entity<M> | undefined,
+    formActions: EntityAction[],
     collection: CollectionConfig,
     context: RebaseContext,
     sidePanelController: SidePanelController,
@@ -123,7 +123,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     status: "new" | "existing" | "copy",
     sideDialogContext: SideDialogController,
     pluginActions?: React.ReactNode[],
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<Record<string, unknown>>;
@@ -133,7 +133,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
 
 function buildBottomActions<M extends Record<string, unknown>>({
     savingError,
-    snapshot,
+    entity,
     formActions,
     collection,
     context,
@@ -142,7 +142,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
     status,
     sideDialogContext,
     pluginActions,
-    openSnapshotMode,
+    openEntityMode,
     navigateBack,
     formContext,
     formex,
@@ -151,7 +151,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
-    const canClose = openSnapshotMode === "side_panel" || openSnapshotMode === "dialog";
+    const canClose = openEntityMode === "side_panel" || openEntityMode === "dialog";
     return <DialogActions
         className={className}
         position={"absolute"}>
@@ -167,19 +167,19 @@ function buildBottomActions<M extends Record<string, unknown>>({
 
                 const props = {
                     view: "form",
-                    snapshot,
+                    entity,
                     path: getCollectionDataPath(collection),
                     collection: collection,
                     context,
                     sidePanelController,
-                    openSnapshotMode,
+                    openEntityMode,
                     navigateBack,
                     formContext
-                } satisfies SnapshotActionClickProps<Record<string, unknown>>;
+                } satisfies EntityActionClickProps<Record<string, unknown>>;
 
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
-                    <SnapshotActionButton
+                    <EntityActionButton
                         key={action.key ?? action.name ?? index}
                         action={action}
                         enabled={isEnabled}
@@ -201,7 +201,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
             type="reset">
             {status === "existing" ? t("discard") : t("clear")}
         </Button>
-        {collection.defaultSnapshotAction === "view" && status === "existing" && (
+        {collection.defaultEntityAction === "view" && status === "existing" && (
             <Button variant="text"
                 color="primary"
                 disabled={disabled}
@@ -239,7 +239,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
 
 function buildSideActions<M extends Record<string, unknown>>({
     savingError,
-    snapshot,
+    entity,
     formActions,
     collection,
     context,
@@ -248,7 +248,7 @@ function buildSideActions<M extends Record<string, unknown>>({
     status,
     sideDialogContext,
     pluginActions,
-    openSnapshotMode,
+    openEntityMode,
     navigateBack,
     formContext,
     formex,
@@ -279,7 +279,7 @@ function buildSideActions<M extends Record<string, unknown>>({
         <Button fullWidth={true} variant="text" disabled={disabled || formex.isSubmitting} type="reset">
             {status === "existing" ? t("discard") : t("clear")}
         </Button>
-        {collection.defaultSnapshotAction === "view" && status === "existing" && (
+        {collection.defaultEntityAction === "view" && status === "existing" && (
             <Button fullWidth={true} variant="text" disabled={disabled} onClick={navigateBack}>
                 {t("back_to_detail") ?? "Back to details"}
             </Button>
@@ -291,18 +291,18 @@ function buildSideActions<M extends Record<string, unknown>>({
             {formActions.map((action, index) => {
                 const props = {
                     view: "form",
-                    snapshot,
+                    entity,
                     path: getCollectionDataPath(collection),
                     collection: collection,
                     context,
                     sidePanelController,
-                    openSnapshotMode,
+                    openEntityMode,
                     navigateBack,
                     formContext
-                } satisfies SnapshotActionClickProps<Record<string, unknown>>;
+                } satisfies EntityActionClickProps<Record<string, unknown>>;
                 const isEnabled = !action.isEnabled || action.isEnabled(props);
                 return (
-                    <SnapshotActionButton key={action.key ?? action.name ?? index} action={action} enabled={isEnabled} props={props}/>
+                    <EntityActionButton key={action.key ?? action.name ?? index} action={action} enabled={isEnabled} props={props}/>
                 );
             })}
         </div>}
@@ -315,14 +315,14 @@ function buildSideActions<M extends Record<string, unknown>>({
     </div>;
 }
 
-function SnapshotActionButton({
+function EntityActionButton({
     action,
     enabled,
     props
 }: {
-    action: SnapshotAction,
+    action: EntityAction,
     enabled: boolean,
-    props: SnapshotActionClickProps<Record<string, unknown>>
+    props: EntityActionClickProps<Record<string, unknown>>
 }) {
     const snackbarController = useSnackbarController();
     const [loading, setLoading] = React.useState(false);
@@ -335,7 +335,7 @@ function SnapshotActionButton({
                 console.debug("Executing action", action.key, props);
                 try {
                     event.stopPropagation();
-                    if (props.snapshot) {
+                    if (props.entity) {
                         const onClick = action.onClick(props);
                         // If the action returns a promise, we can handle it
                         if (onClick instanceof Promise) {

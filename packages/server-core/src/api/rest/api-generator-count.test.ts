@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "./api-generator";
-import type { DataDriver, Snapshot, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, Entity, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
 
 /**
  * Minimal mock DataDriver for testing.
@@ -12,7 +12,7 @@ function createMockDriver(overrides?: Partial<DataDriver>): DataDriver {
         fetchOne: jest.fn<DataDriver["fetchOne"]>().mockResolvedValue(undefined),
         save: jest.fn<DataDriver["save"]>().mockResolvedValue({ id: "1",
 path: "test",
-values: {} } as Snapshot),
+values: {} } as Entity),
         delete: jest.fn<DataDriver["delete"]>().mockResolvedValue(undefined),
         count: jest.fn<NonNullable<DataDriver["count"]>>().mockResolvedValue(0),
         ...overrides
@@ -120,7 +120,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
         const json = await res.json() as { count: number };
         expect(json.count).toBe(99);
 
-        // fetchOne should NOT have been called (i.e. "count" was not treated as a snapshot ID)
+        // fetchOne should NOT have been called (i.e. "count" was not treated as a entity ID)
         expect(fetchOne).not.toHaveBeenCalled();
     });
 });

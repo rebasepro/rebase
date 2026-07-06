@@ -1,6 +1,6 @@
 import { useUrlController } from "./_cms_internals";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Snapshot, CollectionConfig, Property, TableMetadata, User } from "@rebasepro/types";
+import { Entity, CollectionConfig, Property, TableMetadata, User } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
@@ -90,14 +90,14 @@ export const ConfigControllerProvider = React.memo(
             parentCollection?: CollectionConfig,
             editedCollectionId?: string,
             path?: string,
-            parentCollectionSlugs: string[], parentSnapshotIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             initialValues?: {
                 path?: string,
                 name?: string
             },
             copyFrom?: CollectionConfig,
             redirect: boolean,
-            existingSnapshots?: Snapshot[],
+            existingEntitys?: Entity[],
             pathSuggestions?: string[];
             initialView?: "general" | "display" | "properties";
             expandKanban?: boolean;
@@ -111,9 +111,9 @@ export const ConfigControllerProvider = React.memo(
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
             path?: string,
-            parentCollectionSlugs: string[], parentSnapshotIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
 
-            existingSnapshots?: Snapshot[];
+            existingEntitys?: Entity[];
             collection?: CollectionConfig;
         }>();
 
@@ -121,21 +121,21 @@ export const ConfigControllerProvider = React.memo(
         const editCollection = useCallback(({
             id,
             path,
-            parentCollectionSlugs, parentSnapshotIds,
+            parentCollectionSlugs, parentEntityIds,
             parentCollection,
-            existingSnapshots,
+            existingEntitys,
             initialView,
             expandKanban
         }: {
             id?: string,
             path?: string,
-            parentCollectionSlugs: string[], parentSnapshotIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             parentCollection?: CollectionConfig,
-            existingSnapshots?: Snapshot[],
+            existingEntitys?: Entity[],
             initialView?: "general" | "display" | "properties",
             expandKanban?: boolean
         }) => {
-            console.debug("Edit collection", id, path, parentCollectionSlugs, parentSnapshotIds, parentCollection);
+            console.debug("Edit collection", id, path, parentCollectionSlugs, parentEntityIds, parentCollection);
             onAnalyticsEvent?.("edit_collection", {
                 id,
                 path
@@ -144,11 +144,11 @@ export const ConfigControllerProvider = React.memo(
                 editedCollectionId: id,
                 path,
                 parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                 isNewCollection: false,
                 parentCollection,
                 redirect: false,
-                existingSnapshots,
+                existingEntitys,
                 pathSuggestions,
                 initialView,
                 expandKanban
@@ -160,19 +160,19 @@ parentSnapshotIds,
             property,
             editedCollectionId,
             currentPropertiesOrder,
-            parentCollectionSlugs, parentSnapshotIds,
+            parentCollectionSlugs, parentEntityIds,
             collection,
-            existingSnapshots
+            existingEntitys
         }: {
             propertyKey?: string,
             property?: Property,
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
-            parentCollectionSlugs: string[], parentSnapshotIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             collection: CollectionConfig,
-            existingSnapshots?: Snapshot[]
+            existingEntitys?: Entity[]
         }) => {
-            console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentSnapshotIds, collection);
+            console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentEntityIds, collection);
             onAnalyticsEvent?.("edit_property", {
                 propertyKey,
                 editedCollectionId
@@ -191,22 +191,22 @@ parentSnapshotIds,
                 currentPropertiesOrder,
                 editedCollectionId,
                 parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
 
-                existingSnapshots,
+                existingEntitys,
                 collection
             });
         }, [onAnalyticsEvent]);
 
         const createCollection = useCallback(({
-            parentCollectionSlugs, parentSnapshotIds,
+            parentCollectionSlugs, parentEntityIds,
             parentCollection,
             initialValues,
             copyFrom,
             redirect,
             sourceClick
         }: {
-            parentCollectionSlugs: string[], parentSnapshotIds: string[],
+            parentCollectionSlugs: string[], parentEntityIds: string[],
             parentCollection?: CollectionConfig
             initialValues?: {
                 path?: string,
@@ -218,7 +218,7 @@ parentSnapshotIds,
         }) => {
             console.debug("Create collection", {
                 parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                 parentCollection,
                 initialValues,
                 copyFrom,
@@ -227,7 +227,7 @@ parentSnapshotIds,
             });
             onAnalyticsEvent?.(copyFrom ? "duplicate_collection" : "create_collection", {
                 parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                 parentCollection,
                 initialValues,
                 redirect,
@@ -236,7 +236,7 @@ parentSnapshotIds,
             setCurrentDialog({
                 isNewCollection: true,
                 parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                 parentCollection,
                 initialValues,
                 copyFrom,
@@ -288,11 +288,11 @@ parentSnapshotIds,
                 autoUpdateId: !currentPropertyDialog.propertyKey,
                 autoOpenTypeSelect: !currentPropertyDialog.propertyKey,
                 inArray: false,
-                getData: currentPropertyDialog.existingSnapshots || (getData && currentPropertyDialog.editedCollectionId)
+                getData: currentPropertyDialog.existingEntitys || (getData && currentPropertyDialog.editedCollectionId)
                     ? async () => {
                         let data: object[] = [];
-                        if (currentPropertyDialog.existingSnapshots) {
-                            data = currentPropertyDialog.existingSnapshots.map(e => e.values);
+                        if (currentPropertyDialog.existingEntitys) {
+                            data = currentPropertyDialog.existingEntitys.map(e => e.values);
                         }
                         if (getData && currentPropertyDialog.editedCollectionId) {
                             console.debug("Get data for property, path:", currentPropertyDialog.editedCollectionId);

@@ -11,7 +11,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
  */
 export function ArrayOfStorageComponentsPreview({
     propertyKey,
-    // snapshot,
+    // entity,
     value,
     property: property,
     size

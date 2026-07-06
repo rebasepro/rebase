@@ -1,10 +1,10 @@
 import {
     canReadCollection,
-    canEditSnapshot,
-    canCreateSnapshot,
-    canDeleteSnapshot
+    canEditEntity,
+    canCreateEntity,
+    canDeleteEntity
 } from "../src/util/permissions";
-import { AuthController, Snapshot, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
+import { AuthController, Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ function makeCollection(securityRules?: SecurityRule[]): CollectionConfig {
     };
 }
 
-function makeSnapshot(values: Record<string, unknown> = {}): Snapshot<any> {
+function makeEntity(values: Record<string, unknown> = {}): Entity<any> {
     return { id: "ent-1",
 path: "products",
 values };
@@ -51,16 +51,16 @@ describe("Permissions — Security Rule Evaluation", () => {
             const col = makeCollection(undefined);
             const auth = makeAuthController();
             expect(canReadCollection(col, auth)).toBe(true);
-            expect(canCreateSnapshot(col, auth, "products", null)).toBe(true);
-            expect(canEditSnapshot(col, auth, "products", makeSnapshot())).toBe(true);
-            expect(canDeleteSnapshot(col, auth, "products", makeSnapshot())).toBe(true);
+            expect(canCreateEntity(col, auth, "products", null)).toBe(true);
+            expect(canEditEntity(col, auth, "products", makeEntity())).toBe(true);
+            expect(canDeleteEntity(col, auth, "products", makeEntity())).toBe(true);
         });
 
         it("allows all operations when securityRules is empty array", () => {
             const col = makeCollection([]);
             const auth = makeAuthController();
             expect(canReadCollection(col, auth)).toBe(true);
-            expect(canCreateSnapshot(col, auth, "products", null)).toBe(true);
+            expect(canCreateEntity(col, auth, "products", null)).toBe(true);
         });
     });
 
@@ -79,7 +79,7 @@ operation: "select" } as SecurityRule
                 { access: "public",
 operation: "all" } as SecurityRule
             ]);
-            expect(canCreateSnapshot(col, noUser(), "products", null)).toBe(true);
+            expect(canCreateEntity(col, noUser(), "products", null)).toBe(true);
         });
     });
 
@@ -93,9 +93,9 @@ mode: "permissive" } as SecurityRule
             ]);
             const admin = makeAuthController({ roles: ["admin"] });
             expect(canReadCollection(col, admin)).toBe(true);
-            expect(canCreateSnapshot(col, admin, "products", null)).toBe(true);
-            expect(canEditSnapshot(col, admin, "products", makeSnapshot())).toBe(true);
-            expect(canDeleteSnapshot(col, admin, "products", makeSnapshot())).toBe(true);
+            expect(canCreateEntity(col, admin, "products", null)).toBe(true);
+            expect(canEditEntity(col, admin, "products", makeEntity())).toBe(true);
+            expect(canDeleteEntity(col, admin, "products", makeEntity())).toBe(true);
         });
 
         it("denies access when user lacks matching role", () => {
@@ -106,7 +106,7 @@ mode: "permissive" } as SecurityRule
             ]);
             const viewer = makeAuthController({ roles: ["viewer"] });
             expect(canReadCollection(col, viewer)).toBe(false);
-            expect(canCreateSnapshot(col, viewer, "products", null)).toBe(false);
+            expect(canCreateEntity(col, viewer, "products", null)).toBe(false);
         });
 
         it("handles multiple roles — grants if user matches any", () => {
@@ -127,36 +127,36 @@ mode: "permissive" } as SecurityRule
             ]);
             const editor = makeAuthController({ roles: ["editor"] });
             expect(canReadCollection(col, editor)).toBe(true);
-            expect(canEditSnapshot(col, editor, "products", makeSnapshot())).toBe(true);
-            expect(canDeleteSnapshot(col, editor, "products", makeSnapshot())).toBe(false);
+            expect(canEditEntity(col, editor, "products", makeEntity())).toBe(true);
+            expect(canDeleteEntity(col, editor, "products", makeEntity())).toBe(false);
         });
     });
 
     // ── Owner-based rules ───────────────────────────────────
     describe("owner-based rules", () => {
-        it("allows when snapshot owner matches user", () => {
+        it("allows when entity owner matches user", () => {
             const col = makeCollection([
                 { ownerField: "created_by",
 operation: "update",
 mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
-            const snapshot = makeSnapshot({ created_by: "user-42" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(true);
+            const entity = makeEntity({ created_by: "user-42" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
 
-        it("denies when snapshot owner does not match user", () => {
+        it("denies when entity owner does not match user", () => {
             const col = makeCollection([
                 { ownerField: "created_by",
 operation: "update",
 mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
-            const snapshot = makeSnapshot({ created_by: "other-user" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            const entity = makeEntity({ created_by: "other-user" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
 
-        it("optimistically allows when snapshot is null (new snapshot)", () => {
+        it("optimistically allows when entity is null (new entity)", () => {
             const col = makeCollection([
                 { ownerField: "created_by",
 operation: "select",
@@ -182,8 +182,8 @@ mode: "restrictive" } as SecurityRule
             ]);
             const admin = makeAuthController({ uid: "admin-1",
 roles: ["admin"] });
-            const snapshot = makeSnapshot({ created_by: "someone-else" });
-            expect(canEditSnapshot(col, admin, "products", snapshot)).toBe(false);
+            const entity = makeEntity({ created_by: "someone-else" });
+            expect(canEditEntity(col, admin, "products", entity)).toBe(false);
         });
 
         it("allows when both permissive AND restrictive pass", () => {
@@ -197,8 +197,8 @@ mode: "restrictive" } as SecurityRule
             ]);
             const admin = makeAuthController({ uid: "admin-1",
 roles: ["admin"] });
-            const snapshot = makeSnapshot({ created_by: "admin-1" });
-            expect(canEditSnapshot(col, admin, "products", snapshot)).toBe(true);
+            const entity = makeEntity({ created_by: "admin-1" });
+            expect(canEditEntity(col, admin, "products", entity)).toBe(true);
         });
     });
 
@@ -213,8 +213,8 @@ roles: ["admin"] });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-99" });
-            const snapshot = makeSnapshot({ user_id: "user-99" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(true);
+            const entity = makeEntity({ user_id: "user-99" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
 
         it("denies when auth.uid() does not match", () => {
@@ -226,8 +226,8 @@ roles: ["admin"] });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-99" });
-            const snapshot = makeSnapshot({ user_id: "someone-else" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            const entity = makeEntity({ user_id: "someone-else" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
 
         it("evaluates current_setting('app.user_id') pattern", () => {
@@ -239,8 +239,8 @@ roles: ["admin"] });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "usr-123" });
-            const snapshot = makeSnapshot({ owner_id: "usr-123" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(true);
+            const entity = makeEntity({ owner_id: "usr-123" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
 
         it("evaluates role intersection (&&)", () => {
@@ -251,12 +251,12 @@ roles: ["admin"] });
                     using: "string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']"
                 } as SecurityRule
             ]);
-            const snapshot = makeSnapshot({ some: "data" });
+            const entity = makeEntity({ some: "data" });
             const editor = makeAuthController({ roles: ["editor"] });
-            expect(canEditSnapshot(col, editor, "products", snapshot)).toBe(true);
+            expect(canEditEntity(col, editor, "products", entity)).toBe(true);
 
             const viewer = makeAuthController({ roles: ["viewer"] });
-            expect(canEditSnapshot(col, viewer, "products", snapshot)).toBe(false);
+            expect(canEditEntity(col, viewer, "products", entity)).toBe(false);
         });
 
         it("evaluates role containment (@>)", () => {
@@ -267,12 +267,12 @@ roles: ["admin"] });
                     using: "string_to_array(auth.roles(), ',') @> ARRAY['admin']"
                 } as SecurityRule
             ]);
-            const snapshot = makeSnapshot({ some: "data" });
+            const entity = makeEntity({ some: "data" });
             const admin = makeAuthController({ roles: ["admin", "editor"] });
-            expect(canEditSnapshot(col, admin, "products", snapshot)).toBe(true);
+            expect(canEditEntity(col, admin, "products", entity)).toBe(true);
 
             const editor = makeAuthController({ roles: ["editor"] });
-            expect(canEditSnapshot(col, editor, "products", snapshot)).toBe(false);
+            expect(canEditEntity(col, editor, "products", entity)).toBe(false);
         });
 
         it("evaluates AND in SQL using", () => {
@@ -284,13 +284,13 @@ roles: ["admin"] });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const draftSnapshot = makeSnapshot({ user_id: "u1",
+            const draftEntity = makeEntity({ user_id: "u1",
 status: "draft" });
-            expect(canEditSnapshot(col, auth, "products", draftSnapshot)).toBe(true);
+            expect(canEditEntity(col, auth, "products", draftEntity)).toBe(true);
 
-            const publishedSnapshot = makeSnapshot({ user_id: "u1",
+            const publishedEntity = makeEntity({ user_id: "u1",
 status: "published" });
-            expect(canEditSnapshot(col, auth, "products", publishedSnapshot)).toBe(false);
+            expect(canEditEntity(col, auth, "products", publishedEntity)).toBe(false);
         });
 
         it("evaluates OR in SQL using", () => {
@@ -303,17 +303,17 @@ status: "published" });
             ]);
             const auth = makeAuthController({ uid: "u1" });
             // Published — anyone can edit
-            const pub = makeSnapshot({ status: "published",
+            const pub = makeEntity({ status: "published",
 user_id: "other" });
-            expect(canEditSnapshot(col, auth, "products", pub)).toBe(true);
+            expect(canEditEntity(col, auth, "products", pub)).toBe(true);
             // Draft owned by user
-            const own = makeSnapshot({ status: "draft",
+            const own = makeEntity({ status: "draft",
 user_id: "u1" });
-            expect(canEditSnapshot(col, auth, "products", own)).toBe(true);
+            expect(canEditEntity(col, auth, "products", own)).toBe(true);
             // Draft not owned
-            const other = makeSnapshot({ status: "draft",
+            const other = makeEntity({ status: "draft",
 user_id: "x" });
-            expect(canEditSnapshot(col, auth, "products", other)).toBe(false);
+            expect(canEditEntity(col, auth, "products", other)).toBe(false);
         });
 
         it("evaluates withCheck for insert operations", () => {
@@ -325,11 +325,11 @@ user_id: "x" });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const snapshot = makeSnapshot({ user_id: "u1" });
-            expect(canCreateSnapshot(col, auth, "products", snapshot)).toBe(true);
+            const entity = makeEntity({ user_id: "u1" });
+            expect(canCreateEntity(col, auth, "products", entity)).toBe(true);
 
-            const badSnapshot = makeSnapshot({ user_id: "other" });
-            expect(canCreateSnapshot(col, auth, "products", badSnapshot)).toBe(false);
+            const badEntity = makeEntity({ user_id: "other" });
+            expect(canCreateEntity(col, auth, "products", badEntity)).toBe(false);
         });
     });
 
@@ -345,7 +345,7 @@ mode: "permissive" } as SecurityRule
             // select should pass
             expect(canReadCollection(col, auth)).toBe(true);
             // insert should fail (no applicable rule)
-            expect(canCreateSnapshot(col, auth, "products", null)).toBe(false);
+            expect(canCreateEntity(col, auth, "products", null)).toBe(false);
         });
 
         it("handles user with no roles (falls back to 'public')", () => {
@@ -367,7 +367,7 @@ mode: "permissive" } as SecurityRule
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            const snapshot = makeSnapshot({ status: "published" });
+            const entity = makeEntity({ status: "published" });
             expect(canReadCollection(col, auth)).toBe(true);
         });
 
@@ -396,7 +396,7 @@ mode: "permissive" } as SecurityRule
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            const snapshot = makeSnapshot({ status: "active" });
+            const entity = makeEntity({ status: "active" });
             expect(canReadCollection(col, auth)).toBe(true);
         });
 
@@ -409,8 +409,8 @@ mode: "permissive" } as SecurityRule
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            const snapshot = makeSnapshot({ status: "deleted" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            const entity = makeEntity({ status: "deleted" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
     });
 
@@ -427,9 +427,9 @@ mode: "permissive" } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
             // USING passes (user_id matches), withCheck fails (status isn't 'draft')
-            const snapshot = makeSnapshot({ user_id: "u1",
+            const entity = makeEntity({ user_id: "u1",
 status: "published" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
 
         it("allows when both USING and withCheck pass", () => {
@@ -442,9 +442,9 @@ status: "published" });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const snapshot = makeSnapshot({ user_id: "u1",
+            const entity = makeEntity({ user_id: "u1",
 status: "draft" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(true);
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
     });
 
@@ -459,8 +459,8 @@ status: "draft" });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
-            const snapshot = makeSnapshot({ owner_id: "user-42" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(true);
+            const entity = makeEntity({ owner_id: "user-42" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
 
         it("denies when reversed auth.uid() doesn't match", () => {
@@ -472,8 +472,8 @@ status: "draft" });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "user-42" });
-            const snapshot = makeSnapshot({ owner_id: "other-user" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            const entity = makeEntity({ owner_id: "other-user" });
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
     });
 
@@ -488,9 +488,9 @@ status: "draft" });
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            const snapshot = makeSnapshot({ status: "draft" });
+            const entity = makeEntity({ status: "draft" });
             // Restrictive passes, but there's no permissive to grant access
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
     });
 
@@ -511,9 +511,9 @@ status: "draft" });
             ]);
             const auth = makeAuthController({ uid: "u1" });
             // First rule fails (wrong user_id), but second passes (status is published)
-            const snapshot = makeSnapshot({ user_id: "other",
+            const entity = makeEntity({ user_id: "other",
 status: "published" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(true);
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
         });
 
         it("denies if all permissive rules fail", () => {
@@ -530,9 +530,9 @@ status: "published" });
                 } as SecurityRule
             ]);
             const auth = makeAuthController({ uid: "u1" });
-            const snapshot = makeSnapshot({ user_id: "other",
+            const entity = makeEntity({ user_id: "other",
 status: "draft" });
-            expect(canEditSnapshot(col, auth, "products", snapshot)).toBe(false);
+            expect(canEditEntity(col, auth, "products", entity)).toBe(false);
         });
     });
 
@@ -546,7 +546,7 @@ status: "draft" });
                     using: "string_to_array(auth.roles(), ',') @> ARRAY['admin', 'superadmin']"
                 } as SecurityRule
             ]);
-            const snapshot = makeSnapshot({});
+            const entity = makeEntity({});
             // User has both roles
             const superAdmin = makeAuthController({ roles: ["admin", "superadmin", "viewer"] });
             expect(canReadCollection(col, superAdmin)).toBe(true);
@@ -554,7 +554,7 @@ status: "draft" });
             // User has only one
             const justAdmin = makeAuthController({ roles: ["admin"] });
             expect(canReadCollection(col, justAdmin)).toBe(false);
-            // ^ Note: This now returns false because rolesContain is accurately evaluated even without a snapshot.
+            // ^ Note: This now returns false because rolesContain is accurately evaluated even without a entity.
         });
     });
 });

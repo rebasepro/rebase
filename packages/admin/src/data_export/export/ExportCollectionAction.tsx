@@ -8,7 +8,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { useCMSContext } from "../../hooks";
-import { CollectionActionsProps, Snapshot, CollectionConfig, ExportConfig, RebaseContext, User } from "@rebasepro/types";
+import { CollectionActionsProps, Entity, CollectionConfig, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
     Alert,
@@ -27,19 +27,19 @@ import {
     RadioGroupItem,
     Tooltip
 } from "@rebasepro/ui";
-import { downloadSnapshotsExport } from "./export";
+import { downloadEntitysExport } from "./export";
 
 const DOCS_LIMIT = 500;
 
 export function ExportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
     path,
-    collectionSnapshotsCount,
+    collectionEntitysCount,
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
 }: CollectionActionsProps<M, USER, CollectionConfig<M>> & {
-    exportAllowed?: (props: { collectionSnapshotsCount: number, path: string, collection: CollectionConfig }) => boolean;
+    exportAllowed?: (props: { collectionEntitysCount: number, path: string, collection: CollectionConfig }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
 }) {
@@ -59,7 +59,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const dataClient = useData();
 
     const canExport = !exportAllowed || exportAllowed({
-        collectionSnapshotsCount: collectionSnapshotsCount ?? 0,
+        collectionEntitysCount: collectionEntitysCount ?? 0,
         path,
         collection
     });
@@ -77,17 +77,17 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setOpen(false);
     }, [setOpen]);
 
-    const fetchAdditionalFields = useCallback(async (snapshots: Snapshot<M>[]) => {
+    const fetchAdditionalFields = useCallback(async (entitys: Entity<M>[]) => {
 
         const additionalExportFields = exportConfig?.additionalFields;
         const additionalFields = collection.additionalFields;
 
         const resolvedExportColumnsValues: Record<string, any>[] = additionalExportFields
-            ? await Promise.all(snapshots.map(async (snapshot) => {
+            ? await Promise.all(entitys.map(async (entity) => {
                 return (await Promise.all(additionalExportFields.map(async (column) => {
                     return {
                         [column.key]: await column.builder({
-                            snapshot,
+                            entity,
                             context: context as RebaseContext
                         })
                     };
@@ -97,14 +97,14 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             : [];
 
         const resolvedColumnsValues: Record<string, any>[] = additionalFields
-            ? await Promise.all(snapshots.map(async (snapshot) => {
+            ? await Promise.all(entitys.map(async (entity) => {
                 return (await Promise.all(additionalFields
                     .map(async (field) => {
                         if (!field.value)
                             return {};
                         return {
                             [field.key]: await field.value({
-                                snapshot,
+                                entity,
                                 context: context as RebaseContext
                             })
                         };
@@ -124,7 +124,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setDataLoading(true);
         dataClient.collection(path).find({})
             .then(async (res) => {
-                const data = res.data as Snapshot<M>[];
+                const data = res.data as Entity<M>[];
                 setDataLoadingError(undefined);
                 const additionalData = await fetchAdditionalFields(data);
                 const additionalHeaders = [
@@ -133,16 +133,16 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                 ];
 
                 const dataWithDefaults = includeUndefinedValues
-                    ? data.map(snapshot => {
+                    ? data.map(entity => {
                         const defaultValues = getDefaultValuesFor(collection.properties);
                         return {
-                            ...snapshot,
+                            ...entity,
                             values: { ...defaultValues,
-...snapshot.values }
+...entity.values }
                         };
                     })
                     : data;
-                downloadSnapshotsExport({
+                downloadEntitysExport({
                     data: dataWithDefaults,
                     additionalData,
                     properties: collection.properties,
@@ -193,10 +193,10 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 <div>{t("download_table_csv")}</div>
 
-                {collectionSnapshotsCount !== undefined && collectionSnapshotsCount > DOCS_LIMIT &&
+                {collectionEntitysCount !== undefined && collectionEntitysCount > DOCS_LIMIT &&
                     <Alert color={"warning"}>
                         <div>
-                            {t("large_number_of_documents", { count: collectionSnapshotsCount.toString() })}
+                            {t("large_number_of_documents", { count: collectionEntitysCount.toString() })}
                         </div>
                     </Alert>}
 

@@ -353,15 +353,15 @@ describe("mergeDeep", () => {
         });
     });
 
-    it("should preserve SnapshotReference class instances instead of merging them as plain objects", () => {
-        // Simulate SnapshotReference-like class with isSnapshotReference method
-        class SnapshotReference {
+    it("should preserve EntityReference class instances instead of merging them as plain objects", () => {
+        // Simulate EntityReference-like class with isEntityReference method
+        class EntityReference {
             constructor(public id: string, public path: string) { }
-            isSnapshotReference() { return true; }
+            isEntityReference() { return true; }
         }
 
-        const ref1 = new SnapshotReference("id1", "collection/path1");
-        const ref2 = new SnapshotReference("id2", "collection/path2");
+        const ref1 = new EntityReference("id1", "collection/path1");
+        const ref2 = new EntityReference("id2", "collection/path2");
 
         const target = { ref: ref1,
 other: "value" };
@@ -372,8 +372,8 @@ other: "value" };
         // The source reference should replace target reference completely
         expect(result.ref).toBe(ref2);
         // Should preserve the class instance and its method
-        expect(result.ref.isSnapshotReference).toBeDefined();
-        expect(result.ref.isSnapshotReference()).toBe(true);
+        expect(result.ref.isEntityReference).toBeDefined();
+        expect(result.ref.isEntityReference()).toBe(true);
         expect(result.ref.id).toBe("id2");
         expect(result.ref.path).toBe("collection/path2");
     });
@@ -399,12 +399,12 @@ other: "value" };
     });
 
     it("should still merge plain objects normally while preserving class instances", () => {
-        class SnapshotReference {
+        class EntityReference {
             constructor(public id: string, public path: string) { }
-            isSnapshotReference() { return true; }
+            isEntityReference() { return true; }
         }
 
-        const ref = new SnapshotReference("id1", "collection/path1");
+        const ref = new EntityReference("id1", "collection/path1");
 
         const target = {
             ref: ref,
@@ -420,7 +420,7 @@ c: 4 }
 
         // Reference should be preserved from target (not in source)
         expect(result.ref).toBe(ref);
-        expect(result.ref.isSnapshotReference()).toBe(true);
+        expect(result.ref.isEntityReference()).toBe(true);
 
         // Plain object should be merged normally
         expect(result.nested).toEqual({ a: 1,

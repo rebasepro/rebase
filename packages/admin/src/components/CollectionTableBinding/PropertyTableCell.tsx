@@ -3,7 +3,7 @@ import type { ArrayProperty, NumberProperty, Property, ReferenceProperty, String
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { Snapshot, SnapshotReference, SnapshotRelation } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation } from "@rebasepro/types";
 
 import { getTableBindingForProperty } from "./table_bindings";
 
@@ -12,8 +12,8 @@ import { getPreviewSizeFrom } from "../../preview/util";
 
 import { CustomFieldValidator, mapPropertyToZod } from "../../form/validation";
 
-import { SnapshotTableCell } from "./internal/SnapshotTableCell";
-import { SnapshotTableCellActions } from "./internal/SnapshotTableCellActions";
+import { EntityTableCell } from "./internal/EntityTableCell";
+import { EntityTableCellActions } from "./internal/EntityTableCellActions";
 
 import { useSelectableTableController } from "../SelectableTable/SelectableTableContext";
 import { useClearRestoreValue } from "../../form/useClearRestoreValue";
@@ -32,7 +32,7 @@ export interface PropertyTableCellProps<T> {
     property: Property;
     height: number;
     width: number;
-    snapshot: Snapshot<any>;
+    entity: Entity<any>;
     path: string;
     disabled: boolean;
     enablePopupIcon?: boolean;
@@ -56,7 +56,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         width,
         height,
         path,
-        snapshot,
+        entity,
         readonly,
         disabled: disabledProp,
         enablePopupIcon = true,
@@ -78,7 +78,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
         const dummySelectionStore = useMemo(() => createSelectionStore(), []);
         const activeSelectionStore = selectionStore || dummySelectionStore;
-        const selected = useCellSelected(activeSelectionStore, propertyKey, snapshot.path, snapshot.id);
+        const selected = useCellSelected(activeSelectionStore, propertyKey, entity.path, entity.id);
 
         const [internalValue, setInternalValue] = useState<any | null>(value);
         const internalValueRef = useRef(value);
@@ -99,10 +99,10 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
         const validation = useMemo(() => mapPropertyToZod({
             property,
-            snapshotId: snapshot.id,
+            entityId: entity.id,
             customFieldValidator,
             name: propertyKey
-        }), [snapshot.id, property, propertyKey]);
+        }), [entity.id, property, propertyKey]);
 
         useEffect(
             () => {
@@ -130,7 +130,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                                 propertyKey,
                                 setError,
                                 onValueUpdated,
-                                data: snapshot
+                                data: entity
                             });
                         } catch (e: unknown) {
                             console.error("onValueChange error", e);
@@ -153,7 +153,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                         setValidationError(result.error);
                     }
                 });
-        }, [internalValue, validation, propertyKey, property, snapshot]);
+        }, [internalValue, validation, propertyKey, property, entity]);
 
         const updateValue = (newValue: unknown | null) => {
 
@@ -180,13 +180,13 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 select({
                     width,
                     height,
-                    snapshotPath: snapshot.path,
-                    snapshotId: snapshot.id,
+                    entityPath: entity.path,
+                    entityId: entity.id,
                     cellRect,
                     propertyKey: propertyKey as Extract<keyof M, string>
                 });
             }
-        }, [snapshot, height, propertyKey, select, width]);
+        }, [entity, height, propertyKey, select, width]);
 
         const openPopup = (cellRect: DOMRect | undefined) => {
             if (!setPopupCell)
@@ -197,8 +197,8 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 setPopupCell({
                     width,
                     height,
-                    snapshotPath: snapshot.path,
-                    snapshotId: snapshot.id,
+                    entityPath: entity.path,
+                    entityId: entity.id,
                     cellRect,
                     propertyKey: propertyKey as Extract<keyof M, string>
                 });
@@ -215,11 +215,11 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         const showError = !disabled && error;
 
         if (readonly || readOnlyProperty) {
-            return <SnapshotTableCell
+            return <EntityTableCell
                 size={size}
                 width={width}
                 savedTimestamp={savedTimestamp}
-                key={`${propertyKey}_${snapshot.path}_${snapshot.id}`}
+                key={`${propertyKey}_${entity.path}_${entity.id}`}
                 value={internalValue}
                 align={align ?? "left"}
                 fullHeight={false}
@@ -239,7 +239,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     value={internalValue}
                     size={getPreviewSizeFrom(size)}
                 />
-            </SnapshotTableCell>;
+            </EntityTableCell>;
         }
 
         if (!customField && (!customPreview || selected)) {
@@ -258,7 +258,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                     selected={selected}
                     size={size}
                     align={align}
-                    snapshot={snapshot}
+                    entity={entity}
                     path={path}
                     openPopup={setPopupCell ? openPopup : undefined}
                 />;
@@ -287,8 +287,8 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         }
 
         return (
-            <SnapshotTableCell
-                key={`cell_${propertyKey}_${snapshot.path}_${snapshot.id}`}
+            <EntityTableCell
+                key={`cell_${propertyKey}_${entity.path}_${entity.id}`}
                 size={size}
                 width={width}
                 onSelect={onSelect}
@@ -310,7 +310,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                 isDragging={isDragging}
                 isDraggable={isDraggable}
                 frozen={frozen}
-                actions={includeActions && <SnapshotTableCellActions
+                actions={includeActions && <EntityTableCellActions
                     showError={showError}
                     disabled={disabled}
                     showExpandIcon={showExpandIcon}
@@ -320,7 +320,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
                 {innerComponent}
 
-            </SnapshotTableCell>
+            </EntityTableCell>
         );
 
     },
@@ -333,8 +333,8 @@ function areEqual(prevProps: PropertyTableCellProps<any>, nextProps: PropertyTab
         prevProps.width === nextProps.width &&
         equal(prevProps.property, nextProps.property) &&
         equal(prevProps.value, nextProps.value) &&
-        prevProps.snapshot.id === nextProps.snapshot.id &&
-        prevProps.snapshot.path === nextProps.snapshot.path &&
+        prevProps.entity.id === nextProps.entity.id &&
+        prevProps.entity.path === nextProps.entity.path &&
         prevProps.isDragging === nextProps.isDragging &&
         prevProps.isDraggable === nextProps.isDraggable &&
         prevProps.frozen === nextProps.frozen

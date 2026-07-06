@@ -1,4 +1,4 @@
-import { buildRebaseData, buildSdkData, wrapAsSdkData, wrapAsSnapshotData } from "../src/data/buildRebaseData";
+import { buildRebaseData, buildSdkData, wrapAsSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
 import { DataDriver } from "@rebasepro/types";
 
 /**
@@ -9,11 +9,11 @@ import { DataDriver } from "@rebasepro/types";
  *   - backend  `context.data.products.find()`  (built by `buildSdkData`)
  * Both return FLAT rows (`{ id, ...columns }`) — never `.values`.
  *
- * The admin CMS is the ONLY surface that uses the Snapshot view-model
+ * The admin CMS is the ONLY surface that uses the Entity view-model
  * (`{ id, path, values }`), built by `buildRebaseData`.
  *
  * If someone points the backend `context.data` back at `buildRebaseData`
- * (Snapshot) — the exact regression that broke symmetry before — these tests
+ * (Entity) — the exact regression that broke symmetry before — these tests
  * fail loudly.
  */
 
@@ -41,7 +41,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect(rows[0].id).toBe("p1");
         expect(rows[0].name).toBe("Widget");
         expect(rows[0].price).toBe(9);
-        // No Snapshot wrapper.
+        // No Entity wrapper.
         expect((rows[0] as any).values).toBeUndefined();
         expect((rows[0] as any).path).toBeUndefined();
     });
@@ -62,17 +62,17 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect((updated as any).values).toBeUndefined();
     });
 
-    it("buildRebaseData.find() returns Snapshots — the admin CMS view-model", async () => {
+    it("buildRebaseData.find() returns Entitys — the admin CMS view-model", async () => {
         const data = buildRebaseData(createMockDriver());
-        const { data: snapshots } = await data.products.find();
+        const { data: entitys } = await data.products.find();
 
-        expect(snapshots).toHaveLength(1);
-        expect(snapshots[0].id).toBe("p1");
-        expect(snapshots[0].path).toBe("products");
-        expect(snapshots[0].values.name).toBe("Widget");
+        expect(entitys).toHaveLength(1);
+        expect(entitys[0].id).toBe("p1");
+        expect(entitys[0].path).toBe("products");
+        expect(entitys[0].values.name).toBe("Widget");
     });
 
-    it("the flat SDK row and the Snapshot's .values carry the same fields", async () => {
+    it("the flat SDK row and the Entity's .values carry the same fields", async () => {
         const driver = createMockDriver();
         const flat = (await buildSdkData(driver).products.find()).data[0];
         const snap = (await buildRebaseData(driver).products.find()).data[0];
@@ -81,14 +81,14 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect(flat.id).toBe(snap.id);
     });
 
-    it("wrapAsSdkData ∘ buildRebaseData is flat; wrapAsSnapshotData round-trips back", async () => {
+    it("wrapAsSdkData ∘ buildRebaseData is flat; wrapAsEntityData round-trips back", async () => {
         const driver = createMockDriver();
 
         const flat = (await wrapAsSdkData(buildRebaseData(driver)).products.find()).data[0];
         expect(flat.name).toBe("Widget");
         expect((flat as any).values).toBeUndefined();
 
-        const reSnap = (await wrapAsSnapshotData(buildSdkData(driver)).products.find()).data[0];
+        const reSnap = (await wrapAsEntityData(buildSdkData(driver)).products.find()).data[0];
         expect(reSnap.path).toBe("products");
         expect(reSnap.values.name).toBe("Widget");
         expect(reSnap.id).toBe("p1");
@@ -101,7 +101,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect((rows[0] as any).values).toBeUndefined();
     });
 
-    it("realtime listen(): flat SDK delivers flat rows, admin delivers Snapshots", () => {
+    it("realtime listen(): flat SDK delivers flat rows, admin delivers Entitys", () => {
         const driver = createMockDriver({
             listenCollection: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate([{ ...PRODUCT }]); return () => {}; }),
             listenOne: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate({ ...PRODUCT }); return () => {}; })

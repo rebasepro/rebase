@@ -41,7 +41,7 @@ export interface RoutedRealtimeOptions {
  *
  * The WebSocket server stays single and engine-agnostic; this composite is
  * passed in its place. Routing rules:
- * - `subscribe_collection` / `subscribe_snapshot` → the provider for the
+ * - `subscribe_collection` / `subscribe_entity` → the provider for the
  *   collection's data source (by `payload.path`).
  * - `unsubscribe` → forwarded to all providers (a no-op on non-owners).
  * - channel / presence / broadcast → the default provider (these are global

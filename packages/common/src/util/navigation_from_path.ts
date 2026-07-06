@@ -1,16 +1,16 @@
 import { CollectionConfig } from "@rebasepro/types";
-type SnapshotCustomView<M extends Record<string, unknown> = Record<string, unknown>> = { key: string; [key: string]: unknown };
+type EntityCustomView<M extends Record<string, unknown> = Record<string, unknown>> = { key: string; [key: string]: unknown };
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "./resolutions";
 
 export type NavigationViewInternal<M extends Record<string, unknown> = Record<string, unknown>> =
-    | NavigationViewSnapshotInternal<M>
+    | NavigationViewEntityInternal<M>
     | NavigationViewCollectionInternal<M>
-    | NavigationViewSnapshotCustomInternal<M>;
+    | NavigationViewEntityCustomInternal<M>;
 
-export interface NavigationViewSnapshotInternal<M extends Record<string, unknown>> {
-    type: "snapshot";
-    snapshotId: string | number;
+export interface NavigationViewEntityInternal<M extends Record<string, unknown>> {
+    type: "entity";
+    entityId: string | number;
     slug: string;
     path: string;
     parentCollection: CollectionConfig<M>;
@@ -24,19 +24,19 @@ export interface NavigationViewCollectionInternal<M extends Record<string, unkno
     collection: CollectionConfig<M>;
 }
 
-export interface NavigationViewSnapshotCustomInternal<M extends Record<string, unknown>> {
+export interface NavigationViewEntityCustomInternal<M extends Record<string, unknown>> {
     type: "custom_view";
     slug: string;
     path: string;
-    snapshotId: string | number;
-    view: SnapshotCustomView<M>;
+    entityId: string | number;
+    view: EntityCustomView<M>;
 }
 
 export function getNavigationEntriesFromPath(props: {
     path: string,
     collections: CollectionConfig[] | undefined,
     currentFullPath?: string,
-    contextSnapshotViews?: SnapshotCustomView[]
+    contextEntityViews?: EntityCustomView[]
 }): NavigationViewInternal[] {
 
     const {
@@ -68,11 +68,11 @@ export function getNavigationEntriesFromPath(props: {
             const restOfThePath = removeInitialAndTrailingSlashes(removeInitialAndTrailingSlashes(path).replace(subpathCombination, ""));
             const nextSegments = restOfThePath.length > 0 ? restOfThePath.split("/") : [];
             if (nextSegments.length > 0) {
-                const snapshotId = nextSegments[0];
-                const path = collectionPath + "/" + snapshotId;
+                const entityId = nextSegments[0];
+                const path = collectionPath + "/" + entityId;
                 result.push({
-                    type: "snapshot",
-                    snapshotId,
+                    type: "entity",
+                    entityId,
                     slug: collectionPath,
                     path,
                     parentCollection: collection
@@ -82,17 +82,17 @@ export function getNavigationEntriesFromPath(props: {
                     if (!collection) {
                         throw Error("collection not found resolving path: " + collection);
                     }
-                    const snapshotViews = collection.snapshotViews;
-                    const customView = snapshotViews && snapshotViews
-                        .map((entry) => resolveSnapshotView(entry, props.contextSnapshotViews))
-                        .filter((v): v is SnapshotCustomView => v != null)
+                    const entityViews = collection.entityViews;
+                    const customView = entityViews && entityViews
+                        .map((entry) => resolveEntityView(entry, props.contextEntityViews))
+                        .filter((v): v is EntityCustomView => v != null)
                         .find((entry) => entry.key === newPath);
                     const subcollections = getSubcollections(collection);
                     if (customView) {
                         result.push({
                             type: "custom_view",
                             slug: collectionPath,
-                            snapshotId: snapshotId,
+                            entityId: entityId,
                             path: path + "/" + customView.key,
                             view: customView
                         });
@@ -101,7 +101,7 @@ export function getNavigationEntriesFromPath(props: {
                             path: newPath,
                             collections: subcollections,
                             currentFullPath: path,
-                            contextSnapshotViews: props.contextSnapshotViews
+                            contextEntityViews: props.contextEntityViews
                         }));
                     }
                 }
@@ -113,10 +113,10 @@ export function getNavigationEntriesFromPath(props: {
     return result;
 }
 
-function resolveSnapshotView(snapshotView: string | SnapshotCustomView, contextSnapshotViews?: SnapshotCustomView[]): SnapshotCustomView | undefined {
-    if (typeof snapshotView === "string") {
-        return contextSnapshotViews?.find((entry) => entry.key === snapshotView);
+function resolveEntityView(entityView: string | EntityCustomView, contextEntityViews?: EntityCustomView[]): EntityCustomView | undefined {
+    if (typeof entityView === "string") {
+        return contextEntityViews?.find((entry) => entry.key === entityView);
     } else {
-        return snapshotView;
+        return entityView;
     }
 }

@@ -522,10 +522,10 @@ data: [] as Record<string, unknown>[] };
         let rows: Record<string, unknown>[] = [];
         const val = result.value as Record<string, unknown>;
         if (val?.data && Array.isArray(val.data)) {
-            rows = (val.data as Record<string, unknown>[]).map((snapshot) => ({
-                id: snapshot.id,
-                ...(snapshot.values as Record<string, unknown> ?? {}),
-                ...(snapshot.values ? {} : snapshot)
+            rows = (val.data as Record<string, unknown>[]).map((entity) => ({
+                id: entity.id,
+                ...(entity.values as Record<string, unknown> ?? {}),
+                ...(entity.values ? {} : entity)
             }));
         } else if (Array.isArray(result.value)) {
             rows = result.value;
@@ -551,7 +551,7 @@ data: [] as Record<string, unknown>[] };
 data: rows };
     }, [result]);
 
-    // ─── Matched collections for snapshot actions ──────────────────
+    // ─── Matched collections for entity actions ──────────────────
 
     const matchedCollections = useMemo(() => {
         if (!result?.value || result.error) return [];
@@ -562,13 +562,13 @@ data: rows };
         );
     }, [result, activeTab?.code, collectionRegistry?.collections]);
 
-    const getRowSnapshotActions = useCallback((rowData: Record<string, unknown>): { collection: MatchedJSCollection; snapshotId: string | number }[] => {
+    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: MatchedJSCollection; entityId: string | number }[] => {
         if (!rowData || matchedCollections.length === 0) return [];
         return matchedCollections
             .filter(mc => rowData[mc.pkColumn] != null)
             .map(mc => ({
                 collection: mc,
-                snapshotId: rowData[mc.pkColumn] as string | number
+                entityId: rowData[mc.pkColumn] as string | number
             }));
     }, [matchedCollections]);
 
@@ -829,7 +829,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                                 data={tableData.data}
                                                                 columns={
                                                                     matchedCollections.length > 0
-                                                                        ? [{ key: "__snapshot_action__",
+                                                                        ? [{ key: "__entity_action__",
 title: "",
 width: 36,
 sortable: false,
@@ -839,16 +839,16 @@ resizable: false }, ...tableData.columns]
                                                                 rowHeight={32}
                                                                 headerHeight={32}
                                                                 cellRenderer={({ rowData, column, rowIndex }: CellRendererParams<Record<string, unknown>>) => {
-                                                                    // Snapshot action column
-                                                                    if (column.key === "__snapshot_action__") {
-                                                                        const rowActions = getRowSnapshotActions(rowData ?? {});
+                                                                    // Entity action column
+                                                                    if (column.key === "__entity_action__") {
+                                                                        const rowActions = getRowEntityActions(rowData ?? {});
                                                                         if (rowActions.length === 0) return <div className="h-full w-full"/>;
                                                                         if (rowActions.length === 1) {
                                                                             const ra = rowActions[0];
                                                                             return (
                                                                                 <div className="h-full flex items-center justify-center">
-                                                                                    <Tooltip title={t("studio_sql_edit_snapshot", { name: ra.collection.collection.name,
-id: String(ra.snapshotId) })}>
+                                                                                    <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
                                                                                         <IconButton
                                                                                             size="small"
                                                                                             className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
@@ -856,7 +856,7 @@ id: String(ra.snapshotId) })}>
                                                                                                 e.stopPropagation();
                                                                                                 sidePanelController.open({
                                                                                                     path: ra.collection.collectionSlug,
-                                                                                                    snapshotId: ra.snapshotId,
+                                                                                                    entityId: ra.entityId,
                                                                                                     collection: ra.collection.collection,
                                                                                                     updateUrl: false
                                                                                                 });
@@ -889,14 +889,14 @@ id: String(ra.snapshotId) })}>
                                                                                             onClick={() => {
                                                                                                 sidePanelController.open({
                                                                                                     path: ra.collection.collectionSlug,
-                                                                                                    snapshotId: ra.snapshotId,
+                                                                                                    entityId: ra.entityId,
                                                                                                     collection: ra.collection.collection,
                                                                                                     updateUrl: false
                                                                                                 });
                                                                                             }}
                                                                                         >
-                                                                                            {t("studio_sql_edit_snapshot", { name: ra.collection.collection.name,
-id: String(ra.snapshotId) })}
+                                                                                            {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
                                                                                         </MenuItem>
                                                                                     ))}
                                                                                 </Menu>

@@ -20,7 +20,7 @@ import type {
  * Props for the headless {@link CollectionView} component.
  *
  * This component is data-agnostic — it renders collection data based on
- * property configurations and callbacks, with ZERO coupling to any snapshot
+ * property configurations and callbacks, with ZERO coupling to any entity
  * or data layer.
  *
  * @group Collection View
@@ -168,7 +168,7 @@ const DEFAULT_ENABLED_VIEWS: CollectionViewMode[] = ["list", "table", "cards", "
  * A data-agnostic collection view component that orchestrates table, card,
  * list, and kanban views — driven entirely by props.
  *
- * Zero imports from any snapshot or data layer. This component lives in
+ * Zero imports from any entity or data layer. This component lives in
  * `@rebasepro/ui` and can be used with any data source.
  *
  * @example

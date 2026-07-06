@@ -16,7 +16,7 @@ class MockFile {
 // Helpers
 function makeParams(overrides: Partial<{
     input: string;
-    snapshotId: string;
+    entityId: string;
     path: string;
     fileName: string;
     propertyKey: string;
@@ -32,10 +32,10 @@ function makeParams(overrides: Partial<{
         storage
     };
     return {
-        input: overrides.input ?? "{path}/{snapshotId}/{file}",
+        input: overrides.input ?? "{path}/{entityId}/{file}",
         storage,
         values: {},
-        snapshotId: overrides.snapshotId ?? "snapshot-123",
+        entityId: overrides.entityId ?? "entity-123",
         path: overrides.path ?? "products",
         property,
         file,
@@ -46,10 +46,10 @@ function makeParams(overrides: Partial<{
 describe("Storage Path Resolution", () => {
 
     describe("resolveStoragePathString", () => {
-        it("replaces {snapshotId} placeholder", () => {
-            const params = makeParams({ input: "uploads/{snapshotId}/images" });
+        it("replaces {entityId} placeholder", () => {
+            const params = makeParams({ input: "uploads/{entityId}/images" });
             const result = resolveStoragePathString(params);
-            expect(result).toBe("uploads/snapshot-123/images");
+            expect(result).toBe("uploads/entity-123/images");
         });
 
         it("replaces {path} placeholder", () => {
@@ -80,9 +80,9 @@ propertyKey: "avatar" });
         });
 
         it("handles multiple placeholders", () => {
-            const params = makeParams({ input: "{path}/{snapshotId}/files" });
+            const params = makeParams({ input: "{path}/{entityId}/files" });
             const result = resolveStoragePathString(params);
-            expect(result).toBe("products/snapshot-123/files");
+            expect(result).toBe("products/entity-123/files");
         });
 
         it("returns literal path when no placeholders", () => {
@@ -116,9 +116,9 @@ fileName: "photo.jpg" });
             expect(result.endsWith(".jpg")).toBe(true);
         });
 
-        it("replaces {snapshotId}", async () => {
-            const params = makeParams({ input: "{snapshotId}_{file}",
-snapshotId: "e42",
+        it("replaces {entityId}", async () => {
+            const params = makeParams({ input: "{entityId}_{file}",
+entityId: "e42",
 fileName: "avatar.png" });
             const result = await resolveStorageFilenameString(params);
             expect(result).toBe("e42_avatar.png");

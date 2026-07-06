@@ -59,7 +59,7 @@ export class RelationService {
     /**
      * Fetch rows related to a parent row through a specific relation
      */
-    async fetchRelatedSnapshots<M extends Record<string, unknown>>(
+    async fetchRelatedEntitys<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
@@ -82,13 +82,13 @@ export class RelationService {
             throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
         }
 
-        return this.fetchSnapshotsUsingJoins<M>(parentCollection, parentId, relation, options);
+        return this.fetchEntitysUsingJoins<M>(parentCollection, parentId, relation, options);
     }
 
     /**
      * Fetch rows using join paths for complex relations
      */
-    async fetchSnapshotsUsingJoins<M extends Record<string, unknown>>(
+    async fetchEntitysUsingJoins<M extends Record<string, unknown>>(
         parentCollection: CollectionConfig,
         parentId: string | number,
         relation: Relation,
@@ -244,7 +244,7 @@ export class RelationService {
     /**
      * Count related rows for a parent row
      */
-    async countRelatedSnapshots<M extends Record<string, unknown>>(
+    async countRelatedEntitys<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
@@ -298,7 +298,7 @@ export class RelationService {
     /**
      * Batch fetch related rows for multiple parent rows to avoid N+1 queries
      */
-    async batchFetchRelatedSnapshots(
+    async batchFetchRelatedEntitys(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
@@ -505,7 +505,7 @@ export class RelationService {
      * Returns a Map<parentId, RelatedRow[]> instead of Map<parentId, RelatedRow>.
      * Uses a single SQL query with IN clause to avoid N+1.
      */
-    async batchFetchRelatedSnapshotsMany(
+    async batchFetchRelatedEntitysMany(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
@@ -581,7 +581,7 @@ export class RelationService {
         if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
             const junctionTable = this.registry.getTable(relation.through.table);
             if (!junctionTable) {
-                logger.warn(`[batchFetchRelatedSnapshotsMany] Junction table '${relation.through.table}' not found`);
+                logger.warn(`[batchFetchRelatedEntitysMany] Junction table '${relation.through.table}' not found`);
                 return new Map();
             }
 
@@ -589,7 +589,7 @@ export class RelationService {
             const targetJunctionCol = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionCol || !targetJunctionCol) {
-                logger.warn(`[batchFetchRelatedSnapshotsMany] Junction columns not found in '${relation.through.table}'`);
+                logger.warn(`[batchFetchRelatedEntitysMany] Junction columns not found in '${relation.through.table}'`);
                 return new Map();
             }
 
@@ -698,7 +698,7 @@ export class RelationService {
             const relation = findRelation(resolvedRelations, key);
             if (!relation || relation.cardinality !== "many") continue;
 
-            const targetSnapshotIds = (value && Array.isArray(value)) ? value.map((rel: { id: string | number }) => rel.id) : [];
+            const targetEntityIds = (value && Array.isArray(value)) ? value.map((rel: { id: string | number }) => rel.id) : [];
             const targetCollection = relation.target();
 
             // Use joinPath if available
@@ -754,10 +754,10 @@ export class RelationService {
                 // Delete existing relations for this row
                 await tx.delete(junctionTable).where(eq(sourceJunctionColumn, parsedParentId));
 
-                if (targetSnapshotIds.length > 0) {
+                if (targetEntityIds.length > 0) {
                     const targetPks = getPrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const parsedTargetIds = targetSnapshotIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
+                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                     const newLinks = parsedTargetIds.map(targetId => ({
                         [sourceJunctionColumn.name]: parsedParentId,
@@ -792,10 +792,10 @@ export class RelationService {
                 // Delete existing relations for this row
                 await tx.delete(junctionTable).where(eq(sourceJunctionColumn, parsedParentId));
 
-                if (targetSnapshotIds.length > 0) {
+                if (targetEntityIds.length > 0) {
                     const targetPks = getPrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const parsedTargetIds = targetSnapshotIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
+                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                     const newLinks = parsedTargetIds.map(targetId => ({
                         [sourceJunctionColumn.name]: parsedParentId,
@@ -829,8 +829,8 @@ export class RelationService {
                 const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
 
                 // Clear existing links not in the new set
-                if (targetSnapshotIds.length > 0) {
-                    const parsedTargetIds = targetSnapshotIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
+                if (targetEntityIds.length > 0) {
+                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
                     await tx
                         .update(targetTable)
                         .set({ [relation.foreignKeyOnTarget]: null })
@@ -860,7 +860,7 @@ export class RelationService {
     async updateInverseRelations(
         tx: DrizzleClient,
         sourceCollection: CollectionConfig,
-        sourceSnapshotId: string | number,
+        sourceEntityId: string | number,
         inverseRelationUpdates: Array<{
             relationKey: string;
             relation: Relation;
@@ -884,7 +884,7 @@ export class RelationService {
                     await this.updateInverseJoinPathRelation(
                         tx,
                         sourceCollection,
-                        sourceSnapshotId,
+                        sourceEntityId,
                         targetCollection,
                         relation,
                         newValue
@@ -915,7 +915,7 @@ export class RelationService {
                         await this.updateManyToManyInverseRelation(
                             tx,
                             sourceCollection,
-                            sourceSnapshotId,
+                            sourceEntityId,
                             targetCollection,
                             relation,
                             newValue,
@@ -937,7 +937,7 @@ export class RelationService {
                     continue;
                 }
 
-                const parsedSourceIdObj = parseIdValues(sourceSnapshotId, sourcePks);
+                const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
                 const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
 
                 if (newValue === null || newValue === undefined) {
@@ -974,7 +974,7 @@ export class RelationService {
     private async updateInverseJoinPathRelation(
         tx: DrizzleClient,
         sourceCollection: CollectionConfig,
-        sourceSnapshotId: string | number,
+        sourceEntityId: string | number,
         targetCollection: CollectionConfig,
         relation: Relation,
         newValue: unknown
@@ -1035,7 +1035,7 @@ export class RelationService {
                 // Perform the junction table update
                 const sourcePks = getPrimaryKeys(sourceCollection, this.registry);
                 const sourceIdInfo = sourcePks[0];
-                const parsedSourceIdObj = parseIdValues(sourceSnapshotId, sourcePks);
+                const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
                 const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
 
                 // Clear existing entries for this source row
@@ -1045,8 +1045,8 @@ export class RelationService {
                 if (newValue && Array.isArray(newValue) && newValue.length > 0) {
                     const targetPks = getPrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const targetSnapshotIds = (newValue as Array<{ id: string | number } | string | number>).map((rel) => typeof rel === "object" && rel !== null ? rel.id : rel);
-                    const parsedTargetIds = targetSnapshotIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
+                    const targetEntityIds = (newValue as Array<{ id: string | number } | string | number>).map((rel) => typeof rel === "object" && rel !== null ? rel.id : rel);
+                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                     const newLinks = parsedTargetIds.map(targetId => ({
                         [sourceJunctionColumn!.name]: parsedSourceId,
@@ -1084,7 +1084,7 @@ export class RelationService {
     private async updateManyToManyInverseRelation(
         tx: DrizzleClient,
         sourceCollection: CollectionConfig,
-        sourceSnapshotId: string | number,
+        sourceEntityId: string | number,
         targetCollection: CollectionConfig,
         relation: Relation,
         newValue: unknown,
@@ -1107,7 +1107,7 @@ export class RelationService {
 
             const sourcePks = getPrimaryKeys(sourceCollection, this.registry);
             const sourceIdInfo = sourcePks[0];
-            const parsedSourceIdObj = parseIdValues(sourceSnapshotId, sourcePks);
+            const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
             const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
 
             // Clear existing entries for this source row
@@ -1117,8 +1117,8 @@ export class RelationService {
             if (newValue && Array.isArray(newValue) && newValue.length > 0) {
                 const targetPks = getPrimaryKeys(targetCollection, this.registry);
                 const targetIdInfo = targetPks[0];
-                const targetSnapshotIds = (newValue as Array<{ id: string | number }>).map((rel) => rel.id);
-                const parsedTargetIds = targetSnapshotIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
+                const targetEntityIds = (newValue as Array<{ id: string | number }>).map((rel) => rel.id);
+                const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                 const newLinks = parsedTargetIds.map(targetId => ({
                     [sourceJunctionColumn.name]: parsedSourceId,
@@ -1257,7 +1257,7 @@ parentSourceColName };
      */
     async handleJunctionTableCreation(
         tx: DrizzleClient,
-        newSnapshotId: string | number,
+        newEntityId: string | number,
         junctionTableInfo: {
             parentCollection: CollectionConfig;
             parentId: string | number;
@@ -1286,13 +1286,13 @@ parentSourceColName };
             // Parse the new row ID to the correct type
             const targetPks = getPrimaryKeys(targetCollection, this.registry);
             const targetIdInfo = targetPks[0];
-            const parsedNewSnapshotIdObj = parseIdValues(newSnapshotId, targetPks);
-            const parsedNewSnapshotId = parsedNewSnapshotIdObj[targetIdInfo.fieldName];
+            const parsedNewEntityIdObj = parseIdValues(newEntityId, targetPks);
+            const parsedNewEntityId = parsedNewEntityIdObj[targetIdInfo.fieldName];
 
             // Create the junction table entry linking parent to the new row
             const junctionData = {
                 [sourceJunctionColumn.name]: parentId,
-                [targetJunctionColumn.name]: parsedNewSnapshotId
+                [targetJunctionColumn.name]: parsedNewEntityId
             };
 
             await tx.insert(junctionTable).values(junctionData);

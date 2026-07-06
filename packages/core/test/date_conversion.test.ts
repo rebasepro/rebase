@@ -1,7 +1,7 @@
 /**
  * Test to reproduce the Date-to-string conversion bug.
  *
- * The bug occurs when saving a snapshot with a date field that has autoValue.
+ * The bug occurs when saving a entity with a date field that has autoValue.
  * The date gets converted to an ISO string at some point, causing validation
  * to fail with: "updated_on must be a `object` type, but the final value was: `2026-01-26T12:40:43.083Z`"
  *
@@ -9,10 +9,10 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { updateDateAutoValues, traverseValuesProperties } from "@rebasepro/common";
-import { Properties, DateProperty, SnapshotReference, GeoPoint } from "@rebasepro/types";
+import { Properties, DateProperty, EntityReference, GeoPoint } from "@rebasepro/types";
 import { mergeDeep, removeFunctions, removeUndefined } from "@rebasepro/utils";
 
-// Snapshot cache functions have internal JSON serialization that we need to test
+// Entity cache functions have internal JSON serialization that we need to test
 
 // Helper to create a date property with autoValue
 function createAutoDateProperty(autoValue: "on_create" | "on_update"): DateProperty {
@@ -61,7 +61,7 @@ describe("Date-to-String Conversion Bug", () => {
             expect(typeof result.updated_on).not.toBe("string");
         });
 
-        it("should preserve Date objects when updating existing snapshots", () => {
+        it("should preserve Date objects when updating existing entitys", () => {
             const existingDate = new Date("2025-01-01T10:00:00Z");
             const inputValues = {
                 title: "Existing Document",
@@ -206,10 +206,10 @@ name: "Title" },
             expect(cleanedValues.updated_on).toBeInstanceOf(Date);
         });
 
-        it("should preserve Date objects when updating an existing snapshot", () => {
+        it("should preserve Date objects when updating an existing entity", () => {
             const existingCreatedOn = new Date("2024-01-01T10:00:00Z");
 
-            // Existing snapshot values (simulating what comes from the database)
+            // Existing entity values (simulating what comes from the database)
             const existingValues = {
                 title: "Existing Document",
                 created_on: existingCreatedOn,
@@ -229,7 +229,7 @@ name: "Title" },
                 title: "Updated Title"
             };
 
-            // Apply date auto values for existing snapshot
+            // Apply date auto values for existing entity
             const timestampNow = new Date();
             const valuesWithDates = updateDateAutoValues({
                 inputValues: formValues,

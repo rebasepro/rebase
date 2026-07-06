@@ -80,7 +80,7 @@ b: { nested: true } };
                 values: { name: "Alice" }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).toArray();
             expect(history).toHaveLength(1);
             expect(history[0].action).toBe("create");
             expect(history[0].table_name).toBe("users");
@@ -100,7 +100,7 @@ age: 30 },
 age: 30 }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).toArray();
             expect(history).toHaveLength(1);
             expect(history[0].action).toBe("update");
             expect(history[0].changed_fields).toEqual(["name"]);
@@ -116,7 +116,7 @@ age: 30 }
                 previousValues: { name: "Alice" }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).toArray();
             expect(history).toHaveLength(0); // Because it should abort early
         });
 
@@ -129,7 +129,7 @@ age: 30 }
                 previousValues: { name: "Alice" }
             });
 
-            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).toArray();
             expect(history).toHaveLength(1);
             expect(history[0].action).toBe("delete");
             expect(history[0].previous_values).toEqual({ name: "Alice" });
@@ -167,7 +167,7 @@ previousValues: { a: 2 } });
             // Since it fire-and-forgets pruneHistory, we might need to wait slightly
             await new Promise(r => setTimeout(r, 100));
 
-            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).sort({ updated_at: 1 }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).sort({ updated_at: 1 }).toArray();
 
             // Only the latest 2 should be kept
             expect(history).toHaveLength(2);
@@ -191,7 +191,7 @@ previousValues: { a: 2 } });
                 {
                     _id: new ObjectId(),
                     action: "create",
-                    snapshot_id: id,
+                    entity_id: id,
                     table_name: "users",
                     values: { a: 1 },
                     updated_at: twoDaysAgo
@@ -199,7 +199,7 @@ previousValues: { a: 2 } });
                 {
                     _id: new ObjectId(),
                     action: "update",
-                    snapshot_id: id,
+                    entity_id: id,
                     table_name: "users",
                     values: { a: 2 },
                     previous_values: { a: 1 },
@@ -216,7 +216,7 @@ previousValues: { a: 2 } });
 
             await new Promise(r => setTimeout(r, 100));
 
-            const history = await db.collection(COLLECTION_NAME).find({ snapshot_id: id }).sort({ updated_at: 1 }).toArray();
+            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).sort({ updated_at: 1 }).toArray();
 
             // The record from twoDaysAgo should be deleted
             expect(history).toHaveLength(2);

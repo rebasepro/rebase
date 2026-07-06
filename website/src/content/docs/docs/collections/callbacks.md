@@ -1,14 +1,14 @@
 ---
-title: Snapshot Callbacks
+title: Entity Callbacks
 sidebar_label: Callbacks
-description: Use lifecycle callbacks to run custom logic when snapshots are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
+description: Use lifecycle callbacks to run custom logic when entitys are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 ---
 
 ## Overview
 
-Callbacks let you hook into the snapshot lifecycle to:
+Callbacks let you hook into the entity lifecycle to:
 
-- **Sync data between collections** — copy or move snapshots across tables on status changes
+- **Sync data between collections** — copy or move entitys across tables on status changes
 - **Transform data** before saving (computed fields, slugification)
 - **Validate** business rules beyond schema validation
 - **Trigger side effects** after writes (send emails, sync APIs, update caches)
@@ -21,7 +21,7 @@ Callbacks let you hook into the snapshot lifecycle to:
 const articlesCollection: CollectionConfig = {
     slug: "articles",
     callbacks: {
-        beforeSave: async ({ values, snapshotId, status }) => {
+        beforeSave: async ({ values, entityId, status }) => {
             // Auto-generate slug from title
             if (values.title) {
                 values.slug = values.title
@@ -62,12 +62,12 @@ const articlesCollection: CollectionConfig = {
 
 ### `beforeSave`
 
-Called before a snapshot is written to the database. Return the modified values.
+Called before a entity is written to the database. Return the modified values.
 
 ```typescript
 beforeSave: async ({
-    values,       // Snapshot values
-    id,           // Snapshot ID (null for new snapshots)
+    values,       // Entity values
+    id,           // Entity ID (null for new entitys)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context
@@ -95,8 +95,8 @@ Called after a successful save. Use for side effects.
 ```typescript
 afterSave: async ({
     values,         // Saved values
-    id,             // Snapshot ID
-    previousValues, // Previous values (null for new snapshots)
+    id,             // Entity ID
+    previousValues, // Previous values (null for new entitys)
     status,         // "new" | "existing" | "copy"
     context
 }) => {
@@ -125,7 +125,7 @@ afterSaveError: async ({
 
 ### `afterRead`
 
-Called after reading snapshots from the database. Transform the data for display.
+Called after reading entitys from the database. Transform the data for display.
 
 ```typescript
 afterRead: async ({
@@ -142,7 +142,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Called before a snapshot is deleted. Throw to block deletion.
+Called before a entity is deleted. Throw to block deletion.
 
 ```typescript
 beforeDelete: async ({
@@ -197,7 +197,7 @@ Every callback receives a `context` object that includes `context.data` — a un
 `context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
 
 ```typescript
-afterSave: async ({ values, snapshotId, context }) => {
+afterSave: async ({ values, entityId, context }) => {
     // Dynamic property access — works for any collection slug
     const jobs = context.data.jobs;
     const users = context.data.users;
@@ -214,14 +214,14 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Query snapshots with filters, sorting, and pagination |
-| `.findById()` | `findById(id: string \| number) → Snapshot \| undefined` | Fetch a single snapshot by ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Snapshot` | Create a new snapshot |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Snapshot` | Update an existing snapshot |
-| `.delete()` | `delete(id: string \| number) → void` | Delete a snapshot |
-| `.count()` | `count(params?: FindParams) → number` | Count matching snapshots |
+| `.find()` | `find(params?: FindParams) → FindResponse` | Query entitys with filters, sorting, and pagination |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
+| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
+| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
+| `.delete()` | `delete(id: string \| number) → void` | Delete a entity |
+| `.count()` | `count(params?: FindParams) → number` | Count matching entitys |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
-| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single snapshot |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
 
 ### Querying with `.find()`
 
@@ -254,10 +254,10 @@ afterSave: async ({ values, context }) => {
 }
 ```
 
-### Creating Snapshots
+### Creating Entitys
 
 ```typescript
-afterSave: async ({ values, snapshotId, previousValues, context }) => {
+afterSave: async ({ values, entityId, previousValues, context }) => {
     // Promote an approved submission to a published job
     if (values.status === "approved" && previousValues?.status !== "approved") {
         const newJob = await context.data.jobs.create({
@@ -265,11 +265,11 @@ afterSave: async ({ values, snapshotId, previousValues, context }) => {
             description: values.description,
             company_id: values.company_id,
             status: "published",
-            source_submission_id: snapshotId,
+            source_submission_id: entityId,
         });
 
         // Link back to the original submission
-        await context.data["job-submissions"].update(snapshotId, {
+        await context.data["job-submissions"].update(entityId, {
             promoted_job_id: newJob.id,
         });
     }
@@ -304,7 +304,7 @@ afterSave: async ({ context }) => {
 :::warning
 **`context.data` operations are NOT automatically wrapped in the same transaction as the triggering save.**
 
-The original snapshot save completes its database transaction first. Then `afterSave` runs and any `context.data` calls open **separate transactions**. If a `context.data` operation fails in `afterSave`, the original save is **not rolled back**.
+The original entity save completes its database transaction first. Then `afterSave` runs and any `context.data` calls open **separate transactions**. If a `context.data` operation fails in `afterSave`, the original save is **not rolled back**.
 :::
 
 This means:
@@ -316,7 +316,7 @@ This means:
 For operations that must be atomic, wrap them in error handling:
 
 ```typescript
-afterSave: async ({ values, snapshotId, context }) => {
+afterSave: async ({ values, entityId, context }) => {
     try {
         await context.data.jobs.create({
             title: values.title,
@@ -342,7 +342,7 @@ One of the most powerful uses of callbacks is **syncing data across collections*
 const submissionsCollection: CollectionConfig = {
     slug: "job_submissions",
     callbacks: {
-        afterSave: async ({ values, snapshotId, previousValues, context }) => {
+        afterSave: async ({ values, entityId, previousValues, context }) => {
             // When a submission is approved, create a published job
             if (values.status === "approved" && previousValues?.status !== "approved") {
                 const newJob = await context.data.jobs.create({
@@ -350,7 +350,7 @@ const submissionsCollection: CollectionConfig = {
                     description: values.description,
                     company_id: values.company_id,
                     status: "published",
-                    source_submission_id: snapshotId,
+                    source_submission_id: entityId,
                 });
 
                 // Update the submission with the promoted job reference
@@ -369,7 +369,7 @@ Other cross-collection patterns:
 - **Cascade delete**: Use `afterDelete` to remove related records in child collections
 - **Denormalization**: Use `afterSave` to update summary fields in a parent collection
 - **Audit logging**: Use `afterSave` / `afterDelete` to write to an audit log collection
-- **Counters**: Use `afterSave` / `afterDelete` to update count fields on related snapshots
+- **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entitys
 
 ## Full Context Reference
 
@@ -389,5 +389,5 @@ interface RebaseCallContext {
 ## Next Steps
 
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[Snapshot History](/docs/backend/history)** — Audit trail
+- **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints

@@ -11,9 +11,9 @@ const usersCollection = defineCollection({
     schema: "rebase",
     icon: "Users",
     group: "Settings",
-    openSnapshotMode: "dialog",
+    openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
-    snapshotActions: [
+    entityActions: [
         resetPasswordAction
     ],
     sort: ["createdAt", "desc"],

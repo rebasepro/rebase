@@ -558,7 +558,7 @@ function gettype(value: unknown): DataType | undefined {
         return "array";
     } else if (value instanceof Date) {
         return "date";
-    } else if (value && typeof value === "object" && "isSnapshotReference" in value && typeof (value as Record<string, unknown>).isSnapshotReference === "function" && (value as Record<string, (...args: unknown[]) => unknown>).isSnapshotReference()) {
+    } else if (value && typeof value === "object" && "isEntityReference" in value && typeof (value as Record<string, unknown>).isEntityReference === "function" && (value as Record<string, (...args: unknown[]) => unknown>).isEntityReference()) {
         return "reference";
     } else if (value instanceof GeoPoint) {
         return "geopoint";

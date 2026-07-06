@@ -171,7 +171,7 @@ properties: {
 
 ## Nächste Schritte
 
-- **[Entitätsansichten](/docs/frontend/snapshot-views)** — Benutzerdefinierte Tabs im Entitäts-Editor
-- **[Entitätsaktionen](/docs/frontend/snapshot-actions)** — Benutzerdefinierte Aktionsschaltflächen
+- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs im Entitäts-Editor
+- **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Zusätzliche Spalten](/docs/frontend/additional-columns)** — Berechnete Tabellenspalten
 ---

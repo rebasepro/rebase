@@ -95,8 +95,8 @@ await initializeRebaseBackend({
 - **REST API** routes at `/api/data/*` — auto-generated CRUD for each collection
 - **Auth** routes at `/api/auth/*` — signup, login, refresh, Google OAuth
 - **Storage** routes at `/api/storage/*` — file upload/download
-- **WebSocket** server — real-time snapshot sync via Postgres LISTEN/NOTIFY
-- **History** — audit trail recording on every snapshot change
+- **WebSocket** server — real-time entity sync via Postgres LISTEN/NOTIFY
+- **History** — audit trail recording on every entity change
 
 ## Collections (`config/collections/`)
 

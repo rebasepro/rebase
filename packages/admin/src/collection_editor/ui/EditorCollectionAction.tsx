@@ -7,7 +7,7 @@ import { useCollectionEditorController } from "../useCollectionEditorController"
 
 export function EditorCollectionAction({
     path,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
 }: CollectionActionsProps) {
@@ -37,9 +37,9 @@ export function EditorCollectionAction({
                     id: collection.slug,
                     path,
                     parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                     parentCollection: parentCollection as CollectionConfig,
-                    existingSnapshots: tableController?.data ?? []
+                    existingEntitys: tableController?.data ?? []
                 })
                 : undefined}>
             <SettingsIcon/>

@@ -43,9 +43,9 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
             dbQuery = query(dbQuery, limitToFirst(limit));
         }
 
-        const snapshot = await get(dbQuery);
-        if (snapshot.exists()) {
-            return Object.entries(snapshot.val()).map(([id, values]) => ({
+        const entity = await get(dbQuery);
+        if (entity.exists()) {
+            return Object.entries(entity.val()).map(([id, values]) => ({
                 ...(delegateToCMSModel(values) as Record<string, unknown>),
                 id
             }));
@@ -64,9 +64,9 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         const database = getDatabase(firebaseApp);
 
         const dbRef = ref(database, path);
-        const unsubscribe = onValue(dbRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const result: Record<string, unknown>[] = Object.entries(snapshot.val()).map(([id, values]) => ({
+        const unsubscribe = onValue(dbRef, (entity) => {
+            if (entity.exists()) {
+                const result: Record<string, unknown>[] = Object.entries(entity.val()).map(([id, values]) => ({
                     ...(delegateToCMSModel(values) as Record<string, unknown>),
                     id
                 }));
@@ -88,10 +88,10 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         }
         const database = getDatabase(firebaseApp);
 
-        const snapshot = await get(ref(database, `${path}/${id}`));
-        if (snapshot.exists()) {
+        const entity = await get(ref(database, `${path}/${id}`));
+        if (entity.exists()) {
             return {
-                ...(delegateToCMSModel(snapshot.val()) as Record<string, unknown>),
+                ...(delegateToCMSModel(entity.val()) as Record<string, unknown>),
                 id: id
             };
         }
@@ -110,14 +110,14 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         const database = getDatabase(firebaseApp);
 
         const dbRef = ref(database, `${path}/${id}`);
-        const unsubscribe = onValue(dbRef, (snapshot) => {
-            if (snapshot.exists()) {
+        const unsubscribe = onValue(dbRef, (entity) => {
+            if (entity.exists()) {
                 onUpdate({
-                    ...(delegateToCMSModel(snapshot.val()) as Record<string, unknown>),
+                    ...(delegateToCMSModel(entity.val()) as Record<string, unknown>),
                     id: id
                 });
             } else {
-                onError?.(new Error("Snapshot does not exist"));
+                onError?.(new Error("Entity does not exist"));
             }
         });
 
@@ -134,7 +134,7 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
         }
         const database = getDatabase(firebaseApp);
 
-        // If id is not provided, a new snapshot will be created
+        // If id is not provided, a new entity will be created
         const finalId = id ?? push(ref(database, path)).key;
         if (!finalId) {
             throw new Error("Could not generate a new id");
@@ -170,15 +170,15 @@ export function useFirebaseRTDBDelegate({ firebaseApp }: { firebaseApp?: Firebas
 
         // Simplified example; the Realtime Database does not support querying with "not equal" conditions
         const dbRef = query(ref(database, slug), orderByChild(name), startAt(value as string | number | boolean | null), limitToFirst(1));
-        const snapshot = await get(dbRef);
+        const entity = await get(dbRef);
 
-        if (!snapshot.exists()) {
+        if (!entity.exists()) {
             return true;
         }
 
-        // Check if the found snapshot is the same as the one being checked
-        const [key, snapshotValue] = Object.entries(snapshot.val())[0];
-        if (snapshotValue && typeof snapshotValue === "object" && (snapshotValue as Record<string, unknown>)[name] === value && key === id) {
+        // Check if the found entity is the same as the one being checked
+        const [key, entityValue] = Object.entries(entity.val())[0];
+        if (entityValue && typeof entityValue === "object" && (entityValue as Record<string, unknown>)[name] === value && key === id) {
             return true;
         }
 
@@ -247,9 +247,9 @@ function cmsToRTDBModel(data: unknown, database: Database): unknown {
         return null;
     } else if (Array.isArray(data)) {
         return data.filter(v => v !== undefined).map(v => cmsToRTDBModel(v, database));
-    } else if (typeof data === "object" && data !== null && "isSnapshotReference" in data && typeof (data as Record<string, unknown>).isSnapshotReference === "function" && (data as { isSnapshotReference: () => boolean }).isSnapshotReference()) {
-        const snapshotRef = data as unknown as { slug: string; id: string };
-        return ref(database, `${snapshotRef.slug}/${snapshotRef.id}`);
+    } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
+        const entityRef = data as unknown as { slug: string; id: string };
+        return ref(database, `${entityRef.slug}/${entityRef.id}`);
     } else if (data instanceof Date) {
         // For dates, convert to ISO string or timestamp.
         return data.toISOString();

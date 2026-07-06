@@ -8,11 +8,11 @@ describe("usePostgresClientDriver hook", () => {
     beforeEach(() => {
         mockWsClient = {
             fetchCollection: jest.fn().mockResolvedValue([{ id: "1",
-name: "Snapshot 1" }]),
+name: "Entity 1" }]),
             fetchOne: jest.fn().mockResolvedValue({ id: "1",
-name: "Snapshot 1" }),
+name: "Entity 1" }),
             save: jest.fn().mockResolvedValue({ id: "1",
-name: "Saved Snapshot" }),
+name: "Saved Entity" }),
             delete: jest.fn().mockResolvedValue(undefined),
             checkUniqueField: jest.fn().mockResolvedValue(true),
             count: jest.fn().mockResolvedValue(42),
@@ -52,7 +52,7 @@ name: "Saved Snapshot" }),
         const list = await driver.fetchCollection({ path: "posts" });
         expect(mockWsClient.fetchCollection).toHaveBeenCalledWith({ path: "posts" });
         expect(list).toEqual([{ id: "1",
-name: "Snapshot 1" }]);
+name: "Entity 1" }]);
 
         // fetchOne
         const item = await driver.fetchOne({ path: "posts",
@@ -60,7 +60,7 @@ id: "1" });
         expect(mockWsClient.fetchOne).toHaveBeenCalledWith({ path: "posts",
 id: "1" });
         expect(item).toEqual({ id: "1",
-name: "Snapshot 1" });
+name: "Entity 1" });
 
         // save
         const saved = await driver.save({ path: "posts",
@@ -73,7 +73,7 @@ values: { name: "Test" } });
             status: undefined
         });
         expect(saved).toEqual({ id: "1",
-name: "Saved Snapshot" });
+name: "Saved Entity" });
 
         // delete
         await driver.delete({ row: { id: "1",

@@ -1,12 +1,12 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import { Snapshot, FilterValues } from "@rebasepro/types";
+import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useData, useRebaseContext } from "@rebasepro/core";
 
 const DEFAULT_PAGE_SIZE = 20;
 
 /**
- * Shallow equality for snapshot value records.
+ * Shallow equality for entity value records.
  * Handles primitives and reference equality for nested values.
  * Avoids JSON.stringify allocation on every comparison.
  */
@@ -29,15 +29,15 @@ function shallowEqualValues(
  * Data state for a single board column
  */
 export interface BoardColumnData<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Snapshots loaded for this column */
-    snapshots: Snapshot<M>[];
+    /** Entitys loaded for this column */
+    entitys: Entity<M>[];
     /** Whether the column is currently loading data */
     loading: boolean;
     /** Whether there are more items to load */
     hasMore: boolean;
     /** Error if loading failed */
     error?: Error;
-    /** Total count of snapshots in this column */
+    /** Total count of entitys in this column */
     totalCount?: number;
 }
 
@@ -66,7 +66,7 @@ export interface BoardDataController<M extends Record<string, unknown> = any, CO
 export interface UseBoardDataControllerProps<M extends Record<string, unknown> = Record<string, unknown>> {
     /** Full path to the collection */
     fullPath: string;
-    /** The snapshot collection configuration */
+    /** The entity collection configuration */
     collection: CollectionConfig<M>;
     /** Property key used for column assignment */
     columnProperty: string;
@@ -76,7 +76,7 @@ export interface UseBoardDataControllerProps<M extends Record<string, unknown> =
     orderProperty?: string;
     /** Number of items to load per page per column */
     pageSize?: number;
-    /** Text search string to filter snapshots */
+    /** Text search string to filter entitys */
     searchString?: string;
     /** Additional filter values */
     filterValues?: FilterValues<string>;
@@ -136,7 +136,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         const initial: Record<string, BoardColumnData<M>> = {};
         columns.forEach(col => {
             initial[col] = {
-                snapshots: [],
+                entitys: [],
                 loading: true,
                 hasMore: true,
                 error: undefined,
@@ -153,7 +153,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
     const isCleaningUpRef = useRef(false);
 
     // Track items that are currently in an optimistic state (awaiting DB sync)
-    const pendingItemsRef = useRef<Record<string, { snapshot: Snapshot<M>, expectedValues: Record<string, any> }>>({});
+    const pendingItemsRef = useRef<Record<string, { entity: Entity<M>, expectedValues: Record<string, any> }>>({});
 
     // Stable keys for dependency comparison
     const columnsKey = useMemo(() => [...columns].sort().join(","), [columns]);
@@ -228,7 +228,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
             setColumnData(prev => ({
                 ...prev,
                 [column]: {
-                    snapshots: [],
+                    entitys: [],
                     loading: false,
                     hasMore: false,
                     error: undefined,
@@ -257,17 +257,17 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         }));
 
         // onUpdate callback
-        const onUpdate = async (snapshots: Snapshot<M>[]) => {
+        const onUpdate = async (entitys: Entity<M>[]) => {
             // Skip updates if we're cleaning up
             if (isCleaningUpRef.current) return;
 
             const pendingMap = pendingItemsRef.current;
 
-            // Apply pending updates to incoming snapshots
-            const mergedSnapshots = snapshots.map(e => {
+            // Apply pending updates to incoming entitys
+            const mergedEntitys = entitys.map(e => {
                 const pending = pendingMap[String(e.id)];
                 if (pending) {
-                    // Check if DB snapshot has caught up to the expected column and order
+                    // Check if DB entity has caught up to the expected column and order
                     const expectedCol = pending.expectedValues[currentColumnProperty];
                     const expectedOrder = currentOrderProperty ? pending.expectedValues[currentOrderProperty] : undefined;
 
@@ -282,7 +282,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
                     if (caughtUp) {
                         // DB has caught up, clear pending state
                         delete pendingMap[String(e.id)];
-                        return e; // Use the real DB snapshot
+                        return e; // Use the real DB entity
                     }
 
                     // DB hasn't caught up, overlay expected values
@@ -293,22 +293,22 @@ values: { ...e.values,
                 return e;
             });
 
-            // Add any pending items that belong to this column but aren't in the incoming snapshots yet
+            // Add any pending items that belong to this column but aren't in the incoming entitys yet
             // (e.g. backend hasn't moved them to this column yet)
             Object.values(pendingMap).forEach(pending => {
                 if (pending.expectedValues[currentColumnProperty] === column) {
-                    if (!mergedSnapshots.some(e => String(e.id) === String(pending.snapshot.id))) {
-                        mergedSnapshots.push(pending.snapshot);
+                    if (!mergedEntitys.some(e => String(e.id) === String(pending.entity.id))) {
+                        mergedEntitys.push(pending.entity);
                     }
                 }
             });
 
-            // Always filter in memory to only show snapshots that belong to this specific column.
-            // This is required because text search returns all matches, and collection_snapshot_patch
-            // may contain snapshots that have just been moved out of this column.
-            let processed = mergedSnapshots.filter(e => e.values?.[currentColumnProperty] === column);
+            // Always filter in memory to only show entitys that belong to this specific column.
+            // This is required because text search returns all matches, and collection_entity_patch
+            // may contain entitys that have just been moved out of this column.
+            let processed = mergedEntitys.filter(e => e.values?.[currentColumnProperty] === column);
 
-            // Sort locally if orderProperty is defined. This ensures that collection_snapshot_patch
+            // Sort locally if orderProperty is defined. This ensures that collection_entity_patch
             // insertions (which prepend by default in websocket.ts) are correctly placed.
             if (currentOrderProperty) {
                 processed = [...processed].sort((a, b) => {
@@ -327,20 +327,20 @@ values: { ...e.values,
             }
 
             // Apply afterRead callbacks if any.
-            // afterRead operates on flat rows; unwrap the Snapshot view-model
+            // afterRead operates on flat rows; unwrap the Entity view-model
             // before invoking and re-wrap the processed row after.
             if (currentCollection.callbacks?.afterRead) {
                 try {
                     processed = await Promise.all(
-                        processed.map(async (snapshot) => {
+                        processed.map(async (entity) => {
                             const processedRow = await currentCollection.callbacks!.afterRead!({
                                 collection: currentCollection,
                                 path: currentResolvedPath,
-                                row: { id: snapshot.id, ...snapshot.values },
+                                row: { id: entity.id, ...entity.values },
                                 context: currentContext
                             });
                             return {
-                                ...snapshot,
+                                ...entity,
                                 values: processedRow as M
                             };
                         })
@@ -350,23 +350,23 @@ values: { ...e.values,
                 }
             }
 
-            const newHasMore = snapshots.length >= itemCount;
+            const newHasMore = entitys.length >= itemCount;
 
             // Compare with current state — skip update if identical to avoid UI flash
             setColumnData(prev => {
                 const existing = prev[column];
-                if (existing && !existing.loading && existing.snapshots.length === processed.length) {
+                if (existing && !existing.loading && existing.entitys.length === processed.length) {
                     // Quick structural equality check: same IDs in same order with same values
                     let identical = true;
                     for (let i = 0; i < processed.length; i++) {
-                        const a = existing.snapshots[i];
+                        const a = existing.entitys[i];
                         const b = processed[i];
                         if (a.id !== b.id) {
                             identical = false;
                             break;
                         }
                         // Shallow-compare values to avoid JSON.stringify allocations
-                        // snapshot.values are flat records from the DB, so shallow suffices
+                        // entity.values are flat records from the DB, so shallow suffices
                         if (!shallowEqualValues(a.values, b.values)) {
                             identical = false;
                             break;
@@ -381,7 +381,7 @@ values: { ...e.values,
                 return {
                     ...prev,
                     [column]: {
-                        snapshots: processed,
+                        entitys: processed,
                         loading: false,
                         hasMore: newHasMore,
                         error: undefined,
@@ -400,7 +400,7 @@ values: { ...e.values,
                 ...prev,
                 [column]: {
                     ...prev[column],
-                    snapshots: [],
+                    entitys: [],
                     loading: false,
                     hasMore: false,
                     error
@@ -415,7 +415,7 @@ values: { ...e.values,
                 where: whereFilter,
                 limit: itemCount,
                 orderBy: orderByParam
-            }, res => onUpdate(res.data as Snapshot<M>[]), onError);
+            }, res => onUpdate(res.data as Entity<M>[]), onError);
             unsubscribersRef.current[column] = unsubscribe;
         } else {
             accessor.find({
@@ -423,7 +423,7 @@ values: { ...e.values,
                 limit: itemCount,
                 orderBy: orderByParam
             })
-                .then(res => onUpdate(res.data as Snapshot<M>[]))
+                .then(res => onUpdate(res.data as Entity<M>[]))
                 .catch(onError);
         }
     }, []); // No dependencies - uses refs for all values
@@ -583,14 +583,14 @@ values: { ...e.values,
     const moveItemOptimistically = useCallback((itemId: string, sourceColumn: COLUMN, targetColumn: COLUMN, newValues?: Record<string, any>, newIndex?: number) => {
         setColumnData(prev => {
             const updated = { ...prev };
-            let itemToMove: Snapshot<M> | undefined;
+            let itemToMove: Entity<M> | undefined;
 
-            const sourceSnapshots = [...(updated[sourceColumn]?.snapshots || [])];
-            const itemIndex = sourceSnapshots.findIndex(e => String(e.id) === itemId);
+            const sourceEntitys = [...(updated[sourceColumn]?.entitys || [])];
+            const itemIndex = sourceEntitys.findIndex(e => String(e.id) === itemId);
 
             if (itemIndex !== -1) {
-                itemToMove = sourceSnapshots[itemIndex];
-                sourceSnapshots.splice(itemIndex, 1);
+                itemToMove = sourceEntitys[itemIndex];
+                sourceEntitys.splice(itemIndex, 1);
             }
 
             if (itemToMove) {
@@ -599,26 +599,26 @@ values: { ...e.values,
                     ...(newValues || {})
                 };
 
-                const updatedSnapshot = {
+                const updatedEntity = {
                     ...itemToMove,
                     values: newValuesMerged
                 };
 
                 // Store in pending items ref
-                pendingItemsRef.current[String(updatedSnapshot.id)] = {
-                    snapshot: updatedSnapshot,
+                pendingItemsRef.current[String(updatedEntity.id)] = {
+                    entity: updatedEntity,
                     expectedValues: newValuesMerged
                 };
 
-                const targetSnapshots = sourceColumn === targetColumn ? sourceSnapshots : [...(updated[targetColumn]?.snapshots || [])];
+                const targetEntitys = sourceColumn === targetColumn ? sourceEntitys : [...(updated[targetColumn]?.entitys || [])];
 
-                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetSnapshots.length) {
-                    targetSnapshots.splice(newIndex, 0, updatedSnapshot);
+                if (newIndex !== undefined && newIndex >= 0 && newIndex <= targetEntitys.length) {
+                    targetEntitys.splice(newIndex, 0, updatedEntity);
                 } else {
-                    targetSnapshots.push(updatedSnapshot);
+                    targetEntitys.push(updatedEntity);
                     if (orderPropertyRef.current) {
                         const orderProp = orderPropertyRef.current;
-                        targetSnapshots.sort((a, b) => {
+                        targetEntitys.sort((a, b) => {
                             const valA = a.values?.[orderProp] as string | undefined | null;
                             const valB = b.values?.[orderProp] as string | undefined | null;
 
@@ -637,7 +637,7 @@ values: { ...e.values,
 
                 updated[sourceColumn] = {
                     ...updated[sourceColumn],
-                    snapshots: sourceColumn === targetColumn ? targetSnapshots : sourceSnapshots,
+                    entitys: sourceColumn === targetColumn ? targetEntitys : sourceEntitys,
                     totalCount: sourceColumn === targetColumn
                         ? updated[sourceColumn].totalCount
                         : Math.max(0, (updated[sourceColumn].totalCount ?? 0) - 1)
@@ -646,7 +646,7 @@ values: { ...e.values,
                 if (sourceColumn !== targetColumn) {
                     updated[targetColumn] = {
                         ...updated[targetColumn],
-                        snapshots: targetSnapshots,
+                        entitys: targetEntitys,
                         totalCount: (updated[targetColumn].totalCount ?? 0) + 1
                     };
                 }

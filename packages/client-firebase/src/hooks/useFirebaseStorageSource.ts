@@ -69,8 +69,8 @@ export function useFirebaseStorageSource({
                     setProgressTimeout();
 
                     uploadTask.on("state_changed",
-                        (snapshot) => {
-                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        (entity) => {
+                            const progress = (entity.bytesTransferred / entity.totalBytes) * 100;
 
                             if (progress > lastProgress) {
                                 lastProgress = progress;
@@ -106,8 +106,8 @@ export function useFirebaseStorageSource({
                         },
                         () => {
                             clearTimeoutIfExists();
-                            const fullPath = uploadTask.snapshot.ref.fullPath;
-                            const bucketName = uploadTask.snapshot.ref.bucket;
+                            const fullPath = uploadTask.entity.ref.fullPath;
+                            const bucketName = uploadTask.entity.ref.bucket;
                             resolve({
                                 key: fullPath,
                                 bucket: bucketName,

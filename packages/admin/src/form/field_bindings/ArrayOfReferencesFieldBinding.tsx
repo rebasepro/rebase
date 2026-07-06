@@ -3,7 +3,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
-import { Snapshot, SnapshotReference } from "@rebasepro/types";
+import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../preview";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
@@ -15,7 +15,7 @@ import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typogra
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useCollectionRegistryController } from "../../index";
 
-type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, SnapshotReference[]>;
+type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, EntityReference[]>;
 
 /**
  * This field allows selecting multiple references.
@@ -47,7 +47,7 @@ export function ArrayOfReferencesFieldBinding({
     }
 
     const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
-    const selectedSnapshotIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
+    const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
 
     useClearRestoreValue({
         property,
@@ -64,8 +64,8 @@ export function ArrayOfReferencesFieldBinding({
         throw Error(`Couldn't find the corresponding collection for the path: ${ofProperty.path}`);
     }
 
-    const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<Record<string, unknown>>[]) => {
-        const refs = snapshots.map(e => getReferenceFrom(e));
+    const onMultipleEntitysSelected = useCallback((entitys: Entity<Record<string, unknown>>[]) => {
+        const refs = entitys.map(e => getReferenceFrom(e));
         setValue(refs);
     }, [setValue]);
 
@@ -73,8 +73,8 @@ export function ArrayOfReferencesFieldBinding({
         multiselect: true,
         path: ofProperty.path,
         collection,
-        onMultipleSnapshotsSelected,
-        selectedSnapshotIds,
+        onMultipleEntitysSelected,
+        selectedEntityIds,
         fixedFilter: ofProperty.fixedFilter
     }
     );
@@ -103,7 +103,7 @@ export function ArrayOfReferencesFieldBinding({
                 hover={!disabled}
                 reference={entryValue}
                 includeId={ofProperty.includeId}
-                includeSnapshotLink={ofProperty.includeSnapshotLink}
+                includeEntityLink={ofProperty.includeEntityLink}
             />
         );
     }, [ofProperty.path, ofProperty.ui?.previewProperties, value]);

@@ -120,7 +120,7 @@ description: "Whether more records exist beyond this page" }
 
         const dataPath = `/data/${slug}`;
 
-        // ── GET /data/{slug} — List snapshots ──────────────────────────
+        // ── GET /data/{slug} — List entitys ──────────────────────────
         paths[dataPath] = {
             get: {
                 tags: [collection.name],
@@ -180,7 +180,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
                 ],
                 responses: {
                     200: {
-                        description: "Paginated list of snapshots",
+                        description: "Paginated list of entitys",
                         content: {
                             "application/json": {
                                 schema: {
@@ -213,7 +213,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
                 },
                 responses: {
                     201: {
-                        description: "Created snapshot",
+                        description: "Created entity",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
@@ -226,8 +226,8 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
         };
 
         // ── GET/PUT/DELETE /data/{slug}/{id} ──────────────────────────
-        const snapshotPath = `/data/${slug}/{id}`;
-        paths[snapshotPath] = {
+        const entityPath = `/data/${slug}/{id}`;
+        paths[entityPath] = {
             get: {
                 tags: [collection.name],
                 summary: `Get ${collection.singularName || collection.name} by ID`,
@@ -237,7 +237,7 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Snapshot ID" },
+description: "Entity ID" },
                     {
                         name: "include",
                         in: "query",
@@ -248,14 +248,14 @@ description: "Snapshot ID" },
                 ],
                 responses: {
                     200: {
-                        description: "Snapshot found",
+                        description: "Entity found",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
                     },
-                    404: { description: "Snapshot not found",
+                    404: { description: "Entity not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
@@ -269,7 +269,7 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Snapshot ID" }
+description: "Entity ID" }
                 ],
                 requestBody: {
                     required: true,
@@ -281,14 +281,14 @@ description: "Snapshot ID" }
                 },
                 responses: {
                     200: {
-                        description: "Updated snapshot",
+                        description: "Updated entity",
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
                             }
                         }
                     },
-                    404: { description: "Snapshot not found",
+                    404: { description: "Entity not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }
@@ -302,11 +302,11 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Snapshot ID" }
+description: "Entity ID" }
                 ],
                 responses: {
                     204: { description: "Deleted successfully" },
-                    404: { description: "Snapshot not found",
+                    404: { description: "Entity not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     ...errorResponses(requireAuth)
                 }

@@ -1,5 +1,5 @@
-export type { RecordViewBindingProps } from "./RecordViewBinding";
-export { RecordViewBinding } from "./RecordViewBinding";
+export type { EntityViewBindingProps } from "./EntityViewBinding";
+export { EntityViewBinding } from "./EntityViewBinding";
 
 export * from "./DetailViewBinding";
 
@@ -11,7 +11,7 @@ export * from "./SelectableTable/SelectableTableContext";
 export * from "./CollectionViewBinding/CollectionViewBinding";
 export * from "./CollectionViewBinding/CollectionViewActions";
 export * from "./CollectionViewBinding/CollectionCardViewBinding";
-export * from "./CollectionViewBinding/RecordCardBinding";
+export * from "./CollectionViewBinding/EntityCardBinding";
 export * from "./CollectionViewBinding/useSelectionController";
 
 export * from "./PropertyConfigBadge";
@@ -23,7 +23,7 @@ export * from "./ArrayContainer";
 export * from "./ReferenceWidget";
 export * from "./SearchIconsView";
 export * from "./FieldCaption";
-export * from "./RecordPreviewBinding";
+export * from "./EntityPreviewBinding";
 
 // history is lazy-loaded by EditViewBinding and resolutions.ts
 // export * from "./history";

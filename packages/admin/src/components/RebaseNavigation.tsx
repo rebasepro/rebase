@@ -16,7 +16,7 @@ import {
 } from "@rebasepro/core";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions, SnapshotCustomView, SnapshotAction, CollectionConfig, RebasePlugin } from "@rebasepro/types";
+import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, CollectionConfig, RebasePlugin } from "@rebasepro/types";
 import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/types";
 
@@ -49,13 +49,13 @@ export interface RebaseNavigationProps {
 
 /**
  * Navigation layer — builds and provides all CMS navigation controllers:
- * collection registry, URL controller, navigation state, side snapshot,
+ * collection registry, URL controller, navigation state, side entity,
  * and the self-assembling Studio bridge.
  *
  * Also handles the collection editor config controller when enabled.
  *
  * **Independently usable**: Use this when you need CMS navigation
- * (snapshot tables, side panels) in a custom layout.
+ * (entity tables, side panels) in a custom layout.
  *
  * @example
  * ```tsx
@@ -209,34 +209,34 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         adminMode: adminModeController?.mode
     });
 
-    // ── Merge CMS-registered snapshotViews/snapshotActions into the customization controller ──
+    // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
     // The <Rebase> component builds the customizationController from its own props,
-    // but snapshot views passed to <RebaseCMS> are stored in the registry and not
+    // but entity views passed to <RebaseCMS> are stored in the registry and not
     // automatically merged. We re-provide an enriched controller here so that
     // downstream consumers (EditViewBinding, side panels, etc.) can resolve
-    // string-keyed snapshot views like "blog_preview".
+    // string-keyed entity views like "blog_preview".
     const enrichedCustomizationController = useMemo(() => {
-        const cmsSnapshotViews = (registry.cmsConfig?.snapshotViews ?? []) as SnapshotCustomView[];
-        const cmsSnapshotActions = (registry.cmsConfig?.snapshotActions ?? []) as SnapshotAction[];
-        if (cmsSnapshotViews.length === 0 && cmsSnapshotActions.length === 0) {
+        const cmsEntityViews = (registry.cmsConfig?.entityViews ?? []) as EntityCustomView[];
+        const cmsEntityActions = (registry.cmsConfig?.entityActions ?? []) as EntityAction[];
+        if (cmsEntityViews.length === 0 && cmsEntityActions.length === 0) {
             return parentCustomizationController;
         }
         return {
             ...parentCustomizationController,
-            snapshotViews: [
-                ...(parentCustomizationController.snapshotViews ?? []),
-                ...cmsSnapshotViews.filter(v => !(parentCustomizationController.snapshotViews ?? []).some(ev => ev.key === v.key))
+            entityViews: [
+                ...(parentCustomizationController.entityViews ?? []),
+                ...cmsEntityViews.filter(v => !(parentCustomizationController.entityViews ?? []).some(ev => ev.key === v.key))
             ],
-            snapshotActions: [
-                ...(parentCustomizationController.snapshotActions ?? []),
-                ...cmsSnapshotActions.filter(a => !(parentCustomizationController.snapshotActions ?? []).some(ea => ea.key === a.key))
+            entityActions: [
+                ...(parentCustomizationController.entityActions ?? []),
+                ...cmsEntityActions.filter(a => !(parentCustomizationController.entityActions ?? []).some(ea => ea.key === a.key))
             ]
         };
-    }, [parentCustomizationController, registry.cmsConfig?.snapshotViews, registry.cmsConfig?.snapshotActions]);
+    }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);
 
     // ── Inner content with all context providers ──────────────────────
     // Re-provide RebaseDataContext with the routed data so that every CMS
-    // consumer (list/snapshot views, references, board, import/export, and
+    // consumer (list/entity views, references, board, import/export, and
     // `context.data`) is routed to the correct driver by collection path.
     const navigationContent = (
         <RebaseDataContext.Provider value={routedData}>

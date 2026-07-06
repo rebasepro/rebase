@@ -369,5 +369,5 @@ If loading fails, the loader provides diagnostic output:
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
-- **[Snapshot Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks

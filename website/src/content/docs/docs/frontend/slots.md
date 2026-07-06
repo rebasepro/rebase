@@ -6,7 +6,7 @@ description: Reference for all UI extension point slots available in Rebase — 
 
 ## Overview
 
-Slots are named UI extension points where you can inject custom React components. Each slot has typed props specific to its location in the UI. Rebase ships with 29 built-in slots covering the home page, navigation, collection views, snapshot forms, dashboards, and more.
+Slots are named UI extension points where you can inject custom React components. Each slot has typed props specific to its location in the UI. Rebase ships with 29 built-in slots covering the home page, navigation, collection views, entity forms, dashboards, and more.
 
 ## Usage
 
@@ -82,17 +82,17 @@ const myPlugin: RebasePlugin = {
 | `collection.insights` | `CollectionInsightsSlotProps` | Insight widgets above the collection table |
 | `collection.filter-panel` | `CollectionFilterPanelProps` | Custom filter sidebar alongside the table |
 
-#### Snapshot / Form
+#### Entity / Form
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `form.actions` | `PluginFormActionProps` | Actions in the snapshot form action bar |
+| `form.actions` | `PluginFormActionProps` | Actions in the entity form action bar |
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `snapshot.row.actions` | `EntityRowActionsProps` | Per-row actions in snapshot tables |
-| `snapshot.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
-| `snapshot.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in entity tables |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
+| `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
 
 #### Dashboard
 
@@ -122,4 +122,4 @@ All slot prop types are exported from `@rebasepro/types` and can be imported for
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/types";
 ```
 
-Each props type provides access to the context relevant to the slot's location — collection metadata, snapshot data, navigation state, and more. Refer to the individual type definitions for full property details.
+Each props type provides access to the context relevant to the slot's location — collection metadata, entity data, navigation state, and more. Refer to the individual type definitions for full property details.

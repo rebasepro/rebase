@@ -17,7 +17,7 @@ import {
 
 /* ── Types ──────────────────────────────────────────────────── */
 
-interface TaskSnapshot {
+interface TaskEntity {
     id: string;
     values: {
         title: string;
@@ -35,10 +35,10 @@ interface TaskSnapshot {
 }
 
 export interface TaskTableProps {
-    tasks: TaskSnapshot[];
+    tasks: TaskEntity[];
     loading: boolean;
-    pendingTasks: TaskSnapshot[];
-    visiblePendingTasks: TaskSnapshot[];
+    pendingTasks: TaskEntity[];
+    visiblePendingTasks: TaskEntity[];
     hasMorePending: boolean;
     onLoadMorePending: () => void;
     pendingCount: number;
@@ -50,7 +50,7 @@ export interface TaskTableProps {
     stageLabels: Record<string, string>;
     recentlyToggledIds: Set<string>;
     /* Completed section */
-    completedTasks: TaskSnapshot[];
+    completedTasks: TaskEntity[];
     completedLoaded: boolean;
     loadingCompleted: boolean;
     completedHasMore: boolean;
@@ -148,7 +148,7 @@ export function TaskTable({
 }: TaskTableProps) {
 
     /* ── Task Row Renderer ── */
-    const renderTaskRow = useCallback((task: TaskSnapshot) => {
+    const renderTaskRow = useCallback((task: TaskEntity) => {
         const isCompleted = task.values?.status === "completed";
         const isToggling = togglingIds.has(task.id);
         const dueLabel = formatDueDate(task.values?.dueDate);
@@ -346,8 +346,8 @@ function CompletedSection({
     loading,
     hasMore
 }: {
-    tasks: TaskSnapshot[];
-    renderTaskRow: (task: TaskSnapshot) => React.ReactNode;
+    tasks: TaskEntity[];
+    renderTaskRow: (task: TaskEntity) => React.ReactNode;
     onExpand: () => void;
     onLoadMore: () => void;
     loading: boolean;

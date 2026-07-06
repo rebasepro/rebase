@@ -194,7 +194,7 @@ export interface FunctionsAPI {
 // ─── HistoryConfig ───────────────────────────────────────────────────────────
 
 /**
- * Configuration for snapshot history / audit-log tracking.
+ * Configuration for entity history / audit-log tracking.
  *
  * - `true` — enable history with default settings
  * - `{ retention?: number }` — enable with optional retention period in days

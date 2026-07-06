@@ -12,7 +12,7 @@ import {
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
 /**
- * CollectionClient returns flat rows (no Snapshot wrapper).
+ * CollectionClient returns flat rows (no Entity wrapper).
  * This is the public API surface for app developers.
  *
  * Additionally it exposes fluent query builder methods like `.where()`, `.orderBy()`.

@@ -272,5 +272,5 @@ Avoid the legacy pattern of checking `string_to_array(auth.roles(), ',')` for an
 ## Next Steps
 
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
-- **[Snapshot Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints

@@ -44,13 +44,13 @@ export type CollectionComponentName =
     | "Collection.EmptyState"
     | "Collection.Actions"
 
-    // ── Snapshot / Form ──
-    | "Snapshot.Form"
+    // ── Entity / Form ──
+    | "Entity.Form"
     | "EditView.FormActions"
     | "DetailView"
-    | "Snapshot.SidePanel"
-    | "RecordPreview"
-    | "Snapshot.MissingReference";
+    | "Entity.SidePanel"
+    | "EntityPreview"
+    | "Entity.MissingReference";
 
 /**
  * All overridable component names across all scopes.
@@ -128,7 +128,7 @@ export interface ComponentOverride<P = Record<string, unknown>> {
  *     name: "Products",
  *     slug: "products",
  *     components: {
- *         "Snapshot.Form": { Component: ProductForm },
+ *         "Entity.Form": { Component: ProductForm },
  *         "Collection.EmptyState": { Component: ProductsEmptyState },
  *         "Collection.Card": { Component: ProductCard },
  *     }

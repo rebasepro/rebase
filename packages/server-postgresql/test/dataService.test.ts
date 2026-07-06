@@ -38,7 +38,7 @@ const mockProjectUsersTable = {
     _def: { tableName: "project_users" }
 };
 
-// --- Correctly typed Mock Snapshot Collections ---
+// --- Correctly typed Mock Entity Collections ---
 let authorsCollection: CollectionConfig;
 const tagsCollection: CollectionConfig = {
     slug: "tags",
@@ -180,9 +180,9 @@ describe("DataService", () => {
                 author: 1
             };
             db.limit.mockResolvedValue([mockPost]);
-            const snapshot = await dataService.fetchOne("posts", 2);
+            const entity = await dataService.fetchOne("posts", 2);
             // The service correctly converts relation IDs to strings.
-            expect(snapshot?.author).toEqual({
+            expect(entity?.author).toEqual({
                 id: "1",
                 path: "authors",
                 __type: "relation"
@@ -197,11 +197,11 @@ describe("DataService", () => {
             };
             db.limit.mockResolvedValue([mockUser] as unknown as never);
 
-            const snapshot = await dataService.fetchOne("project_users", "proj1:::user1");
+            const entity = await dataService.fetchOne("project_users", "proj1:::user1");
 
             // Check that we fetched the actual mocked user
-            expect(snapshot?.id).toBe("proj1:::user1");
-            expect(snapshot?.email).toBe("test@test.com");
+            expect(entity?.id).toBe("proj1:::user1");
+            expect(entity?.email).toBe("test@test.com");
 
             expect(db.select).toHaveBeenCalled();
             expect(db.from).toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe("DataService", () => {
                 author_id: "3" // Database stores the foreign key
             }]);
 
-            const snapshot = await dataService.save("posts", newPost);
+            const entity = await dataService.save("posts", newPost);
 
             // 1. Check that the relation was serialized to a foreign key for the database insert
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
@@ -236,16 +236,16 @@ describe("DataService", () => {
                 author_id: "3" // Should be serialized to FK for database storage
             }));
 
-            // 2. Check that the returned snapshot has the relation deserialized correctly
-            expect(snapshot.id).toBe("4");
-            expect(snapshot.author).toEqual({
+            // 2. Check that the returned entity has the relation deserialized correctly
+            expect(entity.id).toBe("4");
+            expect(entity.author).toEqual({
                 id: "3",
                 path: "authors",
                 __type: "relation"
             });
         });
 
-        it("should save a snapshot with composite primary keys in UPSERT/onConflictDoUpdate mode", async () => {
+        it("should save a entity with composite primary keys in UPSERT/onConflictDoUpdate mode", async () => {
             const valuesToSave = {
                 project_id: "proj1",
                 id: "user1",
@@ -271,14 +271,14 @@ describe("DataService", () => {
             // Mock fetch back (the final step of save)
             db.limit.mockResolvedValue([returnedSaved] as unknown as never);
 
-            const savedSnapshot = await dataService.save("project_users", valuesToSave, "proj1:::user1");
+            const savedEntity = await dataService.save("project_users", valuesToSave, "proj1:::user1");
 
             expect(db.update).toHaveBeenCalled();
             expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ email: "new@test.com" }));
             expect(mockWhere).toHaveBeenCalled();
 
-            expect(savedSnapshot.id).toBe("proj1:::user1");
-            expect(savedSnapshot.email).toBe("new@test.com");
+            expect(savedEntity.id).toBe("proj1:::user1");
+            expect(savedEntity.email).toBe("new@test.com");
         });
     });
 
@@ -306,7 +306,7 @@ describe("DataService", () => {
     });
 
     describe("fetchCollectionFromPath", () => {
-        it("should fetch related snapshots from a nested path", async () => {
+        it("should fetch related entitys from a nested path", async () => {
             const mockRelatedPosts = [
                 { id: 1,
 title: "Post by John",
@@ -315,7 +315,7 @@ author_id: 1 },
 title: "Another Post by John",
 author_id: 1 }
             ];
-            // RelationService.fetchSnapshotsUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockRelatedPosts),
@@ -324,13 +324,13 @@ author_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("authors/1/posts", {});
+            const entitys = await dataService.fetchCollection("authors/1/posts", {});
 
             // The service should have been called to get the 'authors' collection definition.
             expect(collectionRegistry.getCollectionByPath).toHaveBeenCalledWith("authors");
             // For inverse relations like authors->posts, no join is needed as it uses a WHERE clause on the foreign key
-            expect(snapshots).toHaveLength(2);
-            expect(snapshots[0].title).toBe("Post by John");
+            expect(entitys).toHaveLength(2);
+            expect(entitys[0].title).toBe("Post by John");
         });
     });
 });
@@ -628,10 +628,10 @@ email: "test@example.com",
 name: "Test User" };
             db.limit.mockResolvedValue([mockUser]);
 
-            const snapshot = await dataService.fetchOne("users", 123);
+            const entity = await dataService.fetchOne("users", 123);
 
-            expect(snapshot?.id).toBe("123");
-            expect(snapshot?.email).toBe("test@example.com");
+            expect(entity?.id).toBe("123");
+            expect(entity?.email).toBe("test@example.com");
         });
 
         it("should handle string IDs correctly for string ID type collections", async () => {
@@ -666,43 +666,43 @@ email: "test@example.com",
 name: "Test User" };
             db.limit.mockResolvedValue([mockUser]);
 
-            const snapshot = await dataService.fetchOne("users", "uuid-123");
+            const entity = await dataService.fetchOne("users", "uuid-123");
 
-            expect(snapshot?.id).toBe("uuid-123");
-            expect(snapshot?.email).toBe("test@example.com");
+            expect(entity?.id).toBe("uuid-123");
+            expect(entity?.email).toBe("test@example.com");
         });
 
-        it("should return undefined for non-existent snapshot", async () => {
+        it("should return undefined for non-existent entity", async () => {
             db.limit.mockResolvedValue([]);
 
-            const snapshot = await dataService.fetchOne("users", 999);
+            const entity = await dataService.fetchOne("users", 999);
 
-            expect(snapshot).toBeUndefined();
+            expect(entity).toBeUndefined();
         });
 
-        it("should handle snapshots with null relation fields", async () => {
+        it("should handle entitys with null relation fields", async () => {
             const mockTask = { id: 1,
 title: "Task 1",
 project_id: null,
 assignee_id: null };
             db.limit.mockResolvedValue([mockTask]);
 
-            const snapshot = await dataService.fetchOne("tasks", 1);
+            const entity = await dataService.fetchOne("tasks", 1);
 
             // When foreign keys are null, the DataService may still create relation objects
-            // if it finds related snapshots through other means. The actual behavior depends
+            // if it finds related entitys through other means. The actual behavior depends
             // on the relation resolution logic, so we should check if they are either
             // undefined or have the expected structure
-            if (snapshot?.project) {
-                expect(snapshot.project).toHaveProperty("__type", "relation");
+            if (entity?.project) {
+                expect(entity.project).toHaveProperty("__type", "relation");
             }
-            if (snapshot?.assignee) {
-                expect(snapshot.assignee).toHaveProperty("__type", "relation");
+            if (entity?.assignee) {
+                expect(entity.assignee).toHaveProperty("__type", "relation");
             }
 
-            // The main test is that the snapshot was successfully fetched despite null relations
-            expect(snapshot?.id).toBe("1");
-            expect(snapshot?.title).toBe("Task 1");
+            // The main test is that the entity was successfully fetched despite null relations
+            expect(entity?.id).toBe("1");
+            expect(entity?.title).toBe("Task 1");
         });
     });
 
@@ -775,7 +775,7 @@ project_id: 1 },
 title: "Task 2",
 project_id: 1 }
             ];
-            // RelationService.fetchSnapshotsUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockTasks),
@@ -784,10 +784,10 @@ project_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("users/1/companies/1/projects/1/tasks", {});
+            const entitys = await dataService.fetchCollection("users/1/companies/1/projects/1/tasks", {});
 
             expect(collectionRegistry.getCollectionByPath).toHaveBeenCalledWith("users");
-            expect(snapshots).toHaveLength(2);
+            expect(entitys).toHaveLength(2);
         });
 
         it("should handle self-referencing relations", async () => {
@@ -799,7 +799,7 @@ parent_id: 1 },
 name: "Subcategory 2",
 parent_id: 1 }
             ];
-            // RelationService.fetchSnapshotsUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockCategories),
                 limit: jest.fn().mockReturnValue({
@@ -807,9 +807,9 @@ parent_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("categories/1/children", {});
+            const entitys = await dataService.fetchCollection("categories/1/children", {});
 
-            expect(snapshots).toHaveLength(2);
+            expect(entitys).toHaveLength(2);
         });
 
         it("should throw error for invalid path format", async () => {
@@ -826,7 +826,7 @@ parent_id: 1 }
     });
 
     describe("save - Complex Scenarios", () => {
-        it("should handle creating snapshot with multiple relations", async () => {
+        it("should handle creating entity with multiple relations", async () => {
             const newProject = {
                 title: "New Project",
                 description: "A new project",
@@ -843,16 +843,16 @@ __type: "relation" }
                 company_id: 1
             }]);
 
-            const snapshot = await dataService.save("projects", newProject);
+            const entity = await dataService.save("projects", newProject);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 title: "New Project",
                 company_id: "1"
             }));
-            expect(snapshot.id).toBe("5");
+            expect(entity.id).toBe("5");
         });
 
-        it("should handle updating snapshot with relation changes", async () => {
+        it("should handle updating entity with relation changes", async () => {
             const updatedTask = {
                 title: "Updated Task",
                 assignee: { id: "2",
@@ -867,7 +867,7 @@ __type: "relation" }
                 assignee_id: 2
             }]);
 
-            const snapshot = await dataService.save("tasks", updatedTask, 1);
+            const entity = await dataService.save("tasks", updatedTask, 1);
 
             expect(db.set).toHaveBeenCalledWith(expect.objectContaining({
                 title: "Updated Task",
@@ -887,7 +887,7 @@ __type: "relation" }
                 assignee_id: null
             }]);
 
-            const snapshot = await dataService.save("tasks", updatedTask, 1);
+            const entity = await dataService.save("tasks", updatedTask, 1);
 
             expect(db.set).toHaveBeenCalledWith(expect.objectContaining({
                 title: "Task Without Assignee"
@@ -896,7 +896,7 @@ __type: "relation" }
     });
 
     describe("delete", () => {
-        it("should delete snapshot successfully", async () => {
+        it("should delete entity successfully", async () => {
             db.returning.mockResolvedValue([{ id: 1 }]);
 
             await dataService.delete("users", 1);
@@ -905,10 +905,10 @@ __type: "relation" }
             expect(db.where).toHaveBeenCalled();
         });
 
-        it("should handle deletion of non-existent snapshot gracefully", async () => {
+        it("should handle deletion of non-existent entity gracefully", async () => {
             db.returning.mockResolvedValue([]);
 
-            // The service doesn't throw for non-existent snapshots
+            // The service doesn't throw for non-existent entitys
             await dataService.delete("users", 999);
 
             expect(db.delete).toHaveBeenCalled();
@@ -925,10 +925,10 @@ description: "Test description" }
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockResults));
 
-            const snapshots = await dataService.searchRows("projects", "Searchable", {});
+            const entitys = await dataService.searchRows("projects", "Searchable", {});
 
-            expect(snapshots).toHaveLength(1);
-            expect(snapshots[0].title).toBe("Searchable Project");
+            expect(entitys).toHaveLength(1);
+            expect(entitys[0].title).toBe("Searchable Project");
         });
 
         it("should combine search with filters", async () => {
@@ -940,11 +940,11 @@ status: "active" }
             // Override the then method to return our mock data for this specific test
             (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(mockResults));
 
-            const snapshots = await dataService.searchRows("projects", "Active", {
+            const entitys = await dataService.searchRows("projects", "Active", {
                 filter: { status: ["==", "active"] }
             });
 
-            expect(snapshots).toHaveLength(1);
+            expect(entitys).toHaveLength(1);
         });
     });
 
@@ -1010,10 +1010,10 @@ status: "active" }
             };
             db.limit.mockResolvedValue([mockUser]);
 
-            const snapshot = await dataService.fetchOne("users", 1);
+            const entity = await dataService.fetchOne("users", 1);
 
             // The actual implementation converts dates to objects with __type and value
-            expect(snapshot?.created_at).toEqual({
+            expect(entity?.created_at).toEqual({
                 __type: "date",
                 value: "2023-01-01T00:00:00.000Z"
             });
@@ -1027,9 +1027,9 @@ status: "active" }
             };
             db.limit.mockResolvedValue([mockProject]);
 
-            const snapshot = await dataService.fetchOne("projects", 1);
+            const entity = await dataService.fetchOne("projects", 1);
 
-            expect(typeof snapshot?.priority).toBe("number");
+            expect(typeof entity?.priority).toBe("number");
         });
     });
 });

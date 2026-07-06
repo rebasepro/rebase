@@ -201,7 +201,7 @@ describe("Error Propagation through Sub-Routers", () => {
             dataRouter.onError(errorHandler);
 
             dataRouter.get("/posts/:id", () => {
-                throw ApiError.notFound("Snapshot not found");
+                throw ApiError.notFound("Entity not found");
             });
             dataRouter.post("/posts", () => {
                 throw ApiError.badRequest("Validation failed", "INVALID_INPUT");
@@ -211,7 +211,7 @@ describe("Error Propagation through Sub-Routers", () => {
             return app;
         }
 
-        it("returns 404 for snapshot not found", async () => {
+        it("returns 404 for entity not found", async () => {
             const app = createDataApp();
             const res = await app.request("/api/data/posts/999");
             expect(res.status).toBe(404);

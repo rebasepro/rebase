@@ -4,61 +4,61 @@
 
 ### Breaking
 
-- **Entity → Snapshot vocabulary rename** — The `Entity` noun has been removed from the entire public API surface. Every type, hook, component, prop, config key, and wire-protocol message that previously used "entity" now uses "snapshot" (or, in backend callbacks, the flat database term "row"). This is a search-and-replace-level migration for consumers — no behavioral changes. The full rename map follows.
+- **Entity → Entity vocabulary rename** — The `Entity` noun has been removed from the entire public API surface. Every type, hook, component, prop, config key, and wire-protocol message that previously used "entity" now uses "entity" (or, in backend callbacks, the flat database term "row"). This is a search-and-replace-level migration for consumers — no behavioral changes. The full rename map follows.
 
   **Types (`@rebasepro/types`)**
 
   | Old Name | New Name |
   |----------|----------|
-  | `Entity<M>` | `Snapshot<M>` |
+  | `Entity<M>` | `Entity<M>` |
   | `EntityCollection<M>` | `CollectionConfig<M>` |
   | `EntityCallbacks<M>` | `CollectionCallbacks<M>` |
-  | `EntityValues<M>` | `SnapshotValues<M>` |
-  | `EntityStatus` | `SnapshotStatus` |
-  | `EntityReference` | `SnapshotReference` |
-  | `EntityView` | `SnapshotCustomView` |
-  | `EntityAction<M>` | `SnapshotAction<M>` |
-  | `EntityActionClickProps<M>` | `SnapshotActionClickProps<M>` |
-  | `EntityFormProps` | `SnapshotFormProps` |
-  | `EntitySidePanelProps` | `SnapshotSidePanelProps` |
-  | `SideEntityController` | `SideSnapshotController` |
-  | `EntitySelectionProps` | `SnapshotSelectionProps` |
-  | `EntityPreview` | `SnapshotPreview` |
+  | `EntityValues<M>` | `EntityValues<M>` |
+  | `EntityStatus` | `EntityStatus` |
+  | `EntityReference` | `EntityReference` |
+  | `EntityView` | `EntityCustomView` |
+  | `EntityAction<M>` | `EntityAction<M>` |
+  | `EntityActionClickProps<M>` | `EntityActionClickProps<M>` |
+  | `EntityFormProps` | `EntityFormProps` |
+  | `EntitySidePanelProps` | `EntitySidePanelProps` |
+  | `SideEntityController` | `SideEntityController` |
+  | `EntitySelectionProps` | `EntitySelectionProps` |
+  | `EntityPreview` | `EntityPreview` |
   | `EntityCollectionView` | `DataCollectionView` |
-  | `EntityCard` | `SnapshotCard` |
-  | `EntitySelectionTable` | `SnapshotSelectionTable` |
+  | `EntityCard` | `EntityCard` |
+  | `EntitySelectionTable` | `EntitySelectionTable` |
 
   **Collection config props**
 
   | Old Prop | New Prop |
   |----------|----------|
-  | `entityViews` | `snapshotViews` |
-  | `entityActions` | `snapshotActions` |
-  | `openEntityMode` | `openSnapshotMode` |
-  | `includeEntityLink` | `includeSnapshotLink` |
-  | `entityId` (in panel props) | `snapshotId` |
+  | `entityViews` | `entityViews` |
+  | `entityActions` | `entityActions` |
+  | `openEntityMode` | `openEntityMode` |
+  | `includeEntityLink` | `includeEntityLink` |
+  | `entityId` (in panel props) | `entityId` |
 
   **React hooks & components (`@rebasepro/admin`)**
 
   | Old Name | New Name |
   |----------|----------|
-  | `useSideEntityController()` | `useSideSnapshotController()` |
-  | `useEntitySelectionDialog()` | `useSnapshotSelectionDialog()` |
-  | `SideEntityProvider` | `SideSnapshotProvider` |
-  | `mergeEntityActions()` | `mergeSnapshotActions()` |
-  | `resolveEntityAction()` | `resolveSnapshotAction()` |
-  | `resolveEntityView()` | `resolveSnapshotView()` |
-  | `editEntityAction` | `editSnapshotAction` |
-  | `copyEntityAction` | `copySnapshotAction` |
-  | `deleteEntityAction` | `deleteSnapshotAction` |
+  | `useSideEntityController()` | `useSideEntityController()` |
+  | `useEntitySelectionDialog()` | `useEntitySelectionDialog()` |
+  | `SideEntityProvider` | `SideEntityProvider` |
+  | `mergeEntityActions()` | `mergeEntityActions()` |
+  | `resolveEntityAction()` | `resolveEntityAction()` |
+  | `resolveEntityView()` | `resolveEntityView()` |
+  | `editEntityAction` | `editEntityAction` |
+  | `copyEntityAction` | `copyEntityAction` |
+  | `deleteEntityAction` | `deleteEntityAction` |
 
   **Callback API (`CollectionCallbacks`)** — beyond the rename, the parameter shapes changed:
 
   | Old Param | New Param | Notes |
   |-----------|-----------|-------|
-  | `entity` (in `afterRead`) | `row` | Now a flat `Record<string, unknown>`, not a `Snapshot<M>` wrapper |
+  | `entity` (in `afterRead`) | `row` | Now a flat `Record<string, unknown>`, not a `Entity<M>` wrapper |
   | `entityId` (in save/delete) | `id` | `string \| number` |
-  | `previousEntity` | `previousValues` | `Partial<SnapshotValues<M>>` |
+  | `previousEntity` | `previousValues` | `Partial<EntityValues<M>>` |
   | `afterCreate` / `afterUpdate` | `afterSave` | Use `status: "new" \| "existing"` to distinguish |
 
   Migration example:
@@ -95,58 +95,58 @@
 
   | Old Name | New Name |
   |----------|----------|
-  | `rebase.entity_history` (table) | `rebase.snapshot_history` |
-  | `entity_id` (column) | `snapshot_id` |
-  | `rebase_entity_changes` (PG NOTIFY channel) | `rebase_snapshot_changes` |
+  | `rebase.entity_history` (table) | `rebase.entity_history` |
+  | `entity_id` (column) | `entity_id` |
+  | `rebase_entity_changes` (PG NOTIFY channel) | `rebase_entity_changes` |
 
 - **Unified `<Rebase>` data props** — Removed the `data` and `driver` props. There are now exactly two ways to provide data: `client` (server transport) and `dataSources` (everything else). A `dataSources` entry keyed `"(default)"` with a `driver` replaces `client.data` as the default source — this is how a fully client-side app (e.g. Firestore-only via `RebaseFirebaseApp`) is wired. Migration: `driver={x}` → `dataSources={[{ key: "(default)", engine: "firestore", driver: x }]}`; `data={x}` had no known users (custom backends implement `DataDriver`, now the documented integration SPI).
 - **Deterministic default-source resolution** — The default data source resolves as: `"(default)"`-keyed entry with driver → `client.data` → the sole registered source. Several sources without an explicit default now throw instead of silently picking the first object entry (order-dependent).
 
-- **Side-panel / Edit-view / Collection-view component rename** — Renames mechanically-generated "Snapshot" component names to descriptive, role-based names. Components bound to Rebase core data use the `Binding` suffix. This is a search-and-replace migration — no behavioral changes.
+- **Side-panel / Edit-view / Collection-view component rename** — Renames mechanically-generated "Entity" component names to descriptive, role-based names. Components bound to Rebase core data use the `Binding` suffix. This is a search-and-replace migration — no behavioral changes.
 
   **Types (`@rebasepro/types`)**
 
   | Old Name | New Name |
   |----------|----------|
-  | `SnapshotSidePanelProps` | `SidePanelBindingProps` |
-  | `sideSnapshotController` (on `RebaseContext`) | `sidePanelController` |
-  | `sideSnapshotController` (on `SnapshotActionClickProps`) | `sidePanelController` |
-  | `"Snapshot.FormActions"` (override key) | `"EditView.FormActions"` |
-  | `"Snapshot.DetailView"` (override key) | `"DetailView"` |
-  | `"Snapshot.Preview"` (override key) | `"RecordPreview"` |
+  | `EntitySidePanelProps` | `SidePanelBindingProps` |
+  | `sideEntityController` (on `RebaseContext`) | `sidePanelController` |
+  | `sideEntityController` (on `EntityActionClickProps`) | `sidePanelController` |
+  | `"Entity.FormActions"` (override key) | `"EditView.FormActions"` |
+  | `"Entity.DetailView"` (override key) | `"DetailView"` |
+  | `"Entity.Preview"` (override key) | `"RecordPreview"` |
 
   **Components (`@rebasepro/admin`)**
 
   | Old Name | New Name |
   |----------|----------|
-  | `SideSnapshotProvider` | `SidePanelProvider` |
-  | `SnapshotSidePanel` | `SidePanelBinding` |
-  | `SnapshotEditView` | `EditViewBinding` |
-  | `SnapshotEditViewFormActions` | `EditFormActions` |
-  | `SnapshotDetailView` | `DetailViewBinding` |
-  | `SnapshotView` | `RecordViewBinding` |
-  | `SnapshotPreview` | `RecordPreviewBinding` |
-  | `SnapshotJsonPreview` | `JsonPreviewBinding` |
+  | `SideEntityProvider` | `SidePanelProvider` |
+  | `EntitySidePanel` | `SidePanelBinding` |
+  | `EntityEditView` | `EditViewBinding` |
+  | `EntityEditViewFormActions` | `EditFormActions` |
+  | `EntityDetailView` | `DetailViewBinding` |
+  | `EntityView` | `RecordViewBinding` |
+  | `EntityPreview` | `RecordPreviewBinding` |
+  | `EntityJsonPreview` | `JsonPreviewBinding` |
   | `DataCollectionView` | `CollectionViewBinding` |
-  | `SnapshotCollectionBoardView` | `CollectionBoardViewBinding` |
-  | `SnapshotCollectionCardView` | `CollectionCardViewBinding` |
-  | `SnapshotCollectionListView` | `CollectionListViewBinding` |
+  | `EntityCollectionBoardView` | `CollectionBoardViewBinding` |
+  | `EntityCollectionCardView` | `CollectionCardViewBinding` |
+  | `EntityCollectionListView` | `CollectionListViewBinding` |
   | `DataCollectionViewActions` | `CollectionViewActions` |
   | `DataCollectionViewStartActions` | `CollectionViewStartActions` |
   | `DataCollectionTable` | `CollectionTableBinding` |
-  | `SnapshotCollectionRowActions` | `CollectionRowActions` |
-  | `SnapshotSelectionTable` | `SelectionTableBinding` |
-  | `SnapshotBoardCard` | `BoardCardBinding` |
-  | `SnapshotCard` | `RecordCardBinding` |
-  | `useSnapshotPreviewSlots` | `usePreviewSlots` |
-  | `SideSnapshotControllerContext` | `SidePanelControllerContext` |
+  | `EntityCollectionRowActions` | `CollectionRowActions` |
+  | `EntitySelectionTable` | `SelectionTableBinding` |
+  | `EntityBoardCard` | `BoardCardBinding` |
+  | `EntityCard` | `RecordCardBinding` |
+  | `useEntityPreviewSlots` | `usePreviewSlots` |
+  | `SideEntityControllerContext` | `SidePanelControllerContext` |
 
   **Bridge key (`@rebasepro/core`)**
 
   | Old Key | New Key |
   |---------|---------|
-  | `"sideSnapshotController"` | `"sidePanelController"` |
-  | `sideSnapshotController` (on `StudioBridge`) | `sidePanelController` |
+  | `"sideEntityController"` | `"sidePanelController"` |
+  | `sideEntityController` (on `StudioBridge`) | `sidePanelController` |
 
 ### Features & Improvements
 

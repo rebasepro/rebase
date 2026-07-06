@@ -163,7 +163,7 @@ Rebase verwendet **Tailwind CSS v4** und unterstützt helle/dunkle Modi. Anpassu
 ## Nächste Schritte
 
 - **[Benutzerdefinierte Felder](/docs/frontend/custom-fields)** — Erstellen Sie benutzerdefinierte Formularfelder
-- **[Entitätsansichten](/docs/frontend/snapshot-views)** — Fügen Sie Tabs zu Entitäts-Editoren hinzu
+- **[Entitätsansichten](/docs/frontend/entity-views)** — Fügen Sie Tabs zu Entitäts-Editoren hinzu
 - **[Ansichtsmodi](/docs/frontend/view-modes)** — Liste, Tabelle, Karten, Kanban
 - **[Plugins](/docs/plugins)** — Erweitern Sie das Framework
 ---

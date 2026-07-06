@@ -7,7 +7,7 @@ export const CollectionRegistryContext = createContext<CollectionRegistryControl
     getRawCollection: () => undefined,
     getParentReferencesFromPath: () => [],
     getParentCollectionSlugs: () => [],
-    getParentSnapshotIds: () => [],
+    getParentEntityIds: () => [],
     convertIdsToPaths: () => [],
     initialised: false
 });

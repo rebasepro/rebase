@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 import {
-    getSnapshotPreviewKeys,
-    getSnapshotTitlePropertyKey,
+    getEntityPreviewKeys,
+    getEntityTitlePropertyKey,
     resolveTitleToString
 } from "../../src/util/previews";
 import type { AuthController, CollectionConfig, PropertyConfig, Property } from "@rebasepro/types";
@@ -16,9 +16,9 @@ const mockAuthController = {
 const fields: Record<string, PropertyConfig> = {};
 
 // ---------------------------------------------------------------------------
-// getSnapshotPreviewKeys
+// getEntityPreviewKeys
 // ---------------------------------------------------------------------------
-describe("getSnapshotPreviewKeys", () => {
+describe("getEntityPreviewKeys", () => {
     it("returns previewProperties when explicitly passed", () => {
         const collection: CollectionConfig = {
             id: "test",
@@ -34,7 +34,7 @@ name: "Status" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields, ["title", "status"]);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields, ["title", "status"]);
         expect(result).toEqual(["title", "status"]);
     });
 
@@ -52,7 +52,7 @@ name: "Body" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).toEqual(["body"]);
     });
 
@@ -73,7 +73,7 @@ name: "Extra" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).toHaveLength(3);
         expect(result).toEqual(["title", "body", "count"]);
     });
@@ -94,7 +94,7 @@ name: "Body" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("author");
     });
 
@@ -111,7 +111,7 @@ name: "Tags" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("tags");
     });
 
@@ -129,7 +129,7 @@ name: "Title" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("id");
     });
 
@@ -149,7 +149,7 @@ name: "Body" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
         expect(result).not.toContain("secret");
         expect(result).toContain("title");
         expect(result).toContain("body");
@@ -172,7 +172,7 @@ name: "D" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields, undefined, 2);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields, undefined, 2);
         expect(result).toHaveLength(2);
     });
 
@@ -187,15 +187,15 @@ name: "Title" } as Property
             }
         } as CollectionConfig;
 
-        const result = getSnapshotPreviewKeys(mockAuthController, collection, fields, ["title", "nonexistent"]);
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields, ["title", "nonexistent"]);
         expect(result).toEqual(["title"]);
     });
 });
 
 // ---------------------------------------------------------------------------
-// getSnapshotTitlePropertyKey
+// getEntityTitlePropertyKey
 // ---------------------------------------------------------------------------
-describe("getSnapshotTitlePropertyKey", () => {
+describe("getEntityTitlePropertyKey", () => {
     it("returns explicit titleProperty when set", () => {
         const collection: CollectionConfig = {
             id: "test",
@@ -211,7 +211,7 @@ ui: { multiline: true } } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
     });
 
     it("auto-detects first single-line text field as title", () => {
@@ -230,7 +230,7 @@ ui: { multiline: true } } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("title");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("title");
     });
 
     it("skips multiline text fields", () => {
@@ -247,7 +247,7 @@ name: "Name" } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
     });
 
     it("skips markdown text fields", () => {
@@ -264,7 +264,7 @@ name: "Slug" } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("slug");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("slug");
     });
 
     it("skips storage text fields", () => {
@@ -281,7 +281,7 @@ name: "Label" } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("label");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("label");
     });
 
     it("skips isId fields", () => {
@@ -298,7 +298,7 @@ name: "Name" } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
     });
 
     it("returns undefined when no suitable title field exists", () => {
@@ -314,7 +314,7 @@ name: "Flag" } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBeUndefined();
+        expect(getEntityTitlePropertyKey(collection, fields)).toBeUndefined();
     });
 
     it("skips hidden properties when auto-detecting title", () => {
@@ -331,7 +331,7 @@ name: "Name" } as Property
             }
         } as CollectionConfig;
 
-        expect(getSnapshotTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
     });
 });
 
@@ -372,7 +372,7 @@ describe("resolveTitleToString", () => {
         const reference = {
             id: "ref-1",
             path: "refs",
-            isSnapshotReference: () => true
+            isEntityReference: () => true
         };
         expect(resolveTitleToString(reference)).toBe("ref-1");
     });

@@ -1,12 +1,12 @@
 /**
  * MongoDataService Tests
  *
- * Tests for MongoDB snapshot CRUD operations using mongodb-memory-server.
+ * Tests for MongoDB entity CRUD operations using mongodb-memory-server.
  */
 
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
-import { SnapshotReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/types";
 import { MongoDataService } from "../src/db/MongoDataService";
 
 describe("MongoDataService", () => {
@@ -55,34 +55,34 @@ describe("MongoDataService", () => {
     });
 
     describe("save", () => {
-        it("should create a new snapshot without ID", async () => {
+        it("should create a new entity without ID", async () => {
             const values = { name: "Test User",
 email: "test@example.com" };
-            const snapshot = await dataService.save("users", values);
+            const entity = await dataService.save("users", values);
 
-            expect(snapshot.id).toBeDefined();
-            expect(ObjectId.isValid(snapshot.id as string)).toBe(true);
-            expect(snapshot.name).toBe("Test User");
-            expect(snapshot.email).toBe("test@example.com");
+            expect(entity.id).toBeDefined();
+            expect(ObjectId.isValid(entity.id as string)).toBe(true);
+            expect(entity.name).toBe("Test User");
+            expect(entity.email).toBe("test@example.com");
         });
 
-        it("should create a new snapshot with provided ID", async () => {
+        it("should create a new entity with provided ID", async () => {
             const id = new ObjectId().toString();
             const values = { name: "Test User",
 email: "test@example.com" };
-            const snapshot = await dataService.save("users", values, id);
+            const entity = await dataService.save("users", values, id);
 
-            expect(snapshot.id).toBe(id);
-            expect(snapshot.name).toBe("Test User");
+            expect(entity.id).toBe(id);
+            expect(entity.name).toBe("Test User");
         });
 
-        it("should update an existing snapshot", async () => {
-            // Create snapshot
+        it("should update an existing entity", async () => {
+            // Create entity
             const values = { name: "Original Name",
 email: "test@example.com" };
             const created = await dataService.save("users", values);
 
-            // Update snapshot
+            // Update entity
             const updated = await dataService.save(
                 "users",
                 { name: "Updated Name",
@@ -103,9 +103,9 @@ email: "test@example.com" },
                     country: "Test Country"
                 }
             };
-            const snapshot = await dataService.save("users", values);
+            const entity = await dataService.save("users", values);
 
-            expect(snapshot.address).toEqual({
+            expect(entity.address).toEqual({
                 street: "123 Main St",
                 city: "Test City",
                 country: "Test Country"
@@ -117,24 +117,24 @@ email: "test@example.com" },
                 name: "Test Post",
                 tags: ["javascript", "mongodb", "testing"]
             };
-            const snapshot = await dataService.save("posts", values);
+            const entity = await dataService.save("posts", values);
 
-            expect(snapshot.tags).toEqual(["javascript", "mongodb", "testing"]);
+            expect(entity.tags).toEqual(["javascript", "mongodb", "testing"]);
         });
 
         it("should handle Date values", async () => {
             const now = new Date();
             const values = { name: "Test",
 createdAt: now };
-            const snapshot = await dataService.save("items", values);
+            const entity = await dataService.save("items", values);
 
-            expect(snapshot.createdAt).toEqual(now);
+            expect(entity.createdAt).toEqual(now);
         });
     });
 
-    describe("SnapshotReference round-trip", () => {
-        it("should round-trip a SnapshotReference, preserving driver/databaseId", async () => {
-            const ref = new SnapshotReference({
+    describe("EntityReference round-trip", () => {
+        it("should round-trip a EntityReference, preserving driver/databaseId", async () => {
+            const ref = new EntityReference({
                 id: new ObjectId().toString(),
                 path: "authors",
                 driver: "firestore",
@@ -143,21 +143,21 @@ createdAt: now };
             const created = await dataService.save("posts", { title: "Hi",
 author: ref });
 
-            const fetched = await dataService.fetchOne<{ title: string; author: SnapshotReference }>(
+            const fetched = await dataService.fetchOne<{ title: string; author: EntityReference }>(
                 "posts",
                 created.id
             );
 
             const fetchedRef = fetched!.author;
-            expect(fetchedRef).toBeInstanceOf(SnapshotReference);
-            expect(fetchedRef.isSnapshotReference()).toBe(true);
+            expect(fetchedRef).toBeInstanceOf(EntityReference);
+            expect(fetchedRef.isEntityReference()).toBe(true);
             expect(fetchedRef.id).toBe(ref.id);
             expect(fetchedRef.path).toBe("authors");
             expect(fetchedRef.driver).toBe("firestore");
             expect(fetchedRef.databaseId).toBe("analytics");
         });
 
-        it("should decode the legacy { id, path } shape into a SnapshotReference", async () => {
+        it("should decode the legacy { id, path } shape into a EntityReference", async () => {
             // Simulate a reference written before the __type sentinel existed.
             const legacyId = new ObjectId();
             await db.collection("posts").insertOne({
@@ -167,13 +167,13 @@ author: ref });
 path: "authors" }
             } as never);
 
-            const fetched = await dataService.fetchOne<{ author: SnapshotReference }>(
+            const fetched = await dataService.fetchOne<{ author: EntityReference }>(
                 "posts",
                 legacyId.toString()
             );
 
             const fetchedRef = fetched!.author;
-            expect(fetchedRef).toBeInstanceOf(SnapshotReference);
+            expect(fetchedRef).toBeInstanceOf(EntityReference);
             expect(fetchedRef.id).toBe("abc123");
             expect(fetchedRef.path).toBe("authors");
         });
@@ -190,7 +190,7 @@ label: "HQ" }
             const created = await dataService.save("posts", values);
             const fetched = await dataService.fetchOne<typeof values>("posts", created.id);
 
-            expect(fetched!.location).not.toBeInstanceOf(SnapshotReference);
+            expect(fetched!.location).not.toBeInstanceOf(EntityReference);
             expect(fetched!.location).toEqual({ id: "loc-1",
 path: "/maps/somewhere",
 label: "HQ" });
@@ -198,7 +198,7 @@ label: "HQ" });
     });
 
     describe("fetchOne", () => {
-        it("should fetch a snapshot by ID", async () => {
+        it("should fetch a entity by ID", async () => {
             const values = { name: "Test User",
 email: "test@example.com" };
             const created = await dataService.save("users", values);
@@ -210,11 +210,11 @@ email: "test@example.com" };
             expect(fetched?.name).toBe("Test User");
         });
 
-        it("should return undefined for non-existent snapshot", async () => {
+        it("should return undefined for non-existent entity", async () => {
             const nonExistentId = new ObjectId().toString();
-            const snapshot = await dataService.fetchOne("users", nonExistentId);
+            const entity = await dataService.fetchOne("users", nonExistentId);
 
-            expect(snapshot).toBeUndefined();
+            expect(entity).toBeUndefined();
         });
 
         it("should handle string IDs", async () => {
@@ -224,8 +224,8 @@ email: "test@example.com" };
                 name: "Custom ID Item"
             });
 
-            const snapshot = await dataService.fetchOne("items", "custom-string-id");
-            expect(snapshot?.id).toBe("custom-string-id");
+            const entity = await dataService.fetchOne("items", "custom-string-id");
+            expect(entity?.id).toBe("custom-string-id");
         });
 
         it("keeps the canonical _id even when the document has a literal 'id' column", async () => {
@@ -267,80 +267,80 @@ status: "pending" }
             await db.collection("users").insertMany(users);
         });
 
-        it("should fetch all snapshots in a collection", async () => {
-            const snapshots = await dataService.fetchCollection("users", {});
-            expect(snapshots).toHaveLength(5);
+        it("should fetch all entitys in a collection", async () => {
+            const entitys = await dataService.fetchCollection("users", {});
+            expect(entitys).toHaveLength(5);
         });
 
         it("should apply limit", async () => {
-            const snapshots = await dataService.fetchCollection("users", { limit: 2 });
-            expect(snapshots).toHaveLength(2);
+            const entitys = await dataService.fetchCollection("users", { limit: 2 });
+            expect(entitys).toHaveLength(2);
         });
 
         it("should apply ordering (ascending)", async () => {
-            const snapshots = await dataService.fetchCollection("users", {
+            const entitys = await dataService.fetchCollection("users", {
                 orderBy: "age",
                 order: "asc"
             });
 
-            const ages = snapshots.map(e => e.age);
+            const ages = entitys.map(e => e.age);
             expect(ages).toEqual([25, 28, 30, 35, 40]);
         });
 
         it("should apply ordering (descending)", async () => {
-            const snapshots = await dataService.fetchCollection("users", {
+            const entitys = await dataService.fetchCollection("users", {
                 orderBy: "age",
                 order: "desc"
             });
 
-            const ages = snapshots.map(e => e.age);
+            const ages = entitys.map(e => e.age);
             expect(ages).toEqual([40, 35, 30, 28, 25]);
         });
 
         it("should apply equality filter", async () => {
-            const snapshots = await dataService.fetchCollection("users", {
+            const entitys = await dataService.fetchCollection("users", {
                 filter: { status: ["==", "active"] }
             });
 
-            expect(snapshots).toHaveLength(3);
-            snapshots.forEach(e => expect(e.status).toBe("active"));
+            expect(entitys).toHaveLength(3);
+            entitys.forEach(e => expect(e.status).toBe("active"));
         });
 
         it("should apply greater than filter", async () => {
-            const snapshots = await dataService.fetchCollection("users", {
+            const entitys = await dataService.fetchCollection("users", {
                 filter: { age: [">", 30] }
             });
 
-            expect(snapshots).toHaveLength(2);
-            snapshots.forEach(e => expect(e.age).toBeGreaterThan(30));
+            expect(entitys).toHaveLength(2);
+            entitys.forEach(e => expect(e.age).toBeGreaterThan(30));
         });
 
         it("should apply combined filters", async () => {
-            const snapshots = await dataService.fetchCollection("users", {
+            const entitys = await dataService.fetchCollection("users", {
                 filter: {
                     status: ["==", "active"],
                     age: [">=", 30]
                 }
             });
 
-            expect(snapshots).toHaveLength(2);
-            snapshots.forEach(e => {
+            expect(entitys).toHaveLength(2);
+            entitys.forEach(e => {
                 expect(e.status).toBe("active");
                 expect(e.age).toBeGreaterThanOrEqual(30);
             });
         });
 
         it("should return empty array for no matches", async () => {
-            const snapshots = await dataService.fetchCollection("users", {
+            const entitys = await dataService.fetchCollection("users", {
                 filter: { status: ["==", "nonexistent"] }
             });
 
-            expect(snapshots).toEqual([]);
+            expect(entitys).toEqual([]);
         });
     });
 
     describe("delete", () => {
-        it("should delete an existing snapshot", async () => {
+        it("should delete an existing entity", async () => {
             const values = { name: "To Delete" };
             const created = await dataService.save("users", values);
 
@@ -350,7 +350,7 @@ status: "pending" }
             expect(fetched).toBeUndefined();
         });
 
-        it("should not throw for non-existent snapshot", async () => {
+        it("should not throw for non-existent entity", async () => {
             const nonExistentId = new ObjectId().toString();
 
             // Should not throw
@@ -369,7 +369,7 @@ status: "pending" }
             ]);
         });
 
-        it("should count all snapshots", async () => {
+        it("should count all entitys", async () => {
             const count = await dataService.count("users", {});
             expect(count).toBe(3);
         });
@@ -408,7 +408,7 @@ status: "pending" }
             expect(isUnique).toBe(false);
         });
 
-        it("should exclude specified snapshot from check", async () => {
+        it("should exclude specified entity from check", async () => {
             // Get Alice's ID
             const alice = await db.collection("users").findOne({ email: "alice@example.com" });
 
@@ -425,11 +425,11 @@ status: "pending" }
 
     describe("nested collection paths", () => {
         it("should handle nested paths", async () => {
-            // Create snapshot in nested path
+            // Create entity in nested path
             const values = { content: "Test comment" };
-            const snapshot = await dataService.save("posts/123/comments", values);
+            const entity = await dataService.save("posts/123/comments", values);
 
-            expect(snapshot.content).toBe("Test comment");
+            expect(entity.content).toBe("Test comment");
 
             // The actual MongoDB collection should be "posts_123_comments"
             const collections = await db.listCollections().toArray();

@@ -1,7 +1,7 @@
 import {
-  Snapshot,
+  Entity,
   CollectionConfig,
-  SnapshotStatus,
+  EntityStatus,
   FilterValues,
   FetchCollectionProps,
   FetchOneProps,
@@ -15,13 +15,13 @@ import {
 // Subscription types
 export interface ListenCollectionRequest<M extends Record<string, unknown> = Record<string, unknown>> extends FetchCollectionProps<M> {
   subscriptionId: string;
-  onUpdate: (snapshots: Snapshot<M>[]) => void;
+  onUpdate: (entitys: Entity<M>[]) => void;
   onError?: (error: Error) => void;
 }
 
-export interface ListenSnapshotRequest<M extends Record<string, unknown> = Record<string, unknown>> extends FetchOneProps<M> {
+export interface ListenEntityRequest<M extends Record<string, unknown> = Record<string, unknown>> extends FetchOneProps<M> {
   subscriptionId: string;
-  onUpdate: (snapshot: Snapshot<M> | null) => void;
+  onUpdate: (entity: Entity<M> | null) => void;
   onError?: (error: Error) => void;
 }
 

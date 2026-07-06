@@ -1,23 +1,23 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { memo, useCallback, useMemo } from "react";
-import { Snapshot } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
 import { Checkbox, Chip, cls, defaultBorderMixin, Markdown } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
 import { useAuthController, useCustomizationController } from "@rebasepro/core";
 import { IconForView } from "@rebasepro/core";
 import { BoardItemViewProps } from "@rebasepro/ui";
-import { useCollectionSlotKeys, resolveSnapshotSlots } from "./usePreviewSlots";
+import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
 
-export type BoardCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<Snapshot<M>> & {
+export type BoardCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<Entity<M>> & {
     collection: CollectionConfig<M>;
-    onClick?: (snapshot: Snapshot<M>) => void;
+    onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
-    onSelectionChange?: (snapshot: Snapshot<M>, selected: boolean) => void;
+    onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
 };
 
 /**
- * Compact card component for displaying a snapshot in a Kanban board.
+ * Compact card component for displaying a entity in a Kanban board.
  * Uses the shared slot system for consistent preview rendering.
  *
  * Selection UX: The checkbox overlays on top of the image/icon thumbnail area,
@@ -35,7 +35,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     onSelectionChange,
     selectionEnabled = false
 }: BoardCardBindingProps<M>) {
-    const snapshot = item.data;
+    const entity = item.data;
     const authController = useAuthController();
     const customizationController = useCustomizationController();
 
@@ -46,12 +46,12 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     );
 
     const slots = useMemo(
-        () => resolveSnapshotSlots(
-            snapshot as Snapshot<Record<string, unknown>>,
+        () => resolveEntitySlots(
+            entity as Entity<Record<string, unknown>>,
             collection as CollectionConfig<Record<string, unknown>>,
             slotKeys
         ),
-        [snapshot, collection, slotKeys]
+        [entity, collection, slotKeys]
     );
 
     const handleClick = useCallback((e: React.MouseEvent) => {
@@ -59,25 +59,25 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
         if ((e.metaKey || e.ctrlKey) && selectionEnabled) {
             e.preventDefault();
             e.stopPropagation();
-            onSelectionChange?.(snapshot, !selected);
+            onSelectionChange?.(entity, !selected);
             return;
         }
         if (onClick) {
             e.stopPropagation();
-            onClick(snapshot);
+            onClick(entity);
         }
-    }, [snapshot, onClick, onSelectionChange, selected, selectionEnabled]);
+    }, [entity, onClick, onSelectionChange, selected, selectionEnabled]);
 
     const handleThumbnailClick = useCallback((e: React.MouseEvent) => {
         if (!selectionEnabled) return;
         e.stopPropagation();
         e.preventDefault();
-        onSelectionChange?.(snapshot, !selected);
-    }, [snapshot, onSelectionChange, selected, selectionEnabled]);
+        onSelectionChange?.(entity, !selected);
+    }, [entity, onSelectionChange, selected, selectionEnabled]);
 
     const handleSelectionChange = useCallback((checked: boolean) => {
-        onSelectionChange?.(snapshot, checked);
-    }, [snapshot, onSelectionChange]);
+        onSelectionChange?.(entity, checked);
+    }, [entity, onSelectionChange]);
 
     // Memoize className computations
     const backgroundColor = useMemo((): string => {
@@ -183,7 +183,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                                 size="small"
                             />
                         ) : (
-                            <span className="text-surface-500">{snapshot.id}</span>
+                            <span className="text-surface-500">{entity.id}</span>
                         )}
                     </div>
                     {/* Subtitle / Description */}
@@ -202,7 +202,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                         </div>
                     ) : (
                         <div className="text-xs text-surface-500 font-mono truncate mt-1">
-                            {snapshot.id}
+                            {entity.id}
                         </div>
                     )}
                     {/* Relation chips slot */}
@@ -242,19 +242,19 @@ export const BoardCardBinding = memo(BoardCardBindingInner) as typeof BoardCardB
 export function createBoardCardBindingComponent<M extends Record<string, unknown>>(
     collection: CollectionConfig<M>,
     options: {
-        onClick?: (snapshot: Snapshot<M>) => void;
-        isSnapshotSelected?: (snapshot: Snapshot<M>) => boolean;
-        onSelectionChange?: (snapshot: Snapshot<M>, selected: boolean) => void;
+        onClick?: (entity: Entity<M>) => void;
+        isEntitySelected?: (entity: Entity<M>) => boolean;
+        onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
         selectionEnabled?: boolean;
     }
-): React.ComponentType<BoardItemViewProps<Snapshot<M>>> {
-    return function BoardCardBindingWrapper(props: BoardItemViewProps<Snapshot<M>>) {
+): React.ComponentType<BoardItemViewProps<Entity<M>>> {
+    return function BoardCardBindingWrapper(props: BoardItemViewProps<Entity<M>>) {
         return (
             <BoardCardBinding
                 {...props}
                 collection={collection}
                 onClick={options.onClick}
-                selected={options.isSnapshotSelected?.(props.item.data)}
+                selected={options.isEntitySelected?.(props.item.data)}
                 onSelectionChange={options.onSelectionChange}
                 selectionEnabled={options.selectionEnabled}
             />

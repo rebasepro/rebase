@@ -1,5 +1,5 @@
 import React from "react";
-import { SnapshotRelation, FilterValues, Relation } from "@rebasepro/types";
+import { EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 import { RelationSelector } from "../../RelationSelector";
 
 interface RelationSelectorFieldProps {
@@ -7,10 +7,10 @@ interface RelationSelectorFieldProps {
     name: string;
     /** Whether the field is disabled */
     disabled?: boolean;
-    /** Current value - can be single SnapshotRelation or array for multiple selection */
-    internalValue: SnapshotRelation | SnapshotRelation[] | undefined | null;
+    /** Current value - can be single EntityRelation or array for multiple selection */
+    internalValue: EntityRelation | EntityRelation[] | undefined | null;
     /** Callback when value changes */
-    updateValue: (newValue: SnapshotRelation | SnapshotRelation[] | null) => void;
+    updateValue: (newValue: EntityRelation | EntityRelation[] | null) => void;
     /** The relation configuration */
     relation: Relation;
     /** Force filter to be applied to the relation search */

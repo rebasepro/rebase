@@ -17,7 +17,7 @@ import { logger } from "@rebasepro/server-core";
  * Replaces the hidden `__inverseRelationUpdates` / `__joinPathRelationUpdates`
  * dunder-property mutation pattern with explicit, typed state management.
  */
-export interface SerializedSnapshotData {
+export interface SerializedEntityData {
     /** Scalar column values ready for INSERT/UPDATE. */
     scalarData: Record<string, unknown>;
     /** Inverse relation updates that must be applied to target tables. */
@@ -90,7 +90,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
     properties: Properties,
     collection?: CollectionConfig,
     registry?: PostgresCollectionRegistry
-): SerializedSnapshotData {
+): SerializedEntityData {
     if (!row || !properties) return { scalarData: row ?? {},
 inverseRelationUpdates: [],
 joinPathRelationUpdates: [] };

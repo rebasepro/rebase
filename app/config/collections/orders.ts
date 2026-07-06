@@ -1,4 +1,4 @@
-import { defineCollection, SnapshotCallbackContext } from "@rebasepro/common";
+import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import { maskValues } from "../masking";
@@ -19,7 +19,7 @@ const ordersCollection = defineCollection({
     icon: "ShoppingCart",
     group: "E-Commerce",
     history: true,
-    defaultSnapshotAction: "view",
+    defaultEntityAction: "view",
     enabledViews: ["table", "kanban"],
     kanban: {
         columnProperty: "status"
@@ -288,7 +288,7 @@ const ordersCollection = defineCollection({
 });
 
 // Helper function to update customer lifetime value and total orders count
-async function updateCustomerMetrics(customerId: string | number, context: SnapshotCallbackContext) {
+async function updateCustomerMetrics(customerId: string | number, context: EntityCallbackContext) {
     const { data: customerOrders } = await context.data.collection("orders").find({
         where: {
             customer: ["==", customerId],

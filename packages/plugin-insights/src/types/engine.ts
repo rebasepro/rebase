@@ -4,8 +4,8 @@ export interface InsightContext {
     /** The resolved path of the collection (e.g., "products/123/orders" or "orders") */
     path?: string;
     parentCollectionSlugs?: string[];
-    /** The parent snapshot IDs if this is a subcollection (e.g., ["123"]) */
-    parentSnapshotIds?: string[];
+    /** The parent entity IDs if this is a subcollection (e.g., ["123"]) */
+    parentEntityIds?: string[];
     /** The collection slug if this is an insight at the collection level */
     collectionSlug?: string;
 }

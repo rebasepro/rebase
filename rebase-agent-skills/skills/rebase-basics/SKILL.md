@@ -442,7 +442,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-
 | `dataSources` | `DataSourceDefinition[]` | `[]` | Declared data sources (`key`, `engine`, `transport`). Drives capabilities and the server-vs-direct distinction. Collections on a `direct`/`custom` transport are client-only — the backend skips data routes for them. Server engines need no entry |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
-| `history` | `unknown` | — | Snapshot history/audit-log configuration |
+| `history` | `unknown` | — | Entity history/audit-log configuration |
 | `defaultSecurityRules` | `SecurityRule[]` | — | Default RLS rules for collections without their own |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI spec at `/api/docs` and Swagger UI at `/api/swagger` (dev only) |
 | `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers |
@@ -654,7 +654,7 @@ The Rebase MCP server provides these tools for AI agents. Use the MCP tool calli
 | `rebase_schema_generate` | Generate Drizzle schema from collection definitions. Run after adding or modifying collection files | — |
 | `rebase_schema_introspect` | Introspect the live database and generate Rebase collection definitions from existing tables | — |
 | `rebase_db_push` | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) | — |
-| `rebase_db_generate` | Generate SQL migration files from schema changes (compares current Drizzle schema against the last snapshot) | — |
+| `rebase_db_generate` | Generate SQL migration files from schema changes (compares current Drizzle schema against the last entity) | — |
 | `rebase_db_migrate` | Run all pending SQL migrations against the database | — |
 
 ### SDK

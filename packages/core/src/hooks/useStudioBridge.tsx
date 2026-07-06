@@ -35,7 +35,7 @@ const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
     getRawCollection: () => undefined,
     getParentReferencesFromPath: () => [],
     getParentCollectionSlugs: () => [],
-    getParentSnapshotIds: () => [],
+    getParentEntityIds: () => [],
     convertIdsToPaths: () => [],
     initialised: false
 };

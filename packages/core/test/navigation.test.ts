@@ -48,7 +48,7 @@ describe("Resolving paths test", () => {
 
     });
 
-    it("build snapshot collection array", () => {
+    it("build entity collection array", () => {
 
         const navigationEntries = getNavigationEntriesFromPath({
             path: "products/pid",
@@ -70,7 +70,7 @@ describe("Resolving paths test", () => {
         expect(navigationEntries.length).toEqual(3);
     });
 
-    it("build snapshot collection array 2", () => {
+    it("build entity collection array 2", () => {
 
         const navigationEntries = getNavigationEntriesFromPath({
             path: "products/pid/locales/yep",

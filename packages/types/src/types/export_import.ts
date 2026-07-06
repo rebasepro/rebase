@@ -1,4 +1,4 @@
-import type { Snapshot } from "./snapshots";
+import type { Entity } from "./entitys";
 import type { User } from "../users";
 import type { RebaseContext } from "../rebase_context";
 
@@ -17,10 +17,10 @@ export interface ExportConfig<USER extends User = User> {
 export interface ExportMappingFunction<USER extends User = User> {
     key: string;
     builder: ({
-        snapshot,
+        entity,
         context
     }: {
-        snapshot: Snapshot,
+        entity: Entity,
         context: RebaseContext<USER>
     }) => Promise<string> | string;
 }

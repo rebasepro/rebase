@@ -8,7 +8,7 @@ import { CollectionViewBinding } from "../components";
 import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride } from "@rebasepro/core";
 import { UnsavedChangesDialog } from "@rebasepro/core";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewSnapshotCustomInternal, NavigationViewInternal } from "@rebasepro/common";
+import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/common";
 import { toArray } from "@rebasepro/utils";
 import { useCollectionRegistryController, useUrlController } from "../index";
 import { useBreadcrumbsController } from "../index";
@@ -44,11 +44,11 @@ export function RebaseRoute() {
             breadcrumbs: navigationEntries.map((entry, index) => {
                 const isLastEntry = index === navigationEntries.length - 1;
 
-                if (entry.type === "snapshot") {
+                if (entry.type === "entity") {
                     return ({
-                        title: String(entry.snapshotId),
+                        title: String(entry.entityId),
                         url: urlController.buildUrlCollectionPath(entry.path)
-                        // count: undefined (not applicable for snapshots)
+                        // count: undefined (not applicable for entitys)
                     });
                 } else if (entry.type === "custom_view") {
                     return ({
@@ -72,8 +72,8 @@ export function RebaseRoute() {
     }, [navigationEntries.map(entry => entry.path).join(",")]);
 
     if (isNew) {
-        // New snapshots always use full-screen mode, even for split-layout collections
-        return <SnapshotFullScreenRoute
+        // New entitys always use full-screen mode, even for split-layout collections
+        return <EntityFullScreenRoute
             pathname={pathname}
             navigationEntries={navigationEntries}
             isNew={true}
@@ -95,7 +95,7 @@ export function RebaseRoute() {
         return <ResolvedCollectionView
             key={`collection_view_${collection.slug}`}
             {...collection}
-            parentCollectionSlugs={[]} parentSnapshotIds={[]}
+            parentCollectionSlugs={[]} parentEntityIds={[]}
             path={collection.slug}
             updateUrl={true}
             Actions={toArray(collection.Actions)}/>
@@ -118,26 +118,26 @@ export function RebaseRoute() {
             return <ResolvedCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
-                parentCollectionSlugs={[]} parentSnapshotIds={[]}
+                parentCollectionSlugs={[]} parentEntityIds={[]}
                 path={collection.slug}
                 updateUrl={true}
                 Actions={toArray(collection.Actions)}/>;
         }
     }
 
-    // Check if this is a simple snapshot route (collection + snapshot) for a split-layout collection.
-    // If so, render the collection view with the snapshot shown in the split detail panel
+    // Check if this is a simple entity route (collection + entity) for a split-layout collection.
+    // If so, render the collection view with the entity shown in the split detail panel
     // instead of the full-screen editor. This keeps the master-detail UX with clean URLs.
     //
     // Also handles subcollection tabs: /c/customers/39/orders produces 3 entries
-    // (collection→snapshot→subcollection). We extract the subcollection slug as selectedTab.
-    const lastSnapshotEntry = navigationEntries.find((entry) => entry.type === "snapshot");
+    // (collection→entity→subcollection). We extract the subcollection slug as selectedTab.
+    const lastEntityEntry = navigationEntries.find((entry) => entry.type === "entity");
     const firstCollectionEntry = navigationEntries[0];
     if (
         !isFullScreen &&
         !isCopy &&
         firstCollectionEntry?.type === "collection" &&
-        lastSnapshotEntry?.type === "snapshot" &&
+        lastEntityEntry?.type === "entity" &&
         (navigationEntries.length === 2 || navigationEntries.length === 3)
     ) {
         let collection: CollectionConfig<any> | undefined;
@@ -145,10 +145,10 @@ export function RebaseRoute() {
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
 
-        // Resolve the effective openSnapshotMode based on the current view mode.
-        // Priority: collection.openSnapshotMode (explicit) > view-mode-based default.
+        // Resolve the effective openEntityMode based on the current view mode.
+        // Priority: collection.openEntityMode (explicit) > view-mode-based default.
         // View mode priority: URL __view param > saved user config > collection default.
-        let effectiveOpenMode: "side_panel" | "full_screen" | "split" | "dialog" | undefined = collection?.openSnapshotMode;
+        let effectiveOpenMode: "side_panel" | "full_screen" | "split" | "dialog" | undefined = collection?.openEntityMode;
         if (!effectiveOpenMode && collection) {
             const urlViewParam = new URLSearchParams(location.search).get("__view");
             let currentViewMode: ViewMode = collection.defaultViewMode ?? "list";
@@ -175,12 +175,12 @@ export function RebaseRoute() {
             }
             // Fallback: check for unregistered tabs (e.g. __json, __rebase_history)
             // that aren't parsed as navigation entries
-            if (!selectedTab && (navigationEntries.length === 2) && lastSnapshotEntry) {
-                const snapshotIdStr = String(lastSnapshotEntry.snapshotId);
-                const snapshotIdIdx = pathname.lastIndexOf(`/${snapshotIdStr}`);
-                if (snapshotIdIdx >= 0) {
-                    const afterSnapshot = pathname.substring(snapshotIdIdx + 1 + snapshotIdStr.length);
-                    const trailingSegment = afterSnapshot.startsWith("/") ? afterSnapshot.substring(1) : afterSnapshot;
+            if (!selectedTab && (navigationEntries.length === 2) && lastEntityEntry) {
+                const entityIdStr = String(lastEntityEntry.entityId);
+                const entityIdIdx = pathname.lastIndexOf(`/${entityIdStr}`);
+                if (entityIdIdx >= 0) {
+                    const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
+                    const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
                     if (trailingSegment.length > 0) {
                         selectedTab = trailingSegment;
                     }
@@ -189,16 +189,16 @@ export function RebaseRoute() {
             return <ResolvedCollectionView
                 key={`collection_view_${collection.slug}`}
                 {...collection}
-                parentCollectionSlugs={[]} parentSnapshotIds={[]}
+                parentCollectionSlugs={[]} parentEntityIds={[]}
                 path={collection.slug}
                 updateUrl={true}
-                selectedSnapshotId={lastSnapshotEntry.snapshotId}
+                selectedEntityId={lastEntityEntry.entityId}
                 selectedTab={selectedTab}
                 Actions={toArray(collection.Actions)}/>;
         }
     }
 
-    return <SnapshotFullScreenRoute
+    return <EntityFullScreenRoute
         pathname={pathname}
         navigationEntries={navigationEntries}
         isNew={isNew}
@@ -207,7 +207,7 @@ export function RebaseRoute() {
 
 }
 
-function getSelectedTabFromUrl(isNew: boolean, lastCustomView: NavigationViewCollectionInternal<any> | NavigationViewSnapshotCustomInternal<any> | undefined) {
+function getSelectedTabFromUrl(isNew: boolean, lastCustomView: NavigationViewCollectionInternal<any> | NavigationViewEntityCustomInternal<any> | undefined) {
     if (isNew) {
         return undefined;
     } else if (lastCustomView) {
@@ -220,7 +220,7 @@ function getSelectedTabFromUrl(isNew: boolean, lastCustomView: NavigationViewCol
     return undefined;
 }
 
-function SnapshotFullScreenRoute({
+function EntityFullScreenRoute({
     pathname,
     navigationEntries,
     isNew,
@@ -249,27 +249,27 @@ function SnapshotFullScreenRoute({
     // is navigating away blocked
     const blocked = useRef(false);
 
-    const lastSnapshotEntry = [...navigationEntries].reverse().find((entry) => entry.type === "snapshot");
-    const navigationEntriesAfterSnapshot = lastSnapshotEntry ? navigationEntries.slice(navigationEntries.indexOf(lastSnapshotEntry) + 1) : [];
+    const lastEntityEntry = [...navigationEntries].reverse().find((entry) => entry.type === "entity");
+    const navigationEntriesAfterEntity = lastEntityEntry ? navigationEntries.slice(navigationEntries.indexOf(lastEntityEntry) + 1) : [];
 
-    const lastCustomView = [...navigationEntriesAfterSnapshot].reverse().find(
+    const lastCustomView = [...navigationEntriesAfterEntity].reverse().find(
         (entry) => entry.type === "custom_view" || entry.type === "collection"
-    ) as NavigationViewCollectionInternal<any> | NavigationViewSnapshotCustomInternal<any> | undefined;
+    ) as NavigationViewCollectionInternal<any> | NavigationViewEntityCustomInternal<any> | undefined;
 
-    const snapshotId = lastSnapshotEntry && "snapshotId" in lastSnapshotEntry ? lastSnapshotEntry.snapshotId : undefined;
+    const entityId = lastEntityEntry && "entityId" in lastEntityEntry ? lastEntityEntry.entityId : undefined;
 
     // Derive tab from navigation entries (works for registered custom views)
     let urlTab = getSelectedTabFromUrl(isNew, lastCustomView);
 
     // Fallback: internal tabs like __json or __rebase_history aren't registered as
-    // snapshot views, so the navigation parser ignores them. Check the raw pathname
-    // for a trailing segment after the snapshot ID to catch those cases.
-    if (!urlTab && snapshotId && !isNew) {
-        const snapshotIdStr = String(snapshotId);
-        const snapshotIdIdx = pathname.lastIndexOf(`/${snapshotIdStr}`);
-        if (snapshotIdIdx >= 0) {
-            const afterSnapshot = pathname.substring(snapshotIdIdx + 1 + snapshotIdStr.length);
-            const trailingSegment = afterSnapshot.startsWith("/") ? afterSnapshot.substring(1) : afterSnapshot;
+    // entity views, so the navigation parser ignores them. Check the raw pathname
+    // for a trailing segment after the entity ID to catch those cases.
+    if (!urlTab && entityId && !isNew) {
+        const entityIdStr = String(entityId);
+        const entityIdIdx = pathname.lastIndexOf(`/${entityIdStr}`);
+        if (entityIdIdx >= 0) {
+            const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
+            const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
             if (trailingSegment.length > 0 && trailingSegment !== "edit") {
                 urlTab = trailingSegment;
             }
@@ -279,24 +279,24 @@ function SnapshotFullScreenRoute({
     const [selectedTab, setSelectedTab] = useState<string | undefined>(urlTab);
 
     const parentCollectionSlugs = collectionRegistry.getParentCollectionSlugs(navigationPath);
-    const parentSnapshotIds = collectionRegistry.getParentSnapshotIds(navigationPath);
+    const parentEntityIds = collectionRegistry.getParentEntityIds(navigationPath);
     useEffect(() => {
         if (urlTab !== selectedTab) {
             setSelectedTab(urlTab);
         }
     }, [urlTab]);
 
-    const basePath = !snapshotId || isNew
+    const basePath = !entityId || isNew
         ? pathname
-        : pathname.substring(0, pathname.lastIndexOf(`/${snapshotId}`));
+        : pathname.substring(0, pathname.lastIndexOf(`/${entityId}`));
 
-    const snapshotPath = basePath + `/${snapshotId}`;
+    const entityPath = basePath + `/${entityId}`;
 
     const blocker = useBlocker(({
         currentLocation,
         nextLocation
     }) => {
-        if (nextLocation.pathname.startsWith(snapshotPath))
+        if (nextLocation.pathname.startsWith(entityPath))
             return false;
 
         // Side panel overlay navigations preserve the underlying form via
@@ -311,7 +311,7 @@ function SnapshotFullScreenRoute({
         const currentHash = currentLocation.hash;
         if ((currentHash === "#side" || currentHash === "#new_side") &&
             (nextLocation.pathname === basePath ||
-             nextLocation.pathname.startsWith(snapshotPath)))
+             nextLocation.pathname.startsWith(entityPath)))
             return false;
 
         return blocked.current;
@@ -326,7 +326,7 @@ function SnapshotFullScreenRoute({
         throw new Error("INTERNAL: No collection found in the navigation");
     }
 
-    if (!isNew && !lastSnapshotEntry) {
+    if (!isNew && !lastEntityEntry) {
         if (!collectionRegistry.initialised) {
             return <CircularProgressCenter/>;
         }
@@ -335,46 +335,46 @@ function SnapshotFullScreenRoute({
 
     const rawCollection = isNew
         ? (lastCollectionEntry && "collection" in lastCollectionEntry ? lastCollectionEntry.collection : undefined)!
-        : (lastSnapshotEntry && "parentCollection" in lastSnapshotEntry ? lastSnapshotEntry.parentCollection : undefined)!;
+        : (lastEntityEntry && "parentCollection" in lastEntityEntry ? lastEntityEntry.parentCollection : undefined)!;
     const collection = collectionRegistry.getCollection(rawCollection.slug) || rawCollection;
-    const fullIdPath = isNew ? lastCollectionEntry!.slug : lastSnapshotEntry!.slug;
+    const fullIdPath = isNew ? lastCollectionEntry!.slug : lastEntityEntry!.slug;
     const collectionPath = urlController.resolveDatabasePathsFrom(fullIdPath);
     const isEditRoute = pathname.endsWith("/edit") || pathname.split("/").pop() === "edit";
     // Determine if this is a detail-view-first collection showing the view page
-    const isDetailMode = collection.defaultSnapshotAction === "view" && !isNew && !isCopy && snapshotId && !isEditRoute;
+    const isDetailMode = collection.defaultEntityAction === "view" && !isNew && !isCopy && entityId && !isEditRoute;
 
     if (isDetailMode) {
         return <>
             <DetailViewBinding
-                key={collection.slug + "_view_" + snapshotId}
-                snapshotId={snapshotId}
+                key={collection.slug + "_view_" + entityId}
+                entityId={entityId}
                 collection={collection}
                 layout={"full_screen"}
                 path={collectionPath}
                 selectedTab={selectedTab ?? undefined}
                 onEditClick={() => {
-                    const editUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${snapshotId}`) + "/edit";
+                    const editUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}`) + "/edit";
                     navigate(editUrl + hash);
                 }}
                 onTabChange={(params) => {
                     setSelectedTab(params.selectedTab);
                     const newSelectedTab = params.selectedTab;
                     if (newSelectedTab) {
-                        navigate(`${basePath}/${snapshotId}/${newSelectedTab}${hash}`, { replace: true });
+                        navigate(`${basePath}/${entityId}/${newSelectedTab}${hash}`, { replace: true });
                     } else {
-                        navigate(`${basePath}/${snapshotId}${hash}`, { replace: true });
+                        navigate(`${basePath}/${entityId}${hash}`, { replace: true });
                     }
                 }}
                 parentCollectionSlugs={parentCollectionSlugs}
-                parentSnapshotIds={parentSnapshotIds}
+                parentEntityIds={parentEntityIds}
             />
         </>;
     }
 
     return <>
         <EditViewBinding
-            key={collection.slug + "_" + (isNew ? "new" : (isCopy ? snapshotId + "_copy" : snapshotId))}
-            snapshotId={isNew ? undefined : snapshotId}
+            key={collection.slug + "_" + (isNew ? "new" : (isCopy ? entityId + "_copy" : entityId))}
+            entityId={isNew ? undefined : entityId}
             collection={collection}
             layout={"full_screen"}
             path={collectionPath}
@@ -383,17 +383,17 @@ function SnapshotFullScreenRoute({
             defaultValues={isNew ? defaultValues : undefined}
             onValuesModified={(modified) => blocked.current = modified}
             navigateBack={() => {
-                const detailUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${snapshotId}`);
+                const detailUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}`);
                 navigate(detailUrl + hash);
             }}
             onSaved={(params) => {
                 const newSelectedTab = params.selectedTab;
-                const newSnapshotId = params.snapshotId;
+                const newEntityId = params.entityId;
                 const savedHash = isNew ? "" : hash;
                 if (newSelectedTab) {
-                    navigate(`${basePath}/${newSnapshotId}/${newSelectedTab}${savedHash}`, { replace: true });
+                    navigate(`${basePath}/${newEntityId}/${newSelectedTab}${savedHash}`, { replace: true });
                 } else {
-                    navigate(`${basePath}/${newSnapshotId}${savedHash}`, { replace: true });
+                    navigate(`${basePath}/${newEntityId}${savedHash}`, { replace: true });
                 }
             }}
             onTabChange={(params) => {
@@ -403,18 +403,18 @@ function SnapshotFullScreenRoute({
                 }
                 const newSelectedTab = params.selectedTab;
                 if (newSelectedTab) {
-                    navigate(`${basePath}/${snapshotId}/${newSelectedTab}${hash}`, { replace: true });
+                    navigate(`${basePath}/${entityId}/${newSelectedTab}${hash}`, { replace: true });
                 } else {
-                    navigate(`${basePath}/${snapshotId}${hash}`, { replace: true });
+                    navigate(`${basePath}/${entityId}${hash}`, { replace: true });
                 }
             }}
-            parentCollectionSlugs={parentCollectionSlugs} parentSnapshotIds={parentSnapshotIds}
+            parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
         />
 
         <UnsavedChangesDialog
             open={blocker?.state === "blocked"}
             handleOk={() => blocker?.proceed?.()}
             handleCancel={() => blocker?.reset?.()}
-            body={"You have unsaved changes in this snapshot."}/>
+            body={"You have unsaved changes in this entity."}/>
     </>;
 }

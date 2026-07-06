@@ -263,7 +263,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (rp.path) result.path = rp.path;
             if (rp.fixedFilter) result.fixedFilter = rp.fixedFilter;
             if (rp.includeId !== undefined) result.includeId = rp.includeId;
-            if (rp.includeSnapshotLink !== undefined) result.includeSnapshotLink = rp.includeSnapshotLink;
+            if (rp.includeEntityLink !== undefined) result.includeEntityLink = rp.includeEntityLink;
             return result;
         }
 
@@ -289,7 +289,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (rl.relationName) result.relationName = rl.relationName;
             if (rl.fixedFilter) result.fixedFilter = rl.fixedFilter;
             if (rl.includeId !== undefined) result.includeId = rl.includeId;
-            if (rl.includeSnapshotLink !== undefined) result.includeSnapshotLink = rl.includeSnapshotLink;
+            if (rl.includeEntityLink !== undefined) result.includeEntityLink = rl.includeEntityLink;
             if (rl.widget) result.widget = rl.widget;
             // overrides and relation (resolved) are dropped
             return result;
@@ -429,8 +429,8 @@ export function toSerializableCollectionConfig(collection: CollectionConfig): Se
     if (collection.securityRules) result.securityRules = collection.securityRules;
 
     // Enum-like fields
-    if (collection.openSnapshotMode) result.openSnapshotMode = collection.openSnapshotMode;
-    if (collection.defaultSnapshotAction) result.defaultSnapshotAction = collection.defaultSnapshotAction;
+    if (collection.openEntityMode) result.openEntityMode = collection.openEntityMode;
+    if (collection.defaultEntityAction) result.defaultEntityAction = collection.defaultEntityAction;
     if (collection.defaultViewMode) result.defaultViewMode = collection.defaultViewMode;
     if (collection.defaultSize) result.defaultSize = collection.defaultSize;
     if (collection.localChangesBackup !== undefined) result.localChangesBackup = collection.localChangesBackup;
@@ -563,7 +563,7 @@ export function fromSerializableProperties(serialized: SerializableProperties): 
  * Convert a `SerializableCollectionConfig` back to an `CollectionConfig`.
  *
  * The result will NOT contain any of the non-serializable fields
- * (callbacks, snapshotActions, etc.) — those must be re-attached by the
+ * (callbacks, entityActions, etc.) — those must be re-attached by the
  * consumer if needed.
  */
 export function fromSerializableCollectionConfig(serialized: SerializableCollectionConfig): CollectionConfig {

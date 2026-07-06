@@ -1,4 +1,4 @@
-import { Snapshot, SnapshotValues } from "../types/snapshots";
+import { Entity, EntityValues } from "../types/entitys";
 import { WhereFilterOp, FilterValues, OrderByTuple } from "../types/filter-operators";
 
 export type WhereValue<T> = T | T[] | null;
@@ -56,8 +56,8 @@ export interface FindParams {
  * @group Data
  */
 export interface FindResponse<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Array of snapshots matching the query */
-    data: Snapshot<M>[];
+    /** Array of entitys matching the query */
+    data: Entity<M>[];
     /** Pagination metadata */
     meta: {
         total: number;
@@ -103,21 +103,21 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Find a single record by its ID.
      */
-    findById(id: string | number): Promise<Snapshot<M> | undefined>;
+    findById(id: string | number): Promise<Entity<M> | undefined>;
 
     /**
      * Create a new record.
-     * @param data The snapshot data to create.
+     * @param data The entity data to create.
      * @param id Optional specific ID to use for the new record.
-     * @returns The created snapshot
+     * @returns The created entity
      */
-    create(data: Partial<SnapshotValues<M>>, id?: string | number): Promise<Snapshot<M>>;
+    create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>>;
 
     /**
      * Update an existing record by ID.
-     * @returns The updated snapshot
+     * @returns The updated entity
      */
-    update(id: string | number, data: Partial<SnapshotValues<M>>): Promise<Snapshot<M>>;
+    update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>>;
 
     /**
      * Delete a record by ID.
@@ -139,7 +139,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      * Subscribe to a single record for real-time updates.
      * Optional method.
      */
-    listenById?(id: string | number, onUpdate: (snapshot: Snapshot<M> | undefined) => void, onError?: (error: Error) => void): () => void;
+    listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Count the number of records matching the given filter.
@@ -157,7 +157,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
 }
 
 // =============================================================================
-// SDK-facing types — flat rows, no Snapshot wrapper
+// SDK-facing types — flat rows, no Entity wrapper
 // =============================================================================
 
 /**
@@ -173,7 +173,7 @@ export interface PaginationMeta {
 
 /**
  * Paginated response from a collection query (SDK-facing).
- * Returns flat rows instead of Snapshot-wrapped objects.
+ * Returns flat rows instead of Entity-wrapped objects.
  *
  * @example
  * const { data, meta } = await rebase.data.posts.find();
@@ -191,7 +191,7 @@ export interface FindResult<M extends Record<string, unknown> = Record<string, u
 
 /**
  * Fluent Query Builder Interface for the SDK client.
- * Returns `FindResult<M>` (flat rows) instead of `FindResponse<M>` (Snapshot-wrapped).
+ * Returns `FindResult<M>` (flat rows) instead of `FindResponse<M>` (Entity-wrapped).
  *
  * @group Data
  */
@@ -209,7 +209,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
 }
 
 /**
- * SDK collection client — returns flat rows, no Snapshot wrapper.
+ * SDK collection client — returns flat rows, no Entity wrapper.
  *
  * This is the public API surface for app developers using
  * `createRebaseClient()`. CMS internals use `CollectionAccessor` instead.
@@ -286,10 +286,10 @@ export interface SDKCollectionClient<M extends Record<string, unknown> = Record<
 }
 
 /**
- * The unified data access object for the **admin CMS** (Snapshot-shaped).
+ * The unified data access object for the **admin CMS** (Entity-shaped).
  *
  * Access collections as dynamic properties: `data.products.find(...)`. Each
- * accessor returns `Snapshot`-wrapped records (`{ id, path, values }`) — the
+ * accessor returns `Entity`-wrapped records (`{ id, path, values }`) — the
  * view-model the CMS renders. This is what `useData()` / the admin
  * `RebaseContext.data` are backed by.
  *
@@ -325,7 +325,7 @@ export type RebaseData<DB = unknown> = {
 );
 
 /**
- * The unified data access object for the **SDK** — flat rows, no Snapshot wrapper.
+ * The unified data access object for the **SDK** — flat rows, no Entity wrapper.
  *
  * This is the symmetric developer-facing data API, identical in shape on both
  * sides of the stack:
@@ -334,7 +334,7 @@ export type RebaseData<DB = unknown> = {
  *
  * Every accessor returns flat rows (`{ id, ...columns }`) via
  * {@link SDKCollectionClient} — access fields directly (`row.title`), never
- * `row.values.title`. The admin CMS uses {@link RebaseData} (Snapshot) instead.
+ * `row.values.title`. The admin CMS uses {@link RebaseData} (Entity) instead.
  *
  * @example
  * // Frontend SDK

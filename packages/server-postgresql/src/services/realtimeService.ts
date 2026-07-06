@@ -14,7 +14,7 @@ import { logger } from "@rebasepro/server-core";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
-const PG_NOTIFY_CHANNEL = "rebase_snapshot_changes";
+const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
 
 /**
  * Auth context stored per-subscription so real-time refetches respect RLS.
@@ -33,7 +33,7 @@ type RealTimeListenCollectionProps = ListenCollectionProps & {
     subscriptionId: string
 };
 
-type RealTimeListenSnapshotProps = ListenOneProps & { subscriptionId: string };
+type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
 
 /**
  * PostgreSQL-specific realtime service.
@@ -270,7 +270,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 await this.handleCollectionSubscription(clientId, message.payload as RealTimeListenCollectionProps, authContext);
                 break;
             case "subscribe_one":
-                await this.handleSnapshotSubscription(clientId, message.payload as RealTimeListenSnapshotProps, authContext);
+                await this.handleEntitySubscription(clientId, message.payload as RealTimeListenEntityProps, authContext);
                 break;
             case "unsubscribe":
                 await this.handleUnsubscribe(clientId, message.subscriptionId!);
@@ -367,7 +367,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         }
     }
 
-    private async handleSnapshotSubscription(clientId: string, request: RealTimeListenSnapshotProps, authContext?: SubscriptionAuthContext) {
+    private async handleEntitySubscription(clientId: string, request: RealTimeListenEntityProps, authContext?: SubscriptionAuthContext) {
         const subscriptionId = request.subscriptionId;
 
         try {
@@ -391,7 +391,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             });
 
             // Send initial data
-            const row = await this.fetchSnapshotWithAuth(
+            const row = await this.fetchEntityWithAuth(
                 request.path,
                 String(request.id),
                 authContext
@@ -618,10 +618,10 @@ roles: ["anon"] };
                 await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
                 await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
 roles: activeAuth.roles })}, true)`);
-                const txSnapshotService = new DataService(tx, this.registry);
-                let fetchedSnapshots;
+                const txEntityService = new DataService(tx, this.registry);
+                let fetchedEntitys;
                 if (collectionRequest.searchString) {
-                    fetchedSnapshots = await txSnapshotService.searchRows(
+                    fetchedEntitys = await txEntityService.searchRows(
                         notifyPath,
                         collectionRequest.searchString,
                         {
@@ -633,7 +633,7 @@ roles: activeAuth.roles })}, true)`);
                         }
                     );
                 } else {
-                    fetchedSnapshots = await txSnapshotService.fetchCollection(notifyPath, {
+                    fetchedEntitys = await txEntityService.fetchCollection(notifyPath, {
                         filter: collectionRequest.filter as FilterValues<string>,
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
@@ -662,40 +662,40 @@ roles: activeAuth.roles },
                         data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
                     } as unknown as RebaseCallContext;
 
-                    return await Promise.all(fetchedSnapshots.map(async (fetchedRow) => {
-                        let processedSnapshot = fetchedRow;
+                    return await Promise.all(fetchedEntitys.map(async (fetchedRow) => {
+                        let processedEntity = fetchedRow;
                         // 1. Global callbacks first
                         if (globalCallbacks?.afterRead) {
-                            processedSnapshot = await globalCallbacks.afterRead({
+                            processedEntity = await globalCallbacks.afterRead({
                                 collection: resolvedCollection,
                                 path: notifyPath,
-                                row: processedSnapshot,
+                                row: processedEntity,
                                 context: contextForCallback
-                            }) ?? processedSnapshot;
+                            }) ?? processedEntity;
                         }
                         // 2. Collection callbacks second
                         if (callbacks?.afterRead) {
-                            processedSnapshot = await callbacks.afterRead({
+                            processedEntity = await callbacks.afterRead({
                                 collection: resolvedCollection,
                                 path: notifyPath,
-                                row: processedSnapshot,
+                                row: processedEntity,
                                 context: contextForCallback
-                            }) ?? processedSnapshot;
+                            }) ?? processedEntity;
                         }
                         // 3. Property callbacks third
                         if (propertyCallbacks?.afterRead) {
-                            processedSnapshot = await propertyCallbacks.afterRead({
+                            processedEntity = await propertyCallbacks.afterRead({
                                 collection: resolvedCollection,
                                 path: notifyPath,
-                                row: processedSnapshot,
+                                row: processedEntity,
                                 context: contextForCallback
-                            }) ?? processedSnapshot;
+                            }) ?? processedEntity;
                         }
-                        return processedSnapshot;
+                        return processedEntity;
                     }));
                 }
 
-                return fetchedSnapshots;
+                return fetchedEntitys;
             });
         }
 
@@ -741,7 +741,7 @@ roles: activeAuth.roles },
             this.refetchTimers.delete(timerKey);
             if (!this._subscriptions.has(subscriptionId)) return;
             try {
-                const row = await this.fetchSnapshotWithAuth(notifyPath, id, subscription.authContext);
+                const row = await this.fetchEntityWithAuth(notifyPath, id, subscription.authContext);
                 this.sendSingleUpdate(subscription.clientId, subscriptionId, row || null);
             } catch (error) {
                 const sanitized = sanitizeErrorForClient(error, notifyPath);
@@ -768,7 +768,7 @@ roles: activeAuth.roles },
             this.refetchTimers.delete(timerKey);
             if (!this._subscriptions.has(subscriptionId)) return;
             try {
-                const row = await this.fetchSnapshotWithAuth(notifyPath, id, subscription.authContext);
+                const row = await this.fetchEntityWithAuth(notifyPath, id, subscription.authContext);
                 callback(row || null);
             } catch (error) {
                 logger.error(`❌ [RealtimeService] Error in debounced row driver refetch for ${subscriptionId}`, { error: error });
@@ -779,7 +779,7 @@ roles: activeAuth.roles },
     /**
      * Fetch a single row with optional RLS auth context.
      */
-    private async fetchSnapshotWithAuth(
+    private async fetchEntityWithAuth(
         notifyPath: string,
         id: string | number,
         authContext?: SubscriptionAuthContext
@@ -800,10 +800,10 @@ roles: ["anon"] };
                 await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
                 await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
 roles: activeAuth.roles })}, true)`);
-                const txSnapshotService = new DataService(tx, this.registry);
-                let processedSnapshot = await txSnapshotService.fetchOne(notifyPath, id, collection?.databaseId);
+                const txEntityService = new DataService(tx, this.registry);
+                let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
 
-                if (processedSnapshot) {
+                if (processedEntity) {
                     const registryCollection = this.registry.getCollectionByPath(notifyPath);
                     const resolvedCollection = collection ? { ...collection,
 ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
@@ -822,35 +822,35 @@ roles: activeAuth.roles },
 
                         // 1. Global callbacks first
                         if (globalCallbacks?.afterRead) {
-                            processedSnapshot = await globalCallbacks.afterRead({
+                            processedEntity = await globalCallbacks.afterRead({
                                 collection: resolvedCollection,
                                 path: notifyPath,
-                                row: processedSnapshot,
+                                row: processedEntity,
                                 context: contextForCallback
-                            }) ?? processedSnapshot;
+                            }) ?? processedEntity;
                         }
                         // 2. Collection callbacks second
                         if (callbacks?.afterRead) {
-                            processedSnapshot = await callbacks.afterRead({
+                            processedEntity = await callbacks.afterRead({
                                 collection: resolvedCollection,
                                 path: notifyPath,
-                                row: processedSnapshot,
+                                row: processedEntity,
                                 context: contextForCallback
-                            }) ?? processedSnapshot;
+                            }) ?? processedEntity;
                         }
                         // 3. Property callbacks third
                         if (propertyCallbacks?.afterRead) {
-                            processedSnapshot = await propertyCallbacks.afterRead({
+                            processedEntity = await propertyCallbacks.afterRead({
                                 collection: resolvedCollection,
                                 path: notifyPath,
-                                row: processedSnapshot,
+                                row: processedEntity,
                                 context: contextForCallback
-                            }) ?? processedSnapshot;
+                            }) ?? processedEntity;
                         }
                     }
                 }
 
-                return processedSnapshot;
+                return processedEntity;
             });
         }
 
@@ -925,8 +925,8 @@ roles: activeAuth.roles },
 
             // If there's an row ID, add the path including the row
             if (i + 1 < segments.length) {
-                const pathWithSnapshot = segments.slice(0, i + 1).join("/");
-                parentPaths.push(pathWithSnapshot);
+                const pathWithEntity = segments.slice(0, i + 1).join("/");
+                parentPaths.push(pathWithEntity);
             }
         }
 

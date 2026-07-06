@@ -82,8 +82,8 @@ export function DisplaySettingsForm({
                         {/* Layout Mode (Side dialog vs Full screen) */}
                         <LayoutModeSwitch
                             className={"col-span-12"}
-                            value={values.openSnapshotMode ?? "side_panel"}
-                            onChange={(value) => setFieldValue("openSnapshotMode", value)}/>
+                            value={values.openEntityMode ?? "side_panel"}
+                            onChange={(value) => setFieldValue("openEntityMode", value)}/>
 
                         {/* View Mode (Table/Cards/Kanban) */}
                         <ViewModeSwitch
@@ -273,7 +273,7 @@ hideFromCollection: true }
                                 value={values.sideDialogWidth ?? ""}
                                 label={"Side dialog width"}/>
                             <FieldCaption>
-                                Optionally define the width (in pixels) of snapshots side dialog. Default is 768px
+                                Optionally define the width (in pixels) of entitys side dialog. Default is 768px
                             </FieldCaption>
                         </div>
 

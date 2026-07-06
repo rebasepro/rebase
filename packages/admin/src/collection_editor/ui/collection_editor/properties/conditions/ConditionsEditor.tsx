@@ -102,11 +102,11 @@ type OperatorId = typeof OPERATORS[number]["id"];
 // Context fields with their types
 const CONTEXT_FIELDS = [
     { id: "isNew",
-label: "Is New Snapshot",
+label: "Is New Entity",
 dataType: "boolean",
 color: "#9c27b0" },
-    { id: "snapshotId",
-label: "Snapshot ID",
+    { id: "entityId",
+label: "Entity ID",
 dataType: "string",
 color: "#2196f3" },
     { id: "user.roles",
@@ -425,7 +425,7 @@ value: "" });
                 {/* Separator */}
                 {availableFields.length > 0 && (
                     <SelectItem value="_divider" disabled>
-                        <span className="text-xs text-surface-500">─ Snapshot Fields ─</span>
+                        <span className="text-xs text-surface-500">─ Entity Fields ─</span>
                     </SelectItem>
                 )}
 
@@ -610,7 +610,7 @@ function simpleRuleToJsonLogic(rule: SimpleRule): Record<string, any> {
     const varRef = { var: `values.${rule.field}` };
 
     // Handle special fields that don't need the "values." prefix
-    const fieldVar = rule.field.startsWith("user.") || rule.field === "isNew" || rule.field === "snapshotId"
+    const fieldVar = rule.field.startsWith("user.") || rule.field === "isNew" || rule.field === "entityId"
         ? { var: rule.field }
         : varRef;
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrayProperty, DateProperty, Snapshot, SnapshotReference, SnapshotRelation, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
+import { ArrayProperty, DateProperty, Entity, EntityReference, EntityRelation, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
 import { TableSize, useCustomizationController } from "@rebasepro/core";
 import {
     VirtualTableInput,
@@ -28,7 +28,7 @@ export interface TableFieldBindingProps<T = unknown> {
     selected: boolean;
     size: TableSize;
     align: "left" | "center" | "right";
-    snapshot: Snapshot<Record<string, unknown>>;
+    entity: Entity<Record<string, unknown>>;
     path: string;
     openPopup?: (cellRect: DOMRect | undefined) => void;
 }
@@ -67,7 +67,7 @@ export function getTableBindingForProperty(
 
     if (isAStorageProperty) {
         return {
-            Component: ({ validationError, error, disabled, selected, openPopup, property, snapshot, path, internalValue, size, updateValue, propertyKey }: TableFieldBindingProps) => (
+            Component: ({ validationError, error, disabled, selected, openPopup, property, entity, path, internalValue, size, updateValue, propertyKey }: TableFieldBindingProps) => (
                 <TableStorageUpload
                     error={validationError ?? error}
                     disabled={disabled}
@@ -75,7 +75,7 @@ export function getTableBindingForProperty(
                     selected={selected}
                     openPopup={openPopup}
                     property={property as StringProperty | ArrayProperty}
-                    snapshot={snapshot}
+                    entity={entity}
                     path={path}
                     value={internalValue as string | string[] | null}
                     previewSize={getPreviewSizeFrom(size)}
@@ -215,7 +215,7 @@ export function getTableBindingForProperty(
                     return (
                     <TableReferenceField
                         name={propertyKey}
-                        internalValue={internalValue as SnapshotReference}
+                        internalValue={internalValue as EntityReference}
                         updateValue={updateValue}
                         disabled={disabled}
                         size={size}
@@ -223,7 +223,7 @@ export function getTableBindingForProperty(
                         multiselect={false}
                         previewProperties={(property as ReferenceProperty).ui?.previewProperties}
                         includeId={(property as ReferenceProperty).includeId}
-                        includeSnapshotLink={(property as ReferenceProperty).includeSnapshotLink}
+                        includeEntityLink={(property as ReferenceProperty).includeEntityLink}
                         title={property.name ?? propertyKey}
                         fixedFilter={(property as ReferenceProperty).fixedFilter}
                     />
@@ -283,7 +283,7 @@ export function getTableBindingForProperty(
                             <TableReferenceField
                                 name={propertyKey}
                                 disabled={disabled}
-                                internalValue={internalValue as SnapshotReference[]}
+                                internalValue={internalValue as EntityReference[]}
                                 updateValue={updateValue}
                                 size={size}
                                 multiselect={true}
@@ -292,7 +292,7 @@ export function getTableBindingForProperty(
                                 title={arrayProperty.name}
                                 fixedFilter={refOfProp.fixedFilter}
                                 includeId={refOfProp.includeId}
-                                includeSnapshotLink={refOfProp.includeSnapshotLink}
+                                includeEntityLink={refOfProp.includeEntityLink}
                             />
                         ),
                         allowScroll: false
@@ -311,7 +311,7 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
     return (
         <TableRelationField
             name={propertyKey}
-            internalValue={internalValue as SnapshotRelation}
+            internalValue={internalValue as EntityRelation}
             updateValue={updateValue}
             disabled={disabled}
             size={size}
@@ -319,7 +319,7 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
             relation={relProp.relation!}
             previewProperties={relProp.ui?.previewProperties}
             includeId={relProp.includeId}
-            includeSnapshotLink={relProp.includeSnapshotLink}
+            includeEntityLink={relProp.includeEntityLink}
             title={relProp.name ?? propertyKey}
             fixedFilter={relProp.fixedFilter}
         />
@@ -332,7 +332,7 @@ function RelationSelectorBindingComponent({ propertyKey, internalValue, updateVa
     return (
         <TableRelationSelectorField
             name={propertyKey}
-            internalValue={internalValue as SnapshotRelation}
+            internalValue={internalValue as EntityRelation}
             updateValue={updateValue}
             disabled={disabled}
             size={"small"}

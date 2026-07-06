@@ -40,7 +40,7 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Strictly acyclic dependency graph**: Cross-package type references must follow a one-way dependency flow. If two modules reference each other, the shared types must be extracted to a common base module.
 
 ## 8. No Hidden Side-Channels (Dunder Properties)
-- **No `__xyz` dunder properties on data objects**: Never attach hidden metadata (e.g., `__junction_table_info`) to snapshot values that flow through the serialization pipeline. These can leak into database writes and corrupt data.
+- **No `__xyz` dunder properties on data objects**: Never attach hidden metadata (e.g., `__junction_table_info`) to entity values that flow through the serialization pipeline. These can leak into database writes and corrupt data.
 - **Use explicit variable transport**: Pass metadata through function parameters, context objects, or dedicated transport structures — never by mutating data payloads.
 
 ## 9. Localization (i18n)

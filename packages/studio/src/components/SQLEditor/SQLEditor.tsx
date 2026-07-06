@@ -1024,14 +1024,14 @@ role: selectedRole });
         // Only collections that have a PK column in the result set can be opened
         const actionableCollections = matchedCollections.filter(mc => mc.pkColumn && resultColumnKeys.includes(mc.pkColumn));
 
-        // For each row, determine which snapshots can be opened
-        const getRowSnapshotActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, snapshotId: string | number }[] => {
+        // For each row, determine which entitys can be opened
+        const getRowEntityActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
             if (!rowData) return [];
             return actionableCollections
                 .filter(mc => rowData[mc.pkColumn!] != null)
                 .map(mc => ({
                     collection: mc,
-                    snapshotId: rowData[mc.pkColumn!] as string | number
+                    entityId: rowData[mc.pkColumn!] as string | number
                 }));
         };
 
@@ -1085,7 +1085,7 @@ resizable: false }, ...dataColumns]
                         cellRenderer={({ rowData, column, rowIndex }) => {
                             // Dedicated collection action column
                             if (column.key === "__cms_action__") {
-                                const rowActions = getRowSnapshotActions(rowData ?? {});
+                                const rowActions = getRowEntityActions(rowData ?? {});
                                 if (rowActions.length === 0) {
                                     return <div className="h-full w-full"/>;
                                 }
@@ -1093,8 +1093,8 @@ resizable: false }, ...dataColumns]
                                     const ra = rowActions[0];
                                     return (
                                         <div className="h-full flex items-center justify-center">
-                                            <Tooltip title={t("studio_sql_edit_snapshot", { name: ra.collection.collection.name,
-id: String(ra.snapshotId) })}>
+                                            <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
                                                 <IconButton
                                                     size="small"
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
@@ -1102,7 +1102,7 @@ id: String(ra.snapshotId) })}>
                                                         e.stopPropagation();
                                                         sidePanelController?.open({
                                                             path: ra.collection.collection.slug,
-                                                            snapshotId: ra.snapshotId,
+                                                            entityId: ra.entityId,
                                                             collection: ra.collection.collection,
                                                             updateUrl: false
                                                         });
@@ -1135,14 +1135,14 @@ id: String(ra.snapshotId) })}>
                                                     onClick={() => {
                                                         sidePanelController?.open({
                                                             path: ra.collection.collection.slug,
-                                                            snapshotId: ra.snapshotId,
+                                                            entityId: ra.entityId,
                                                             collection: ra.collection.collection,
                                                             updateUrl: false
                                                         });
                                                     }}
                                                 >
-                                                    {t("studio_sql_edit_snapshot", { name: ra.collection.collection.name,
-id: String(ra.snapshotId) })}
+                                                    {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
                                                 </MenuItem>
                                             ))}
                                         </Menu>

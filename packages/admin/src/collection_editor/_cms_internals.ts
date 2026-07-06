@@ -26,7 +26,7 @@ export { ImportFileUpload } from "../data_import/components/ImportFileUpload";
 export { ImportSaveInProgress } from "../data_import/components/ImportSaveInProgress";
 export { useImportConfig } from "../data_import/hooks/useImportConfig";
 export { getInferenceType } from "../data_import/utils/get_import_inference_type";
-export { convertDataToSnapshot } from "../data_import/utils/data";
+export { convertDataToEntity } from "../data_import/utils/data";
 export type { ImportConfig } from "../data_import/types";
 
 // Data import components
@@ -38,4 +38,4 @@ export { getFieldConfig, getFieldId, getDefaultFieldConfig, getDefaultFieldId, D
 
 // Property & resolution utilities
 export { getPropertyInPath, getResolvedPropertyInPath, getDefaultPropertiesOrder, getPropertiesWithPropertiesOrder } from "../util/property_utils";
-export { resolveSnapshotAction, resolveSnapshotView } from "../util/resolutions";
+export { resolveEntityAction, resolveEntityView } from "../util/resolutions";

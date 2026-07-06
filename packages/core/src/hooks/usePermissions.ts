@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { useAuthController } from "./useAuthController";
-import { Snapshot } from "@rebasepro/types";
-import { canCreateSnapshot, canEditSnapshot, canDeleteSnapshot, canReadCollection } from "@rebasepro/common";
+import { Entity } from "@rebasepro/types";
+import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "@rebasepro/common";
 import { useCallback, useMemo } from "react";
 
 /**
@@ -13,19 +13,19 @@ export function usePermissions() {
 
     const canCreate = useCallback(
         (collection: CollectionConfig<any>, path: string) =>
-            canCreateSnapshot(collection, authController, path, null),
+            canCreateEntity(collection, authController, path, null),
         [authController]
     );
 
     const canEdit = useCallback(
-        (collection: CollectionConfig<any>, path: string, snapshot: Snapshot<any> | null) =>
-            canEditSnapshot(collection, authController, path, snapshot),
+        (collection: CollectionConfig<any>, path: string, entity: Entity<any> | null) =>
+            canEditEntity(collection, authController, path, entity),
         [authController]
     );
 
     const canDelete = useCallback(
-        (collection: CollectionConfig<any>, path: string, snapshot: Snapshot<any> | null) =>
-            canDeleteSnapshot(collection, authController, path, snapshot),
+        (collection: CollectionConfig<any>, path: string, entity: Entity<any> | null) =>
+            canDeleteEntity(collection, authController, path, entity),
         [authController]
     );
 

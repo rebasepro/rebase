@@ -15,10 +15,10 @@ export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
 
         await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rebase.snapshot_history (
+            CREATE TABLE IF NOT EXISTS rebase.entity_history (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 table_name TEXT NOT NULL,
-                snapshot_id TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
                 action TEXT NOT NULL,
                 changed_fields TEXT[],
                 "values" JSONB,
@@ -29,16 +29,16 @@ export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void
         `);
 
         await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_history_snapshot
-            ON rebase.snapshot_history(table_name, snapshot_id)
+            CREATE INDEX IF NOT EXISTS idx_history_entity
+            ON rebase.entity_history(table_name, entity_id)
         `);
 
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_history_time
-            ON rebase.snapshot_history(table_name, snapshot_id, updated_at DESC)
+            ON rebase.entity_history(table_name, entity_id, updated_at DESC)
         `);
 
-        logger.info("✅ Snapshot history table ready");
+        logger.info("✅ Entity history table ready");
     } catch (error) {
         logger.error("❌ Failed to create row history table", { error: error });
         logger.warn("⚠️ Continuing without creating history table.");

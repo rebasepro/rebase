@@ -6,7 +6,7 @@ import {
     FirebaseCollectionConfig,
     FirebaseProperties,
     GeopointProperty,
-    InferSnapshotType,
+    InferEntityType,
     MapProperty,
     MongoDBCollectionConfig,
     MongoProperties,
@@ -49,7 +49,7 @@ export function buildCollection<
  *
  * The `const P` generic captures literal property types from your
  * `properties` object, which enables autocomplete on `titleProperty`,
- * `sort`, `propertiesOrder`, `fixedFilter`, and snapshot callbacks.
+ * `sort`, `propertiesOrder`, `fixedFilter`, and entity callbacks.
  *
  * @example
  * ```ts
@@ -72,8 +72,8 @@ export function defineCollection<
     const P extends PostgresProperties,
     USER extends User = User
 >(
-    collection: Omit<PostgresCollectionConfig<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
-): PostgresCollectionConfig<InferSnapshotType<P>, USER> & { properties: P };
+    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: P }
+): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
  * Define a Firestore-backed collection with full type inference.
@@ -83,8 +83,8 @@ export function defineCollection<
     const P extends FirebaseProperties,
     USER extends User = User
 >(
-    collection: Omit<FirebaseCollectionConfig<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
-): FirebaseCollectionConfig<InferSnapshotType<P>, USER> & { properties: P };
+    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: P }
+): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
  * Define a MongoDB-backed collection with full type inference.
@@ -94,8 +94,8 @@ export function defineCollection<
     const P extends MongoProperties,
     USER extends User = User
 >(
-    collection: Omit<MongoDBCollectionConfig<InferSnapshotType<P>, USER>, "properties"> & { properties: P }
-): MongoDBCollectionConfig<InferSnapshotType<P>, USER> & { properties: P };
+    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: P }
+): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
  * Implementation — delegates to the correct overload at the type level.

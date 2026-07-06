@@ -771,7 +771,7 @@ Schedule automated PostgreSQL backups via cron on the host:
 0 3 * * * root docker compose -f /path/to/docker-compose.yml exec -T db pg_dump -U rebase rebase | gzip > /backups/rebase-$(date +\%Y\%m\%d).sql.gz
 ```
 
-> **TIP:** Hetzner also offers managed snapshots (server-level) and the option to attach a Hetzner Volume for data that survives server rebuilds. For production, strongly consider both.
+> **TIP:** Hetzner also offers managed entitys (server-level) and the option to attach a Hetzner Volume for data that survives server rebuilds. For production, strongly consider both.
 
 ---
 

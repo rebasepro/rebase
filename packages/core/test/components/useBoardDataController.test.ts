@@ -10,7 +10,7 @@ import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 
 // Mock types matching the actual implementation
 interface BoardColumnData<M extends Record<string, any> = Record<string, any>> {
-    snapshots: Array<{ id: string; values: M; path: string }>;
+    entitys: Array<{ id: string; values: M; path: string }>;
     loading: boolean;
     hasMore: boolean;
     error?: Error;
@@ -29,27 +29,27 @@ describe("useBoardDataController types and logic", () => {
     describe("BoardColumnData interface", () => {
         it("should have correct shape for a column's data state", () => {
             const columnData: BoardColumnData = {
-                snapshots: [],
+                entitys: [],
                 loading: false,
                 hasMore: true,
                 error: undefined
             };
 
-            expect(columnData.snapshots).toEqual([]);
+            expect(columnData.entitys).toEqual([]);
             expect(columnData.loading).toBe(false);
             expect(columnData.hasMore).toBe(true);
             expect(columnData.error).toBeUndefined();
         });
 
-        it("should support snapshots with typed values", () => {
-            interface TaskSnapshot {
+        it("should support entitys with typed values", () => {
+            interface TaskEntity {
                 title: string;
                 status: string;
                 order: number;
             }
 
-            const columnData: BoardColumnData<TaskSnapshot> = {
-                snapshots: [
+            const columnData: BoardColumnData<TaskEntity> = {
+                entitys: [
                     { id: "1",
 values: { title: "Task 1",
 status: "todo",
@@ -65,15 +65,15 @@ path: "tasks/2" }
                 hasMore: false
             };
 
-            expect(columnData.snapshots).toHaveLength(2);
-            expect(columnData.snapshots[0].values.title).toBe("Task 1");
-            expect(columnData.snapshots[1].values.order).toBe(1);
+            expect(columnData.entitys).toHaveLength(2);
+            expect(columnData.entitys[0].values.title).toBe("Task 1");
+            expect(columnData.entitys[1].values.order).toBe(1);
         });
 
         it("should handle error state", () => {
             const error = new Error("Failed to load data");
             const columnData: BoardColumnData = {
-                snapshots: [],
+                entitys: [],
                 loading: false,
                 hasMore: false,
                 error
@@ -92,13 +92,13 @@ path: "tasks/2" }
 
             const controller: BoardDataController<Record<string, unknown>, "todo" | "in_progress" | "done"> = {
                 columnData: {
-                    todo: { snapshots: [],
+                    todo: { entitys: [],
 loading: false,
 hasMore: true },
-                    in_progress: { snapshots: [],
+                    in_progress: { entitys: [],
 loading: true,
 hasMore: true },
-                    done: { snapshots: [],
+                    done: { entitys: [],
 loading: false,
 hasMore: false }
                 },
@@ -125,13 +125,13 @@ hasMore: false }
 
         it("should report aggregate loading state correctly", () => {
             const columnData = {
-                col1: { snapshots: [],
+                col1: { entitys: [],
 loading: false,
 hasMore: false },
-                col2: { snapshots: [],
+                col2: { entitys: [],
 loading: false,
 hasMore: false },
-                col3: { snapshots: [],
+                col3: { entitys: [],
 loading: false,
 hasMore: false }
             };
@@ -151,11 +151,11 @@ hasMore: false }
             const error2 = new Error("Error in column 2");
 
             const columnData = {
-                col1: { snapshots: [],
+                col1: { entitys: [],
 loading: false,
 hasMore: false,
 error: error1 },
-                col2: { snapshots: [],
+                col2: { entitys: [],
 loading: false,
 hasMore: false,
 error: error2 }
@@ -219,23 +219,23 @@ done: 30 };
             expect(columnItemCounts.in_progress).toBe(30); // unchanged
         });
 
-        it("should determine hasMore based on snapshot count", () => {
+        it("should determine hasMore based on entity count", () => {
             const pageSize = 30;
 
             // Scenario 1: Less items than limit = no more to load
-            const snapshots1 = Array(25).fill({ id: "test",
+            const entitys1 = Array(25).fill({ id: "test",
 values: {} });
-            expect(snapshots1.length >= pageSize).toBe(false);
+            expect(entitys1.length >= pageSize).toBe(false);
 
             // Scenario 2: Exactly limit items = might have more
-            const snapshots2 = Array(30).fill({ id: "test",
+            const entitys2 = Array(30).fill({ id: "test",
 values: {} });
-            expect(snapshots2.length >= pageSize).toBe(true);
+            expect(entitys2.length >= pageSize).toBe(true);
 
             // Scenario 3: More items (edge case) = definitely has more
-            const snapshots3 = Array(31).fill({ id: "test",
+            const entitys3 = Array(31).fill({ id: "test",
 values: {} });
-            expect(snapshots3.length >= pageSize).toBe(true);
+            expect(entitys3.length >= pageSize).toBe(true);
         });
     });
 
@@ -298,7 +298,7 @@ in_progress: 30 };
 
         it("should initialize column data state for new columns", () => {
             const existingData: Record<string, BoardColumnData> = {
-                todo: { snapshots: [{ id: "1",
+                todo: { entitys: [{ id: "1",
 values: {},
 path: "x" }],
 loading: false,
@@ -310,7 +310,7 @@ hasMore: true }
             newColumns.forEach(col => {
                 if (!(col in updated)) {
                     updated[col] = {
-                        snapshots: [],
+                        entitys: [],
                         loading: true,
                         hasMore: true,
                         error: undefined
@@ -318,8 +318,8 @@ hasMore: true }
                 }
             });
 
-            expect(updated.todo.snapshots).toHaveLength(1); // Preserved
-            expect(updated.in_progress.snapshots).toHaveLength(0); // New
+            expect(updated.todo.entitys).toHaveLength(1); // Preserved
+            expect(updated.in_progress.entitys).toHaveLength(0); // New
             expect(updated.in_progress.loading).toBe(true); // New starts loading
         });
     });

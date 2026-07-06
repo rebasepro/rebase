@@ -211,7 +211,7 @@ You now have a fully functional blog CMS with:
 - Draft → Review → Published workflow
 - Auto-generated URL slugs
 - RLS policies limiting authors to their own posts
-- Full audit trail via snapshot history
+- Full audit trail via entity history
 
 ## Querying from the SDK
 
@@ -230,7 +230,7 @@ for (const article of articles) {
     console.log(article.values.title);
     console.log(article.values.author?.name);    // Hydrated relation
     console.log(article.values.author_id);       // Scalar FK
-    console.log(article.values.categories);      // Array of related snapshots
+    console.log(article.values.categories);      // Array of related entitys
 }
 ```
 

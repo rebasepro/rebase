@@ -1,20 +1,20 @@
-import { Snapshot, FilterValues } from "@rebasepro/types";
+import { Entity, FilterValues } from "@rebasepro/types";
 
-const collectionScrollCache = new Map<string, { scrollOffset: number, data: Snapshot<any>[] }>();
+const collectionScrollCache = new Map<string, { scrollOffset: number, data: Entity<any>[] }>();
 
 export type ScrollRestorationController = {
 
     getCollectionScroll: (path: string,
         filters?: FilterValues<any>) => {
             scrollOffset: number,
-            data: Snapshot<any>[]
+            data: Entity<any>[]
         } | undefined;
 
     updateCollectionScroll: (props: {
         path: string,
         scrollOffset: number,
         filters?: FilterValues<any>;
-        data: Snapshot<any>[]
+        data: Entity<any>[]
     }) => void;
 
 }
@@ -31,7 +31,7 @@ export function useScrollRestoration(): ScrollRestorationController {
         filters?: FilterValues<any>;
         sort?: [string, "asc" | "desc"];
         scrollOffset: number;
-        data: Snapshot<any>[]
+        data: Entity<any>[]
     }) => {
         collectionScrollCache.set(
             createCacheKey(path, filters),

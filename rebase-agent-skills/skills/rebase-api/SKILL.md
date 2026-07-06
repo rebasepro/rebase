@@ -18,7 +18,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | Base Path | Purpose |
 |-----------|---------|
 | `/api/data/{slug}` | Collection CRUD (auto-generated) |
-| `/api/data/{slug}/count` | Count matching snapshots |
+| `/api/data/{slug}/count` | Count matching entitys |
 | `/api/data/{parent}/{parentId}/{child}` | Subcollection routes |
 | `/api/auth/*` | Authentication (login, register, refresh, OAuth) |
 | `/api/admin/*` | User & role management |
@@ -39,12 +39,12 @@ All data routes are mounted under `/api/data/`. Other route categories:
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|
-| `GET` | `/api/data/{slug}` | List snapshots (with filtering, sorting, pagination) | `200` |
-| `GET` | `/api/data/{slug}/count` | Count matching snapshots (with optional filters) | `200` |
-| `GET` | `/api/data/{slug}/:id` | Get a single snapshot by ID | `200` |
-| `POST` | `/api/data/{slug}` | Create a new snapshot | `201` |
-| `PUT` | `/api/data/{slug}/:id` | Update a snapshot | `200` |
-| `DELETE` | `/api/data/{slug}/:id` | Delete a snapshot | `204` |
+| `GET` | `/api/data/{slug}` | List entitys (with filtering, sorting, pagination) | `200` |
+| `GET` | `/api/data/{slug}/count` | Count matching entitys (with optional filters) | `200` |
+| `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
+| `POST` | `/api/data/{slug}` | Create a new entity | `201` |
+| `PUT` | `/api/data/{slug}/:id` | Update a entity | `200` |
+| `DELETE` | `/api/data/{slug}/:id` | Delete a entity | `204` |
 
 ### Subcollection Routes
 
@@ -52,12 +52,12 @@ For collections with relations, Rebase generates nested routes automatically. Th
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|
-| `GET` | `/api/data/{parent}/{parentId}/{child}` | List child snapshots | `200` |
-| `GET` | `/api/data/{parent}/{parentId}/{child}/count` | Count child snapshots | `200` |
-| `GET` | `/api/data/{parent}/{parentId}/{child}/:id` | Get a single child snapshot | `200` |
-| `POST` | `/api/data/{parent}/{parentId}/{child}` | Create a child snapshot | `201` |
-| `PUT` | `/api/data/{parent}/{parentId}/{child}/:id` | Update a child snapshot | `200` |
-| `DELETE` | `/api/data/{parent}/{parentId}/{child}/:id` | Delete a child snapshot | `204` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}` | List child entitys | `200` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}/count` | Count child entitys | `200` |
+| `GET` | `/api/data/{parent}/{parentId}/{child}/:id` | Get a single child entity | `200` |
+| `POST` | `/api/data/{parent}/{parentId}/{child}` | Create a child entity | `201` |
+| `PUT` | `/api/data/{parent}/{parentId}/{child}/:id` | Update a child entity | `200` |
+| `DELETE` | `/api/data/{parent}/{parentId}/{child}/:id` | Delete a child entity | `204` |
 
 **Example:** List all posts by author `111094`:
 ```bash
@@ -214,9 +214,9 @@ These parameter names are reserved and will NOT be interpreted as filter fields:
 
 > **IMPORTANT FOR AGENTS:** The pagination envelope key is `meta`, NOT `pagination`.
 
-### Single Snapshot Response (GET by ID)
+### Single Entity Response (GET by ID)
 
-Returns the flat snapshot object directly (no `data` wrapper):
+Returns the flat entity object directly (no `data` wrapper):
 
 ```json
 {
@@ -229,7 +229,7 @@ Returns the flat snapshot object directly (no `data` wrapper):
 
 ### Create Response (POST — 201)
 
-Returns the created snapshot as a flat object:
+Returns the created entity as a flat object:
 
 ```json
 {
@@ -241,7 +241,7 @@ Returns the created snapshot as a flat object:
 
 ### Update Response (PUT — 200)
 
-Returns the updated snapshot as a flat object.
+Returns the updated entity as a flat object.
 
 ### Delete Response (DELETE — 204)
 
@@ -282,7 +282,7 @@ The `details` field is optional and only present when additional context is avai
 | `401` | `INVALID_TOKEN` | Expired or malformed JWT |
 | `403` | `FORBIDDEN` | Insufficient permissions (e.g., API key lacks permission) |
 | `403` | `API_KEY_FORBIDDEN` | API key does not have permission for this operation |
-| `404` | `NOT_FOUND` | Snapshot not found |
+| `404` | `NOT_FOUND` | Entity not found |
 | `409` | `CONFLICT` | Duplicate resource (e.g., email exists) |
 | `409` | `EMAIL_EXISTS` | Registration with existing email |
 | `413` | `PAYLOAD_TOO_LARGE` | Request body exceeds max size (default 10MB) |
@@ -297,7 +297,7 @@ The backend uses `ApiError` static methods to throw typed errors:
 ApiError.badRequest("Invalid email format", "INVALID_INPUT");
 ApiError.unauthorized("Token expired");
 ApiError.forbidden("Admin access required");
-ApiError.notFound("Snapshot not found");
+ApiError.notFound("Entity not found");
 ApiError.conflict("Email already registered", "EMAIL_EXISTS");
 ApiError.internal("Database connection failed");
 ApiError.serviceUnavailable("Service is down");
@@ -360,11 +360,11 @@ DataHooks run at the REST API boundary (after DB operations, before response) an
 
 | Hook | Trigger | Can Modify? | Can Abort? |
 |------|---------|-------------|------------|
-| `afterRead(slug, snapshot, ctx)` | GET (list & single) | Return modified snapshot, or `null` to filter it out | No |
-| `beforeSave(slug, values, snapshotId, ctx)` | POST and PUT, before DB write | Return modified values | Throw to abort |
-| `afterSave(slug, snapshot, ctx)` | POST and PUT, after DB write | No (fire-and-forget) | No |
-| `beforeDelete(slug, snapshotId, ctx)` | DELETE, before DB delete | No | Throw to abort |
-| `afterDelete(slug, snapshotId, ctx)` | DELETE, after DB delete | No (fire-and-forget) | No |
+| `afterRead(slug, entity, ctx)` | GET (list & single) | Return modified entity, or `null` to filter it out | No |
+| `beforeSave(slug, values, entityId, ctx)` | POST and PUT, before DB write | Return modified values | Throw to abort |
+| `afterSave(slug, entity, ctx)` | POST and PUT, after DB write | No (fire-and-forget) | No |
+| `beforeDelete(slug, entityId, ctx)` | DELETE, before DB delete | No | Throw to abort |
+| `afterDelete(slug, entityId, ctx)` | DELETE, after DB delete | No (fire-and-forget) | No |
 
 The `BackendHookContext` provides:
 
@@ -382,13 +382,13 @@ interface BackendHookContext {
 ```typescript
 const hooks: BackendHooks = {
   data: {
-    afterRead(slug, snapshot, ctx) {
-      if (!ctx.requestUser?.roles.includes("admin") && snapshot.email) {
-        return { ...snapshot, email: "***" };
+    afterRead(slug, entity, ctx) {
+      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
+        return { ...entity, email: "***" };
       }
-      return snapshot;
+      return entity;
     },
-    beforeSave(slug, values, snapshotId, ctx) {
+    beforeSave(slug, values, entityId, ctx) {
       // Add audit trail
       return { ...values, updatedBy: ctx.requestUser?.userId };
     }
@@ -405,7 +405,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://example.com/api/data/products?status=eq.active&price=gte.50&orderBy=created_at:desc&limit=10&offset=0&include=category"
 ```
 
-### Create a snapshot
+### Create a entity
 
 ```bash
 curl -X POST \
@@ -415,7 +415,7 @@ curl -X POST \
   "https://example.com/api/data/products"
 ```
 
-### Update a snapshot
+### Update a entity
 
 ```bash
 curl -X PUT \
@@ -425,7 +425,7 @@ curl -X PUT \
   "https://example.com/api/data/products/uuid-123"
 ```
 
-### Delete a snapshot
+### Delete a entity
 
 ```bash
 curl -X DELETE \
@@ -469,7 +469,7 @@ GraphQL is **enabled by default** (`enableGraphQL: true` in `ApiConfig`). In non
 For each collection, Rebase generates the following GraphQL types and operations:
 
 **Types:**
-- `{TypeName}` — Snapshot output type (e.g., `Product`, `BlogPost`)
+- `{TypeName}` — Entity output type (e.g., `Product`, `BlogPost`)
 - `{TypeName}Input` — Input type for create/update mutations
 
 The type name is derived from `collection.singularName` (spaces removed) or by removing the last character of `collection.name`.
@@ -478,16 +478,16 @@ The type name is derived from `collection.singularName` (spaces removed) or by r
 
 | Query | Arguments | Returns | Description |
 |-------|-----------|---------|-------------|
-| `{typeName}` (lowercase) | `id: String!` | `{TypeName}` | Get single snapshot |
-| `{collection.slug}` | `limit: Int = 20`, `offset: Int = 0`, `where: String`, `orderBy: String` | `[{TypeName}]` | List snapshots |
+| `{typeName}` (lowercase) | `id: String!` | `{TypeName}` | Get single entity |
+| `{collection.slug}` | `limit: Int = 20`, `offset: Int = 0`, `where: String`, `orderBy: String` | `[{TypeName}]` | List entitys |
 
 **Mutations:**
 
 | Mutation | Arguments | Returns | Description |
 |----------|-----------|---------|-------------|
-| `create{TypeName}` | `input: {TypeName}Input!` | `{TypeName}` | Create snapshot |
-| `update{TypeName}` | `id: String!`, `input: {TypeName}Input!` | `{TypeName}` | Update snapshot |
-| `delete{TypeName}` | `id: String!` | `Boolean` | Delete snapshot (returns `true`/`false`) |
+| `create{TypeName}` | `input: {TypeName}Input!` | `{TypeName}` | Create entity |
+| `update{TypeName}` | `id: String!`, `input: {TypeName}Input!` | `{TypeName}` | Update entity |
+| `delete{TypeName}` | `id: String!` | `Boolean` | Delete entity (returns `true`/`false`) |
 
 ### GraphQL Type Mapping
 

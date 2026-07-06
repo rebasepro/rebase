@@ -29,9 +29,9 @@ import {
     Typography,
     UploadIcon
 } from "@rebasepro/ui";
-import { buildSnapshotPropertiesFromData } from "@rebasepro/schema-inference";
+import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
 import { useImportConfig } from "../hooks";
-import { convertDataToSnapshot, getInferenceType } from "../utils";
+import { convertDataToEntity, getInferenceType } from "../utils";
 import { DataNewPropertiesMapping, ImportFileUpload, ImportSaveInProgress } from "../components";
 import { ImportConfig } from "../types";
 import { slugify } from "@rebasepro/utils";
@@ -79,7 +79,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
         importConfig.setImportData(data);
 
         if (data.length > 0) {
-            const originProperties = await buildSnapshotPropertiesFromData(data, getInferenceType);
+            const originProperties = await buildEntityPropertiesFromData(data, getInferenceType);
             importConfig.setOriginProperties(originProperties as Properties);
 
             const headersMapping = buildHeadersMappingFromData(data, collection?.properties);
@@ -381,7 +381,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
     const authController = useAuthController();
     const collectionRegistry = useCollectionRegistryController();
     useEffect(() => {
-        const mappedData = importConfig.importData.map(d => convertDataToSnapshot(
+        const mappedData = importConfig.importData.map(d => convertDataToEntity(
             authController,
             collectionRegistry,
             d,
@@ -391,7 +391,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
             "TEMP_PATH",
             importConfig.defaultValues
         ));
-        importConfig.setSnapshots(mappedData);
+        importConfig.setEntitys(mappedData);
     }, []);
 
     const selectionController = useSelectionController();
@@ -399,10 +399,10 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
     return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Snapshots with the same id will be overwritten</Typography>
+            <Typography variant={"caption"}>Entitys with the same id will be overwritten</Typography>
         </div>}
         tableController={{
-            data: importConfig.snapshots,
+            data: importConfig.entitys,
             dataLoading: false,
             noMoreToLoad: false
         }}
@@ -410,7 +410,7 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
         endAdornment={<div className={"h-12"}/>}
         filterable={false}
         sortable={false}
-        openSnapshotMode={"full_screen"}
+        openEntityMode={"full_screen"}
         selectionController={selectionController}
         properties={properties}/>
 

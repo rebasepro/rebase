@@ -26,7 +26,7 @@ Properties define the columns in your database table and how they are rendered i
 | `array` | Ordered list of values | `jsonb` |
 | `map` | Key-value object | `jsonb` |
 | `geopoint` | Latitude/longitude pair | `jsonb` |
-| `reference` | Embedded reference to another snapshot | `varchar` (stores ID) |
+| `reference` | Embedded reference to another entity | `varchar` (stores ID) |
 | `relation` | SQL foreign key relation | Uses the `relations` array |
 
 ## Common Properties
@@ -38,7 +38,7 @@ All property types share these options:
 | `type` | `string` | **Required.** Data type (see above) |
 | `name` | `string` | **Required.** Display label |
 | `description` | `string` | Help text shown below the field |
-| `defaultValue` | `any` | Default value for new snapshots |
+| `defaultValue` | `any` | Default value for new entitys |
 | `validation` | `object` | Validation rules |
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
@@ -441,7 +441,7 @@ metadata: {
 
 ## Reference Properties
 
-References link to snapshots in another collection. They render as a preview card showing the referenced snapshot's details.
+References link to entitys in another collection. They render as a preview card showing the referenced entity's details.
 
 ```typescript
 client: {
@@ -505,7 +505,7 @@ validation: {
 
 ## Conditional Fields
 
-You can make fields dynamic so they react to the snapshot's values. There are two ways to do this:
+You can make fields dynamic so they react to the entity's values. There are two ways to do this:
 
 ### 1. JSON Logic Conditions (Declarative)
 

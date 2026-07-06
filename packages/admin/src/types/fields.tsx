@@ -1,5 +1,5 @@
 import { InferPropertyType } from "@rebasepro/types";
-import { Snapshot } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
 import { FormexController } from "./components/formex";
 import { CollectionConfig } from "@rebasepro/types";
 import { Property } from "@rebasepro/types";
@@ -129,7 +129,7 @@ export interface FieldProps<
     customProps?: CustomProps;
 
     /**
-     * Additional values related to the state of the form or the snapshot
+     * Additional values related to the state of the form or the entity
      */
     context: FormContext<M>;
 
@@ -161,7 +161,7 @@ export interface FieldProps<
 export interface FormContext<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
-     * Current values of the snapshot
+     * Current values of the entity
      */
     values: M;
 
@@ -174,7 +174,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     setFieldValue: (key: string, value: unknown, shouldValidate?: boolean) => void;
 
     /**
-     * Quietly persist the snapshot to the database without any UI feedback
+     * Quietly persist the entity to the database without any UI feedback
      * (no validation, no snackbar, no form reset).
      * Use this for programmatic/background saves from custom views.
      */
@@ -188,27 +188,27 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     submit: () => void;
 
     /**
-     * Collection of the snapshot being modified
+     * Collection of the entity being modified
      */
     collection?: CollectionConfig<M>;
 
     /**
-     * Snapshot id, it can be undefined if it's a new snapshot
+     * Entity id, it can be undefined if it's a new entity
      */
-    snapshotId?: string | number;
+    entityId?: string | number;
 
     /**
-     * Path this snapshot is located at
+     * Path this entity is located at
      */
     path?: string;
 
     status: "new" | "existing" | "copy";
 
-    snapshot?: Snapshot<M>;
+    entity?: Entity<M>;
 
     savingError?: Error;
 
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
      * This is the underlying formex controller that powers the form.
@@ -221,7 +221,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
 
     /**
      * Whether the form context is in read-only detail view mode.
-     * Custom snapshot views can use this to adjust their rendering.
+     * Custom entity views can use this to adjust their rendering.
      */
     readOnly?: boolean;
 }

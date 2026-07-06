@@ -42,8 +42,8 @@ The key components that make up a Rebase frontend:
 | `authController` | Authentication state and methods |
 | `storageSource` | File storage operations |
 | `userConfigPersistence` | Local UI preferences (column widths, etc.) |
-| `snapshotViews` | Global custom snapshot view tabs |
-| `snapshotActions` | Global snapshot actions |
+| `entityViews` | Global custom entity view tabs |
+| `entityActions` | Global entity actions |
 | `plugins` | Plugin instances (legacy prop — prefer passing via navigation controller) |
 
 ## Controllers
@@ -115,7 +115,7 @@ const adminModeController = useBuildAdminModeController();
 | `<Scaffold>` | Main layout container with responsive sidebar |
 | `<AppBar>` | Top navigation bar with search, mode toggle, user menu |
 | `<Drawer>` | Side navigation with collection list and view links |
-| `<SideDialogs>` | Container for side panel snapshot editors |
+| `<SideDialogs>` | Container for side panel entity editors |
 | `<RebaseRoutes>` | Route container that integrates with React Router |
 | `<RebaseRoute>` | Handles collection routes (`/c/*`) |
 | `<ContentHomePage>` | Default home page showing collection cards |
@@ -163,6 +163,6 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 ## Next Steps
 
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom form fields
-- **[Snapshot Views](/docs/frontend/snapshot-views)** — Add tabs to snapshot editors
+- **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
 - **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
 - **[Plugins](/docs/plugins)** — Extend the framework

@@ -28,7 +28,7 @@ properties: {
             acceptedFiles: ["image/*"],    // MIME type filter
             maxSize: 5 * 1024 * 1024,      // 5MB max
             fileName: (context) => {        // Custom filename
-                return context.snapshotId + "_" + context.file.name;
+                return context.entityId + "_" + context.file.name;
             }
         }
     }
@@ -93,7 +93,7 @@ image: {
     name: "Product Image",
     storage: {
         storageSource: "firebase",     // Routes to the "firebase" backend
-        storagePath: "products/{snapshotId}",
+        storagePath: "products/{entityId}",
         acceptedFiles: ["image/*"],
     }
 }

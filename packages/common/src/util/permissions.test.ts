@@ -1,5 +1,5 @@
-import { canCreateSnapshot, canEditSnapshot, canDeleteSnapshot, canReadCollection } from "./permissions";
-import { CollectionConfig, AuthController, Snapshot, User, SecurityRule } from "@rebasepro/types";
+import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "./permissions";
+import { CollectionConfig, AuthController, Entity, User, SecurityRule } from "@rebasepro/types";
 
 describe("Permissions Evaluator", () => {
 
@@ -54,8 +54,8 @@ describe("Permissions Evaluator", () => {
         securityRules: rules
     });
 
-    const createMockSnapshot = (values: Record<string, unknown>): Snapshot => ({
-        id: "snapshot-123",
+    const createMockEntity = (values: Record<string, unknown>): Entity => ({
+        id: "entity-123",
         path: "test",
         values
     });
@@ -65,9 +65,9 @@ describe("Permissions Evaluator", () => {
     test("1. Implicit fallback: no rules at all returns true (optimistic UI)", () => {
         const collection = createMockCollection();
         expect(canReadCollection(collection, mockAuthController)).toBe(true);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-        expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(true);
     });
 
     test("2. Empty rules array [] also returns true", () => {
@@ -90,15 +90,15 @@ access: "public" },
 roles: ["admin"] }
         ]);
         // Public insert
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
         // No update rule → denied
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(false);
         // select/delete need admin → denied for author
         expect(canReadCollection(collection, mockAuthController)).toBe(false);
-        expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+        expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(false);
         // Admin can read and delete
         expect(canReadCollection(collection, adminAuthController)).toBe(true);
-        expect(canDeleteSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+        expect(canDeleteEntity(collection, adminAuthController, "test", null)).toBe(true);
     });
 
     test("6. 'all' operation matches every CRUD action", () => {
@@ -107,9 +107,9 @@ roles: ["admin"] }
 roles: ["author"] }
         ]);
         expect(canReadCollection(collection, mockAuthController)).toBe(true);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-        expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(true);
         // Admin lacks 'author' role
         expect(canReadCollection(collection, adminAuthController)).toBe(false);
     });
@@ -123,14 +123,14 @@ roles: ["author"] }
         ]);
         // Admin: all operations
         expect(canReadCollection(collection, adminAuthController)).toBe(true);
-        expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(true);
-        expect(canEditSnapshot(collection, adminAuthController, "test", null)).toBe(true);
-        expect(canDeleteSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
+        expect(canEditEntity(collection, adminAuthController, "test", null)).toBe(true);
+        expect(canDeleteEntity(collection, adminAuthController, "test", null)).toBe(true);
         // Author: only update, not read/create/delete
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
         expect(canReadCollection(collection, mockAuthController)).toBe(false);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-        expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(false);
+        expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(false);
     });
 
     test("8. Unknown operation name in rule is silently ignored", () => {
@@ -168,9 +168,9 @@ roles: ["author"] }
 access: "public",
 roles: [] }
         ]);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-        expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(true);
-        expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
     });
 
     test("12. Undefined roles on a public rule grants access to everyone", () => {
@@ -178,8 +178,8 @@ roles: [] }
             { operation: "insert",
 access: "public" }
         ]);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-        expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(true);
     });
 
     test("13. No rules match user's role → implicit deny", () => {
@@ -208,8 +208,8 @@ roles: ["public"] }
             { operation: "insert",
 roles: ["editor", "user", "moderator"] }
         ]);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true); // 'user' matches
-        expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(false); // 'admin' doesn't match
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true); // 'user' matches
+        expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(false); // 'admin' doesn't match
     });
 
     test("16. Unknown role in rule denies everyone", () => {
@@ -217,9 +217,9 @@ roles: ["editor", "user", "moderator"] }
             { operation: "insert",
 roles: ["unknown_role_xyz"] }
         ]);
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-        expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(false);
-        expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(false);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(false);
+        expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(false);
+        expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(false);
     });
 
     // ─── Section 4: Access Shortcuts (access: "public") ───────────────────────────
@@ -235,36 +235,36 @@ access: "public" }
 
     // ─── Section 5: Owner Fields ───────────────────────────────────────────────────
 
-    test("18. ownerField: user can edit their own snapshot, not others'", () => {
+    test("18. ownerField: user can edit their own entity, not others'", () => {
         const collection = createMockCollection([
             { operation: "update",
 ownerField: "user_id" }
         ]);
-        const owned = createMockSnapshot({ user_id: "user-123" });
-        const notOwned = createMockSnapshot({ user_id: "other-user" });
-        expect(canEditSnapshot(collection, mockAuthController, "test", owned)).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", notOwned)).toBe(false);
+        const owned = createMockEntity({ user_id: "user-123" });
+        const notOwned = createMockEntity({ user_id: "other-user" });
+        expect(canEditEntity(collection, mockAuthController, "test", owned)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", notOwned)).toBe(false);
     });
 
-    test("19. ownerField: unauthenticated user (no uid) cannot own any snapshot", () => {
+    test("19. ownerField: unauthenticated user (no uid) cannot own any entity", () => {
         const collection = createMockCollection([
             { operation: "update",
 ownerField: "user_id" }
         ]);
-        const snapshot = createMockSnapshot({ user_id: "user-123" });
-        expect(canEditSnapshot(collection, unauthenticatedController, "test", snapshot)).toBe(false);
+        const entity = createMockEntity({ user_id: "user-123" });
+        expect(canEditEntity(collection, unauthenticatedController, "test", entity)).toBe(false);
     });
 
-    test("20. ownerField with null snapshot is OPTIMISTICALLY enabled (UI has no data yet)", () => {
-        // NOTE: This is by design — the UI cannot know ownership before snapshot exists.
+    test("20. ownerField with null entity is OPTIMISTICALLY enabled (UI has no data yet)", () => {
+        // NOTE: This is by design — the UI cannot know ownership before entity exists.
         // The backend will enforce the actual denial. This is documented behavior.
         const collection = createMockCollection([
             { operation: "update",
 ownerField: "user_uid" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
         // Even unauthenticated! The button shows, backend blocks.
-        expect(canEditSnapshot(collection, unauthenticatedController, "test", null)).toBe(true);
+        expect(canEditEntity(collection, unauthenticatedController, "test", null)).toBe(true);
     });
 
     test("21. ownerField: admin cannot bypass ownerField without an 'admin' role rule", () => {
@@ -272,12 +272,12 @@ ownerField: "user_uid" }
             { operation: "update",
 ownerField: "user_id" }
         ]);
-        const adminOwnedSnapshot = createMockSnapshot({ user_id: "admin-123" });
-        const regularSnapshot = createMockSnapshot({ user_id: "user-123" });
-        // Admin owns this snapshot
-        expect(canEditSnapshot(collection, adminAuthController, "test", adminOwnedSnapshot)).toBe(true);
-        // Admin does NOT own this snapshot — denied!
-        expect(canEditSnapshot(collection, adminAuthController, "test", regularSnapshot)).toBe(false);
+        const adminOwnedEntity = createMockEntity({ user_id: "admin-123" });
+        const regularEntity = createMockEntity({ user_id: "user-123" });
+        // Admin owns this entity
+        expect(canEditEntity(collection, adminAuthController, "test", adminOwnedEntity)).toBe(true);
+        // Admin does NOT own this entity — denied!
+        expect(canEditEntity(collection, adminAuthController, "test", regularEntity)).toBe(false);
     });
 
     test("22. ownerField used in a delete rule", () => {
@@ -285,10 +285,10 @@ ownerField: "user_id" }
             { operation: "delete",
 ownerField: "author_uid" }
         ]);
-        const owned = createMockSnapshot({ author_uid: "user-123" });
-        const notOwned = createMockSnapshot({ author_uid: "someone-else" });
-        expect(canDeleteSnapshot(collection, mockAuthController, "test", owned)).toBe(true);
-        expect(canDeleteSnapshot(collection, mockAuthController, "test", notOwned)).toBe(false);
+        const owned = createMockEntity({ author_uid: "user-123" });
+        const notOwned = createMockEntity({ author_uid: "someone-else" });
+        expect(canDeleteEntity(collection, mockAuthController, "test", owned)).toBe(true);
+        expect(canDeleteEntity(collection, mockAuthController, "test", notOwned)).toBe(false);
     });
 
     // ─── Section 6: SQL AST Evaluation ───────────────────────────────────────────
@@ -298,8 +298,8 @@ ownerField: "author_uid" }
             { operation: "update",
 using: "status = 'published'" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "published" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "draft" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "published" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "draft" }))).toBe(false);
     });
 
     test("24. AST: simple inequality check", () => {
@@ -307,8 +307,8 @@ using: "status = 'published'" }
             { operation: "update",
 using: "status != 'archived'" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "draft" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "archived" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "draft" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "archived" }))).toBe(false);
     });
 
     test("25. AST: current_setting('app.user_id') comparison", () => {
@@ -316,8 +316,8 @@ using: "status != 'archived'" }
             { operation: "update",
 using: "author_uid = current_setting('app.user_id')" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ author_uid: "user-123" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ author_uid: "other" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ author_uid: "user-123" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ author_uid: "other" }))).toBe(false);
     });
 
     test("26. AST: current_setting reversed operand order", () => {
@@ -325,8 +325,8 @@ using: "author_uid = current_setting('app.user_id')" }
             { operation: "update",
 using: "current_setting('app.user_id') = author_uid" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ author_uid: "user-123" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ author_uid: "other" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ author_uid: "user-123" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ author_uid: "other" }))).toBe(false);
     });
 
     test("27. AST: current_setting with extra whitespace in SQL string", () => {
@@ -334,8 +334,8 @@ using: "current_setting('app.user_id') = author_uid" }
             { operation: "update",
 using: "author_uid=current_setting (  'app.user_id'  )" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ author_uid: "user-123" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ author_uid: "other" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ author_uid: "user-123" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ author_uid: "other" }))).toBe(false);
     });
 
     test("28. AST: complex SQL with AND/OR is evaluated by the parser", () => {
@@ -344,23 +344,23 @@ using: "author_uid=current_setting (  'app.user_id'  )" }
 using: "status IN ('published', 'draft') AND author_id = current_setting('app.user_id')" }
         ]);
         // IN clause is optimistic true, but AND requires author_id to match user uid
-        const mismatchSnapshot = createMockSnapshot({ status: "archived",
+        const mismatchEntity = createMockEntity({ status: "archived",
 author_id: "someone-else" });
-        expect(canEditSnapshot(collection, mockAuthController, "test", mismatchSnapshot)).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", mismatchEntity)).toBe(false);
 
         // When author_id matches the current user, AND passes
-        const matchingSnapshot = createMockSnapshot({ status: "published",
+        const matchingEntity = createMockEntity({ status: "published",
 author_id: "user-123" });
-        expect(canEditSnapshot(collection, mockAuthController, "test", matchingSnapshot)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", matchingEntity)).toBe(true);
     });
 
-    test("29. AST: null snapshot ALWAYS optimistically passes SQL evaluation", () => {
+    test("29. AST: null entity ALWAYS optimistically passes SQL evaluation", () => {
         const collection = createMockCollection([
             { operation: "update",
 using: "status = 'published'" }
         ]);
-        // Even a simple parseable SQL works optimistically with null snapshot
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        // Even a simple parseable SQL works optimistically with null entity
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
     });
 
     // ─── Section 7: using AND withCheck (both must pass) ─────────────────────────
@@ -371,10 +371,10 @@ using: "status = 'published'" }
 using: "status = 'draft'",
 withCheck: "title_length > 5" }
         ]);
-        // As the snapshot values are strings, title_length > 5 won't parse cleanly → optimistic true for withCheck
+        // As the entity values are strings, title_length > 5 won't parse cleanly → optimistic true for withCheck
         // status = 'draft' WILL parse and must match
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "draft" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "published" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "draft" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "published" }))).toBe(false);
     });
 
     test("31. using passes but withCheck fails → rule denied", () => {
@@ -383,10 +383,10 @@ withCheck: "title_length > 5" }
 using: "status = 'draft'",
 withCheck: "visibility = 'public'" }
         ]);
-        const snapshot = createMockSnapshot({ status: "draft",
+        const entity = createMockEntity({ status: "draft",
 visibility: "private" });
         // using passes (status is 'draft'), withCheck fails (visibility is 'private')
-        expect(canEditSnapshot(collection, mockAuthController, "test", snapshot)).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", entity)).toBe(false);
     });
 
     test("32. withCheck without using: evaluated independently", () => {
@@ -395,8 +395,8 @@ visibility: "private" });
 using: "true",
 withCheck: "status = 'draft'" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "draft" }))).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", createMockSnapshot({ status: "published" }))).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "draft" }))).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", createMockEntity({ status: "published" }))).toBe(false);
     });
 
     // ─── Section 8: Permissive Mode ───────────────────────────────────────────────
@@ -410,14 +410,14 @@ mode: "permissive" },
 ownerField: "user_id",
 mode: "permissive" }
         ]);
-        const owned = createMockSnapshot({ user_id: "user-123" });
-        const notOwned = createMockSnapshot({ user_id: "other" });
+        const owned = createMockEntity({ user_id: "user-123" });
+        const notOwned = createMockEntity({ user_id: "other" });
         // Admin: first rule passes
-        expect(canEditSnapshot(collection, adminAuthController, "test", notOwned)).toBe(true);
-        // Author: second rule passes for owned snapshot
-        expect(canEditSnapshot(collection, mockAuthController, "test", owned)).toBe(true);
-        // Author: neither rule passes for unowned snapshot
-        expect(canEditSnapshot(collection, mockAuthController, "test", notOwned)).toBe(false);
+        expect(canEditEntity(collection, adminAuthController, "test", notOwned)).toBe(true);
+        // Author: second rule passes for owned entity
+        expect(canEditEntity(collection, mockAuthController, "test", owned)).toBe(true);
+        // Author: neither rule passes for unowned entity
+        expect(canEditEntity(collection, mockAuthController, "test", notOwned)).toBe(false);
     });
 
     test("34. A single permissive rule that fails → denied", () => {
@@ -426,7 +426,7 @@ mode: "permissive" }
 roles: ["admin"],
 mode: "permissive" }
         ]);
-        expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(false);
     });
 
     // ─── Section 9: Restrictive Mode ────────────────────────────────────────────
@@ -444,7 +444,7 @@ using: "status = 'draft'" }
         expect(canReadCollection(collection, unauthenticatedController)).toBe(false);
     });
 
-    test("36. Permissive base + restrictive filter: snapshot matching restrictor passes", () => {
+    test("36. Permissive base + restrictive filter: entity matching restrictor passes", () => {
         const collection = createMockCollection([
             { operation: "update",
 access: "public",
@@ -453,10 +453,10 @@ mode: "permissive" },
 mode: "restrictive",
 using: "owner_id = current_setting('app.user_id')" }
         ]);
-        const owned = createMockSnapshot({ owner_id: "user-123" });
-        const notOwned = createMockSnapshot({ owner_id: "other-user" });
-        expect(canEditSnapshot(collection, mockAuthController, "test", owned)).toBe(true);
-        expect(canEditSnapshot(collection, mockAuthController, "test", notOwned)).toBe(false);
+        const owned = createMockEntity({ owner_id: "user-123" });
+        const notOwned = createMockEntity({ owner_id: "other-user" });
+        expect(canEditEntity(collection, mockAuthController, "test", owned)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", notOwned)).toBe(false);
     });
 
     test("37. Restrictive rule with role filter: only applies to users with that role", () => {
@@ -471,17 +471,17 @@ roles: ["author"],
 mode: "restrictive",
 using: "status = 'published'" }
         ]);
-        const draftSnapshot = createMockSnapshot({ status: "draft" });
-        const publishedSnapshot = createMockSnapshot({ status: "published" });
+        const draftEntity = createMockEntity({ status: "draft" });
+        const publishedEntity = createMockEntity({ status: "published" });
 
         // Admin has no "author" role → restrictive rule does NOT apply to admin → permissive grants true
-        expect(canEditSnapshot(collection, adminAuthController, "test", draftSnapshot)).toBe(true);
+        expect(canEditEntity(collection, adminAuthController, "test", draftEntity)).toBe(true);
 
         // Author HAS "author" role → restrictive rule applies → draft fails restrictive → denied
-        expect(canEditSnapshot(collection, mockAuthController, "test", draftSnapshot)).toBe(false);
+        expect(canEditEntity(collection, mockAuthController, "test", draftEntity)).toBe(false);
 
         // Author + published → restrictive passes → permissive grants true
-        expect(canEditSnapshot(collection, mockAuthController, "test", publishedSnapshot)).toBe(true);
+        expect(canEditEntity(collection, mockAuthController, "test", publishedEntity)).toBe(true);
     });
 
     test("38. Restrictive rule fails immediately, does not continue to permissive", () => {
@@ -495,42 +495,42 @@ mode: "restrictive",
 using: "status = 'draft'" }
         ]);
 
-        // With null snapshot: evaluateAST("status = 'draft'", ..., null) → true (optimistic)
+        // With null entity: evaluateAST("status = 'draft'", ..., null) → true (optimistic)
         // So restrictive passes → permissive also passes → true
-        expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+        expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
 
-        // With real snapshot that fails the restrictive check: immediate deny
-        const publishedSnapshot = createMockSnapshot({ status: "published" });
-        expect(canCreateSnapshot(collection, mockAuthController, "test", publishedSnapshot)).toBe(false);
+        // With real entity that fails the restrictive check: immediate deny
+        const publishedEntity = createMockEntity({ status: "published" });
+        expect(canCreateEntity(collection, mockAuthController, "test", publishedEntity)).toBe(false);
 
-        const draftSnapshot = createMockSnapshot({ status: "draft" });
-        expect(canCreateSnapshot(collection, mockAuthController, "test", draftSnapshot)).toBe(true);
+        const draftEntity = createMockEntity({ status: "draft" });
+        expect(canCreateEntity(collection, mockAuthController, "test", draftEntity)).toBe(true);
     });
 
-    // ─── Section 10: UI Enablability (null snapshot = optimistic) ─────────────────
+    // ─── Section 10: UI Enablability (null entity = optimistic) ─────────────────
 
-    describe("UI enablability with null snapshots", () => {
+    describe("UI enablability with null entitys", () => {
 
         test("39. Create: role-gated rule → disabled for non-matching user", () => {
             const collection = createMockCollection([{ operation: "insert",
 roles: ["admin"] }]);
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(true);
-            expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(false);
         });
 
         test("40. Edit: role-gated rule → disabled for non-matching user", () => {
             const collection = createMockCollection([{ operation: "update",
 roles: ["admin"] }]);
-            expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canEditSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canEditEntity(collection, adminAuthController, "test", null)).toBe(true);
         });
 
         test("41. Delete: role-gated rule → disabled for non-matching user", () => {
             const collection = createMockCollection([{ operation: "delete",
 roles: ["admin"] }]);
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canDeleteSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canDeleteEntity(collection, adminAuthController, "test", null)).toBe(true);
         });
 
         test("42. Read: role-gated rule → disabled for non-matching user", () => {
@@ -540,28 +540,28 @@ roles: ["admin"] }]);
             expect(canReadCollection(collection, adminAuthController)).toBe(true);
         });
 
-        test("43. Create: complex SQL condition → optimistically enabled (null snapshot)", () => {
+        test("43. Create: complex SQL condition → optimistically enabled (null entity)", () => {
             const collection = createMockCollection([
                 { operation: "insert",
 using: "status = 'published' AND id IN (SELECT id FROM drafts)" }
             ]);
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
         });
 
-        test("44. Edit: ownerField with null snapshot → optimistically enabled", () => {
+        test("44. Edit: ownerField with null entity → optimistically enabled", () => {
             const collection = createMockCollection([{ operation: "update",
 ownerField: "user_uid" }]);
-            expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+            expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
             // Even unauth! Backend will block.
-            expect(canEditSnapshot(collection, unauthenticatedController, "test", null)).toBe(true);
+            expect(canEditEntity(collection, unauthenticatedController, "test", null)).toBe(true);
         });
 
         test("45. Delete: public rule → everyone enabled", () => {
             const collection = createMockCollection([{ operation: "delete",
 access: "public" }]);
-            expect(canDeleteSnapshot(collection, unauthenticatedController, "test", null)).toBe(true);
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-            expect(canDeleteSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canDeleteEntity(collection, unauthenticatedController, "test", null)).toBe(true);
+            expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(true);
+            expect(canDeleteEntity(collection, adminAuthController, "test", null)).toBe(true);
         });
 
         test("46. Read: sole restrictive rule → disabled for everyone", () => {
@@ -575,7 +575,7 @@ using: "status = 'draft'" }
             expect(canReadCollection(collection, unauthenticatedController)).toBe(false);
         });
 
-        test("47. Create: public permissive + data-level restrictive → optimistically true (null snapshot)", () => {
+        test("47. Create: public permissive + data-level restrictive → optimistically true (null entity)", () => {
             const collection = createMockCollection([
                 { operation: "insert",
 access: "public",
@@ -584,12 +584,12 @@ mode: "permissive" },
 mode: "restrictive",
 using: "status = 'published'" }
             ]);
-            // null snapshot → restrictive evaluateAST returns true (optimistic) → passes → permissive grants → true
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-            expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(true);
+            // null entity → restrictive evaluateAST returns true (optimistic) → passes → permissive grants → true
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(true);
         });
 
-        test("48. Create: admin-permissive + author-restrictive → admin enabled, author disabled (null snapshot)", () => {
+        test("48. Create: admin-permissive + author-restrictive → admin enabled, author disabled (null entity)", () => {
             const collection = createMockCollection([
                 { operation: "insert",
 roles: ["admin"],
@@ -600,11 +600,11 @@ mode: "restrictive",
 using: "status = 'draft'" }
             ]);
             // Admin: only the permissive rule applies → true
-            expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
             // Author: restrictive rule applies + passes (null-optimistic), BUT no permissive rule → false
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(false);
             // Unauth: no rules apply → false
-            expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(false);
         });
 
         test("49. Edit: any rule without matching op → disabled", () => {
@@ -612,8 +612,8 @@ using: "status = 'draft'" }
                 { operation: "insert",
 access: "public" }
             ]);
-            expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canEditSnapshot(collection, unauthenticatedController, "test", null)).toBe(false);
+            expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canEditEntity(collection, unauthenticatedController, "test", null)).toBe(false);
         });
 
         test("50. All CRUD disabled when all rules have unknown role", () => {
@@ -621,9 +621,9 @@ access: "public" }
                 { operation: "all",
 roles: ["nonexistent_role"] }
             ]);
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(false);
             expect(canReadCollection(collection, mockAuthController)).toBe(false);
         });
     });
@@ -641,25 +641,25 @@ mode: "permissive" },
 roles: ["author"],
 mode: "permissive" }
             ]);
-            expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(true);
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
-            expect(canCreateSnapshot(collection, unauthenticatedController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, unauthenticatedController, "test", null)).toBe(false);
         });
 
-        test("52. Admin can delete anything, author only their own snapshots", () => {
+        test("52. Admin can delete anything, author only their own entitys", () => {
             const collection = createMockCollection([
                 { operation: "delete",
 roles: ["admin"] },
                 { operation: "delete",
 ownerField: "author_uid" }
             ]);
-            const authorSnapshot = createMockSnapshot({ author_uid: "user-123" });
-            const hackerSnapshot = createMockSnapshot({ author_uid: "hacker" });
+            const authorEntity = createMockEntity({ author_uid: "user-123" });
+            const hackerEntity = createMockEntity({ author_uid: "hacker" });
 
-            expect(canDeleteSnapshot(collection, adminAuthController, "test", authorSnapshot)).toBe(true);
-            expect(canDeleteSnapshot(collection, adminAuthController, "test", hackerSnapshot)).toBe(true);
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", authorSnapshot)).toBe(true);
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", hackerSnapshot)).toBe(false);
+            expect(canDeleteEntity(collection, adminAuthController, "test", authorEntity)).toBe(true);
+            expect(canDeleteEntity(collection, adminAuthController, "test", hackerEntity)).toBe(true);
+            expect(canDeleteEntity(collection, mockAuthController, "test", authorEntity)).toBe(true);
+            expect(canDeleteEntity(collection, mockAuthController, "test", hackerEntity)).toBe(false);
         });
 
         test("53. Role OR owner combinded: admin by role, others by ownership", () => {
@@ -671,12 +671,12 @@ mode: "permissive" },
 ownerField: "user_id",
 mode: "permissive" }
             ]);
-            const owned = createMockSnapshot({ user_id: "user-123" });
-            const notOwned = createMockSnapshot({ user_id: "other" });
+            const owned = createMockEntity({ user_id: "user-123" });
+            const notOwned = createMockEntity({ user_id: "other" });
 
-            expect(canEditSnapshot(collection, adminAuthController, "test", notOwned)).toBe(true);
-            expect(canEditSnapshot(collection, mockAuthController, "test", owned)).toBe(true);
-            expect(canEditSnapshot(collection, mockAuthController, "test", notOwned)).toBe(false);
+            expect(canEditEntity(collection, adminAuthController, "test", notOwned)).toBe(true);
+            expect(canEditEntity(collection, mockAuthController, "test", owned)).toBe(true);
+            expect(canEditEntity(collection, mockAuthController, "test", notOwned)).toBe(false);
         });
 
         test("54. 'all' rule permissive base + specific delete restrictive", () => {
@@ -688,15 +688,15 @@ mode: "permissive" },
 mode: "restrictive",
 using: "is_deletable = 'true'" }
             ]);
-            const deletable = createMockSnapshot({ is_deletable: "true" });
-            const notDeletable = createMockSnapshot({ is_deletable: "false" });
+            const deletable = createMockEntity({ is_deletable: "true" });
+            const notDeletable = createMockEntity({ is_deletable: "false" });
 
             // Reading still works (only 'all' permissive applies to select)
             expect(canReadCollection(collection, mockAuthController)).toBe(true);
-            // Deletable snapshot passes restrictive
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", deletable)).toBe(true);
-            // Non-deletable snapshot fails restrictive
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", notDeletable)).toBe(false);
+            // Deletable entity passes restrictive
+            expect(canDeleteEntity(collection, mockAuthController, "test", deletable)).toBe(true);
+            // Non-deletable entity fails restrictive
+            expect(canDeleteEntity(collection, mockAuthController, "test", notDeletable)).toBe(false);
         });
 
         test("55. Three-user-role scenario: platform role hierarchy", () => {
@@ -725,19 +725,19 @@ roles: ["admin"] } // delete admin only
 
             // Admin
             expect(canReadCollection(collection, adminAuthController)).toBe(true);
-            expect(canCreateSnapshot(collection, adminAuthController, "test", null)).toBe(true);
-            expect(canEditSnapshot(collection, adminAuthController, "test", null)).toBe(true);
-            expect(canDeleteSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canCreateEntity(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canEditEntity(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canDeleteEntity(collection, adminAuthController, "test", null)).toBe(true);
             // Editor
             expect(canReadCollection(collection, editorAuth)).toBe(true);
-            expect(canCreateSnapshot(collection, editorAuth, "test", null)).toBe(true);
-            expect(canEditSnapshot(collection, editorAuth, "test", null)).toBe(false);
-            expect(canDeleteSnapshot(collection, editorAuth, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, editorAuth, "test", null)).toBe(true);
+            expect(canEditEntity(collection, editorAuth, "test", null)).toBe(false);
+            expect(canDeleteEntity(collection, editorAuth, "test", null)).toBe(false);
             // Author (mockUser)
             expect(canReadCollection(collection, mockAuthController)).toBe(true);
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(false);
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(false);
             // Unauth
             expect(canReadCollection(collection, unauthenticatedController)).toBe(false);
         });
@@ -764,31 +764,31 @@ roles: ["editor"] },
 roles: ["admin"] }
             ]);
 
-            const draft = createMockSnapshot({ status: "draft",
+            const draft = createMockEntity({ status: "draft",
 author_id: "user-123" });
-            const published = createMockSnapshot({ status: "published",
+            const published = createMockEntity({ status: "published",
 author_id: "user-123" });
-            const othersDraft = createMockSnapshot({ status: "draft",
+            const othersDraft = createMockEntity({ status: "draft",
 author_id: "someone-else" });
 
-            // Author can create (null snapshot, optimistic)
-            expect(canCreateSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+            // Author can create (null entity, optimistic)
+            expect(canCreateEntity(collection, mockAuthController, "test", null)).toBe(true);
             // Author can edit their own draft
-            expect(canEditSnapshot(collection, mockAuthController, "test", draft)).toBe(true);
+            expect(canEditEntity(collection, mockAuthController, "test", draft)).toBe(true);
             // Author CANNOT edit their own published content (status = 'published' fails using)
-            expect(canEditSnapshot(collection, mockAuthController, "test", published)).toBe(false);
+            expect(canEditEntity(collection, mockAuthController, "test", published)).toBe(false);
             // Author CANNOT edit others' drafts
-            expect(canEditSnapshot(collection, mockAuthController, "test", othersDraft)).toBe(false);
+            expect(canEditEntity(collection, mockAuthController, "test", othersDraft)).toBe(false);
             // Author CANNOT delete
-            expect(canDeleteSnapshot(collection, mockAuthController, "test", null)).toBe(false);
+            expect(canDeleteEntity(collection, mockAuthController, "test", null)).toBe(false);
             // Admin CAN delete
-            expect(canDeleteSnapshot(collection, adminAuthController, "test", null)).toBe(true);
+            expect(canDeleteEntity(collection, adminAuthController, "test", null)).toBe(true);
         });
 
         test("57. Unauthenticated user: ownerField rule denies, SQL rule without roles still grants", () => {
             // Three update rules, each independently permissive (OR logic).
             // Rule 1: admin-only role → unauthenticated lacks it → filtered out
-            // Rule 2: ownerField user_id → snapshot.user_id = null, auth.uid = undefined → null !== undefined → fails
+            // Rule 2: ownerField user_id → entity.user_id = null, auth.uid = undefined → null !== undefined → fails
             // Rule 3: using status = 'draft' → passes, has no role restriction → grants true
             // Result: true (rule 3 wins)
             const collection = createMockCollection([
@@ -799,9 +799,9 @@ ownerField: "user_id" },
                 { operation: "update",
 using: "status = 'draft'" }
             ]);
-            const draftOwned = createMockSnapshot({ user_id: null,
+            const draftOwned = createMockEntity({ user_id: null,
 status: "draft" });
-            expect(canEditSnapshot(collection, unauthenticatedController, "test", draftOwned)).toBe(true);
+            expect(canEditEntity(collection, unauthenticatedController, "test", draftOwned)).toBe(true);
 
             // To actually restrict unauthenticated users, the 3rd rule needs a role guard:
             const restrictedCollection = createMockCollection([
@@ -813,15 +813,15 @@ ownerField: "user_id" },
 roles: ["author"],
 using: "status = 'draft'" }
             ]);
-            expect(canEditSnapshot(collection, unauthenticatedController, "test", draftOwned)).toBe(true);
-            expect(canEditSnapshot(restrictedCollection, unauthenticatedController, "test", draftOwned)).toBe(false);
+            expect(canEditEntity(collection, unauthenticatedController, "test", draftOwned)).toBe(true);
+            expect(canEditEntity(restrictedCollection, unauthenticatedController, "test", draftOwned)).toBe(false);
         });
 
         test("58. Missing authController ('blankAuth') handled gracefully", () => {
             const collection = createMockCollection([{ operation: "insert",
 roles: ["admin"] }]);
             const blankAuth = { user: null } as unknown as AuthController<User>;
-            expect(canCreateSnapshot(collection, blankAuth, "test", null)).toBe(false);
+            expect(canCreateEntity(collection, blankAuth, "test", null)).toBe(false);
         });
 
         test("59. SQL injection-like string in 'using' is safely treated as unparseable → optimistic", () => {
@@ -830,7 +830,7 @@ roles: ["admin"] }]);
 using: "\"); DROP TABLE users; --" }
             ]);
             // Frontend never executes SQL, just parses. Malformed string → optimistic pass
-            expect(canEditSnapshot(collection, mockAuthController, "test", null)).toBe(true);
+            expect(canEditEntity(collection, mockAuthController, "test", null)).toBe(true);
         });
     });
 });

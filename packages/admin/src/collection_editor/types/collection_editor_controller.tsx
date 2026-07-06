@@ -1,5 +1,5 @@
 import { CollectionsConfigController } from "./config_controller";
-import { Snapshot, CollectionConfig, Property } from "@rebasepro/types";
+import { Entity, CollectionConfig, Property } from "@rebasepro/types";
 
 /**
  * Controller to open the collection editor dialog.
@@ -10,9 +10,9 @@ export interface CollectionEditorController {
     editCollection: (props: {
         id?: string,
         path?: string,
-        parentCollectionSlugs: string[], parentSnapshotIds: string[],
+        parentCollectionSlugs: string[], parentEntityIds: string[],
         parentCollection?: CollectionConfig,
-        existingSnapshots?: Snapshot<any>[],
+        existingEntitys?: Entity<any>[],
         /**
          * Initial view to open: "general", "display", or "properties"
          */
@@ -35,7 +35,7 @@ export interface CollectionEditorController {
          * pre-populated with the same properties (but with empty name, path, and id).
          */
         copyFrom?: CollectionConfig,
-        parentCollectionSlugs: string[], parentSnapshotIds: string[],
+        parentCollectionSlugs: string[], parentEntityIds: string[],
         parentCollection?: CollectionConfig,
         redirect: boolean,
         sourceClick?: string
@@ -46,9 +46,9 @@ export interface CollectionEditorController {
         property?: Property,
         currentPropertiesOrder?: string[],
         editedCollectionId: string,
-        parentCollectionSlugs: string[], parentSnapshotIds: string[],
+        parentCollectionSlugs: string[], parentEntityIds: string[],
         collection: CollectionConfig,
-        existingSnapshots: Snapshot<any>[]
+        existingEntitys: Entity<any>[]
     }) => void;
 
     /**

@@ -218,7 +218,7 @@ export function mergeDeep<T extends object, U extends object>(
                     (output as Record<string, unknown>)[key] = [...sourceValue];
                 }
             } else if (isPlainObject(sourceValue)) {
-                // If source value is a plain object (not a class instance like SnapshotReference, GeoPoint, etc.):
+                // If source value is a plain object (not a class instance like EntityReference, GeoPoint, etc.):
                 if (isPlainObject(outputValue)) {
                     // If the corresponding value in output (from target) is also a plain object, recurse.
                     // Ensure the ignoreUndefined flag is passed down.
@@ -294,7 +294,7 @@ export function removeFunctions(o: unknown): unknown {
         if (Array.isArray(o)) {
             return o.map(v => removeFunctions(v));
         }
-        // Preserve class instances (SnapshotReference, GeoPoint, etc.) - don't recurse into them
+        // Preserve class instances (EntityReference, GeoPoint, etc.) - don't recurse into them
         if (!isPlainObject(o)) {
             return o;
         }
@@ -336,7 +336,7 @@ export function removeUndefined(value: unknown, removeEmptyStrings?: boolean): u
     if (typeof value === "object") {
         if (value === null)
             return value;
-        // Preserve class instances (SnapshotReference, GeoPoint, etc.) - don't recurse into them
+        // Preserve class instances (EntityReference, GeoPoint, etc.) - don't recurse into them
         if (!isPlainObject(value)) {
             return value;
         }
@@ -365,7 +365,7 @@ export function removeNulls(value: unknown): unknown {
     if (typeof value === "object") {
         if (value === null)
             return value;
-        // Preserve class instances (SnapshotReference, GeoPoint, etc.) - don't recurse into them
+        // Preserve class instances (EntityReference, GeoPoint, etc.) - don't recurse into them
         if (!isPlainObject(value)) {
             return value;
         }

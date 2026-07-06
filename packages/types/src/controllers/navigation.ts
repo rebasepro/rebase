@@ -1,5 +1,5 @@
 import React from "react";
-import type { SnapshotReference } from "../types/snapshots";
+import type { EntityReference } from "../types/entitys";
 import type { CollectionConfig } from "../types/collections";
 
 
@@ -21,7 +21,7 @@ export type UrlController = {
     baseCollectionPath: string;
 
     /**
-     * Convert a URL path to a collection or snapshot path
+     * Convert a URL path to a collection or entity path
      * `/c/products` => `products`
      * `/my_cms/c/products/B34SAP8Z` => `products/B34SAP8Z`
      * `/my_cms/my_view` => `my_view`

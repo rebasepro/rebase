@@ -632,41 +632,41 @@ relationName: "categories" }
 
         it("should handle circular references", async () => {
             const aCollection: CollectionConfig = {
-                slug: "a_snapshots",
-                table: "a_snapshots",
-                name: "A Snapshots",
+                slug: "a_entitys",
+                table: "a_entitys",
+                name: "A Entitys",
                 properties: {
                     name: { type: "string" },
-                    b_snapshots: { type: "relation",
-relationName: "b_snapshots" }
+                    b_entitys: { type: "relation",
+relationName: "b_entitys" }
                 },
                 relations: [
                     {
-                        relationName: "b_snapshots",
+                        relationName: "b_entitys",
                         target: () => bCollection,
                         cardinality: "many",
                         direction: "inverse",
-                        foreignKeyOnTarget: "a_snapshot_id"
+                        foreignKeyOnTarget: "a_entity_id"
                     }
                 ]
             };
 
             const bCollection: CollectionConfig = {
-                slug: "b_snapshots",
-                table: "b_snapshots",
-                name: "B Snapshots",
+                slug: "b_entitys",
+                table: "b_entitys",
+                name: "B Entitys",
                 properties: {
                     name: { type: "string" },
-                    a_snapshot: { type: "relation",
-relationName: "a_snapshot" }
+                    a_entity: { type: "relation",
+relationName: "a_entity" }
                 },
                 relations: [
                     {
-                        relationName: "a_snapshot",
+                        relationName: "a_entity",
                         target: () => aCollection,
                         cardinality: "one",
                         direction: "owning",
-                        localKey: "a_snapshot_id"
+                        localKey: "a_entity_id"
                     }
                 ]
             };
@@ -676,12 +676,12 @@ relationName: "a_snapshot" }
 
             // Should handle circular references without infinite loops
             // The 'owning' relation on bCollection should correctly generate the FK
-            expect(cleanResult).toContain("export const aSnapshots = pgTable(\"a_snapshots\"");
-            expect(cleanResult).toContain("export const bSnapshots = pgTable(\"b_snapshots\"");
-            expect(cleanResult).toContain("a_snapshot_id: varchar(\"a_snapshot_id\").references(() => aSnapshots.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("export const aEntitys = pgTable(\"a_entitys\"");
+            expect(cleanResult).toContain("export const bEntitys = pgTable(\"b_entitys\"");
+            expect(cleanResult).toContain("a_entity_id: varchar(\"a_entity_id\").references(() => aEntitys.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
-            expect(cleanResult).toContain("\"b_snapshots\": many(bSnapshots, { relationName: \"b_snapshots_a_snapshot_id\" })");
-            expect(cleanResult).toContain("\"a_snapshot\": one(aSnapshots, { fields: [bSnapshots.a_snapshot_id], references: [aSnapshots.id], relationName: \"b_snapshots_a_snapshot_id\" })");
+            expect(cleanResult).toContain("\"b_entitys\": many(bEntitys, { relationName: \"b_entitys_a_entity_id\" })");
+            expect(cleanResult).toContain("\"a_entity\": one(aEntitys, { fields: [bEntitys.a_entity_id], references: [aEntitys.id], relationName: \"b_entitys_a_entity_id\" })");
         });
     });
 });

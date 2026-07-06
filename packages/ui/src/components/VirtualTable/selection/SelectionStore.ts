@@ -12,7 +12,7 @@ export function createVirtualTableSelectionStore<T extends SelectedCell = Select
     let selectedCell: T | undefined = undefined;
     const listeners = new Set<() => void>();
 
-    function getSnapshot(): T | undefined {
+    function getEntity(): T | undefined {
         return selectedCell;
     }
 
@@ -27,7 +27,7 @@ export function createVirtualTableSelectionStore<T extends SelectedCell = Select
     }
 
     return {
-        getSnapshot,
+        getEntity,
         subscribe,
         select
     };
@@ -43,12 +43,12 @@ export function useVirtualTableCellSelected<T extends SelectedCell = SelectedCel
     const selectorRef = useRef({ columnKey, id });
     selectorRef.current = { columnKey, id };
 
-    const getSnapshot = useCallback(() => {
-        const cell = store.getSnapshot();
+    const getEntity = useCallback(() => {
+        const cell = store.getEntity();
         if (!cell) return false;
         const s = selectorRef.current;
         return cell.columnKey === s.columnKey && cell.id === s.id;
     }, [store]);
 
-    return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+    return useSyncExternalStore(store.subscribe, getEntity, getEntity);
 }

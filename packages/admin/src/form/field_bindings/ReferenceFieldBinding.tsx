@@ -4,11 +4,11 @@ import type { FieldProps } from "../../types/fields";
 import type { Property, ReferenceProperty } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 
-import { Snapshot, SnapshotReference } from "@rebasepro/types";
+import { Entity, EntityReference } from "@rebasepro/types";
 import { ErrorView } from "@rebasepro/core";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { SnapshotPreviewContainer } from "../../components/RecordPreviewBinding";
+import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
 import { IconForView } from "@rebasepro/core";
 import { getIconForProperty } from "../../util/property_utils";
@@ -53,7 +53,7 @@ function ReferenceFieldBindingInternal({
         throw new Error("Property path is required for ReferenceFieldBinding");
     }
 
-    const refValue = value as SnapshotReference | null | undefined;
+    const refValue = value as EntityReference | null | undefined;
 
     useClearRestoreValue({
         property,
@@ -61,7 +61,7 @@ function ReferenceFieldBindingInternal({
         setValue
     });
 
-    const validValue = refValue && typeof refValue === "object" && "isSnapshotReference" in refValue && refValue.isSnapshotReference();
+    const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
 
     const collectionRegistryController = useCollectionRegistryController();
     const collection: CollectionConfig | undefined = useMemo(() => {
@@ -72,7 +72,7 @@ function ReferenceFieldBindingInternal({
         throw Error(`Couldn't find the corresponding collection for the path: ${property.path}`);
     }
 
-    const onSingleSnapshotSelected = useCallback((e: Snapshot<Record<string, unknown>> | null) => {
+    const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
         const ref = e ? getReferenceFrom(e) : null;
         setValue(ref);
     }, [setValue, propertyKey]);
@@ -81,8 +81,8 @@ function ReferenceFieldBindingInternal({
         multiselect: false,
         path: property.path,
         collection,
-        onSingleSnapshotSelected,
-        selectedSnapshotIds: validValue && refValue ? [refValue.id] : undefined,
+        onSingleEntitySelected,
+        selectedEntityIds: validValue && refValue ? [refValue.id] : undefined,
         fixedFilter: property.fixedFilter
     }
     );
@@ -113,12 +113,12 @@ function ReferenceFieldBindingInternal({
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
                     reference={refValue}
-                    includeSnapshotLink={property.includeSnapshotLink}
+                    includeEntityLink={property.includeEntityLink}
                     includeId={property.includeId}
                 />}
 
                 {!refValue && <div className="justify-center text-left">
-                    <SnapshotPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
+                    <EntityPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}
@@ -127,7 +127,7 @@ function ReferenceFieldBindingInternal({
                         <IconForView collectionOrView={collection}
                             className={"text-surface-300 dark:text-surface-600"}/>
                         {`Edit ${property.name}`.toUpperCase()}
-                    </SnapshotPreviewContainer>
+                    </EntityPreviewContainer>
                 </div>}
             </>}
 

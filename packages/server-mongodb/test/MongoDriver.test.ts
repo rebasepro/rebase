@@ -79,31 +79,31 @@ describe("MongoDriver", () => {
 
 
     describe("fetchOne", () => {
-        it("should fetch a snapshot", async () => {
+        it("should fetch a entity", async () => {
             // Insert test data
             const result = await db.collection("users").insertOne({
                 name: "Test User",
                 email: "test@example.com"
             });
 
-            const snapshot = await delegate.fetchOne({
+            const entity = await delegate.fetchOne({
                 path: "users",
                 id: result.insertedId.toString(),
                 collection: mockCollection
             });
 
-            expect(snapshot).toBeDefined();
-            expect(snapshot?.name).toBe("Test User");
+            expect(entity).toBeDefined();
+            expect(entity?.name).toBe("Test User");
         });
 
-        it("should return undefined for non-existent snapshot", async () => {
-            const snapshot = await delegate.fetchOne({
+        it("should return undefined for non-existent entity", async () => {
+            const entity = await delegate.fetchOne({
                 path: "users",
                 id: new ObjectId().toString(),
                 collection: mockCollection
             });
 
-            expect(snapshot).toBeUndefined();
+            expect(entity).toBeUndefined();
         });
     });
 
@@ -119,41 +119,41 @@ age: 35 }
             ]);
         });
 
-        it("should fetch all snapshots", async () => {
-            const snapshots = await delegate.fetchCollection({
+        it("should fetch all entitys", async () => {
+            const entitys = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection
             });
 
-            expect(snapshots).toHaveLength(3);
+            expect(entitys).toHaveLength(3);
         });
 
         it("should apply limit", async () => {
-            const snapshots = await delegate.fetchCollection({
+            const entitys = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection,
                 limit: 2
             });
 
-            expect(snapshots).toHaveLength(2);
+            expect(entitys).toHaveLength(2);
         });
 
         it("should apply ordering", async () => {
-            const snapshots = await delegate.fetchCollection({
+            const entitys = await delegate.fetchCollection({
                 path: "users",
                 collection: mockCollection,
                 orderBy: "age",
                 order: "desc"
             });
 
-            const ages = snapshots.map(e => e.age);
+            const ages = entitys.map(e => e.age);
             expect(ages).toEqual([35, 30, 25]);
         });
     });
 
     describe("save", () => {
-        it("should create a new snapshot", async () => {
-            const snapshot = await delegate.save({
+        it("should create a new entity", async () => {
+            const entity = await delegate.save({
                 path: "users",
                 values: { name: "New User",
 email: "new@example.com" },
@@ -161,19 +161,19 @@ email: "new@example.com" },
                 status: "new"
             });
 
-            expect(snapshot.id).toBeDefined();
-            expect(snapshot.name).toBe("New User");
+            expect(entity.id).toBeDefined();
+            expect(entity.name).toBe("New User");
 
             // Verify it was saved
             const fetched = await delegate.fetchOne({
                 path: "users",
-                id: snapshot.id,
+                id: entity.id,
                 collection: mockCollection
             });
             expect(fetched?.name).toBe("New User");
         });
 
-        it("should update an existing snapshot", async () => {
+        it("should update an existing entity", async () => {
             // Create first
             const created = await delegate.save({
                 path: "users",
@@ -199,9 +199,9 @@ email: "test@example.com" },
     });
 
     describe("delete", () => {
-        it("should delete a snapshot", async () => {
+        it("should delete a entity", async () => {
             // Create
-            const snapshot = await delegate.save({
+            const entity = await delegate.save({
                 path: "users",
                 values: { name: "To Delete" },
                 collection: mockCollection,
@@ -210,14 +210,14 @@ email: "test@example.com" },
 
             // Delete — rows are flat, so the caller provides the collection path
             await delegate.delete({
-                row: { id: snapshot.id as string, path: "users" },
+                row: { id: entity.id as string, path: "users" },
                 collection: mockCollection
             });
 
             // Verify deleted
             const fetched = await delegate.fetchOne({
                 path: "users",
-                id: snapshot.id,
+                id: entity.id,
                 collection: mockCollection
             });
             expect(fetched).toBeUndefined();
@@ -233,7 +233,7 @@ email: "test@example.com" },
             ]);
         });
 
-        it("should count all snapshots", async () => {
+        it("should count all entitys", async () => {
             const count = await delegate.count({
                 path: "users",
                 collection: mockCollection
@@ -295,8 +295,8 @@ email: "test@example.com" },
                 const unsubscribe = delegate.listenCollection({
                     path: "users",
                     collection: mockCollection,
-                    onUpdate: (snapshots) => {
-                        expect(snapshots).toHaveLength(2);
+                    onUpdate: (entitys) => {
+                        expect(entitys).toHaveLength(2);
                         unsubscribe();
                         done();
                     },
@@ -330,8 +330,8 @@ email: "test@example.com" },
                     path: "users",
                     id,
                     collection: mockCollection,
-                    onUpdate: (snapshot) => {
-                        expect(snapshot?.name).toBe("Test User");
+                    onUpdate: (entity) => {
+                        expect(entity?.name).toBe("Test User");
                         unsubscribe();
                         done();
                     },

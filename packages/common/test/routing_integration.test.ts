@@ -75,7 +75,7 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
         expect(fs.fetchCollection).not.toHaveBeenCalled();
     });
 
-    it("routes by the accessed path (snapshot sub-path inherits the source)", async () => {
+    it("routes by the accessed path (entity sub-path inherits the source)", async () => {
         const { routed, fs } = buildRouted();
         await routed.collection("events/evt1").findById("evt1");
         expect(fs.fetchOne).toHaveBeenCalledTimes(1);

@@ -13,13 +13,13 @@ export {
 } from "@rebasepro/common";
 
 /**
- * Navigate to a snapshot using either a side panel or full-screen mode.
+ * Navigate to a entity using either a side panel or full-screen mode.
  * This is an admin-specific UI concern and lives here (not in common).
  */
-export function navigateToSnapshot({
-    openSnapshotMode,
+export function navigateToEntity({
+    openEntityMode,
     collection,
-    snapshotId,
+    entityId,
     copy,
     path,
     selectedTab,
@@ -31,14 +31,14 @@ export function navigateToSnapshot({
 }:
 
     {
-        openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+        openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
         collection?: CollectionConfig;
-        snapshotId?: string | number;
+        entityId?: string | number;
         selectedTab?: string;
         copy?: boolean;
         /**
-         * Pre-populate the new snapshot form with these values.
-         * Only applied when snapshotId is not set (i.e. "new" mode).
+         * Pre-populate the new entity form with these values.
+         * Only applied when entityId is not set (i.e. "new" mode).
          *
          * Side panel: passed through SidePanelBindingProps → EditViewBinding.
          * Full screen: carried via React Router location.state so the route
@@ -52,23 +52,23 @@ export function navigateToSnapshot({
         replace?: boolean;
     }) {
 
-    if (openSnapshotMode === "side_panel" || openSnapshotMode === "dialog") {
+    if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
 
 
         sidePanelController.open({
-            snapshotId,
+            entityId,
             path: path,
             copy,
             selectedTab,
             collection,
-            updateUrl: openSnapshotMode !== "dialog",
+            updateUrl: openEntityMode !== "dialog",
             onClose,
             defaultValues
         });
 
     } else {
-        let to = navigation.buildUrlCollectionPath(snapshotId ? `${path ?? path}/${snapshotId}` : path ?? path);
-        if (snapshotId && selectedTab) {
+        let to = navigation.buildUrlCollectionPath(entityId ? `${path ?? path}/${entityId}` : path ?? path);
+        if (entityId && selectedTab) {
             to += `/${selectedTab}`;
         }
         // Preserve the __view query param so the target route knows the current view mode
@@ -76,7 +76,7 @@ export function navigateToSnapshot({
         if (currentViewParam) {
             to += `${to.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
         }
-        if (!snapshotId) {
+        if (!entityId) {
             to += "#new";
         }
         if (copy) {
@@ -84,7 +84,7 @@ export function navigateToSnapshot({
         }
         // Use React Router location.state to carry defaultValues — the correct SPA
         // approach. No URL size limits, no encoding, nothing in the address bar.
-        // SnapshotFullScreenRoute reads location.state.defaultValues on mount.
+        // EntityFullScreenRoute reads location.state.defaultValues on mount.
         const navigateOptions: NavigateOptions = {};
         if (replace !== undefined) {
             navigateOptions.replace = replace;

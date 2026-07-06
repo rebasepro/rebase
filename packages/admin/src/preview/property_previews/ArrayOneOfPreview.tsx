@@ -15,7 +15,7 @@ export function ArrayOneOfPreview({
     value,
     property: property,
     size
-    // snapshot
+    // entity
 }: PropertyPreviewProps<ArrayProperty>) {
 
     if (property.type !== "array")
@@ -57,7 +57,7 @@ export function ArrayOneOfPreview({
                                     <PropertyPreview
                                         propertyKey={propertyKey}
                                         value={val[valueField]}
-                                        // snapshot={snapshot}
+                                        // entity={entity}
                                         property={resolvedProperty as Property}
                                         size={childSize}/>
                                 </ErrorBoundary>

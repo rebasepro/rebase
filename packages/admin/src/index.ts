@@ -9,14 +9,14 @@ export * from "./routes";
 
 // Components — explicitly listed to avoid conflicts with ./types re-exports
 export {
-    RecordViewBinding,
+    EntityViewBinding,
     SelectionTableBinding,
     SelectableTable,
     SelectableTableContext,
     CollectionViewBinding,
     CollectionViewActions,
     CollectionCardViewBinding,
-    RecordCardBinding,
+    EntityCardBinding,
     useSelectionController,
     PropertyConfigBadge,
     PropertyIdCopyTooltip,
@@ -28,15 +28,15 @@ export {
     ReferenceWidget,
     SearchIconsView,
     FieldCaption,
-    RecordPreviewBinding,
+    EntityPreviewBinding,
     getFieldConfig,
     getFieldId,
     getDefaultFieldConfig,
     getDefaultFieldId,
     DEFAULT_FIELD_CONFIGS,
-    editSnapshotAction,
-    copySnapshotAction,
-    deleteSnapshotAction,
+    editEntityAction,
+    copyEntityAction,
+    deleteEntityAction,
     resetPasswordAction,
     SidePanelProvider,
     Scaffold,
@@ -57,7 +57,7 @@ export {
     CollectionPanel
 } from "./components";
 export type {
-    RecordViewBindingProps,
+    EntityViewBindingProps,
     SelectionProps,
     SelectableTableProps,
     CollectionPanelProps
@@ -74,9 +74,9 @@ export {
     getCollectionBySlugWithin,
     getCollectionPathsCombinations,
     resolveCollectionPathIds,
-    mergeSnapshotActions,
-    resolveSnapshotAction,
-    resolveSnapshotView,
+    mergeEntityActions,
+    resolveEntityAction,
+    resolveEntityView,
     // Property utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
     isReferenceProperty,
     isRelationProperty,
@@ -88,12 +88,12 @@ export {
     getPropertiesWithPropertiesOrder,
     getDefaultPropertiesOrder,
     // Preview utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
-    getSnapshotPreviewKeys,
-    getSnapshotTitlePropertyKey
+    getEntityPreviewKeys,
+    getEntityTitlePropertyKey
 } from "./util";
 
 // Headless collection view adapters
-// Map snapshot types to the data-agnostic CollectionView from @rebasepro/ui
+// Map entity types to the data-agnostic CollectionView from @rebasepro/ui
 export { mapPropertyToConfig, mapPropertiesToConfigs } from "./util/propertyConfigMapper";
 export { useCollectionDataController, createStaticDataController } from "./util/dataControllerAdapter";
 

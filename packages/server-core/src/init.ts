@@ -251,7 +251,7 @@ export interface RebaseBackendConfig {
     storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
 
     /**
-     * Snapshot history / audit-log configuration.
+     * Entity history / audit-log configuration.
      *
      * - `true` — enable history with default settings
      * - `{ retention?: number }` — enable with optional retention period (days)
@@ -648,7 +648,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
     if (config.history) {
         if (defaultBootstrapper.initializeHistory) {
-            logger.info("Bootstrapping snapshot history via driver protocol");
+            logger.info("Bootstrapping entity history via driver protocol");
             historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult) as { historyService: import("./history/history-routes").HistoryService } | undefined;
 
             // Inject the historyService into the driver so save/delete can record history.
@@ -662,7 +662,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 }
             }
 
-            logger.info("Snapshot history initialized");
+            logger.info("Entity history initialized");
         } else {
             logger.warn("History requested but default bootstrapper does not support initializeHistory");
         }
@@ -1032,7 +1032,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     logger.info("Rebase singleton initialized");
 
     // Retroactively inject the server client into the driver so that
-    // snapshot callbacks receive `context.client` at runtime.
+    // entity callbacks receive `context.client` at runtime.
     // The driver is created before the client (which depends on the mounted
     // Hono app), so we set it here, mirroring the historyService injection above.
     if (defaultDriverResult.internals) {

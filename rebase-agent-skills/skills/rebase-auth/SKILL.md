@@ -136,7 +136,7 @@ const membersCollection: PostgresCollectionConfig = {
 
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
-      resetPassword: true // Or false to disable, or a custom SnapshotAction
+      resetPassword: true // Or false to disable, or a custom EntityAction
     }
   },
   properties: { ... }
@@ -1113,15 +1113,15 @@ interface BackendHooks {
 | `beforeDelete` | `(userId, context) => void` | Throw to prevent deletion. |
 | `afterDelete` | `(userId, context) => void` | After user deleted. |
 
-### DataHooks (All Collection Snapshots)
+### DataHooks (All Collection Entitys)
 
 | Hook | Signature | Description |
 |---|---|---|
-| `afterRead` | `(slug, snapshot, context) => snapshot \| null` | Transform snapshot after read. Return `null` to filter out. |
-| `beforeSave` | `(slug, values, snapshotId, context) => values` | Transform before write. Throw to abort. |
-| `afterSave` | `(slug, snapshot, context) => void` | After snapshot create/update. Side effects. |
-| `beforeDelete` | `(slug, snapshotId, context) => void` | Throw to prevent deletion. |
-| `afterDelete` | `(slug, snapshotId, context) => void` | After snapshot deleted. |
+| `afterRead` | `(slug, entity, context) => entity \| null` | Transform entity after read. Return `null` to filter out. |
+| `beforeSave` | `(slug, values, entityId, context) => values` | Transform before write. Throw to abort. |
+| `afterSave` | `(slug, entity, context) => void` | After entity create/update. Side effects. |
+| `beforeDelete` | `(slug, entityId, context) => void` | Throw to prevent deletion. |
+| `afterDelete` | `(slug, entityId, context) => void` | After entity deleted. |
 
 ### BackendHookContext
 
@@ -1137,11 +1137,11 @@ interface BackendHookContext {
 ```typescript
 const hooks: BackendHooks = {
   data: {
-    afterRead(slug, snapshot, ctx) {
-      if (!ctx.requestUser?.roles.includes("admin") && snapshot.email) {
-        return { ...snapshot, email: "***" };
+    afterRead(slug, entity, ctx) {
+      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
+        return { ...entity, email: "***" };
       }
-      return snapshot;
+      return entity;
     },
   },
   users: {

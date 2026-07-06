@@ -9,7 +9,7 @@ import {
     removeInitialAndTrailingSlashes,
     resolveDefaultSelectedView
 } from "@rebasepro/common";
-import { resolvedSelectedSnapshotView } from "../util/resolutions";
+import { resolvedSelectedEntityView } from "../util/resolutions";
 import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/core";
 import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
 import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EditViewBinding";
@@ -17,13 +17,13 @@ import React from "react";
 import { SidePanelBinding } from "../components/SidePanelBinding";
 
 /**
- * Thin wrapper that resolves the Snapshot.SidePanel component override.
+ * Thin wrapper that resolves the Entity.SidePanel component override.
  * Because the JSX is created inside `propsToSidePanel` (a plain function,
  * not a React component), we need this wrapper so the hook is called at the
  * top level of a React component per the Rules of Hooks.
  */
 function ResolvedSidePanelBindingInner(props: SidePanelBindingProps) {
-    const Resolved = useComponentOverride("Snapshot.SidePanel", SidePanelBinding);
+    const Resolved = useComponentOverride("Entity.SidePanel", SidePanelBinding);
     return <Resolved {...props}/>;
 }
 
@@ -41,12 +41,12 @@ function ResolvedSidePanelBinding(props: SidePanelBindingProps) {
 const NEW_URL_HASH = "new_side";
 const SIDE_URL_HASH = "side";
 
-export function getSnapshotViewWidth(props: SidePanelBindingProps<any>, small: boolean, customizationController: CustomizationController): string {
+export function getEntityViewWidth(props: SidePanelBindingProps<any>, small: boolean, customizationController: CustomizationController): string {
     if (small) return CONTAINER_FULL_WIDTH;
 
     const {
         selectedSecondaryForm
-    } = resolvedSelectedSnapshotView(props.collection?.snapshotViews, customizationController, props.selectedTab);
+    } = resolvedSelectedEntityView(props.collection?.entityViews, customizationController, props.selectedTab);
 
     const shouldUseSmallLayout = !props.selectedTab || props.selectedTab === "edit" || props.selectedTab === JSON_TAB_VALUE || props.selectedTab === HISTORY_TAB_VALUE || Boolean(selectedSecondaryForm);
 
@@ -129,8 +129,8 @@ export const useBuildSidePanel = (collectionRegistryController: CollectionRegist
 
         if (!navigationStateController.loading) {
             if ((newFlag || sideFlag) && urlController.isUrlCollectionPath(location.pathname)) {
-                const snapshotOrCollectionPath = urlController.urlPathToDataPath(location.pathname);
-                const panelsFromUrl = buildSidePanelsFromUrl(snapshotOrCollectionPath, collectionRegistryController.collections ?? [], newFlag);
+                const entityOrCollectionPath = urlController.urlPathToDataPath(location.pathname);
+                const panelsFromUrl = buildSidePanelsFromUrl(entityOrCollectionPath, collectionRegistryController.collections ?? [], newFlag);
                 for (let i = 0; i < panelsFromUrl.length; i++) {
                     const props = panelsFromUrl[i];
                     if (i === 0)
@@ -154,8 +154,8 @@ export const useBuildSidePanel = (collectionRegistryController: CollectionRegist
             const sideFlag = location.hash === `#${SIDE_URL_HASH}`;
             if (sideFlag) {
                 const currentKeys = currentPanelKeysRef.current;
-                const snapshotOrCollectionPath = urlController.urlPathToDataPath(location.pathname);
-                const panelsFromUrl = buildSidePanelsFromUrl(snapshotOrCollectionPath, collectionRegistryController.collections ?? [], false);
+                const entityOrCollectionPath = urlController.urlPathToDataPath(location.pathname);
+                const panelsFromUrl = buildSidePanelsFromUrl(entityOrCollectionPath, collectionRegistryController.collections ?? [], false);
                 // if we have more panels than determined by the url, we ignore the url. We might have references open
                 if (panelsFromUrl.length <= currentKeys.length) {
                     return;
@@ -177,8 +177,8 @@ export const useBuildSidePanel = (collectionRegistryController: CollectionRegist
     useEffect(() => {
         const updatedSidePanels = sideDialogsController.sidePanels.map(sidePanelProps => {
             if (sidePanelProps.additional) {
-                const snapshotProps = sidePanelProps.additional as SidePanelBindingProps;
-                const newWidth = getSnapshotViewWidth(snapshotProps, smallLayout, customizationController);
+                const entityProps = sidePanelProps.additional as SidePanelBindingProps;
+                const newWidth = getEntityViewWidth(entityProps, smallLayout, customizationController);
                 if (sidePanelProps.width !== newWidth) {
                     return { ...sidePanelProps,
 width: newWidth };
@@ -195,15 +195,15 @@ width: newWidth };
 
     const open = useCallback((props: SidePanelBindingProps<any>) => {
 
-        if (props.copy && !props.snapshotId) {
-            throw Error("If you want to copy a snapshot you need to provide a snapshotId");
+        if (props.copy && !props.entityId) {
+            throw Error("If you want to copy a entity you need to provide a entityId");
         }
 
         const defaultSelectedView = resolveDefaultSelectedView(
             props.collection ? props.collection.defaultSelectedView : undefined,
             {
-                status: props.copy ? "copy" : (props.snapshotId ? "existing" : "new"),
-                snapshotId: props.snapshotId
+                status: props.copy ? "copy" : (props.entityId ? "existing" : "new"),
+                entityId: props.entityId
             }
         );
 
@@ -224,8 +224,8 @@ width: newWidth };
 
     const replace = useCallback((props: SidePanelBindingProps<any>) => {
 
-        if (props.copy && !props.snapshotId) {
-            throw Error("If you want to copy a snapshot you need to provide a snapshotId");
+        if (props.copy && !props.entityId) {
+            throw Error("If you want to copy a entity you need to provide a entityId");
         }
 
         sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController, location.search));
@@ -258,21 +258,21 @@ export function buildSidePanelsFromUrl(path: string, collections: CollectionConf
         }
 
         const previousEntry = navigationViewsForPath[i - 1];
-        if (navigationEntry.type === "snapshot") {
+        if (navigationEntry.type === "entity") {
             sidePanel = {
                 path: navigationEntry.slug,
-                snapshotId: navigationEntry.snapshotId,
+                entityId: navigationEntry.entityId,
                 copy: false,
                 collection: navigationEntry.parentCollection,
                 width: navigationEntry.parentCollection?.sideDialogWidth
             };
         } else if (navigationEntry.type === "custom_view") {
-            if (previousEntry?.type === "snapshot") {
+            if (previousEntry?.type === "entity") {
                 if (sidePanel)
                     sidePanel.selectedTab = navigationEntry.view.key;
             }
         } else if (navigationEntry.type === "collection") {
-            if (previousEntry?.type === "snapshot") {
+            if (previousEntry?.type === "entity") {
                 if (sidePanel)
                     sidePanel.selectedTab = navigationEntry.collection.slug;
             }
@@ -287,8 +287,8 @@ export function buildSidePanelsFromUrl(path: string, collections: CollectionConf
         const defaultView = resolveDefaultSelectedView(
             sidePanel.collection.defaultSelectedView,
             {
-                status: sidePanel.copy ? "copy" : (sidePanel.snapshotId ? "existing" : "new"),
-                snapshotId: sidePanel.snapshotId
+                status: sidePanel.copy ? "copy" : (sidePanel.entityId ? "existing" : "new"),
+                entityId: sidePanel.entityId
             }
         );
         if (defaultView) {
@@ -322,8 +322,8 @@ const propsToSidePanel = (props: SidePanelBindingProps,
     const shouldUpdateUrl = props.updateUrl !== false;
 
     const urlPath = shouldUpdateUrl
-        ? (props.snapshotId
-            ? buildUrlCollectionPath(`${collectionPath}/${props.snapshotId}${props.selectedTab ? "/" + props.selectedTab : ""}${locationSearch}#${SIDE_URL_HASH}`)
+        ? (props.entityId
+            ? buildUrlCollectionPath(`${collectionPath}/${props.entityId}${props.selectedTab ? "/" + props.selectedTab : ""}${locationSearch}#${SIDE_URL_HASH}`)
             : buildUrlCollectionPath(`${collectionPath}${locationSearch}#${NEW_URL_HASH}`))
         : undefined;
 
@@ -336,13 +336,13 @@ const propsToSidePanel = (props: SidePanelBindingProps,
         formProps: props.formProps
     };
 
-    const snapshotViewWidth = getSnapshotViewWidth(props, smallLayout, customizationController);
+    const entityViewWidth = getEntityViewWidth(props, smallLayout, customizationController);
     return {
-        key: `${props.path}/${props.snapshotId}`,
+        key: `${props.path}/${props.entityId}`,
         component: <ResolvedSidePanelBinding {...resolvedPanelProps}/>,
         urlPath: urlPath,
         parentUrlPath: parentUrlPath,
-        width: snapshotViewWidth,
+        width: entityViewWidth,
         onClose: props.onClose,
         additional: resolvedPanelProps
     };

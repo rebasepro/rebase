@@ -1,4 +1,4 @@
-import { defineCollection, SnapshotCallbackContext } from "@rebasepro/common";
+import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import ordersCollection from "./orders";
 import productsCollection from "./products";
 
@@ -49,12 +49,12 @@ const orderItemsCollection = defineCollection({
         product_name: {
             name: "Product Name",
             type: "string",
-            description: "Product name at time of order (snapshot)"
+            description: "Product name at time of order (entity)"
         },
         sku: {
             name: "SKU",
             type: "string",
-            description: "Product SKU at time of order (snapshot)"
+            description: "Product SKU at time of order (entity)"
         },
         quantity: {
             name: "Quantity",
@@ -87,7 +87,7 @@ const orderItemsCollection = defineCollection({
     callbacks: {
         beforeSave: async ({ values, context }) => {
             const productId = getRelationId(values.product);
-            // 1. Resolve and snapshot product info if missing
+            // 1. Resolve and entity product info if missing
             if (productId && (!values.product_name || !values.sku || values.unit_price === undefined)) {
                 const product = await context.data.collection<ProductValues>("products").findById(productId);
                 if (product) {
@@ -131,7 +131,7 @@ const orderItemsCollection = defineCollection({
 });
 
 // Helper function to recalculate the parent order subtotal & total
-async function updateOrderTotals(orderId: string | number, context: SnapshotCallbackContext) {
+async function updateOrderTotals(orderId: string | number, context: EntityCallbackContext) {
     const { data: items } = await context.data.collection("order_items").find({
         where: { order: ["==", orderId] }
     });

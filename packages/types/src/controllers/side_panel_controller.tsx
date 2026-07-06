@@ -1,4 +1,4 @@
-import type { Snapshot } from "../types/snapshots";
+import type { Entity } from "../types/entitys";
 import type { CollectionConfig } from "../types/collections";
 
 /**
@@ -8,23 +8,23 @@ import type { CollectionConfig } from "../types/collections";
 export interface SidePanelBindingProps<M extends Record<string, unknown> = Record<string, unknown>> {
 
     /**
-     * Absolute path of the snapshot
+     * Absolute path of the entity
      */
     path: string;
 
     /**
-     * ID of the snapshot, if not set, it means we are creating a new snapshot
+     * ID of the entity, if not set, it means we are creating a new entity
      */
-    snapshotId?: string | number;
+    entityId?: string | number;
 
     /**
-     * Set this flag to true if you want to make a copy of an existing snapshot
+     * Set this flag to true if you want to make a copy of an existing entity
      */
     copy?: boolean;
 
     /**
-     * Open the snapshot with a selected sub-collection view. If the panel for this
-     * snapshot was already open, it is replaced.
+     * Open the entity with a selected sub-collection view. If the panel for this
+     * entity was already open, it is replaced.
      */
     selectedTab?: string;
 
@@ -35,7 +35,7 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     width?: number | string;
 
     /**
-     * Collection representing the snapshots of this view.
+     * Collection representing the entitys of this view.
      * If you leave it blank it will be induced by your navigation
      */
     collection?: CollectionConfig<M>;
@@ -49,10 +49,10 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     updateUrl?: boolean;
 
     /**
-     * Callback when the snapshot is updated
+     * Callback when the entity is updated
      * @param params
      */
-    onUpdate?: (params: { snapshot: Snapshot<M> }) => void;
+    onUpdate?: (params: { entity: Entity<M> }) => void;
 
     /**
      * Callback when the dialog is closed
@@ -70,13 +70,13 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     formProps?: Record<string, unknown>;
 
     /**
-     * Allow the user to open the snapshot fullscreen
+     * Allow the user to open the entity fullscreen
      */
     allowFullScreen?: boolean;
 
     /**
-     * Pre-populate the form with these values when creating a new snapshot.
-     * Only applied when `snapshotId` is not set (i.e. the form is in "new" mode).
+     * Pre-populate the form with these values when creating a new entity.
+     * Only applied when `entityId` is not set (i.e. the form is in "new" mode).
      * Useful for actions that fetch data from an external source (e.g. a URL)
      * and want to pre-fill the document before the user saves.
      */
@@ -84,7 +84,7 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
 }
 
 /**
- * Controller to open the side dialog displaying snapshot forms
+ * Controller to open the side dialog displaying entity forms
  * @group Hooks and utilities
  */
 export interface SidePanelController {
@@ -94,18 +94,18 @@ export interface SidePanelController {
     close: () => void;
 
     /**
-     * Open a new snapshot sideDialog. By default, the collection and configuration
+     * Open a new entity sideDialog. By default, the collection and configuration
      * of the view is fetched from the collections you have specified in the
      * navigation.
-     * At least you need to pass the path of the snapshot you would like
-     * to edit. You can set a snapshotId if you would like to edit and existing one
+     * At least you need to pass the path of the entity you would like
+     * to edit. You can set a entityId if you would like to edit and existing one
      * (or a new one with that id).
      * @param props
      */
     open: <M extends Record<string, unknown> = Record<string, unknown>>(props: SidePanelBindingProps<M>) => void;
 
     /**
-     * Replace the last open snapshot panel with the given one.
+     * Replace the last open entity panel with the given one.
      * @param props
      */
     replace: <M extends Record<string, unknown> = Record<string, unknown>>(props: SidePanelBindingProps<M>) => void;

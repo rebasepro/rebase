@@ -116,7 +116,7 @@ const articlesCollection: CollectionConfig = {
 
 ## Próximos Pasos
 
-- **[Vistas de Entidad](/docs/frontend/snapshot-views)** — Pestañas personalizadas en formularios de entidad
-- **[Acciones de Entidad](/docs/frontend/snapshot-actions)** — Acciones de entidad personalizadas
+- **[Vistas de Entidad](/docs/frontend/entity-views)** — Pestañas personalizadas en formularios de entidad
+- **[Acciones de Entidad](/docs/frontend/entity-actions)** — Acciones de entidad personalizadas
 
 ---

@@ -348,7 +348,7 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const snapshots: Snapshot[] = [
+            const entitys: Entity[] = [
                 { id: "1",
 path: "posts",
 values: { title: "A" } },
@@ -356,7 +356,7 @@ values: { title: "A" } },
 path: "posts",
 values: { title: "B" } }
             ];
-            capturedCallback!(snapshots);
+            capturedCallback!(entitys);
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -364,7 +364,7 @@ values: { title: "B" } }
             // Single emission — no estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: snapshots,
+                data: entitys,
                 meta: {
                     total: 2,
                     limit: 20,
@@ -390,12 +390,12 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!({ limit: 10, offset: 5 }, onUpdate);
 
-            const snapshots: Snapshot[] = [
+            const entitys: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
-            capturedCallback!(snapshots);
+            capturedCallback!(entitys);
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -404,7 +404,7 @@ values: { title: "B" } }
             // Single emission with authoritative meta
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: snapshots,
+                data: entitys,
                 meta: {
                     total: 100,
                     limit: 10,
@@ -430,12 +430,12 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const snapshots: Snapshot[] = [
+            const entitys: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
                 { id: "2", path: "posts", values: { title: "B" } }
             ];
 
-            capturedCallback!(snapshots);
+            capturedCallback!(entitys);
 
             // Wait for count promise to resolve
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -443,7 +443,7 @@ values: { title: "B" } }
             // Single emission — count matched the heuristic
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: snapshots,
+                data: entitys,
                 meta: {
                     total: 2,
                     limit: 20,
@@ -469,11 +469,11 @@ values: { title: "B" } }
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
-            const snapshots: Snapshot[] = [
+            const entitys: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } }
             ];
 
-            capturedCallback!(snapshots);
+            capturedCallback!(entitys);
 
             // Wait for count rejection to settle
             await new Promise(resolve => setTimeout(resolve, 0));
@@ -481,7 +481,7 @@ values: { title: "B" } }
             // Single emission with heuristic meta, no estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
-                data: snapshots,
+                data: entitys,
                 meta: {
                     total: 1,
                     limit: 20,
@@ -511,7 +511,7 @@ id: "abc" },
             );
         });
 
-        it("listenById callback passes snapshot or undefined", () => {
+        it("listenById callback passes entity or undefined", () => {
             let capturedCallback: Function;
             const mockWs = {
                 listenCollection: jest.fn().mockReturnValue(() => {}),
@@ -525,14 +525,14 @@ id: "abc" },
             const onUpdate = jest.fn();
             client.listenById!("abc", onUpdate);
 
-            // Snapshot exists
-            const snapshot: Snapshot = { id: "abc",
+            // Entity exists
+            const entity: Entity = { id: "abc",
 path: "posts",
 values: { title: "Test" } };
-            capturedCallback!(snapshot);
-            expect(onUpdate).toHaveBeenCalledWith(snapshot);
+            capturedCallback!(entity);
+            expect(onUpdate).toHaveBeenCalledWith(entity);
 
-            // Snapshot deleted / null
+            // Entity deleted / null
             onUpdate.mockClear();
             capturedCallback!(null);
             expect(onUpdate).toHaveBeenCalledWith(undefined);
@@ -695,7 +695,7 @@ tags: ["a", "b"],
 extra_field: "kept" });
         });
 
-        it("never leaks the CMS Snapshot wrapper (no path / values fields)", async () => {
+        it("never leaks the CMS Entity wrapper (no path / values fields)", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: "1",
 title: "Flat" }],
@@ -703,7 +703,7 @@ meta: { total: 1 } });
 
             const { data } = await client.find();
             const row = data[0] as Record<string, unknown>;
-            // The SDK surface returns plain rows — the Snapshot view-model
+            // The SDK surface returns plain rows — the Entity view-model
             // (`{ id, path, values }`) must not bleed through.
             expect(row).not.toHaveProperty("path");
             expect(row).not.toHaveProperty("values");

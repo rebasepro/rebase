@@ -5,26 +5,26 @@ import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals";
 
 import { cls, PencilIcon } from "@rebasepro/ui";
-import { getRelationFrom, normalizeToSnapshotRelation } from "@rebasepro/common";
+import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
-import { CollectionSize, Snapshot, SnapshotRelation, FilterValues, Relation } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 import { } from "@rebasepro/core";
 import { ErrorView } from "@rebasepro/core";
-import { SnapshotPreviewContainer } from "../../RecordPreviewBinding";
+import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 
 type TableMultipleRelationFieldProps = {
     name: string;
     disabled: boolean;
-    internalValue: SnapshotRelation[] | undefined | null;
-    updateValue: (newValue: SnapshotRelation[] | null) => void;
+    internalValue: EntityRelation[] | undefined | null;
+    updateValue: (newValue: EntityRelation[] | null) => void;
     size: CollectionSize;
     previewProperties?: string[];
     title?: string;
     relation: Relation;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
 };
 
 export function TableMultipleRelationField(props: TableMultipleRelationFieldProps) {
@@ -46,23 +46,23 @@ export const TableMultipleRelationFieldInternal = React.memo(
             fixedFilter,
             collection,
             includeId,
-            includeSnapshotLink
+            includeEntityLink
         } = props;
 
         const value = Array.isArray(internalValue) ? internalValue : [];
 
-        const onMultipleSnapshotsSelected = useCallback((snapshots: Snapshot<any>[]) => {
-            updateValue(snapshots.map(e => getRelationFrom(e)));
+        const onMultipleEntitysSelected = useCallback((entitys: Entity<any>[]) => {
+            updateValue(entitys.map(e => getRelationFrom(e)));
         }, [updateValue]);
 
-        const selectedSnapshotIds = value.map((ref) => ref.id);
+        const selectedEntityIds = value.map((ref) => ref.id);
 
         const relationDialogController = useSelectionDialog({
             multiselect: true,
             path: getCollectionDataPath(collection),
             collection,
-            onMultipleSnapshotsSelected,
-            selectedSnapshotIds,
+            onMultipleEntitysSelected,
+            selectedEntityIds,
             fixedFilter
         }
         );
@@ -79,7 +79,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
             if (Array.isArray(internalValue))
                 return <>
                     {internalValue.map((item, index) => {
-                        const relationItem = normalizeToSnapshotRelation(item);
+                        const relationItem = normalizeToEntityRelation(item);
 
                         if (!relationItem) return null;
 
@@ -93,7 +93,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                                 hover={!disabled}
                                 previewProperties={previewProperties}
                                 includeId={includeId}
-                                includeSnapshotLink={includeSnapshotLink}
+                                includeEntityLink={includeEntityLink}
                             />
                         </div>
                         );
@@ -113,7 +113,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                 {internalValue && buildMultipleRelationField()}
 
                 {valueNotSet &&
-                    <SnapshotPreviewContainer
+                    <EntityPreviewContainer
                         className={cls("px-3 py-2 text-sm font-medium flex items-center gap-4",
                             disabled
                                 ? "text-surface-accent-500"
@@ -123,7 +123,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                         <PencilIcon
                             className={"ml-2 mr-1 text-surface-300 dark:text-surface-600"}/>
                         {title}
-                    </SnapshotPreviewContainer>}
+                    </EntityPreviewContainer>}
 
             </div>
         );

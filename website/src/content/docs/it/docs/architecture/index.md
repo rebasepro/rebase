@@ -103,7 +103,7 @@ Come i driver, i backend di storage sono registrati in un registro. Puoi avere p
 4. Il backend serializza i valori, esegue l'`UPDATE` di Drizzle
 5. Vengono eseguiti i callback `afterSave` (effetti collaterali)
 6. La trasmissione `NOTIFY` attiva l'aggiornamento WebSocket a tutti i client
-7. Se la cronologia è abilitata, viene registrato uno snapshot
+7. Se la cronologia è abilitata, viene registrato uno entity
 
 ## Prossimi Passi
 

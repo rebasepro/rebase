@@ -21,10 +21,10 @@ Rebase includes a built-in WebSocket-based realtime engine that broadcasts datab
 The realtime pipeline has three stages:
 
 1. **Database mutation** — A record is created/updated/deleted (via REST API, SDK, or Studio).
-2. **Server fan-out** — The `RealtimeService` detects the change and fans out to every active WebSocket subscription matching the affected collection or snapshot.
+2. **Server fan-out** — The `RealtimeService` detects the change and fans out to every active WebSocket subscription matching the affected collection or entity.
 3. **Client callback** — The client SDK fires the registered `onUpdate` callback with fresh data.
 
-For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts changes across server instances via the `rebase_snapshot_changes` channel.
+For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts changes across server instances via the `rebase_entity_changes` channel.
 
 ### Zero Configuration
 
@@ -49,7 +49,7 @@ const client = createRebaseClient({
 const unsubscribe = client.data.products.listen(
     undefined, // FindParams — pass undefined for all records
     (response) => {
-        console.log("Products updated:", response.data);   // Snapshot<M>[]
+        console.log("Products updated:", response.data);   // Entity<M>[]
         console.log("Total:", response.meta.total);
     },
     (error) => {
@@ -94,20 +94,20 @@ The `FindResponse<M>` contains:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `data` | `Snapshot<M>[]` | Array of matching snapshots |
-| `meta.total` | `number` | Number of snapshots returned |
+| `data` | `Entity<M>[]` | Array of matching entitys |
+| `meta.total` | `number` | Number of entitys returned |
 | `meta.limit` | `number` | Requested limit |
 | `meta.offset` | `number` | Requested offset |
 | `meta.hasMore` | `boolean` | Whether more records exist beyond limit |
 
-### Subscribing to a Single Snapshot — `listenById()`
+### Subscribing to a Single Entity — `listenById()`
 
 ```typescript
 const unsubscribe = client.data.products.listenById(
     "product-123",
-    (snapshot) => {
-        if (snapshot) {
-            console.log("Product changed:", snapshot.values);
+    (entity) => {
+        if (entity) {
+            console.log("Product changed:", entity.values);
         } else {
             console.log("Product was deleted");
         }
@@ -123,12 +123,12 @@ const unsubscribe = client.data.products.listenById(
 ```typescript
 listenById(
     id: string | number,
-    onUpdate: (snapshot: Snapshot<M> | undefined) => void,
+    onUpdate: (entity: Entity<M> | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-The callback receives `undefined` when the snapshot is deleted.
+The callback receives `undefined` when the entity is deleted.
 
 ### Unsubscribing
 
@@ -191,7 +191,7 @@ listen(
 
 Rebase uses a two-phase update strategy for collection subscriptions:
 
-1. **Phase 1 — Instant snapshot patch (`collection_snapshot_patch`):** When a single snapshot changes, the server immediately pushes a lightweight patch message. The client merges this into its cached collection data for near-instant cross-tab feedback — no database query needed.
+1. **Phase 1 — Instant entity patch (`collection_entity_patch`):** When a single entity changes, the server immediately pushes a lightweight patch message. The client merges this into its cached collection data for near-instant cross-tab feedback — no database query needed.
 
 2. **Phase 2 — Debounced full refetch (`collection_update`):** After a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), the server runs a full collection query with the original filters and sort order, then sends the authoritative update. This ensures correctness when filters, sort order, or pagination are affected by the change.
 
@@ -208,7 +208,7 @@ The client SDK automatically deduplicates subscriptions:
 
 Deduplication keys are computed deterministically:
 - **Collection subscriptions:** JSON of `{ path, filter, limit, startAfter, orderBy, order, searchString, collection.name }` with sorted keys.
-- **Snapshot subscriptions:** `"${path}|${snapshotId}"`.
+- **Entity subscriptions:** `"${path}|${entityId}"`.
 
 ## WebSocket Protocol (Raw / Low-Level)
 
@@ -219,8 +219,8 @@ For environments where the SDK is not available, you can use the raw WebSocket p
 1. Open a WebSocket connection to the server URL.
 2. Send an `AUTHENTICATE` message with your JWT token.
 3. Wait for `AUTH_SUCCESS` before sending subscription or other messages.
-4. Send `subscribe_collection` or `subscribe_snapshot` to start receiving data.
-5. Receive `collection_update`, `snapshot_update`, and `collection_snapshot_patch` messages.
+4. Send `subscribe_collection` or `subscribe_entity` to start receiving data.
+5. Receive `collection_update`, `entity_update`, and `collection_entity_patch` messages.
 6. Send `unsubscribe` to stop a subscription.
 
 ### Authentication Step (Required First)
@@ -270,15 +270,15 @@ ws.send(JSON.stringify({
 }));
 ```
 
-### Subscribe to a Single Snapshot
+### Subscribe to a Single Entity
 
 ```typescript
 ws.send(JSON.stringify({
-    type: "subscribe_snapshot",
+    type: "subscribe_entity",
     payload: {
         subscriptionId: "sub_product_42",
         path: "products",
-        snapshotId: "42"
+        entityId: "42"
     }
 }));
 ```
@@ -302,20 +302,20 @@ ws.onmessage = (event) => {
         case "collection_update":
             // Full collection data after refetch
             console.log("Collection:", message.subscriptionId);
-            console.log("Snapshots:", message.snapshots); // Snapshot[]
+            console.log("Entitys:", message.entitys); // Entity[]
             break;
 
-        case "snapshot_update":
-            // Single snapshot update
-            console.log("Snapshot:", message.subscriptionId);
-            console.log("Data:", message.snapshot); // Snapshot | null
+        case "entity_update":
+            // Single entity update
+            console.log("Entity:", message.subscriptionId);
+            console.log("Data:", message.entity); // Entity | null
             break;
 
-        case "collection_snapshot_patch":
+        case "collection_entity_patch":
             // Lightweight instant patch for a collection subscription
             console.log("Patch:", message.subscriptionId);
-            console.log("Snapshot ID:", message.snapshotId);
-            console.log("Snapshot:", message.snapshot); // Snapshot | null (null = deleted)
+            console.log("Entity ID:", message.entityId);
+            console.log("Entity:", message.entity); // Entity | null (null = deleted)
             break;
 
         case "ERROR":
@@ -334,20 +334,20 @@ ws.onmessage = (event) => {
 |------|---------|-------------|
 | `AUTHENTICATE` | `{ token }` | Authenticate the WebSocket session with a JWT |
 | `subscribe_collection` | `{ subscriptionId, path, filter?, orderBy?, order?, limit?, offset?, startAfter?, searchString? }` | Subscribe to collection changes |
-| `subscribe_snapshot` | `{ subscriptionId, path, snapshotId }` | Subscribe to a single snapshot |
+| `subscribe_entity` | `{ subscriptionId, path, entityId }` | Subscribe to a single entity |
 | `unsubscribe` | `{ subscriptionId }` | Unsubscribe from a subscription |
 | `join_channel` | `{ channel }` | Join a broadcast channel |
 | `leave_channel` | `{ channel }` | Leave a broadcast channel |
 | `broadcast` | `{ channel, event, payload }` | Send a message to channel members |
 | `presence_track` | `{ channel, state }` | Track presence with custom state (auto-joins channel) |
 | `presence_untrack` | `{ channel }` | Stop tracking presence |
-| `presence_state` | `{ channel }` | Request full presence snapshot |
+| `presence_state` | `{ channel }` | Request full presence entity |
 | `FETCH_COLLECTION` | `FetchCollectionProps` | One-shot collection fetch (request/response) |
-| `FETCH_SNAPSHOT` | `FetchSnapshotProps` | One-shot snapshot fetch |
-| `SAVE_SNAPSHOT` | `SaveSnapshotProps` | Create or update a snapshot |
-| `DELETE_SNAPSHOT` | `DeleteSnapshotProps` | Delete a snapshot |
-| `COUNT_SNAPSHOTS` | `FetchCollectionProps` | Count snapshots matching criteria |
-| `CHECK_UNIQUE_FIELD` | `{ path, name, value, snapshotId?, collection? }` | Check field uniqueness |
+| `FETCH_ENTITY` | `FetchEntityProps` | One-shot entity fetch |
+| `SAVE_ENTITY` | `SaveEntityProps` | Create or update a entity |
+| `DELETE_ENTITY` | `DeleteEntityProps` | Delete a entity |
+| `COUNT_ENTITIES` | `FetchCollectionProps` | Count entitys matching criteria |
+| `CHECK_UNIQUE_FIELD` | `{ path, name, value, entityId?, collection? }` | Check field uniqueness |
 
 ### Server → Client
 
@@ -355,18 +355,18 @@ ws.onmessage = (event) => {
 |------|-----------|-------------|
 | `AUTH_SUCCESS` | `{ requestId, payload: { userId, roles } }` | Authentication successful |
 | `AUTH_ERROR` | `{ requestId, payload: { error: { message, code } } }` | Authentication failed |
-| `collection_update` | `{ subscriptionId, snapshots }` | Full collection data (authoritative refetch) |
-| `snapshot_update` | `{ subscriptionId, snapshot }` | Single snapshot data (snapshot or `null` if deleted) |
-| `collection_snapshot_patch` | `{ subscriptionId, snapshotId, snapshot }` | Instant single-snapshot patch for a collection subscription |
+| `collection_update` | `{ subscriptionId, entitys }` | Full collection data (authoritative refetch) |
+| `entity_update` | `{ subscriptionId, entity }` | Single entity data (entity or `null` if deleted) |
+| `collection_entity_patch` | `{ subscriptionId, entityId, entity }` | Instant single-entity patch for a collection subscription |
 | `broadcast` | `{ channel, event, payload }` | Broadcast from another channel member |
-| `presence_state` | `{ channel, presences }` | Full presence snapshot |
+| `presence_state` | `{ channel, presences }` | Full presence entity |
 | `presence_diff` | `{ channel, joins, leaves }` | Incremental presence update |
 | `ERROR` | `{ requestId?, payload: { error: { message, code } } }` | General error |
-| `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { snapshots } }` | Response to FETCH_COLLECTION |
-| `FETCH_SNAPSHOT_SUCCESS` | `{ requestId, payload: { snapshot } }` | Response to FETCH_SNAPSHOT |
-| `SAVE_SNAPSHOT_SUCCESS` | `{ requestId, payload: { snapshot } }` | Response to SAVE_SNAPSHOT |
-| `DELETE_SNAPSHOT_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to DELETE_SNAPSHOT |
-| `COUNT_SNAPSHOTS_SUCCESS` | `{ requestId, payload: { count } }` | Response to COUNT_SNAPSHOTS |
+| `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { entitys } }` | Response to FETCH_COLLECTION |
+| `FETCH_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to FETCH_ENTITY |
+| `SAVE_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to SAVE_ENTITY |
+| `DELETE_ENTITY_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to DELETE_ENTITY |
+| `COUNT_ENTITIES_SUCCESS` | `{ requestId, payload: { count } }` | Response to COUNT_ENTITIES |
 | `CHECK_UNIQUE_FIELD_SUCCESS` | `{ requestId, payload: { isUnique } }` | Response to CHECK_UNIQUE_FIELD |
 
 ### Error Codes
@@ -553,7 +553,7 @@ The client SDK (`RebaseWebSocketClient`) automatically reconnects when the conne
 3. Reconnect after exponential backoff delay.
 4. On successful reconnect:
    - Auto-authenticates if `getAuthToken` is configured.
-   - Calls `resubscribeAll()` — all active collection and snapshot subscriptions are re-registered with fresh subscription IDs.
+   - Calls `resubscribeAll()` — all active collection and entity subscriptions are re-registered with fresh subscription IDs.
    - Processes the queued message queue.
    - Emits `"reconnect"` event.
 
@@ -643,9 +643,9 @@ With more than one realtime-capable engine in a single instance (e.g. Postgres +
 
 For multi-instance deployments (behind a load balancer), Rebase uses PostgreSQL `LISTEN/NOTIFY` to synchronize changes:
 
-- A mutation on Instance A triggers `pg_notify('rebase_snapshot_changes', ...)`.
+- A mutation on Instance A triggers `pg_notify('rebase_entity_changes', ...)`.
 - Instance B receives the notification via its dedicated `LISTEN` connection.
-- Instance B refetches the affected snapshot and fans out the update to its local subscribers.
+- Instance B refetches the affected entity and fans out the update to its local subscribers.
 - Each instance has a unique ID (`inst_<uuid>`) to skip its own notifications.
 
 This is **automatic** when `connectionString` is provided to the Postgres bootstrapper. The dedicated `LISTEN` connection auto-reconnects with a **3-second fixed delay** if it drops.
@@ -670,13 +670,13 @@ const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
 
 ### Debounce Window
 
-The server coalesces rapid snapshot mutations into a single database refetch using a configurable debounce:
+The server coalesces rapid entity mutations into a single database refetch using a configurable debounce:
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `REFETCH_DEBOUNCE_MS` | `300` ms | Debounce window for collection and snapshot refetches |
+| `REFETCH_DEBOUNCE_MS` | `300` ms | Debounce window for collection and entity refetches |
 
-If 10 snapshots change within 300ms, only **one** database query is executed for each affected subscription.
+If 10 entitys change within 300ms, only **one** database query is executed for each affected subscription.
 
 ### Presence Cleanup
 
@@ -687,12 +687,12 @@ If 10 snapshots change within 300ms, only **one** database query is executed for
 
 ## Nested Relation Updates
 
-The realtime engine handles nested relation paths (e.g., `"posts/70/tags"`). When a snapshot changes at a nested path:
+The realtime engine handles nested relation paths (e.g., `"posts/70/tags"`). When a entity changes at a nested path:
 
 1. The exact path is notified (`"posts/70/tags"`).
 2. All parent paths are also notified (`"posts"`, `"posts/70"`).
 
-This ensures that a subscription to `"posts"` receives updates even when a related `"tags"` snapshot changes.
+This ensures that a subscription to `"posts"` receives updates even when a related `"tags"` entity changes.
 
 ## Error Handling
 
@@ -725,13 +725,13 @@ const unsubscribe = client.data.products.listen(
 
 ### Pending Request Timeout
 
-To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as `FETCH_COLLECTION`, `FETCH_SNAPSHOT`, `SAVE_SNAPSHOT`, `DELETE_SNAPSHOT`, `COUNT_SNAPSHOTS`, and `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds (`requestTimeoutMs = 30000`).
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as `FETCH_COLLECTION`, `FETCH_ENTITY`, `SAVE_ENTITY`, `DELETE_ENTITY`, `COUNT_ENTITIES`, and `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds (`requestTimeoutMs = 30000`).
 
 If the server does not respond within this window, the client automatically deletes the pending request record and rejects the request's promise with an `ApiError`:
 - Message: `"Request timed out"`
 - Code: `undefined`
 
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_snapshot`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_entity`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
 
 ### Production Error Sanitization
 

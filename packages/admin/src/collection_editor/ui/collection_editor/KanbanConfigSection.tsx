@@ -133,7 +133,7 @@ block: "center" });
                     ? `Property "${kanbanConfig?.columnProperty}" does not exist or is not an enum string property. Please select a valid property or clear the selection.`
                     : enumStringProperties.length === 0
                         ? "No enum string properties found. Add a string property with enum to use Kanban view."
-                        : "Select a string property with enum values to group snapshots into columns"
+                        : "Select a string property with enum values to group entitys into columns"
                 }
             </FieldCaption>
 

@@ -1,24 +1,24 @@
 import type { ComponentRef } from "./component_ref";
 
-import type { Snapshot, SnapshotReference, SnapshotRelation, SnapshotValues, GeoPoint, Vector } from "./snapshots";
+import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entitys";
 import type { JoinStep, OnAction, Relation } from "./relations";
 import type { CollectionConfig, FilterValues } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthController } from "../controllers/auth";
-import type { AfterReadProps, BeforeSaveProps } from "./snapshot_callbacks";
+import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
 import type { User } from "../users";
 
 /**
  * Callbacks/Hooks for individual property fields
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type PropertyCallbacks<T = unknown, M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
     /**
      * Callback used after fetching data, to transform the value before rendering
      */
-    afterRead?(props: Omit<AfterReadProps<M, USER>, "snapshot"> & {
+    afterRead?(props: Omit<AfterReadProps<M, USER>, "entity"> & {
         value: T;
-        snapshot: Snapshot<M> | undefined;
+        entity: Entity<M> | undefined;
     }): Promise<T> | T;
 
     /**
@@ -33,7 +33,7 @@ export type PropertyCallbacks<T = unknown, M extends Record<string, unknown> = R
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type DataType =
     | "string"
@@ -99,10 +99,10 @@ export type InferPropertyType<P extends Property> =
             P extends BooleanProperty ? boolean :
                 P extends DateProperty ? Date :
                     P extends GeopointProperty ? GeoPoint :
-                        P extends ReferenceProperty ? SnapshotReference :
-                            P extends RelationProperty ? SnapshotRelation | SnapshotRelation[] :
+                        P extends ReferenceProperty ? EntityReference :
+                            P extends RelationProperty ? EntityRelation | EntityRelation[] :
                                 P extends ArrayProperty ? (P["of"] extends Property ? InferPropertyType<P["of"]>[] : unknown[]) :
-                                    P extends MapProperty ? (P["properties"] extends Properties ? InferSnapshotType<P["properties"]> : Record<string, unknown>) :
+                                    P extends MapProperty ? (P["properties"] extends Properties ? InferEntityType<P["properties"]> : Record<string, unknown>) :
                                         P extends VectorProperty ? Vector :
                                             P extends BinaryProperty ? string :
                                                 never;
@@ -131,7 +131,7 @@ type OptionalPropertyKeys<P extends Properties> = {
 
 /**
  * A generic type that converts a `Properties` schema definition into a corresponding
- * TypeScript snapshot type. It correctly handles required and optional properties.
+ * TypeScript entity type. It correctly handles required and optional properties.
  *
  * A property is considered required when it has `validation: { required: true }`.
  * The `true` must be a literal type — if `required` is typed as `boolean`,
@@ -142,10 +142,10 @@ type OptionalPropertyKeys<P extends Properties> = {
  *   name: { type: 'string', validation: { required: true } },
  *   price: { type: 'number' }
  * } as const satisfies Properties;
- * type Product = InferSnapshotType<typeof productSchema>;
+ * type Product = InferEntityType<typeof productSchema>;
  * // Result: { name: string; price?: number; }
  */
-export type InferSnapshotType<P extends Properties> = {
+export type InferEntityType<P extends Properties> = {
     -readonly [K in RequiredPropertyKeys<P>]: InferPropertyType<P[K]>;
 } & {
     -readonly [K in OptionalPropertyKeys<P>]?: InferPropertyType<P[K]>;
@@ -153,7 +153,7 @@ export type InferSnapshotType<P extends Properties> = {
 
 /**
  * Interface including all common properties of a CMS property.
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface BaseUIConfig<CustomProps = unknown> {
     columnWidth?: number;
@@ -210,7 +210,7 @@ export interface BaseProperty<CustomProps = unknown> {
 
     /**
      * Use this to define dynamic properties that change based on certain conditions
-     * or on the snapshot's values. For example, you can make a field read-only if
+     * or on the entity's values. For example, you can make a field read-only if
      * another field has a certain value.
      * This function receives the same props as a `PropertyBuilder` and should return a partial `Property` object.
      */
@@ -245,7 +245,7 @@ export interface BaseProperty<CustomProps = unknown> {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface StringUIConfig extends BaseUIConfig {
     /**
@@ -276,7 +276,7 @@ export interface StringProperty extends BaseProperty {
     ui?: StringUIConfig;
     type: "string";
     /**
-     * Default value for new snapshots. Must be a string.
+     * Default value for new entitys. Must be a string.
      */
     defaultValue?: string;
     /**
@@ -299,7 +299,7 @@ export interface StringProperty extends BaseProperty {
      * 'cuid' -> Drizzle `.default(sql\`cuid()\`)`
      * Or any other random string to act as a raw SQL default expression: e.g. `nanoid()`
      *
-     * On the UI side, the field automatically gets disabled on new snapshots if a string strategy is provided.
+     * On the UI side, the field automatically gets disabled on new entitys if a string strategy is provided.
      */
     isId?: boolean | "manual" | "uuid" | "cuid" | string;
     /**
@@ -325,7 +325,7 @@ export interface StringProperty extends BaseProperty {
      * Note that the user ID needs to be the one used in your authentication
      * provider (e.g. the ID in your `users` table).
      * You can also use a property builder to specify the user path dynamically
-     * based on other values of the snapshot.
+     * based on other values of the entity.
      */
     userSelect?: boolean;
 
@@ -336,7 +336,7 @@ export interface StringProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface NumberUIConfig extends BaseUIConfig {
     clearable?: boolean;
@@ -346,7 +346,7 @@ export interface NumberProperty extends BaseProperty {
     ui?: NumberUIConfig;
     type: "number";
     /**
-     * Default value for new snapshots. Must be a number.
+     * Default value for new entitys. Must be a number.
      */
     defaultValue?: number;
     /**
@@ -379,13 +379,13 @@ export interface NumberProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface BooleanProperty extends BaseProperty {
     ui?: BaseUIConfig;
     type: "boolean";
     /**
-     * Default value for new snapshots. Must be a boolean.
+     * Default value for new entitys. Must be a boolean.
      */
     defaultValue?: boolean;
     /**
@@ -395,7 +395,7 @@ export interface BooleanProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface VectorUIConfig extends BaseUIConfig {
     clearable?: boolean;
@@ -405,7 +405,7 @@ export interface VectorProperty extends BaseProperty {
     ui?: VectorUIConfig;
     type: "vector";
     /**
-     * Default value for new snapshots.
+     * Default value for new entitys.
      */
     defaultValue?: Vector;
     dimensions: number;
@@ -413,19 +413,19 @@ export interface VectorProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface BinaryProperty extends BaseProperty {
     type: "binary";
     /**
-     * Default value for new snapshots. Must be a base64-encoded string.
+     * Default value for new entitys. Must be a base64-encoded string.
      */
     defaultValue?: string;
     validation?: PropertyValidationSchema;
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface DateUIConfig extends BaseUIConfig {
     /**
@@ -438,7 +438,7 @@ export interface DateProperty extends BaseProperty {
     ui?: DateUIConfig;
     type: "date";
     /**
-     * Default value for new snapshots. Must be a Date.
+     * Default value for new entitys. Must be a Date.
      */
     defaultValue?: Date;
     /**
@@ -461,7 +461,7 @@ export interface DateProperty extends BaseProperty {
     timezone?: string;
     /**
      * If this flag is  set to `on_create` or `on_update` this timestamp is
-     * updated automatically on creation of the snapshot only or on every
+     * updated automatically on creation of the entity only or on every
      * update (including creation). Useful for creating `created_on` or
      * `updated_on` fields
      */
@@ -469,13 +469,13 @@ export interface DateProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface GeopointProperty extends BaseProperty {
     ui?: BaseUIConfig;
     type: "geopoint";
     /**
-     * Default value for new snapshots. Must be a GeoPoint.
+     * Default value for new entitys. Must be a GeoPoint.
      */
     defaultValue?: GeoPoint;
     /**
@@ -485,14 +485,14 @@ export interface GeopointProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface ReferenceUIConfig extends BaseUIConfig {
     previewProperties?: string[];
 }
 
 /**
- * A pointer to a snapshot, stored **as a value** on the row (id + path, and
+ * A pointer to a entity, stored **as a value** on the row (id + path, and
  * optionally a `driver`/`databaseId` for cross-datasource pointers).
  *
  * This is the native primitive of **document databases** — it maps 1:1 to a
@@ -505,15 +505,15 @@ export interface ReferenceUIConfig extends BaseUIConfig {
  * - Postgres collection → use {@link RelationProperty} (`type: "relation"`),
  *   which models a real foreign key / join with prefetch and cascade.
  *
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface ReferenceProperty extends BaseProperty {
     ui?: ReferenceUIConfig;
     type: "reference";
     /**
-     * Default value for new snapshots. Must be a SnapshotReference.
+     * Default value for new entitys. Must be a EntityReference.
      */
-    defaultValue?: SnapshotReference;
+    defaultValue?: EntityReference;
     /**
      * Marks this field as a Primary Key / Unique Identifier.
      * Framework behavior: Auto-maps to `collection.primaryKeys` internally if not explicitly set.
@@ -523,7 +523,7 @@ export interface ReferenceProperty extends BaseProperty {
     isId?: boolean;
     /**
      * Absolute collection path of the collection this reference points to.
-     * The collection of the snapshot is inferred based on the root navigation, so
+     * The collection of the entity is inferred based on the root navigation, so
      * the filters and search delegate existing there are applied to this view
      * as well.
      * You can leave this prop undefined if the path is not yet know, e.g.
@@ -532,23 +532,23 @@ export interface ReferenceProperty extends BaseProperty {
      */
     path?: string;
     /**
-     * Allow selection of snapshots that pass the given filter only.
+     * Allow selection of entitys that pass the given filter only.
      * e.g. `fixedFilter: { age: [">=", 18] }`
      */
     fixedFilter?: FilterValues<string>;
 
     /**
-     * Should the reference include the ID of the snapshot. Defaults to `true`
+     * Should the reference include the ID of the entity. Defaults to `true`
      */
     includeId?: boolean;
     /**
-     * Should the reference include a link to the snapshot (open the snapshot details). Defaults to `true`
+     * Should the reference include a link to the entity (open the entity details). Defaults to `true`
      */
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface RelationUIConfig extends BaseUIConfig {
     previewProperties?: string[];
@@ -558,7 +558,7 @@ export interface RelationUIConfig extends BaseUIConfig {
 /**
  * A schema-level relationship between collections **within a single
  * datasource** — backed by a foreign key, junction table, or explicit join
- * path. The resolved value (an `SnapshotRelation`) can carry a prefetched snapshot
+ * path. The resolved value (an `EntityRelation`) can carry a prefetched entity
  * payload to eliminate N+1 queries, and supports `onUpdate`/`onDelete` cascade.
  *
  * This is the native primitive of **relational databases** (Postgres). It is
@@ -569,15 +569,15 @@ export interface RelationUIConfig extends BaseUIConfig {
  * - Firestore / MongoDB collection → use {@link ReferenceProperty}
  *   (`type: "reference"`), a stored pointer with no join engine.
  *
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface RelationProperty extends BaseProperty {
     ui?: RelationUIConfig;
     type: "relation";
     /**
-     * Default value for new snapshots. Must be a SnapshotRelation or array of SnapshotRelation.
+     * Default value for new entitys. Must be a EntityRelation or array of EntityRelation.
      */
-    defaultValue?: SnapshotRelation | SnapshotRelation[];
+    defaultValue?: EntityRelation | EntityRelation[];
     /**
      * Marks this field as a Primary Key / Unique Identifier.
      * Framework behavior: Auto-maps to `collection.primaryKeys` internally if not explicitly set.
@@ -627,7 +627,7 @@ export interface RelationProperty extends BaseProperty {
     localKey?: string;
 
     /**
-     * Column on the TARGET table that stores the foreign key back to this snapshot.
+     * Column on the TARGET table that stores the foreign key back to this entity.
      * Required when `direction` is `"inverse"`.
      * Auto-inferred if not set.
      * @example "post_id"
@@ -685,19 +685,19 @@ export interface RelationProperty extends BaseProperty {
     // ─── UI configuration ───
 
     /**
-     * Allow selection of snapshots that pass the given filter only.
+     * Allow selection of entitys that pass the given filter only.
      * e.g. `fixedFilter: { age: [">=", 18] }`
      */
     fixedFilter?: FilterValues<string>;
 
     /**
-     * Should the reference include the ID of the snapshot. Defaults to `true`
+     * Should the reference include the ID of the entity. Defaults to `true`
      */
     includeId?: boolean;
     /**
-     * Should the reference include a link to the snapshot (open the snapshot details). Defaults to `true`
+     * Should the reference include a link to the entity (open the entity details). Defaults to `true`
      */
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
 
     /**
      * Choose the widget to use for selecting the relation.
@@ -707,7 +707,7 @@ export interface RelationProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface ArrayUIConfig extends BaseUIConfig {
     expanded?: boolean;
@@ -718,7 +718,7 @@ export interface ArrayProperty extends BaseProperty {
     ui?: ArrayUIConfig;
     type: "array";
     /**
-     * Default value for new snapshots. Must be an array.
+     * Default value for new entitys. Must be an array.
      */
     defaultValue?: unknown[];
     /**
@@ -790,7 +790,7 @@ export interface ArrayProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface MapUIConfig extends BaseUIConfig {
     expanded?: boolean;
@@ -802,7 +802,7 @@ export interface MapProperty extends BaseProperty {
     ui?: MapUIConfig;
     type: "map";
     /**
-     * Default value for new snapshots. Must be a record/object.
+     * Default value for new entitys. Must be a record/object.
      */
     defaultValue?: Record<string, unknown>;
     /**
@@ -837,7 +837,7 @@ export interface MapProperty extends BaseProperty {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type PropertyBuilderProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     values: Partial<M>;
@@ -845,12 +845,12 @@ export type PropertyBuilderProps<M extends Record<string, unknown> = Record<stri
     propertyValue?: unknown;
     index?: number;
     path: string;
-    snapshotId?: string | number;
+    entityId?: string | number;
     authController: AuthController;
 };
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface PropertyDisabledConfig {
     /**
@@ -883,13 +883,13 @@ export interface PropertyDisabledConfig {
  * label instead of a simple string (for enabling or disabling options and
  * choosing colors).
  * If you need to ensure the order of the elements use an array of {@link EnumValueConfig}
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type EnumValues = EnumValueConfig[] | Record<string | number, string | EnumValueConfig>;
 
 /**
  * Configuration for a particular entry in an `EnumValues`
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type EnumValueConfig = {
     /**
@@ -914,7 +914,7 @@ export type EnumValueConfig = {
 /**
  * Rules to validate any property. Some properties have specific rules
  * additionally to these.
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface PropertyValidationSchema {
     /**
@@ -928,7 +928,7 @@ export interface PropertyValidationSchema {
     requiredMessage?: string;
 
     /**
-     * If the unique flag is set to `true`, you can only have one snapshot in the
+     * If the unique flag is set to `true`, you can only have one entity in the
      * collection with this value.
      */
     unique?: boolean;
@@ -944,7 +944,7 @@ export interface PropertyValidationSchema {
 
 /**
  * Validation rules for numbers
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface NumberPropertyValidationSchema extends PropertyValidationSchema {
     min?: number;
@@ -958,7 +958,7 @@ export interface NumberPropertyValidationSchema extends PropertyValidationSchema
 
 /**
  * Validation rules for strings
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface StringPropertyValidationSchema extends PropertyValidationSchema {
     length?: number;
@@ -976,7 +976,7 @@ export interface StringPropertyValidationSchema extends PropertyValidationSchema
 
 /**
  * Validation rules for dates
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface DatePropertyValidationSchema extends PropertyValidationSchema {
     min?: Date;
@@ -985,7 +985,7 @@ export interface DatePropertyValidationSchema extends PropertyValidationSchema {
 
 /**
  * Validation rules for arrays
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface ArrayPropertyValidationSchema extends PropertyValidationSchema {
     min?: number;
@@ -994,7 +994,7 @@ export interface ArrayPropertyValidationSchema extends PropertyValidationSchema 
 
 /**
  * Additional configuration related to Storage related fields
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type StorageConfig = {
     /**
@@ -1036,9 +1036,9 @@ export type StorageConfig = {
      * - `{file.name}` - Name of the file without extension
      * - `{file.ext}` - Extension of the file
      * - `{rand}` - Random value used to avoid name collisions
-     * - `{snapshotId}` - ID of the snapshot
+     * - `{entityId}` - ID of the entity
      * - `{propertyKey}` - ID of this property
-     * - `{path}` - Path of this snapshot
+     * - `{path}` - Path of this entity
      *
      * @param context
      */
@@ -1053,9 +1053,9 @@ export type StorageConfig = {
      * - `{file.name}` - Name of the file without extension
      * - `{file.ext}` - Extension of the file
      * - `{rand}` - Random value used to avoid name collisions
-     * - `{snapshotId}` - ID of the snapshot
+     * - `{entityId}` - ID of the entity
      * - `{propertyKey}` - ID of this property
-     * - `{path}` - Path of this snapshot
+     * - `{path}` - Path of this entity
      */
     storagePath: string | ((context: UploadedFileContext) => string);
 
@@ -1107,7 +1107,7 @@ export type StorageConfig = {
 }
 
 /**
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface UploadedFileContext {
     /**
@@ -1126,19 +1126,19 @@ export interface UploadedFileContext {
     property: StringProperty | ArrayProperty;
 
     /**
-     * Snapshot ID
+     * Entity ID
      */
-    snapshotId?: string | number;
+    entityId?: string | number;
 
     /**
-     * Snapshot path. E.g. `products/PID/locales`
+     * Entity path. E.g. `products/PID/locales`
      */
     path?: string;
 
     /**
-     * Values of the current snapshot
+     * Values of the current entity
      */
-    values: SnapshotValues<any>;
+    values: EntityValues<any>;
 
     /**
      * Storage meta specified by the developer
@@ -1148,14 +1148,14 @@ export interface UploadedFileContext {
 
 /**
  * Used for previewing urls if the download file is known
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type PreviewType = "image" | "video" | "audio" | "file";
 
 /**
  * MIME types for storage fields
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type FileType =
     | "image/*"
@@ -1219,13 +1219,13 @@ export interface ImageResize {
  * - isPast(timestamp) - check if timestamp is in the past
  * - isFuture(timestamp) - check if timestamp is in the future
  *
- * @group Snapshot properties
+ * @group Entity properties
  */
 export type JsonLogicRule = Record<string, any>;
 
 /**
  * Conditions for individual enum values within a property.
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface EnumValueConditions {
     /**
@@ -1256,7 +1256,7 @@ export interface EnumValueConditions {
  * - Evaluated at runtime like property builders
  *
  * @see https://jsonlogic.com/ for JSON Logic syntax
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface PropertyConditions {
 
@@ -1330,9 +1330,9 @@ export interface PropertyConditions {
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Dynamic default value for new snapshots.
+     * Dynamic default value for new entitys.
      * Should evaluate to a value of the appropriate type for the field.
-     * Only applied when snapshotId is empty (new snapshot).
+     * Only applied when entityId is empty (new entity).
      */
     defaultValue?: JsonLogicRule;
 
@@ -1418,11 +1418,11 @@ export interface PropertyConditions {
 /**
  * Context available during JSON Logic condition evaluation.
  * Mirrors PropertyBuilderProps but adapted for JSON serialization.
- * @group Snapshot properties
+ * @group Entity properties
  */
 export interface ConditionContext {
     /**
-     * Current form/snapshot values.
+     * Current form/entity values.
      * Date values are converted to Unix timestamps (milliseconds).
      */
     values: Record<string, unknown>;
@@ -1443,12 +1443,12 @@ export interface ConditionContext {
     path: string;
 
     /**
-     * Snapshot ID. Undefined for new snapshots.
+     * Entity ID. Undefined for new entitys.
      */
-    snapshotId?: string;
+    entityId?: string;
 
     /**
-     * Whether this is a new snapshot being created.
+     * Whether this is a new entity being created.
      */
     isNew: boolean;
 

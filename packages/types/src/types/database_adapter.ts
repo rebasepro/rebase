@@ -71,7 +71,7 @@ export interface DatabaseAdapter {
     ): Promise<BootstrappedAuth | undefined>;
 
     /**
-     * Initialize snapshot history tracking.
+     * Initialize entity history tracking.
      *
      * Return `undefined` if the database does not support history.
      */

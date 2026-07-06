@@ -10,7 +10,7 @@ const customersCollection = defineCollection({
     icon: "Users",
     group: "E-Commerce",
     history: true,
-    defaultSnapshotAction: "view",
+    defaultEntityAction: "view",
     properties: {
         id: {
             name: "ID",

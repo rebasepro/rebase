@@ -1,4 +1,4 @@
-import type { ArrayProperty, ReferenceProperty, SnapshotReference } from "@rebasepro/types";
+import type { ArrayProperty, ReferenceProperty, EntityReference } from "@rebasepro/types";
 import type { PropertyPreviewProps, PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { ReferencePreview } from "../components/ReferencePreview";
 
@@ -24,7 +24,7 @@ export function ArrayOfReferencesPreview({
     return (
         <div className="flex flex-col w-full">
             {value ?
-                (value as SnapshotReference[]).map((reference, index: number) => {
+                (value as EntityReference[]).map((reference, index: number) => {
                     const ofProperty = property.of as ReferenceProperty;
                     return <div className="mt-1 mb-1 w-full"
                         key={`preview_array_ref_${propertyKey}_${index}`}>
@@ -34,7 +34,7 @@ export function ArrayOfReferencesPreview({
                             size={childSize}
                             reference={reference}
                             includeId={ofProperty.includeId}
-                            includeSnapshotLink={ofProperty.includeSnapshotLink}
+                            includeEntityLink={ofProperty.includeEntityLink}
                         />
                     </div>;
                 }

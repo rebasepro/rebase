@@ -240,8 +240,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             });
         },
 
-        async finalizeUserCreation(snapshot, clearPassword) {
-            return finalizeAdminUserCreation(snapshot, clearPassword, {
+        async finalizeUserCreation(entity, clearPassword) {
+            return finalizeAdminUserCreation(entity, clearPassword, {
                 authRepo: authRepository,
                 emailService,
                 emailConfig,

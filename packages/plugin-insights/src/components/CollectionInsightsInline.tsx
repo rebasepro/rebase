@@ -12,11 +12,11 @@ export function CollectionInsightsInline({
     insights,
     path,
     parentCollectionSlugs,
-    parentSnapshotIds
+    parentEntityIds
 }: {
     path: string;
     collection: unknown;
-    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     insights: InsightDefinition[];
 }) {
     if (!insights || insights.length === 0) return null;
@@ -28,7 +28,7 @@ export function CollectionInsightsInline({
                     key={def.id}
                     definition={def}
                     path={path}
-                    parentCollectionSlugs={parentCollectionSlugs} parentSnapshotIds={parentSnapshotIds}
+                    parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                 />
             ))}
         </div>

@@ -1,8 +1,8 @@
 /**
- * Regression tests for batchFetchRelatedSnapshotsMany
+ * Regression tests for batchFetchRelatedEntitysMany
  *
  * Root cause of the original bug:
- *   `batchFetchRelatedSnapshotsMany` only had two code paths:
+ *   `batchFetchRelatedEntitysMany` only had two code paths:
  *     1. `relation.joinPath` — custom multi-hop join path
  *     2. FK-based fallback — delegated to `buildRelationQuery`, then extracted
  *        parentId from `foreignKeyOnTarget` / `inverseRelationName`
@@ -205,7 +205,7 @@ function generateJunctionRows(
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
-describe("batchFetchRelatedSnapshotsMany: M2M through junction table regression", () => {
+describe("batchFetchRelatedEntitysMany: M2M through junction table regression", () => {
     let registry: PostgresCollectionRegistry;
 
     function createMockDb(resolveResults: () => unknown[]) {
@@ -319,7 +319,7 @@ name: "TypeScript" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1, 2, 3], "tags", relation
             );
 
@@ -340,7 +340,7 @@ name: "TypeScript" } }
             expect(results.get("3")![0].values.name).toBe("TypeScript");
         });
 
-        it("should set correct snapshot id and path on each relation result", async () => {
+        it("should set correct entity id and path on each relation result", async () => {
             const junctionRows = [
                 { posts_tags: { post_id: 1,
 tag_id: 42 },
@@ -352,7 +352,7 @@ name: "GraphQL" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1], "tags", relation
             );
 
@@ -374,7 +374,7 @@ name: "TypeScript" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            await service.batchFetchRelatedSnapshotsMany(
+            await service.batchFetchRelatedEntitysMany(
                 "posts", [1, 2, 3], "tags", relation
             );
 
@@ -388,7 +388,7 @@ name: "TypeScript" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1, 2, 3], "tags", relation
             );
 
@@ -400,7 +400,7 @@ name: "TypeScript" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [], "tags", relation
             );
 
@@ -426,7 +426,7 @@ name: "React" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1, 2, 3], "tags", relation
             );
 
@@ -462,7 +462,7 @@ title: "Post C" } }
             const service = new RelationService(db, registry);
             const relation = tagsWithInversePosts.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "tags_inv", [1, 2], "posts", relation
             );
 
@@ -482,7 +482,7 @@ title: "Post C" } }
             const service = new RelationService(db, registry);
             const relation = tagsWithInversePosts.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "tags_inv", [1, 2], "posts", relation
             );
 
@@ -514,7 +514,7 @@ title: "Post Z" } }
             const service = new RelationService(db, registry);
             const relation = authorsWithJoinPath.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "authors_jp", [1, 2], "posts", relation
             );
 
@@ -547,7 +547,7 @@ title: "Post Z" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1], "tags", relation
             );
 
@@ -585,7 +585,7 @@ name: "Rust" } }
             const relation = postsCollection.relations![0] as Relation;
 
             // Pass numeric parent IDs (parseIdValues will return numbers for numeric PKs)
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1, 2], "tags", relation
             );
 
@@ -613,7 +613,7 @@ title: "Post B" } }
             const relation = tagsWithInversePosts.relations![0] as Relation;
 
             // Pass numeric parent IDs
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "tags_inv", [1, 2], "posts", relation
             );
 
@@ -641,7 +641,7 @@ name: "React" } }
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedSnapshotsMany(
+            const results = await service.batchFetchRelatedEntitysMany(
                 "posts", [1, 2], "tags", relation
             );
 

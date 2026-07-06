@@ -4,7 +4,7 @@ import { useApiConfig } from "@rebasepro/core";
 export interface HistoryEntryData {
     id: string;
     table_name: string;
-    snapshot_id: string;
+    entity_id: string;
     action: "create" | "update" | "delete";
     changed_fields: string[] | null;
     values: Record<string, unknown> | null;
@@ -13,7 +13,7 @@ export interface HistoryEntryData {
     updated_at: string;
 }
 
-export interface UseSnapshotHistoryResult {
+export interface UseEntityHistoryResult {
     entries: HistoryEntryData[];
     total: number;
     isLoading: boolean;
@@ -24,16 +24,16 @@ export interface UseSnapshotHistoryResult {
 }
 
 /**
- * Hook to fetch snapshot history from the backend REST API.
+ * Hook to fetch entity history from the backend REST API.
  * Replaces the old subcollection-based approach with a proper API call.
  */
 export function useHistory(params: {
     slug: string;
-    snapshotId: string | number | undefined;
+    entityId: string | number | undefined;
     enabled?: boolean;
     pageSize?: number;
-}): UseSnapshotHistoryResult {
-    const { slug, snapshotId, enabled = true, pageSize = 10 } = params;
+}): UseEntityHistoryResult {
+    const { slug, entityId, enabled = true, pageSize = 10 } = params;
     const apiConfig = useApiConfig();
 
     const [entries, setEntries] = useState<HistoryEntryData[]>([]);
@@ -44,14 +44,14 @@ export function useHistory(params: {
     const [offset, setOffset] = useState(0);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Track the current snapshot identity so we can detect stale responses
-    const currentSnapshotRef = useRef<string | undefined>(undefined);
+    // Track the current entity identity so we can detect stale responses
+    const currentEntityRef = useRef<string | undefined>(undefined);
 
     const fetchEntries = useCallback(async (
         currentOffset: number,
         signal?: AbortSignal
     ) => {
-        if (!apiConfig?.apiUrl || !snapshotId || !enabled) return;
+        if (!apiConfig?.apiUrl || !entityId || !enabled) return;
 
         setIsLoading(true);
         setError(undefined);
@@ -63,14 +63,14 @@ export function useHistory(params: {
             };
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const url = `${apiConfig.apiUrl}/api/data/${slug}/${snapshotId}/history?limit=${pageSize}&offset=${currentOffset}`;
+            const url = `${apiConfig.apiUrl}/api/data/${slug}/${entityId}/history?limit=${pageSize}&offset=${currentOffset}`;
             const response = await fetch(url, { headers,
 signal });
 
-            // Check if the request was aborted or the snapshot changed while in-flight
+            // Check if the request was aborted or the entity changed while in-flight
             if (signal?.aborted) return;
-            const snapshotKey = `${slug}/${snapshotId}`;
-            if (currentSnapshotRef.current !== snapshotKey) return;
+            const entityKey = `${slug}/${entityId}`;
+            if (currentEntityRef.current !== entityKey) return;
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
@@ -94,34 +94,34 @@ signal });
         } finally {
             setIsLoading(false);
         }
-    }, [apiConfig, slug, snapshotId, enabled, pageSize]);
+    }, [apiConfig, slug, entityId, enabled, pageSize]);
 
-    // Single unified effect: reset state when snapshot changes, fetch when offset changes.
-    // Uses AbortController to cancel stale requests on snapshot change or unmount.
+    // Single unified effect: reset state when entity changes, fetch when offset changes.
+    // Uses AbortController to cancel stale requests on entity change or unmount.
     useEffect(() => {
-        const snapshotKey = `${slug}/${snapshotId}`;
-        const isNewSnapshot = currentSnapshotRef.current !== snapshotKey;
+        const entityKey = `${slug}/${entityId}`;
+        const isNewEntity = currentEntityRef.current !== entityKey;
 
-        if (isNewSnapshot) {
-            // Reset state for new snapshot
-            currentSnapshotRef.current = snapshotKey;
+        if (isNewEntity) {
+            // Reset state for new entity
+            currentEntityRef.current = entityKey;
             setEntries([]);
             setTotal(0);
             setHasMore(true);
             setOffset(0);
         }
 
-        if (!enabled || !snapshotId) return;
+        if (!enabled || !entityId) return;
 
         const abortController = new AbortController();
-        // When snapshot changed, always fetch from offset 0
-        const effectiveOffset = isNewSnapshot ? 0 : offset;
+        // When entity changed, always fetch from offset 0
+        const effectiveOffset = isNewEntity ? 0 : offset;
         fetchEntries(effectiveOffset, abortController.signal);
 
         return () => {
             abortController.abort();
         };
-    }, [fetchEntries, offset, enabled, snapshotId, slug, refreshTrigger]);
+    }, [fetchEntries, offset, enabled, entityId, slug, refreshTrigger]);
 
     const loadMore = useCallback(() => {
         if (!isLoading && hasMore && offset + entries.length < total) {
@@ -130,8 +130,8 @@ signal });
     }, [isLoading, hasMore, pageSize, offset, entries.length, total]);
 
     const revert = useCallback(async (historyId: string): Promise<Record<string, unknown>> => {
-        if (!apiConfig?.apiUrl || !snapshotId) {
-            throw new Error("Cannot revert: missing API configuration or snapshot ID");
+        if (!apiConfig?.apiUrl || !entityId) {
+            throw new Error("Cannot revert: missing API configuration or entity ID");
         }
 
         const token = await apiConfig.getAuthToken?.();
@@ -140,7 +140,7 @@ signal });
         };
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const url = `${apiConfig.apiUrl}/api/data/${slug}/${snapshotId}/history/${historyId}/revert`;
+        const url = `${apiConfig.apiUrl}/api/data/${slug}/${entityId}/history/${historyId}/revert`;
         const response = await fetch(url, { method: "POST",
 headers });
 
@@ -151,14 +151,14 @@ headers });
 
         const result = await response.json();
 
-        // Refresh the history list after revert by resetting the snapshot ref
+        // Refresh the history list after revert by resetting the entity ref
         // and triggering the effect.
-        currentSnapshotRef.current = undefined;
+        currentEntityRef.current = undefined;
         setRefreshTrigger(prev => prev + 1);
 
-        // Return the reverted snapshot data so callers can update the form
+        // Return the reverted entity data so callers can update the form
         return result.data as Record<string, unknown>;
-    }, [apiConfig, slug, snapshotId]);
+    }, [apiConfig, slug, entityId]);
 
     return useMemo(() => ({
         entries,

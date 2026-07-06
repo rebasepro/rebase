@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Snapshot, SnapshotTableController, EnumValueConfig, SelectionController } from "@rebasepro/types";
+import { Entity, EntityTableController, EnumValueConfig, SelectionController } from "@rebasepro/types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
     Button,
@@ -25,8 +25,8 @@ import {
 import { resolveEnumValues } from "@rebasepro/common";
 import { getPropertyInPath } from "../../util/property_utils";
 import {
-    saveSnapshotWithCallbacks,
-    SaveSnapshotWithCallbacksProps,
+    saveEntityWithCallbacks,
+    SaveEntityWithCallbacksProps,
     useAuthController,
     useCustomizationController,
     useData,
@@ -43,35 +43,35 @@ import { generateNKeysBetween } from "fractional-indexing";
 
 export type CollectionBoardViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: CollectionConfig<M>;
-    tableController: SnapshotTableController<M>;
+    tableController: EntityTableController<M>;
     fullPath: string;
-    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     columnProperty: string;
-    onSnapshotClick?: (snapshot: Snapshot<M>) => void;
+    onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedSnapshots?: Snapshot<M>[];
+    highlightedEntitys?: Entity<M>[];
     emptyComponent?: React.ReactNode;
-    /** Called when snapshots are deleted - used for optimistic count updates */
-    deletedSnapshots?: Snapshot<M>[];
+    /** Called when entitys are deleted - used for optimistic count updates */
+    deletedEntitys?: Entity<M>[];
 };
 
 /**
- * Kanban board view for displaying snapshots grouped by a string enum property.
+ * Kanban board view for displaying entitys grouped by a string enum property.
  */
 export function CollectionBoardViewBinding<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
     tableController,
     fullPath,
     parentCollectionSlugs = [],
-    parentSnapshotIds = [],
+    parentEntityIds = [],
     columnProperty,
-    onSnapshotClick,
+    onEntityClick,
     selectionController,
     selectionEnabled = true,
-    highlightedSnapshots,
+    highlightedEntitys,
     emptyComponent,
-    deletedSnapshots
+    deletedEntitys
 }: CollectionBoardViewBindingProps<M>) {
     const customizationController = useCustomizationController();
     const context = useRebaseContext();
@@ -180,21 +180,21 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
     const dataLoading = boardDataController.loading;
     const dataLoadingError = boardDataController.error;
 
-    // Track previously processed deleted snapshots to avoid double-counting
+    // Track previously processed deleted entitys to avoid double-counting
     const processedDeletedRef = useRef<Set<string>>(new Set());
 
-    // Optimistic update for column counts when snapshots are deleted
+    // Optimistic update for column counts when entitys are deleted
     useEffect(() => {
-        if (!deletedSnapshots || deletedSnapshots.length === 0) return;
+        if (!deletedEntitys || deletedEntitys.length === 0) return;
 
-        // Calculate column deltas from deleted snapshots
+        // Calculate column deltas from deleted entitys
         const deltas: Record<string, number> = {};
-        deletedSnapshots.forEach(snapshot => {
-            // Skip if we've already processed this snapshot
-            if (processedDeletedRef.current.has(String(snapshot.id))) return;
-            processedDeletedRef.current.add(String(snapshot.id));
+        deletedEntitys.forEach(entity => {
+            // Skip if we've already processed this entity
+            if (processedDeletedRef.current.has(String(entity.id))) return;
+            processedDeletedRef.current.add(String(entity.id));
 
-            const col = snapshot.values?.[columnProperty];
+            const col = entity.values?.[columnProperty];
             if (col && typeof col === "string") {
                 deltas[col] = (deltas[col] ?? 0) + 1;
             }
@@ -203,25 +203,25 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
         if (Object.keys(deltas).length > 0) {
             boardDataController.decrementColumnCounts(deltas);
         }
-    }, [deletedSnapshots, columnProperty, boardDataController]);
+    }, [deletedEntitys, columnProperty, boardDataController]);
 
-    // Build all snapshots from all columns for operations that need the full list
-    const allSnapshots = useMemo(() => {
-        const snapshots: Snapshot<M>[] = [];
+    // Build all entitys from all columns for operations that need the full list
+    const allEntitys = useMemo(() => {
+        const entitys: Entity<M>[] = [];
         const seenIds = new Set<string>();
         columns.forEach(col => {
             const colData = boardDataController.columnData[col];
-            if (colData?.snapshots) {
-                colData.snapshots.forEach((snapshot: Snapshot<M>) => {
-                    const idStr = String(snapshot.id);
+            if (colData?.entitys) {
+                colData.entitys.forEach((entity: Entity<M>) => {
+                    const idStr = String(entity.id);
                     if (!seenIds.has(idStr)) {
                         seenIds.add(idStr);
-                        snapshots.push(snapshot);
+                        entitys.push(entity);
                     }
                 });
             }
         });
-        return snapshots;
+        return entitys;
     }, [boardDataController.columnData, columns]);
 
     const allowColumnReorder = useMemo(() => {
@@ -241,13 +241,13 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
                 plugin.hooks!.onKanbanColumnsReorder!({
                     fullPath,
                     parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                     collection,
                     kanbanColumnProperty: columnProperty,
                     newColumnsOrder: newColumns
                 });
             });
-    }, [plugins, fullPath, parentCollectionSlugs, parentSnapshotIds, collection, columnProperty, analyticsController]);
+    }, [plugins, fullPath, parentCollectionSlugs, parentEntityIds, collection, columnProperty, analyticsController]);
 
     // Collection-level count queries to detect missing order property
     // Just TWO counts: total and ordered (for the entire collection, not per column)
@@ -297,35 +297,35 @@ parentSnapshotIds,
         if (!orderProperty || dataLoading) return false;
         // Use collection-level count detection
         if (missingOrderCount > 0) return true;
-        // Fallback to checking loaded snapshots
-        return allSnapshots.some((snapshot: Snapshot<M>) => {
-            const orderValue = snapshot.values?.[orderProperty];
+        // Fallback to checking loaded entitys
+        return allEntitys.some((entity: Entity<M>) => {
+            const orderValue = entity.values?.[orderProperty];
             return orderValue === undefined || orderValue === null;
         });
-    }, [allSnapshots, orderProperty, dataLoading, missingOrderCount]);
+    }, [allEntitys, orderProperty, dataLoading, missingOrderCount]);
 
-    // Create a lookup map of snapshot ID → column from boardDataController data
-    // This ensures items stay in the column they were fetched for, not re-evaluated from snapshot.values
-    const snapshotColumnMap = useMemo(() => {
+    // Create a lookup map of entity ID → column from boardDataController data
+    // This ensures items stay in the column they were fetched for, not re-evaluated from entity.values
+    const entityColumnMap = useMemo(() => {
         const map: Record<string, string> = {};
         columns.forEach(col => {
             const colData = boardDataController.columnData[col];
-            if (colData?.snapshots) {
-                colData.snapshots.forEach((snapshot: Snapshot<M>) => {
-                    map[String(snapshot.id)] = col;
+            if (colData?.entitys) {
+                colData.entitys.forEach((entity: Entity<M>) => {
+                    map[String(entity.id)] = col;
                 });
             }
         });
         return map;
     }, [columns, boardDataController.columnData]);
 
-    // Convert snapshots to board items per column (data already sorted by orderProperty from controller)
-    const boardItems: BoardItem<Snapshot<M>>[] = useMemo(() => {
-        return allSnapshots.map((snapshot: Snapshot<M>) => ({
-            id: String(snapshot.id),
-            data: snapshot
+    // Convert entitys to board items per column (data already sorted by orderProperty from controller)
+    const boardItems: BoardItem<Entity<M>>[] = useMemo(() => {
+        return allEntitys.map((entity: Entity<M>) => ({
+            id: String(entity.id),
+            data: entity
         }));
-    }, [allSnapshots]);
+    }, [allEntitys]);
 
     // Column loading state from the board data controller
     const columnLoadingState: ColumnLoadingState = useMemo(() => {
@@ -335,7 +335,7 @@ parentSnapshotIds,
             state[col] = {
                 loading: colData?.loading ?? true,
                 hasMore: colData?.hasMore ?? false,
-                itemCount: colData?.snapshots?.length ?? 0,
+                itemCount: colData?.entitys?.length ?? 0,
                 totalCount: colData?.totalCount
             };
         });
@@ -343,14 +343,14 @@ parentSnapshotIds,
     }, [columns, boardDataController.columnData]);
 
     // Use the lookup map to assign columns - ensures items stay in the column they were fetched for
-    const assignColumn = useCallback((item: BoardItem<Snapshot<M>>): string => {
-        const column = snapshotColumnMap[item.id];
+    const assignColumn = useCallback((item: BoardItem<Entity<M>>): string => {
+        const column = entityColumnMap[item.id];
         if (column) return column;
-        // Fallback: read from snapshot values (for newly created items or edge cases)
+        // Fallback: read from entity values (for newly created items or edge cases)
         const value = item.data.values?.[columnProperty];
         if (value && columns.includes(String(value))) return String(value);
         return columns[0] || "";
-    }, [snapshotColumnMap, columnProperty, columns]);
+    }, [entityColumnMap, columnProperty, columns]);
 
     const { handleItemsReorder } = useKanbanDragAndDrop({
         collection,
@@ -363,7 +363,7 @@ parentSnapshotIds,
         analyticsController
     });
 
-    // Backfill order values for all snapshots
+    // Backfill order values for all entitys
     const handleBackfill = useCallback(async () => {
         if (!orderProperty) {
             return;
@@ -374,35 +374,35 @@ parentSnapshotIds,
         setBackfillLoading(true);
 
         try {
-            // Fetch ALL documents from collection (not relying on loaded snapshots)
+            // Fetch ALL documents from collection (not relying on loaded entitys)
             const allDocsRes = await dataClient.collection(fullPath).find({
                 limit: 10000 // Fetch all
             });
-            const allDocs = allDocsRes.data as Snapshot<M>[];
+            const allDocs = allDocsRes.data as Entity<M>[];
 
-            // Find snapshots missing order property
-            const snapshotsToUpdate = allDocs.filter((snapshot: Snapshot<M>) => {
-                const orderValue = snapshot.values?.[orderProperty];
+            // Find entitys missing order property
+            const entitysToUpdate = allDocs.filter((entity: Entity<M>) => {
+                const orderValue = entity.values?.[orderProperty];
                 return orderValue === undefined || orderValue === null;
             });
 
-            // Generate string fractional keys for all snapshots that need them
-            const keys = generateNKeysBetween(null, null, snapshotsToUpdate.length);
+            // Generate string fractional keys for all entitys that need them
+            const keys = generateNKeysBetween(null, null, entitysToUpdate.length);
             const updates: Promise<void>[] = [];
-            snapshotsToUpdate.forEach((snapshot: Snapshot<M>, index: number) => {
-                const updatedValues = setIn({ ...snapshot.values }, orderProperty, keys[index]);
+            entitysToUpdate.forEach((entity: Entity<M>, index: number) => {
+                const updatedValues = setIn({ ...entity.values }, orderProperty, keys[index]);
 
-                const saveProps: SaveSnapshotWithCallbacksProps<Record<string, unknown>> = {
-                    path: snapshot.path,
-                    snapshotId: snapshot.id,
+                const saveProps: SaveEntityWithCallbacksProps<Record<string, unknown>> = {
+                    path: entity.path,
+                    entityId: entity.id,
                     values: updatedValues as M,
-                    previousValues: snapshot.values,
+                    previousValues: entity.values,
                     collection,
                     status: "existing"
                 };
 
                 updates.push(
-                    saveSnapshotWithCallbacks({
+                    saveEntityWithCallbacks({
                         ...saveProps,
                         collection,
                         data: dataClient,
@@ -428,35 +428,35 @@ parentSnapshotIds,
         }
     }, [orderProperty, fullPath, collection, dataClient, context, boardDataController, analyticsController]);
 
-    const handleSnapshotClick = useCallback((snapshot: Snapshot<M>) => {
-        onSnapshotClick?.(snapshot);
-    }, [onSnapshotClick]);
+    const handleEntityClick = useCallback((entity: Entity<M>) => {
+        onEntityClick?.(entity);
+    }, [onEntityClick]);
 
-    const handleSelectionChange = useCallback((snapshot: Snapshot<M>, selected: boolean) => {
-        selectionController?.toggleSnapshotSelection(snapshot, selected);
+    const handleSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        selectionController?.toggleEntitySelection(entity, selected);
     }, [selectionController]);
 
-    const isSnapshotSelected = useCallback((snapshot: Snapshot<M>) => {
-        return selectionController?.isSnapshotSelected(snapshot) ?? false;
+    const isEntitySelected = useCallback((entity: Entity<M>) => {
+        return selectionController?.isEntitySelected(entity) ?? false;
     }, [selectionController]);
 
     // Store latest callbacks in refs so the stable ItemComponent always
     // reads fresh values without changing its own identity.
-    const handleSnapshotClickRef = useRef(handleSnapshotClick);
-    handleSnapshotClickRef.current = handleSnapshotClick;
-    const isSnapshotSelectedRef = useRef(isSnapshotSelected);
-    isSnapshotSelectedRef.current = isSnapshotSelected;
+    const handleEntityClickRef = useRef(handleEntityClick);
+    handleEntityClickRef.current = handleEntityClick;
+    const isEntitySelectedRef = useRef(isEntitySelected);
+    isEntitySelectedRef.current = isEntitySelected;
     const handleSelectionChangeRef = useRef(handleSelectionChange);
     handleSelectionChangeRef.current = handleSelectionChange;
     const selectionEnabledRef = useRef(selectionEnabled);
     selectionEnabledRef.current = selectionEnabled;
 
     // Stable callback wrappers — identity never changes, delegates to refs.
-    const stableOnClick = useCallback((snapshot: Snapshot<M>) => {
-        handleSnapshotClickRef.current(snapshot);
+    const stableOnClick = useCallback((entity: Entity<M>) => {
+        handleEntityClickRef.current(entity);
     }, []);
-    const stableOnSelectionChange = useCallback((snapshot: Snapshot<M>, sel: boolean) => {
-        handleSelectionChangeRef.current(snapshot, sel);
+    const stableOnSelectionChange = useCallback((entity: Entity<M>, sel: boolean) => {
+        handleSelectionChangeRef.current(entity, sel);
     }, []);
 
     // Build a single, truly stable component reference.
@@ -464,12 +464,12 @@ parentSnapshotIds,
     // When ItemComponent identity changes, React.memo'd SortableItem remounts
     // the card → DOM is destroyed/recreated → CSS :hover state is lost → flicker.
     const ItemComponent = useMemo(() => {
-        const Comp = (props: BoardItemViewProps<Snapshot<M>>) => (
+        const Comp = (props: BoardItemViewProps<Entity<M>>) => (
             <BoardCardBinding
                 {...props}
                 collection={collectionRef.current as CollectionConfig<M>}
                 onClick={stableOnClick}
-                selected={isSnapshotSelectedRef.current(props.item.data)}
+                selected={isEntitySelectedRef.current(props.item.data)}
                 onSelectionChange={stableOnSelectionChange}
                 selectionEnabled={selectionEnabledRef.current}
             />
@@ -483,7 +483,7 @@ parentSnapshotIds,
         collection,
         fullPath,
         parentCollectionSlugs,
-        parentSnapshotIds
+        parentEntityIds
     });
 
 
@@ -492,7 +492,7 @@ parentSnapshotIds,
         collection,
         fullPath,
         parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
         columnProperty
     });
 
@@ -534,7 +534,7 @@ parentSnapshotIds,
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* Error banner - only show when no data loaded */}
-            {hasError && allSnapshots.length === 0 && (
+            {hasError && allEntitys.length === 0 && (
                 <div
                     className="flex items-center gap-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
                     <Typography variant="body2" className="text-red-700 dark:text-red-300 flex-1">
@@ -607,14 +607,14 @@ parentSnapshotIds,
                     columnLoadingState={columnLoadingState}
                     onLoadMoreColumn={(column) => boardDataController.loadMoreColumn(column)}
                     onAddItemToColumn={(column) => {
-                        analyticsController.onAnalyticsEvent?.("kanban_new_snapshot_in_column", {
+                        analyticsController.onAnalyticsEvent?.("kanban_new_entity_in_column", {
                             path: fullPath,
                             column
                         });
                         sidePanelController.open({
                             path: fullPath,
                             collection,
-                            snapshotId: undefined,
+                            entityId: undefined,
                             updateUrl: true,
                             formProps: {
                                 initialDirtyValues: {

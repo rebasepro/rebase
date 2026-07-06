@@ -20,7 +20,7 @@ import {
 } from "@rebasepro/ui";
 import { FormexController } from "@rebasepro/formex";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
-import { flattenKeys, removeSnapshotFromCache } from "@rebasepro/core";
+import { flattenKeys, removeEntityFromCache } from "@rebasepro/core";
 ;
 import { PropertyCollectionView } from "../../components/PropertyCollectionView";
 import { mergeDeep } from "@rebasepro/utils";
@@ -73,7 +73,7 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
     };
 
     const handleDiscard = () => {
-        removeSnapshotFromCache(cacheKey);
+        removeEntityFromCache(cacheKey);
         snackbarController.open({
             type: "info",
             message: t("local_changes_discarded")

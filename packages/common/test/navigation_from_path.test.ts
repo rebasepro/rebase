@@ -1,5 +1,5 @@
 import { getNavigationEntriesFromPath } from "../src/util/navigation_from_path";
-import { CollectionConfig, FirebaseCollectionConfig, SnapshotCustomView } from "@rebasepro/types";
+import { CollectionConfig, FirebaseCollectionConfig, EntityCustomView } from "@rebasepro/types";
 
 function makeCollection(overrides: Record<string, any> = {}): CollectionConfig {
     const base = {
@@ -25,7 +25,7 @@ describe("getNavigationEntriesFromPath", () => {
         expect((result[0] as any).collection.slug).toBe("products");
     });
 
-    it("resolves collection + snapshot", () => {
+    it("resolves collection + entity", () => {
         const collections = [makeCollection()];
         const result = getNavigationEntriesFromPath({
             path: "products/123",
@@ -33,8 +33,8 @@ describe("getNavigationEntriesFromPath", () => {
         });
         expect(result).toHaveLength(2);
         expect(result[0].type).toBe("collection");
-        expect(result[1].type).toBe("snapshot");
-        expect((result[1] as any).snapshotId).toBe("123");
+        expect(result[1].type).toBe("entity");
+        expect((result[1] as any).entityId).toBe("123");
     });
 
     it("resolves nested subcollection path", () => {
@@ -54,20 +54,20 @@ describe("getNavigationEntriesFromPath", () => {
         });
         expect(result).toHaveLength(3);
         expect(result[0].type).toBe("collection");
-        expect(result[1].type).toBe("snapshot");
+        expect(result[1].type).toBe("entity");
         expect(result[2].type).toBe("collection");
         expect((result[2] as any).collection.slug).toBe("variants");
     });
 
-    it("resolves custom snapshot view", () => {
-        const customView: SnapshotCustomView<any> = {
+    it("resolves custom entity view", () => {
+        const customView: EntityCustomView<any> = {
             key: "analytics",
             name: "Analytics",
             Builder: () => null
         };
         const collections = [
             makeCollection({
-                snapshotViews: [customView]
+                entityViews: [customView]
             })
         ];
         const result = getNavigationEntriesFromPath({
@@ -79,21 +79,21 @@ describe("getNavigationEntriesFromPath", () => {
         expect((result[2] as any).view.key).toBe("analytics");
     });
 
-    it("resolves string snapshot view reference", () => {
-        const contextView: SnapshotCustomView<any> = {
+    it("resolves string entity view reference", () => {
+        const contextView: EntityCustomView<any> = {
             key: "preview",
             name: "Preview",
             Builder: () => null
         };
         const collections = [
             makeCollection({
-                snapshotViews: ["preview"]
+                entityViews: ["preview"]
             })
         ];
         const result = getNavigationEntriesFromPath({
             path: "products/123/preview",
             collections,
-            contextSnapshotViews: [contextView]
+            contextEntityViews: [contextView]
         });
         expect(result).toHaveLength(3);
         expect(result[2].type).toBe("custom_view");

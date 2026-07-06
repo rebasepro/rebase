@@ -1,5 +1,5 @@
 import { useTranslation } from "@rebasepro/core";
-import { CollectionConfig, SnapshotTableController, Property } from "@rebasepro/types";
+import { CollectionConfig, EntityTableController, Property } from "@rebasepro/types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 import React from "react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -9,7 +9,7 @@ export function CollectionViewHeaderAction({
     onHover,
     property,
     path,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     collection,
     tableController
 }: {
@@ -17,9 +17,9 @@ export function CollectionViewHeaderAction({
     propertyKey: string,
     onHover: boolean,
     path: string,
-    parentCollectionSlugs: string[], parentSnapshotIds: string[],
+    parentCollectionSlugs: string[], parentEntityIds: string[],
     collection: CollectionConfig;
-    tableController: SnapshotTableController;
+    tableController: EntityTableController;
 }) {
 
     const collectionEditorController = useCollectionEditorController();
@@ -37,9 +37,9 @@ export function CollectionViewHeaderAction({
                         property,
                         editedCollectionId: collection.slug,
                         parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
                         collection,
-                        existingSnapshots: tableController.data ?? []
+                        existingEntitys: tableController.data ?? []
                     });
                 }}
                 size={"small"}>

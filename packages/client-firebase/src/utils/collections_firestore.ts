@@ -2,7 +2,7 @@ import { deleteField, DocumentSnapshot } from "@firebase/firestore";
 import { CollectionConfig, FirebaseCollectionConfig, Properties, Property } from "@rebasepro/types";
 import { COLLECTION_PATH_SEPARATOR, sortProperties, stripCollectionPath } from "@rebasepro/common";
 
-export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentSnapshotIds?: string[]): string {
+export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentEntityIds?: string[]): string {
     if (!parentCollectionSlugs)
         return stripCollectionPath(idOrPath);
     return [...parentCollectionSlugs.map(stripCollectionPath), stripCollectionPath(idOrPath)].join(COLLECTION_PATH_SEPARATOR);
@@ -37,7 +37,7 @@ export const docsToCollectionTree = (docs: DocumentSnapshot[]): CollectionConfig
 export const docToCollection = (doc: DocumentSnapshot): CollectionConfig => {
     const data = doc.data();
     if (!data)
-        throw Error("Snapshot collection has not been persisted correctly");
+        throw Error("Entity collection has not been persisted correctly");
     const propertiesOrder = data.propertiesOrder;
     const properties = data.properties as Properties ?? {};
 

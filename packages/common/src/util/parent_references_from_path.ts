@@ -1,4 +1,4 @@
-import { CollectionConfig, SnapshotReference } from "@rebasepro/types";
+import { CollectionConfig, EntityReference } from "@rebasepro/types";
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "./resolutions";
 
@@ -6,7 +6,7 @@ export function getParentReferencesFromPath(props: {
     path: string,
     collections: CollectionConfig[] | undefined,
     currentFullPath?: string,
-}): SnapshotReference[] {
+}): EntityReference[] {
 
     const {
         path,
@@ -17,7 +17,7 @@ export function getParentReferencesFromPath(props: {
     const subpaths = removeInitialAndTrailingSlashes(path).split("/");
     const subpathCombinations = getCollectionPathsCombinations(subpaths);
 
-    const result: SnapshotReference[] = [];
+    const result: EntityReference[] = [];
     for (let i = 0; i < subpathCombinations.length; i++) {
         const subpathCombination = subpathCombinations[i];
 
@@ -32,9 +32,9 @@ export function getParentReferencesFromPath(props: {
             const restOfThePath = removeInitialAndTrailingSlashes(removeInitialAndTrailingSlashes(path).replace(subpathCombination, ""));
             const nextSegments = restOfThePath.length > 0 ? restOfThePath.split("/") : [];
             if (nextSegments.length > 0) {
-                const snapshotId = nextSegments[0];
-                const path = collectionPath + "/" + snapshotId;
-                result.push(new SnapshotReference({ id: snapshotId,
+                const entityId = nextSegments[0];
+                const path = collectionPath + "/" + entityId;
+                result.push(new EntityReference({ id: entityId,
 path: collectionPath }));
                 if (nextSegments.length > 1) {
                     const newPath = nextSegments.slice(1).join("/");

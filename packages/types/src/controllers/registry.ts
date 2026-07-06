@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 import type { CollectionConfig } from "../types/collections";
 import type { CollectionConfigsBuilder, AppViewsBuilder } from "../types/builders";
-import type { SnapshotCustomView } from "../types/snapshot_views";
-import type { SnapshotAction } from "../types/snapshot_actions";
+import type { EntityCustomView } from "../types/entity_views";
+import type { EntityAction } from "../types/entity_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
 
 /**
@@ -32,8 +32,8 @@ export interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig>
     views?: AppView[] | AppViewsBuilder;
 
     homePage?: ReactNode;
-    snapshotViews?: SnapshotCustomView[];
-    snapshotActions?: SnapshotAction[];
+    entityViews?: EntityCustomView[];
+    entityActions?: EntityAction[];
 
     /**
      * Centralized configuration for how collections and views are grouped

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Snapshot, SnapshotTableController, SelectionController } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
 import { EditViewBinding } from "../EditViewBinding";
 import { DetailViewBinding } from "../DetailViewBinding";
 import {
@@ -16,12 +16,12 @@ import { ErrorBoundary } from "@rebasepro/ui";
 
 export type SplitListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: CollectionConfig<M>;
-    tableController: SnapshotTableController<M>;
-    onSnapshotClick?: (snapshot: Snapshot<M>) => void;
+    tableController: EntityTableController<M>;
+    onEntityClick?: (entity: Entity<M>) => void;
     onNewClick?: () => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedSnapshots?: Snapshot<M>[];
+    highlightedEntitys?: Entity<M>[];
     emptyComponent?: React.ReactNode;
     onScroll?: (props: {
         scrollDirection: "forward" | "backward";
@@ -31,13 +31,13 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
     initialScroll?: number;
     size?: CollectionSize;
     path: string;
-    parentCollectionSlugs?: string[], parentSnapshotIds?: string[];
+    parentCollectionSlugs?: string[], parentEntityIds?: string[];
     /**
-     * The snapshot ID to show in the detail panel.
-     * Comes from the URL path (e.g. /c/authors/14 → selectedSnapshotId = "14").
+     * The entity ID to show in the detail panel.
+     * Comes from the URL path (e.g. /c/authors/14 → selectedEntityId = "14").
      * When undefined, no detail panel is shown.
      */
-    selectedSnapshotId?: string | number;
+    selectedEntityId?: string | number;
     /**
      * When provided, the detail panel will open this tab (e.g. a subcollection slug).
      * Used by the router to pass the subcollection tab from the URL.
@@ -74,7 +74,7 @@ function savePanelSize(path: string, size: number) {
 
 /**
  * Master-detail split view.
- * Shows the list on the left and the snapshot edit view on the right.
+ * Shows the list on the left and the entity edit view on the right.
  *
  * Animation approach:
  * - The list always renders at full width.
@@ -82,26 +82,26 @@ function savePanelSize(path: string, size: number) {
  * - On close, the reverse plays.
  *
  * State management:
- * - The selected snapshot is driven by the URL path (e.g. /c/authors/14).
- *   `selectedSnapshotId` comes from props via RebaseRoute, NOT from internal state.
- * - Clicking a snapshot navigates to /c/authors/{id} via the standard onSnapshotClick handler.
+ * - The selected entity is driven by the URL path (e.g. /c/authors/14).
+ *   `selectedEntityId` comes from props via RebaseRoute, NOT from internal state.
+ * - Clicking a entity navigates to /c/authors/{id} via the standard onEntityClick handler.
  * - Closing the detail navigates back to /c/authors.
  */
 export function SplitListView<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
     tableController,
-    onSnapshotClick: externalOnSnapshotClick,
+    onEntityClick: externalOnEntityClick,
     onNewClick: externalOnNewClick,
     selectionController,
     selectionEnabled = true,
-    highlightedSnapshots,
+    highlightedEntitys,
     emptyComponent,
     onScroll,
     initialScroll,
     size = "m",
     path,
-    parentCollectionSlugs, parentSnapshotIds,
-    selectedSnapshotId,
+    parentCollectionSlugs, parentEntityIds,
+    selectedEntityId,
     selectedTab,
     toolbar,
     children
@@ -113,7 +113,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     const navigate = useNavigate();
     const urlController = useUrlController();
 
-    const showDetail = selectedSnapshotId !== undefined;
+    const showDetail = selectedEntityId !== undefined;
 
     // Panel size state with persistence
     const [panelSize, setPanelSize] = useState(() => getSavedPanelSize(path));
@@ -123,10 +123,10 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     }, [panelSize, path]);
 
     // ── Animation state ──
-    // We track the "rendered" snapshot to keep the detail panel mounted during the exit animation.
-    const [renderedSnapshotId, setRenderedSnapshotId] = useState<string | number | undefined>(selectedSnapshotId);
+    // We track the "rendered" entity to keep the detail panel mounted during the exit animation.
+    const [renderedEntityId, setRenderedEntityId] = useState<string | number | undefined>(selectedEntityId);
     const [animationPhase, setAnimationPhase] = useState<"idle" | "entering" | "entered" | "exiting">(
-        selectedSnapshotId !== undefined ? "entered" : "idle"
+        selectedEntityId !== undefined ? "entered" : "idle"
     );
     const animationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -139,9 +139,9 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             animationTimer.current = null;
         }
 
-        if (selectedSnapshotId !== undefined) {
-            // Opening or switching snapshot
-            setRenderedSnapshotId(selectedSnapshotId);
+        if (selectedEntityId !== undefined) {
+            // Opening or switching entity
+            setRenderedEntityId(selectedEntityId);
             if (animationPhase === "idle" || animationPhase === "exiting") {
                 // Fresh open — trigger enter
                 setAnimationPhase("entering");
@@ -153,14 +153,14 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     });
                 });
             }
-            // If already entered (switching snapshots), keep "entered"
+            // If already entered (switching entitys), keep "entered"
         } else {
             // Closing
             if (animationPhase === "entered" || animationPhase === "entering") {
                 setAnimationPhase("exiting");
                 animationTimer.current = setTimeout(() => {
                     setAnimationPhase("idle");
-                    setRenderedSnapshotId(undefined);
+                    setRenderedEntityId(undefined);
                 }, TRANSITION_DURATION);
             }
         }
@@ -168,7 +168,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         return () => {
             if (animationTimer.current) clearTimeout(animationTimer.current);
         };
-    }, [selectedSnapshotId]); // Intentionally only depend on selectedSnapshotId
+    }, [selectedEntityId]); // Intentionally only depend on selectedEntityId
 
     // Close the detail panel: navigate back to the collection path
     const handleCloseDetail = useCallback(() => {
@@ -182,8 +182,8 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     }, [navigate, urlController, path]);
 
     // ── Keyboard navigation ──
-    const snapshotIds = useMemo(
-        () => tableController.data.map((e: Snapshot<M>) => e.id),
+    const entityIds = useMemo(
+        () => tableController.data.map((e: Entity<M>) => e.id),
         [tableController.data]
     );
 
@@ -193,56 +193,56 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             const tag = (e.target as HTMLElement)?.tagName;
             if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target as HTMLElement)?.isContentEditable) {
                 // Only intercept Escape when inside the detail panel
-                if (e.key === "Escape" && selectedSnapshotId) {
+                if (e.key === "Escape" && selectedEntityId) {
                     handleCloseDetail();
                     e.preventDefault();
                 }
                 return;
             }
 
-            if (e.key === "Escape" && selectedSnapshotId) {
+            if (e.key === "Escape" && selectedEntityId) {
                 handleCloseDetail();
                 e.preventDefault();
                 return;
             }
 
-            // Arrow down / j → next snapshot
+            // Arrow down / j → next entity
             if ((e.key === "ArrowDown" || e.key === "j") && !e.metaKey && !e.ctrlKey) {
                 e.preventDefault();
-                if (snapshotIds.length === 0) return;
+                if (entityIds.length === 0) return;
 
-                if (selectedSnapshotId === undefined) {
-                    const firstSnapshot = tableController.data[0];
-                    if (firstSnapshot) externalOnSnapshotClick?.(firstSnapshot);
+                if (selectedEntityId === undefined) {
+                    const firstEntity = tableController.data[0];
+                    if (firstEntity) externalOnEntityClick?.(firstEntity);
                 } else {
-                    const currentIndex = snapshotIds.indexOf(selectedSnapshotId);
-                    if (currentIndex >= 0 && currentIndex < snapshotIds.length - 1) {
-                        const nextSnapshot = tableController.data[currentIndex + 1];
-                        if (nextSnapshot) externalOnSnapshotClick?.(nextSnapshot);
+                    const currentIndex = entityIds.indexOf(selectedEntityId);
+                    if (currentIndex >= 0 && currentIndex < entityIds.length - 1) {
+                        const nextEntity = tableController.data[currentIndex + 1];
+                        if (nextEntity) externalOnEntityClick?.(nextEntity);
                     }
                 }
                 return;
             }
 
-            // Arrow up / k → previous snapshot
+            // Arrow up / k → previous entity
             if ((e.key === "ArrowUp" || e.key === "k") && !e.metaKey && !e.ctrlKey) {
                 e.preventDefault();
-                if (snapshotIds.length === 0) return;
+                if (entityIds.length === 0) return;
 
-                if (selectedSnapshotId === undefined) {
-                    const lastSnapshot = tableController.data[tableController.data.length - 1];
-                    if (lastSnapshot) externalOnSnapshotClick?.(lastSnapshot);
+                if (selectedEntityId === undefined) {
+                    const lastEntity = tableController.data[tableController.data.length - 1];
+                    if (lastEntity) externalOnEntityClick?.(lastEntity);
                 } else {
-                    const currentIndex = snapshotIds.indexOf(selectedSnapshotId);
+                    const currentIndex = entityIds.indexOf(selectedEntityId);
                     if (currentIndex > 0) {
-                        const prevSnapshot = tableController.data[currentIndex - 1];
-                        if (prevSnapshot) externalOnSnapshotClick?.(prevSnapshot);
+                        const prevEntity = tableController.data[currentIndex - 1];
+                        if (prevEntity) externalOnEntityClick?.(prevEntity);
                     }
                 }
                 return;
             }
 
-            // n → new snapshot
+            // n → new entity
             if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
                 externalOnNewClick?.();
                 e.preventDefault();
@@ -252,10 +252,10 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [selectedSnapshotId, handleCloseDetail, externalOnSnapshotClick, externalOnNewClick, snapshotIds, tableController.data]);
+    }, [selectedEntityId, handleCloseDetail, externalOnEntityClick, externalOnNewClick, entityIds, tableController.data]);
 
     const usedParentCollectionIds = parentCollectionSlugs ?? collectionRegistryController.getParentCollectionSlugs(path);
-    const usedParentSnapshotIds = parentSnapshotIds ?? collectionRegistryController.getParentSnapshotIds(path);
+    const usedParentEntityIds = parentEntityIds ?? collectionRegistryController.getParentEntityIds(path);
 
     const isDetailVisible = animationPhase !== "idle";
 
@@ -280,7 +280,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         </div>
     );
 
-    const detailPanel = renderedSnapshotId !== undefined ? (
+    const detailPanel = renderedEntityId !== undefined ? (
         <div
             className={cls(
                 "flex-1 flex flex-col min-w-0 h-full transition-all ease-out w-full",
@@ -291,75 +291,75 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
             <ErrorBoundary>
-                {collection.defaultSnapshotAction === "view" && !isEditMode
+                {collection.defaultEntityAction === "view" && !isEditMode
                     ? <DetailViewBinding
-                        key={String(renderedSnapshotId)}
+                        key={String(renderedEntityId)}
                         path={path}
                         collection={collection as CollectionConfig<Record<string, unknown>>}
-                        snapshotId={renderedSnapshotId}
+                        entityId={renderedEntityId}
                         parentCollectionSlugs={usedParentCollectionIds}
-                        parentSnapshotIds={usedParentSnapshotIds}
+                        parentEntityIds={usedParentEntityIds}
                         selectedTab={selectedTab}
                         layout="split"
                         onEditClick={() => {
-                            let snapshotUrl = urlController.buildUrlCollectionPath(`${path}/${renderedSnapshotId}/edit`);
+                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}/edit`);
                             const currentViewParam = new URLSearchParams(window.location.search).get("__view");
                             if (currentViewParam) {
-                                snapshotUrl += `${snapshotUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
                             }
-                            navigate(snapshotUrl);
+                            navigate(entityUrl);
                         }}
                         onTabChange={(params) => {
                             const newSelectedTab = params.selectedTab;
-                            let snapshotUrl = urlController.buildUrlCollectionPath(
+                            let entityUrl = urlController.buildUrlCollectionPath(
                                 newSelectedTab
-                                    ? `${path}/${renderedSnapshotId}/${newSelectedTab}`
-                                    : `${path}/${renderedSnapshotId}`
+                                    ? `${path}/${renderedEntityId}/${newSelectedTab}`
+                                    : `${path}/${renderedEntityId}`
                             );
                             const currentViewParam = new URLSearchParams(window.location.search).get("__view");
                             if (currentViewParam) {
-                                snapshotUrl += `${snapshotUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
                             }
-                            navigate(snapshotUrl);
+                            navigate(entityUrl);
                         }}
                     />
                     : <EditViewBinding
-                        key={String(renderedSnapshotId)}
+                        key={String(renderedEntityId)}
                         path={path}
                         collection={collection as CollectionConfig<Record<string, unknown>>}
-                        snapshotId={renderedSnapshotId}
+                        entityId={renderedEntityId}
                         parentCollectionSlugs={usedParentCollectionIds}
-                        parentSnapshotIds={usedParentSnapshotIds}
+                        parentEntityIds={usedParentEntityIds}
                         selectedTab={selectedTab}
                         layout="split"
                         onSaved={(params) => {
-                            let snapshotUrl = urlController.buildUrlCollectionPath(`${path}/${renderedSnapshotId}`);
+                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}`);
                             const currentViewParam = new URLSearchParams(window.location.search).get("__view");
                             if (currentViewParam) {
-                                snapshotUrl += `${snapshotUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
                             }
-                            navigate(snapshotUrl, { replace: true });
+                            navigate(entityUrl, { replace: true });
                         }}
                         navigateBack={() => {
-                            let snapshotUrl = urlController.buildUrlCollectionPath(`${path}/${renderedSnapshotId}`);
+                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}`);
                             const currentViewParam = new URLSearchParams(window.location.search).get("__view");
                             if (currentViewParam) {
-                                snapshotUrl += `${snapshotUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
                             }
-                            navigate(snapshotUrl);
+                            navigate(entityUrl);
                         }}
                         onTabChange={(params) => {
                             const newSelectedTab = params.selectedTab;
-                            let snapshotUrl = urlController.buildUrlCollectionPath(
+                            let entityUrl = urlController.buildUrlCollectionPath(
                                 newSelectedTab
-                                    ? `${path}/${renderedSnapshotId}/${newSelectedTab}`
-                                    : `${path}/${renderedSnapshotId}`
+                                    ? `${path}/${renderedEntityId}/${newSelectedTab}`
+                                    : `${path}/${renderedEntityId}`
                             );
                             const currentViewParam = new URLSearchParams(window.location.search).get("__view");
                             if (currentViewParam) {
-                                snapshotUrl += `${snapshotUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
+                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
                             }
-                            navigate(snapshotUrl);
+                            navigate(entityUrl);
                         }}
                     />
                 }

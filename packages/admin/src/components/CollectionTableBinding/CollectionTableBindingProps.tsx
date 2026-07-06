@@ -2,7 +2,7 @@ import type { Properties } from "@rebasepro/types";
 import type { AdditionalFieldDelegate } from "@rebasepro/types";
 import type { Property } from "@rebasepro/types";
 import React from "react";
-import { CollectionSize, Snapshot, SnapshotTableController, FilterValues, SelectionController, User } from "@rebasepro/types";
+import { CollectionSize, Entity, EntityTableController, FilterValues, SelectionController, User } from "@rebasepro/types";
 import { OnCellValueChange, OnColumnResizeParams, UniqueFieldValidator } from "@rebasepro/core";
 import { VirtualTableColumn } from "@rebasepro/ui";
 
@@ -17,14 +17,14 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
         style?: React.CSSProperties;
 
         /**
-         * Display these snapshots as selected
+         * Display these entitys as selected
          */
         selectionController: SelectionController<M>;
 
         /**
-         * List of snapshots that will be displayed as selected;
+         * List of entitys that will be displayed as selected;
          */
-        highlightedSnapshots?: Snapshot<M>[];
+        highlightedEntitys?: Entity<M>[];
 
         /**
          * Override the title in the toolbar
@@ -46,11 +46,11 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
 
         /**
          * Builder for creating the buttons in each row
-         * @param snapshot
+         * @param entity
          * @param size
          */
         tableRowActionsBuilder?: (params: {
-            snapshot: Snapshot<M>,
+            entity: Entity<M>,
             size: CollectionSize,
             width: number,
             frozen?: boolean
@@ -59,7 +59,7 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
         /**
          * Callback when anywhere on the table is clicked
          */
-        onSnapshotClick?(snapshot: Snapshot<M>): void;
+        onEntityClick?(entity: Entity<M>): void;
 
         /**
          * Callback when a column is resized
@@ -105,9 +105,9 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
         /**
          * Controller holding the logic for the table
          * {@link useDataTableController}
-         * {@link SnapshotTableController}
+         * {@link EntityTableController}
          */
-        tableController: SnapshotTableController<M>;
+        tableController: EntityTableController<M>;
 
         displayedColumnIds?: PropertyColumnConfig[];
 
@@ -146,7 +146,7 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
 
         enablePopupIcon: boolean;
 
-        openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+        openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
         /**
          * Callback when columns are reordered via drag-and-drop
@@ -162,7 +162,7 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
 
 export type GetPropertyForProps<M extends Record<string, unknown>> = {
     propertyKey: string,
-    snapshot: Snapshot<M>
+    entity: Entity<M>
 };
 
 export type PropertyColumnConfig = {

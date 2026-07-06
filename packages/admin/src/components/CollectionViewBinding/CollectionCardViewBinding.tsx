@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { CollectionSize, Snapshot, SnapshotTableController, SelectionController } from "@rebasepro/types";
-import { RecordCardBinding } from "./RecordCardBinding";
+import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
+import { EntityCardBinding } from "./EntityCardBinding";
 import {
     cls,
     CircularProgress,
@@ -12,11 +12,11 @@ import { useComponentOverride } from "@rebasepro/core";
 
 export type CollectionCardViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: CollectionConfig<M>;
-    tableController: SnapshotTableController<M>;
-    onSnapshotClick?: (snapshot: Snapshot<M>) => void;
+    tableController: EntityTableController<M>;
+    onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
-    highlightedSnapshots?: Snapshot<M>[];
+    highlightedEntitys?: Entity<M>[];
     emptyComponent?: React.ReactNode;
     onScroll?: (props: {
         scrollDirection: "forward" | "backward";
@@ -76,23 +76,23 @@ function getScrollParent(element: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * Card grid view for displaying snapshots with infinite scroll.
+ * Card grid view for displaying entitys with infinite scroll.
  * Alternative to the CollectionTableBinding for visual browsing.
  */
 export function CollectionCardViewBinding<M extends Record<string, unknown> = Record<string, unknown>>({
     collection,
     tableController,
-    onSnapshotClick,
+    onEntityClick,
     selectionController,
     selectionEnabled = true,
-    highlightedSnapshots,
+    highlightedEntitys,
     emptyComponent,
     onScroll,
     initialScroll,
     size = "m"
 }: CollectionCardViewBindingProps<M>) {
 
-    const ResolvedRecordCard = useComponentOverride("Collection.Card", RecordCardBinding) as typeof RecordCardBinding;
+    const ResolvedEntityCard = useComponentOverride("Collection.Card", EntityCardBinding) as typeof EntityCardBinding;
 
     const {
         data,
@@ -105,23 +105,23 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
         paginationEnabled
     } = tableController;
 
-    const handleSnapshotClick = useCallback((snapshot: Snapshot<M>) => {
-        onSnapshotClick?.(snapshot);
-    }, [onSnapshotClick]);
+    const handleEntityClick = useCallback((entity: Entity<M>) => {
+        onEntityClick?.(entity);
+    }, [onEntityClick]);
 
-    const handleSelectionChange = useCallback((snapshot: Snapshot<M>, selected: boolean) => {
-        selectionController?.toggleSnapshotSelection(snapshot, selected);
+    const handleSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        selectionController?.toggleEntitySelection(entity, selected);
     }, [selectionController]);
 
-    const selectedIds = useMemo(() => new Set(selectionController?.selectedSnapshots.map(e => e.id)), [selectionController?.selectedSnapshots]);
-    const highlightedIds = useMemo(() => new Set(highlightedSnapshots?.map(e => e.id)), [highlightedSnapshots]);
+    const selectedIds = useMemo(() => new Set(selectionController?.selectedEntitys.map(e => e.id)), [selectionController?.selectedEntitys]);
+    const highlightedIds = useMemo(() => new Set(highlightedEntitys?.map(e => e.id)), [highlightedEntitys]);
 
-    const handleRowSelectionChange = useCallback((snapshot: Snapshot<M>, selected: boolean) => {
-        handleSelectionChange(snapshot, selected);
+    const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
+        handleSelectionChange(entity, selected);
     }, [handleSelectionChange]);
 
     return (
-        <CardView<Snapshot<M>>
+        <CardView<Entity<M>>
             data={data}
             dataLoading={dataLoading}
             noMoreToLoad={noMoreToLoad}
@@ -130,7 +130,7 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
             setItemCount={setItemCount}
             pageSize={pageSize}
             paginationEnabled={paginationEnabled}
-            onItemClick={handleSnapshotClick}
+            onItemClick={handleEntityClick}
             selectedIds={selectedIds}
             highlightedIds={highlightedIds}
             selectionEnabled={selectionEnabled}
@@ -139,10 +139,10 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
             initialScroll={initialScroll}
             size={size}
             emptyComponent={emptyComponent}
-            renderCard={useCallback((snapshot, { selected, highlighted, onClick }) => (
-                <ResolvedRecordCard
-                    key={`${snapshot.path}_${snapshot.id}`}
-                    snapshot={snapshot}
+            renderCard={useCallback((entity, { selected, highlighted, onClick }) => (
+                <ResolvedEntityCard
+                    key={`${entity.path}_${entity.id}`}
+                    entity={entity}
                     collection={collection}
                     onClick={onClick as any}
                     selected={selected}
@@ -151,7 +151,7 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
                     selectionEnabled={selectionEnabled}
                     size={size}
                 />
-            ), [collection, selectionEnabled, size, handleRowSelectionChange, ResolvedRecordCard])}
+            ), [collection, selectionEnabled, size, handleRowSelectionChange, ResolvedEntityCard])}
         />
     );
 }

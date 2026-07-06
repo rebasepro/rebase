@@ -1,9 +1,9 @@
 import React, { PropsWithChildren } from "react";
 
-import type { CollectionConfig, CollectionActionsProps, SnapshotTableController, SelectionController } from "./collections";
-import type { SnapshotStatus } from "./snapshots";
+import type { CollectionConfig, CollectionActionsProps, EntityTableController, SelectionController } from "./collections";
+import type { EntityStatus } from "./entitys";
 import type { InferPropertyType, Property } from "./properties";
-import type { FormContext } from "./snapshot_views";
+import type { FormContext } from "./entity_views";
 import type { RebaseContext } from "../rebase_context";
 import type { NavigationGroupMapping, AppView } from "../controllers/navigation";
 
@@ -20,7 +20,7 @@ import type { SlotContribution } from "./slots";
  *
  * @typeParam P - The property type this field is bound to
  * @typeParam CustomProps - Extra props injected via the property's `customProps`
- * @typeParam M - The snapshot model type
+ * @typeParam M - The entity model type
  * @group Form custom fields
  */
 export interface FieldProps<
@@ -76,7 +76,7 @@ export interface FieldProps<
     /** Additional properties set by the developer */
     customProps?: CustomProps;
 
-    /** Additional values related to the state of the form or the snapshot */
+    /** Additional values related to the state of the form or the entity */
     context: FormContext<M>;
 
     /** Flag to indicate if this field should be disabled */
@@ -116,7 +116,7 @@ export interface RebasePlugin {
     /**
      * HOC providers wrapping root or form content.
      * Providers with `scope: "root"` wrap the entire CMS below RebaseContext.
-     * Providers with `scope: "form"` wrap each snapshot form/edit view.
+     * Providers with `scope: "form"` wrap each entity form/edit view.
      */
     providers?: PluginProvider[];
 
@@ -153,7 +153,7 @@ export interface RebasePlugin {
 export interface PluginProvider {
     /**
      * `"root"` — wraps the entire CMS below RebaseContext.
-     * `"form"` — wraps each snapshot form / edit view.
+     * `"form"` — wraps each entity form / edit view.
      */
     scope: "root" | "form";
 
@@ -201,7 +201,7 @@ export interface PluginHooks {
     onColumnsReorder?: (props: {
         fullPath: string;
         parentCollectionSlugs: string[];
-        parentSnapshotIds: string[];
+        parentEntityIds: string[];
         collection: CollectionConfig;
         newPropertiesOrder: string[];
     }) => void;
@@ -212,7 +212,7 @@ export interface PluginHooks {
     onKanbanColumnsReorder?: (props: {
         fullPath: string;
         parentCollectionSlugs: string[];
-        parentSnapshotIds: string[];
+        parentEntityIds: string[];
         collection: CollectionConfig;
         kanbanColumnProperty: string;
         newColumnsOrder: string[];
@@ -261,10 +261,10 @@ export interface PluginLifecycle {
     onAuthStateChange?: (user: User | null) => void;
 
     /**
-     * Called when a collection's visible snapshots change.
+     * Called when a collection's visible entitys change.
      * Useful for analytics, caching, or cross-plugin coordination.
      */
-    onCollectionChange?: (slug: string, snapshots: unknown[]) => void;
+    onCollectionChange?: (slug: string, entitys: unknown[]) => void;
 }
 
 // ── Field Builder ─────────────────────────────────────────────────────
@@ -298,20 +298,20 @@ export interface PluginHomePageActionsProps<EP extends object = object, M extend
 }
 
 /**
- * Props passed to form action components in snapshot edit/form views.
+ * Props passed to form action components in entity edit/form views.
  * @group Models
  */
 export interface PluginFormActionProps<USER extends User = User, EC extends CollectionConfig = CollectionConfig> {
-    snapshotId?: string | number;
+    entityId?: string | number;
     path: string;
     parentCollectionSlugs: string[];
-    parentSnapshotIds: string[];
-    status: SnapshotStatus;
+    parentEntityIds: string[];
+    status: EntityStatus;
     collection: EC;
     disabled: boolean;
     formContext?: FormContext;
     context: RebaseContext<USER>;
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }
 
 /**

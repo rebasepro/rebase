@@ -6,7 +6,7 @@ description: Apply cross-cutting lifecycle callbacks to every collection at the 
 
 ## Overview
 
-Rebase provides two levels of snapshot lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
+Rebase provides two levels of entity lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
 
 - **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
 - **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.data`).
@@ -33,11 +33,11 @@ const instance = await initializeRebaseBackend({
     // ... other config
     callbacks: {
         afterRead({ row, context }) {
-            // Runs after every snapshot read, across all collections
+            // Runs after every entity read, across all collections
             return row;
         },
         beforeSave({ values, context }) {
-            // Runs before every snapshot save
+            // Runs before every entity save
             return values;
         }
     }
@@ -75,8 +75,8 @@ Each callback receives a single props object. Common fields:
 | `path` | `string` | All callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
 | `id` | `string` | `beforeSave` (optional), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
-| `values` | `SnapshotValues` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `previousValues` | `SnapshotValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
+| `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `previousValues` | `EntityValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
 | `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | All callbacks |
 

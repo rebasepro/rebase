@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo } from "react";
 import { CheckIcon, ChevronsUpDownIcon, cls, FilterChip, Menu, MenuItem, Tooltip } from "@rebasepro/ui";
-import type { SnapshotTableController, FilterValues, FilterPreset } from "@rebasepro/types";
+import type { EntityTableController, FilterValues, FilterPreset } from "@rebasepro/types";
 
 export interface FilterPresetsButtonProps<M extends Record<string, unknown>> {
     filterPresets: FilterPreset<Extract<keyof M, string> | (string & {})>[];
-    tableController: SnapshotTableController<M>;
+    tableController: EntityTableController<M>;
     compact?: boolean;
 }
 

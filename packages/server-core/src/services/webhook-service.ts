@@ -30,13 +30,13 @@ export class WebhookDispatcher {
         this.webhooks = webhooks.filter(w => w.enabled);
     }
 
-    /** Called when a snapshot changes — checks if any webhook matches */
-    async onSnapshotChange(
+    /** Called when a entity changes — checks if any webhook matches */
+    async onEntityChange(
         table: string,
         event: "INSERT" | "UPDATE" | "DELETE",
         id: string,
-        snapshot: Record<string, unknown> | null,
-        previousSnapshot?: Record<string, unknown> | null
+        entity: Record<string, unknown> | null,
+        previousEntity?: Record<string, unknown> | null
     ): Promise<WebhookDeliveryResult[]> {
         const matchingWebhooks = this.webhooks.filter(
             w => w.table === table && w.events.includes(event)
@@ -50,8 +50,8 @@ export class WebhookDispatcher {
             const payload: Record<string, unknown> = {
                 type: event,
                 table,
-                record: snapshot,
-                old_record: event === "UPDATE" ? previousSnapshot : undefined,
+                record: entity,
+                old_record: event === "UPDATE" ? previousEntity : undefined,
                 schema: "public",
                 timestamp: new Date().toISOString()
             };

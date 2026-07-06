@@ -52,7 +52,7 @@ export * from "./email";
 export * from "./storage";
 
 // =============================================================================
-// Snapshot History
+// Entity History
 // =============================================================================
 export { createHistoryRoutes } from "./history";
 

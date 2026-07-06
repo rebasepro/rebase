@@ -375,5 +375,5 @@ export default job;
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
-- **[Snapshot Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events

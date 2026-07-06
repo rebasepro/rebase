@@ -171,6 +171,6 @@ properties: {
 
 ## Passi Successivi
 
-- **[Visualizzazioni Entità](/docs/frontend/snapshot-views)** — Schede personalizzate nell'editor di entità
-- **[Azioni Entità](/docs/frontend/snapshot-actions)** — Pulsanti di azione personalizzati
+- **[Visualizzazioni Entità](/docs/frontend/entity-views)** — Schede personalizzate nell'editor di entità
+- **[Azioni Entità](/docs/frontend/entity-actions)** — Pulsanti di azione personalizzati
 - **[Colonne Aggiuntive](/docs/frontend/additional-columns)** — Colonne di tabella calcolate

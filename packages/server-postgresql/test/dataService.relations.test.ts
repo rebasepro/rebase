@@ -195,7 +195,7 @@ relationName: "user" }
     });
 
     describe("One-to-Many Relations (Inverse)", () => {
-        it("should fetch related snapshots using foreign key where clause", async () => {
+        it("should fetch related entitys using foreign key where clause", async () => {
             const mockOrders = [
                 { id: 1,
 total: 100,
@@ -204,7 +204,7 @@ customer_id: 1 },
 total: 200,
 customer_id: 1 }
             ];
-            // RelationService.fetchSnapshotsUsingJoins ends query chain with where(), not orderBy()
+            // RelationService.fetchEntitysUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue({
                 then: (resolve: Function) => resolve(mockOrders),
                 limit: jest.fn().mockReturnValue({
@@ -212,10 +212,10 @@ customer_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("customers/1/orders", {});
+            const entitys = await dataService.fetchCollection("customers/1/orders", {});
 
-            expect(snapshots).toHaveLength(2);
-            expect(snapshots[0].total).toBe(100);
+            expect(entitys).toHaveLength(2);
+            expect(entitys[0].total).toBe(100);
             // Should use WHERE clause, not JOIN for simple inverse relations
             expect(db.where).toHaveBeenCalled();
         });
@@ -223,9 +223,9 @@ customer_id: 1 }
         it("should handle empty result sets", async () => {
             db.orderBy.mockResolvedValue([]);
 
-            const snapshots = await dataService.fetchCollection("customers/999/orders", {});
+            const entitys = await dataService.fetchCollection("customers/999/orders", {});
 
-            expect(snapshots).toHaveLength(0);
+            expect(entitys).toHaveLength(0);
         });
     });
 
@@ -245,13 +245,13 @@ __type: "relation" }
                 customer_id: 1
             }]);
 
-            const snapshot = await dataService.save("orders", newOrder);
+            const entity = await dataService.save("orders", newOrder);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 total: 150,
                 customer_id: "1"
             }));
-            expect(snapshot.customer).toEqual({
+            expect(entity.customer).toEqual({
                 id: "1",
                 path: "customers",
                 __type: "relation"
@@ -266,9 +266,9 @@ __type: "relation" }
             };
             db.limit.mockResolvedValue([mockOrder]);
 
-            const snapshot = await dataService.fetchOne("orders", 1);
+            const entity = await dataService.fetchOne("orders", 1);
 
-            expect(snapshot?.customer).toEqual({
+            expect(entity?.customer).toEqual({
                 id: "5",
                 path: "customers",
                 __type: "relation"
@@ -294,10 +294,10 @@ price: 20 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("orders/1/products", {});
+            const entitys = await dataService.fetchCollection("orders/1/products", {});
 
-            expect(snapshots).toHaveLength(2);
-            expect(snapshots[0].name).toBe("Product 1");
+            expect(entitys).toHaveLength(2);
+            expect(entitys[0].name).toBe("Product 1");
             // Should use JOIN for many-to-many relations
             expect(db.innerJoin).toHaveBeenCalled();
         });
@@ -317,7 +317,7 @@ __type: "relation" }
                 customer_id: 1
             }]);
 
-            const snapshot = await dataService.save("orders", newOrder);
+            const entity = await dataService.save("orders", newOrder);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 total: 300,
@@ -341,10 +341,10 @@ user_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("customers/1/profile", {});
+            const entitys = await dataService.fetchCollection("customers/1/profile", {});
 
-            expect(snapshots).toHaveLength(1);
-            expect(snapshots[0].bio).toBe("User bio");
+            expect(entitys).toHaveLength(1);
+            expect(entitys[0].bio).toBe("User bio");
         });
 
         it("should create one-to-one relations correctly", async () => {
@@ -362,7 +362,7 @@ __type: "relation" }
                 user_id: 1
             }]);
 
-            const snapshot = await dataService.save("user_profiles", newProfile);
+            const entity = await dataService.save("user_profiles", newProfile);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 bio: "New user bio",
@@ -380,7 +380,7 @@ __type: "relation" }
             db.returning.mockResolvedValue([{ id: 5 }]);
             // This mock is used by fetchOne after save which chains .where().limit()
             // NOTE: The mock returns customer_id: null, but due to how the DataService
-            // deserializes owning relations from saved snapshots, it may still create a relation
+            // deserializes owning relations from saved entitys, it may still create a relation
             // object. This test verifies that save works without providing a customer relation.
             db.limit.mockResolvedValue([{
                 id: 5,
@@ -388,15 +388,15 @@ __type: "relation" }
                 customer_id: null
             }]);
 
-            const snapshot = await dataService.save("orders", orderWithoutCustomer);
+            const entity = await dataService.save("orders", orderWithoutCustomer);
 
-            // Verify the snapshot was saved with the correct values (no customer_id set)
+            // Verify the entity was saved with the correct values (no customer_id set)
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 total: 150
             }));
-            // Verify the snapshot was returned successfully
-            expect(snapshot.id).toBe("5");
-            expect(snapshot.total).toBe(150);
+            // Verify the entity was returned successfully
+            expect(entity.id).toBe("5");
+            expect(entity.total).toBe(150);
         });
     });
 
@@ -414,13 +414,13 @@ name: "Product 1" }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("customers/1/orders/1/products", {});
+            const entitys = await dataService.fetchCollection("customers/1/orders/1/products", {});
 
-            expect(snapshots).toHaveLength(1);
+            expect(entitys).toHaveLength(1);
             expect(collectionRegistry.getCollectionByPath).toHaveBeenCalledWith("customers");
         });
 
-        it("should apply filters on related snapshots", async () => {
+        it("should apply filters on related entitys", async () => {
             const mockOrders = [
                 { id: 1,
 total: 100,
@@ -434,15 +434,15 @@ customer_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("customers/1/orders", {
+            const entitys = await dataService.fetchCollection("customers/1/orders", {
                 filter: { total: [">=", 100] }
             });
 
-            expect(snapshots).toHaveLength(1);
+            expect(entitys).toHaveLength(1);
             expect(db.where).toHaveBeenCalled();
         });
 
-        it("should order related snapshots correctly", async () => {
+        it("should order related entitys correctly", async () => {
             const mockOrders = [
                 { id: 2,
 total: 200,
@@ -459,12 +459,12 @@ customer_id: 1 }
                 })
             });
 
-            const snapshots = await dataService.fetchCollection("customers/1/orders", {
+            const entitys = await dataService.fetchCollection("customers/1/orders", {
                 orderBy: "total",
                 order: "desc"
             });
 
-            expect(snapshots[0].total).toBe(200);
+            expect(entitys[0].total).toBe(200);
             // where() is always called for relation queries
             expect(db.where).toHaveBeenCalled();
         });
@@ -485,7 +485,7 @@ __type: "relation" }
                 customer_id: 2
             }]);
 
-            const snapshot = await dataService.save("orders", updatedOrder, 1);
+            const entity = await dataService.save("orders", updatedOrder, 1);
 
             expect(db.set).toHaveBeenCalledWith(expect.objectContaining({
                 customer_id: "2"
@@ -504,7 +504,7 @@ __type: "relation" }
                 customer_id: null
             }]);
 
-            const snapshot = await dataService.save("orders", orderWithoutCustomer, 1);
+            const entity = await dataService.save("orders", orderWithoutCustomer, 1);
 
             // Since no customer property was provided, nothing should be set
             expect(db.set).not.toHaveBeenCalled();
@@ -599,13 +599,13 @@ __type: "relation" }
 title: "Test Post",
 author_id: 1 }]);
 
-                const snapshot = await dataService.save("posts_jp", newPost);
+                const entity = await dataService.save("posts_jp", newPost);
 
                 // Should have captured the joinPath relation update
                 expect(db.transaction).toHaveBeenCalled();
             });
 
-            it("applies joinPath updates BEFORE main UPDATE on existing snapshots to prevent stale data corruption", async () => {
+            it("applies joinPath updates BEFORE main UPDATE on existing entitys to prevent stale data corruption", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
                 jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
@@ -629,7 +629,7 @@ __type: "relation" }
                     expectedOps.push("joinPathUpdate");
                 });
 
-                // Track main snapshot update
+                // Track main entity update
                 const originalUpdate = db.update;
                 db.update = jest.fn(function(this: any, table) {
                     if (table && (table as any)._def?.tableName === "posts") {
@@ -666,7 +666,7 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 name: "John Doe" }]);
 
-                const snapshot = await dataService.save("customers", customerWithProfile);
+                const entity = await dataService.save("customers", customerWithProfile);
 
                 // Should trigger inverse relation update
                 expect(db.transaction).toHaveBeenCalled();
@@ -723,7 +723,7 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 name: "Jane Author" }]);
 
-                const snapshot = await dataService.save("authors_jp", newAuthor);
+                const entity = await dataService.save("authors_jp", newAuthor);
 
                 // Should trigger inverse joinPath relation update
                 expect(db.transaction).toHaveBeenCalled();
@@ -749,7 +749,7 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 total: 500 }]);
 
-                const snapshot = await dataService.save("orders", orderWithProducts);
+                const entity = await dataService.save("orders", orderWithProducts);
 
                 // Should manage junction table entries
                 expect(db.transaction).toHaveBeenCalled();
@@ -824,7 +824,7 @@ title: "Tagged Post" }]);
                 // Mock the fetch for tags relation - return empty array since we're testing write
                 db.orderBy.mockResolvedValue([]);
 
-                const _snapshot = await dataService.save("posts_tags_jp", postWithTags);
+                const _entity = await dataService.save("posts_tags_jp", postWithTags);
 
                 // Should manage junction table via joinPath
                 expect(db.transaction).toHaveBeenCalled();
@@ -851,9 +851,9 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 name: "Big Customer" }]);
 
-                const snapshot = await dataService.save("customers", customerWithOrders);
+                const entity = await dataService.save("customers", customerWithOrders);
 
-                // Should update FK on target snapshots
+                // Should update FK on target entitys
                 expect(db.transaction).toHaveBeenCalled();
             });
         });
@@ -921,7 +921,7 @@ name: "Popular Product" }]);
                 // Mock the fetch for orders relation - return empty array
                 db.orderBy.mockResolvedValue([]);
 
-                const _snapshot = await dataService.save("products_orders", productWithOrders);
+                const _entity = await dataService.save("products_orders", productWithOrders);
 
                 // Should manage junction table from inverse side
                 expect(db.transaction).toHaveBeenCalled();
@@ -997,7 +997,7 @@ name: "Popular Tag" }]);
                 // Mock the fetch for posts relation - return empty array since we're testing write
                 db.orderBy.mockResolvedValue([]);
 
-                const _snapshot = await dataService.save("tags_posts_jp", tagWithPosts);
+                const _entity = await dataService.save("tags_posts_jp", tagWithPosts);
 
                 // Should manage junction table via inverse joinPath
                 expect(db.transaction).toHaveBeenCalled();

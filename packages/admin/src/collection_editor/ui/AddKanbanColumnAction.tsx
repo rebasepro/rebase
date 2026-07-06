@@ -31,12 +31,12 @@ import { toSnakeCase } from "@rebasepro/utils";
 export function AddKanbanColumnAction({
     collection,
     fullPath,
-    parentCollectionSlugs, parentSnapshotIds,
+    parentCollectionSlugs, parentEntityIds,
     columnProperty
 }: {
     collection: CollectionConfig;
     fullPath: string;
-    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
     columnProperty: string;
 }) {
     const [dialogOpen, setDialogOpen] = useState(false);

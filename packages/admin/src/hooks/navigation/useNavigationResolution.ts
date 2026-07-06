@@ -2,7 +2,7 @@ import type {
     AppView,
     AppViewsBuilder,
     AuthCollectionConfig,
-    SnapshotAction,
+    EntityAction,
     CollectionConfig,
     CollectionConfigsBuilder,
     RebaseContext,
@@ -11,7 +11,7 @@ import type {
 } from "@rebasepro/types";
 import { type AuthController, type User, type RebaseData } from "@rebasepro/types";
 import { canReadCollection } from "@rebasepro/common";
-import { resetPasswordAction } from "../../components/common/default_record_actions";
+import { resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
 import React from "react";
 
@@ -49,11 +49,11 @@ export function applyPluginModifyCollection(resolvedCollections: CollectionConfi
 }
 
 /**
- * Auto-inject auth-specific snapshot actions and callbacks for collections
+ * Auto-inject auth-specific entity actions and callbacks for collections
  * with `auth: true` or `auth: { enabled: true }`.
  *
  * Injections:
- * 1. **resetPasswordAction** — adds the snapshot action unless explicitly disabled
+ * 1. **resetPasswordAction** — adds the entity action unless explicitly disabled
  * 2. **afterSave callback** — shows the `CreationResultDialog` when a new user
  *    is created with `invitationSent` or `temporaryPassword` in the response
  *
@@ -71,9 +71,9 @@ function injectAuthCollectionConfig(collections: CollectionConfig[]): Collection
 
         let result = collection;
 
-        // ─── Snapshot Action injection (resetPassword) ─────────────────────
+        // ─── Entity Action injection (resetPassword) ─────────────────────
         const resetPref = authConfig?.actions?.resetPassword;
-        let actionToInject: SnapshotAction | undefined;
+        let actionToInject: EntityAction | undefined;
 
         if (resetPref === false) {
             actionToInject = undefined;
@@ -85,14 +85,14 @@ function injectAuthCollectionConfig(collections: CollectionConfig[]): Collection
 
         if (actionToInject) {
             const injectedAction = actionToInject;
-            const existing = result.snapshotActions ?? [];
+            const existing = result.entityActions ?? [];
             const alreadyHas = existing.some(
                 (a) => a.key != null && a.key === injectedAction.key
             );
             if (!alreadyHas) {
                 result = {
                     ...result,
-                    snapshotActions: [...existing, injectedAction]
+                    entityActions: [...existing, injectedAction]
                 };
             }
         }
@@ -178,7 +178,7 @@ export async function resolveCollections(
         }
     }
 
-    // Auto-inject auth snapshot actions and callbacks (resetPassword, creation dialog, etc.)
+    // Auto-inject auth entity actions and callbacks (resetPassword, creation dialog, etc.)
     resolvedCollections = injectAuthCollectionConfig(resolvedCollections);
 
     resolvedCollections = filterOutNotAllowedCollections(resolvedCollections, authController);

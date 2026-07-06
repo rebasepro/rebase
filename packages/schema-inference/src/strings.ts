@@ -2,8 +2,8 @@ import { ValuesCountEntry } from "./types";
 
 /**
  * Parse a reference string value which can be in the format:
- * - Simple: "path/snapshotId"
- * - With database: "database_name:::path/snapshotId"
+ * - Simple: "path/entityId"
+ * - With database: "database_name:::path/entityId"
  * Returns the path and database (undefined if not specified or if "(default)")
  */
 export function parseReferenceString(value: string): { path: string; database?: string } | null {
@@ -12,7 +12,7 @@ export function parseReferenceString(value: string): { path: string; database?: 
     let database: string | undefined = undefined;
     let fullPath = value;
 
-    // Parse the new format: database_name:::path/snapshotId
+    // Parse the new format: database_name:::path/entityId
     if (value.includes(":::")) {
         const [dbName, pathPart] = value.split(":::");
         if (dbName && dbName !== "(default)") {
@@ -59,7 +59,7 @@ export function findCommonInitialStringInPath(valuesCount?: ValuesCountEntry) {
 
         if (!pathString) return undefined;
 
-        // Parse the new format: database_name:::path/snapshotId
+        // Parse the new format: database_name:::path/entityId
         // Extract just the path portion for comparison
         if (pathString.includes(":::")) {
             const [, pathPart] = pathString.split(":::");

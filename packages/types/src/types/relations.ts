@@ -50,7 +50,7 @@ export interface Relation {
     localKey?: string;
 
     /**
-     * Column on the TARGET table that stores the foreign key to this snapshot.
+     * Column on the TARGET table that stores the foreign key to this entity.
      * Required when `direction` is "inverse".
      * @example "post_id"
      */

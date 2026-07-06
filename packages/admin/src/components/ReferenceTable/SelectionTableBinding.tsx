@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { MouseEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Snapshot, FilterValues } from "@rebasepro/types";
+import { CollectionSize, Entity, FilterValues } from "@rebasepro/types";
 
 import {
     CollectionRowActions,
@@ -35,7 +35,7 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     multiselect?: boolean;
 
     /**
-     * Snapshot collection config
+     * Entity collection config
      */
     collection?: CollectionConfig<M>;
 
@@ -48,28 +48,28 @@ export interface SelectionProps<M extends Record<string, unknown>> {
 
     /**
      * If you are opening the dialog for the first time, you can select some
-     * snapshot ids to be displayed first.
+     * entity ids to be displayed first.
      */
-    selectedSnapshotIds?: (string | number)[];
+    selectedEntityIds?: (string | number)[];
 
     /**
-     * If `multiselect` is set to `false`, you will get the selected snapshot
+     * If `multiselect` is set to `false`, you will get the selected entity
      * in this callback.
-     * @param snapshot
+     * @param entity
      * @callback
      */
-    onSingleSnapshotSelected?(snapshot: Snapshot<any> | null): void;
+    onSingleEntitySelected?(entity: Entity<any> | null): void;
 
     /**
-     * If `multiselect` is set to `true`, you will get the selected snapshots
+     * If `multiselect` is set to `true`, you will get the selected entitys
      * in this callback.
-     * @param snapshots
+     * @param entitys
      * @callback
      */
-    onMultipleSnapshotsSelected?(snapshots: Snapshot<any>[]): void;
+    onMultipleEntitysSelected?(entitys: Entity<any>[]): void;
 
     /**
-     * Allow selection of snapshots that pass the given filter only.
+     * Allow selection of entitys that pass the given filter only.
      */
     fixedFilter?: FilterValues<string>;
 
@@ -79,14 +79,14 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     description?: React.ReactNode;
 
     /**
-     * Maximum number of snapshots that can be selected.
+     * Maximum number of entitys that can be selected.
      */
     maxSelection?: number;
 
 }
 
 /**
- * This component allows to select snapshots from a given collection.
+ * This component allows to select entitys from a given collection.
  * You probably want to open this dialog as a side view using {@link useSelectionTableBinding}
  * @group Components
  */
@@ -102,12 +102,12 @@ export function SelectionTableBinding<M extends Record<string, unknown>>(
 
 function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     {
-        onSingleSnapshotSelected,
-        onMultipleSnapshotsSelected,
+        onSingleEntitySelected,
+        onMultipleEntitysSelected,
         multiselect,
         collection,
         path: pathInput,
-        selectedSnapshotIds: selectedSnapshotIdsProp,
+        selectedEntityIds: selectedEntityIdsProp,
         description,
         fixedFilter,
         maxSelection
@@ -122,12 +122,12 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
 
     const dataClient = useData();
 
-    const [snapshotsDisplayedFirst, setSnapshotsDisplayedFirst] = useState<Snapshot<any>[]>([]);
+    const [entitysDisplayedFirst, setEntitysDisplayedFirst] = useState<Entity<any>[]>([]);
 
     const selectionController = useSelectionController();
 
     // Track whether the selection has been initialized to avoid
-    // firing onMultipleSnapshotsSelected during the initial mount/fetch.
+    // firing onMultipleEntitysSelected during the initial mount/fetch.
     const selectionInitializedRef = useRef(false);
 
     // Propagate selection changes to the parent callback.
@@ -135,119 +135,119 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     // we always send the correct, non-stale selection to the parent.
     useEffect(() => {
         if (!selectionInitializedRef.current) return;
-        if (onMultipleSnapshotsSelected) {
-            onMultipleSnapshotsSelected(selectionController.selectedSnapshots);
+        if (onMultipleEntitysSelected) {
+            onMultipleEntitysSelected(selectionController.selectedEntitys);
         }
-    }, [selectionController.selectedSnapshots]);
+    }, [selectionController.selectedEntitys]);
 
     /**
      * Fetch initially selected ids
      */
     useEffect(() => {
         let unmounted = false;
-        const selectedSnapshotIds = selectedSnapshotIdsProp?.map(id => id?.toString()).filter(Boolean);
-        if (selectedSnapshotIds && selectedSnapshotIds.length > 0 && collection) {
+        const selectedEntityIds = selectedEntityIdsProp?.map(id => id?.toString()).filter(Boolean);
+        if (selectedEntityIds && selectedEntityIds.length > 0 && collection) {
             Promise.all(
-                selectedSnapshotIds.map((snapshotId) =>
-                    dataClient.collection(path).findById(snapshotId))
+                selectedEntityIds.map((entityId) =>
+                    dataClient.collection(path).findById(entityId))
                 )
-                .then((snapshots) => {
+                .then((entitys) => {
                     if (!unmounted) {
-                        const result = snapshots.filter((e): e is Snapshot<any> => !!e);
-                        selectionController.setSelectedSnapshots(result);
-                        setSnapshotsDisplayedFirst(result);
+                        const result = entitys.filter((e): e is Entity<any> => !!e);
+                        selectionController.setSelectedEntitys(result);
+                        setEntitysDisplayedFirst(result);
                         // Mark initialized after the initial fetch completes
                         selectionInitializedRef.current = true;
                     }
                 });
         } else {
-            selectionController.setSelectedSnapshots([]);
-            setSnapshotsDisplayedFirst([]);
+            selectionController.setSelectedEntitys([]);
+            setEntitysDisplayedFirst([]);
             selectionInitializedRef.current = true;
         }
         return () => {
             unmounted = true;
         };
-    }, [dataClient, path, selectedSnapshotIdsProp, collection, selectionController.setSelectedSnapshots]);
+    }, [dataClient, path, selectedEntityIdsProp, collection, selectionController.setSelectedEntitys]);
 
     const onClear = () => {
         analyticsController.onAnalyticsEvent?.("reference_selection_clear", {
             path
         });
-        selectionController.setSelectedSnapshots([]);
-        if (!multiselect && onSingleSnapshotSelected) {
-            onSingleSnapshotSelected(null);
+        selectionController.setSelectedEntitys([]);
+        if (!multiselect && onSingleEntitySelected) {
+            onSingleEntitySelected(null);
         }
     };
 
-    const onSnapshotClick = useCallback((snapshot: Snapshot<any>) => {
-        if (!multiselect && onSingleSnapshotSelected) {
+    const onEntityClick = useCallback((entity: Entity<any>) => {
+        if (!multiselect && onSingleEntitySelected) {
             analyticsController.onAnalyticsEvent?.("reference_selected_single", {
                 path,
-                snapshotId: snapshot.id
+                entityId: entity.id
             });
-            onSingleSnapshotSelected(snapshot);
+            onSingleEntitySelected(entity);
             sideDialogContext.close(false);
         } else {
             // For multiselect, delegate to the selection controller's toggle.
-            // The useEffect above will propagate the change to onMultipleSnapshotsSelected.
+            // The useEffect above will propagate the change to onMultipleEntitysSelected.
             analyticsController.onAnalyticsEvent?.("reference_selection_toggle", {
                 path,
-                snapshotId: snapshot.id
+                entityId: entity.id
             });
-            const selectedSnapshots = selectionController.selectedSnapshots;
-            if (selectedSnapshots.map((e) => e.id).indexOf(snapshot.id) > -1) {
-                selectionController.setSelectedSnapshots(
-                    selectedSnapshots.filter((item: Snapshot<any>) => item.id !== snapshot.id)
+            const selectedEntitys = selectionController.selectedEntitys;
+            if (selectedEntitys.map((e) => e.id).indexOf(entity.id) > -1) {
+                selectionController.setSelectedEntitys(
+                    selectedEntitys.filter((item: Entity<any>) => item.id !== entity.id)
                 );
             } else {
-                if (maxSelection && selectedSnapshots.length >= maxSelection) return;
-                selectionController.setSelectedSnapshots([...selectedSnapshots, snapshot]);
+                if (maxSelection && selectedEntitys.length >= maxSelection) return;
+                selectionController.setSelectedEntitys([...selectedEntitys, entity]);
             }
         }
-    }, [multiselect, onSingleSnapshotSelected, analyticsController, path, sideDialogContext, selectionController, maxSelection]);
+    }, [multiselect, onSingleEntitySelected, analyticsController, path, sideDialogContext, selectionController, maxSelection]);
 
-    // create a new snapshot from within the reference dialog
+    // create a new entity from within the reference dialog
     const onNewClick = () => {
-        analyticsController.onAnalyticsEvent?.("reference_selection_new_snapshot", {
+        analyticsController.onAnalyticsEvent?.("reference_selection_new_entity", {
             path
         });
         sidePanelController.open({
             path: path,
             collection,
             updateUrl: true,
-            onUpdate: ({ snapshot }) => {
-                setSnapshotsDisplayedFirst([snapshot, ...snapshotsDisplayedFirst]);
-                onSnapshotClick(snapshot);
+            onUpdate: ({ entity }) => {
+                setEntitysDisplayedFirst([entity, ...entitysDisplayedFirst]);
+                onEntityClick(entity);
             },
             closeOnSave: true
         });
     };
 
     const tableRowActionsBuilder = ({
-        snapshot,
+        entity,
         size,
         width,
         frozen
     }: {
-        snapshot: Snapshot<any>,
+        entity: Entity<any>,
         size: CollectionSize,
         width: number,
         frozen?: boolean
     }) => {
-        const selectedSnapshots = selectionController.selectedSnapshots;
-        const isSelected = selectedSnapshots && selectedSnapshots.map(e => e.id).indexOf(snapshot.id) > -1;
+        const selectedEntitys = selectionController.selectedEntitys;
+        const isSelected = selectedEntitys && selectedEntitys.map(e => e.id).indexOf(entity.id) > -1;
         return <CollectionRowActions
             width={width}
             frozen={frozen}
-            snapshot={snapshot}
+            entity={entity}
             size={size}
             isSelected={isSelected}
             selectionEnabled={multiselect}
             hideId={collection?.hideIdFromCollection}
             path={path}
             selectionController={selectionController}
-            openSnapshotMode={"side_panel"}
+            openEntityMode={"side_panel"}
         />;
 
     };
@@ -262,7 +262,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     const tableController = useDataTableController<M>({
         path,
         collection,
-        snapshotsDisplayedFirst,
+        entitysDisplayedFirst,
         fixedFilter,
         updateUrl: false
     });
@@ -272,15 +272,15 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         <div className="flex flex-col h-full">
 
             <div className="grow">
-                {snapshotsDisplayedFirst &&
+                {entitysDisplayedFirst &&
                     <CollectionTableBinding
                         additionalFields={collection.additionalFields}
                         displayedColumnIds={displayedColumnIds}
-                        onSnapshotClick={onSnapshotClick}
+                        onEntityClick={onEntityClick}
                         tableController={tableController}
                         enablePopupIcon={false}
                         tableRowActionsBuilder={tableRowActionsBuilder}
-                        openSnapshotMode={"side_panel"}
+                        openEntityMode={"side_panel"}
                         title={<Typography variant={"subtitle2"} className={"flex flex-row gap-2"}>
                             <IconForView
                                 size={"small"}
@@ -295,7 +295,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                         fixedFilter={fixedFilter}
                         inlineEditing={false}
                         selectionController={selectionController}
-                        actions={<SnapshotSelectionDialogActions
+                        actions={<EntitySelectionDialogActions
                             collection={collection}
                             path={path}
                             onNewClick={onNewClick}
@@ -321,7 +321,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
 
 }
 
-function SnapshotSelectionDialogActions({
+function EntitySelectionDialogActions({
     collection,
     path,
     onClear,

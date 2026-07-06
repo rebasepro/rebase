@@ -1,4 +1,4 @@
-import type { Property, Snapshot } from "@rebasepro/types";
+import type { Property, Entity } from "@rebasepro/types";
 import { CollectionSize, SelectedCellProps } from "@rebasepro/types";
 
 export type DataCollectionTableController<M extends Record<string, unknown>> = {
@@ -10,7 +10,7 @@ export type DataCollectionTableController<M extends Record<string, unknown>> = {
     /**
      * Store used to sync selection state across cells efficiently.
      */
-    selectionStore?: { getSnapshot: () => SelectedCellProps | undefined; subscribe: (cb: () => void) => () => void };
+    selectionStore?: { getEntity: () => SelectedCellProps | undefined; subscribe: (cb: () => void) => () => void };
     /**
      * Select a table cell
      * @param cell
@@ -25,7 +25,7 @@ export type DataCollectionTableController<M extends Record<string, unknown>> = {
      * Callback used when the value of a cell has changed.
      * @param params
      */
-    onValueChange?: (params: OnCellValueChangeParams<unknown, Snapshot<M>>) => void;
+    onValueChange?: (params: OnCellValueChangeParams<unknown, Entity<M>>) => void;
     /**
      * Size of the elements in the collection
      */
@@ -51,14 +51,14 @@ export type UniqueFieldValidator = (props: {
     name: string,
     value: unknown,
     property: Property,
-    snapshotId?: string | number
+    entityId?: string | number
 }) => Promise<boolean>;
 
 /**
  * Callback when a cell has changed in a table
  * @group Collection components
  */
-export type OnCellValueChange<T, M extends Record<string, unknown>> = (params: OnCellValueChangeParams<T, Snapshot<M>>) => Promise<void> | void;
+export type OnCellValueChange<T, M extends Record<string, unknown>> = (params: OnCellValueChangeParams<T, Entity<M>>) => Promise<void> | void;
 
 /**
  * @group Collection components

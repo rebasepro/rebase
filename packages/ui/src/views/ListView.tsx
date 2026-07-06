@@ -34,7 +34,7 @@ export type ListViewProps<T> = {
     emptyComponent?: React.ReactNode;
 
     size?: CollectionSize;
-    selectedSnapshotId?: string | number;
+    selectedEntityId?: string | number;
 
     renderRow: (params: {
         item: T;
@@ -96,7 +96,7 @@ export function ListView<T>({
     emptyComponent,
 
     size = "m",
-    selectedSnapshotId,
+    selectedEntityId,
     renderRow
 }: ListViewProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -191,7 +191,7 @@ export function ListView<T>({
             ref={containerRef}
             className={cls(
                 "w-full",
-                selectedSnapshotId === undefined && `rounded-lg overflow-hidden border ${borderMixinClass}`
+                selectedEntityId === undefined && `rounded-lg overflow-hidden border ${borderMixinClass}`
             )}
         >
             {dataLoadingError && data.length === 0 ? (

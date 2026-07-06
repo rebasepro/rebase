@@ -257,7 +257,7 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
     path?: string;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
 }
 
 /**
@@ -287,7 +287,7 @@ export interface SerializableRelationProperty extends SerializableBaseProperty {
     relationName?: string;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
-    includeSnapshotLink?: boolean;
+    includeEntityLink?: boolean;
     widget?: "select" | "dialog";
     // overrides are dropped (can contain non-serializable CollectionConfig fields)
     // relation (resolved Relation object) is dropped (runtime-only, contains function target)
@@ -356,9 +356,9 @@ export type SerializableProperties = {
  *
  * Strips all non-serializable fields:
  * - Functions: `callbacks`, `childCollections`, `additionalFields`, `defaultSelectedView` (fn)
- * - React nodes: `icon` (ReactNode variant), `snapshotViews`, `formView`
+ * - React nodes: `icon` (ReactNode variant), `entityViews`, `formView`
  * - Runtime objects: `selectionController`, `overrides`
- * - Component refs: `Actions`, `components`, `snapshotActions`
+ * - Component refs: `Actions`, `components`, `entityActions`
  * - `exportable` when it's an `ExportConfig` (contains functions)
  * - `auth` when it's an `AuthCollectionConfig` (contains functions)
  *
@@ -388,8 +388,8 @@ export interface SerializableCollectionConfig {
     titleProperty?: string;
 
     // ── Display config ────────────────────────────────────────────────
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
-    defaultSnapshotAction?: "view" | "edit";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    defaultEntityAction?: "view" | "edit";
     defaultViewMode?: ViewMode;
     enabledViews?: ViewMode[];
     kanban?: KanbanConfig<Record<string, unknown>>;

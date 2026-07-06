@@ -116,6 +116,6 @@ const articlesCollection: CollectionConfig = {
 
 ## Próximos Passos
 
-- **[Visualizações de Entidade](/docs/frontend/snapshot-views)** — Abas personalizadas em formulários de entidade
-- **[Ações de Entidade](/docs/frontend/snapshot-actions)** — Ações de entidade personalizadas
+- **[Visualizações de Entidade](/docs/frontend/entity-views)** — Abas personalizadas em formulários de entidade
+- **[Ações de Entidade](/docs/frontend/entity-actions)** — Ações de entidade personalizadas
 ---

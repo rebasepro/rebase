@@ -51,7 +51,7 @@ describe("<Rebase> data source wiring", () => {
     }
 
     // `context.data`/`useData()` wraps the flat `client.data` at the CMS boundary
-    // (Snapshot view-model). Assert it delegates to `clientData` rather than being
+    // (Entity view-model). Assert it delegates to `clientData` rather than being
     // the same reference.
     function expectWrapsClientData(data?: RebaseData) {
         expect(data).toBeDefined();
@@ -98,7 +98,7 @@ describe("<Rebase> data source wiring", () => {
         });
         // At the core level (no navigation layer), useData() is the default source.
         // The flat SDK `client.data` is wrapped at the CMS boundary into the
-        // Snapshot view-model, so it delegates to `clientData` rather than being it.
+        // Entity view-model, so it delegates to `clientData` rather than being it.
         expectWrapsClientData(captured.data);
     });
 

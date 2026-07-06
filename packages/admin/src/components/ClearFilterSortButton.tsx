@@ -1,5 +1,5 @@
 import { Button, FilterXIcon, iconSize, Tooltip } from "@rebasepro/ui";
-import { SnapshotTableController } from "@rebasepro/types";
+import { EntityTableController } from "@rebasepro/types";
 import { useTranslation } from "@rebasepro/core";
 
 export function ClearFilterSortButton({
@@ -7,7 +7,7 @@ export function ClearFilterSortButton({
     enabled
 }: {
     enabled: boolean;
-    tableController: SnapshotTableController
+    tableController: EntityTableController
 }) {
     const { t } = useTranslation();
 

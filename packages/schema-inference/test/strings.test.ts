@@ -9,7 +9,7 @@ import {
 import type { ValuesCountEntry } from "../src/types";
 
 describe("parseReferenceString", () => {
-    it("parses a simple path/snapshotId reference", () => {
+    it("parses a simple path/entityId reference", () => {
         const result = parseReferenceString("users/abc123");
         expect(result).toEqual({ path: "users",
 database: undefined });

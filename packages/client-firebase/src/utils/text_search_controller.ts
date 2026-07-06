@@ -3,7 +3,7 @@ import { CollectionConfig } from "@rebasepro/types";
 
 /**
  * Utility function to perform a text search in an external index,
- * returning the ids of the snapshots.
+ * returning the ids of the entitys.
  * @group Firebase
  */
 export function buildExternalSearchController({

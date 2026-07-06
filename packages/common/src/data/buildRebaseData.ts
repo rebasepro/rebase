@@ -1,8 +1,8 @@
 import {
     CollectionAccessor,
     DataDriver,
-    Snapshot,
-    SnapshotValues,
+    Entity,
+    EntityValues,
     FindParams,
     FindResponse,
     FindResult,
@@ -19,14 +19,14 @@ import { QueryBuilder } from "./query_builder";
 import { deserializeFilter } from "./filter-dialect";
 
 /**
- * Convert a flat REST record (e.g. from RestFetchService) to Snapshot<M> format.
- * Mirrors the client SDK's rowToSnapshot conversion.
+ * Convert a flat REST record (e.g. from RestFetchService) to Entity<M> format.
+ * Mirrors the client SDK's rowToEntity conversion.
  */
-function rowToSnapshot<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Snapshot<M> {
+function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Entity<M> {
     return {
         id: row.id as string | number,
         path: slug,
-        values: row as SnapshotValues<M>
+        values: row as EntityValues<M>
     };
 }
 
@@ -75,34 +75,34 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             }
 
             return {
-                data: rows.map((row: Record<string, unknown>) => rowToSnapshot<M>(row, slug)),
+                data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
                 meta: { total, limit, offset, hasMore }
             };
         },
 
-        async findById(id: string | number): Promise<Snapshot<M> | undefined> {
+        async findById(id: string | number): Promise<Entity<M> | undefined> {
             const row = await driver.fetchOne<M>({ path: slug, id: id });
-            return row ? rowToSnapshot<M>(row, slug) : undefined;
+            return row ? rowToEntity<M>(row, slug) : undefined;
         },
 
-        async create(data: Partial<SnapshotValues<M>>, id?: string | number): Promise<Snapshot<M>> {
+        async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
             const row = await driver.save<M>({
                 path: slug,
                 values: data,
                 id: id,
                 status: "new"
             });
-            return rowToSnapshot<M>(row, slug);
+            return rowToEntity<M>(row, slug);
         },
 
-        async update(id: string | number, data: Partial<SnapshotValues<M>>): Promise<Snapshot<M>> {
+        async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await driver.save<M>({
                 path: slug,
                 values: data,
                 id: id,
                 status: "existing"
             });
-            return rowToSnapshot<M>(row, slug);
+            return rowToEntity<M>(row, slug);
         },
 
         async delete(id: string | number): Promise<void> {
@@ -141,14 +141,14 @@ values: {} as Record<string, unknown> }
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString,
-                    onUpdate: (snapshots) => {
+                    onUpdate: (entitys) => {
                         onUpdate({
-                            data: snapshots.map((row: Record<string, unknown>) => rowToSnapshot<M>(row, slug)),
+                            data: entitys.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
                             meta: {
-                                total: snapshots.length,
+                                total: entitys.length,
                                 limit,
                                 offset,
-                                hasMore: snapshots.length >= limit
+                                hasMore: entitys.length >= limit
                             }
                         });
                     },
@@ -157,11 +157,11 @@ values: {} as Record<string, unknown> }
             } : undefined,
 
         listenById: driver.listenOne
-            ? (id: string | number, onUpdate: (snapshot: Snapshot<M> | undefined) => void, onError?: (error: Error) => void) => {
+            ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
                 return driver.listenOne!<M>({
                     path: slug,
                     id: id,
-                    onUpdate: (snapshot) => onUpdate(snapshot ? rowToSnapshot<M>(snapshot, slug) : undefined),
+                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(entity, slug) : undefined),
                     onError
                 });
             } : undefined,
@@ -242,16 +242,16 @@ export function buildRebaseData(driver: DataDriver): RebaseData {
 // =============================================================================
 
 /**
- * Unwrap a Snapshot into a flat row. `rowToSnapshot` stores the whole flat row
+ * Unwrap a Entity into a flat row. `rowToEntity` stores the whole flat row
  * (id included) under `.values`, so this is just that payload.
  */
-function snapshotToRow<M extends Record<string, unknown>>(snapshot: Snapshot<M>): M {
-    return snapshot.values as unknown as M;
+function entityToRow<M extends Record<string, unknown>>(entity: Entity<M>): M {
+    return entity.values as unknown as M;
 }
 
 /**
  * Fluent query builder for the flat SDK data layer. Mirrors {@link QueryBuilder}
- * but resolves to `FindResult<M>` (flat rows) instead of Snapshot-wrapped
+ * but resolves to `FindResult<M>` (flat rows) instead of Entity-wrapped
  * `FindResponse<M>`.
  */
 class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements SDKQueryBuilderInterface<M> {
@@ -313,7 +313,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
 }
 
 /**
- * Wrap a Snapshot-shaped {@link CollectionAccessor} into a flat
+ * Wrap a Entity-shaped {@link CollectionAccessor} into a flat
  * {@link SDKCollectionClient}. Every returned record is unwrapped to a flat row
  * so the backend SDK is byte-for-byte the same shape as the frontend client.
  */
@@ -323,17 +323,17 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
     const client: SDKCollectionClient<M> = {
         async find(params?: FindParams): Promise<FindResult<M>> {
             const res = await snap.find(params);
-            return { data: res.data.map(snapshotToRow), meta: res.meta };
+            return { data: res.data.map(entityToRow), meta: res.meta };
         },
         async findById(id: string | number): Promise<M | undefined> {
             const s = await snap.findById(id);
-            return s ? snapshotToRow(s) : undefined;
+            return s ? entityToRow(s) : undefined;
         },
         async create(data: Partial<M>, id?: string | number): Promise<M> {
-            return snapshotToRow(await snap.create(data as Partial<SnapshotValues<M>>, id));
+            return entityToRow(await snap.create(data as Partial<EntityValues<M>>, id));
         },
         async update(id: string | number, data: Partial<M>): Promise<M> {
-            return snapshotToRow(await snap.update(id, data as Partial<SnapshotValues<M>>));
+            return entityToRow(await snap.update(id, data as Partial<EntityValues<M>>));
         },
         delete(id: string | number): Promise<void> {
             return snap.delete(id);
@@ -342,11 +342,11 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         count: snap.count ? (params?: FindParams) => snap.count!(params) : undefined,
         listen: snap.listen
             ? (params: FindParams | undefined, onUpdate: (r: FindResult<M>) => void, onError?: (e: Error) => void) =>
-                snap.listen!(params, (res) => onUpdate({ data: res.data.map(snapshotToRow), meta: res.meta }), onError)
+                snap.listen!(params, (res) => onUpdate({ data: res.data.map(entityToRow), meta: res.meta }), onError)
             : undefined,
         listenById: snap.listenById
             ? (id: string | number, onUpdate: (r: M | undefined) => void, onError?: (e: Error) => void) =>
-                snap.listenById!(id, (s) => onUpdate(s ? snapshotToRow(s) : undefined), onError)
+                snap.listenById!(id, (s) => onUpdate(s ? entityToRow(s) : undefined), onError)
             : undefined,
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new SdkQueryBuilder<M>(client);
@@ -365,30 +365,30 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
 }
 
 /**
- * Wrap a flat {@link SDKCollectionClient} into a Snapshot-shaped
+ * Wrap a flat {@link SDKCollectionClient} into a Entity-shaped
  * {@link CollectionAccessor}. Every returned row is re-wrapped into the
  * `{ id, path, values }` view-model the admin CMS renders.
  */
-function toSnapshotAccessor<M extends Record<string, unknown>>(
+function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,
     slug: string
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             const res = await sdk.find(params);
-            return { data: res.data.map((row) => rowToSnapshot<M>(row, slug)), meta: res.meta };
+            return { data: res.data.map((row) => rowToEntity<M>(row, slug)), meta: res.meta };
         },
-        async findById(id: string | number): Promise<Snapshot<M> | undefined> {
+        async findById(id: string | number): Promise<Entity<M> | undefined> {
             const row = await sdk.findById(id);
-            return row ? rowToSnapshot<M>(row, slug) : undefined;
+            return row ? rowToEntity<M>(row, slug) : undefined;
         },
-        async create(data: Partial<SnapshotValues<M>>, id?: string | number): Promise<Snapshot<M>> {
-            return rowToSnapshot<M>(await sdk.create(data as Partial<M>, id), slug);
+        async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
+            return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug);
         },
-        async update(id: string | number, data: Partial<SnapshotValues<M>>): Promise<Snapshot<M>> {
+        async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await sdk.update(id, data as Partial<M>);
             if (!row) throw new Error(`Update returned no data for id ${id}`);
-            return rowToSnapshot<M>(row, slug);
+            return rowToEntity<M>(row, slug);
         },
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
@@ -397,11 +397,11 @@ function toSnapshotAccessor<M extends Record<string, unknown>>(
         count: sdk.count ? (params?: FindParams) => sdk.count!(params) : undefined,
         listen: sdk.listen
             ? (params: FindParams | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
-                sdk.listen!(params, (res) => onUpdate({ data: res.data.map((row) => rowToSnapshot<M>(row, slug)), meta: res.meta }), onError)
+                sdk.listen!(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug)), meta: res.meta }), onError)
             : undefined,
         listenById: sdk.listenById
-            ? (id: string | number, onUpdate: (s: Snapshot<M> | undefined) => void, onError?: (e: Error) => void) =>
-                sdk.listenById!(id, (row) => onUpdate(row ? rowToSnapshot<M>(row, slug) : undefined), onError)
+            ? (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
+                sdk.listenById!(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug) : undefined), onError)
             : undefined,
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
@@ -420,21 +420,21 @@ function toSnapshotAccessor<M extends Record<string, unknown>>(
 }
 
 /**
- * Wrap a flat {@link RebaseSdkData} into a Snapshot-shaped {@link RebaseData}.
+ * Wrap a flat {@link RebaseSdkData} into a Entity-shaped {@link RebaseData}.
  *
  * This is the **CMS boundary**: the SDK client (`client.data`) returns flat
- * rows, but the admin renders the `Snapshot` view-model (`snapshot.values.*`).
+ * rows, but the admin renders the `Entity` view-model (`entity.values.*`).
  * `core/Rebase.tsx` wraps `client.data` through this before handing it to the
  * CMS `RebaseDataContext` — without it the admin renders rows with only their
  * `id`.
  */
-export function wrapAsSnapshotData(sdkData: RebaseSdkData): RebaseData {
+export function wrapAsEntityData(sdkData: RebaseSdkData): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toSnapshotAccessor(sdkData.collection(slug), slug);
+            accessor = toEntityAccessor(sdkData.collection(slug), slug);
             cache.set(slug, accessor);
         }
         return accessor;
@@ -453,20 +453,20 @@ export function wrapAsSnapshotData(sdkData: RebaseSdkData): RebaseData {
 }
 
 /**
- * Wrap a Snapshot-shaped {@link RebaseData} into a flat {@link RebaseSdkData}.
+ * Wrap a Entity-shaped {@link RebaseData} into a flat {@link RebaseSdkData}.
  *
  * Every collection accessor is adapted to return flat rows. Use this to derive
- * the flat SDK data layer (`context.data`) from an existing Snapshot data layer
- * — e.g. the admin routes its Snapshot data via `useData()` and exposes the
+ * the flat SDK data layer (`context.data`) from an existing Entity data layer
+ * — e.g. the admin routes its Entity data via `useData()` and exposes the
  * same routing as flat `context.data` for callbacks by wrapping it here.
  */
-export function wrapAsSdkData(snapshotData: RebaseData): RebaseSdkData {
+export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
     const cache = new Map<string, SDKCollectionClient>();
 
     function getAccessor(slug: string): SDKCollectionClient {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toSdkCollectionClient(snapshotData.collection(slug));
+            accessor = toSdkCollectionClient(entityData.collection(slug));
             cache.set(slug, accessor);
         }
         return accessor;
@@ -490,7 +490,7 @@ export function wrapAsSdkData(snapshotData: RebaseData): RebaseSdkData {
  * This is the developer-facing SDK data layer used by backend framework
  * callbacks & scripts (`context.data` / `rebase.data`). It returns flat rows —
  * identical in shape to the frontend SDK client — so the API is symmetric
- * across front and back. The admin CMS uses {@link buildRebaseData} (Snapshot).
+ * across front and back. The admin CMS uses {@link buildRebaseData} (Entity).
  */
 export function buildSdkData(driver: DataDriver): RebaseSdkData {
     return wrapAsSdkData(buildRebaseData(driver));

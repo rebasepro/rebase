@@ -10,7 +10,7 @@ import {
     resolveCollectionPathIds,
     getCollectionBySlugWithin,
     getCollectionPathsCombinations,
-    navigateToSnapshot
+    navigateToEntity
 } from "../../src/util/navigation_utils";
 
 import type { CollectionConfig, SidePanelController, UrlController } from "@rebasepro/types";
@@ -168,7 +168,7 @@ describe("resolveCollectionPathIds", () => {
         expect(resolveCollectionPathIds("products", collections)).toBe("products");
     });
 
-    it("resolves collection/snapshotId path", () => {
+    it("resolves collection/entityId path", () => {
         // Warn is expected but we get: "users_table/abc123"
         const warnSpy = jest.spyOn(console, "warn").mockImplementation();
         const result = resolveCollectionPathIds("users/abc123", collections);
@@ -235,7 +235,7 @@ describe("getCollectionBySlugWithin", () => {
     });
 
     it("finds a subcollection by nested path", () => {
-        const result = getCollectionBySlugWithin("products/snapshot1/reviews", collections);
+        const result = getCollectionBySlugWithin("products/entity1/reviews", collections);
         expect(result).toBeDefined();
         expect(result!.id).toBe("reviews");
     });
@@ -245,15 +245,15 @@ describe("getCollectionBySlugWithin", () => {
     });
 
     it("throws on even-segment paths (invalid collection path)", () => {
-        expect(() => getCollectionBySlugWithin("products/snapshot1", collections))
+        expect(() => getCollectionBySlugWithin("products/entity1", collections))
             .toThrow("Collection paths must have an odd number of segments");
     });
 });
 
 // ---------------------------------------------------------------------------
-// navigateToSnapshot
+// navigateToEntity
 // ---------------------------------------------------------------------------
-describe("navigateToSnapshot", () => {
+describe("navigateToEntity", () => {
     const mockNavigate = jest.fn();
 
     const mockNavigation: UrlController = {
@@ -278,10 +278,10 @@ describe("navigateToSnapshot", () => {
         jest.clearAllMocks();
     });
 
-    it("opens a side panel when openSnapshotMode is side_panel", () => {
-        navigateToSnapshot({
-            openSnapshotMode: "side_panel",
-            snapshotId: "abc",
+    it("opens a side panel when openEntityMode is side_panel", () => {
+        navigateToEntity({
+            openEntityMode: "side_panel",
+            entityId: "abc",
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation
@@ -289,7 +289,7 @@ describe("navigateToSnapshot", () => {
 
         expect(mockSidePanelController.open).toHaveBeenCalledWith(
             expect.objectContaining({
-                snapshotId: "abc",
+                entityId: "abc",
                 path: "products",
                 updateUrl: true
             })
@@ -297,10 +297,10 @@ describe("navigateToSnapshot", () => {
         expect(mockNavigate).not.toHaveBeenCalled();
     });
 
-    it("navigates to full screen when openSnapshotMode is full_screen", () => {
-        navigateToSnapshot({
-            openSnapshotMode: "full_screen",
-            snapshotId: "abc",
+    it("navigates to full screen when openEntityMode is full_screen", () => {
+        navigateToEntity({
+            openEntityMode: "full_screen",
+            entityId: "abc",
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation
@@ -311,9 +311,9 @@ describe("navigateToSnapshot", () => {
     });
 
     it("appends selectedTab to full_screen URL", () => {
-        navigateToSnapshot({
-            openSnapshotMode: "full_screen",
-            snapshotId: "abc",
+        navigateToEntity({
+            openEntityMode: "full_screen",
+            entityId: "abc",
             path: "products",
             selectedTab: "details",
             sidePanelController: mockSidePanelController,
@@ -323,10 +323,10 @@ describe("navigateToSnapshot", () => {
         expect(mockNavigate).toHaveBeenCalledWith("/c/products/abc/details", undefined);
     });
 
-    it("adds #new when no snapshotId in full_screen mode", () => {
-        navigateToSnapshot({
-            openSnapshotMode: "full_screen",
-            snapshotId: undefined,
+    it("adds #new when no entityId in full_screen mode", () => {
+        navigateToEntity({
+            openEntityMode: "full_screen",
+            entityId: undefined,
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation
@@ -336,9 +336,9 @@ describe("navigateToSnapshot", () => {
     });
 
     it("adds #copy when copy flag is set in full_screen mode", () => {
-        navigateToSnapshot({
-            openSnapshotMode: "full_screen",
-            snapshotId: "abc",
+        navigateToEntity({
+            openEntityMode: "full_screen",
+            entityId: "abc",
             path: "products",
             copy: true,
             sidePanelController: mockSidePanelController,
@@ -349,9 +349,9 @@ describe("navigateToSnapshot", () => {
     });
 
     it("passes replace option when replace parameter is set", () => {
-        navigateToSnapshot({
-            openSnapshotMode: "full_screen",
-            snapshotId: "abc",
+        navigateToEntity({
+            openEntityMode: "full_screen",
+            entityId: "abc",
             path: "products",
             sidePanelController: mockSidePanelController,
             navigation: mockNavigation,

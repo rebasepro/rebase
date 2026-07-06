@@ -76,28 +76,28 @@ export function resolveCollectionPathIds(path: string, allCollections: Collectio
                 break; // Path ends with a collection segment
             }
 
-            // The next segment must be a snapshot ID
+            // The next segment must be a entity ID
             const idSeparatorIndex = remainingPath.indexOf("/");
-            let snapshotId: string | number;
+            let entityId: string | number;
             if (idSeparatorIndex > -1) {
-                snapshotId = remainingPath.substring(0, idSeparatorIndex);
+                entityId = remainingPath.substring(0, idSeparatorIndex);
                 remainingPath = remainingPath.substring(idSeparatorIndex + 1);
             } else {
                 // This should not happen if the original path is valid (odd segments)
                 // but handle it defensively: assume the rest is the ID
-                snapshotId = remainingPath;
+                entityId = remainingPath;
                 remainingPath = "";
-                console.warn(`resolveCollectionPathIds: Path seems to end with a snapshot ID "${snapshotId}" instead of a collection segment in original path "${path}". This might indicate an invalid input path.`);
+                console.warn(`resolveCollectionPathIds: Path seems to end with a entity ID "${entityId}" instead of a collection segment in original path "${path}". This might indicate an invalid input path.`);
                 // Even if it ends here, we still need to push the ID
             }
 
-            resolvedPathParts.push(snapshotId); // Append snapshot ID
+            resolvedPathParts.push(entityId); // Append entity ID
             currentCollections = getSubcollections(foundCollection); // Move to subcollections
             foundMatch = true;
 
             if (!currentCollections && remainingPath.length > 0) {
                 // Warn if the path continues but no subcollections were defined
-                console.warn(`resolveCollectionPathIds: Path continues after snapshot ID "${snapshotId}", but no subcollections are defined for the preceding collection "${foundCollection.slug}" in path "${path}". Appending remaining original path.`);
+                console.warn(`resolveCollectionPathIds: Path continues after entity ID "${entityId}", but no subcollections are defined for the preceding collection "${foundCollection.slug}" in path "${path}". Appending remaining original path.`);
                 resolvedPathParts.push(remainingPath); // Append the rest
                 remainingPath = ""; // Stop processing
                 break;

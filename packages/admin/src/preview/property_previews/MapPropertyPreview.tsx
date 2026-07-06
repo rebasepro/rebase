@@ -44,7 +44,7 @@ export function MapPropertyPreview({
                             <PropertyPreview propertyKey={key}
                                 value={mapValue[key]}
                                 property={mapProperty.properties![key]}
-                                // snapshot={snapshot}
+                                // entity={entity}
                                 size={size}/>
                         </ErrorBoundary>
                     </div>
@@ -81,7 +81,7 @@ export function MapPropertyPreview({
                                                 propertyKey={key}
                                                 value={mapValue[key]}
                                                 property={childProperty}
-                                                // snapshot={snapshot}
+                                                // entity={entity}
                                                 size={size}/>}
                                     </ErrorBoundary>
                                 </div>
@@ -93,7 +93,7 @@ export function MapPropertyPreview({
                                         propertyKey={key}
                                         value={mapValue[key]}
                                         property={childProperty}
-                                        // snapshot={snapshot}
+                                        // entity={entity}
                                         size={size}/>
                                 </div>
                             }

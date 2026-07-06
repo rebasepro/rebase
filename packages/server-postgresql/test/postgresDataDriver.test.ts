@@ -5,7 +5,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
-import type { CollectionConfig, Snapshot } from "@rebasepro/types";
+import type { CollectionConfig, Entity } from "@rebasepro/types";
 
 type MockTx = { execute: jest.Mock };
 type MockUser = { uid: string; email?: string; roles?: unknown[] };
@@ -299,7 +299,7 @@ email: "test@example.com" });
                     id: "123",
                     row: {} as unknown as Record<string, unknown>
                 });
-                return {} as unknown as Snapshot;
+                return {} as unknown as Entity;
             });
 
             await authDelegate.save({ path: "test",
@@ -358,14 +358,14 @@ status: "new" })).rejects.toThrow("Transaction failed");
                     id: "buggy-123",
                     row: {} as unknown as Record<string, unknown>
                 });
-                return { id: "success" } as unknown as Snapshot;
+                return { id: "success" } as unknown as Entity;
             });
 
             // Mock the notification service intentionally crashing
             const notifySpy = mockRealtimeService.notifyUpdate as jest.Mock;
             notifySpy.mockRejectedValueOnce(new Error("Network Failure on Notification"));
 
-            // Should still return the snapshot successfully despite the error
+            // Should still return the entity successfully despite the error
             const result = await authDelegate.save({ path: "test",
 id: "buggy-123",
 values: {},
@@ -392,7 +392,7 @@ status: "new" });
                 this._pendingNotifications?.push({ path: "scope-1",
 id: "1",
 row: {} as unknown as Record<string, unknown> });
-                return {} as unknown as Snapshot;
+                return {} as unknown as Entity;
             });
 
             // Operation 2 flags a different notification
@@ -400,7 +400,7 @@ row: {} as unknown as Record<string, unknown> });
                 this._pendingNotifications?.push({ path: "scope-2",
 id: "2",
 row: {} as unknown as Record<string, unknown> });
-                return {} as unknown as Snapshot;
+                return {} as unknown as Entity;
             });
 
             // Fire simultaneously
@@ -631,7 +631,7 @@ properties: {} } as unknown as CollectionConfig });
 email: "del@test.com" } as MockUser);
             await authDelegate.delete({ row: { id: "1",
 path: "x",
-values: {} } as unknown as Snapshot });
+values: {} } as unknown as Entity });
 
             expect(mockDb.transaction).toHaveBeenCalled();
         });
@@ -696,13 +696,13 @@ email: "u@t.com" } as MockUser);
                     this._pendingNotifications?.push({ path: "call-1",
 id: "1",
 row: {} as unknown as Record<string, unknown> });
-                    return {} as unknown as Snapshot;
+                    return {} as unknown as Entity;
                 })
                 .mockImplementationOnce(async function(this: { _pendingNotifications?: Array<Record<string, unknown>> }) {
                     this._pendingNotifications?.push({ path: "call-2",
 id: "2",
 row: {} as unknown as Record<string, unknown> });
-                    return {} as unknown as Snapshot;
+                    return {} as unknown as Entity;
                 });
 
             await authDelegate.save({ path: "call-1",
@@ -747,7 +747,7 @@ status: "new" });
                 storage: mockStorage
             } as any;
 
-            const afterReadSpy = jest.fn().mockImplementation(async ({ snapshot }) => snapshot);
+            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => entity);
             const mockCollectionWithCallback = {
                 slug: "test_coll",
                 callbacks: {
@@ -778,7 +778,7 @@ values: {} } as any
                 storage: mockStorage
             } as any;
 
-            const afterReadSpy = jest.fn().mockImplementation(async ({ snapshot }) => snapshot);
+            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => entity);
             const mockCollectionWithCallback = {
                 slug: "test_coll",
                 callbacks: {

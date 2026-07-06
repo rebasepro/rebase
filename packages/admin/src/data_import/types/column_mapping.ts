@@ -1,5 +1,5 @@
 import React from "react";
-import { DataType, Snapshot, Property } from "@rebasepro/types";
+import { DataType, Entity, Property } from "@rebasepro/types";
 
 export type ImportConfig = {
 
@@ -12,8 +12,8 @@ export type ImportConfig = {
     importData: object[];
     setImportData: React.Dispatch<React.SetStateAction<object[]>>;
 
-    snapshots: Snapshot<any>[];
-    setSnapshots: React.Dispatch<React.SetStateAction<Snapshot<any>[]>>;
+    entitys: Entity<any>[];
+    setEntitys: React.Dispatch<React.SetStateAction<Entity<any>[]>>;
 
     // mapping of the column name in the import file to the property key in the data model
     headersMapping: Record<string, string | null>;

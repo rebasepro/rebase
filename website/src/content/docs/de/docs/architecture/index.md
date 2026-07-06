@@ -103,7 +103,7 @@ Wie Treiber werden auch Speicher-Backends in einer Registrierung erfasst. Sie k�
 4. Das Backend serialisiert die Werte, führt Drizzle `UPDATE` aus
 5. `afterSave`-Callbacks werden ausgeführt (Nebeneffekte)
 6. Der `NOTIFY`-Broadcast löst ein WebSocket-Update an alle Clients aus
-7. Wenn der Verlauf aktiviert ist, wird ein Snapshot aufgezeichnet
+7. Wenn der Verlauf aktiviert ist, wird ein Entity aufgezeichnet
 
 ## Nächste Schritte
 

@@ -1,8 +1,8 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import type { SnapshotAction } from "@rebasepro/types";
+import type { EntityAction } from "@rebasepro/types";
 import React, { MouseEvent, useCallback } from "react";
 
-import { CollectionSize, Snapshot, SelectionController } from "@rebasepro/types";
+import { CollectionSize, Entity, SelectionController } from "@rebasepro/types";
 import {
     Badge,
     Checkbox,
@@ -15,25 +15,25 @@ import {
     Tooltip
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
-import { getSnapshotFromCache } from "@rebasepro/core";
+import { getEntityFromCache } from "@rebasepro/core";
 import { getLocalChangesBackup } from "@rebasepro/common";
 import { useCMSContext } from "../../index";
 
 /**
  *
- * @param snapshot
+ * @param entity
  * @param width
  * @param frozen
  * @param isSelected
  * @param selectionEnabled
  * @param size
- * @param toggleSnapshotSelection
+ * @param toggleEntitySelection
  * @param hideId
  *
  * @group Collection components
  */
 export const CollectionRowActions = function CollectionRowActions({
-    snapshot,
+    entity,
     collection,
     path,
     width,
@@ -41,13 +41,13 @@ export const CollectionRowActions = function CollectionRowActions({
     isSelected,
     selectionEnabled,
     size,
-    highlightSnapshot,
+    highlightEntity,
     onCollectionChange,
-    unhighlightSnapshot,
+    unhighlightEntity,
     actions = [],
     hideId,
     selectionController,
-    openSnapshotMode,
+    openEntityMode,
     sortableNodeRef,
     sortableStyle,
     sortableAttributes,
@@ -55,7 +55,7 @@ export const CollectionRowActions = function CollectionRowActions({
     isDraggable
 }:
     {
-        snapshot: Snapshot<any>,
+        entity: Entity<any>,
         collection?: CollectionConfig<any>,
         path?: string,
         width: number,
@@ -63,13 +63,13 @@ export const CollectionRowActions = function CollectionRowActions({
         size: CollectionSize,
         isSelected?: boolean,
         selectionEnabled?: boolean,
-        actions?: SnapshotAction[],
+        actions?: EntityAction[],
         hideId?: boolean,
         onCollectionChange?: () => void,
         selectionController?: SelectionController;
-        highlightSnapshot?: (snapshot: Snapshot<any>) => void;
-        unhighlightSnapshot?: (snapshot: Snapshot<any>) => void;
-        openSnapshotMode: "side_panel" | "full_screen" | "split" | "dialog";
+        highlightEntity?: (entity: Entity<any>) => void;
+        unhighlightEntity?: (entity: Entity<any>) => void;
+        openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
         // Sortable props for dnd-kit integration
         sortableNodeRef?: (node: HTMLElement | null) => void;
         sortableStyle?: React.CSSProperties;
@@ -84,8 +84,8 @@ export const CollectionRowActions = function CollectionRowActions({
     const { t } = useTranslation();
 
     const onCheckedChange = useCallback((checked: boolean) => {
-        selectionController?.toggleSnapshotSelection(snapshot, checked);
-    }, [snapshot, selectionController?.toggleSnapshotSelection]);
+        selectionController?.toggleEntitySelection(entity, checked);
+    }, [entity, selectionController?.toggleEntitySelection]);
 
     const hasActions = actions.length > 0;
     const hasCollapsedActions = actions.some(a => a.collapsed || a.collapsed === undefined);
@@ -93,7 +93,7 @@ export const CollectionRowActions = function CollectionRowActions({
     const collapsedActions = actions.filter(a => a.collapsed || a.collapsed === undefined);
     const uncollapsedActions = actions.filter(a => a.collapsed === false);
     const enableLocalChangesBackup = collection ? getLocalChangesBackup(collection) : false;
-    const hasDraft = enableLocalChangesBackup ? getSnapshotFromCache(path + "/" + snapshot.id) : false;
+    const hasDraft = enableLocalChangesBackup ? getEntityFromCache(path + "/" + entity.id) : false;
     const iconSize = "small" as const;
 
     const content = (
@@ -127,16 +127,16 @@ export const CollectionRowActions = function CollectionRowActions({
                                 event.stopPropagation();
                                 action.onClick({
                                     view: "collection",
-                                    snapshot,
+                                    entity,
                                     path,
                                     collection,
                                     context,
                                     sidePanelController: sidePanelCtrl,
                                     selectionController,
-                                    highlightSnapshot,
-                                    unhighlightSnapshot,
+                                    highlightEntity,
+                                    unhighlightEntity,
                                     onCollectionChange,
-                                    openSnapshotMode: openSnapshotMode ?? collection?.openSnapshotMode
+                                    openEntityMode: openEntityMode ?? collection?.openEntityMode
                                 });
                             }}
                             size={iconSize}>
@@ -171,16 +171,16 @@ export const CollectionRowActions = function CollectionRowActions({
                                         e.stopPropagation();
                                         action.onClick({
                                             view: "collection",
-                                            snapshot,
+                                            entity,
                                             path,
                                             collection,
                                             context,
                                             sidePanelController: sidePanelCtrl,
                                             selectionController,
-                                            highlightSnapshot,
-                                            unhighlightSnapshot,
+                                            highlightEntity,
+                                            unhighlightEntity,
                                             onCollectionChange,
-                                            openSnapshotMode: openSnapshotMode ?? collection?.openSnapshotMode
+                                            openEntityMode: openEntityMode ?? collection?.openEntityMode
                                         });
                                     }}>
                                     {action.icon}
@@ -191,7 +191,7 @@ export const CollectionRowActions = function CollectionRowActions({
                     }
 
                     {selectionEnabled &&
-                        <Tooltip title={`Select ${snapshot.id}`}>
+                        <Tooltip title={`Select ${entity.id}`}>
                             <Checkbox
                                 size={"smallest"}
                                 checked={Boolean(isSelected)}
@@ -208,8 +208,8 @@ export const CollectionRowActions = function CollectionRowActions({
                         event.stopPropagation();
                     }}>
                     <span className="min-w-0 truncate text-center">
-                        {snapshot
-                            ? snapshot.id
+                        {entity
+                            ? entity.id
                             : <Skeleton/>
                         }
                     </span>

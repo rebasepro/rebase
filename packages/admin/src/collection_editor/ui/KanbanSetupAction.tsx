@@ -12,11 +12,11 @@ export function KanbanSetupAction({
     collection,
     fullPath,
     parentCollectionSlugs,
-    parentSnapshotIds
+    parentEntityIds
 }: {
     collection: CollectionConfig;
     fullPath: string;
-    parentCollectionSlugs: string[], parentSnapshotIds: string[];
+    parentCollectionSlugs: string[], parentEntityIds: string[];
 }) {
     const collectionEditorController = useCollectionEditorController();
     const { t } = useTranslation();
@@ -25,7 +25,7 @@ export function KanbanSetupAction({
         collectionEditorController.editCollection({
             id: collection.slug,
             parentCollectionSlugs,
-parentSnapshotIds,
+parentEntityIds,
             initialView: "display",
             expandKanban: true
         });

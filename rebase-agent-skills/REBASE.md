@@ -22,7 +22,7 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 | **Collection Editor** | AST-backed visual schema editing |
 | **Custom Functions** | Auto-mounted Hono route files |
 | **Cron Jobs** | Auto-scheduled background jobs |
-| **Snapshot History** | Audit trails with diff viewer |
+| **Entity History** | Audit trails with diff viewer |
 | **Data Enhancement** | AI-powered autofill plugin |
 
 ## Core Philosophy
@@ -56,7 +56,7 @@ Relations are defined **directly on the property** using `type: "relation"` with
 
 For specific topics, see:
 - `rebase-basics` — Setup, CLI, MCP tools, project structure
-- `rebase-collections` — Collection schemas, properties, relations, callbacks, snapshot actions
+- `rebase-collections` — Collection schemas, properties, relations, callbacks, entity actions
 - `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
 - `rebase-auth` — Authentication, roles, RLS policies
 - `rebase-studio` — Visual admin panel, collection editor, custom views

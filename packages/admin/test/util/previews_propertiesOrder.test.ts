@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 import {
-    getSnapshotPreviewKeys,
-    getSnapshotTitlePropertyKey
+    getEntityPreviewKeys,
+    getEntityTitlePropertyKey
 } from "../../src/util/previews";
 import { resolveCollectionSlotKeys } from "../../src/components/CollectionViewBinding/usePreviewSlots";
 import type { AuthController, CollectionConfig, PropertyConfig, Property } from "@rebasepro/types";
@@ -137,17 +137,17 @@ const databasesCollectionNoOrder: CollectionConfig = {
 } as unknown as CollectionConfig;
 
 // ---------------------------------------------------------------------------
-// getSnapshotPreviewKeys — with explicit propertiesOrder
+// getEntityPreviewKeys — with explicit propertiesOrder
 // ---------------------------------------------------------------------------
-describe("getSnapshotPreviewKeys with propertiesOrder (databases collection)", () => {
+describe("getEntityPreviewKeys with propertiesOrder (databases collection)", () => {
 
     it("includes relation properties when propertiesOrder is set", () => {
-        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
+        const result = getEntityPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
         expect(result).toContain("project");
     });
 
     it("respects the propertiesOrder ordering", () => {
-        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
+        const result = getEntityPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
         const projectIdx = result.indexOf("project");
         const typeIdx = result.indexOf("type");
         const connIdx = result.indexOf("connectionString");
@@ -157,12 +157,12 @@ describe("getSnapshotPreviewKeys with propertiesOrder (databases collection)", (
     });
 
     it("excludes id property", () => {
-        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
+        const result = getEntityPreviewKeys(mockAuthController, databasesCollection, fields, undefined, 10);
         expect(result).not.toContain("id");
     });
 
     it("still excludes relations when propertiesOrder is NOT set", () => {
-        const result = getSnapshotPreviewKeys(mockAuthController, databasesCollectionNoOrder, fields, undefined, 10);
+        const result = getEntityPreviewKeys(mockAuthController, databasesCollectionNoOrder, fields, undefined, 10);
         expect(result).not.toContain("project");
     });
 });

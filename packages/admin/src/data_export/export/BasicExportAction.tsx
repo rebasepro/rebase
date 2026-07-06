@@ -2,7 +2,7 @@
 import React, { useCallback } from "react";
 
 import { useTranslation } from "@rebasepro/core";
-import { Snapshot, Properties } from "@rebasepro/types";
+import { Entity, Properties } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -18,10 +18,10 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { downloadSnapshotsExport } from "./export";
+import { downloadEntitysExport } from "./export";
 
 export type BasicExportActionProps = {
-    data: Snapshot<any>[];
+    data: Entity<any>[];
     properties: Properties;
     propertiesOrder?: string[];
 }
@@ -49,7 +49,7 @@ export function BasicExportAction({
     }, [setOpen]);
 
     const onOkClicked = useCallback(() => {
-        downloadSnapshotsExport({
+        downloadEntitysExport({
             data,
             additionalData: [],
             properties,

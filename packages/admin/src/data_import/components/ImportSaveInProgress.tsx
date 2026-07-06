@@ -1,5 +1,5 @@
 import { useData } from "@rebasepro/core";
-import { Snapshot, CollectionConfig } from "@rebasepro/types";
+import { Entity, CollectionConfig } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";
 import { useEffect, useRef, useState } from "react";
@@ -24,7 +24,7 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
 
     const savingRef = useRef<boolean>(false);
 
-    const [processedSnapshots, setProcessedSnapshots] = useState<number>(0);
+    const [processedEntitys, setProcessedEntitys] = useState<number>(0);
 
     function save() {
 
@@ -37,10 +37,10 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
             dataClient,
             collection,
             path,
-            importConfig.snapshots,
+            importConfig.entitys,
             0,
             25,
-            setProcessedSnapshots
+            setProcessedEntitys
         ).then(() => {
             onImportSuccess(collection);
             savingRef.current = false;
@@ -82,7 +82,7 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
             </Typography>
 
             <Typography variant={"body2"}>
-                {processedSnapshots}/{importConfig.snapshots.length} snapshots saved
+                {processedEntitys}/{importConfig.entitys.length} entitys saved
             </Typography>
 
             <Typography variant={"caption"}>
@@ -97,7 +97,7 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
 function saveDataBatch(dataClient: RebaseData,
     collection: CollectionConfig,
     path: string,
-    data: Partial<Snapshot<any>>[],
+    data: Partial<Entity<any>>[],
     offset = 0,
     batchSize = 25,
     onProgressUpdate: (progress: number) => void): Promise<void> {

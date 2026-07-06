@@ -1,10 +1,10 @@
-import { Snapshot, PolicyCompareOperator, PolicyExpression, PolicyOperand } from "@rebasepro/types";
+import { Entity, PolicyCompareOperator, PolicyExpression, PolicyOperand } from "@rebasepro/types";
 
 /**
  * Result of evaluating a policy client-side. `"unknown"` means the expression
  * could not be decided without more information — either a raw-SQL escape-hatch
  * node (which the client deliberately never guesses) or a row-column reference
- * with no snapshot in hand (e.g. list-level gating). Callers decide how to resolve
+ * with no entity in hand (e.g. list-level gating). Callers decide how to resolve
  * `"unknown"`: fail-closed for an enforcement decision, optimistic for pure
  * visibility gating.
  */
@@ -20,7 +20,7 @@ export interface PolicyEvalContext {
     /** The current user's application roles. */
     roles?: string[];
     /** The row being evaluated, or null when no specific row is available. */
-    snapshot: Snapshot | null;
+    entity: Entity | null;
 }
 
 /**
@@ -94,8 +94,8 @@ function resolveOperand(operand: PolicyOperand, ctx: PolicyEvalContext): Resolve
             return { known: true, value: ctx.roles ?? [] };
         case "field":
             // Can't resolve a row column without the row.
-            if (!ctx.snapshot) return { known: false };
-            return { known: true, value: ctx.snapshot.values[operand.name] };
+            if (!ctx.entity) return { known: false };
+            return { known: true, value: ctx.entity.values[operand.name] };
     }
 }
 

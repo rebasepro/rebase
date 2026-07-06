@@ -27,7 +27,7 @@ function isStorageProperty(property: Property | undefined): boolean {
     return false;
 }
 
-export function getSnapshotPreviewKeys(
+export function getEntityPreviewKeys(
     authController: AuthController,
     targetCollection: CollectionConfig<any>,
     fields: Record<string, PropertyConfig>,
@@ -58,7 +58,7 @@ export function getSnapshotPreviewKeys(
     }
 }
 
-export function getSnapshotTitlePropertyKey<M extends Record<string, unknown>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
     if (collection.titleProperty) {
         return collection.titleProperty as string;
     }
@@ -141,8 +141,8 @@ export function resolveTitleToString(title: any): string {
         }
     }
 
-    // Check if it's a reference shape: { isSnapshotReference() } or similar
-    if ("isSnapshotReference" in title && typeof title.isSnapshotReference === "function" && title.isSnapshotReference()) {
+    // Check if it's a reference shape: { isEntityReference() } or similar
+    if ("isEntityReference" in title && typeof title.isEntityReference === "function" && title.isEntityReference()) {
         return String(title.id);
     }
     if ("id" in title && "path" in title && !("__type" in title)) {

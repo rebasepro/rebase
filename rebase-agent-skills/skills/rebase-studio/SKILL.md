@@ -244,12 +244,12 @@ These components can be overridden globally on `<Rebase>` (which acts as a fallb
 - `"Collection.Card"` — Individual card wrapper.
 - `"Collection.EmptyState"` — View shown when a collection is empty.
 - `"Collection.Actions"` — Toolbar actions header.
-- `"Snapshot.Form"` — The detail form view.
-- `"Snapshot.FormActions"` — Form action button bar.
-- `"Snapshot.DetailView"` — Read-only detail view.
-- `"Snapshot.SidePanel"` — Side panel wrapper.
-- `"Snapshot.Preview"` — Reference / relation preview chip.
-- `"Snapshot.MissingReference"` — Placeholder view when a relation references a deleted/non-existent snapshot.
+- `"Entity.Form"` — The detail form view.
+- `"Entity.FormActions"` — Form action button bar.
+- `"Entity.DetailView"` — Read-only detail view.
+- `"Entity.SidePanel"` — Side panel wrapper.
+- `"Entity.Preview"` — Reference / relation preview chip.
+- `"Entity.MissingReference"` — Placeholder view when a relation references a deleted/non-existent entity.
 
 ## RebaseCMS Configuration
 
@@ -260,8 +260,8 @@ interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig> {
     collections?: EC[] | CollectionConfigsBuilder<EC>;
     views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
-    snapshotViews?: SnapshotCustomView[];
-    snapshotActions?: SnapshotAction[];
+    entityViews?: EntityCustomView[];
+    entityActions?: EntityAction[];
     plugins?: RebasePlugin[];
     navigationGroupMappings?: NavigationGroupMapping[];
     collectionEditor?: boolean | CollectionEditorOptions;
@@ -450,7 +450,7 @@ Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They
 
 ## CollectionPanel Component
 
-`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, snapshot detail views):
+`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, entity detail views):
 
 ```typescript
 import { CollectionPanel } from "@rebasepro/admin";
@@ -460,9 +460,9 @@ type CollectionPanelProps = {
     title?: string | false;                 // Title above the collection (false = hide)
     viewMode?: ViewMode;                    // Force view mode (table, card, etc.)
     sort?: [string, "asc" | "desc"];        // Override sort
-    limit?: number;                         // Max snapshots to display
+    limit?: number;                         // Max entitys to display
     updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
-    openSnapshotMode?: "side_panel" | "full_screen" | "split" | "dialog";
+    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     className?: string;                     // Container CSS class
     collectionOverrides?: Partial<CollectionConfig>; // Additional overrides
 };
@@ -494,7 +494,7 @@ function MyDashboard() {
             <CollectionPanel
                 path="orders"
                 title={false}
-                openSnapshotMode="dialog"
+                openEntityMode="dialog"
             />
         </div>
     );
@@ -512,7 +512,7 @@ The Studio Bridge provides CMS capabilities to Studio components. When CMS is pr
 ```typescript
 interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
-    sideSnapshotController: SidePanelController;
+    sideEntityController: SidePanelController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
@@ -524,7 +524,7 @@ interface StudioBridge {
 | Hook | Return Type | Description |
 |------|-------------|-------------|
 | `useStudioCollectionRegistry()` | `CollectionRegistryController` | Access registered collections from Studio |
-| `useStudioSidePanelController()` | `SidePanelController` | Open/close snapshot side panels from Studio |
+| `useStudioSidePanelController()` | `SidePanelController` | Open/close entity side panels from Studio |
 | `useStudioUrlController()` | `UrlController` | Build URLs and navigate from Studio |
 | `useStudioNavigationState()` | `NavigationStateController` | Access navigation state from Studio |
 | `useStudioBreadcrumbs()` | `BreadcrumbsController` | Set breadcrumbs from Studio tools |
@@ -567,7 +567,7 @@ import { StudioBridgeProvider } from "@rebasepro/studio";
 
 <StudioBridgeProvider value={{
     collectionRegistry: useCollectionRegistryController(),
-    sideSnapshotController: useSidePanel(),
+    sideEntityController: useSidePanel(),
     urlController: useUrlController(),
     navigationState: useNavigationStateController(),
     breadcrumbs: useBreadcrumbsController(),
@@ -610,7 +610,7 @@ These hooks are exported from `@rebasepro/core` and available inside any `<Rebas
 
 | Hook | Package | Description |
 |------|---------|-------------|
-| `useSidePanel()` | `@rebasepro/admin` | Open/close snapshot side panels |
+| `useSidePanel()` | `@rebasepro/admin` | Open/close entity side panels |
 | `useNavigationStateController()` | `@rebasepro/admin` | Navigate between views |
 | `useUrlController()` | `@rebasepro/admin` | Build URLs and navigate |
 | `useBreadcrumbsController()` | `@rebasepro/admin` | Set breadcrumbs |
@@ -661,8 +661,8 @@ const { canCreate, canEdit, canDelete, canRead } = usePermissions();
 // Check if current user can create in a collection
 if (canCreate(myCollection, "products")) { ... }
 
-// Check if current user can edit a specific snapshot
-if (canEdit(myCollection, "products", snapshot)) { ... }
+// Check if current user can edit a specific entity
+if (canEdit(myCollection, "products", entity)) { ... }
 ```
 
 ### useRebaseContext

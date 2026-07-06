@@ -329,7 +329,7 @@ id: "missing" });
         it("save sends correct message type and returns row", async () => {
             const { client, ws } = await setupConnected();
 
-            const wireSnapshot = { id: "1",
+            const wireEntity = { id: "1",
 title: "Hello" };
             const promise = client.save({ path: "posts",
 id: "1",
@@ -339,7 +339,7 @@ values: { title: "Hello" } } as any);
 
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
-                payload: { row: wireSnapshot }
+                payload: { row: wireEntity }
             }) });
 
             const result = await promise;
@@ -700,9 +700,9 @@ limit: 20 }, jest.fn());
     });
 
     // -----------------------------------------------------------------------
-    // Snapshot subscriptions
+    // Entity subscriptions
     // -----------------------------------------------------------------------
-    describe("Snapshot subscriptions", () => {
+    describe("Entity subscriptions", () => {
         it("subscribes to row updates", () => {
             const client = createClient();
             jest.runAllTimers();
@@ -811,9 +811,9 @@ id: "1" }, jest.fn());
     });
 
     // -----------------------------------------------------------------------
-    // mergeSnapshots structural equality and normalization
+    // mergeEntitys structural equality and normalization
     // -----------------------------------------------------------------------
-    describe("mergeSnapshots structural equality and normalization", () => {
+    describe("mergeEntitys structural equality and normalization", () => {
         it("preserves row reference if only relation .data changes", () => {
             const client = createClient();
             jest.runAllTimers();
@@ -826,7 +826,7 @@ id: "1" }, jest.fn());
             const subId = subMsg.payload.subscriptionId;
 
             // Initial data contains a relation without .data
-            const initialSnapshot = {
+            const initialEntity = {
                 id: "1",
                 title: "Hello",
                 author: { __type: "relation",
@@ -837,17 +837,17 @@ path: "users" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [initialSnapshot]
+                rows: [initialEntity]
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
-            const cachedSnapshotInstance = firstUpdate[0];
+            const cachedEntityInstance = firstUpdate[0];
 
             onUpdate.mockClear();
 
             // Next update contains EXACTLY the same relation, but WITH .data appended
-            const refetchedSnapshot = {
+            const refetchedEntity = {
                 id: "1",
                 title: "Hello",
                 author: {
@@ -862,7 +862,7 @@ name: "Alice" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [refetchedSnapshot]
+                rows: [refetchedEntity]
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
@@ -870,7 +870,7 @@ name: "Alice" }
 
             // Because the .data is purely denormalized cache, the identity of the relation
             // is the same, so it should have preserved the SAME object reference!
-            expect(secondUpdate[0]).toBe(cachedSnapshotInstance);
+            expect(secondUpdate[0]).toBe(cachedEntityInstance);
         });
 
         it("does NOT preserve row reference if the relation ID changes", () => {
@@ -884,7 +884,7 @@ name: "Alice" }
             const subMsg = JSON.parse(ws.sentMessages[0]);
             const subId = subMsg.payload.subscriptionId;
 
-            const initialSnapshot = {
+            const initialEntity = {
                 id: "1",
                 title: "Hello",
                 author: { __type: "relation",
@@ -895,15 +895,15 @@ path: "users" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [initialSnapshot]
+                rows: [initialEntity]
             }) });
 
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
-            const cachedSnapshotInstance = firstUpdate[0];
+            const cachedEntityInstance = firstUpdate[0];
             onUpdate.mockClear();
 
             // Next update changes the author ID
-            const newAuthorSnapshot = {
+            const newAuthorEntity = {
                 id: "1",
                 title: "Hello",
                 author: { __type: "relation",
@@ -914,12 +914,12 @@ path: "users" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [newAuthorSnapshot]
+                rows: [newAuthorEntity]
             }) });
 
             const secondUpdate = onUpdate.mock.calls[0][0] as any[];
             // It should be a new reference because the value is structurally different
-            expect(secondUpdate[0]).not.toBe(cachedSnapshotInstance);
+            expect(secondUpdate[0]).not.toBe(cachedEntityInstance);
         });
 
         it("preserves relation identity inside array of relations", () => {
@@ -950,7 +950,7 @@ rows: [row] }) });
             const firstInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             onUpdate.mockClear();
 
-            const snapshotWithData = {
+            const entityWithData = {
                 id: "1",
                 tags: [
                     { __type: "relation",
@@ -965,7 +965,7 @@ data: { id: "11" } }
             };
             ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
 subscriptionId: subId,
-rows: [snapshotWithData] }) });
+rows: [entityWithData] }) });
 
             const secondInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             expect(secondInstance).toBe(firstInstance);
@@ -973,7 +973,7 @@ rows: [snapshotWithData] }) });
     });
 
     // -----------------------------------------------------------------------
-    // collection_snapshot_patch handling
+    // collection_entity_patch handling
     // -----------------------------------------------------------------------
     describe("collection_patch", () => {
         it("patches existing row in collection", () => {
@@ -1010,11 +1010,11 @@ title: "New" }
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
-            const updatedSnapshots = onUpdate.mock.calls[0][0];
-            expect(updatedSnapshots).toHaveLength(2);
-            expect(updatedSnapshots[0]).toEqual({ id: "1",
+            const updatedEntitys = onUpdate.mock.calls[0][0];
+            expect(updatedEntitys).toHaveLength(2);
+            expect(updatedEntitys[0]).toEqual({ id: "1",
 title: "New" });
-            expect(updatedSnapshots[1]).toEqual({ id: "2",
+            expect(updatedEntitys[1]).toEqual({ id: "2",
 title: "Two" });
         });
 
@@ -1578,7 +1578,7 @@ ws: getWs() };
     });
 
     // -----------------------------------------------------------------------
-    // rehydrateServerValues / rehydrateSnapshot  (tested via public API)
+    // rehydrateServerValues / rehydrateEntity  (tested via public API)
     // -----------------------------------------------------------------------
     describe("rehydrateServerValues (date rehydration)", () => {
         async function setupConnected() {
@@ -2024,7 +2024,7 @@ value: "2025-09-15T18:30:00.000Z" }
             expect(row.updatedAt.toISOString()).toBe("2025-09-15T18:30:00.000Z");
         });
 
-        it("rehydrates dates in collection_snapshot_patch updates", () => {
+        it("rehydrates dates in collection_entity_patch updates", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -2064,7 +2064,7 @@ value: "2025-10-01T00:00:00.000Z" }
             expect(patched.patchedAt).toBeInstanceOf(Date);
         });
 
-        // -- rehydrateSnapshot guards ----------------------------------------
+        // -- rehydrateEntity guards ----------------------------------------
 
         it("handles row with missing values gracefully", async () => {
             const { client, ws } = await setupConnected();
@@ -2072,7 +2072,7 @@ value: "2025-10-01T00:00:00.000Z" }
             const promise = client.fetchCollection({ path: "posts" });
             const msg = JSON.parse(ws.sentMessages[ws.sentMessages.length - 1]);
 
-            // Snapshot without a values property
+            // Entity without a values property
             ws.onmessage!({ data: JSON.stringify({
                 requestId: msg.requestId,
                 payload: {

@@ -171,7 +171,7 @@ properties: {
 
 ## Próximos Pasos
 
-- **[Entity Views](/docs/frontend/snapshot-views)** — Pestañas personalizadas en el editor de entidades
-- **[Entity Actions](/docs/frontend/snapshot-actions)** — Botones de acción personalizados
+- **[Entity Views](/docs/frontend/entity-views)** — Pestañas personalizadas en el editor de entidades
+- **[Entity Actions](/docs/frontend/entity-actions)** — Botones de acción personalizados
 - **[Additional Columns](/docs/frontend/additional-columns)** — Columnas de tabla calculadas
 ---

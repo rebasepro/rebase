@@ -1,5 +1,5 @@
 import { buildRebaseData } from "../src/data/buildRebaseData";
-import { DataDriver, Snapshot } from "@rebasepro/types";
+import { DataDriver, Entity } from "@rebasepro/types";
 
 // ── Mock driver ─────────────────────────────────────────────
 function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
@@ -83,7 +83,7 @@ describe("buildRebaseData", () => {
     // ── find ────────────────────────────────────────────────
     describe("CollectionAccessor.find", () => {
         it("delegates to driver.fetchCollection", async () => {
-            // The driver returns flat rows; the accessor wraps them into Snapshots
+            // The driver returns flat rows; the accessor wraps them into Entitys
             const mockRows = [
                 { id: "1",
 name: "Camera" }
@@ -164,14 +164,14 @@ price: "gte.100" }
             );
         });
 
-        it("sets hasMore based on snapshot count vs limit", async () => {
-            const snapshots = Array.from({ length: 20 }, (_, i) => ({
+        it("sets hasMore based on entity count vs limit", async () => {
+            const entitys = Array.from({ length: 20 }, (_, i) => ({
                 id: String(i),
                 path: "products",
                 values: {}
             }));
             const driver = createMockDriver({
-                fetchCollection: jest.fn().mockResolvedValue(snapshots),
+                fetchCollection: jest.fn().mockResolvedValue(entitys),
                 // When count is available, hasMore is based on
                 // total vs offset+fetched. 100 > 0+20 → hasMore=true.
                 count: jest.fn().mockResolvedValue(100)
@@ -182,7 +182,7 @@ price: "gte.100" }
             expect(result.meta.hasMore).toBe(true);
             expect(result.meta.total).toBe(100);
 
-            const partial = snapshots.slice(0, 5);
+            const partial = entitys.slice(0, 5);
             (driver.fetchCollection as jest.Mock).mockResolvedValue(partial);
             // 5 returned, total still 100 → offset 0 + 5 < 100 → hasMore=true
             // but typically the driver returns fewer when near the end
@@ -196,7 +196,7 @@ price: "gte.100" }
     // ── findById ────────────────────────────────────────────
     describe("CollectionAccessor.findById", () => {
         it("delegates to driver.fetchOne", async () => {
-            // The driver returns a flat row; the accessor wraps it into a Snapshot
+            // The driver returns a flat row; the accessor wraps it into a Entity
             const row = { id: "abc",
 name: "Camera" };
             const driver = createMockDriver({

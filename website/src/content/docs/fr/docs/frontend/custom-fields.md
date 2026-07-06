@@ -171,8 +171,8 @@ properties: {
 
 ## Prochaines étapes
 
-- **[Vues d'entité](/docs/frontend/snapshot-views)** — Onglets personnalisés dans l'éditeur d'entité
-- **[Actions d'entité](/docs/frontend/snapshot-actions)** — Boutons d'action personnalisés
+- **[Vues d'entité](/docs/frontend/entity-views)** — Onglets personnalisés dans l'éditeur d'entité
+- **[Actions d'entité](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
 - **[Colonnes supplémentaires](/docs/frontend/additional-columns)** — Colonnes de tableau calculées
 
 ---

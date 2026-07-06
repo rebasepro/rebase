@@ -40,7 +40,7 @@ export interface MongoBackendInstance extends BackendInstance {
     client: MongoClient;
     /** MongoDB DataDriver for use with Rebase */
     driver: DataDriver;
-    /** Snapshot service for direct database operations */
+    /** Entity service for direct database operations */
     dataService: MongoDataService;
     /** Realtime service for subscriptions */
     realtimeService: MongoRealtimeService;
@@ -125,7 +125,7 @@ export class MongoCollectionRegistry implements CollectionRegistryInterface {
  * });
  *
  * // Use the backend
- * const rows = await backend.snapshotRepository.fetchCollection("users", {});
+ * const rows = await backend.entityRepository.fetchCollection("users", {});
  * ```
  */
 export function createMongoBackend(config: MongoBackendConfig): MongoBackendInstance {
@@ -193,7 +193,7 @@ policies: [] };
     return {
         // Abstract interface implementations
         connection: mongoConnection,
-        snapshotRepository: dataService,
+        entityRepository: dataService,
         realtimeProvider: realtimeService,
         collectionRegistry: collectionRegistry,
         admin,
@@ -269,13 +269,13 @@ export function createMongoRealtimeService(db: Db): MongoRealtimeService {
  *
  * @example
  * ```typescript
- * import { createMongoSnapshotRepository } from "@rebasepro/server-mongodb";
+ * import { createMongoEntityRepository } from "@rebasepro/server-mongodb";
  *
- * const repository = createMongoSnapshotRepository(db);
+ * const repository = createMongoEntityRepository(db);
  * const users = await repository.fetchCollection("users", {});
  * ```
  */
-export function createMongoSnapshotRepository(db: Db): DataRepository {
+export function createMongoEntityRepository(db: Db): DataRepository {
     return new MongoDataService(db);
 }
 

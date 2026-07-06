@@ -41,7 +41,7 @@ export const useSideDialogContext = () => useContext<SideDialogController>(SideD
 
 /**
  * This is the component in charge of rendering the side dialogs used
- * for editing snapshots. Use the {@link useSidePanel} to open
+ * for editing entitys. Use the {@link useSidePanel} to open
  * and control the dialogs.
  * This component needs a parent {@link Rebase}
  * {@link useSideDialogsController}
@@ -147,7 +147,7 @@ function SideDialogView({
     }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, pendingClose]);
 
     const additionalProps = panel?.additional as SidePanelBindingProps | undefined;
-    const isDialogMode = additionalProps?.collection?.openSnapshotMode === "dialog";
+    const isDialogMode = additionalProps?.collection?.openEntityMode === "dialog";
 
     return (
         <SideDialogContext.Provider value={contextValue}>

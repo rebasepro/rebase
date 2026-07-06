@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/formex";
-import { CollectionConfig, RebaseData, RebaseContext, AnalyticsController, Snapshot } from "@rebasepro/types";
-import { saveSnapshotWithCallbacks, SaveSnapshotWithCallbacksProps } from "@rebasepro/core";
+import { CollectionConfig, RebaseData, RebaseContext, AnalyticsController, Entity } from "@rebasepro/types";
+import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps } from "@rebasepro/core";
 import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";
@@ -33,15 +33,15 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
     // to compute a single new sort key for the moved item.
     // Only one DB write per drag — the moved item gets its new key.
     const handleItemsReorder = useCallback(async (
-        items: BoardItem<Snapshot<M>>[],
+        items: BoardItem<Entity<M>>[],
         moveInfo?: { itemId: string; sourceColumn: string; targetColumn: string; }
     ) => {
-        const snapshot = items.find(item => item.id === moveInfo?.itemId)?.data;
-        if (!snapshot || !moveInfo) return;
+        const entity = items.find(item => item.id === moveInfo?.itemId)?.data;
+        if (!entity || !moveInfo) return;
 
         analyticsController.onAnalyticsEvent?.("kanban_card_moved", {
             path: fullPath,
-            snapshotId: snapshot.id,
+            entityId: entity.id,
             sourceColumn: moveInfo.sourceColumn,
             targetColumn: moveInfo.targetColumn
         });
@@ -106,31 +106,31 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
             );
         }
 
-        const saveProps: SaveSnapshotWithCallbacksProps<Record<string, unknown>> = {
-            path: snapshot.path,
-            snapshotId: snapshot.id,
+        const saveProps: SaveEntityWithCallbacksProps<Record<string, unknown>> = {
+            path: entity.path,
+            entityId: entity.id,
             values: updatedValues as M,
-            previousValues: snapshot.values,
+            previousValues: entity.values,
             collection,
             status: "existing"
         };
 
         try {
-            await saveSnapshotWithCallbacks({
+            await saveEntityWithCallbacks({
                 ...saveProps,
                 collection,
                 data: dataClient,
                 context,
                 afterSave: () => {},
                 afterSaveError: (e: Error) => {
-                    console.error("Failed to save snapshot after reorder:", e);
+                    console.error("Failed to save entity after reorder:", e);
                     if (boardDataController.refreshAll) {
                         boardDataController.refreshAll();
                     }
                 }
             });
         } catch (e) {
-            console.error("Error saving snapshot:", e);
+            console.error("Error saving entity:", e);
             if (boardDataController.refreshAll) {
                 boardDataController.refreshAll();
             }

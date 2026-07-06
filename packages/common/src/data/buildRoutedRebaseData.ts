@@ -2,7 +2,7 @@ import { RebaseData, RebaseSdkData } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**
- * The two data-layer shapes that can be routed: the Snapshot-shaped admin
+ * The two data-layer shapes that can be routed: the Entity-shaped admin
  * {@link RebaseData} or the flat SDK {@link RebaseSdkData}. Both expose a
  * `.collection(slug)` accessor, which is all the router needs.
  */

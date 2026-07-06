@@ -70,7 +70,7 @@ type: "number" }
         expect(callbacks?.beforeSave).toBeDefined();
     });
 
-    it("afterRead callback transforms snapshot values", async () => {
+    it("afterRead callback transforms entity values", async () => {
         const properties: Properties = {
             title: {
                 name: "title",

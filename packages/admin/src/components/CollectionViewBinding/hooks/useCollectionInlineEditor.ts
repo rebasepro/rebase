@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/formex";
 import { CollectionConfig, RebaseData, RebaseContext } from "@rebasepro/types";
-import { OnCellValueChange, saveSnapshotWithCallbacks, SaveSnapshotWithCallbacksProps, UniqueFieldValidator } from "@rebasepro/core";
+import { OnCellValueChange, saveEntityWithCallbacks, SaveEntityWithCallbacksProps, UniqueFieldValidator } from "@rebasepro/core";
 
 export interface UseCollectionInlineEditorParams<M extends Record<string, unknown>> {
     path: string;
@@ -19,15 +19,15 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
 
     // Unique field validator (ported from CollectionViewBinding)
     const uniqueFieldValidator: UniqueFieldValidator = useCallback(
-        async ({ name, value, property, snapshotId }: Parameters<UniqueFieldValidator>[0]) => {
+        async ({ name, value, property, entityId }: Parameters<UniqueFieldValidator>[0]) => {
             const accessor = dataClient.collection(path);
             const res = await accessor.find({
                 where: { [name]: ["==", value] }
             });
 
-            const conflictingSnapshots = res.data;
-            const isUnique = conflictingSnapshots.length === 0 ||
-                (conflictingSnapshots.length === 1 && conflictingSnapshots[0].id === snapshotId);
+            const conflictingEntitys = res.data;
+            const isUnique = conflictingEntitys.length === 0 ||
+                (conflictingEntitys.length === 1 && conflictingEntitys[0].id === entityId);
 
             return isUnique;
         },
@@ -40,22 +40,22 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
         propertyKey,
         onValueUpdated,
         setError,
-        data: snapshot
+        data: entity
     }) => {
-        if (!snapshot) return;
+        if (!entity) return;
 
         const updatedValues = setIn({}, propertyKey, value) as Partial<Record<string, unknown>>;
 
-        const saveProps: SaveSnapshotWithCallbacksProps<Record<string, unknown>> = {
-            path: snapshot.path ?? path,
-            snapshotId: snapshot.id,
+        const saveProps: SaveEntityWithCallbacksProps<Record<string, unknown>> = {
+            path: entity.path ?? path,
+            entityId: entity.id,
             values: updatedValues,
-            previousValues: snapshot.values,
+            previousValues: entity.values,
             collection,
             status: "existing"
         };
 
-        return saveSnapshotWithCallbacks({
+        return saveEntityWithCallbacks({
             ...saveProps,
             collection,
             data: dataClient,

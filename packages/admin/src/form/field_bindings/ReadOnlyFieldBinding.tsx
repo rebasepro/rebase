@@ -29,8 +29,8 @@ export function ReadOnlyFieldBinding({
     context
 }: FieldProps<Property>) {
 
-    // if (!context.snapshotId)
-    //     throw new Error("ReadOnlyFieldBinding: Snapshot id is null");
+    // if (!context.entityId)
+    //     throw new Error("ReadOnlyFieldBinding: Entity id is null");
 
     const skipCardWrapper = property.type === "relation" || property.type === "reference";
 

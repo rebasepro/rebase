@@ -14,7 +14,7 @@ Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** bui
 
 - **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
 - **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
-- **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, snapshot history, and WebSocket real-time — all built in.
+- **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
 
 :::tip
@@ -88,7 +88,7 @@ That's it. Your admin panel is running at `http://localhost:5173` and the API at
 | **Authentication** | JWT + refresh tokens, Google OAuth, role-based access control |
 | **File Storage** | Local filesystem or S3-compatible with upload fields and browser |
 | **Real-time Sync** | WebSocket-powered live updates across all connected clients |
-| **Snapshot History** | Full audit trail for every create, update, and delete |
+| **Entity History** | Full audit trail for every create, update, and delete |
 | **REST API** | Auto-generated CRUD endpoints for every collection |
 | **Data Import/Export** | CSV, JSON, and Excel import with field mapping; CSV/JSON export |
 | **Collection Editor** | Visual schema editor that generates TypeScript via AST manipulation |

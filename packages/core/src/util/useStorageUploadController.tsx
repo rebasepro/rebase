@@ -3,7 +3,7 @@ import type { ArrayProperty, Property, StringProperty } from "@rebasepro/types";
 import Compressor from "compressorjs";
 import { deepEqual as equal } from "fast-equals";
 
-import { SnapshotValues, StorageConfig, StorageSource, StorageSourceRegistry } from "@rebasepro/types";import { useCallback, useEffect, useMemo, useState } from "react";
+import { EntityValues, StorageConfig, StorageSource, StorageSourceRegistry } from "@rebasepro/types";import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource } from "@rebasepro/common";
 import { useAuthController } from "../hooks";
 import { useStorageSources } from "../contexts/StorageSourcesContext";
@@ -27,8 +27,8 @@ export interface StorageFieldItem {
 }
 
 export function useStorageUploadController<M extends Record<string, unknown>>({
-    snapshotId,
-    snapshotValues,
+    entityId,
+    entityValues,
     path,
     value,
     property,
@@ -39,8 +39,8 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
     onChange
 }:
     {
-        snapshotId?: string | number,
-        snapshotValues: SnapshotValues<M>,
+        entityId?: string | number,
+        entityValues: EntityValues<M>,
         value: string | string[] | null;
         path?: string,
         propertyKey: string,
@@ -101,8 +101,8 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
             const fileName = await resolveStorageFilenameString({
                 input: storage.fileName,
                 storage,
-                values: snapshotValues,
-                snapshotId,
+                values: entityValues,
+                entityId,
                 path,
                 property: property,
                 file,
@@ -114,20 +114,20 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
             return fileName;
         }
         return randomString() + "_" + file.name;
-    }, [snapshotId, snapshotValues, path, property, propertyKey, storage]);
+    }, [entityId, entityValues, path, property, propertyKey, storage]);
 
     const storagePathBuilder = useCallback((file: File) => {
         return resolveStoragePathString({
             input: storage.storagePath,
             storage,
-            values: snapshotValues,
-            snapshotId,
+            values: entityValues,
+            entityId,
             path,
             property: property,
             file,
             propertyKey
         }) ?? "/";
-    }, [snapshotId, snapshotValues, path, property, propertyKey, storage]);
+    }, [entityId, entityValues, path, property, propertyKey, storage]);
 
     const onFileUploadComplete = useCallback(async (uploadedPath: string,
         entry: StorageFieldItem,
