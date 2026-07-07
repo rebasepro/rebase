@@ -17,7 +17,10 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export function App() {
     const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL
+        baseUrl: API_URL,
+        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+        // localStorage. The backend issues it via `auth.cookieAuth`.
+        auth: { authFlowMode: "cookie" }
     }), []);
 
     const authController = useRebaseAuthController({

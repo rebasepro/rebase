@@ -113,12 +113,6 @@ values: {} as Record<string, unknown> }
             });
         },
 
-        deleteAll: driver.deleteAll
-            ? async (): Promise<void> => {
-                return driver.deleteAll!(slug);
-            }
-            : undefined,
-
         count: driver.count
             ? async (params?: FindParams): Promise<number> => {
                 const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
@@ -338,7 +332,6 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         delete(id: string | number): Promise<void> {
             return snap.delete(id);
         },
-        deleteAll: snap.deleteAll ? () => snap.deleteAll!() : undefined,
         count: snap.count ? (params?: FindParams) => snap.count!(params) : undefined,
         listen: snap.listen
             ? (params: FindParams | undefined, onUpdate: (r: FindResult<M>) => void, onError?: (e: Error) => void) =>
@@ -393,7 +386,6 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
         },
-        deleteAll: sdk.deleteAll ? () => sdk.deleteAll!() : undefined,
         count: sdk.count ? (params?: FindParams) => sdk.count!(params) : undefined,
         listen: sdk.listen
             ? (params: FindParams | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>

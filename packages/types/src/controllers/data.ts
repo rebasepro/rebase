@@ -173,11 +173,6 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     delete(id: string | number): Promise<void>;
 
     /**
-     * Delete all records in this collection.
-     */
-    deleteAll?(): Promise<void>;
-
-    /**
      * Subscribe to a collection for real-time updates.
      * Optional method, may not be supported by all implementations (like stateless HTTP clients).
      */
@@ -303,11 +298,6 @@ export interface SDKCollectionClient<M extends Record<string, unknown> = Record<
      * @throws {RebaseApiError} with status 404 when the record does not exist.
      */
     delete(id: string | number): Promise<void>;
-
-    /**
-     * Delete all records in this collection.
-     */
-    deleteAll?(): Promise<void>;
 
     /**
      * Subscribe to a collection for real-time updates.

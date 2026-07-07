@@ -89,6 +89,12 @@ relations },
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
             serviceKey: env.REBASE_SERVICE_KEY,
+            // Cookie-based auth: the refresh token is stored in an httpOnly
+            // cookie (not readable by JS) instead of localStorage, so it is
+            // not exposed to XSS. The frontend opts in via
+            // `authFlowMode: "cookie"` on createRebaseClient. Requires CORS
+            // `credentials: true` (set above).
+            cookieAuth: { sameSite: "Lax" },
             google: env.GOOGLE_CLIENT_ID
                 ? { clientId: env.GOOGLE_CLIENT_ID }
                 : undefined,
