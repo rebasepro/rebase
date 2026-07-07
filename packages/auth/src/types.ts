@@ -1,4 +1,5 @@
-import { AuthController, User, AuthTokens, DeviceSession } from "@rebasepro/types";
+import { AuthController, User, AuthTokens, DeviceSession, RebaseSession, AuthChangeEvent } from "@rebasepro/types";
+import type { AuthConfigResponse } from "./api";
 
 /** @deprecated Use `User` from `@rebasepro/types` instead. */
 export type UserInfo = User;
@@ -53,6 +54,31 @@ export type RebaseAuthController = AuthController & {
 }
 
 /**
+ * Structural type for the subset of `client.auth` (from `@rebasepro/client`)
+ * that the React hook delegates to. Avoids a hard dependency on
+ * `@rebasepro/client` while remaining fully type-safe.
+ */
+export interface ClientAuth {
+    getSession(): RebaseSession | null;
+    onAuthStateChange(callback: (event: AuthChangeEvent, session: RebaseSession | null) => void): () => void;
+    isInitialized(): Promise<void>;
+    getAuthConfig(): Promise<AuthConfigResponse>;
+    signInWithEmail(email: string, password: string): Promise<unknown>;
+    signOut(): Promise<void>;
+    refreshSession(): Promise<RebaseSession>;
+    signUp(email: string, password: string, displayName?: string): Promise<unknown>;
+    signInWithGoogle(payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }): Promise<unknown>;
+    signInWithOAuth(providerId: string, payload: Record<string, unknown>): Promise<unknown>;
+    resetPasswordForEmail(email: string): Promise<unknown>;
+    resetPassword(token: string, password: string): Promise<unknown>;
+    changePassword(oldPassword: string, newPassword: string): Promise<unknown>;
+    updateUser(updates: { displayName?: string; photoURL?: string }): Promise<User>;
+    getSessions(): Promise<DeviceSession[]>;
+    revokeSession(sessionId: string): Promise<unknown>;
+    revokeAllSessions(): Promise<unknown>;
+}
+
+/**
  * Props for useRebaseAuthController hook
  */
 export interface RebaseAuthControllerProps {
@@ -63,9 +89,8 @@ export interface RebaseAuthControllerProps {
         setAuthTokenGetter?: (getter: () => Promise<string | null>) => void;
         setOnUnauthorized?: (handler: () => Promise<boolean>) => void;
         ws?: { setAuthTokenGetter: (getter: () => Promise<string | null>) => void };
+        auth?: ClientAuth;
     };
-    /** Base URL of the backend API */
-    apiUrl?: string;
     /** Google OAuth client ID (optional, enables Google login) */
     googleClientId?: string;
     /** Callback when user signs out */

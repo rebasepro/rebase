@@ -1,15 +1,22 @@
-import type { AuthResponse, RefreshResponse } from "./types";
-import type { DeviceSession, User } from "@rebasepro/types";
+/**
+ * Auth-config fetch helper for the Rebase React frontend.
+ *
+ * The former per-endpoint auth client (login, register, refresh, OAuth,
+ * sessions, …) has been removed: `useRebaseAuthController` now delegates to
+ * the headless SDK's `client.auth` (from `@rebasepro/client`), which is the
+ * single source of truth for the auth session. The only piece that remains
+ * here is the unauthenticated `/api/auth/config` probe used to detect
+ * bootstrap mode and enabled providers before a session exists.
+ */
 
-class AuthApiError extends Error {
-    code: string;
+import { RebaseApiError } from "@rebasepro/types";
 
-    constructor(message: string, code: string) {
-        super(message);
-        this.code = code;
-        this.name = "AuthApiError";
-    }
-}
+/**
+ * @deprecated Use {@link RebaseApiError} (from `@rebasepro/types`, re-exported by
+ * `@rebasepro/client`). Kept as an alias so `instanceof` / imports keep working;
+ * errors thrown here now carry `.code` and `.status` on the unified type.
+ */
+export const AuthApiError = RebaseApiError;
 
 async function handleResponse<T>(response: Response): Promise<T> {
     let data: Record<string, unknown>;
@@ -17,16 +24,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
         data = await response.json();
     } catch (parseError) {
         // Response wasn't JSON - could be network error or server issue
-        throw new AuthApiError(
+        throw new RebaseApiError(
             `Server returned non-JSON response (status: ${response.status})`,
-            "PARSE_ERROR"
+            { status: response.status, code: "PARSE_ERROR" }
         );
     }
 
     if (!response.ok) {
-        throw new AuthApiError(
+        throw new RebaseApiError(
             (data as Record<string, Record<string, string>>).error?.message || "Request failed",
-            (data as Record<string, Record<string, string>>).error?.code || "UNKNOWN_ERROR"
+            {
+                status: response.status,
+                code: (data as Record<string, Record<string, string>>).error?.code || "UNKNOWN_ERROR"
+            }
         );
     }
 
@@ -35,295 +45,23 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 /**
  * Wrapper for fetch that catches generic network failures (like server down)
- * and translates them to an AuthApiError.
+ * and translates them to a {@link RebaseApiError} with code `NETWORK_ERROR`.
  */
 async function fetchWithHandling(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     try {
         return await fetch(input, init);
     } catch (error: unknown) {
         if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
-            throw new AuthApiError(
+            throw new RebaseApiError(
                 "Failed to connect to the backend server. The backend might be down or failed to initialize (e.g., database connection timeout).",
-                "NETWORK_ERROR"
+                { code: "NETWORK_ERROR", cause: error }
             );
         }
-        throw new AuthApiError("Network error: " + (error instanceof Error ? error.message : String(error)), "NETWORK_ERROR");
+        throw new RebaseApiError(
+            "Network error: " + (error instanceof Error ? error.message : String(error)),
+            { code: "NETWORK_ERROR", cause: error }
+        );
     }
-}
-
-/**
- * Register a new user with email/password
- */
-export async function register(
-    apiUrl: string,
-    email: string,
-    password: string,
-    displayName?: string
-): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email,
-password,
-displayName })
-    });
-
-    return handleResponse<AuthResponse>(response);
-}
-
-/**
- * Login with email/password
- */
-export async function login(apiUrl: string, email: string, password: string): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email,
-password })
-    });
-
-    return handleResponse<AuthResponse>(response);
-}
-
-/**
- * Google login payload — one of the three supported flows.
- */
-export type GoogleLoginPayload =
-    | { idToken: string }
-    | { accessToken: string }
-    | { code: string; redirectUri: string };
-
-/**
- * Login with Google.
- *
- * Accepts one of:
- * - `{ idToken }` — ID-token flow (One Tap / Sign In button)
- * - `{ accessToken }` — Access-token flow (popup)
- * - `{ code, redirectUri }` — Authorization code flow (most secure)
- */
-export async function googleLogin(apiUrl: string, payload: GoogleLoginPayload): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-    });
-
-    return handleResponse<AuthResponse>(response);
-}
-
-/**
- * Login with LinkedIn OAuth code
- */
-export async function linkedinLogin(apiUrl: string, code: string, redirectUri: string): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/linkedin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code,
-redirectUri })
-    });
-
-    return handleResponse<AuthResponse>(response);
-}
-
-/**
- * Generic OAuth login — works with any provider registered on the backend.
- * The `providerId` is used to build the endpoint: `/api/auth/{providerId}`.
- */
-export async function oauthLogin(apiUrl: string, providerId: string, payload: Record<string, unknown>): Promise<AuthResponse> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/${providerId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-    });
-
-    return handleResponse<AuthResponse>(response);
-}
-
-/**
- * Refresh access token using refresh token
- */
-export async function refreshAccessToken(apiUrl: string, refreshToken: string): Promise<RefreshResponse> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken })
-    });
-
-    return handleResponse<RefreshResponse>(response);
-}
-
-/**
- * Logout and invalidate refresh token
- */
-export async function logout(apiUrl: string, refreshToken?: string): Promise<void> {
-    await fetchWithHandling(`${apiUrl}/api/auth/logout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken })
-    });
-}
-
-/**
- * Get current user info
- */
-export async function getCurrentUser(apiUrl: string, accessToken: string): Promise<{ user: User }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/me`, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
-
-    return handleResponse<{ user: User }>(response);
-}
-
-/**
- * Request password reset email
- */
-export async function forgotPassword(apiUrl: string, email: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
-}
-
-/**
- * Reset password using token from email
- */
-export async function resetPassword(apiUrl: string, token: string, password: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token,
-password })
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
-}
-
-/**
- * Change password for authenticated user
- */
-export async function changePassword(
-    apiUrl: string,
-    accessToken: string,
-    oldPassword: string,
-    newPassword: string
-): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/change-password`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({ oldPassword,
-newPassword })
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
-}
-
-/**
- * Send email verification link
- */
-export async function sendVerificationEmail(apiUrl: string, accessToken: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/send-verification`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
-}
-
-/**
- * Verify email address using token
- */
-export async function verifyEmail(apiUrl: string, token: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
-}
-
-/**
- * Update current user profile
- */
-export async function updateProfile(
-    apiUrl: string,
-    accessToken: string,
-    displayName?: string,
-    photoURL?: string
-): Promise<{ user: User }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/me`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({ displayName,
-photoURL })
-    });
-
-    return handleResponse<{ user: User }>(response);
-}
-
-/**
- * Fetch active sessions for current user
- */
-export async function fetchSessions(apiUrl: string, accessToken: string, currentRefreshToken?: string): Promise<{ sessions: DeviceSession[] }> {
-    const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`
-    };
-    if (currentRefreshToken) {
-        headers["X-Refresh-Token"] = currentRefreshToken;
-    }
-
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/sessions`, {
-        method: "GET",
-        headers
-    });
-
-    return handleResponse<{ sessions: DeviceSession[] }>(response);
-}
-
-/**
- * Revoke a specific session
- */
-export async function revokeSession(apiUrl: string, accessToken: string, sessionId: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/sessions/${sessionId}`, {
-        method: "DELETE",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
-}
-
-/**
- * Revoke all sessions for current user
- */
-export async function revokeAllSessions(apiUrl: string, accessToken: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetchWithHandling(`${apiUrl}/api/auth/sessions`, {
-        method: "DELETE",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`
-        }
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(response);
 }
 
 /**
@@ -402,5 +140,3 @@ export function clearAuthConfigCache(cache: AuthConfigCache): void {
     cache.cached = null;
     cache.inflight = null;
 }
-
-export { AuthApiError };

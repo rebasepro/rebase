@@ -140,6 +140,55 @@ expiresAt: Date.now() + 100000 }));
             const auth = createAuth(transport, { storage });
             expect(auth.getSession()).toBeNull();
         });
+
+        it("resolves isInitialized after restore", async () => {
+            const storage = createMemoryStorage();
+            const session = mockSessionObj(Date.now() + 1000000);
+            storage.setItem("rebase_auth", JSON.stringify(session));
+
+            const auth = createAuth(transport, { storage });
+            await expect(auth.isInitialized()).resolves.toBeUndefined();
+            expect(auth.getSession()).toBeDefined();
+        });
+
+        it("resolves isInitialized after failed restore", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", "invalid-json");
+
+            const auth = createAuth(transport, { storage });
+            await expect(auth.isInitialized()).resolves.toBeUndefined();
+            expect(auth.getSession()).toBeNull();
+        });
+
+        it("resolves isInitialized after background refresh on boot", async () => {
+            const storage = createMemoryStorage();
+            const expiredSession = mockSessionObj(Date.now() - 1000);
+            storage.setItem("rebase_auth", JSON.stringify(expiredSession));
+
+            let resolveFetch: (val: any) => void;
+            const fetchPromise = new Promise(resolve => { resolveFetch = resolve; });
+            mockFetch.mockReturnValueOnce(fetchPromise as any);
+
+            const auth = createAuth(transport, { storage });
+            
+            let initialized = false;
+            auth.isInitialized().then(() => { initialized = true; });
+            
+            expect(initialized).toBe(false);
+            
+            resolveFetch!({
+                ok: true,
+                json: async () => ({
+                    tokens: mockTokens(Date.now() + 3600000),
+                    user: mockUser
+                })
+            });
+            await Promise.resolve();
+            await Promise.resolve();
+
+            await expect(auth.isInitialized()).resolves.toBeUndefined();
+            expect(initialized).toBe(true);
+        });
     });
 
     // -----------------------------------------------------------------------

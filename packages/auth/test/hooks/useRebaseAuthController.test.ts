@@ -1,62 +1,70 @@
 import { renderHook, act } from "@testing-library/react";
 import { useRebaseAuthController } from "../../src/hooks/useRebaseAuthController";
-import * as authApi from "../../src/api";
+import type { ClientAuth } from "../../src/types";
 
-const STORAGE_KEY = "rebase_react_auth";
-
-describe("useRebaseAuthController hook", () => {
-    let mockClient: any;
-
-    beforeEach(() => {
-        localStorage.clear();
-        jest.useFakeTimers();
-
-        mockClient = {
-            baseUrl: "https://api.test.rebase.pro",
-            setAuthTokenGetter: jest.fn(),
-            setOnUnauthorized: jest.fn(),
-            ws: {
-                setAuthTokenGetter: jest.fn()
-            }
-        };
-
-        // Spy on authApi functions and provide basic defaults
-        jest.spyOn(authApi, "fetchAuthConfig").mockResolvedValue({
+/**
+ * Creates a fully-mocked ClientAuth that satisfies the structural interface.
+ * Every method is a jest.fn() so individual tests can override behavior.
+ */
+function createMockAuth(): jest.Mocked<ClientAuth> {
+    return {
+        getSession: jest.fn().mockReturnValue(null),
+        onAuthStateChange: jest.fn(() => jest.fn()),
+        isInitialized: jest.fn().mockResolvedValue(undefined),
+        getAuthConfig: jest.fn().mockResolvedValue({
             needsSetup: false,
             registrationEnabled: true,
             enabledProviders: ["google"]
-        });
-        jest.spyOn(authApi, "getCurrentUser").mockResolvedValue({
-            user: {
-                uid: "123",
-                email: "test@rebase.pro",
-                displayName: "Test User",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
-        });
-        jest.spyOn(authApi, "login").mockResolvedValue({
-            user: {
-                uid: "123",
-                email: "test@rebase.pro",
-                displayName: "Test User",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            },
-            tokens: {
-                accessToken: "access_token_123",
-                refreshToken: "refresh_token_123",
-                accessTokenExpiresAt: Date.now() + 3600 * 1000 // 1 hour validity
-            }
-        });
-        jest.spyOn(authApi, "refreshAccessToken").mockResolvedValue({
-            tokens: {
-                accessToken: "new_access_token",
-                refreshToken: "new_refresh_token",
-                accessTokenExpiresAt: Date.now() + 3600 * 1000
-            }
-        });
-        jest.spyOn(authApi, "logout").mockResolvedValue(undefined);
+        }),
+        signInWithEmail: jest.fn().mockResolvedValue(undefined),
+        signOut: jest.fn().mockResolvedValue(undefined),
+        refreshSession: jest.fn(),
+        updateUser: jest.fn(),
+        signUp: jest.fn().mockResolvedValue(undefined),
+        signInWithGoogle: jest.fn().mockResolvedValue(undefined),
+        signInWithOAuth: jest.fn().mockResolvedValue(undefined),
+        resetPasswordForEmail: jest.fn().mockResolvedValue(undefined),
+        resetPassword: jest.fn().mockResolvedValue(undefined),
+        changePassword: jest.fn().mockResolvedValue(undefined),
+        getSessions: jest.fn().mockResolvedValue([]),
+        revokeSession: jest.fn().mockResolvedValue(undefined),
+        revokeAllSessions: jest.fn().mockResolvedValue(undefined),
+    };
+}
+
+const mockUser = {
+    uid: "123",
+    email: "test@rebase.pro",
+    displayName: "Test User",
+    photoURL: null,
+    providerId: "password",
+    isAnonymous: false,
+    roles: [] as string[]
+};
+
+const mockSession = {
+    accessToken: "access_token_123",
+    refreshToken: "refresh_token_123",
+    expiresAt: Date.now() + 3600 * 1000,
+    user: mockUser
+};
+
+describe("useRebaseAuthController hook (Unified Auth)", () => {
+    let mockAuth: jest.Mocked<ClientAuth>;
+    let mockClient: {
+        baseUrl: string;
+        auth: jest.Mocked<ClientAuth>;
+        setAuthTokenGetter: jest.Mock;
+    };
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        mockAuth = createMockAuth();
+        mockClient = {
+            baseUrl: "https://api.test.rebase.pro",
+            auth: mockAuth,
+            setAuthTokenGetter: jest.fn(),
+        };
     });
 
     afterEach(() => {
@@ -64,222 +72,428 @@ describe("useRebaseAuthController hook", () => {
         jest.restoreAllMocks();
     });
 
-    it("should mount in initial unauthenticated state", async () => {
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+    // ─── Initialization ──────────────────────────────────────────────
 
-        expect(result.current.initialLoading).toBe(true);
-        expect(result.current.user).toBeNull();
+    describe("Initialization", () => {
+        it("should mount in initial loading state and resolve after SDK initializes", async () => {
+            let resolveInit!: () => void;
+            const initPromise = new Promise<void>(resolve => { resolveInit = resolve; });
+            mockAuth.isInitialized.mockReturnValue(initPromise);
 
-        // Let the restoreAuth useEffect resolve
-        await act(async () => {
-            await Promise.resolve();
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            expect(result.current.initialLoading).toBe(true);
+            expect(result.current.user).toBeNull();
+
+            await act(async () => {
+                resolveInit();
+                await Promise.resolve();
+            });
+
+            expect(result.current.initialLoading).toBe(false);
         });
 
-        expect(result.current.initialLoading).toBe(false);
-        expect(result.current.user).toBeNull();
+        it("should sync with existing SDK session on mount", async () => {
+            mockAuth.getSession.mockReturnValue(mockSession);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await Promise.resolve();
+            });
+
+            expect(result.current.initialLoading).toBe(false);
+            expect(result.current.user?.uid).toBe("123");
+            expect(result.current.user?.displayName).toBe("Test User");
+        });
+
+        it("should set initialLoading false when no client/auth is provided", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({}));
+
+            // No auth → immediately not loading
+            expect(result.current.initialLoading).toBe(false);
+            expect(result.current.user).toBeNull();
+        });
+
+        it("should set initialLoading false even if isInitialized rejects", async () => {
+            mockAuth.isInitialized.mockRejectedValue(new Error("init failed"));
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.initialLoading).toBe(false);
+        });
     });
 
-    it("should restore user from valid stored session in localStorage", async () => {
-        const storedData = {
-            tokens: {
-                accessToken: "access_token_123",
-                refreshToken: "refresh_token_123",
-                accessTokenExpiresAt: Date.now() + 1000 * 600 // 10 minutes from now
-            },
-            user: {
-                uid: "123",
-                email: "stored@rebase.pro",
-                displayName: "Stored User",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
-        };
+    // ─── State Sync via onAuthStateChange ────────────────────────────
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+    describe("State sync via onAuthStateChange", () => {
+        it("should update user state when SIGNED_IN fires", async () => {
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
 
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
 
-        await act(async () => {
-            await Promise.resolve();
+            await act(async () => { await Promise.resolve(); });
+
+            expect(result.current.user).toBeNull();
+
+            await act(async () => {
+                authListener("SIGNED_IN", mockSession);
+                await Promise.resolve();
+            });
+
+            expect(result.current.user?.uid).toBe("123");
+            expect(result.current.user?.displayName).toBe("Test User");
         });
 
-        expect(result.current.initialLoading).toBe(false);
-        expect(result.current.user).toEqual({
-            uid: "123",
-            email: "stored@rebase.pro",
-            displayName: "Stored User",
-            photoURL: null,
-            providerId: "password",
-            isAnonymous: false,
-            emailVerified: undefined,
-            roles: [],
-            metadata: undefined
+        it("should clear user state when SIGNED_OUT fires", async () => {
+            mockAuth.getSession.mockReturnValue(mockSession);
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => { await Promise.resolve(); });
+            expect(result.current.user?.uid).toBe("123");
+
+            await act(async () => {
+                authListener("SIGNED_OUT", null);
+                await Promise.resolve();
+            });
+
+            expect(result.current.user).toBeNull();
+            expect(result.current.loginSkipped).toBe(false);
+        });
+
+        it("should call onSignOut callback when SIGNED_OUT fires", async () => {
+            const onSignOut = jest.fn();
+            let authListener!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb) => {
+                authListener = cb;
+                return jest.fn();
+            });
+
+            renderHook(() => useRebaseAuthController({ client: mockClient, onSignOut }));
+
+            await act(async () => { await Promise.resolve(); });
+
+            await act(async () => {
+                authListener("SIGNED_OUT", null);
+                await Promise.resolve();
+            });
+
+            expect(onSignOut).toHaveBeenCalledTimes(1);
+        });
+
+        it("should unsubscribe from onAuthStateChange on unmount", async () => {
+            const unsubscribe = jest.fn();
+            mockAuth.onAuthStateChange.mockReturnValue(unsubscribe);
+
+            const { unmount } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => { await Promise.resolve(); });
+
+            unmount();
+            expect(unsubscribe).toHaveBeenCalledTimes(1);
         });
     });
 
-    it("should refresh token on mount if expired, and update user state", async () => {
-        const storedData = {
-            tokens: {
-                accessToken: "expired_access_token",
-                refreshToken: "refresh_token_123",
-                accessTokenExpiresAt: Date.now() - 1000 // Expired 1s ago
-            },
-            user: {
-                uid: "123",
-                email: "expired@rebase.pro",
-                displayName: "Expired User",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
-        };
+    // ─── defineRolesFor ──────────────────────────────────────────────
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+    describe("defineRolesFor", () => {
+        it("should apply custom roles to the user state", async () => {
+            mockAuth.getSession.mockReturnValue(mockSession);
+            const defineRolesFor = jest.fn().mockResolvedValue(["admin", "editor"]);
 
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            const { result } = renderHook(() => useRebaseAuthController({
+                client: mockClient,
+                defineRolesFor
+            }));
 
-        await act(async () => {
-            await Promise.resolve(); // Resolves restoreAuth
+            await act(async () => {
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(defineRolesFor).toHaveBeenCalledWith(expect.objectContaining({ uid: "123" }));
+            expect(result.current.user?.roles).toEqual(["admin", "editor"]);
         });
-
-        expect(authApi.refreshAccessToken).toHaveBeenCalledWith("https://api.test.rebase.pro", "refresh_token_123");
-        expect(authApi.getCurrentUser).toHaveBeenCalledWith("https://api.test.rebase.pro", "new_access_token");
-
-        expect(result.current.initialLoading).toBe(false);
-        expect(result.current.user?.displayName).toBe("Test User"); // Updated user from getCurrentUser mock
     });
 
-    it("should clear localStorage and log out if token refresh fails on mount", async () => {
-        const storedData = {
-            tokens: {
-                accessToken: "expired_access_token",
-                refreshToken: "invalid_refresh_token",
-                accessTokenExpiresAt: Date.now() - 1000
-            },
-            user: {
-                uid: "123",
-                email: "expired@rebase.pro",
-                displayName: "Expired User",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
-        };
+    // ─── Delegation to SDK ───────────────────────────────────────────
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+    describe("Delegation to SDK", () => {
+        it("should delegate emailPasswordLogin to auth.signInWithEmail", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
 
-        // Mock refreshAccessToken failure
-        (authApi.refreshAccessToken as jest.Mock).mockResolvedValueOnce(null);
+            await act(async () => {
+                await result.current.emailPasswordLogin("test@rebase.pro", "password123");
+            });
 
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
-
-        await act(async () => {
-            await Promise.resolve();
+            expect(mockAuth.signInWithEmail).toHaveBeenCalledWith("test@rebase.pro", "password123");
         });
 
-        expect(result.current.initialLoading).toBe(false);
-        expect(result.current.user).toBeNull();
-        expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+        it("should delegate signOut to auth.signOut", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.signOut();
+            });
+
+            expect(mockAuth.signOut).toHaveBeenCalled();
+        });
+
+        it("should delegate register to auth.signUp", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.register("new@user.com", "pass123", "New User");
+            });
+
+            expect(mockAuth.signUp).toHaveBeenCalledWith("new@user.com", "pass123", "New User");
+        });
+
+        it("should delegate googleLogin to auth.signInWithGoogle", async () => {
+            const payload = { idToken: "google-id-token" } as const;
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.googleLogin(payload);
+            });
+
+            expect(mockAuth.signInWithGoogle).toHaveBeenCalledWith(payload);
+        });
+
+        it("should delegate oauthLogin to auth.signInWithOAuth", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.oauthLogin("github", { code: "abc" });
+            });
+
+            expect(mockAuth.signInWithOAuth).toHaveBeenCalledWith("github", { code: "abc" });
+        });
+
+        it("should delegate updateProfile to auth.updateUser and return result", async () => {
+            const updatedUser = { ...mockUser, displayName: "New Name" };
+            mockAuth.updateUser.mockResolvedValue(updatedUser);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            let returnedUser;
+            await act(async () => {
+                returnedUser = await result.current.updateProfile("New Name", "http://photo.jpg");
+            });
+
+            expect(mockAuth.updateUser).toHaveBeenCalledWith({
+                displayName: "New Name",
+                photoURL: "http://photo.jpg"
+            });
+            expect(returnedUser).toEqual(updatedUser);
+        });
+
+        it("should delegate forgotPassword to auth.resetPasswordForEmail", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.forgotPassword("user@example.com");
+            });
+
+            expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith("user@example.com");
+        });
+
+        it("should delegate resetPassword to auth.resetPassword", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.resetPassword("reset-token-123", "new-password");
+            });
+
+            expect(mockAuth.resetPassword).toHaveBeenCalledWith("reset-token-123", "new-password");
+        });
+
+        it("should delegate fetchSessions to auth.getSessions", async () => {
+            const sessions = [{ id: "sess-1", current: true }];
+            mockAuth.getSessions.mockResolvedValue(sessions as never);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            let returned;
+            await act(async () => {
+                returned = await result.current.fetchSessions();
+            });
+
+            expect(mockAuth.getSessions).toHaveBeenCalled();
+            expect(returned).toEqual(sessions);
+        });
+
+        it("should delegate revokeSession to auth.revokeSession", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.revokeSession("sess-1");
+            });
+
+            expect(mockAuth.revokeSession).toHaveBeenCalledWith("sess-1");
+        });
+
+        it("should delegate revokeAllSessions to auth.revokeAllSessions", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.revokeAllSessions();
+            });
+
+            expect(mockAuth.revokeAllSessions).toHaveBeenCalled();
+        });
     });
 
-    it("should successfully log in with email and password", async () => {
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+    // ─── Error handling ──────────────────────────────────────────────
 
-        await act(async () => {
-            await Promise.resolve();
+    describe("Error handling", () => {
+        it("should set authProviderError when emailPasswordLogin fails", async () => {
+            const loginError = new Error("Invalid credentials");
+            mockAuth.signInWithEmail.mockRejectedValue(loginError);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await expect(result.current.emailPasswordLogin("bad@email.com", "wrong"))
+                    .rejects.toThrow("Invalid credentials");
+            });
+
+            expect(result.current.authProviderError).toBe(loginError);
+            expect(result.current.authLoading).toBe(false);
         });
 
-        await act(async () => {
-            await result.current.emailPasswordLogin("test@rebase.pro", "password123");
+        it("should set authProviderError when signOut fails", async () => {
+            mockAuth.signOut.mockRejectedValue(new Error("network error"));
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await result.current.signOut();
+            });
+
+            expect(result.current.authProviderError).toBeInstanceOf(Error);
+            expect(result.current.authLoading).toBe(false);
         });
 
-        expect(authApi.login).toHaveBeenCalledWith("https://api.test.rebase.pro", "test@rebase.pro", "password123");
-        expect(result.current.user?.email).toBe("test@rebase.pro");
-        expect(result.current.user?.displayName).toBe("Test User");
+        it("should clear authProviderError via clearError", async () => {
+            const loginError = new Error("fail");
+            mockAuth.signInWithEmail.mockRejectedValue(loginError);
 
-        // Verify stored in localStorage
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-        expect(stored.tokens.accessToken).toBe("access_token_123");
-        expect(stored.user.uid).toBe("123");
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                try { await result.current.emailPasswordLogin("x", "y"); } catch { /* expected */ }
+            });
+
+            expect(result.current.authProviderError).toBe(loginError);
+
+            act(() => {
+                result.current.clearError();
+            });
+
+            expect(result.current.authProviderError).toBeNull();
+        });
     });
 
-    it("should clear state and remove storage data on signOut", async () => {
-        // Initial setup with active session
-        const storedData = {
-            tokens: {
-                accessToken: "access_token_123",
-                refreshToken: "refresh_token_123",
-                accessTokenExpiresAt: Date.now() + 1000 * 600
-            },
-            user: {
-                uid: "123",
-                email: "active@rebase.pro",
-                displayName: "Active User",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+    // ─── getAuthToken ────────────────────────────────────────────────
 
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+    describe("getAuthToken", () => {
+        it("should return access token from current SDK session", async () => {
+            const futureSession = {
+                ...mockSession,
+                expiresAt: Date.now() + 3600 * 1000
+            };
+            mockAuth.getSession.mockReturnValue(futureSession);
 
-        await act(async () => {
-            await Promise.resolve();
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => { await Promise.resolve(); });
+
+            const token = await result.current.getAuthToken();
+            expect(token).toBe("access_token_123");
+            expect(mockAuth.refreshSession).not.toHaveBeenCalled();
         });
 
-        expect(result.current.user).not.toBeNull();
+        it("should refresh when token is near expiry", async () => {
+            const nearExpired = { ...mockSession, expiresAt: Date.now() + 5000 };
+            const refreshed = { ...mockSession, accessToken: "new_token", expiresAt: Date.now() + 3600 * 1000 };
+            mockAuth.getSession.mockReturnValue(nearExpired);
+            mockAuth.refreshSession.mockResolvedValue(refreshed);
 
-        await act(async () => {
-            await result.current.signOut();
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => { await Promise.resolve(); });
+
+            const token = await result.current.getAuthToken();
+            expect(token).toBe("new_token");
+            expect(mockAuth.refreshSession).toHaveBeenCalled();
         });
 
-        expect(authApi.logout).toHaveBeenCalledWith("https://api.test.rebase.pro", "refresh_token_123");
-        expect(result.current.user).toBeNull();
-        expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+        it("should throw when no auth is available", async () => {
+            const { result } = renderHook(() => useRebaseAuthController({}));
+
+            await expect(result.current.getAuthToken())
+                .rejects.toThrow("Rebase client with auth is required");
+        });
     });
 
-    it("should update profile and persist changes in state and localStorage", async () => {
-        const storedData = {
-            tokens: {
-                accessToken: "access_token_123",
-                refreshToken: "refresh_token_123",
-                accessTokenExpiresAt: Date.now() + 1000 * 600
-            },
-            user: {
-                uid: "123",
-                email: "test@rebase.pro",
-                displayName: "Original Name",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+    // ─── skipLogin ───────────────────────────────────────────────────
 
-        jest.spyOn(authApi, "updateProfile").mockResolvedValueOnce({
-            user: {
-                uid: "123",
-                email: "test@rebase.pro",
-                displayName: "Updated Name",
-                photoURL: "http://new-photo",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }
+    describe("skipLogin", () => {
+        it("should set loginSkipped and clear user", () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            act(() => {
+                result.current.skipLogin();
+            });
+
+            expect(result.current.loginSkipped).toBe(true);
+            expect(result.current.user).toBeNull();
         });
+    });
 
-        const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+    // ─── Capabilities ────────────────────────────────────────────────
 
-        await act(async () => {
-            await Promise.resolve();
+    describe("capabilities", () => {
+        it("should reflect auth config in capabilities", async () => {
+            mockAuth.getAuthConfig.mockResolvedValue({
+                needsSetup: false,
+                registrationEnabled: true,
+                passwordReset: true,
+                emailVerification: true,
+                enabledProviders: ["google", "github"]
+            });
+
+            const { result } = renderHook(() => useRebaseAuthController({
+                client: mockClient,
+                googleClientId: "google-client-id"
+            }));
+
+            await act(async () => {
+                await Promise.resolve();
+                await Promise.resolve();
+            });
+
+            expect(result.current.capabilities?.registration).toBe(true);
+            expect(result.current.capabilities?.passwordReset).toBe(true);
+            expect(result.current.capabilities?.emailVerification).toBe(true);
+            expect(result.current.capabilities?.googleLogin).toBe(true);
+            expect(result.current.capabilities?.enabledProviders).toEqual(["google", "github"]);
         });
-
-        await act(async () => {
-            await result.current.updateProfile("Updated Name", "http://new-photo");
-        });
-
-        expect(authApi.updateProfile).toHaveBeenCalledWith("https://api.test.rebase.pro", "access_token_123", "Updated Name", "http://new-photo");
-        expect(result.current.user?.displayName).toBe("Updated Name");
-        expect(result.current.user?.photoURL).toBe("http://new-photo");
-
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-        expect(stored.user.displayName).toBe("Updated Name");
-        expect(stored.user.photoURL).toBe("http://new-photo");
     });
 });

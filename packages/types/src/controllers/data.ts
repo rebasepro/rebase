@@ -257,6 +257,15 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
  * This is the public API surface for app developers using
  * `createRebaseClient()`. CMS internals use `CollectionAccessor` instead.
  *
+ * Type parameters:
+ * - `M` — the **Row** shape returned by reads (`find`, `findById`, `listen`).
+ * - `I` — the **Insert** shape accepted by {@link create}. Defaults to
+ *   `Partial<M>`; the generated SDK supplies a dedicated `Insert` type where
+ *   required columns are required and auto-generated / read-only columns are
+ *   omitted, so `create({})` on a table with required fields is a compile error.
+ * - `U` — the **Update** shape accepted by {@link update}. Defaults to
+ *   `Partial<M>`; the generated SDK supplies a dedicated `Update` type.
+ *
  * @example
  * const { data: posts } = await rebase.data.posts.find();
  * console.log(posts[0].title);       // flat access
@@ -267,7 +276,11 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
  *
  * @group Data
  */
-export interface SDKCollectionClient<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface SDKCollectionClient<
+    M extends Record<string, unknown> = Record<string, unknown>,
+    I = Partial<M>,
+    U = Partial<M>
+> {
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
      */
@@ -280,18 +293,19 @@ export interface SDKCollectionClient<M extends Record<string, unknown> = Record<
 
     /**
      * Create a new record.
-     * @param data The record data to create.
+     * @param data The record data to create (the collection's `Insert` shape).
      * @param id Optional specific ID to use for the new record.
      * @returns The created row
      */
-    create(data: Partial<M>, id?: string | number): Promise<M>;
+    create(data: I, id?: string | number): Promise<M>;
 
     /**
      * Update an existing record by ID.
+     * @param data The fields to update (the collection's `Update` shape).
      * @returns The updated row.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
      */
-    update(id: string | number, data: Partial<M>): Promise<M>;
+    update(id: string | number, data: U): Promise<M>;
 
     /**
      * Delete a record by ID.
@@ -391,6 +405,27 @@ export type RebaseData<DB = unknown> = {
  *
  * @group Data
  */
+/**
+ * Extract the `Row` shape from a generated `Database[slug]` entry, falling
+ * back to an open record when the entry is untyped.
+ * @group Data
+ */
+export type RowOf<T> = T extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>;
+
+/**
+ * Extract the `Insert` shape from a generated `Database[slug]` entry (the
+ * input accepted by `create`), falling back to `Partial<Row>`.
+ * @group Data
+ */
+export type InsertOf<T> = T extends { Insert: infer I extends Record<string, unknown> } ? I : Partial<RowOf<T>>;
+
+/**
+ * Extract the `Update` shape from a generated `Database[slug]` entry (the
+ * input accepted by `update`), falling back to `Partial<Row>`.
+ * @group Data
+ */
+export type UpdateOf<T> = T extends { Update: infer U extends Record<string, unknown> } ? U : Partial<RowOf<T>>;
+
 export type RebaseSdkData<DB = unknown> = {
     /**
      * Get a flat collection accessor by slug.
@@ -402,7 +437,7 @@ export type RebaseSdkData<DB = unknown> = {
     collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKCollectionClient<M>;
 } & (
     DB extends Record<string, unknown>
-        ? { [K in keyof DB]: SDKCollectionClient<DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>> }
+        ? { [K in keyof DB]: SDKCollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>> }
         : {
             /**
              * Dynamic flat collection accessor.

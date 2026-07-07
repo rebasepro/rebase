@@ -169,7 +169,7 @@ hasMore: false }
         it("should return undefined for 404", async () => {
             const { RebaseApiError } = await import("./transport");
             (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
-                new RebaseApiError(404, "Not Found")
+                new RebaseApiError("Not Found", { status: 404 })
             );
 
             const client = createCollectionClient(transport, "posts");
@@ -204,7 +204,7 @@ hasMore: false }
         it("should throw RebaseApiError for 404", async () => {
             const { RebaseApiError } = await import("./transport");
             (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
-                new RebaseApiError(404, "Not Found")
+                new RebaseApiError("Not Found", { status: 404 })
             );
 
             const client = createCollectionClient(transport, "posts");
@@ -218,7 +218,7 @@ hasMore: false }
         it("should throw RebaseApiError for 404", async () => {
             const { RebaseApiError } = await import("./transport");
             (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
-                new RebaseApiError(404, "Not Found")
+                new RebaseApiError("Not Found", { status: 404 })
             );
 
             const client = createCollectionClient(transport, "posts");
@@ -228,7 +228,7 @@ hasMore: false }
         it("should propagate non-404 errors", async () => {
             const { RebaseApiError } = await import("./transport");
             (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
-                new RebaseApiError(500, "Internal Server Error")
+                new RebaseApiError("Internal Server Error", { status: 500 })
             );
 
             const client = createCollectionClient(transport, "posts");

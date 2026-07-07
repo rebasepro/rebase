@@ -1,5 +1,8 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { RebaseWebSocketClient, ApiError } from "../src/websocket";
+import { RebaseWebSocketClient } from "../src/websocket";
+// The WS client now throws the unified RebaseApiError. Aliased to `ApiError`
+// so the existing instanceof/code assertions below read unchanged.
+import { RebaseApiError as ApiError } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
 // Mock WebSocket
@@ -1560,20 +1563,19 @@ ws: getWs() };
     // -----------------------------------------------------------------------
     // ApiError
     // -----------------------------------------------------------------------
-    describe("ApiError", () => {
-        it("creates error with message, error, and code", () => {
-            const err = new ApiError("test message", "test error", "CODE");
+    describe("RebaseApiError (thrown by the WS client)", () => {
+        it("creates error with message and code", () => {
+            const err = new ApiError("test message", { code: "CODE" });
             expect(err).toBeInstanceOf(Error);
-            expect(err.name).toBe("ApiError");
+            expect(err.name).toBe("RebaseApiError");
             expect(err.message).toBe("test message");
-            expect(err.error).toBe("test error");
             expect(err.code).toBe("CODE");
         });
 
         it("works without optional parameters", () => {
             const err = new ApiError("simple error");
             expect(err.code).toBeUndefined();
-            expect(err.error).toBeUndefined();
+            expect(err.status).toBeUndefined();
         });
     });
 

@@ -73,6 +73,10 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     let currentSession: RebaseSession | null = null;
     const listeners = new Set<(event: AuthChangeEvent, session: RebaseSession | null) => void>();
     let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    let resolveInitialized: (value: void | PromiseLike<void>) => void;
+    const isInitialized = new Promise<void>((resolve) => {
+        resolveInitialized = resolve;
+    });
 
     function authUrl(endpoint: string) {
         return transport.baseUrl + transport.apiPath + authPath + endpoint;
@@ -84,10 +88,12 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
     function throwApiError(status: number, body: { error?: { message?: string; code?: string; details?: unknown }; message?: string; code?: string; details?: unknown } | undefined, statusText: string): never {
         throw new RebaseApiError(
-            status,
             body?.error?.message || body?.message || statusText,
-            body?.error?.code || body?.code,
-            body?.error?.details || body?.details
+            {
+                status,
+                code: body?.error?.code || body?.code,
+                details: body?.error?.details || body?.details
+            }
         );
     }
 
@@ -517,20 +523,32 @@ refreshToken: session.refreshToken };
                 currentSession = stored;
                 transport.setToken(stored.accessToken);
                 scheduleRefresh(stored.expiresAt);
+                resolveInitialized!();
             } else if (authFlowMode === "cookie" || stored.refreshToken) {
                 currentSession = stored;
-                refreshSession().catch(() => {
+                refreshSession().then(() => {
+                    resolveInitialized!();
+                }).catch(() => {
                     currentSession = null;
                     clearStoredSession();
                     transport.setToken(null);
+                    resolveInitialized!();
                 });
+            } else {
+                resolveInitialized!();
             }
         } else if (authFlowMode === "cookie") {
             // Silent refresh on boot to pick up httpOnly session
-            refreshSession().catch(() => {
-                // Ignore failure on boot (no session)
+            refreshSession().then(() => {
+                resolveInitialized!();
+            }).catch(() => {
+                resolveInitialized!();
             });
+        } else {
+            resolveInitialized!();
         }
+    } else {
+        resolveInitialized!();
     }
 
     return {
@@ -565,7 +583,8 @@ refreshToken: session.refreshToken };
         revokeAllSessions,
         getAuthConfig,
         getSession,
-        onAuthStateChange
+        onAuthStateChange,
+        isInitialized: () => isInitialized
     };
 }
 

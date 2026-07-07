@@ -1,89 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AuthTokens, User } from "@rebasepro/types";
-import * as authApi from "../api";
-import { AuthConfigResponse } from "../api";
+import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
+import type { AuthConfigResponse } from "../api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "../types";
 
-const STORAGE_KEY = "rebase_react_auth";
-
-// Buffer time before expiry to trigger refresh (2 minutes)
-const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;
-
 /**
- * Normalize a raw user object from the server into the canonical User shape.
- * Handles the transition period where stored sessions or server responses
- * may lack `providerId` / `isAnonymous` (added in this release).
- */
-function normalizeUser(raw: User): User {
-    return {
-        uid: raw.uid,
-        email: raw.email ?? null,
-        displayName: raw.displayName ?? null,
-        photoURL: raw.photoURL ?? null,
-        providerId: raw.providerId ?? "password",
-        isAnonymous: raw.isAnonymous ?? false,
-        emailVerified: raw.emailVerified,
-        roles: raw.roles ?? [],
-        metadata: raw.metadata,
-    };
-}
-
-/**
- * Storage data structure
- */
-interface StoredAuthData {
-    tokens: AuthTokens;
-    user: User;
-}
-
-/**
- * Save auth data to localStorage
- */
-function saveAuthToStorage(tokens: AuthTokens, user: User): void {
-    try {
-        const data: StoredAuthData = { tokens,
-user };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) { /* ignore */ }
-}
-
-/**
- * Load auth data from localStorage
- */
-function loadAuthFromStorage(): StoredAuthData | null {
-    try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (data) {
-            const parsed = JSON.parse(data);
-            return parsed;
-        }
-    } catch (e) {
-        console.warn("Failed to load auth from storage:", e);
-    }
-    return null;
-}
-
-/**
- * Clear auth data from localStorage
- */
-function clearAuthFromStorage(): void {
-    try {
-        localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-        console.warn("Failed to clear auth from storage:", e);
-    }
-}
-
-/**
- * Check if token is expired or about to expire
- */
-function isTokenExpiredOrNearExpiry(expiresAt: number, bufferMs: number = TOKEN_REFRESH_BUFFER_MS): boolean {
-    return Date.now() + bufferMs >= expiresAt;
-}
-
-/**
- * Auth controller hook for JWT-based authentication
- * with @rebasepro/server-core
+ * Auth controller hook for JWT-based authentication.
+ *
+ * This is a thin React binding over the headless SDK `client.auth`.
+ * It synchronizes React state with the SDK's internal state and delegates
+ * all operations to the SDK to ensure a single source of truth for
+ * authentication sessions across the entire application.
  *
  * @param props Configuration options
  * @returns RebaseAuthController instance
@@ -91,8 +17,8 @@ function isTokenExpiredOrNearExpiry(expiresAt: number, bufferMs: number = TOKEN_
 export function useRebaseAuthController(
     props: RebaseAuthControllerProps = {}
 ): RebaseAuthController {
-    const { client, apiUrl, onSignOut, defineRolesFor } = props;
-    const resolvedApiUrl = client?.baseUrl || apiUrl || "";
+    const { client, onSignOut, defineRolesFor } = props;
+    const auth = client?.auth;
 
     const [user, setUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState(false);
@@ -103,613 +29,259 @@ export function useRebaseAuthController(
     const [extra, setExtra] = useState<unknown>(null);
     const [authConfig, setAuthConfig] = useState<AuthConfigResponse | null>(null);
 
-    // Store tokens in ref for quick access, but also persist to localStorage
-    const tokensRef = useRef<AuthTokens | null>(null);
-    const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Track if a refresh is currently in progress to avoid concurrent refreshes
-    const refreshPromiseRef = useRef<Promise<AuthTokens | null> | null>(null);
-    // Track if component is mounted
     const isMountedRef = useRef(true);
-    const authConfigCacheRef = useRef(authApi.createAuthConfigCache());
-
-
+    // Keep a stable ref to onSignOut so the listener never goes stale.
+    const onSignOutRef = useRef(onSignOut);
+    onSignOutRef.current = onSignOut;
+    // Keep a stable ref to defineRolesFor too, so an inline (non-memoized)
+    // function from the consumer does not re-run the sync effect on every
+    // render — which would re-subscribe to auth events and re-fetch the
+    // (uncached) auth config each time.
+    const defineRolesForRef = useRef(defineRolesFor);
+    defineRolesForRef.current = defineRolesFor;
 
     const clearError = useCallback(() => {
         setAuthProviderError(null);
     }, []);
 
-    // Clear session and sign out
-    const clearSessionAndSignOut = useCallback(() => {
-        tokensRef.current = null;
-        clearAuthFromStorage();
-        if (refreshTimeoutRef.current) {
-            clearTimeout(refreshTimeoutRef.current);
-            refreshTimeoutRef.current = null;
-        }
-        setUser(null);
-        setLoginSkipped(false);
-        onSignOut?.();
-    }, [onSignOut]);
-
-    /**
-     * Refresh the access token using the stored refresh token.
-     * Returns the new tokens or null if refresh failed.
-     */
-    const refreshAccessToken = useCallback(async (): Promise<AuthTokens | null> => {
-        // Prevent concurrent refreshes
-        if (refreshPromiseRef.current) {
-            // Wait for the current refresh to complete
-            return refreshPromiseRef.current;
-        }
-
-        const executeRefresh = async (): Promise<AuthTokens | null> => {
-            // Check if another tab has already refreshed the token
-            const storedData = loadAuthFromStorage();
-            if (storedData?.tokens?.accessTokenExpiresAt) {
-                const storedTokens = storedData.tokens;
-                // If stored token is newer and not expired
-                if (!isTokenExpiredOrNearExpiry(storedTokens.accessTokenExpiresAt) && storedTokens.accessToken !== tokensRef.current?.accessToken) {
-                    tokensRef.current = storedTokens;
-                    return storedTokens;
-                }
-            }
-
-            const currentTokens = tokensRef.current;
-            if (!currentTokens?.refreshToken) {
-                return null;
-            }
-
-
-            try {
-                const response = await authApi.refreshAccessToken(resolvedApiUrl, currentTokens.refreshToken);
-                const newTokens = response.tokens;
-
-                // Update tokens immediately
-                tokensRef.current = newTokens;
-
-                // Persist to storage
-                const latestStoredData = loadAuthFromStorage();
-                if (latestStoredData) {
-                    saveAuthToStorage(newTokens, latestStoredData.user);
-                }
-
-                return newTokens;
-            } catch (error: unknown) {
-
-                // If it's a network error (e.g., backend restarting), we throw so callers can retry
-                // instead of immediately assuming the refresh token is invalid and signing out.
-                if (error instanceof Error && (error as { code?: string }).code === "NETWORK_ERROR") {
-                    throw error;
-                }
-                return null;
-            } finally {
-                refreshPromiseRef.current = null;
-            }
-        };
-
-        refreshPromiseRef.current = executeRefresh();
-        return refreshPromiseRef.current;
-    }, []);
-
-    // Schedule token refresh before expiry
-    const scheduleTokenRefresh = useCallback((tokens: AuthTokens) => {
-        if (refreshTimeoutRef.current) {
-            clearTimeout(refreshTimeoutRef.current);
-        }
-
-        // Calculate when to refresh (2 minutes before expiry)
-        const expiresAt = tokens.accessTokenExpiresAt;
-        const refreshAt = expiresAt - TOKEN_REFRESH_BUFFER_MS;
-        const timeUntilRefresh = refreshAt - Date.now();
-
-        if (timeUntilRefresh <= 0) {
-            // Token already expired or about to expire - refresh now
-            refreshAccessToken().then(newTokens => {
-                if (newTokens && isMountedRef.current) {
-                    scheduleTokenRefresh(newTokens);
-                } else if (!newTokens && isMountedRef.current) {
-                    clearSessionAndSignOut();
-                }
-            });
+    // Sync state with client.auth
+    useEffect(() => {
+        if (!auth) {
+            setInitialLoading(false);
             return;
         }
 
+        isMountedRef.current = true;
 
-        refreshTimeoutRef.current = setTimeout(async () => {
+        const updateState = async (session: RebaseSession | null) => {
             if (!isMountedRef.current) return;
 
-            try {
-                const newTokens = await refreshAccessToken();
-
-                if (newTokens && isMountedRef.current) {
-                    scheduleTokenRefresh(newTokens);
-                } else if (!newTokens && isMountedRef.current) {
-                    clearSessionAndSignOut();
-                }
-            } catch (error) {
-                // Network error - try again shortly instead of logging out
-                if (isMountedRef.current) {
-                    refreshTimeoutRef.current = setTimeout(() => {
-                        scheduleTokenRefresh(tokens);
-                    }, 10000);
-                }
-            }
-        }, timeUntilRefresh);
-    }, [refreshAccessToken, clearSessionAndSignOut]);
-
-    // Get auth token for API requests (with automatic refresh if needed)
-    const getAuthToken = useCallback(async (): Promise<string> => {
-        // If still loading, throw - the UI should show a spinner
-        if (initialLoading) {
-            throw new Error("Auth is still loading");
-        }
-
-        const currentTokens = tokensRef.current;
-        if (!currentTokens) {
-            throw new Error("User is not logged in");
-        }
-
-        // Check if token is expired or about to expire
-        if (isTokenExpiredOrNearExpiry(currentTokens.accessTokenExpiresAt)) {
-            try {
-                const newTokens = await refreshAccessToken();
-                if (!newTokens) {
-                    clearSessionAndSignOut();
-                    throw new Error("Session expired. Please login again.");
-                }
-                return newTokens.accessToken;
-            } catch (error: unknown) {
-                // If the error was a network error during refresh, just re-throw it
-                // so the user isn't logged out locally and the network request fails naturally.
-                if (error instanceof Error && (error as { code?: string }).code === "NETWORK_ERROR") {
-                    throw error;
-                }
-                clearSessionAndSignOut();
-                throw error;
-            }
-        }
-
-        return currentTokens.accessToken;
-    }, [initialLoading, refreshAccessToken, clearSessionAndSignOut]);
-
-    // Install token getter onto client
-    useEffect(() => {
-        if (client) {
-            client.setAuthTokenGetter?.(async () => {
-                try { return await getAuthToken(); } catch { return null; }
-            });
-            if (client.setOnUnauthorized) {
-                client.setOnUnauthorized(async () => {
-                    try {
-                        const newTokens = await refreshAccessToken();
-                        if (newTokens) return true;
-                        clearSessionAndSignOut();
-                        return false;
-                    } catch (e) {
-                        clearSessionAndSignOut();
-                        return false;
+            let userToSet = session?.user ?? null;
+            const defineRolesFor = defineRolesForRef.current;
+            if (userToSet && defineRolesFor) {
+                try {
+                    const roles = await defineRolesFor(userToSet);
+                    if (roles && isMountedRef.current) {
+                        userToSet = { ...userToSet, roles };
                     }
-                });
+                } catch (e) {
+                    console.error("Error defining roles:", e);
+                }
             }
-            if (client.ws) {
-                client.ws.setAuthTokenGetter(async () => {
-                    try { return await getAuthToken(); } catch { return null; }
-                });
+
+            if (isMountedRef.current) {
+                setUser(userToSet);
             }
-        }
-    }, [client, getAuthToken, refreshAccessToken, clearSessionAndSignOut]);
+        };
 
-    // Handle successful authentication
-    const handleAuthSuccess = useCallback(async (userFromServer: User, tokens: AuthTokens) => {
-        tokensRef.current = tokens;
-        let normalizedUser = normalizeUser(userFromServer);
-
-        // Apply custom roles if defineRolesFor provided
-        if (defineRolesFor) {
-            const customRoles = await defineRolesFor(normalizedUser);
-            if (customRoles) {
-                normalizedUser = { ...normalizedUser,
-roles: customRoles };
+        const syncState = async (event: AuthChangeEvent, session: RebaseSession | null) => {
+            await updateState(session);
+            if (event === "SIGNED_OUT") {
+                if (isMountedRef.current) {
+                    setLoginSkipped(false);
+                }
+                onSignOutRef.current?.();
             }
+        };
+
+        // Initial sync with whatever is currently in the SDK
+        updateState(auth.getSession());
+
+        // Wait for SDK initialization (restoring session from storage or silent refresh)
+        auth.isInitialized().then(() => {
+            if (isMountedRef.current) {
+                updateState(auth.getSession());
+                setInitialLoading(false);
+            }
+        }).catch(() => {
+            if (isMountedRef.current) setInitialLoading(false);
+        });
+
+        // Fetch backend auth configuration
+        auth.getAuthConfig().then((config: AuthConfigResponse) => {
+            if (isMountedRef.current) setAuthConfig(config);
+        }).catch(() => {});
+
+        const unsubscribe = auth.onAuthStateChange(syncState);
+
+        return () => {
+            isMountedRef.current = false;
+            unsubscribe();
+        };
+    }, [auth]);
+
+    const getAuthToken = useCallback(async (): Promise<string> => {
+        if (!auth) throw new Error("Rebase client with auth is required");
+        const session = auth.getSession();
+
+        // If we have a valid token, return it
+        if (session?.accessToken && session.expiresAt > Date.now() + 10000) {
+            return session.accessToken;
         }
 
-        // Save to localStorage for persistence
-        saveAuthToStorage(tokens, userFromServer);
+        // Otherwise, refresh
+        const newSession = await auth.refreshSession();
+        return newSession.accessToken;
+    }, [auth]);
 
-        setUser(normalizedUser);
-        setAuthError(null);
-        setAuthProviderError(null);
-        setLoginSkipped(false);
-        scheduleTokenRefresh(tokens);
-    }, [scheduleTokenRefresh, defineRolesFor]);
-
-    // Email/password login
-    const emailPasswordLogin = useCallback(async (email: string, password: string) => {
-        setAuthLoading(true);
-        setAuthProviderError(null);
-
-        try {
-            const response = await authApi.login(resolvedApiUrl, email, password);
-            await handleAuthSuccess(response.user, response.tokens);
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        } finally {
-            setAuthLoading(false);
-        }
-    }, [handleAuthSuccess]);
-
-    // Register new user
-    const register = useCallback(async (email: string, password: string, displayName?: string) => {
-        setAuthLoading(true);
-        setAuthProviderError(null);
-
-        try {
-            const response = await authApi.register(resolvedApiUrl, email, password, displayName);
-            await handleAuthSuccess(response.user, response.tokens);
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        } finally {
-            setAuthLoading(false);
-        }
-    }, [handleAuthSuccess]);
-
-    // Google login — accepts payload object with code flow or token
-    const googleLogin = useCallback(async (
-        payload: { code: string; redirectUri: string } | { idToken: string } | { accessToken: string }
-    ) => {
-        setAuthLoading(true);
-        setAuthProviderError(null);
-
-        try {
-            const response = await authApi.googleLogin(resolvedApiUrl, payload);
-            await handleAuthSuccess(response.user, response.tokens);
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        } finally {
-            setAuthLoading(false);
-        }
-    }, [handleAuthSuccess]);
-
-    // Generic OAuth login — works with any provider registered on the backend
-    const oauthLogin = useCallback(async (providerId: string, payload: Record<string, unknown>) => {
-        setAuthLoading(true);
-        setAuthProviderError(null);
-
-        try {
-            const response = await authApi.oauthLogin(resolvedApiUrl, providerId, payload);
-            await handleAuthSuccess(response.user, response.tokens);
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        } finally {
-            setAuthLoading(false);
-        }
-    }, [handleAuthSuccess]);
-
-    // Sign out
     const signOut = useCallback(async () => {
+        if (!auth) return;
+        setAuthLoading(true);
         try {
-            if (tokensRef.current) {
-                await authApi.logout(resolvedApiUrl, tokensRef.current.refreshToken);
-            }
-        } catch (error) {
-            console.error("Logout error:", error);
+            await auth.signOut();
+            // signOut emits SIGNED_OUT → syncState calls onSignOutRef.current
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
         } finally {
-            clearSessionAndSignOut();
+            setAuthLoading(false);
         }
-    }, [clearSessionAndSignOut]);
+    }, [auth]);
 
-    // Skip login
+    const emailPasswordLogin = useCallback(async (email: string, password: string) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            await auth.signInWithEmail(email, password);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
+    const register = useCallback(async (email: string, password: string, displayName?: string) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            await auth.signUp(email, password, displayName);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
+    const googleLogin = useCallback(async (
+        payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }
+    ) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            await auth.signInWithGoogle(payload);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
+    const oauthLogin = useCallback(async (providerId: string, payload: Record<string, unknown>) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            await auth.signInWithOAuth(providerId, payload);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
     const skipLogin = useCallback(() => {
         setLoginSkipped(true);
         setUser(null);
     }, []);
 
-    // Forgot password - request reset email
     const forgotPassword = useCallback(async (email: string) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
         setAuthProviderError(null);
-
         try {
-            await authApi.forgotPassword(resolvedApiUrl, email);
+            await auth.resetPasswordForEmail(email);
         } catch (error: unknown) {
-            setAuthProviderError(error as Error);
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
             throw error;
         } finally {
             setAuthLoading(false);
         }
-    }, []);
+    }, [auth]);
 
-    // Reset password using token
     const resetPassword = useCallback(async (token: string, password: string) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
         setAuthProviderError(null);
-
         try {
-            await authApi.resetPassword(resolvedApiUrl, token, password);
+            await auth.resetPassword(token, password);
         } catch (error: unknown) {
-            setAuthProviderError(error as Error);
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
             throw error;
         } finally {
             setAuthLoading(false);
         }
-    }, []);
+    }, [auth]);
 
-    // Change password for authenticated user
     const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
         setAuthProviderError(null);
-
         try {
-            if (!tokensRef.current) {
-                throw new Error("User is not logged in");
-            }
-            await authApi.changePassword(resolvedApiUrl, tokensRef.current.accessToken, oldPassword, newPassword);
-            // After password change, user needs to log in again (all sessions invalidated)
-            clearSessionAndSignOut();
+            await auth.changePassword(oldPassword, newPassword);
+            // Sign out after password change as sessions are usually invalidated
+            await auth.signOut();
         } catch (error: unknown) {
-            setAuthProviderError(error as Error);
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
             throw error;
         } finally {
             setAuthLoading(false);
         }
-    }, [clearSessionAndSignOut]);
+    }, [auth]);
 
-    // Update user profile
     const updateProfile = useCallback(async (displayName?: string, photoURL?: string) => {
+        if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
         setAuthProviderError(null);
-
         try {
-            if (!tokensRef.current) {
-                throw new Error("User is not logged in");
-            }
-            const response = await authApi.updateProfile(resolvedApiUrl, tokensRef.current.accessToken, displayName, photoURL);
-
-            // Update local user state
-            let convertedUser = normalizeUser(response.user);
-            if (defineRolesFor) {
-                const customRoles = await defineRolesFor(convertedUser);
-                if (customRoles) {
-                    convertedUser = { ...convertedUser,
-roles: customRoles };
-                }
-            }
-
-            // Update storage
-            const storedData = loadAuthFromStorage();
-            if (storedData) {
-                saveAuthToStorage(storedData.tokens, response.user);
-            }
-
-            setUser(convertedUser);
-            return convertedUser;
+            const updatedUser = await auth.updateUser({ displayName, photoURL });
+            return updatedUser;
         } catch (error: unknown) {
-            setAuthProviderError(error as Error);
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
             throw error;
         } finally {
             setAuthLoading(false);
         }
-    }, [defineRolesFor]);
+    }, [auth]);
 
-    // Fetch active sessions
     const fetchSessions = useCallback(async () => {
-        try {
-            if (!tokensRef.current) {
-                throw new Error("User is not logged in");
-            }
-            const response = await authApi.fetchSessions(resolvedApiUrl, tokensRef.current.accessToken, tokensRef.current.refreshToken);
-            return response.sessions;
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        }
-    }, []);
+        if (!auth) throw new Error("Rebase client with auth is required");
+        return await auth.getSessions();
+    }, [auth]);
 
-    // Revoke a session
     const revokeSession = useCallback(async (sessionId: string) => {
-        try {
-            if (!tokensRef.current) {
-                throw new Error("User is not logged in");
-            }
-            await authApi.revokeSession(resolvedApiUrl, tokensRef.current.accessToken, sessionId);
-            // If the revoked session is the current one, the next API request will fail with 401
-            // and trigger an auto-logout. Otherwise, it just removes it from the DB.
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        }
-    }, []);
+        if (!auth) throw new Error("Rebase client with auth is required");
+        await auth.revokeSession(sessionId);
+    }, [auth]);
 
-    // Restore auth state from localStorage on mount
-    useEffect(() => {
-        isMountedRef.current = true;
-
-        const restoreAuth = async () => {
-
-            // Fetch auth config (needsSetup, registrationEnabled, etc.)
-            try {
-                const config = await authApi.fetchAuthConfig(resolvedApiUrl, authConfigCacheRef.current);
-                if (isMountedRef.current) {
-                    setAuthConfig(config);
-                }
-            } catch (e) { /* ignore */ }
-
-            const stored = loadAuthFromStorage();
-
-            if (!stored) {
-                setInitialLoading(false);
-                return;
-            }
-
-            if (!stored.tokens?.refreshToken) {
-                clearAuthFromStorage();
-                setInitialLoading(false);
-                return;
-            }
-
-
-            // Validate accessTokenExpiresAt is a valid number
-            const expiresAt = stored.tokens.accessTokenExpiresAt;
-            if (typeof expiresAt !== "number" || !Number.isFinite(expiresAt)) {
-                clearAuthFromStorage();
-                setInitialLoading(false);
-                return;
-            }
-
-
-            // Check if access token is still valid
-            if (!isTokenExpiredOrNearExpiry(stored.tokens.accessTokenExpiresAt)) {
-                // Token is still valid - use it directly
-                tokensRef.current = stored.tokens;
-
-                let userToSet = normalizeUser(stored.user);
-                if (defineRolesFor) {
-                    const customRoles = await defineRolesFor(userToSet);
-                    if (customRoles) {
-                        userToSet = { ...userToSet,
-roles: customRoles };
-                    }
-                }
-
-                setUser(userToSet);
-                scheduleTokenRefresh(stored.tokens);
-                setInitialLoading(false);
-                return;
-            }
-
-            // Token is expired or near expiry - refresh it
-            tokensRef.current = stored.tokens; // Set so refreshAccessToken can use it
-
-            try {
-                const newTokens = await refreshAccessToken();
-
-                if (!newTokens) {
-                    clearAuthFromStorage();
-                    tokensRef.current = null;
-                    setInitialLoading(false);
-                    return;
-                }
-
-                if (!isMountedRef.current) return;
-
-                // Fetch fresh user data from the server
-                let userToSet: User;
-                try {
-                    const meResponse = await authApi.getCurrentUser(resolvedApiUrl, newTokens.accessToken);
-
-                    if (!isMountedRef.current) return;
-
-                    const freshUserInfo = meResponse.user;
-
-                    // Update stored data with fresh user info
-                    saveAuthToStorage(newTokens, freshUserInfo);
-
-                    userToSet = normalizeUser(freshUserInfo);
-
-                    if (defineRolesFor) {
-                        const customRoles = await defineRolesFor(userToSet);
-                        if (!isMountedRef.current) return;
-                        if (customRoles) {
-                            userToSet = { ...userToSet,
-roles: customRoles };
-                        }
-                    }
-                } catch (meError: unknown) {
-                    if (!isMountedRef.current) return;
-                    if (meError instanceof authApi.AuthApiError && (meError.code === "NOT_FOUND" || meError.code === "UNAUTHORIZED")) {
-                        clearSessionAndSignOut();
-                        return;
-                    }
-                    userToSet = normalizeUser(stored.user);
-                }
-
-                if (!isMountedRef.current) return;
-
-                setUser(userToSet);
-                scheduleTokenRefresh(newTokens);
-            } catch (error: unknown) {
-                if (!isMountedRef.current) return;
-
-                // Do not clear the session entirely if it's just a temporary network outage
-                if (!(error instanceof Error && (error as { code?: string }).code === "NETWORK_ERROR")) {
-                    clearAuthFromStorage();
-                    tokensRef.current = null;
-                }
-            } finally {
-                if (isMountedRef.current) {
-                    setInitialLoading(false);
-                }
-            }
-        };
-
-        restoreAuth();
-
-        return () => {
-            isMountedRef.current = false;
-        };
-    }, [scheduleTokenRefresh, defineRolesFor, refreshAccessToken]);
-
-    // Handle visibility change - refresh token when user returns to tab
-    useEffect(() => {
-        const handleVisibilityChange = async () => {
-            if (initialLoading) return;
-
-            if (document.visibilityState === "visible" && tokensRef.current) {
-                // Check if token needs refreshing
-                if (isTokenExpiredOrNearExpiry(tokensRef.current.accessTokenExpiresAt)) {
-                    try {
-                        const newTokens = await refreshAccessToken();
-
-                        if (newTokens && isMountedRef.current) {
-                            scheduleTokenRefresh(newTokens);
-                        } else if (!newTokens && isMountedRef.current) {
-                            clearSessionAndSignOut();
-                        }
-                    } catch (e) { /* ignore */ }
-                }
-            }
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-
-        return () => {
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, [initialLoading, refreshAccessToken, scheduleTokenRefresh, clearSessionAndSignOut]);
-
-
-    // Get currently configured API URL
-    const getApiUrl = useCallback(() => {
-        return resolvedApiUrl;
-    }, [resolvedApiUrl]);
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            isMountedRef.current = false;
-            if (refreshTimeoutRef.current) {
-                clearTimeout(refreshTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    // Revoke all sessions
     const revokeAllSessions = useCallback(async () => {
-        try {
-            if (!tokensRef.current) {
-                throw new Error("User is not logged in");
-            }
-            await authApi.revokeAllSessions(resolvedApiUrl, tokensRef.current.accessToken);
-            clearSessionAndSignOut();
-        } catch (error: unknown) {
-            setAuthProviderError(error as Error);
-            throw error;
-        }
-    }, [clearSessionAndSignOut]);
+        if (!auth) throw new Error("Rebase client with auth is required");
+        await auth.revokeAllSessions();
+    }, [auth]);
 
     return {
         user,
@@ -721,7 +293,7 @@ roles: customRoles };
         needsSetup: authConfig?.needsSetup ?? false,
         registrationEnabled: authConfig?.registrationEnabled ?? false,
         getAuthToken,
-        getApiUrl,
+        getApiUrl: () => client?.baseUrl,
         signOut,
         emailPasswordLogin,
         register,

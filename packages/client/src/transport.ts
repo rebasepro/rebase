@@ -1,6 +1,12 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse } from "@rebasepro/types";
+import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError } from "@rebasepro/types";
 import { serializeFilter, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
+
+// The canonical client error now lives in `@rebasepro/types` so every package
+// (client, auth, …) throws one type. Re-exported here to preserve the historical
+// `import { RebaseApiError } from ".../transport"` path used across the SDK.
+export { RebaseApiError } from "@rebasepro/types";
+export type { RebaseErrorInit } from "@rebasepro/types";
 
 export interface RebaseClientConfig {
     baseUrl?: string;
@@ -16,20 +22,6 @@ export interface RebaseClientConfig {
  */
 export type FindParams = TypesFindParams;
 export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown> ? T : Record<string, unknown>>;
-
-export class RebaseApiError extends Error {
-    status: number;
-    code?: string;
-    details?: unknown;
-
-    constructor(status: number, message: string, code?: string, details?: unknown) {
-        super(message);
-        this.name = "RebaseApiError";
-        this.status = status;
-        this.code = code;
-        this.details = details;
-    }
-}
 
 export function buildQueryString(params?: FindParams): string {
     if (!params) return "";
@@ -180,10 +172,12 @@ headers: retryHeaders });
                         fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
                     }
                     throw new RebaseApiError(
-                        retryRes.status,
                         String(getErrorField(retryBody, "message") || fallbackMessage || `Request failed with status ${retryRes.status}`),
-                        getErrorField(retryBody, "code") as string | undefined,
-                        getErrorField(retryBody, "details")
+                        {
+                            status: retryRes.status,
+                            code: getErrorField(retryBody, "code") as string | undefined,
+                            details: getErrorField(retryBody, "details")
+                        }
                     );
                 }
                 return retryBody as T;
@@ -197,10 +191,12 @@ headers: retryHeaders });
                 fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
             }
             throw new RebaseApiError(
-                res.status,
                 String(getErrorField(body, "message") || fallbackMessage || `Request failed with status ${res.status}`),
-                getErrorField(body, "code") as string | undefined,
-                getErrorField(body, "details")
+                {
+                    status: res.status,
+                    code: getErrorField(body, "code") as string | undefined,
+                    details: getErrorField(body, "details")
+                }
             );
         }
 

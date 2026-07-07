@@ -74,7 +74,7 @@ count: "gt.5" } }))
 // --------------------------------------------------------------------------
 describe("RebaseApiError", () => {
     it("sets name, status, code, and details", () => {
-        const err = new RebaseApiError(422, "Validation failed", "INVALID_INPUT", { field: "email" });
+        const err = new RebaseApiError("Validation failed", { status: 422, code: "INVALID_INPUT", details: { field: "email" } });
         expect(err).toBeInstanceOf(Error);
         expect(err.name).toBe("RebaseApiError");
         expect(err.status).toBe(422);
@@ -84,7 +84,8 @@ describe("RebaseApiError", () => {
     });
 
     it("works without optional parameters", () => {
-        const err = new RebaseApiError(500, "Server error");
+        const err = new RebaseApiError("Server error", { status: 500 });
+        expect(err.status).toBe(500);
         expect(err.code).toBeUndefined();
         expect(err.details).toBeUndefined();
     });

@@ -21,7 +21,11 @@ import { SDKQueryBuilder } from "./sdk_query_builder";
  * `count()`. Program against {@link SDKCollectionClient} when you want a
  * transport-agnostic type.
  */
-export interface CollectionClient<M extends Record<string, unknown> = Record<string, unknown>> extends SDKCollectionClient<M> {
+export interface CollectionClient<
+    M extends Record<string, unknown> = Record<string, unknown>,
+    I = Partial<M>,
+    U = Partial<M>
+> extends SDKCollectionClient<M, I, U> {
     count(params?: FindParams): Promise<number>;
 }
 

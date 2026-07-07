@@ -1,4 +1,5 @@
 import { mapOperator, parseQueryOptions } from "../src/api/rest/query-parser";
+import { deserializeFilter } from "@rebasepro/common";
 
 // ─────────────────────────────────────────────────────────────
 // mapOperator
@@ -77,24 +78,29 @@ describe("parseQueryOptions — PostgREST filters", () => {
         expect(result.where?.status).toEqual(["==", "published"]);
     });
 
-    it("parses gt with number coercion", () => {
+    // NOTE: wire values are preserved as strings. Type coercion is delegated
+    // to the schema-aware driver / PostgreSQL parameter binding, which casts
+    // by column type. This is the canonical filter-dialect contract, shared
+    // byte-for-byte with the SDK/admin path — and it fixes bugs where JS-side
+    // coercion corrupted values (e.g. a "07306" zip code becoming 7306).
+    it("preserves gt value as a string (driver coerces)", () => {
         const result = parseQueryOptions({ age: "gt.18" });
-        expect(result.where?.age).toEqual([">", 18]);
+        expect(result.where?.age).toEqual([">", "18"]);
     });
 
     it("parses gte operator", () => {
         const result = parseQueryOptions({ price: "gte.9.99" });
-        expect(result.where?.price).toEqual([">=", 9.99]);
+        expect(result.where?.price).toEqual([">=", "9.99"]);
     });
 
     it("parses lt operator", () => {
         const result = parseQueryOptions({ count: "lt.100" });
-        expect(result.where?.count).toEqual(["<", 100]);
+        expect(result.where?.count).toEqual(["<", "100"]);
     });
 
     it("parses lte operator", () => {
         const result = parseQueryOptions({ rating: "lte.5" });
-        expect(result.where?.rating).toEqual(["<=", 5]);
+        expect(result.where?.rating).toEqual(["<=", "5"]);
     });
 
     it("parses neq operator", () => {
@@ -102,24 +108,29 @@ describe("parseQueryOptions — PostgREST filters", () => {
         expect(result.where?.status).toEqual(["!=", "draft"]);
     });
 
-    it("parses boolean true", () => {
+    it("preserves boolean literal as a string (driver coerces)", () => {
         const result = parseQueryOptions({ active: "true" });
-        expect(result.where?.active).toEqual(["==", true]);
+        expect(result.where?.active).toEqual(["==", "true"]);
     });
 
-    it("parses boolean false", () => {
-        const result = parseQueryOptions({ active: "false" });
-        expect(result.where?.active).toEqual(["==", false]);
+    it("preserves numeric-looking string without coercion", () => {
+        const result = parseQueryOptions({ zip: "07306" });
+        expect(result.where?.zip).toEqual(["==", "07306"]);
     });
 
-    it("parses null", () => {
+    it("expresses IS NULL via the explicit is-null operator", () => {
+        const result = parseQueryOptions({ deleted_at: "isnull.null" });
+        expect(result.where?.deleted_at).toEqual(["is-null", null]);
+    });
+
+    it("treats a literal `null` value as the string 'null' (use isnull for SQL NULL)", () => {
         const result = parseQueryOptions({ deleted_at: "null" });
-        expect(result.where?.deleted_at).toEqual(["==", null]);
+        expect(result.where?.deleted_at).toEqual(["==", "null"]);
     });
 
-    it("parses numeric strings as numbers", () => {
+    it("parses numeric strings as strings", () => {
         const result = parseQueryOptions({ quantity: "42" });
-        expect(result.where?.quantity).toEqual(["==", 42]);
+        expect(result.where?.quantity).toEqual(["==", "42"]);
     });
 
     it("parses in operator with array", () => {
@@ -127,9 +138,18 @@ describe("parseQueryOptions — PostgREST filters", () => {
         expect(result.where?.role).toEqual(["in", ["admin", "editor", "viewer"]]);
     });
 
-    it("parses in operator with numeric array", () => {
+    it("parses in operator with numeric array (values stay strings)", () => {
         const result = parseQueryOptions({ priority: "in.(1,2,3)" });
-        expect(result.where?.priority).toEqual(["in", [1, 2, 3]]);
+        expect(result.where?.priority).toEqual(["in", ["1", "2", "3"]]);
+    });
+
+    it("produces identical output to the SDK/admin deserializeFilter path", () => {
+        // Same wire input, both code paths — this is the whole point of the
+        // convergence: the REST parser must not diverge from the shared dialect.
+        const wire = { status: "eq.active", age: "gte.18", zip: "07306" };
+        const viaParser = parseQueryOptions(wire).where;
+        const viaDialect = deserializeFilter(wire);
+        expect(viaParser).toEqual(viaDialect);
     });
 
     it("parses array-contains operator", () => {

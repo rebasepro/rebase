@@ -1,6 +1,6 @@
-import type { FilterCondition, LogicalCondition, VectorSearchParams, WhereFilterOp } from "@rebasepro/types";
+import type { LogicalCondition, VectorSearchParams } from "@rebasepro/types";
 import { toCanonicalOp } from "@rebasepro/types";
-import { deserializeOrderBy } from "@rebasepro/common";
+import { deserializeOrderBy, deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 
 export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
@@ -12,83 +12,25 @@ function getLastValue(val: unknown): unknown {
     return val;
 }
 
-export function parseLogicalString(str: string): FilterCondition | LogicalCondition {
-    str = str.trim();
-    if (str.startsWith("or(") && str.endsWith(")")) {
-        const inner = str.slice(3, -1);
-        return { type: "or",
-conditions: parseLogicalList(inner) };
+/**
+ * Parse an `or(...)` / `and(...)` logical group from its wire form.
+ *
+ * The wire carries the inner conditions wrapped in parens (e.g.
+ * `(status.eq.active,age.gte.18)`); we re-attach the `or`/`and` prefix and
+ * delegate to the canonical filter dialect (`@rebasepro/common`). Values are
+ * preserved as strings — type coercion is the schema-aware driver's job, so
+ * this path stays byte-for-byte consistent with the SDK/admin path (which
+ * also parses via the shared dialect).
+ */
+function parseLogicalGroup(type: "or" | "and", raw: unknown): LogicalCondition | undefined {
+    let inner = String(raw).trim();
+    if (inner.startsWith("(") && inner.endsWith(")")) {
+        inner = inner.slice(1, -1);
     }
-    if (str.startsWith("and(") && str.endsWith(")")) {
-        const inner = str.slice(4, -1);
-        return { type: "and",
-conditions: parseLogicalList(inner) };
-    }
-
-    // It's a leaf condition: field.op.val
-    const firstDot = str.indexOf(".");
-    if (firstDot === -1) {
-        return { column: str,
-operator: "==",
-value: true };
-    }
-    const field = str.substring(0, firstDot);
-    const rest = str.substring(firstDot + 1);
-    const secondDot = rest.indexOf(".");
-    let op = "eq";
-    let valStr = rest;
-    if (secondDot !== -1) {
-        op = rest.substring(0, secondDot);
-        valStr = rest.substring(secondDot + 1);
-    } else {
-        op = "eq";
-        valStr = rest;
-    }
-
-    const rebaseOp = (toCanonicalOp(op) ?? "==") as FilterCondition["operator"];
-    let parsedVal: unknown = valStr;
-    if (valStr === "true") parsedVal = true;
-    else if (valStr === "false") parsedVal = false;
-    else if (valStr === "null") parsedVal = null;
-    else if (!isNaN(Number(valStr)) && valStr.trim() !== "") parsedVal = Number(valStr);
-    else if (valStr.startsWith("(")) {
-        const arrayContent = valStr.endsWith(")") ? valStr.slice(1, -1) : valStr.slice(1);
-        parsedVal = arrayContent.split(",").map(v => {
-            const trimmed = v.trim();
-            if (!isNaN(Number(trimmed)) && trimmed !== "") return Number(trimmed);
-            if (trimmed === "true") return true;
-            if (trimmed === "false") return false;
-            if (trimmed === "null") return null;
-            return trimmed;
-        });
-    }
-
-    return { column: field,
-operator: rebaseOp,
-value: parsedVal };
-}
-
-function parseLogicalList(str: string): (FilterCondition | LogicalCondition)[] {
-    const list: (FilterCondition | LogicalCondition)[] = [];
-    let depth = 0;
-    let current = "";
-
-    for (let i = 0; i < str.length; i++) {
-        const char = str[i];
-        if (char === "(") depth++;
-        if (char === ")") depth--;
-
-        if (char === "," && depth === 0) {
-            list.push(parseLogicalString(current));
-            current = "";
-        } else {
-            current += char;
-        }
-    }
-    if (current) {
-        list.push(parseLogicalString(current));
-    }
-    return list;
+    inner = inner.trim();
+    if (!inner) return undefined;
+    const parsed = deserializeLogicalCondition(`${type}(${inner})`);
+    return "type" in parsed ? parsed : undefined;
 }
 
 /**
@@ -111,95 +53,32 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
         options.offset = (page - 1) * limit;
     }
 
-    // Filtering
-    options.where = {};
-
-    // Handle logical conditions
+    // ── Logical conditions (or / and) ──────────────────────────────────
     const orVal = getLastValue(query.or);
     const andVal = getLastValue(query.and);
     if (orVal) {
-        let orStr = String(orVal).trim();
-        if (orStr.startsWith("(") && orStr.endsWith(")")) {
-            orStr = orStr.slice(1, -1);
-        }
-        options.logical = {
-            type: "or",
-            conditions: parseLogicalList(orStr)
-        };
+        const logical = parseLogicalGroup("or", orVal);
+        if (logical) options.logical = logical;
     } else if (andVal) {
-        let andStr = String(andVal).trim();
-        if (andStr.startsWith("(") && andStr.endsWith(")")) {
-            andStr = andStr.slice(1, -1);
-        }
-        options.logical = {
-            type: "and",
-            conditions: parseLogicalList(andStr)
-        };
+        const logical = parseLogicalGroup("and", andVal);
+        if (logical) options.logical = logical;
     }
 
-    // PostgREST-style filtering: ?field=op.value
+    // ── PostgREST-style field filters: ?field=op.value ─────────────────
+    // Delegate to the canonical filter dialect (the single source of truth
+    // for the wire grammar: operator codes, list/escape handling, implicit
+    // eq). Values stay strings; the schema-aware driver coerces them to
+    // column types. This keeps the REST path byte-for-byte consistent with
+    // the SDK/admin path, which parses through the same `deserializeFilter`.
     const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and"];
+    const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
-
-        const rawValues = Array.isArray(rawValue) ? rawValue : [rawValue];
-        const conditions: [WhereFilterOp, unknown][] = [];
-
-        for (const value of rawValues) {
-            if (typeof value === "string") {
-                const parts = value.split(".");
-                if (parts.length >= 2) {
-                    const op = parts[0];
-                    const val = parts.slice(1).join(".");
-                    const rebaseOp = toCanonicalOp(op);
-
-                    if (rebaseOp) {
-                        let parsedVal: string | number | boolean | null | (string | number | boolean | null)[] = val;
-                        // Attempt to parse primitive types or arrays
-                        if (val === "true") parsedVal = true;
-                        else if (val === "false") parsedVal = false;
-                        else if (val === "null") parsedVal = null;
-                        else if (!isNaN(Number(val)) && val.trim() !== "") parsedVal = Number(val);
-                        else if (val.startsWith("(")) {
-                            // Array for 'in' or 'not-in' ops (e.g. (1,2,3) or (a,b,c))
-                            const arrayContent = val.endsWith(")") ? val.slice(1, -1) : val.slice(1);
-                            parsedVal = arrayContent.split(",").map(v => {
-                                const trimmed = v.trim();
-                                if (!isNaN(Number(trimmed)) && trimmed !== "") return Number(trimmed);
-                                if (trimmed === "true") return true;
-                                if (trimmed === "false") return false;
-                                if (trimmed === "null") return null;
-                                return trimmed;
-                            });
-                        }
-
-                        conditions.push([rebaseOp, parsedVal]);
-                    } else {
-                        // Fallback: assume implicit eq if the dot wasn't an operator (e.g. email or float)
-                        let parsedVal: string | number | boolean | null = value;
-                        if (!isNaN(Number(value)) && value.trim() !== "") parsedVal = Number(value);
-                        conditions.push(["==", parsedVal]);
-                    }
-                } else {
-                    // Implicit eq
-                    let parsedVal: string | number | boolean | null = value;
-                    if (value === "true") parsedVal = true;
-                    else if (value === "false") parsedVal = false;
-                    else if (value === "null") parsedVal = null;
-                    else if (!isNaN(Number(value)) && value.trim() !== "") parsedVal = Number(value);
-
-                    conditions.push(["==", parsedVal]);
-                }
-            }
-        }
-
-        if (conditions.length > 0) {
-            options.where[key] = conditions.length === 1 ? conditions[0] : conditions;
-        }
+        filterDict[key] = rawValue;
     }
-
-    if (Object.keys(options.where).length === 0) {
-        delete options.where;
+    const where = deserializeFilter(filterDict);
+    if (Object.keys(where).length > 0) {
+        options.where = where;
     }
 
     // Sorting

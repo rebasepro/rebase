@@ -9,7 +9,8 @@ import {
     CollectionUpdateMessage,
     SingleUpdateMessage,
     TableMetadata,
-    BranchInfo
+    BranchInfo,
+    RebaseApiError
 } from "@rebasepro/types";
 import { rebaseReviver } from "./reviver";
 
@@ -40,19 +41,6 @@ export interface RebaseWebSocketConfig {
     WebSocket?: typeof WebSocket;
     /** Callback to handle unauthorized requests or token expiration (refreshes auth session) */
     onUnauthorized?: () => Promise<boolean>;
-}
-
-
-export class ApiError extends Error {
-    public code?: string;
-    public error?: string;
-
-    constructor(message: string, error?: string, code?: string) {
-        super(message);
-        this.name = "ApiError";
-        this.code = code;
-        this.error = error;
-    }
 }
 
 
@@ -302,7 +290,7 @@ export class RebaseWebSocketClient {
                         request.message._queuedReject = request.reject;
                         this.messageQueue.push(request.message);
                     } else {
-                        request.reject(new ApiError("Connection closed", "Connection closed"));
+                        request.reject(new RebaseApiError("Connection closed"));
                     }
                     this.pendingRequests.delete(reqId);
                 }
@@ -425,7 +413,7 @@ export class RebaseWebSocketClient {
                 });
             } else {
                 const { errorMessage, errorCode } = extractMessageError(message);
-                const error = new ApiError(errorMessage, errorMessage, errorCode);
+                const error = new RebaseApiError(errorMessage, { code: errorCode });
                 subscription.callbacks.forEach(callback => {
                     if (callback.onError) callback.onError(error);
                 });
@@ -455,7 +443,7 @@ export class RebaseWebSocketClient {
                             this.doSendMessage(pendingReq.message, pendingReq.resolve, pendingReq.reject).catch(pendingReq.reject);
                         } else {
                             const { errorMessage, errorCode } = extractMessageError(message);
-                            pendingReq.reject(new ApiError(errorMessage, errorMessage, errorCode));
+                            pendingReq.reject(new RebaseApiError(errorMessage, { code: errorCode }));
                         }
                     }).catch(err => {
                         pendingReq.reject(err);
@@ -463,7 +451,7 @@ export class RebaseWebSocketClient {
                 } else {
                     this.pendingRequests.delete(requestId);
                     const { errorMessage, errorCode } = extractMessageError(message);
-                    pendingReq.reject(new ApiError(errorMessage, errorMessage, errorCode));
+                    pendingReq.reject(new RebaseApiError(errorMessage, { code: errorCode }));
                 }
             } else {
                 this.pendingRequests.delete(requestId);
@@ -603,7 +591,7 @@ export class RebaseWebSocketClient {
                     }
 
                     const { errorMessage, errorCode } = extractMessageError(message);
-                    const error = new ApiError(errorMessage, errorMessage, errorCode);
+                    const error = new RebaseApiError(errorMessage, { code: errorCode });
                     collectionSub.callbacks.forEach(callback => {
                         if (callback.onError) {
                             callback.onError(error);
@@ -630,7 +618,7 @@ export class RebaseWebSocketClient {
                     }
 
                     const { errorMessage, errorCode } = extractMessageError(message);
-                    const error = new ApiError(errorMessage, errorMessage, errorCode);
+                    const error = new RebaseApiError(errorMessage, { code: errorCode });
                     entitySub.callbacks.forEach(callback => {
                         if (callback.onError) {
                             callback.onError(error);
@@ -650,7 +638,7 @@ export class RebaseWebSocketClient {
             if (message.type === "ERROR" || message.error) {
                 if (callback.onError) {
                     const { errorMessage, errorCode } = extractMessageError(message);
-                    callback.onError(new ApiError(errorMessage, errorMessage, errorCode));
+                    callback.onError(new RebaseApiError(errorMessage, { code: errorCode }));
                 }
             } else {
                 callback.onUpdate(message);
@@ -758,7 +746,7 @@ export class RebaseWebSocketClient {
                 await this.ensureAuthenticated();
             } catch (error: unknown) {
                 const errorMessage = error instanceof Error ? error.message : "Authentication required";
-                reject(new ApiError(errorMessage, errorMessage));
+                reject(new RebaseApiError(errorMessage));
                 return;
             }
         }
@@ -782,7 +770,7 @@ export class RebaseWebSocketClient {
             const timeoutHandle = setTimeout(() => {
                 if (this.pendingRequests.has(requestId)) {
                     this.pendingRequests.delete(requestId);
-                    reject(new ApiError("Request timed out", "Request timed out"));
+                    reject(new RebaseApiError("Request timed out"));
                 }
             }, this.requestTimeoutMs);
 
@@ -808,7 +796,7 @@ export class RebaseWebSocketClient {
             if (expectsResponse) {
                 this.pendingRequests.delete(requestId);
             }
-            reject(new ApiError("Failed to send message", error instanceof Error ? error.message : "Unknown error"));
+            reject(new RebaseApiError("Failed to send message", { cause: error }));
         }
     }
 

@@ -11,11 +11,14 @@ import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
 import {
     DEFAULT_STORAGE_SOURCE_KEY,
+    InsertOf,
     RebaseClient,
     RebaseSdkData,
+    RowOf,
     StorageSource,
     StorageSourceDefinition,
-    StorageSourceRegistry
+    StorageSourceRegistry,
+    UpdateOf
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
@@ -101,16 +104,20 @@ type KebabToCamelCase<S extends string> =
     ? `${T}${Capitalize<KebabToCamelCase<U>>}`
     : S;
 
+// Resolve a generated `Database` entry from a (kebab-case) slug literal,
+// or `unknown` when the slug isn't in the schema — the extractors below
+// then fall back to the open row / partial shapes.
+type DBEntry<DB, S extends string> =
+    KebabToCamelCase<S> extends keyof DB ? DB[KebabToCamelCase<S>] : unknown;
+
 type TypedDataLayer<DB> = {
     collection<S extends string>(slug: S): CollectionClient<
-        KebabToCamelCase<S> extends keyof DB
-            ? (DB[KebabToCamelCase<S>] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>)
-            : Record<string, unknown>
+        RowOf<DBEntry<DB, S>>,
+        InsertOf<DBEntry<DB, S>>,
+        UpdateOf<DBEntry<DB, S>>
     >;
 } & {
-    [K in keyof DB]: CollectionClient<
-        DB[K] extends { Row: infer R extends Record<string, unknown> } ? R : Record<string, unknown>
-    >;
+    [K in keyof DB]: CollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>>;
 } & RebaseSdkData;
 
 /**
