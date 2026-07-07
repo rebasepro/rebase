@@ -9,7 +9,7 @@ const usersCollection: CollectionConfig = {
     schema: "rebase",
     icon: "Users",
     group: "Settings",
-    openSnapshotMode: "dialog",
+    openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
     securityRules: [
         { operation: "select",

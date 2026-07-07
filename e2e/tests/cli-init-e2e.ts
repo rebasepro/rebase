@@ -307,9 +307,9 @@ function createBooksCollection(projectPath: string) {
     console.log("📚 Creating new 'books' collection...");
     const collectionsDir = path.join(projectPath, "config", "collections");
 
-    const booksContent = `import { EntityCollection } from "@rebasepro/types";
+    const booksContent = `import { CollectionConfig } from "@rebasepro/types";
 
-const booksCollection: EntityCollection = {
+const booksCollection: CollectionConfig = {
     name: "Books",
     singularName: "Book",
     slug: "books",
