@@ -67,31 +67,17 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
 
         async update(id: string | number, data: Partial<M>) {
-            try {
-                const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
-                    method: "PUT",
-                    body: JSON.stringify(data)
-                });
-                return raw as M;
-            } catch (err) {
-                if (err instanceof RebaseApiError && err.status === 404) {
-                    return undefined;
-                }
-                throw err;
-            }
+            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
+                method: "PUT",
+                body: JSON.stringify(data)
+            });
+            return raw as M;
         },
 
         async delete(id: string | number) {
-            try {
-                return await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
-                    method: "DELETE"
-                });
-            } catch (err) {
-                if (err instanceof RebaseApiError && err.status === 404) {
-                    return undefined;
-                }
-                throw err;
-            }
+            await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
+                method: "DELETE"
+            });
         },
 
         async count(params?: FindParams): Promise<number> {

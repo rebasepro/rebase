@@ -197,32 +197,32 @@ hasMore: false }
             const client = createCollectionClient(transport, "posts");
             const result = await client.update("1", { title: "Updated" } as Record<string, unknown>);
 
-            expect(result!.id).toBe("1");
+            expect(result.id).toBe("1");
             expect((result as Record<string, unknown>).title).toBe("Updated");
         });
 
-        it("should return undefined for 404", async () => {
+        it("should throw RebaseApiError for 404", async () => {
             const { RebaseApiError } = await import("./transport");
             (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
                 new RebaseApiError(404, "Not Found")
             );
 
             const client = createCollectionClient(transport, "posts");
-            const result = await client.update("999", { title: "Nope" } as Record<string, unknown>);
-            expect(result).toBeUndefined();
+            await expect(
+                client.update("999", { title: "Nope" } as Record<string, unknown>)
+            ).rejects.toMatchObject({ status: 404 });
         });
     });
 
     describe("delete()", () => {
-        it("should return undefined for 404", async () => {
+        it("should throw RebaseApiError for 404", async () => {
             const { RebaseApiError } = await import("./transport");
             (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(
                 new RebaseApiError(404, "Not Found")
             );
 
             const client = createCollectionClient(transport, "posts");
-            const result = await client.delete("999");
-            expect(result).toBeUndefined();
+            await expect(client.delete("999")).rejects.toMatchObject({ status: 404 });
         });
 
         it("should propagate non-404 errors", async () => {

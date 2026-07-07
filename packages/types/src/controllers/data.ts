@@ -293,15 +293,16 @@ export interface SDKCollectionClient<M extends Record<string, unknown> = Record<
 
     /**
      * Update an existing record by ID.
-     * @returns The updated row, or `undefined` if the record does not exist.
+     * @returns The updated row.
+     * @throws {RebaseApiError} with status 404 when the record does not exist.
      */
-    update(id: string | number, data: Partial<M>): Promise<M | undefined>;
+    update(id: string | number, data: Partial<M>): Promise<M>;
 
     /**
      * Delete a record by ID.
-     * @returns Resolves, or returns `undefined` if the record does not exist.
+     * @throws {RebaseApiError} with status 404 when the record does not exist.
      */
-    delete(id: string | number): Promise<void | undefined>;
+    delete(id: string | number): Promise<void>;
 
     /**
      * Delete all records in this collection.
