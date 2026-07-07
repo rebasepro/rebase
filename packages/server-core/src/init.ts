@@ -988,7 +988,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Overwrite the HTTP-transport data proxy with the native driver-backed one.
     // The rest of the client (auth, admin, cron, functions, storage) keeps using
     // the HTTP transport, which is fine — they are low-frequency control-plane ops.
-    Object.assign(serverClient, { data: serverData });
+    //
+    // `dataAsAdmin` is the loud, explicitly-named admin accessor; `data` is kept
+    // as a (deprecated) alias pointing at the same admin-scoped, RLS-bypassing
+    // object — same trust level, clearer name at the call site.
+    Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
     logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
 
     // Attach email service to the server client when configured.
@@ -1028,7 +1032,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.info("SQL capability attached to singleton");
     }
 
-    _initRebase(serverClient);
+    // The server client is assembled dynamically above (native data plane,
+    // dataAsAdmin, email, sql attached via Object.assign), so TS can't see the
+    // full RebaseServerClient shape statically — cast at the boundary.
+    _initRebase(serverClient as unknown as import("@rebasepro/types").RebaseServerClient);
     logger.info("Rebase singleton initialized");
 
     // Retroactively inject the server client into the driver so that

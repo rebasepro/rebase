@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { RebaseClient } from "@rebasepro/types";
+import type { RebaseServerClient } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { rebase } from "../singleton";
 
@@ -14,11 +14,16 @@ import { rebase } from "../singleton";
  */
 export interface RebaseFunctionContext {
     /**
-     * The server-side Rebase singleton (`data`, `auth`, `storage`, `email`,
-     * `sql`). `rebase.data` runs with **admin privileges** (no RLS) — use the
-     * request `driver` (`c.var.driver`) for user-scoped queries.
+     * The server-side Rebase singleton (`dataAsAdmin`, `auth`, `storage`,
+     * `email`, `sql`).
+     *
+     * `rebase.dataAsAdmin` runs with **admin privileges and bypasses RLS** — use
+     * it only for trusted admin work. For user-scoped queries inside a handler,
+     * use the request `driver` (`c.var.driver`), which carries the caller's
+     * identity so RLS applies. (`rebase.data` is a deprecated alias for
+     * `rebase.dataAsAdmin`.)
      */
-    rebase: RebaseClient;
+    rebase: RebaseServerClient;
 }
 
 /**

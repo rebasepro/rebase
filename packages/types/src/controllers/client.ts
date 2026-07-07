@@ -237,6 +237,24 @@ export interface RebaseClient<DB = unknown> {
     /** Unified Data access layer */
     data: RebaseSdkData<DB>;
 
+    /**
+     * Admin-scoped, **RLS-bypassing** data accessor.
+     *
+     * Present on the **server** singleton only (see {@link RebaseServerClient}).
+     * It runs with `{ uid: "service", roles: ["admin"] }` — every read and write
+     * bypasses row-level-security policies. This is the correct tool for trusted
+     * background work (cron jobs, migrations, service-to-service tasks).
+     *
+     * ⚠️ **Do NOT use it to serve user-facing data.** Inside a request handler,
+     * user-scoped queries must go through the request-scoped driver
+     * (`c.var.driver`), which carries the caller's identity so RLS applies.
+     * Reaching for `dataAsAdmin` (or its alias {@link data}) in a request handler
+     * silently exposes every row to every caller.
+     *
+     * Undefined in the browser SDK.
+     */
+    dataAsAdmin?: RebaseSdkData<DB>;
+
     /** Unified Authentication layer */
     auth: AuthClient;
 
@@ -309,6 +327,114 @@ export interface RebaseClient<DB = unknown> {
      * Only available server-side with a SQL database.
      */
     sql?(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+}
+
+// ─── RebaseServerClient ──────────────────────────────────────────────────────
+
+/**
+ * The server-side Rebase surface — the shape of the `rebase` singleton exported
+ * from `@rebasepro/server-core`.
+ *
+ * Narrows {@link RebaseClient} to the guarantees that always hold on the server:
+ * the admin-scoped {@link dataAsAdmin} accessor, raw {@link sql}, and the
+ * {@link email} service are all present (non-optional).
+ *
+ * **Trust levels.** Both {@link dataAsAdmin} and the deprecated {@link data}
+ * alias point at the same admin-scoped, **RLS-bypassing** driver. Prefer
+ * `dataAsAdmin` so the privilege is explicit at every call site. For user-scoped
+ * queries inside a request handler use the request-scoped driver
+ * (`c.var.driver`) instead — never `dataAsAdmin`/`data`.
+ */
+export interface RebaseServerClient<DB = unknown> extends RebaseClient<DB> {
+    /**
+     * @deprecated On the server, prefer {@link dataAsAdmin} for admin scope or
+     * the request-scoped driver (`c.var.driver`) for user scope. This alias
+     * points at the same admin-scoped, RLS-bypassing accessor as `dataAsAdmin`.
+     */
+    data: RebaseSdkData<DB>;
+
+    /**
+     * Admin-scoped, **RLS-bypassing** data accessor. Always present server-side.
+     * See {@link RebaseClient.dataAsAdmin} for the full safety contract.
+     */
+    dataAsAdmin: RebaseSdkData<DB>;
+
+    /**
+     * Server-side email service. Always present server-side (a no-op sender is
+     * wired when SMTP is not configured).
+     */
+    email: EmailService;
+
+    /**
+     * Execute raw SQL against the database. Always present server-side for SQL
+     * engines.
+     */
+    sql(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+}
+
+// ─── RebaseBrowserClient ─────────────────────────────────────────────────────
+
+/**
+ * The browser-side Rebase surface — the shape produced by
+ * `createRebaseClient()` in `@rebasepro/client`.
+ *
+ * Its {@link data} accessor is **user-scoped**: every call carries the signed-in
+ * user's token, so backend RLS policies apply. It deliberately omits the
+ * server-only members — there is no `sql`, no `email`, and no
+ * `dataAsAdmin`, so the RLS-bypassing accessor can never be reached from
+ * browser code.
+ */
+export interface RebaseBrowserClient<DB = unknown> {
+    /** User-scoped data access layer (carries the signed-in user's token). */
+    data: RebaseSdkData<DB>;
+
+    /** Unified Authentication layer */
+    auth: AuthClient;
+
+    /** Unified Storage layer (default storage source, backward-compatible) */
+    storage?: StorageSource;
+
+    /** Registry of all named storage sources for multi-backend support */
+    storageRegistry?: StorageSourceRegistry;
+
+    /** Build a server-backed {@link StorageSource} for a named storage source. */
+    createStorageSource?(storageId: string): StorageSource;
+
+    /** Discover the storage sources declared on the backend. */
+    fetchStorageSources?(): Promise<StorageSourceDefinition[]>;
+
+    /** Admin API for user management */
+    admin?: AdminAPI;
+
+    /** Cron job management API */
+    cron?: CronAPI;
+
+    /** Custom backend functions API */
+    functions?: FunctionsAPI;
+
+    /** Service API keys management API */
+    apiKeys?: ApiKeysAPI;
+
+    /** Base HTTP URL of the backend server */
+    baseUrl?: string;
+
+    /** WebSocket client for realtime subscriptions */
+    ws?: RebaseWebSocket;
+
+    /** Set the auth token for subsequent requests */
+    setToken?(token: string | null): void;
+
+    /** Set a function that lazily resolves the auth token */
+    setAuthTokenGetter?(getter: () => Promise<string | null>): void;
+
+    /** Set handler called when a request returns 401 */
+    setOnUnauthorized?(handler: () => Promise<boolean>): void;
+
+    /** Resolve the current auth token */
+    resolveToken?(): Promise<string | null>;
+
+    /** Make a raw HTTP call to the backend */
+    call?<T = unknown>(endpoint: string, payload?: unknown): Promise<T>;
 }
 
 /**
