@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
-import * as fs from "fs";
+import { describe, it, expect } from "@jest/globals";
 import * as path from "path";
-import * as os from "os";
 import { defineCron } from "./define-cron";
 import { loadCronJobsFromDirectory } from "./cron-loader";
+import { requireImporter } from "../../test/helpers/require-importer";
 import type { CronJobDefinition } from "@rebasepro/types";
 
 // ─── Unit: defineCron ───────────────────────────────────────────────
@@ -46,34 +45,17 @@ describe("defineCron", () => {
 // ─── Integration: loader with defineCron fixture ────────────────────
 
 describe("loadCronJobsFromDirectory (defineCron fixture)", () => {
-    let tmpDir: string;
-
-    beforeEach(() => {
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cron-loader-test-"));
-    });
-
-    afterEach(() => {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-    });
+    // Load from a committed fixtures directory (test/fixtures/crons) rather
+    // than writing a temp file at runtime. The fixture is a CJS module (a
+    // nested package.json pins `"type": "commonjs"` inside server-core's ESM
+    // package) exporting the same shape defineCron() returns. Using a stable
+    // on-disk fixture avoids the mkdtemp→write→native-import→rmSync lifecycle,
+    // which raced under jest's parallel workers and intermittently yielded an
+    // empty result.
+    const cronsDir = path.resolve(__dirname, "../../test/fixtures/crons");
 
     it("loads a defineCron-authored file correctly", async () => {
-        // The fixture exports the same shape defineCron() returns (identity
-        // is proven by the unit tests above). Using a plain object here
-        // because the temp .js file can't require() our .ts source.
-        const fixture = `
-            module.exports = {
-                name: "Fixture job",
-                schedule: "*/10 * * * *",
-                description: "Test fixture",
-                handler: async function(ctx) {
-                    ctx.log("hello");
-                    return { ok: true };
-                },
-            };
-        `;
-        fs.writeFileSync(path.join(tmpDir, "fixture-job.js"), fixture);
-
-        const jobs = await loadCronJobsFromDirectory(tmpDir);
+        const jobs = await loadCronJobsFromDirectory(cronsDir, requireImporter);
 
         expect(jobs).toHaveLength(1);
         expect(jobs[0].id).toBe("fixture-job");

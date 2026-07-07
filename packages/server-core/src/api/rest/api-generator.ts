@@ -169,7 +169,7 @@ export class RestApiGenerator {
                 const path = collection.slug;
 
 
-                let body = await c.req.json().catch(() => ({}));
+                const body = await c.req.json().catch(() => ({}));
 
 
 
@@ -256,7 +256,7 @@ values: entity.values as Record<string, unknown> },
                     throw ApiError.notFound("Entity not found");
                 }
 
-                let body = await c.req.json().catch(() => ({}));
+                const body = await c.req.json().catch(() => ({}));
 
 
 
@@ -453,7 +453,7 @@ id };
 
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
-            let body = await c.req.json().catch(() => ({}));
+            const body = await c.req.json().catch(() => ({}));
 
 
 
@@ -483,7 +483,7 @@ id };
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
-            let body = await c.req.json().catch(() => ({}));
+            const body = await c.req.json().catch(() => ({}));
 
 
 

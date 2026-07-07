@@ -3,6 +3,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import type { CronJobDefinition } from "@rebasepro/types";
 import { logger } from "../utils/logger.js";
+import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 
 export interface LoadedCronJob {
     /** Job ID derived from filename (e.g. "cleanup-sessions"). */
@@ -21,7 +22,8 @@ export interface LoadedCronJob {
  * Follows the same discovery pattern as `loadFunctionsFromDirectory`.
  */
 export async function loadCronJobsFromDirectory(
-    directory: string
+    directory: string,
+    importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedCronJob[]> {
     const jobs: LoadedCronJob[] = [];
 
@@ -42,9 +44,7 @@ export async function loadCronJobsFromDirectory(
             try {
                 const fileUrl = pathToFileURL(filePath).href;
 
-                // Native dynamic import — bypasses tsc down-compilation
-                const dynamicImport = new Function("url", "return import(url)");
-                const mod = await dynamicImport(fileUrl);
+                const mod = await importModule(fileUrl);
 
                 const exported: unknown = mod.default;
 

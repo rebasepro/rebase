@@ -3,6 +3,7 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import { Hono } from "hono";
 import { logger } from "../utils/logger.js";
+import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 
 export interface LoadedFunction {
     /** Endpoint name derived from filename (e.g., "send-invoice") */
@@ -21,7 +22,8 @@ export interface LoadedFunction {
  * This mirrors how `loadCollectionsFromDirectory` works for collections.
  */
 export async function loadFunctionsFromDirectory(
-    directory: string
+    directory: string,
+    importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedFunction[]> {
     const functions: LoadedFunction[] = [];
     // Aggregate problem files so a broken function surfaces as one loud
@@ -46,10 +48,7 @@ export async function loadFunctionsFromDirectory(
             try {
                 const fileUrl = pathToFileURL(filePath).href;
 
-                // Use new Function to compile dynamic import natively and bypass
-                // tsc converting import() to require() — same pattern as collection loader
-                const dynamicImport = new Function("url", "return import(url)");
-                const mod = await dynamicImport(fileUrl);
+                const mod = await importModule(fileUrl);
 
                 const exported = mod.default;
 

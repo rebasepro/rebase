@@ -15,11 +15,18 @@ describe("mapOperator", () => {
         expect(mapOperator("nin")).toBe("not-in");
         expect(mapOperator("cs")).toBe("array-contains");
         expect(mapOperator("csa")).toBe("array-contains-any");
+        // LIKE family + null checks (added with the filter-operators feature)
+        expect(mapOperator("like")).toBe("like");
+        expect(mapOperator("ilike")).toBe("ilike");
+        expect(mapOperator("nlike")).toBe("not-like");
+        expect(mapOperator("nilike")).toBe("not-ilike");
+        expect(mapOperator("isnull")).toBe("is-null");
+        expect(mapOperator("notnull")).toBe("is-not-null");
     });
 
     it("returns null for unknown operators", () => {
-        expect(mapOperator("like")).toBeNull();
         expect(mapOperator("between")).toBeNull();
+        expect(mapOperator("xyz")).toBeNull();
         expect(mapOperator("")).toBeNull();
     });
 });

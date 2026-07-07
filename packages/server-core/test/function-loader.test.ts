@@ -1,80 +1,26 @@
-import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
-import { Hono } from "hono";
 import { loadFunctionsFromDirectory } from "../src/functions/function-loader";
 import { createFunctionRoutes } from "../src/functions/function-routes";
+import { requireImporter } from "./helpers/require-importer";
 
+// Committed fixtures directory (test/fixtures/functions). A nested
+// package.json pins `"type": "commonjs"` so the `.js` fixtures load as CJS
+// inside server-core's ESM package, and living inside the package tree lets
+// them `require("hono")`. Tests inject `requireImporter` so discovery is
+// deterministic — no native-import race under jest's parallel workers, no
+// runtime temp-file churn. Fixtures: valid-app, valid-factory (loaded),
+// invalid-export, no-default (rejected), ignored.txt (wrong extension).
 describe("Function Loader & Routes", () => {
-    let tempDir: string;
-
-    beforeAll(() => {
-        // Create temporary directory in OS temp folder
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-functions-test-"));
-
-        // 1. Write a valid Hono app default export using CommonJS
-        fs.writeFileSync(
-            path.join(tempDir, "valid-app.js"),
-            `
-            const { Hono } = require("hono");
-            const app = new Hono();
-            app.get("/hello", (c) => c.text("hello from valid-app"));
-            module.exports = app;
-            `
-        );
-
-        // 2. Write a valid Hono app factory default export using CommonJS
-        fs.writeFileSync(
-            path.join(tempDir, "valid-factory.js"),
-            `
-            const { Hono } = require("hono");
-            module.exports = () => {
-                const app = new Hono();
-                app.post("/hello", (c) => c.text("hello from valid-factory"));
-                return app;
-            };
-            `
-        );
-
-        // 3. Write an invalid default export
-        fs.writeFileSync(
-            path.join(tempDir, "invalid-export.js"),
-            `
-            module.exports = { foo: "bar" };
-            `
-        );
-
-        // 4. Write a file with no default export (exports is an object but no module.exports default value)
-        fs.writeFileSync(
-            path.join(tempDir, "no-default.js"),
-            `
-            exports.other = "value";
-            `
-        );
-
-        // 5. Write an ignored non-js/ts file
-        fs.writeFileSync(
-            path.join(tempDir, "ignored.txt"),
-            "some random text"
-        );
-    });
-
-    afterAll(() => {
-        // Clean up temp directory
-        if (tempDir && fs.existsSync(tempDir)) {
-            fs.rmSync(tempDir, { recursive: true,
-force: true });
-        }
-    });
+    const functionsDir = path.resolve(__dirname, "fixtures/functions");
 
     describe("loadFunctionsFromDirectory", () => {
         it("should return empty array if directory does not exist", async () => {
-            const result = await loadFunctionsFromDirectory(path.join(tempDir, "non-existent-folder"));
+            const result = await loadFunctionsFromDirectory(path.join(functionsDir, "non-existent-folder"), requireImporter);
             expect(result).toEqual([]);
         });
 
         it("should load valid apps and factories while ignoring invalid files", async () => {
-            const loaded = await loadFunctionsFromDirectory(tempDir);
+            const loaded = await loadFunctionsFromDirectory(functionsDir, requireImporter);
 
             // We expect exactly 2 functions to be loaded: "valid-app" and "valid-factory"
             expect(loaded).toHaveLength(2);
@@ -96,7 +42,7 @@ force: true });
 
     describe("createFunctionRoutes", () => {
         it("should mount and route correctly", async () => {
-            const loaded = await loadFunctionsFromDirectory(tempDir);
+            const loaded = await loadFunctionsFromDirectory(functionsDir, requireImporter);
             const routes = createFunctionRoutes(loaded);
 
             // 1. Verify GET / lists loaded functions
