@@ -56,6 +56,15 @@ export class ApiError extends Error {
 }
 
 
+/**
+ * Low-level realtime WebSocket client.
+ *
+ * @internal Not a stable app-facing API. `createRebaseClient()` constructs and
+ * manages this internally (exposed as `client.ws`, typed by the minimal
+ * `RebaseWebSocket` contract in `@rebasepro/types`). It is re-exported from the
+ * package root only because the `@rebasepro/client-postgresql` driver
+ * instantiates it directly; its surface may change without a major bump.
+ */
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;

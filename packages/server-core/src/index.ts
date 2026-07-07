@@ -32,14 +32,81 @@ export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 export * from "./db/interfaces";
 
 // =============================================================================
-// Auth
+// Auth — curated public surface (NOT `export *`).
+//
+// `./auth` (auth/index.ts) intentionally exports its internal plumbing so
+// server-core's own init/wiring can consume it: token generation & JWT config,
+// password/token crypto, route mounters (`createAuthRoutes`, `mountMagicLink…`),
+// rate limiters, and the low-level middleware factories. None of that is a
+// backend-author API and none of it has external consumers, so it must not be
+// republished at the package root. Below is the deliberate public list —
+// driver-contract interfaces, custom-auth adapters, OAuth providers, route
+// guards, password helpers, auth hooks, and API-key types. Add here on purpose.
 // =============================================================================
-export * from "./auth";
+// Driver contract: repositories + auth data types (implemented by the
+// server-postgresql / server-mongodb drivers).
+export * from "./auth/interfaces";
+export {
+    // Route guards for custom functions/routes
+    requireAuth,
+    requireAdmin,
+    optionalAuth,
+    queryTokenAuth,
+    extractUserFromToken,
+    // Password helpers (custom user creation)
+    hashPassword,
+    verifyPassword,
+    validatePasswordStrength,
+    // Auth customization hooks
+    resolveAuthHooks,
+    // Pluggable auth adapters
+    createBuiltinAuthAdapter,
+    createCustomAuthAdapter,
+    // Social login providers
+    createGoogleProvider,
+    createLinkedinProvider,
+    createGitHubProvider,
+    createMicrosoftProvider,
+    createAppleProvider,
+    createFacebookProvider,
+    createTwitterProvider,
+    createDiscordProvider,
+    createGitLabProvider,
+    createBitbucketProvider,
+    createSlackProvider,
+    createSpotifyProvider,
+    // API-key permission helpers
+    isApiKeyToken,
+    validateApiKey,
+    httpMethodToOperation,
+    isOperationAllowed
+} from "./auth";
+export type {
+    AccessTokenPayload,
+    PasswordValidationResult,
+    AuthHooks,
+    AuthMethod,
+    ResolvedAuthHooks,
+    BuiltinAuthAdapterConfig,
+    GoogleProviderConfig,
+    AuthMiddlewareOptions,
+    AuthResult,
+    ApiKey,
+    ApiKeyMasked,
+    ApiKeyPermission,
+    ApiKeyWithSecret,
+    CreateApiKeyRequest,
+    UpdateApiKeyRequest,
+    ApiKeyStore,
+    ApiKeyOperation
+} from "./auth";
 
 // =============================================================================
-// API Layer
+// API Layer — public types + error surface only. The `RestApiGenerator`
+// route builder (`./api/rest`) is internal framework wiring, not re-exported.
 // =============================================================================
-export * from "./api";
+export * from "./api/types";
+export * from "./api/errors";
 
 // =============================================================================
 // Email
@@ -96,7 +163,8 @@ export * from "./types";
 export * from "./services/driver-registry";
 
 // =============================================================================
-// Internal plumbing exported for the official app/backend
+// @internal — dev-server / SPA-serving plumbing for the official app template.
+// Not part of the stable public API; see the JSDoc on each symbol.
 // =============================================================================
 export { cleanupDevPortFile, listenWithPortRetry } from "./utils/dev-port";
 export { serveSPA } from "./serve-spa";

@@ -28,6 +28,12 @@ export const DEV_PORT_FILENAME = ".rebase-dev-port";
  * is tried first to maintain port affinity across tsx watch restarts.
  *
  * Resolves with the port that was actually bound.
+ *
+ * @internal Not part of the stable public API. Exported only because the
+ * official app template (`packages/cli/templates/template/backend/src/index.ts`
+ * and `app/backend/src/index.ts`) calls it directly in dev mode. Its dev-only
+ * port-affinity behavior is an implementation detail and may change without
+ * a major version bump.
  */
 export function listenWithPortRetry(
     server: Server,
@@ -137,6 +143,8 @@ export function listenWithPortRetry(
 
 /**
  * Clean up the dev port file and state file (call on graceful shutdown).
+ *
+ * @internal Not part of the stable public API. See {@link listenWithPortRetry}.
  */
 export function cleanupDevPortFile(dir: string): void {
     try {

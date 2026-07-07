@@ -36,6 +36,12 @@ export interface ServeSPAConfig {
 
 /**
  * Serve a Single Page Application from an Hono app.
+ *
+ * @internal Not part of the stable public API. Exported only because the
+ * official app template (`packages/cli/templates/template/backend/src/index.ts`
+ * and `app/backend/src/index.ts`) calls it to serve the built frontend in
+ * production. Its request-handling behavior is an implementation detail and
+ * may change without a major version bump.
  */
 export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: ServeSPAConfig): void {
     const {

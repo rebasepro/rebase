@@ -3,6 +3,15 @@ import { useLocation } from "react-router-dom";
 
 const scrollsMap: Record<string, number> = {};
 
+/**
+ * Restores per-route scroll position on a scrollable container, keyed by
+ * router location. Used by the framework's own home page implementations.
+ *
+ * @internal Not part of the stable public API — exported only because
+ * `@rebasepro/admin` and `@rebasepro/studio` reuse it in their home page
+ * components. Its behavior (module-level scroll cache, router coupling) is
+ * an implementation detail and may change without a major version bump.
+ */
 export function useRestoreScroll() {
 
     const location = useLocation();

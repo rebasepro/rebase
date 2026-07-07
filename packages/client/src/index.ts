@@ -19,21 +19,57 @@ import {
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
-export * from "./transport";
-export * from "./auth";
-export * from "./admin";
-export * from "./cron";
-export * from "./api-keys";
-export * from "./collection";
-export * from "./query_builder";
-export * from "./sdk_query_builder";
-export * from "./websocket";
-export * from "./storage";
-export * from "./storage-registry";
-export * from "./reviver";
-export * from "./functions";
-export * from "./errors";
+// ─── Public API surface ──────────────────────────────────────────────────────
+//
+// This barrel is the public API of `@rebasepro/client`. It is an explicit,
+// curated list — NOT `export *` — so that adding an export to a module below
+// does not silently republish it to app developers. Internal factories
+// (`createTransport`, `createAuth`, `createCollectionClient`, …), the raw
+// `Transport`, the storage-source registry impl, the JSON reviver, and the
+// concrete `SDKQueryBuilder` class are intentionally NOT re-exported: they are
+// implementation details of `createRebaseClient()` and have no external
+// consumers. App developers reach them through the client instance, never by
+// importing the factory. To add something to the public surface, add it here
+// deliberately.
+
+// Errors — the single error type thrown by SDK HTTP calls, plus the
+// data-proxy's unknown-collection error.
+export { RebaseApiError } from "./transport";
+export { RebaseClientError } from "./errors";
+
+// Query + collection types (annotate SDK results; construct via the fluent API).
+export type { RebaseClientConfig, FindParams, FindResponse } from "./transport";
+export type { CollectionClient } from "./collection";
 export type { FindResult, SDKCollectionClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
+
+// Logical-condition helpers for `.where(or(...), and(...))`.
+export { QueryBuilder, or, and, cond } from "@rebasepro/common";
+
+// Auth: session/token types, config, and the pluggable storage strategies.
+export { createCookieStorage, createMemoryStorage } from "./auth";
+export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions } from "./auth";
+export type { RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
+/** @deprecated Import `User` / `AuthTokens` from `@rebasepro/types` instead. */
+export type { RebaseUser, RebaseTokens } from "./auth";
+
+// Control-plane client option/DTO types (the client instance exposes the impls).
+export type { CreateAdminOptions } from "./admin";
+export type { AdminUser } from "./admin";
+export type { CreateCronOptions } from "./cron";
+export type {
+    ApiKeyMasked,
+    ApiKeyPermission,
+    ApiKeyWithSecret,
+    CreateApiKeyRequest,
+    CreateApiKeysOptions,
+    UpdateApiKeyRequest
+} from "./api-keys";
+export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
+
+// Realtime: the WebSocket client class is internal to `createRebaseClient()`,
+// but re-exported (see @internal on the class) because the `client-postgresql`
+// driver constructs it directly. Not a stable app-facing API.
+export { RebaseWebSocketClient } from "./websocket";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;

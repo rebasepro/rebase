@@ -3,8 +3,13 @@ export * from "./hooks";
 export * from "./components";
 export * from "./util";
 export * from "./contexts";
-export * from "./internal/common";
-export * from "./internal/useRestoreScroll";
+
+// @internal — framework implementation details, exported only because
+// @rebasepro/admin and @rebasepro/studio consume them. Named explicitly
+// (not `export *`) so this file is the single place that grows or shrinks
+// the internal surface — see the JSDoc on each symbol for details.
+export { CONTAINER_FULL_WIDTH, ADDITIONAL_TAB_WIDTH, FORM_CONTAINER_WIDTH } from "./internal/common";
+export { useRestoreScroll } from "./internal/useRestoreScroll";
 export { useUnsavedChangesDialog } from "./hooks/useUnsavedChangesDialog";
 export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialog";
 export { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";

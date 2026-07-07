@@ -155,5 +155,22 @@ export default [
         rules: {
             "@typescript-eslint/no-require-imports": "off"
         }
+    },
+    {
+        // A package's public API surface is only as trustworthy as its
+        // barrel file. `export *` into a folder literally named "internal"
+        // silently republishes every future addition to that folder as
+        // public API — nobody reviewing the barrel diff would notice. Named
+        // re-exports (`export { x } from "./internal/y"`) are fine: they
+        // make the internal-to-public boundary an explicit, reviewable list
+        // (see packages/core/src/index.ts for the pattern — pair with an
+        // `@internal` JSDoc tag on each re-exported symbol).
+        files: ["packages/*/src/index.{ts,tsx}"],
+        rules: {
+            "no-restricted-syntax": ["error", {
+                selector: "ExportAllDeclaration[source.value=/internal/]",
+                message: "Do not `export *` from a folder/file named 'internal' in a package barrel — it silently republishes every future export as public API. Re-export the specific symbols by name instead, each with an @internal JSDoc tag."
+            }]
+        }
     }
 ];
