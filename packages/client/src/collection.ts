@@ -12,10 +12,14 @@ import {
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
 /**
- * CollectionClient returns flat rows (no Entity wrapper).
- * This is the public API surface for app developers.
+ * The concrete, HTTP-backed implementation of the public
+ * {@link SDKCollectionClient} contract — flat rows (no Entity wrapper), plus
+ * fluent query-builder methods (`.where()`, `.orderBy()`, …).
  *
- * Additionally it exposes fluent query builder methods like `.where()`, `.orderBy()`.
+ * This is what `createRebaseClient().data.<collection>` returns. It is not a
+ * separate API from {@link SDKCollectionClient}; it only widens it with
+ * `count()`. Program against {@link SDKCollectionClient} when you want a
+ * transport-agnostic type.
  */
 export interface CollectionClient<M extends Record<string, unknown> = Record<string, unknown>> extends SDKCollectionClient<M> {
     count(params?: FindParams): Promise<number>;

@@ -60,7 +60,16 @@ export interface CronJobContext {
     /** A simple logger scoped to this job run. */
     log: (...args: unknown[]) => void;
 
-    /** The RebaseClient instance to interact with the database. */
+    /**
+     * The server-side {@link RebaseClient}. This is the **same singleton**
+     * exposed as `rebase` (imported from `@rebasepro/server-core`) and as
+     * `context` in collection callbacks — it is only named `client` here.
+     *
+     * Its data plane (`client.data`) runs with **admin privileges and bypasses
+     * RLS** (`{ uid: "service", roles: ["admin"] }`). There is no per-request
+     * user in a cron, so treat every query as fully trusted and scope your own
+     * filters explicitly.
+     */
     client: RebaseClient;
 }
 

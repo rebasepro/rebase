@@ -41,12 +41,11 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
     });
 
     it("throws RebaseClientError on unknown key with suggestion", () => {
-        expect(() => {
-            (client.data as Record<string, unknown>)["prodcuts"];
-        }).toThrow(RebaseClientError);
+        const access = () => (client.data as Record<string, unknown>)["prodcuts"];
+        expect(access).toThrow(RebaseClientError);
 
         try {
-            (client.data as Record<string, unknown>)["prodcuts"];
+            access();
         } catch (e) {
             expect(e).toBeInstanceOf(RebaseClientError);
             expect((e as RebaseClientError).message).toContain("prodcuts");
@@ -57,12 +56,11 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
     });
 
     it("throws RebaseClientError on unknown key without a close match", () => {
-        expect(() => {
-            (client.data as Record<string, unknown>)["zzz"];
-        }).toThrow(RebaseClientError);
+        const access = () => (client.data as Record<string, unknown>)["zzz"];
+        expect(access).toThrow(RebaseClientError);
 
         try {
-            (client.data as Record<string, unknown>)["zzz"];
+            access();
         } catch (e) {
             expect(e).toBeInstanceOf(RebaseClientError);
             expect((e as RebaseClientError).message).toContain("zzz");
@@ -71,8 +69,9 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
     });
 
     it("lists all known collections in the error message", () => {
+        const access = () => (client.data as Record<string, unknown>)["nonexistent"];
         try {
-            (client.data as Record<string, unknown>)["nonexistent"];
+            access();
         } catch (e) {
             const msg = (e as RebaseClientError).message;
             expect(msg).toContain("products");
@@ -121,12 +120,8 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
 
     it("falls back to snake_case conversion without a dictionary", () => {
         // Should not throw for any property name
-        expect(() => {
-            (client.data as Record<string, unknown>)["blogPosts"];
-        }).not.toThrow();
-        expect(() => {
-            (client.data as Record<string, unknown>)["anyRandomProp"];
-        }).not.toThrow();
+        expect(() => (client.data as Record<string, unknown>)["blogPosts"]).not.toThrow();
+        expect(() => (client.data as Record<string, unknown>)["anyRandomProp"]).not.toThrow();
     });
 
     it("returns a CollectionClient for any camelCase property", () => {
@@ -153,7 +148,8 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
             const freshClient = createRebaseClient({
                 baseUrl: "http://localhost:3000",
             });
-            (freshClient.data as Record<string, unknown>)["firstAccess"];
+            const readFirst = () => (freshClient.data as Record<string, unknown>)["firstAccess"];
+            readFirst();
             expect(warnSpy).toHaveBeenCalledTimes(1);
             expect(warnSpy).toHaveBeenCalledWith(
                 expect.stringContaining("[Rebase] Untyped data access detected")
@@ -161,7 +157,8 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
 
             // Second access should NOT warn again
             warnSpy.mockClear();
-            (freshClient.data as Record<string, unknown>)["secondAccess"];
+            const readSecond = () => (freshClient.data as Record<string, unknown>)["secondAccess"];
+            readSecond();
             expect(warnSpy).not.toHaveBeenCalled();
         } finally {
             warnSpy.mockRestore();

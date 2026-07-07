@@ -17,19 +17,51 @@ export interface FilterCondition {
 /**
  * Parameters for querying a collection.
  *
+ * ## How the filter parameters combine
+ *
+ * `where`, `logical`, and `searchString` are **independent** and, when more
+ * than one is present, are combined with **AND** — every clause must match.
+ * Concretely the backend builds:
+ *
+ * ```text
+ * (where filters, AND-ed together)
+ *   AND (logical group)
+ *   AND (searchString matches, OR-ed across searchable columns)
+ * ```
+ *
+ * So `where` does **not** conflict with or override `logical` — they stack.
+ * If you need `where` fields OR-ed with each other, move them into `logical`
+ * instead. There is no way to OR `where` against `logical`; express anything
+ * that isn't a plain AND of the three groups inside a single `logical` tree.
+ *
+ * ## Pagination precedence
+ *
+ * `limit`/`offset` and `page` describe the same window two ways. If **both
+ * `offset` and `page` are provided, `page` wins** — the backend computes
+ * `offset = (page - 1) * (limit ?? 20)` and ignores the explicit `offset`.
+ * Pick one style per query.
+ *
  * @group Data
  */
 export interface FindParams {
-    /** Maximum number of items to return (default: 20) */
+    /** Maximum number of items to return (default: 20). */
     limit?: number;
-    /** Number of items to skip */
+    /**
+     * Number of items to skip. Ignored when {@link FindParams.page} is also
+     * set — `page` takes precedence.
+     */
     offset?: number;
-    /** Page number (1-indexed), alternative to offset */
+    /**
+     * Page number (1-indexed), alternative to {@link FindParams.offset}.
+     * When set, overrides `offset` as `(page - 1) * (limit ?? 20)`.
+     */
     page?: number;
     /**
      * Filter conditions keyed by field name.
      * Each value is a `[WhereFilterOp, value]` tuple or an array of tuples
-     * for multiple conditions on the same field.
+     * for multiple conditions on the same field. Multiple fields, and multiple
+     * tuples on one field, are **AND-ed**; also AND-ed with `logical` and
+     * `searchString` when present (see the interface docs).
      *
      * @example
      * { status: ["==", "active"] }
@@ -38,7 +70,11 @@ export interface FindParams {
      * { age: [[">=", 18], ["<", 65]] }
      */
     where?: FilterValues<string>;
-    /** Logical grouping conditions (AND/OR) */
+    /**
+     * Logical grouping conditions (AND/OR). Use this for anything `where`
+     * can't express — notably OR-ing conditions. AND-ed with `where` and
+     * `searchString` when present (see the interface docs).
+     */
     logical?: LogicalCondition;
     /**
      * Sort order as a `[field, direction]` tuple.
@@ -47,7 +83,11 @@ export interface FindParams {
     orderBy?: OrderByTuple;
     /** Relations to include in the response */
     include?: string[];
-    /** Full-text search string */
+    /**
+     * Full-text search string. Matched (OR-ed) across the collection's
+     * searchable columns, then AND-ed with `where`/`logical`. This is the
+     * value behind the query builder's `.search()` method.
+     */
     searchString?: string;
 }
 
@@ -70,7 +110,13 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
 
 
 /**
- * Fluent Query Builder Interface supported on both client and server accessors.
+ * Fluent query builder for the **admin CMS** — resolves to `FindResponse<M>`
+ * (Snapshot-wrapped rows).
+ *
+ * @internal App developers should use {@link SDKQueryBuilderInterface}
+ * (flat rows, returned by `client.data.*` / `context.data.*`). This
+ * Snapshot-flavored variant backs the admin CMS internals only.
+ *
  * @group Data
  */
 export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
@@ -86,11 +132,13 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
 }
 
 /**
- * A single collection's CRUD accessor.
+ * A single collection's CRUD accessor for the **admin CMS** — every method
+ * resolves to `Snapshot`-wrapped rows (`FindResponse<M>` / `Snapshot<M>`).
  *
- * This is the unified API surface used in both:
- * - The generated SDK (`client.data.products.create(...)`)
- * - Framework callbacks (`context.data.products.create(...)`)
+ * @internal App developers do **not** use this. The public, symmetric surface
+ * is {@link SDKCollectionClient} (flat rows), exposed as `client.data.products`
+ * in the SDK and `context.data.products` in framework callbacks. This
+ * Snapshot-flavored accessor backs the admin CMS view-model only.
  *
  * @group Data
  */
@@ -293,8 +341,9 @@ export interface SDKCollectionClient<M extends Record<string, unknown> = Record<
  * view-model the CMS renders. This is what `useData()` / the admin
  * `RebaseContext.data` are backed by.
  *
- * App developers do NOT use this — they use {@link RebaseSdkData} (flat rows),
- * which is what the SDK client and backend `context.data` expose.
+ * @internal App developers do **not** use this — they use
+ * {@link RebaseSdkData} (flat rows), which is what the SDK client and backend
+ * `context.data` expose. This Entity-shaped map backs the admin CMS only.
  *
  * @group Data
  */
