@@ -23,7 +23,8 @@ import {
     RestFilterOp,
     toCanonicalOp,
     LogicalCondition,
-    FilterCondition
+    FilterCondition,
+    NULL_OPS
 } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
@@ -228,6 +229,12 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
         // Not a known operator (e.g., email "user@host.com" or version "1.2.3")
         // Treat the entire string as an equality value
         return ["==", raw];
+    }
+
+    // Null-testing operators ignore their serialized value — normalize to null
+    // so the tuple round-trips stably (`isnull.null` → ["is-null", null]).
+    if (NULL_OPS.has(canonicalOp)) {
+        return [canonicalOp, null];
     }
 
     // Parse list values: "(admin,editor)" → ["admin", "editor"]

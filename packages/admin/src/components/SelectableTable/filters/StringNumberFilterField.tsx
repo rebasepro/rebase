@@ -21,6 +21,12 @@ interface StringNumberFilterFieldProps {
     isArray?: boolean;
     enumValues?: EnumValueConfig[];
     title?: string;
+    /**
+     * Restrict the offered operators (already resolved against engine
+     * capabilities and property config). When omitted, all operators this
+     * field can render are offered.
+     */
+    operators?: readonly VirtualTableWhereFilterOp[];
 }
 
 const operationLabels = {
@@ -34,10 +40,22 @@ const operationLabels = {
     "not-in": "Not in",
     "array-contains": "Contains",
     "array-contains-any": "Any",
-    "is-null": "Is null"
+    "ilike": "Contains",
+    "not-ilike": "Not contains",
+    "is-null": "Is null",
+    "is-not-null": "Is not null"
 };
 
 const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
+
+/** Operators that match a substring, wrapped in SQL wildcards (`%value%`). */
+const containsOperations = ["ilike", "not-ilike"];
+
+/** Strip the surrounding `%` wildcards a contains-filter adds, for display. */
+function unwrapContains(value: unknown): string {
+    if (typeof value !== "string") return "";
+    return value.replace(/^%/, "").replace(/%$/, "");
+}
 
 export function StringNumberFilterField({
                                             name,
@@ -46,13 +64,20 @@ export function StringNumberFilterField({
                                             type,
                                             isArray,
                                             enumValues,
-                                            title
+                                            title,
+                                            operators
                                         }: StringNumberFilterFieldProps) {
     const { t } = useTranslation();
 
-    const possibleOperations: (keyof typeof operationLabels)[] = isArray
+    let possibleOperations: (keyof typeof operationLabels)[] = isArray
         ? ["array-contains"]
-        : ["==", "!=", ">", "<", ">=", "<=", "is-null"];
+        : ["==", "!=", ">", "<", ">=", "<=", "is-null", "is-not-null"];
+
+    // Case-insensitive substring matching is only meaningful for free-text
+    // string columns (not numbers, arrays, or enums).
+    if (!isArray && !enumValues && type === "string") {
+        possibleOperations.push("ilike", "not-ilike");
+    }
 
     if (enumValues) {
         if (isArray) {
@@ -62,18 +87,47 @@ export function StringNumberFilterField({
         }
     }
 
+    if (operators) {
+        possibleOperations = possibleOperations.filter(op => (operators as readonly string[]).includes(op));
+    }
+
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
-    const [operation, setOperation] = useState<VirtualTableWhereFilterOp | "is-null">(fieldOperation === "==" && fieldValue === null ? "is-null" : fieldOperation);
-    const [internalValue, setInternalValue] = useState<string | number | string[] | number[] | null | undefined>(fieldValue as string | number | string[] | number[] | null | undefined);
+    // Read back both the canonical null operators and the legacy `["==", null]` /
+    // `["!=", null]` form saved by older filter presets.
+    const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(
+        fieldOperation === "==" && fieldValue === null ? "is-null"
+            : fieldOperation === "!=" && fieldValue === null ? "is-not-null"
+                : fieldOperation
+    );
+    const [internalValue, setInternalValue] = useState<string | number | string[] | number[] | null | undefined>(
+        containsOperations.includes(fieldOperation) ? unwrapContains(fieldValue) : (fieldValue as string | number | string[] | number[] | null | undefined)
+    );
 
-    const isNullOperation = operation === "is-null";
+    const isNullOperation = operation === "is-null" || operation === "is-not-null";
 
-    function updateFilter(op: VirtualTableWhereFilterOp | "is-null", val: string | number | string[] | number[] | null | undefined) {
-        // Handle "is null" operation
-        if (op === "is-null") {
+    // All renderable operators were filtered out (engine/property narrowing).
+    if (possibleOperations.length === 0) return null;
+
+    function updateFilter(op: VirtualTableWhereFilterOp, val: string | number | string[] | number[] | null | undefined) {
+        // Null-testing operators ignore their value.
+        if (op === "is-null" || op === "is-not-null") {
             setOperation(op);
             setInternalValue(null);
-            setValue(["==", null]);
+            setValue([op, null]);
+            return;
+        }
+
+        // Substring matching: keep the raw text in the field, emit it wrapped
+        // in SQL wildcards so the backend runs `column ILIKE '%value%'`.
+        if (op === "ilike" || op === "not-ilike") {
+            const raw = typeof val === "string" ? val : "";
+            setOperation(op);
+            setInternalValue(raw);
+            if (raw.length > 0) {
+                setValue([op, `%${raw}%`]);
+            } else {
+                setValue(undefined);
+            }
             return;
         }
 
@@ -121,7 +175,7 @@ export function StringNumberFilterField({
                         fullWidth={true}
                         position={"item-aligned"}
                         onValueChange={(value) => {
-                            updateFilter(value as VirtualTableWhereFilterOp | "is-null", internalValue);
+                            updateFilter(value as VirtualTableWhereFilterOp, internalValue);
                         }}
                         renderValue={(op) => operationLabels[op as keyof typeof operationLabels]}>
                     {possibleOperations.map((op) => (

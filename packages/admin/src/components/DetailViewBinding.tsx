@@ -3,7 +3,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, getCollectionDataPath, Property } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
 
 import { CollectionViewBinding, EntityViewBinding } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
@@ -113,14 +113,11 @@ export function DetailViewBinding<M extends Record<string, unknown>>({
         />
     );
 
-    if (props.collection.components) {
-        return (
-            <CollectionComponentOverrideProvider overrides={props.collection.components}>
-                {content}
-            </CollectionComponentOverrideProvider>
-        );
-    }
-    return content;
+    return (
+        <CollectionScopeProvider collection={props.collection}>
+            {content}
+        </CollectionScopeProvider>
+    );
 }
 
 function DetailViewBindingInner<M extends Record<string, unknown>>({

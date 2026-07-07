@@ -11,7 +11,7 @@ import { logger } from "@rebasepro/server-core";
 /**
  * Mapping from Rebase filter operators to MongoDB query operators
  */
-const REBASE_TO_MONGO_OP: Record<WhereFilterOp, string> = {
+const REBASE_TO_MONGO_OP: Partial<Record<WhereFilterOp, string>> = {
     "<": "$lt",
     "<=": "$lte",
     "==": "$eq",
@@ -26,6 +26,21 @@ const REBASE_TO_MONGO_OP: Record<WhereFilterOp, string> = {
 
 function escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Translate a SQL LIKE/ILIKE pattern into an anchored regular expression.
+ * `%` matches any sequence of characters, `_` matches a single character;
+ * every other character is matched literally.
+ */
+function likePatternToRegExp(pattern: string, caseInsensitive: boolean): RegExp {
+    let body = "";
+    for (const ch of String(pattern)) {
+        if (ch === "%") body += ".*";
+        else if (ch === "_") body += ".";
+        else body += escapeRegExp(ch);
+    }
+    return new RegExp(`^${body}$`, caseInsensitive ? "i" : "");
 }
 
 /**
@@ -52,6 +67,28 @@ export class MongoConditionBuilder {
             if (!filterParam) continue;
 
             const [op, value] = filterParam as [WhereFilterOp, any];
+
+            // Null-testing operators ignore their value.
+            if (op === "is-null") {
+                conditions.push({ [field]: { $eq: null } });
+                continue;
+            }
+            if (op === "is-not-null") {
+                conditions.push({ [field]: { $ne: null } });
+                continue;
+            }
+
+            // Pattern matching → regular expressions.
+            if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
+                const caseInsensitive = op === "ilike" || op === "not-ilike";
+                const regex = likePatternToRegExp(value, caseInsensitive);
+                const negated = op === "not-like" || op === "not-ilike";
+                conditions.push({
+                    [field]: negated ? { $not: regex } : { $regex: regex }
+                });
+                continue;
+            }
+
             const mongoOp = REBASE_TO_MONGO_OP[op];
 
             if (!mongoOp) {

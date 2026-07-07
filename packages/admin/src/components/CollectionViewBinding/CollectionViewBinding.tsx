@@ -23,7 +23,7 @@ import { resolveEntityAction } from "../../util/resolutions";
 import { getPropertyInPath } from "../../util/property_utils";
 import { ReferencePreview } from "../../preview";
 import {
-    CollectionComponentOverrideProvider,
+    CollectionScopeProvider,
     OnColumnResizeParams,
     useAnalyticsController,
     useAuthController,
@@ -1220,11 +1220,11 @@ export const CollectionViewBinding = React.memo(
 
         const content = <CollectionViewBindingInner {...props} />;
 
-        if (collection?.components) {
+        if (collection) {
             return (
-                <CollectionComponentOverrideProvider overrides={collection.components}>
+                <CollectionScopeProvider collection={collection as CollectionConfig}>
                     {content}
-                </CollectionComponentOverrideProvider>
+                </CollectionScopeProvider>
             );
         }
         return content;

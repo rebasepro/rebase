@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { Entity, EntityReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useFetch, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/core";
@@ -102,11 +102,11 @@ function ReferencePreviewInternal(props: ReferencePreviewProps) {
         />
     );
 
-    if (collection?.components) {
+    if (collection) {
         return (
-            <CollectionComponentOverrideProvider overrides={collection.components}>
+            <CollectionScopeProvider collection={collection}>
                 {content}
-            </CollectionComponentOverrideProvider>
+            </CollectionScopeProvider>
         );
     }
     return content;

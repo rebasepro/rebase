@@ -1,4 +1,6 @@
 import type React from "react";
+import type { Property } from "./properties";
+import type { WhereFilterOp } from "./filter-operators";
 
 // ── Scoped component name unions ──────────────────────────────────────
 
@@ -43,6 +45,7 @@ export type CollectionComponentName =
     | "Collection.Card"
     | "Collection.EmptyState"
     | "Collection.Actions"
+    | "Collection.FilterField"
 
     // ── Entity / Form ──
     | "Entity.Form"
@@ -57,6 +60,70 @@ export type CollectionComponentName =
  * @group Component Overrides
  */
 export type OverridableComponentName = AppComponentName | CollectionComponentName;
+
+/**
+ * Props received by a filter field component — whether it is a built-in
+ * per-type field, a property-level replacement (`property.ui.Filter`), or a
+ * `"Collection.FilterField"` override.
+ *
+ * The `operators` list is **already resolved**: it is the intersection of the
+ * engine's {@link DataSourceCapabilities.filterOperators}, the property-type
+ * defaults, and any `property.ui.filterOperators` narrowing. A custom field
+ * should only offer operators from this list — anything else may throw at
+ * query time on engines that cannot execute it.
+ *
+ * @example
+ * ```tsx
+ * function MyStatusFilter({ value, setValue, operators }: FilterFieldBindingProps) {
+ *     return (
+ *         <select
+ *             value={value?.[1] as string ?? ""}
+ *             onChange={e => setValue(e.target.value ? ["==", e.target.value] : undefined)}>
+ *             <option value="">Any</option>
+ *             <option value="active">Active</option>
+ *             <option value="archived">Archived</option>
+ *         </select>
+ *     );
+ * }
+ * ```
+ *
+ * @group Component Overrides
+ */
+export interface FilterFieldBindingProps {
+    /** Key of the property being filtered (the column id). */
+    propertyKey: string;
+
+    /**
+     * The resolved property. For array properties this is the **item**
+     * property (`property.of`), with `isArray` set to true.
+     */
+    property: Property;
+
+    /** True when the underlying property is an array of `property`. */
+    isArray: boolean;
+
+    /**
+     * Operators this field may offer, already narrowed by engine
+     * capabilities, property-type defaults, and `property.ui.filterOperators`.
+     */
+    operators: readonly WhereFilterOp[];
+
+    /** Current filter condition for this property, if any. */
+    value?: [WhereFilterOp, unknown];
+
+    /** Set (or clear, with `undefined`) the filter condition. */
+    setValue: (value?: [WhereFilterOp, unknown]) => void;
+
+    /** Display title for the field (usually the property name). */
+    title?: string;
+
+    /**
+     * Coordination flags used by fields that open their own dialogs
+     * (e.g. the reference picker hides the parent filters dialog).
+     */
+    hidden?: boolean;
+    setHidden?: (hidden: boolean) => void;
+}
 
 // ── Override entry ────────────────────────────────────────────────────
 

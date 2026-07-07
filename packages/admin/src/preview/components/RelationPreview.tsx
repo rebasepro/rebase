@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { Entity, EntityRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
 import { Skeleton } from "@rebasepro/ui";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components";
 import { useCollectionRegistryController } from "../../index";
@@ -132,11 +132,11 @@ function RelationPreviewInternal(props: RelationPreviewProps) {
         />
     );
 
-    if (collection?.components) {
+    if (collection) {
         return (
-            <CollectionComponentOverrideProvider overrides={collection.components}>
+            <CollectionScopeProvider collection={collection}>
                 {content}
-            </CollectionComponentOverrideProvider>
+            </CollectionScopeProvider>
         );
     }
     return content;

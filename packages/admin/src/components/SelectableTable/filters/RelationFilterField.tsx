@@ -11,6 +11,12 @@ interface RelationFilterFieldProps {
     relation: Relation; // relation config provided externally
     hidden: boolean;
     setHidden: (value: boolean) => void;
+    /**
+     * Restrict the offered operators (already resolved against engine
+     * capabilities and property config). When omitted, all operators this
+     * field can render are offered.
+     */
+    operators?: readonly VirtualTableWhereFilterOp[];
 }
 
 const operationLabels = {
@@ -34,14 +40,19 @@ export function RelationFilterField({
     relation,
     name: _name,
     hidden: _hidden,
-    setHidden: _setHidden
+    setHidden: _setHidden,
+    operators
 }: RelationFilterFieldProps) {
 
     const manyRelation = relation.cardinality === "many";
 
-    const possibleOperations: (keyof typeof operationLabels)[] = manyRelation
+    let possibleOperations: (keyof typeof operationLabels)[] = manyRelation
         ? ["array-contains", "array-contains-any"]
         : ["==", "!=", ">", "<", ">=", "<=", "in", "not-in"];
+
+    if (operators) {
+        possibleOperations = possibleOperations.filter(op => (operators as readonly string[]).includes(op));
+    }
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(fieldOperation);
@@ -89,6 +100,9 @@ export function RelationFilterField({
         updateFilter(operation, newVal);
     };
 
+    // All renderable operators were filtered out (engine/property narrowing).
+    if (possibleOperations.length === 0) return null;
+
     return (
         <div className="flex flex-row">
             <div className="">
@@ -98,7 +112,7 @@ export function RelationFilterField({
                     onValueChange={(newOp) => {
                         updateFilter(newOp as VirtualTableWhereFilterOp, internalValue);
                     }}
-                    renderValue={(op) => operationLabels[op as VirtualTableWhereFilterOp]}
+                    renderValue={(op) => operationLabels[op as keyof typeof operationLabels]}
                 >
                     {possibleOperations.map((op) => (
                         <SelectItem key={op} value={op}>

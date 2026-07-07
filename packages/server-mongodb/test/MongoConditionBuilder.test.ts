@@ -113,6 +113,61 @@ describe("MongoConditionBuilder", () => {
             const result = MongoConditionBuilder.buildFilterConditions(filter);
             expect(result).toHaveLength(1);
         });
+
+        it("should handle is-null operator", () => {
+            const result = MongoConditionBuilder.buildFilterConditions({
+                deleted_at: ["is-null", null]
+            });
+            expect(result).toEqual([{ deleted_at: { $eq: null } }]);
+        });
+
+        it("should handle is-not-null operator", () => {
+            const result = MongoConditionBuilder.buildFilterConditions({
+                published_at: ["is-not-null", null]
+            });
+            expect(result).toEqual([{ published_at: { $ne: null } }]);
+        });
+
+        it("should translate ilike to a case-insensitive anchored regex", () => {
+            const [cond] = MongoConditionBuilder.buildFilterConditions({
+                name: ["ilike", "%john%"]
+            });
+            const regex = (cond as { name: { $regex: RegExp } }).name.$regex;
+            expect(regex).toBeInstanceOf(RegExp);
+            expect(regex.source).toBe("^.*john.*$");
+            expect(regex.flags).toBe("i");
+            expect(regex.test("Big JOHNny")).toBe(true);
+        });
+
+        it("should translate like to a case-sensitive anchored regex with _ wildcard", () => {
+            const [cond] = MongoConditionBuilder.buildFilterConditions({
+                code: ["like", "A_C%"]
+            });
+            const regex = (cond as { code: { $regex: RegExp } }).code.$regex;
+            expect(regex.source).toBe("^A.C.*$");
+            expect(regex.flags).toBe("");
+            expect(regex.test("ABCdef")).toBe(true);
+            expect(regex.test("abcdef")).toBe(false);
+        });
+
+        it("should negate not-ilike via $not", () => {
+            const [cond] = MongoConditionBuilder.buildFilterConditions({
+                name: ["not-ilike", "%spam%"]
+            });
+            const not = (cond as { name: { $not: RegExp } }).name.$not;
+            expect(not).toBeInstanceOf(RegExp);
+            expect(not.flags).toBe("i");
+        });
+
+        it("should escape regex metacharacters in like patterns", () => {
+            const [cond] = MongoConditionBuilder.buildFilterConditions({
+                path: ["like", "a.b+c%"]
+            });
+            const regex = (cond as { path: { $regex: RegExp } }).path.$regex;
+            expect(regex.source).toBe("^a\\.b\\+c.*$");
+            expect(regex.test("a.b+cXYZ")).toBe(true);
+            expect(regex.test("axbxc")).toBe(false);
+        });
     });
 
     describe("buildSort", () => {

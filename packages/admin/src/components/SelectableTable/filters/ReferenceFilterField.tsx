@@ -20,6 +20,12 @@ interface ReferenceFilterFieldProps {
     previewProperties?: string[];
     hidden: boolean;
     setHidden: (hidden: boolean) => void;
+    /**
+     * Restrict the offered operators (already resolved against engine
+     * capabilities and property config). When omitted, all operators this
+     * field can render are offered.
+     */
+    operators?: readonly VirtualTableWhereFilterOp[];
 }
 
 const operationLabels = {
@@ -44,11 +50,12 @@ export function ReferenceFilterField({
     path,
     includeId = true,
     previewProperties,
-    setHidden
+    setHidden,
+    operators
 }: ReferenceFilterFieldProps) {
     const { t } = useTranslation();
 
-    const possibleOperations: (keyof typeof operationLabels)[] = isArray
+    let possibleOperations: (keyof typeof operationLabels)[] = isArray
         ? ["array-contains"]
         : ["==", "!=", ">", "<", ">=", "<="];
 
@@ -56,6 +63,10 @@ export function ReferenceFilterField({
         possibleOperations.push("array-contains-any");
     } else {
         possibleOperations.push("in", "not-in");
+    }
+
+    if (operators) {
+        possibleOperations = possibleOperations.filter(op => (operators as readonly string[]).includes(op));
     }
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
@@ -147,6 +158,9 @@ export function ReferenceFilterField({
         );
     };
 
+    // All renderable operators were filtered out (engine/property narrowing).
+    if (possibleOperations.length === 0) return null;
+
     return (
 
         <div className="flex w-full flex-row">
@@ -157,7 +171,7 @@ export function ReferenceFilterField({
                     onValueChange={(value) => {
                         updateFilter(value as VirtualTableWhereFilterOp, internalValue);
                     }}
-                    renderValue={(op) => operationLabels[op as VirtualTableWhereFilterOp]}>
+                    renderValue={(op) => operationLabels[op as keyof typeof operationLabels]}>
                     {possibleOperations.map((op) => (
                         <SelectItem key={op} value={op}>
                             {operationLabels[op]}

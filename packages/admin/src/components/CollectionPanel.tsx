@@ -3,7 +3,7 @@ import React, { useMemo } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { Typography } from "@rebasepro/ui";
-import { useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
 
 /**
  * Props for the {@link CollectionPanel} component.
@@ -170,12 +170,9 @@ export function CollectionPanel(props: CollectionPanelProps) {
         />
     );
 
-    if (mergedCollection.components) {
-        return (
-            <CollectionComponentOverrideProvider overrides={mergedCollection.components}>
-                {content}
-            </CollectionComponentOverrideProvider>
-        );
-    }
-    return content;
+    return (
+        <CollectionScopeProvider collection={mergedCollection}>
+            {content}
+        </CollectionScopeProvider>
+    );
 }

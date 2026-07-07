@@ -8,20 +8,31 @@
  * HTTP wire boundary, handled by `serializeFilter` / `deserializeFilter`
  * in `@rebasepro/common`.
  *
- * ┌──────────────────┬───────────────┬──────────────────────────┐
- * │ Canonical        │ REST short    │ Meaning                  │
- * ├──────────────────┼───────────────┼──────────────────────────┤
- * │ "=="             │ "eq"          │ Equal                    │
- * │ "!="             │ "neq"         │ Not equal                │
- * │ ">"              │ "gt"          │ Greater than             │
- * │ ">="             │ "gte"         │ Greater than or equal    │
- * │ "<"              │ "lt"          │ Less than                │
- * │ "<="             │ "lte"         │ Less than or equal       │
- * │ "in"             │ "in"          │ Value in list            │
- * │ "not-in"         │ "nin"         │ Value not in list        │
- * │ "array-contains" │ "cs"          │ Array contains element   │
- * │ "array-contains-any" │ "csa"     │ Array contains any of    │
- * └──────────────────┴───────────────┴──────────────────────────┘
+ * ┌──────────────────────┬───────────────┬──────────────────────────────┐
+ * │ Canonical            │ REST short    │ Meaning                      │
+ * ├──────────────────────┼───────────────┼──────────────────────────────┤
+ * │ "=="                 │ "eq"          │ Equal                        │
+ * │ "!="                 │ "neq"         │ Not equal                    │
+ * │ ">"                  │ "gt"          │ Greater than                 │
+ * │ ">="                 │ "gte"         │ Greater than or equal        │
+ * │ "<"                  │ "lt"          │ Less than                    │
+ * │ "<="                 │ "lte"         │ Less than or equal           │
+ * │ "in"                 │ "in"          │ Value in list                │
+ * │ "not-in"             │ "nin"         │ Value not in list            │
+ * │ "array-contains"     │ "cs"          │ Array contains element       │
+ * │ "array-contains-any" │ "csa"         │ Array contains any of        │
+ * │ "like"               │ "like"        │ SQL LIKE (case-sensitive)    │
+ * │ "ilike"              │ "ilike"       │ SQL ILIKE (case-insensitive) │
+ * │ "not-like"           │ "nlike"       │ NOT LIKE (case-sensitive)    │
+ * │ "not-ilike"          │ "nilike"      │ NOT ILIKE (case-insensitive) │
+ * │ "is-null"            │ "isnull"      │ Field IS NULL                │
+ * │ "is-not-null"        │ "notnull"     │ Field IS NOT NULL            │
+ * └──────────────────────┴───────────────┴──────────────────────────────┘
+ *
+ * Pattern matching (`like`/`ilike`) uses SQL wildcard syntax: `%` matches any
+ * sequence of characters, `_` matches a single character. On MongoDB these are
+ * translated to anchored regular expressions; Firestore has no native pattern
+ * matching and rejects these operators (use `searchString` instead).
  *
  * @module
  */
@@ -57,7 +68,13 @@ export type WhereFilterOp =
     | "array-contains"
     | "in"
     | "not-in"
-    | "array-contains-any";
+    | "array-contains-any"
+    | "like"
+    | "ilike"
+    | "not-like"
+    | "not-ilike"
+    | "is-null"
+    | "is-not-null";
 
 /**
  * Used to define filters applied in collections.
@@ -75,6 +92,14 @@ export type WhereFilterOp =
  * // Array operators
  * { role: ["in", ["admin", "editor"]] }
  * { tags: ["array-contains", "featured"] }
+ *
+ * // Pattern matching (SQL wildcards: % and _)
+ * { name: ["ilike", "%john%"] }
+ * { slug: ["like", "post-%"] }
+ *
+ * // Null checks (the value is ignored; `null` is conventional)
+ * { deleted_at: ["is-null", null] }
+ * { published_at: ["is-not-null", null] }
  *
  * @group Models
  */
@@ -129,7 +154,10 @@ export type RestFilterOp =
     | "gt" | "gte"
     | "lt" | "lte"
     | "in" | "nin"
-    | "cs" | "csa";
+    | "cs" | "csa"
+    | "like" | "ilike"
+    | "nlike" | "nilike"
+    | "isnull" | "notnull";
 
 /** Maps canonical operators to their REST short-code equivalents. */
 export const CANONICAL_TO_REST: Readonly<Record<WhereFilterOp, RestFilterOp>> = {
@@ -142,7 +170,13 @@ export const CANONICAL_TO_REST: Readonly<Record<WhereFilterOp, RestFilterOp>> = 
     "in": "in",
     "not-in": "nin",
     "array-contains": "cs",
-    "array-contains-any": "csa"
+    "array-contains-any": "csa",
+    "like": "like",
+    "ilike": "ilike",
+    "not-like": "nlike",
+    "not-ilike": "nilike",
+    "is-null": "isnull",
+    "is-not-null": "notnull"
 };
 
 /** Maps REST short-code operators to their canonical equivalents. */
@@ -156,15 +190,39 @@ export const REST_TO_CANONICAL: Readonly<Record<RestFilterOp, WhereFilterOp>> = 
     "in": "in",
     "nin": "not-in",
     "cs": "array-contains",
-    "csa": "array-contains-any"
+    "csa": "array-contains-any",
+    "like": "like",
+    "ilike": "ilike",
+    "nlike": "not-like",
+    "nilike": "not-ilike",
+    "isnull": "is-null",
+    "notnull": "is-not-null"
 };
 
-/** All canonical operator strings for runtime validation. */
-const CANONICAL_OPS: ReadonlySet<string> = new Set<WhereFilterOp>([
+/**
+ * Operators that test for null/not-null and therefore ignore their value.
+ * Codecs normalize the value of these conditions to `null`.
+ */
+export const NULL_OPS: ReadonlySet<WhereFilterOp> = new Set<WhereFilterOp>([
+    "is-null", "is-not-null"
+]);
+
+/**
+ * Every canonical operator, in a stable order. Useful for engine capability
+ * declarations ({@link DataSourceCapabilities.filterOperators}) and for
+ * building operator subsets.
+ * @group Models
+ */
+export const ALL_WHERE_FILTER_OPS: readonly WhereFilterOp[] = [
     "<", "<=", "==", "!=", ">=", ">",
     "in", "not-in",
-    "array-contains", "array-contains-any"
-]);
+    "array-contains", "array-contains-any",
+    "like", "ilike", "not-like", "not-ilike",
+    "is-null", "is-not-null"
+];
+
+/** All canonical operator strings for runtime validation. */
+const CANONICAL_OPS: ReadonlySet<string> = new Set<WhereFilterOp>(ALL_WHERE_FILTER_OPS);
 
 /**
  * Resolve any operator string (canonical or REST short-code) to its

@@ -1,3 +1,5 @@
+import { ALL_WHERE_FILTER_OPS, WhereFilterOp } from "./filter-operators";
+
 /**
  * Describes the capabilities and features supported by a data source (driver).
  *
@@ -34,6 +36,17 @@ export interface DataSourceCapabilities {
 
     /** Does this source support real-time listeners? */
     supportsRealtime: boolean;
+
+    /**
+     * Canonical filter operators this engine can execute.
+     *
+     * The admin UI intersects this set with the property-type defaults and
+     * any per-property narrowing (`property.ui.filterOperators`) to decide
+     * which operators to offer in filter fields — so an engine that cannot
+     * run `ilike` (e.g. Firestore) never shows a "Contains" filter that
+     * would throw at query time.
+     */
+    filterOperators: readonly WhereFilterOp[];
 
     // ── Admin capability flags ───────────────────────────────────────
     /** Does this source support SQL admin operations (SQL editor, EXPLAIN, etc.)? */
@@ -151,6 +164,7 @@ export const POSTGRES_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: false,
     supportsColumnTypes: true,
     supportsRealtime: true,
+    filterOperators: ALL_WHERE_FILTER_OPS,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: false,
     supportsSchemaAdmin: true
@@ -166,6 +180,10 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: true,
     supportsColumnTypes: false,
     supportsRealtime: true,
+    // Firestore has no SQL pattern matching — the driver throws on the LIKE
+    // family, so the UI must never offer it.
+    filterOperators: ALL_WHERE_FILTER_OPS.filter(op =>
+        op !== "like" && op !== "ilike" && op !== "not-like" && op !== "not-ilike"),
     supportsSQLAdmin: false,
     supportsDocumentAdmin: false,
     supportsSchemaAdmin: false
@@ -181,6 +199,7 @@ export const MONGODB_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: true,
     supportsColumnTypes: false,
     supportsRealtime: false,
+    filterOperators: ALL_WHERE_FILTER_OPS,
     supportsSQLAdmin: false,
     supportsDocumentAdmin: true,
     supportsSchemaAdmin: true
@@ -200,6 +219,7 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: true,
     supportsColumnTypes: true,
     supportsRealtime: true,
+    filterOperators: ALL_WHERE_FILTER_OPS,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: true,
     supportsSchemaAdmin: true

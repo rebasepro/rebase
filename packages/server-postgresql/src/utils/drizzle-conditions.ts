@@ -162,6 +162,18 @@ export class DrizzleConditionBuilder {
                     return sql`${column} NOT IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`;
                 }
                 return null;
+            case "like":
+                return sql`${column} LIKE ${String(value)}`;
+            case "ilike":
+                return sql`${column} ILIKE ${String(value)}`;
+            case "not-like":
+                return sql`${column} NOT LIKE ${String(value)}`;
+            case "not-ilike":
+                return sql`${column} NOT ILIKE ${String(value)}`;
+            case "is-null":
+                return sql`${column} IS NULL`;
+            case "is-not-null":
+                return sql`${column} IS NOT NULL`;
             default:
                 logger.warn(`Unsupported filter operation: ${op}`);
                 return null;

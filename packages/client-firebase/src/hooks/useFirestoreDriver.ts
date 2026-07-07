@@ -120,6 +120,26 @@ export function useFirestoreDriver({
                 .filter(([_, entry]) => !!entry)
                 .forEach(([key, filterParameter]) => {
                     const [op, value] = filterParameter as [WhereFilterOp, any];
+
+                    // Null-testing operators map to Firestore's == / != against null.
+                    if (op === "is-null") {
+                        queryParams.push(whereClause(key, "==", null));
+                        return;
+                    }
+                    if (op === "is-not-null") {
+                        queryParams.push(whereClause(key, "!=", null));
+                        return;
+                    }
+
+                    // Firestore has no LIKE/ILIKE — fail loudly rather than silently
+                    // returning wrong results. Use `searchString` / a search index instead.
+                    if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
+                        throw new Error(
+                            `Firestore does not support the "${op}" operator (SQL pattern matching). ` +
+                            "Use a full-text search index or the collection's searchString instead."
+                        );
+                    }
+
                     queryParams.push(whereClause(key, op, cmsToFirestoreModel(value, firestore)));
                 });
         }

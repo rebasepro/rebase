@@ -8,6 +8,7 @@ export { SelectionTableBinding } from "./ReferenceTable/SelectionTableBinding";
 
 export * from "./SelectableTable/SelectableTable";
 export * from "./SelectableTable/SelectableTableContext";
+export * from "./SelectableTable/filters/FilterFieldBinding";
 export * from "./CollectionViewBinding/CollectionViewBinding";
 export * from "./CollectionViewBinding/CollectionViewActions";
 export * from "./CollectionViewBinding/CollectionCardViewBinding";

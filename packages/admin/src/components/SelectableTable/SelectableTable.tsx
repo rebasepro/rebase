@@ -1,19 +1,14 @@
 import { createSelectionStore, AdminSelectedCell } from "./SelectionStore";
-import type { Property } from "@rebasepro/types";
+import type { Property, WhereFilterOp } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { CollectionSize, Entity, EntityRelation, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
-import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams, VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { enumToObjectEntries } from "@rebasepro/common";
+import { CollectionSize, Entity, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
+import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams } from "@rebasepro/ui";
 import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
 import { FilterFormFieldProps } from "@rebasepro/ui";
-import { ReferenceFilterField } from "./filters/ReferenceFilterField";
-import { StringNumberFilterField } from "./filters/StringNumberFilterField";
-import { BooleanFilterField } from "./filters/BooleanFilterField";
-import { DateTimeFilterField } from "./filters/DateTimeFilterField";
 import { useOutsideAlerter } from "@rebasepro/ui";
 import { SelectableTableContext } from "./SelectableTableContext";
 import { getRowHeight } from "@rebasepro/core";
-import { RelationFilterField } from "./filters/RelationFilterField";
+import { FilterFieldBinding } from "./filters/FilterFieldBinding";
 
 export type SelectableTableProps<M extends Record<string, unknown>> = {
 
@@ -246,6 +241,28 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         setPopupCell
     } as unknown as DataCollectionTableController<Record<string, unknown>>), [setPopupCell, select, onValueChange, size, selectionStore]);
 
+    const createFilterField = useCallback(({
+        id,
+        filterValue,
+        setFilterValue,
+        column,
+        hidden,
+        setHidden
+    }: FilterFormFieldProps<unknown>): React.ReactNode => {
+        if (!column.custom) return null;
+        const { resolvedProperty } = column.custom as { resolvedProperty?: Property };
+        if (!resolvedProperty) return null;
+        // Engine-aware operator resolution happens inside FilterFieldBinding,
+        // which reads the collection from the surrounding CollectionScopeProvider.
+        return <FilterFieldBinding
+            propertyKey={id as string}
+            property={resolvedProperty}
+            value={filterValue as [WhereFilterOp, unknown] | undefined}
+            setValue={setFilterValue as (value?: [WhereFilterOp, unknown]) => void}
+            hidden={hidden}
+            setHidden={setHidden}/>;
+    }, []);
+
     return (
         <SelectableTableContext.Provider
             value={contextValue}>
@@ -289,74 +306,4 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
 
 };
 
-function createFilterField({
-    id,
-    filterValue,
-    setFilterValue,
-    column,
-    hidden,
-    setHidden
-}: FilterFormFieldProps<unknown>): React.ReactNode {
-
-    if (!column.custom) {
-        return null;
-    }
-
-    const { resolvedProperty } = column.custom as { resolvedProperty?: Property };
-
-    const isArray = resolvedProperty?.type === "array";
-    const ofVal = isArray && resolvedProperty ? resolvedProperty.of : undefined;
-    const baseProperty: Property | undefined = isArray ? (Array.isArray(ofVal) ? ofVal[0] : ofVal) : resolvedProperty;
-    if (!baseProperty) {
-        return null;
-    }
-    if (baseProperty.type === "reference") {
-        return <ReferenceFilterField value={filterValue}
-            setValue={setFilterValue}
-            name={id as string}
-            isArray={isArray}
-            path={baseProperty.path}
-            title={resolvedProperty?.name}
-            includeId={baseProperty.includeId}
-            previewProperties={baseProperty?.ui?.previewProperties}
-            hidden={hidden}
-            setHidden={setHidden}/>;
-    } else if (baseProperty.type === "relation" && baseProperty.relation) {
-        return <RelationFilterField value={filterValue as [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null]}
-            setValue={setFilterValue}
-            name={id as string}
-            relation={baseProperty.relation}
-            hidden={hidden}
-            setHidden={setHidden}/>;
-    } else if (baseProperty.type === "number" || baseProperty.type === "string") {
-        const name = baseProperty.name;
-        const enumValues = baseProperty.enum ? enumToObjectEntries(baseProperty.enum) : undefined;
-        return <StringNumberFilterField value={filterValue}
-            setValue={setFilterValue}
-            name={id as string}
-            type={baseProperty.type}
-            isArray={isArray}
-            enumValues={enumValues}
-            title={name}/>;
-    } else if (baseProperty.type === "boolean") {
-        const name = baseProperty.name;
-        return <BooleanFilterField value={filterValue}
-            setValue={setFilterValue}
-            name={id as string}
-            title={name}/>;
-
-    } else if (baseProperty.type === "date") {
-        const title = baseProperty.name;
-        return <DateTimeFilterField value={filterValue}
-            setValue={setFilterValue}
-            name={id as string}
-            mode={baseProperty.mode}
-            isArray={isArray}
-            title={title}/>;
-    }
-
-    return (
-        <div>{`Currently the filter field ${resolvedProperty?.type} is not supported`}</div>
-    );
-}
 

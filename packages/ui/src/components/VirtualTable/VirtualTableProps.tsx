@@ -288,7 +288,13 @@ export type WhereFilterOp =
     | "array-contains"
     | "in"
     | "not-in"
-    | "array-contains-any";
+    | "array-contains-any"
+    | "like"
+    | "ilike"
+    | "not-like"
+    | "not-ilike"
+    | "is-null"
+    | "is-not-null";
 
 export type FilterValues<Key extends string> =
     Partial<Record<Key, [WhereFilterOp, unknown] | [WhereFilterOp, unknown][]>>;

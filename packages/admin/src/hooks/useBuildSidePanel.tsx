@@ -11,7 +11,7 @@ import {
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/core";
-import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
 import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EditViewBinding";
 import React from "react";
 import { SidePanelBinding } from "../components/SidePanelBinding";
@@ -28,11 +28,11 @@ function ResolvedSidePanelBindingInner(props: SidePanelBindingProps) {
 }
 
 function ResolvedSidePanelBinding(props: SidePanelBindingProps) {
-    if (props.collection?.components) {
+    if (props.collection) {
         return (
-            <CollectionComponentOverrideProvider overrides={props.collection.components}>
+            <CollectionScopeProvider collection={props.collection}>
                 <ResolvedSidePanelBindingInner {...props}/>
-            </CollectionComponentOverrideProvider>
+            </CollectionScopeProvider>
         );
     }
     return <ResolvedSidePanelBindingInner {...props}/>;

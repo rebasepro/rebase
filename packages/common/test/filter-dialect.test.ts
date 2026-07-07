@@ -349,3 +349,44 @@ describe("deserializeLogicalCondition", () => {
         expect(deserialized).toEqual(original);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Pattern-matching and null operators
+// ---------------------------------------------------------------------------
+describe("pattern-matching and null operators", () => {
+    it("serializes like / ilike with SQL wildcards", () => {
+        expect(serializeFilter({ name: ["ilike", "%john%"] })).toEqual({ name: "ilike.%john%" });
+        expect(serializeFilter({ slug: ["like", "post-%"] })).toEqual({ slug: "like.post-%" });
+        expect(serializeFilter({ slug: ["not-ilike", "draft-%"] })).toEqual({ slug: "nilike.draft-%" });
+    });
+
+    it("round-trips like / ilike conditions", () => {
+        assertRoundTrip({ name: ["ilike", "%john%"] });
+        assertRoundTrip({ slug: ["like", "post-%"] });
+        assertRoundTrip({ slug: ["not-like", "tmp\\_%"] });
+    });
+
+    it("serializes null operators with the short-code and no meaningful value", () => {
+        expect(serializeFilter({ deleted_at: ["is-null", null] })).toEqual({ deleted_at: "isnull.null" });
+        expect(serializeFilter({ published_at: ["is-not-null", null] })).toEqual({ published_at: "notnull.null" });
+    });
+
+    it("normalizes null-operator values back to null on deserialize", () => {
+        expect(deserializeFilter({ deleted_at: "isnull.null" })).toEqual({ deleted_at: ["is-null", null] });
+        expect(deserializeFilter({ published_at: "notnull.anything" })).toEqual({ published_at: ["is-not-null", null] });
+    });
+
+    it("round-trips null operators", () => {
+        assertRoundTrip({ deleted_at: ["is-null", null] });
+        assertRoundTrip({ published_at: ["is-not-null", null] });
+    });
+
+    it("carries the new operators through logical conditions", () => {
+        const original = {
+            column: "name", operator: "ilike" as WhereFilterOp, value: "%doe%"
+        };
+        const serialized = serializeLogicalCondition(original);
+        expect(serialized).toBe("name.ilike.%doe%");
+        expect(deserializeLogicalCondition(serialized)).toEqual(original);
+    });
+});

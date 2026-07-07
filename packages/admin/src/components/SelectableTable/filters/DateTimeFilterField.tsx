@@ -11,9 +11,15 @@ interface DateTimeFilterFieldProps {
     isArray?: boolean;
     title?: string;
     timezone?: string;
+    /**
+     * Restrict the offered operators (already resolved against engine
+     * capabilities and property config). When omitted, all operators this
+     * field can render are offered.
+     */
+    operators?: readonly VirtualTableWhereFilterOp[];
 }
 
-const operationLabels: Record<VirtualTableWhereFilterOp | "is-null", string> = {
+const operationLabels: Partial<Record<VirtualTableWhereFilterOp, string>> = {
     "==": "==",
     "!=": "!=",
     ">": ">",
@@ -24,7 +30,8 @@ const operationLabels: Record<VirtualTableWhereFilterOp | "is-null", string> = {
     in: "in",
     "array-contains": "Contains",
     "array-contains-any": "Any",
-    "is-null": "Is null"
+    "is-null": "Is null",
+    "is-not-null": "Is not null"
 };
 
 const multipleSelectOperations = ["array-contains-any", "in"];
@@ -36,26 +43,40 @@ export function DateTimeFilterField({
     value,
     setValue,
     title,
-    timezone
+    timezone,
+    operators
 }: DateTimeFilterFieldProps) {
 
     const { locale } = useCustomizationController();
-    const possibleOperations: (keyof typeof operationLabels)[] = isArray
+    let possibleOperations: (keyof typeof operationLabels)[] = isArray
         ? ["array-contains"]
-        : ["==", "!=", ">", "<", ">=", "<=", "is-null"];
+        : ["==", "!=", ">", "<", ">=", "<=", "is-null", "is-not-null"];
+
+    if (operators) {
+        possibleOperations = possibleOperations.filter(op => (operators as readonly string[]).includes(op));
+    }
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
-    const [operation, setOperation] = useState<VirtualTableWhereFilterOp | "is-null">(fieldOperation === "==" && fieldValue === null ? "is-null" : fieldOperation);
+    // Read back both the canonical null operators and the legacy `["==", null]` /
+    // `["!=", null]` form saved by older filter presets.
+    const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(
+        fieldOperation === "==" && fieldValue === null ? "is-null"
+            : fieldOperation === "!=" && fieldValue === null ? "is-not-null"
+                : fieldOperation
+    );
     const [internalValue, setInternalValue] = useState<Date | null | undefined>(fieldValue as Date | null | undefined);
 
-    const isNullOperation = operation === "is-null";
+    const isNullOperation = operation === "is-null" || operation === "is-not-null";
 
-    function updateFilter(op: VirtualTableWhereFilterOp | "is-null", val: Date | undefined | null) {
-        // Handle "is null" operation
-        if (op === "is-null") {
+    // All renderable operators were filtered out (engine/property narrowing).
+    if (possibleOperations.length === 0) return null;
+
+    function updateFilter(op: VirtualTableWhereFilterOp, val: Date | undefined | null) {
+        // Null-testing operators ignore their value.
+        if (op === "is-null" || op === "is-not-null") {
             setOperation(op);
             setInternalValue(null);
-            setValue(["==", null]);
+            setValue([op, null]);
             return;
         }
 
@@ -91,7 +112,7 @@ export function DateTimeFilterField({
                     size={"medium"}
                     fullWidth={true}
                     onValueChange={(value) => {
-                        updateFilter(value as VirtualTableWhereFilterOp | "is-null", internalValue);
+                        updateFilter(value as VirtualTableWhereFilterOp, internalValue);
                     }}
                     renderValue={(op) => operationLabels[op as keyof typeof operationLabels]}>
                     {possibleOperations.map((op) => (

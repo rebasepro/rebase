@@ -7,6 +7,7 @@ import {
     CollectionTableBinding
 } from "../CollectionTableBinding";
 import {
+    CollectionScopeProvider,
     useAuthController,
     useCustomizationController,
     useData,
@@ -269,6 +270,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
 
     return (
 
+        <CollectionScopeProvider collection={collection}>
         <div className="flex flex-col h-full">
 
             <div className="grow">
@@ -316,6 +318,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 </Button>
             </DialogActions>
         </div>
+        </CollectionScopeProvider>
 
     );
 

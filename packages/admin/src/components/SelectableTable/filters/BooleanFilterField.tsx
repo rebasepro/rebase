@@ -8,15 +8,23 @@ interface BooleanFieldProps {
     value?: [op: VirtualTableWhereFilterOp, fieldValue: unknown];
     setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: unknown]) => void;
     title?: string;
+    /**
+     * Restrict the offered operators. This field only ever emits `["==", …]`,
+     * so it renders nothing when `==` is not allowed.
+     */
+    operators?: readonly VirtualTableWhereFilterOp[];
 }
 
 export function BooleanFilterField({
     name,
     title,
     value,
-    setValue
+    setValue,
+    operators
 }: BooleanFieldProps) {
     const { t } = useTranslation();
+
+    if (operators && !operators.includes("==")) return null;
 
     function updateFilter(val?: boolean) {
         if (val !== undefined) {

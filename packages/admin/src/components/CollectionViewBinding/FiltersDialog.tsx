@@ -4,12 +4,9 @@ import React, { useCallback, useMemo, useState } from "react";
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { FilterIcon, VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { StringNumberFilterField } from "../SelectableTable/filters/StringNumberFilterField";
-import { BooleanFilterField } from "../SelectableTable/filters/BooleanFilterField";
-import { DateTimeFilterField } from "../SelectableTable/filters/DateTimeFilterField";
-import { ReferenceFilterField } from "../SelectableTable/filters/ReferenceFilterField";
-import { enumToObjectEntries } from "@rebasepro/common";
-import { useTranslation } from "@rebasepro/core";
+import { resolveFilterOperators } from "@rebasepro/common";
+import { useCollectionScope, useTranslation } from "@rebasepro/core";
+import { FilterFieldBinding } from "../SelectableTable/filters/FilterFieldBinding";
 
 export interface FiltersDialogProps {
     open: boolean;
@@ -33,6 +30,9 @@ export function FiltersDialog({
     fixedFilter
 }: FiltersDialogProps) {
     const { t } = useTranslation();
+    // Engine of the collection this dialog filters — read from the
+    // surrounding CollectionScopeProvider mounted by the collection view.
+    const engine = useCollectionScope()?.engine;
     // Local state for filters being edited
     const [localFilters, setLocalFilters] = useState<FilterValues<any>>(filterValues ?? {});
 
@@ -52,12 +52,17 @@ export function FiltersDialog({
             if (!property) return false;
             // Force filter properties should not be editable
             if (fixedFilter && key in fixedFilter) return false;
-            // Check if property type is filterable
-            const baseProperty = property.type === "array" ? property.of : property;
-            if (!baseProperty || Array.isArray(baseProperty)) return false;
-            return ["string", "number", "boolean", "date", "reference"].includes(baseProperty.type);
+            const isArray = property.type === "array";
+            const ofProp = isArray && "of" in property ? property.of : undefined;
+            const baseProperty = isArray ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) as Property | undefined : property;
+            if (!baseProperty) return false;
+            // A property is filterable when it has a custom filter field, or
+            // when at least one operator survives the engine ∩ type ∩
+            // property-narrowing resolution.
+            if (baseProperty.ui?.Filter) return true;
+            return resolveFilterOperators({ property: baseProperty, isArray, engine }).length > 0;
         });
-    }, [properties, fixedFilter]);
+    }, [properties, fixedFilter, engine]);
 
     const handleFilterChange = useCallback((propertyKey: string, value?: [VirtualTableWhereFilterOp, any]) => {
         setLocalFilters(prev => {
@@ -94,67 +99,21 @@ export function FiltersDialog({
     const activeFilterCount = Object.keys(localFilters).length;
 
     const renderFilterField = useCallback((propertyKey: string, property: Property) => {
-        const isArray = property.type === "array";
-        const ofProp = isArray && "of" in property ? property.of : undefined;
-        const baseProperty: Property | undefined = isArray ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) as Property | undefined : property;
+        const filterValue = localFilters[propertyKey] as [WhereFilterOp, any] | undefined;
+        const setValue = (value?: [WhereFilterOp, any]) => handleFilterChange(propertyKey, value as [VirtualTableWhereFilterOp, any] | undefined);
 
-        if (!baseProperty) return null;
-
-        const filterValue = localFilters[propertyKey] as [VirtualTableWhereFilterOp, any] | undefined;
-        const setValue = (value?: [VirtualTableWhereFilterOp, any]) => handleFilterChange(propertyKey, value);
-
-        if (baseProperty.type === "reference") {
-            return (
-                <ReferenceFilterField
-                    value={filterValue}
-                    setValue={setValue}
-                    name={propertyKey}
-                    isArray={isArray}
-                    path={baseProperty.path}
-                    title={property.name}
-                    includeId={baseProperty.includeId}
-                    previewProperties={baseProperty.ui?.previewProperties}
-                    hidden={hiddenFields[propertyKey] ?? false}
-                    setHidden={(hidden) => setHiddenForField(propertyKey, hidden)}
-                />
-            );
-        } else if (baseProperty.type === "number" || baseProperty.type === "string") {
-            const enumValues = baseProperty.enum ? enumToObjectEntries(baseProperty.enum) : undefined;
-            return (
-                <StringNumberFilterField
-                    value={filterValue}
-                    setValue={setValue}
-                    name={propertyKey}
-                    type={baseProperty.type}
-                    isArray={isArray}
-                    enumValues={enumValues}
-                    title={property.name}
-                />
-            );
-        } else if (baseProperty.type === "boolean") {
-            return (
-                <BooleanFilterField
-                    value={filterValue}
-                    setValue={setValue}
-                    name={propertyKey}
-                    title={property.name}
-                />
-            );
-        } else if (baseProperty.type === "date") {
-            return (
-                <DateTimeFilterField
-                    value={filterValue}
-                    setValue={setValue}
-                    name={propertyKey}
-                    mode={baseProperty.mode}
-                    isArray={isArray}
-                    title={property.name}
-                />
-            );
-        }
-
-        return null;
-    }, [localFilters, handleFilterChange, hiddenFields, setHiddenForField]);
+        return (
+            <FilterFieldBinding
+                propertyKey={propertyKey}
+                property={property}
+                engine={engine}
+                value={filterValue}
+                setValue={setValue}
+                hidden={hiddenFields[propertyKey] ?? false}
+                setHidden={(hidden) => setHiddenForField(propertyKey, hidden)}
+            />
+        );
+    }, [localFilters, handleFilterChange, hiddenFields, setHiddenForField, engine]);
 
     return (
         <Dialog

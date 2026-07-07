@@ -2,7 +2,7 @@ import type { ComponentRef } from "./component_ref";
 
 import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
 import type { JoinStep, OnAction, Relation } from "./relations";
-import type { CollectionConfig, FilterValues } from "./collections";
+import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthController } from "../controllers/auth";
 import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
@@ -164,6 +164,33 @@ export interface BaseUIConfig<CustomProps = unknown> {
     customProps?: CustomProps;
     Field?: ComponentRef<any>;
     Preview?: ComponentRef<any>;
+
+    /**
+     * Narrow the filter operators offered for this property in collection
+     * filter UIs (table header filters and the Filters dialog).
+     *
+     * The final offered set is the **intersection** of the engine's
+     * capabilities, the property-type defaults, and this list — you can only
+     * *restrict*, never enable an operator the underlying engine cannot run.
+     *
+     * Pass an empty array to disable filtering on this property entirely.
+     *
+     * @example
+     * // Email column: exact match, contains, and null check only
+     * ui: { filterOperators: ["==", "ilike", "is-null"] }
+     */
+    filterOperators?: readonly WhereFilterOp[];
+
+    /**
+     * Replace the filter field rendered for this property in collection
+     * filter UIs. The component receives `FilterFieldBindingProps`
+     * (property, resolved `operators`, `value`, `setValue`, …).
+     *
+     * Takes precedence over the collection-level
+     * `components["Collection.FilterField"]` override and the built-in
+     * per-type filter fields.
+     */
+    Filter?: ComponentRef<any>;
 }
 
 export interface BaseProperty<CustomProps = unknown> {

@@ -7,7 +7,7 @@ import { ReferencePreview } from "../../../preview";
 import { CollectionSize, Entity, EntityReference, FilterValues } from "@rebasepro/types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
-import { useComponentOverride, ErrorView, CollectionComponentOverrideProvider } from "@rebasepro/core";
+import { useComponentOverride, ErrorView, CollectionScopeProvider } from "@rebasepro/core";
 import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getReferenceFrom } from "@rebasepro/common";
@@ -56,11 +56,11 @@ export function TableReferenceField(props: TableReferenceFieldProps) {
         />
     );
 
-    if (collection?.components) {
+    if (collection) {
         return (
-            <CollectionComponentOverrideProvider overrides={collection.components}>
+            <CollectionScopeProvider collection={collection}>
                 {content}
-            </CollectionComponentOverrideProvider>
+            </CollectionScopeProvider>
         );
     }
     return content;

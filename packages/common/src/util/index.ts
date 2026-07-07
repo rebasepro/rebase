@@ -15,3 +15,4 @@ export * from "./callbacks";
 export * from "./relations";
 export * from "./conditions";
 export * from "./navigation_utils";
+export * from "./filter-operator-resolution";

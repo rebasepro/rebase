@@ -1075,6 +1075,55 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
         });
     });
 
+    describe("buildSingleFilterCondition - pattern matching and null operators", () => {
+        const { PgDialect } = require("drizzle-orm/pg-core");
+        const pgDialect = new PgDialect();
+
+        it("should generate LIKE", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name, "like", "post-%"
+            );
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."name" LIKE $1');
+            expect(query.params).toEqual(["post-%"]);
+        });
+
+        it("should generate ILIKE", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.name, "ilike", "%john%"
+            );
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."name" ILIKE $1');
+            expect(query.params).toEqual(["%john%"]);
+        });
+
+        it("should generate NOT LIKE and NOT ILIKE", () => {
+            const notLike = pgDialect.sqlToQuery(
+                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.name, "not-like", "tmp-%")!
+            );
+            expect(notLike.sql).toBe('"users"."name" NOT LIKE $1');
+
+            const notIlike = pgDialect.sqlToQuery(
+                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.name, "not-ilike", "%draft%")!
+            );
+            expect(notIlike.sql).toBe('"users"."name" NOT ILIKE $1');
+        });
+
+        it("should generate IS NULL / IS NOT NULL ignoring the value", () => {
+            const isNull = pgDialect.sqlToQuery(
+                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.age, "is-null", null)!
+            );
+            expect(isNull.sql).toBe('"users"."age" IS NULL');
+            expect(isNull.params).toEqual([]);
+
+            const isNotNull = pgDialect.sqlToQuery(
+                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.age, "is-not-null", null)!
+            );
+            expect(isNotNull.sql).toBe('"users"."age" IS NOT NULL');
+            expect(isNotNull.params).toEqual([]);
+        });
+    });
+
     describe("buildFilterConditions - integration with array operators", () => {
         it("should build filter with array-contains operator", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
