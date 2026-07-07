@@ -113,10 +113,11 @@ export interface AdminUser {
     email: string;
     displayName: string | null;
     photoURL: string | null;
-    // NOTE: This field is named `provider` on the wire (admin-users-route.ts)
-    // while the canonical `User` type uses `providerId`. Renaming would be a
-    // wire-format breaking change — tracked for a future minor.
-    provider: string;
+    /**
+     * The provider used to authenticate the user (e.g. `"password"`,
+     * `"google"`). Named to match the canonical {@link User.providerId}.
+     */
+    providerId: string;
     roles: string[];
     metadata?: Record<string, any>;
     createdAt: string;

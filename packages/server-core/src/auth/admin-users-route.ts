@@ -55,7 +55,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             email: u.email,
             displayName: u.displayName ?? null,
             photoURL: u.photoUrl ?? null,
-            provider: "custom",
+            providerId: "custom",
             roles,
             createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : (u.createdAt ?? new Date().toISOString()),
             updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : (u.updatedAt ?? new Date().toISOString())
