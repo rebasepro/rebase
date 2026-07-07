@@ -16,6 +16,7 @@ import type { Context } from "hono";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
+import { ApiError } from "../api/errors";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -139,15 +140,15 @@ export class TusHandler {
 
         const uploadLengthHeader = c.req.header("Upload-Length");
         if (!uploadLengthHeader) {
-            return c.json({ error: "Upload-Length header is required" }, 400);
+            throw ApiError.badRequest("Upload-Length header is required");
         }
 
         const uploadLength = parseInt(uploadLengthHeader, 10);
         if (Number.isNaN(uploadLength) || uploadLength <= 0) {
-            return c.json({ error: "Invalid Upload-Length" }, 400);
+            throw ApiError.badRequest("Invalid Upload-Length");
         }
         if (uploadLength > MAX_UPLOAD_SIZE) {
-            return c.json({ error: `Upload-Length exceeds maximum of ${MAX_UPLOAD_SIZE} bytes` }, 413);
+            throw new ApiError(413, "PAYLOAD_TOO_LARGE", `Upload-Length exceeds maximum of ${MAX_UPLOAD_SIZE} bytes`);
         }
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
@@ -188,7 +189,7 @@ export class TusHandler {
     head(c: Context, id: string): Response {
         const upload = this.uploads.get(id);
         if (!upload) {
-            return c.json({ error: "Upload not found" }, 404);
+            throw ApiError.notFound("Upload not found");
         }
 
         return new Response(null, {
@@ -206,26 +207,26 @@ export class TusHandler {
     async patch(c: Context, id: string): Promise<Response> {
         const upload = this.uploads.get(id);
         if (!upload) {
-            return c.json({ error: "Upload not found" }, 404);
+            throw ApiError.notFound("Upload not found");
         }
         if (upload.completed) {
-            return c.json({ error: "Upload already completed" }, 400);
+            throw ApiError.badRequest("Upload already completed");
         }
 
         // Validate offset
         const offsetHeader = c.req.header("Upload-Offset");
         if (!offsetHeader) {
-            return c.json({ error: "Upload-Offset header is required" }, 400);
+            throw ApiError.badRequest("Upload-Offset header is required");
         }
         const offset = parseInt(offsetHeader, 10);
         if (offset !== upload.offset) {
-            return c.json({ error: "Offset mismatch" }, 409);
+            throw ApiError.conflict("Offset mismatch");
         }
 
         // Validate content type
         const contentType = c.req.header("Content-Type");
         if (contentType !== "application/offset+octet-stream") {
-            return c.json({ error: "Content-Type must be application/offset+octet-stream" }, 415);
+            throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/offset+octet-stream");
         }
 
         // Read chunk and append to temp file
@@ -234,7 +235,7 @@ export class TusHandler {
 
         // Prevent overrun
         if (upload.offset + chunk.length > upload.size) {
-            return c.json({ error: "Chunk exceeds declared Upload-Length" }, 413);
+            throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Chunk exceeds declared Upload-Length");
         }
 
         const fh = await open(upload.filePath, "a");
@@ -263,7 +264,7 @@ export class TusHandler {
     async delete(c: Context, id: string): Promise<Response> {
         const upload = this.uploads.get(id);
         if (!upload) {
-            return c.json({ error: "Upload not found" }, 404);
+            throw ApiError.notFound("Upload not found");
         }
 
         try { await unlink(upload.filePath); } catch { /* ok */ }

@@ -139,12 +139,15 @@ headers });
             }
         }
 
+        // The server always emits the canonical `{ error: { message, code, details? } }`
+        // envelope (formatted by the central errorHandler), so we read strictly
+        // from `body.error.*`.
         const getErrorField = (obj: Record<string, unknown>, field: string): unknown => {
             const err = obj?.error;
-            if (err && typeof err === "object" && err !== null && field in (err as Record<string, unknown>)) {
+            if (err && typeof err === "object" && err !== null) {
                 return (err as Record<string, unknown>)[field];
             }
-            return obj?.[field];
+            return undefined;
         };
 
         if (res.status === 401 && onUnauthorizedHandler) {

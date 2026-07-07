@@ -418,22 +418,27 @@ details: { field: "email" } } })
             }
         });
 
-        it("falls back to top-level message/code when error.message is missing", async () => {
+        it("ignores a bare top-level message/code (only the canonical error envelope is read)", async () => {
             const transport = createTransport({ baseUrl: "http://localhost",
 fetch: fetchMock as typeof globalThis.fetch });
             fetchMock.mockResolvedValueOnce({
                 ok: false,
                 status: 403,
+                statusText: "Forbidden",
                 text: async () => JSON.stringify ({ message: "Forbidden",
 code: "ACCESS_DENIED" })
             });
 
             try {
                 await transport.request("/fail");
+                throw new Error("expected request to reject");
             } catch (e) {
                 const err = e as RebaseApiError;
-                expect(err.message).toBe("Forbidden");
-                expect(err.code).toBe("ACCESS_DENIED");
+                // The server always emits `{ error: { message, code } }`, so a bare
+                // top-level `{ message, code }` is not parsed — we fall back to statusText.
+                expect(err.status).toBe(403);
+                expect(err.message).toBe("Forbidden"); // from statusText fallback
+                expect(err.code).toBeUndefined();
             }
         });
 

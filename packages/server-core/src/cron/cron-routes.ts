@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../api/types";
 import type { CronScheduler } from "./cron-scheduler";
+import { ApiError, errorHandler } from "../api/errors";
 
 /**
  * Create admin REST routes for managing cron jobs.
@@ -14,6 +15,9 @@ import type { CronScheduler } from "./cron-scheduler";
  */
 export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
+    // Hono's onError does NOT propagate from parent to child routers, so this
+    // child router registers its own handler to format thrown ApiErrors.
+    router.onError(errorHandler);
 
     // List all jobs
     router.get("/", (c) => {
@@ -26,8 +30,7 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
         const id = c.req.param("id");
         const job = scheduler.getJob(id);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`,
-code: "NOT_FOUND" } }, 404);
+            throw ApiError.notFound(`Cron job "${id}" not found`);
         }
         return c.json({ job });
     });
@@ -37,8 +40,7 @@ code: "NOT_FOUND" } }, 404);
         const id = c.req.param("id");
         const job = scheduler.getJob(id);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`,
-code: "NOT_FOUND" } }, 404);
+            throw ApiError.notFound(`Cron job "${id}" not found`);
         }
 
         const log = await scheduler.triggerJob(id);
@@ -54,8 +56,7 @@ job: scheduler.getJob(id) });
 
         const job = scheduler.getJob(id);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`,
-code: "NOT_FOUND" } }, 404);
+            throw ApiError.notFound(`Cron job "${id}" not found`);
         }
 
         const logs = await scheduler.getJobLogsFromDb(id, limit);
@@ -68,14 +69,12 @@ code: "NOT_FOUND" } }, 404);
         const body = await c.req.json().catch(() => ({})) as { enabled: boolean };
 
         if (typeof body.enabled !== "boolean") {
-            return c.json({ error: { message: "Missing 'enabled' boolean in body",
-code: "BAD_REQUEST" } }, 400);
+            throw ApiError.badRequest("Missing 'enabled' boolean in body");
         }
 
         const job = scheduler.setJobEnabled(id, body.enabled);
         if (!job) {
-            return c.json({ error: { message: `Cron job "${id}" not found`,
-code: "NOT_FOUND" } }, 404);
+            throw ApiError.notFound(`Cron job "${id}" not found`);
         }
 
         return c.json({ job });
