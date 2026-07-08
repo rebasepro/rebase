@@ -41,6 +41,7 @@ properties: {
 |----------|------|-------------|
 | `storagePath` | `string` | Subdirectory within the storage backend |
 | `storageSource` | `string` | Named storage source — routes uploads to a specific backend (e.g., `"firebase"`, `"media"`). See [Multi-Backend Storage](#multi-backend-storage). |
+| `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist and hotlink). Defaults to `false` (private files use short-lived signed URLs). |
 | `acceptedFiles` | `string[]` | Allowed MIME types (e.g., `["image/*"]`, `["application/pdf"]`) |
 | `maxSize` | `number` | Maximum file size in bytes |
 | `fileName` | `function` | Custom filename generator |

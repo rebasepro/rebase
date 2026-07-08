@@ -19,6 +19,7 @@ const result = await client.storage.putObject({
     file: fileObject,                   // File or Blob
     key: "products/images/camera.jpg",  // Storage path (optional)
     bucket: "uploads",                  // Bucket name (optional)
+    public: false,                      // Store public (permanent token-less URL) — optional, default false
     metadata: {                         // Custom metadata (optional)
         description: "Product photo",
         uploadedBy: "user-123"
@@ -70,6 +71,11 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 The SDK caches signed URLs to avoid redundant server calls.
+
+### Private vs. public URLs
+
+- **Private files** get a URL with a **short-lived, path-scoped download token** (`?token=…`, default 5 min) — never your access token. Because it expires, **don't persist a private URL**; store the file **path** and call `getSignedUrl()` again when you render it.
+- **Public files** (stored under the `public/` prefix — set `storage: { public: true }` on the property, or pass `public: true` to `putObject`) get a **stable, token-less, permanent, CDN-cacheable** URL with no server round-trip. These are safe to store in a database and hotlink.
 
 ## Download a File
 

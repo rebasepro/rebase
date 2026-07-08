@@ -672,12 +672,15 @@ const config = await client.storage.getSignedUrl(
 if (config.fileNotFound) {
     console.log("File does not exist");
 } else {
-    console.log(config.url);       // Full URL with auth token appended
+    console.log(config.url);       // Private: short-lived scoped token appended. Public: clean permanent URL.
     console.log(config.metadata);  // { bucket, fullPath, name, size, contentType, customMetadata }
 }
 ```
 
-The URL is constructed as `{baseUrl}/api/storage/file/{path}?token={accessToken}`.
+**URL model — never contains the access token:**
+
+- **Private files** → `{baseUrl}/api/storage/file/{path}?token={scopedDownloadToken}`. The token is a **short-lived, path-scoped** download token (default 5 min), signed by the server and valid only for that object — never the caller's full access JWT. Because it expires, **do not persist a private URL**: store the file **path** and call `getSignedUrl()` again at render time.
+- **Public files** → `{baseUrl}/api/storage/file/{path}` with **no token**. A file is public when it lives under the `public/` prefix — set `storage: { public: true }` on the property, or pass `public: true` to `putObject`. Public URLs are **stable, permanent, and CDN-cacheable**, so they are safe to store in a database and hotlink. For public paths, `getSignedUrl()` returns the URL immediately with no server round-trip.
 
 Protocol prefixes (`local://`, `s3://`) are automatically stripped from the key.
 
@@ -775,6 +778,7 @@ The `storageSource` field maps to a named backend registered in the `StorageRegi
 | `storagePath` | `string` | Path template for uploaded files. Supports `{entityId}` placeholder |
 | `acceptedFiles` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`) |
 | `maxSize` | `number` | Maximum file size in bytes |
+| `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist/hotlink). Defaults to `false` (private, short-lived signed URLs). |
 
 ## Frontend Storage Sources
 
