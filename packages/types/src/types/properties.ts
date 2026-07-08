@@ -1034,6 +1034,14 @@ export type StorageConfig = {
     storageSource?: string;
 
     /**
+     * Store files for this property as **public**: they are placed under the
+     * public prefix and served via stable, token-less, permanent, CDN-cacheable
+     * URLs (safe to persist and hotlink). Use for public assets like avatars or
+     * storefront images. Defaults to `false` (private, short-lived signed URLs).
+     */
+    public?: boolean;
+
+    /**
      * File MIME types that can be uploaded to this reference. Don't specify for
      * all.
      * Note that you can also use the asterisk notation, so `image/*`

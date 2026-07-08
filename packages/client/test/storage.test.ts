@@ -112,19 +112,22 @@ alsoNope: null } as any
     // getSignedUrl
     // -----------------------------------------------------------------------
     describe("getSignedUrl", () => {
-        it("fetches metadata and returns a download config", async () => {
+        it("uses the server's scoped download token, never the access token", async () => {
             const storage = createStorage(mockTransport);
 
-            mockTransport.request.mockResolvedValueOnce({ data: { size: 100 } });
-            mockTransport.resolveToken.mockResolvedValueOnce("my-token");
+            // Scoped token arrives in the metadata payload; the access token
+            // (resolveToken) must NEVER end up in a URL.
+            mockTransport.request.mockResolvedValueOnce({ data: { size: 100, token: "my-token" } });
+            mockTransport.resolveToken.mockResolvedValueOnce("ACCESS-JWT");
 
             const result = await storage.getSignedUrl("file.jpg", "bucket");
 
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/bucket/file.jpg");
             expect(result).toEqual({
                 url: "http://localhost:3000/api/storage/file/bucket/file.jpg?token=my-token",
-                metadata: { size: 100 }
+                metadata: { size: 100, token: "my-token" }
             });
+            expect(result.url).not.toContain("ACCESS-JWT");
         });
 
         it("strips local:// prefix", async () => {
@@ -187,14 +190,35 @@ alsoNope: null } as any
             expect(result.url).toBe("http://localhost:3000/api/storage/file/file.jpg?storageId=media");
         });
 
-        it("appends storageId with & when a token is present", async () => {
+        it("appends storageId with & when a scoped token is present", async () => {
             const storage = createStorage(mockTransport, "media");
 
-            mockTransport.request.mockResolvedValueOnce({ data: {} });
-            mockTransport.resolveToken.mockResolvedValueOnce("tok");
+            mockTransport.request.mockResolvedValueOnce({ data: { token: "tok" } });
 
             const result = await storage.getSignedUrl("file.jpg");
             expect(result.url).toBe("http://localhost:3000/api/storage/file/file.jpg?token=tok&storageId=media");
+        });
+
+        it("public objects get a token-less permanent URL with no metadata round-trip", async () => {
+            const storage = createStorage(mockTransport);
+            mockTransport.resolveToken.mockResolvedValue("ACCESS-JWT");
+
+            const result = await storage.getSignedUrl("public/avatar.png");
+
+            // No /storage/metadata request at all — the path is self-describing.
+            expect(mockTransport.request).not.toHaveBeenCalled();
+            expect(result.url).toBe("http://localhost:3000/api/storage/file/public/avatar.png");
+            expect(result.url).not.toContain("token=");
+        });
+
+        it("honours a server-confirmed public flag (token-less URL)", async () => {
+            const storage = createStorage(mockTransport);
+            // A path not obviously public, but the server marks it public.
+            mockTransport.request.mockResolvedValueOnce({ data: { size: 10, public: true, token: "should-be-ignored" } });
+
+            const result = await storage.getSignedUrl("assets/logo.png");
+            expect(result.url).toBe("http://localhost:3000/api/storage/file/assets/logo.png");
+            expect(result.url).not.toContain("token=");
         });
 
         it("returns cached result on subsequent calls", async () => {
@@ -251,6 +275,13 @@ fileNotFound: true });
     // getObject
     // -----------------------------------------------------------------------
     describe("getObject", () => {
+        beforeEach(() => {
+            // Scoped download token arrives via the metadata response (not the
+            // access token), matching the secure server-mediated model.
+            mockTransport.request.mockResolvedValue({ data: { token: "token" } } as any);
+            mockTransport.resolveToken.mockResolvedValue("token");
+        });
+
         it("returns a File object on success", async () => {
             const storage = createStorage(mockTransport);
             const mockBlob = new Blob(["content"], { type: "text/plain" });
@@ -264,8 +295,8 @@ fileNotFound: true });
             const result = await storage.getObject("my_file.txt");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
-                "http://localhost:3000/api/storage/file/my_file.txt",
-                { headers: { Authorization: "Bearer token" } }
+                "http://localhost:3000/api/storage/file/my_file.txt?token=token",
+                { headers: {} }
             );
 
             expect(result).toBeInstanceOf(File);
@@ -309,7 +340,7 @@ fileNotFound: true });
             await storage.getObject("local://images/photo.jpg");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
-                "http://localhost:3000/api/storage/file/images/photo.jpg",
+                "http://localhost:3000/api/storage/file/images/photo.jpg?token=token",
                 expect.any(Object)
             );
         });
@@ -327,7 +358,7 @@ fileNotFound: true });
             await storage.getObject("s3://bucket/file.dat");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
-                "http://localhost:3000/api/storage/file/bucket/file.dat",
+                "http://localhost:3000/api/storage/file/bucket/file.dat?token=token",
                 expect.any(Object)
             );
         });
@@ -345,7 +376,7 @@ fileNotFound: true });
             await storage.getObject("photo.jpg", "media");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
-                "http://localhost:3000/api/storage/file/media/photo.jpg",
+                "http://localhost:3000/api/storage/file/media/photo.jpg?token=token",
                 expect.any(Object)
             );
         });
@@ -363,7 +394,7 @@ fileNotFound: true });
             await storage.getObject("media/photo.jpg", "media");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
-                "http://localhost:3000/api/storage/file/media/photo.jpg",
+                "http://localhost:3000/api/storage/file/media/photo.jpg?token=token",
                 expect.any(Object)
             );
         });

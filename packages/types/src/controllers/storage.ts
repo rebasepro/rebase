@@ -1,11 +1,43 @@
 /**
+ * Path prefix that marks an object as **public**. Files stored under this
+ * prefix are served without any auth token via a stable, permanent,
+ * CDN-cacheable URL (see {@link StorageSource.getSignedUrl}). Shared by the
+ * client SDK and the backend so both agree on which objects are public.
+ *
+ * @group Models
+ */
+export const PUBLIC_STORAGE_PREFIX = "public/";
+
+/**
+ * True when a storage key/path points at a public object (lives under
+ * {@link PUBLIC_STORAGE_PREFIX}). The check is applied to the key *within the
+ * bucket* — strip any `bucket/` and `scheme://` prefixes first.
+ *
+ * @group Models
+ */
+export function isPublicStoragePath(path: string | null | undefined): boolean {
+    if (!path) return false;
+    let p = path;
+    const scheme = p.indexOf("://");
+    if (scheme !== -1) p = p.substring(scheme + 3);
+    return p.startsWith(PUBLIC_STORAGE_PREFIX) || p.includes(`/${PUBLIC_STORAGE_PREFIX}`);
+}
+
+/**
  * @group Models
  */
 export interface UploadFileProps {
     file: File,
     key: string,
     metadata?: Record<string, unknown>,
-    bucket?: string
+    bucket?: string,
+    /**
+     * Store this object as **public**: it is placed under
+     * {@link PUBLIC_STORAGE_PREFIX} and served via a stable, token-less,
+     * permanent URL (safe to persist in a database and cache on a CDN).
+     * Defaults to `false` (private, short-lived signed URLs).
+     */
+    public?: boolean
 }
 
 /**
@@ -74,6 +106,21 @@ export declare interface DownloadMetadata {
     contentType: string;
 
     customMetadata: Record<string, unknown>;
+    /**
+     * Optional short-lived download token (for local/server-mediated storage).
+     * Absent for public objects, which need no token.
+     */
+    token?: string;
+    /**
+     * Optional remaining lifetime of the token, in seconds.
+     */
+    tokenExpiresIn?: number;
+    /**
+     * True when this object is public: it is served without a token via a
+     * stable, permanent, CDN-cacheable URL. When set, the client builds a
+     * token-less URL and caches it indefinitely.
+     */
+    public?: boolean;
 }
 
 /**

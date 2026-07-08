@@ -15,6 +15,7 @@ import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
 import { createStorageRoutes, extractWildcardPath } from "../src/storage/routes";
+import { configureJwt } from "../src/auth/jwt";
 
 // ──────────────────────────────────────────────────────────────────────
 // Unit tests for extractWildcardPath
@@ -92,6 +93,7 @@ describe("Storage routes (sub-router integration)", () => {
     let controller: LocalStorageController;
 
     beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-routes-test-"));
         controller = new LocalStorageController({ basePath: tempDir });
 
@@ -263,6 +265,7 @@ describe("Storage routes — multi-backend routing (registry)", () => {
     let secondaryDir: string;
 
     beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         defaultDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-default-"));
         secondaryDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-secondary-"));
 

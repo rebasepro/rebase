@@ -13,8 +13,9 @@ import fsp from "node:fs/promises";
 import { StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import type { StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
-import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth } from "../auth/middleware";
+import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
+import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
@@ -257,7 +258,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * GET /file/* - Download/serve a file
      * Path: /file/{bucket}/{path} or /file/{path}
      */
-    router.get("/file/*", queryTokenAuth, readAuthMiddleware, async (c) => {
+    router.get("/file/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
         // Allow cross-origin loading so admin frontends on different
         // ports (dev) or domains (CDN) can render images via <img>.
         c.header("Cross-Origin-Resource-Policy", "cross-origin");
@@ -353,7 +354,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     /**
      * GET /metadata/* - Get file metadata
      */
-    router.get("/metadata/*", queryTokenAuth, readAuthMiddleware, async (c) => {
+    router.get("/metadata/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
             return c.json({
@@ -372,6 +373,18 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         if (downloadConfig.fileNotFound) {
             throw ApiError.notFound("File not found");
+        }
+
+        if (downloadConfig.metadata) {
+            const scopedPath = `${bucket}/${resolvedPath}`;
+            if (isPublicStoragePath(scopedPath)) {
+                // Public object: served token-less via a permanent URL.
+                downloadConfig.metadata.public = true;
+            } else {
+                // Private object: mint a short-lived, path-scoped download token.
+                downloadConfig.metadata.token = generateDownloadToken(scopedPath, 300);
+                downloadConfig.metadata.tokenExpiresIn = 300;
+            }
         }
 
         return c.json({

@@ -206,3 +206,54 @@ export function getRefreshTokenExpiry(): Date {
 
     return new Date(Date.now() + ms);
 }
+
+export interface DownloadTokenPayload {
+    purpose: "file-read";
+    path: string;
+}
+
+/**
+ * Generate a short-lived download token scoped to a specific file path or prefix
+ */
+export function generateDownloadToken(
+    path: string,
+    expiresInSeconds: number = 300
+): string {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+
+    const payload: DownloadTokenPayload = {
+        purpose: "file-read",
+        path
+    };
+
+    return jwt.sign(payload, jwtConfig.secret, {
+        expiresIn: expiresInSeconds,
+        algorithm: "HS256"
+    });
+}
+
+/**
+ * Verify and decode a download token
+ */
+export function verifyDownloadToken(token: string): DownloadTokenPayload | null {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+
+    try {
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as any;
+        if (decoded && decoded.purpose === "file-read" && typeof decoded.path === "string") {
+            return {
+                purpose: "file-read",
+                path: decoded.path
+            };
+        }
+        return null;
+    } catch (error) {
+        logger.error("[JWT] Download token verification failed", { error: error });
+        return null;
+    }
+}
+

@@ -52,6 +52,7 @@ export {
     requireAdmin,
     optionalAuth,
     queryTokenAuth,
+    fileTokenAuth,
     extractUserFromToken,
     // Password helpers (custom user creation)
     hashPassword,

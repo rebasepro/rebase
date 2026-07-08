@@ -1,4 +1,4 @@
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata } from "@rebasepro/types";
+import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, isPublicStoragePath } from "@rebasepro/types";
 import { Transport } from "./transport";
 
 /**
@@ -10,7 +10,7 @@ import { Transport } from "./transport";
  *                    `StorageController` is resolved from the registry.
  */
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
-    const urlsCache = new Map<string, DownloadConfig>();
+    const urlsCache = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
 
     /** Append ?storageId=... to a path when multi-backend routing is active. */
     const withStorageId = (path: string): string => {
@@ -23,12 +23,22 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         file,
         key,
         metadata,
-        bucket
+        bucket,
+        public: isPublic
     }: UploadFileProps): Promise<UploadFileResult> {
         const formData = new FormData();
         formData.append("file", file);
 
-        if (key) formData.append("key", key);
+        // Public objects live under the public prefix so they can be served
+        // token-less via a stable, permanent URL. Normalize the key here so the
+        // stored path is self-describing (no server round-trip needed to know
+        // it's public).
+        let effectiveKey = key;
+        if (isPublic && effectiveKey && !isPublicStoragePath(effectiveKey)) {
+            effectiveKey = `${PUBLIC_STORAGE_PREFIX}${effectiveKey.replace(/^\/+/, "")}`;
+        }
+
+        if (effectiveKey) formData.append("key", effectiveKey);
         if (bucket) formData.append("bucket", bucket);
         if (storageId) formData.append("storageId", storageId);
 
@@ -57,8 +67,13 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         bucket?: string
     ): Promise<DownloadConfig> {
         const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
-        const cached = urlsCache.get(cacheKey);
-        if (cached) return cached;
+        const cachedEntry = urlsCache.get(cacheKey);
+        if (cachedEntry) {
+            if (!cachedEntry.expiresAt || cachedEntry.expiresAt > Date.now()) {
+                return cachedEntry.config;
+            }
+            urlsCache.delete(cacheKey);
+        }
 
         let filePath = keyOrUrl;
 
@@ -71,30 +86,58 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         }
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
-            return { url: null,
-fileNotFound: true };
+            return { url: null, fileNotFound: true };
+        }
+
+        // ── Public objects ────────────────────────────────────────────────
+        // A public file (under the public prefix) is served token-less via a
+        // stable, permanent, CDN-cacheable URL. No metadata round-trip and no
+        // token are needed — build the URL directly and cache it forever.
+        if (isPublicStoragePath(filePath)) {
+            const publicConfig: DownloadConfig = {
+                url: withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}`)
+            };
+            urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
+            return publicConfig;
         }
 
         try {
             const result = await transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${filePath}`));
 
-            const activeToken = await transport.resolveToken();
-            const tokenQuery = activeToken ? `?token=${activeToken}` : "";
+            // Public object (server-confirmed): token-less permanent URL.
+            if (result.data.public) {
+                const publicConfig: DownloadConfig = {
+                    url: withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}`),
+                    metadata: result.data
+                };
+                urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
+                return publicConfig;
+            }
+
+            // Private object: use the short-lived, file-scoped download token
+            // minted by the server. We deliberately do NOT fall back to the
+            // caller's access token — a URL must never carry a full-privilege
+            // credential. If no scoped token is present the URL fails closed.
+            const scopedToken = result.data.token;
+            const tokenQuery = scopedToken ? `?token=${scopedToken}` : "";
 
             const downloadConfig: DownloadConfig = {
                 // `withStorageId` picks `?` or `&` based on whether the token
                 // query is already present, so the URL stays valid even when
-                // there is no auth token.
+                // there is no token.
                 url: withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}${tokenQuery}`),
                 metadata: result.data
             };
 
-            urlsCache.set(cacheKey, downloadConfig);
+            const expiresAt = result.data.tokenExpiresIn
+                ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000 // subtract 10s buffer
+                : undefined;
+
+            urlsCache.set(cacheKey, { config: downloadConfig, expiresAt });
             return downloadConfig;
         } catch (e: unknown) {
             if (e instanceof Error && "status" in e && (e as { status: number }).status === 404) {
-                return { url: null,
-fileNotFound: true };
+                return { url: null, fileNotFound: true };
             }
             throw e;
         }
@@ -104,33 +147,22 @@ fileNotFound: true };
         key: string,
         bucket?: string
     ): Promise<File | null> {
-        let filePath = key;
-
-        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://") || filePath.startsWith("gs://"))) {
-            filePath = filePath.substring(filePath.indexOf("://") + 3);
-        }
-
-        if (bucket && filePath && !filePath.startsWith(bucket)) {
-            filePath = `${bucket}/${filePath}`;
-        }
-
-        if (!filePath || filePath.trim() === "" || filePath === "/") {
+        const downloadConfig = await getSignedUrl(key, bucket);
+        if (downloadConfig.fileNotFound || !downloadConfig.url) {
             return null;
         }
 
-        // We must use plain fetch because transport.request expects JSON response, but here we want a Blob.
-        const url = withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}`);
-
-        // This is a bit manual, but necessary for blob handling
-        const response = await transport.fetchFn(url, {
-            headers: transport.getHeaders ? transport.getHeaders() : {}
+        // Fetch using the signed URL directly. Since the scoped token is in the ?token= query param,
+        // we explicitly omit any Authorization headers to prevent passing full access tokens to file serving routes.
+        const response = await transport.fetchFn(downloadConfig.url, {
+            headers: {}
         });
 
         if (response.status === 404) return null;
         if (!response.ok) throw new Error("Failed to get file");
 
         const blob = await response.blob();
-        const fileName = filePath.split("/").pop() || "file";
+        const fileName = (bucket ? `${bucket}/${key}` : key).split("/").pop() || "file";
         return new File([blob], fileName, { type: blob.type });
     }
 

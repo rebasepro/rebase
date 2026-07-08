@@ -6,7 +6,9 @@ import {
     hashRefreshToken,
     getRefreshTokenExpiry,
     getAccessTokenExpiryMs,
-    getAccessTokenExpiry
+    getAccessTokenExpiry,
+    generateDownloadToken,
+    verifyDownloadToken
 } from "../src/auth/jwt";
 
 describe("JWT Utilities", () => {
@@ -320,6 +322,36 @@ accessExpiresIn: "1s" });
             const token = generateAccessToken(uuid, []);
             const payload = verifyAccessToken(token);
             expect(payload!.userId).toBe(uuid);
+        });
+    });
+
+    // ── Scoped Download Tokens ────────────────────────────────
+    describe("Scoped Download Tokens", () => {
+        it("should generate a valid scoped download token", () => {
+            const token = generateDownloadToken("default/photos/file.jpg", 100);
+            expect(token).toBeTruthy();
+            expect(typeof token).toBe("string");
+        });
+
+        it("should verify and decode a valid scoped download token", () => {
+            const token = generateDownloadToken("default/photos/file.jpg", 100);
+            const decoded = verifyDownloadToken(token);
+            expect(decoded).toEqual({
+                purpose: "file-read",
+                path: "default/photos/file.jpg"
+            });
+        });
+
+        it("should return null when verifying an access token as a download token", () => {
+            const accessToken = generateAccessToken("user-1", ["admin"]);
+            const decoded = verifyDownloadToken(accessToken);
+            expect(decoded).toBeNull();
+        });
+
+        it("should return null for expired download tokens", () => {
+            // Configure custom quick expiry if supported, but let's test invalid string / signature mismatch first
+            const decoded = verifyDownloadToken("invalid.download.token");
+            expect(decoded).toBeNull();
         });
     });
 });

@@ -1,8 +1,8 @@
 // Auth module exports
 export * from "./interfaces";
 
-export { configureJwt, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
-export type { JwtConfig, AccessTokenPayload } from "./jwt";
+export { configureJwt, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, generateDownloadToken, verifyDownloadToken } from "./jwt";
+export type { JwtConfig, AccessTokenPayload, DownloadTokenPayload } from "./jwt";
 
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
 export type { PasswordValidationResult } from "./password";
@@ -28,7 +28,7 @@ export { createBitbucketProvider } from "./bitbucket-oauth";
 export { createSlackProvider } from "./slack-oauth";
 export { createSpotifyProvider } from "./spotify-oauth";
 
-export { requireAuth, requireAdmin, optionalAuth, extractUserFromToken, createAuthMiddleware, queryTokenAuth } from "./middleware";
+export { requireAuth, requireAdmin, optionalAuth, extractUserFromToken, createAuthMiddleware, queryTokenAuth, fileTokenAuth } from "./middleware";
 export type { AuthMiddlewareOptions, AuthResult } from "./middleware";
 
 

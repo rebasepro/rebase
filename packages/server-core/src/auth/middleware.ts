@@ -1,6 +1,6 @@
 import { MiddlewareHandler, Context } from "hono";
-import { DataDriver } from "@rebasepro/types";
-import { verifyAccessToken, AccessTokenPayload } from "./jwt";
+import { DataDriver, isPublicStoragePath } from "@rebasepro/types";
+import { verifyAccessToken, AccessTokenPayload, verifyDownloadToken } from "./jwt";
 import { HonoEnv } from "../api/types";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
@@ -417,3 +417,136 @@ export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 
     return next();
 };
+
+/**
+ * Authorizes anonymous access to **public** storage objects (those under the
+ * public prefix), which are served token-less via stable, permanent URLs.
+ *
+ * Runs on the storage `/file/*` and `/metadata/*` routes, *after* the token
+ * middleware and *before* the read-auth gate. If the request is already
+ * authenticated (Bearer or scoped token), it does nothing. Otherwise, when the
+ * requested object path is public, it sets a minimal "public" principal so the
+ * downstream `requireAuth` gate lets the read through. Private paths are left
+ * untouched, so they still require a valid token.
+ */
+export const publicObjectAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
+    // Already authenticated (Bearer / scoped token) — nothing to authorize.
+    if (c.get("user")) return next();
+
+    const routePath = c.req.routePath;          // e.g. "/api/storage/file/*"
+    const prefix = routePath.replace("/*", "");
+    const fullPath = c.req.path;
+    const idx = fullPath.indexOf(prefix);
+    const rawPath = idx < 0 ? "" : fullPath.substring(idx + prefix.length + 1);
+
+    if (rawPath && isPublicStoragePath(decodeURIComponent(rawPath))) {
+        c.set("user", { userId: "public", roles: ["public"] });
+    }
+
+    return next();
+};
+
+/**
+ * Helper to match paths for scoped file tokens.
+ * Matches exact paths or prefixes (exact folder prefixes or ending with /).
+ */
+function isPathMatch(requested: string, allowed: string): boolean {
+    if (requested === allowed) return true;
+    if (allowed.endsWith("/")) {
+        return requested.startsWith(allowed);
+    }
+    return requested.startsWith(allowed + "/");
+}
+
+/**
+ * Middleware that authenticates file-serving routes using scoped download tokens.
+ * It enforces that only scoped "file-read" tokens can access "/file/*" and "?token=" query params.
+ * Full access JWTs are explicitly rejected on "/file/*" routes, and in the "?token=" query param.
+ */
+export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
+    const path = c.req.path;
+    const isFileRoute = path.includes("/storage/file/");
+    const authHeader = c.req.header("authorization");
+    const queryToken = c.req.query("token");
+
+    // Local copy of helper to avoid circular imports with routes.ts
+    const extractWildcard = (ctx: any): string => {
+        const routePath = ctx.req.routePath;
+        const prefix = routePath.replace("/*", "");
+        const fullPath = ctx.req.path;
+        const idx = fullPath.indexOf(prefix);
+        if (idx < 0) return "";
+        return fullPath.substring(idx + prefix.length + 1);
+    };
+
+    const parseBucketPath = (filePath: string): { bucket: string; resolvedPath: string } => {
+        const parts = filePath.split("/");
+        if (parts.length > 1 && parts[0].toLowerCase() === "default") {
+            return {
+                bucket: "default",
+                resolvedPath: parts.slice(1).join("/")
+            };
+        }
+        return {
+            bucket: "default",
+            resolvedPath: filePath
+        };
+    };
+
+    // 1. Authorization: Bearer <token>
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        const payload = verifyDownloadToken(token);
+
+        if (payload) {
+            const rawPath = extractWildcard(c);
+            if (rawPath) {
+                const filePath = decodeURIComponent(rawPath);
+                const { bucket, resolvedPath } = parseBucketPath(filePath);
+                const requestedFullPath = `${bucket}/${resolvedPath}`;
+
+                if (isPathMatch(requestedFullPath, payload.path)) {
+                    c.set("user", { userId: "download-token", roles: ["reader"] });
+                    return next();
+                } else {
+                    return c.json({ error: { message: "Forbidden: Scoped token path mismatch", code: "FORBIDDEN" } }, 403);
+                }
+            }
+        }
+
+        // If it's a file serving route, explicitly reject full access JWTs
+        if (isFileRoute) {
+            return c.json({ error: { message: "Unauthorized: Access JWT not allowed on file routes", code: "UNAUTHORIZED" } }, 401);
+        }
+
+        // Otherwise (e.g. /metadata/*) let it pass to downstream requireAuth
+        return next();
+    }
+
+    // 2. Query param: ?token=<token>
+    if (queryToken) {
+        const payload = verifyDownloadToken(queryToken);
+
+        if (payload) {
+            const rawPath = extractWildcard(c);
+            if (rawPath) {
+                const filePath = decodeURIComponent(rawPath);
+                const { bucket, resolvedPath } = parseBucketPath(filePath);
+                const requestedFullPath = `${bucket}/${resolvedPath}`;
+
+                if (isPathMatch(requestedFullPath, payload.path)) {
+                    c.set("user", { userId: "download-token", roles: ["reader"] });
+                    return next();
+                } else {
+                    return c.json({ error: { message: "Forbidden: Scoped token path mismatch", code: "FORBIDDEN" } }, 403);
+                }
+            }
+        }
+
+        // Explicitly reject query-token if it is not a valid scoped download token (e.g. if it is a full access JWT)
+        return c.json({ error: { message: "Unauthorized: Invalid or unauthorized token", code: "UNAUTHORIZED" } }, 401);
+    }
+
+    return next();
+};
+
