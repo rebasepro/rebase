@@ -20,7 +20,19 @@ export function isPublicStoragePath(path: string | null | undefined): boolean {
     let p = path;
     const scheme = p.indexOf("://");
     if (scheme !== -1) p = p.substring(scheme + 3);
-    return p.startsWith(PUBLIC_STORAGE_PREFIX) || p.includes(`/${PUBLIC_STORAGE_PREFIX}`);
+    p = p.replace(/^\/+/, "");
+
+    // Defense-in-depth: a path containing traversal segments is never public,
+    // so an attacker can't reach a private object via `public/../secret`.
+    if (p.split("/").some((seg) => seg === "..")) return false;
+
+    // Public iff the object **key** starts with the public prefix. A single
+    // leading `default/` bucket segment is tolerated (the default bucket).
+    // A substring match is deliberately NOT used — a private object under a
+    // folder literally named `public` (e.g. `reports/public/q3.pdf`) must stay
+    // private. Named buckets: pass the key (not `bucket/key`) so the prefix is
+    // anchored; otherwise it falls back to a private, token-scoped URL (safe).
+    return p.startsWith(PUBLIC_STORAGE_PREFIX) || p.startsWith(`default/${PUBLIC_STORAGE_PREFIX}`);
 }
 
 /**

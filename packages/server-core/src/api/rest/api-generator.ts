@@ -1,10 +1,26 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+
+/**
+ * Parse a JSON request body for a create/update. An empty body yields `{}`
+ * (a valid "no explicit fields" write), but a **malformed** body throws a 400
+ * rather than being silently swallowed to `{}` — which would turn bad input
+ * into an unintended empty write.
+ */
+async function parseJsonBody(c: Context<HonoEnv>): Promise<Record<string, unknown>> {
+    const raw = await c.req.text();
+    if (!raw || raw.trim() === "") return {};
+    try {
+        return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+        throw ApiError.badRequest("Invalid JSON body");
+    }
+}
 
 
 
@@ -169,7 +185,7 @@ export class RestApiGenerator {
                 const path = collection.slug;
 
 
-                const body = await c.req.json().catch(() => ({}));
+                const body = await parseJsonBody(c);
 
 
 
@@ -256,7 +272,7 @@ values: entity.values as Record<string, unknown> },
                     throw ApiError.notFound("Entity not found");
                 }
 
-                const body = await c.req.json().catch(() => ({}));
+                const body = await parseJsonBody(c);
 
 
 
@@ -453,7 +469,7 @@ id };
 
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
-            const body = await c.req.json().catch(() => ({}));
+            const body = await parseJsonBody(c);
 
 
 
@@ -483,7 +499,7 @@ id };
 
             this.enforceApiKeyPermission(c, c.req.param("parent"));
 
-            const body = await c.req.json().catch(() => ({}));
+            const body = await parseJsonBody(c);
 
 
 
