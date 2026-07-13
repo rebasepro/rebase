@@ -114,7 +114,7 @@ permissive: true }
         }
 
         if (subcommand === "delete") {
-            const id = rawArgs.slice(2).filter((a) => !a.startsWith("-"))[2];
+            const id = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[2];
             if (!id) fail("Usage: rebase cloud webhooks delete <id>");
             await client.data.collection("webhooks").delete(id);
             success(`Deleted webhook ${id}`);
@@ -212,7 +212,7 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
 
-    const action = rawArgs.slice(2).filter((a) => !a.startsWith("-"))[1];
+    const action = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[1];
 
     // `rebase cloud billing setup` — attach a card to the org (one-time, opens a
     // browser). Once done, project create/deploy work headlessly (off_session).
@@ -263,9 +263,9 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     if (!org) fail("No active organization.", "Run `rebase cloud use` first.");
     try {
         const orgRow = (await client.data.collection("organizations").findById(org)) as
-            | { billingAccount?: string | number }
+            | { billing_account_id?: string | number; billingAccount?: string | number }
             | undefined;
-        const billingId = orgRow?.billingAccount;
+        const billingId = orgRow?.billing_account_id ?? orgRow?.billingAccount;
         if (!billingId) {
             console.log("");
             console.log(chalk.gray(`  Organization ${org} has no billing account yet.`));

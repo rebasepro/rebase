@@ -100,7 +100,8 @@ export function unlinkCommand(): void {
 }
 
 export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
-    const target = rawArgs.slice(3).find((a) => !a.startsWith("-"));
+    // positionals after "cloud" are [use, <org>]; take the token after "use".
+    const target = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[1];
     const { client, url } = await requireClient(rawArgs);
 
     try {

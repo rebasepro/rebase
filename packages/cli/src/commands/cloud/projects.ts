@@ -67,6 +67,21 @@ export async function listProjects(rawArgs: string[]): Promise<void> {
 
 /* ─── create ───────────────────────────────────────────────────── */
 
+/** Default region + VM size per provider (both are required on create). */
+function providerDefaults(provider: string): { region: string; vmSize: string } {
+    switch (provider) {
+        case "gcp":
+            return { region: "europe-west1",
+vmSize: "e2-small" };
+        case "aws":
+            return { region: "us-east-1",
+vmSize: "t3.small" };
+        default:
+            return { region: "nbg1",
+vmSize: "cx21" };
+    }
+}
+
 export async function createProject(rawArgs: string[]): Promise<void> {
     const args = arg(
         {
@@ -76,6 +91,7 @@ export async function createProject(rawArgs: string[]): Promise<void> {
             "--branch": String,
             "--provider": String,
             "--region": String,
+            "--vm-size": String,
             "--org": String,
             "--link": Boolean,
             "-n": "--name"
@@ -93,7 +109,9 @@ permissive: true }
         );
     }
 
-    // Prompt for anything not supplied via flags.
+    // Prompt only for the essentials, and only when attached to a terminal —
+    // a headless `projects create --name X --subdomain Y` must never block.
+    // repo/branch/provider are optional and default sensibly.
     const prompts: Array<Record<string, unknown>> = [];
     if (!args["--name"]) prompts.push({ type: "input",
 name: "name",
@@ -101,23 +119,7 @@ message: "Project name:" });
     if (!args["--subdomain"]) prompts.push({ type: "input",
 name: "subdomain",
 message: "Subdomain:" });
-    if (!args["--repo"]) prompts.push({ type: "input",
-name: "repo",
-message: "Git repository URL:" });
-    if (!args["--branch"]) prompts.push({ type: "input",
-name: "branch",
-message: "Git branch:",
-default: "main" });
-    if (!args["--provider"]) {
-        prompts.push({
-            type: "list",
-            name: "provider",
-            message: "Cloud provider:",
-            choices: ["hetzner", "gcp", "aws"],
-            default: "hetzner"
-        });
-    }
-    const answers = prompts.length
+    const answers = prompts.length && process.stdin.isTTY
         ? await inquirer.prompt(prompts as unknown as Parameters<typeof inquirer.prompt>[0])
         : {};
     const a = answers as Record<string, string>;
@@ -127,10 +129,14 @@ default: "main" });
     const gitRepoUrl = (args["--repo"] || a.repo || "").trim();
     const gitBranch = (args["--branch"] || a.branch || "main").trim();
     const provider = (args["--provider"] || a.provider || "hetzner").trim();
-    const region = (args["--region"] || "").trim();
+    // region + vmSize are required by the control plane; default sensibly per
+    // provider so a headless `projects create` needs only name + subdomain.
+    const defaults = providerDefaults(provider);
+    const region = (args["--region"] || defaults.region).trim();
+    const vmSize = (args["--vm-size"] || defaults.vmSize).trim();
 
-    if (!name || !subdomain || !gitRepoUrl) {
-        fail("Name, subdomain and git repository URL are required.");
+    if (!name || !subdomain) {
+        fail("Name and subdomain are required.");
     }
 
     // Validate subdomain availability up front for a clean error.
@@ -158,7 +164,8 @@ default: "main" });
             gitRepoUrl,
             gitBranch,
             provider,
-            region: region || undefined,
+            region,
+            vmSize,
             organization: org,
             createdById: user.uid,
             status: "provisioning"

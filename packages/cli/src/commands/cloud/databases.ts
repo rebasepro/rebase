@@ -158,7 +158,7 @@ async function testDatabase(rawArgs: string[]): Promise<void> {
 
 async function backupCommand(rawArgs: string[]): Promise<void> {
     // `rebase cloud db backup <action>` — action is the 4th positional token.
-    const action = rawArgs.slice(2).filter((a) => !a.startsWith("-"))[2] || "list";
+    const action = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[2] || "list";
     const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
 
@@ -178,7 +178,7 @@ type: "manual" },
         }
 
         if (action === "restore") {
-            const filename = rawArgs.slice(2).filter((a) => !a.startsWith("-"))[3];
+            const filename = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[3];
             if (!filename) fail("Usage: rebase cloud db backup restore <filename>");
             const { confirmed } = await inquirer.prompt([
                 {
