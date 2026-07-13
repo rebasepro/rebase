@@ -192,6 +192,47 @@ expiresAt: Date.now() + 100000 }));
     });
 
     // -----------------------------------------------------------------------
+    // auto-refresh resilience
+    // -----------------------------------------------------------------------
+    describe("auto-refresh resilience", () => {
+        const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+
+        it("retries instead of signing out on a transient refresh failure (5xx)", async () => {
+            const storage = createMemoryStorage();
+            // Valid session but within the refresh buffer → schedules an immediate refresh.
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj(Date.now() + 60000)));
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                statusText: "Server Error",
+                json: async () => ({ error: { message: "boom", code: "INTERNAL" } })
+            });
+
+            const auth = createAuth(transport, { storage });
+            await flush();
+
+            // A transient 5xx must NOT drop the session — a retry is scheduled instead.
+            expect(auth.getSession()).not.toBeNull();
+        });
+
+        it("signs out on a fatal refresh failure (invalid token)", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj(Date.now() + 60000)));
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                status: 401,
+                statusText: "Unauthorized",
+                json: async () => ({ error: { message: "bad", code: "INVALID_TOKEN" } })
+            });
+
+            const auth = createAuth(transport, { storage });
+            await flush();
+
+            expect(auth.getSession()).toBeNull();
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // signInWithEmail
     // -----------------------------------------------------------------------
     describe("signInWithEmail", () => {

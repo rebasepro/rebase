@@ -69,6 +69,11 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
     const STORAGE_KEY = "rebase_auth";
     const REFRESH_BUFFER_MS = 120000;
+    // Auto-refresh resilience: retry transient failures with exponential backoff
+    // (1s, 2s, 4s, … capped) before giving up and signing out.
+    const MAX_REFRESH_RETRIES = 5;
+    const REFRESH_RETRY_BASE_MS = 1000;
+    const REFRESH_RETRY_MAX_MS = 30000;
 
     let currentSession: RebaseSession | null = null;
     const listeners = new Set<(event: AuthChangeEvent, session: RebaseSession | null) => void>();
@@ -129,6 +134,37 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         return null;
     }
 
+    /**
+     * A refresh failure is only fatal if the refresh token itself is rejected
+     * (expired / invalid / forbidden). Network blips, timeouts, and 5xx (e.g. a
+     * backend restart mid-session) are transient and must NOT log the user out.
+     */
+    function isFatalRefreshError(err: unknown): boolean {
+        if (!(err instanceof RebaseApiError)) return false; // network/other → transient
+        if (err.code === "INVALID_TOKEN" || err.code === "TOKEN_EXPIRED") return true;
+        // 401/403 are auth failures; other statuses (incl. 5xx, 0) are transient.
+        return err.status === 401 || err.status === 403;
+    }
+
+    async function attemptScheduledRefresh(attempt: number) {
+        try {
+            await refreshSession();
+            // On success, refreshSession() re-schedules the next refresh itself.
+        } catch (err) {
+            if (isFatalRefreshError(err)) {
+                signOut();
+                return;
+            }
+            if (attempt >= MAX_REFRESH_RETRIES) {
+                signOut();
+                return;
+            }
+            // Transient failure — back off and retry rather than dropping the session.
+            const backoff = Math.min(REFRESH_RETRY_BASE_MS * 2 ** attempt, REFRESH_RETRY_MAX_MS);
+            refreshTimeout = setTimeout(() => { void attemptScheduledRefresh(attempt + 1); }, backoff);
+        }
+    }
+
     function scheduleRefresh(expiresAt: number) {
         if (refreshTimeout) clearTimeout(refreshTimeout);
         if (!autoRefresh) return;
@@ -136,17 +172,11 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const delay = (expiresAt - REFRESH_BUFFER_MS) - Date.now();
 
         if (delay <= 0) {
-            refreshSession().catch(() => signOut());
+            void attemptScheduledRefresh(0);
             return;
         }
 
-        refreshTimeout = setTimeout(async () => {
-            try {
-                await refreshSession();
-            } catch (e) {
-                signOut();
-            }
-        }, delay);
+        refreshTimeout = setTimeout(() => { void attemptScheduledRefresh(0); }, delay);
     }
 
     function handleAuthResponse(data: { tokens: AuthTokens, user: Record<string, unknown> }, event?: AuthChangeEvent): RebaseSession {

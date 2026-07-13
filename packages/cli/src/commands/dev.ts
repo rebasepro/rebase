@@ -274,6 +274,31 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
         console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
 
+        // The .env's PORT / VITE_API_URL look authoritative but are overridden in
+        // dev: we derive a per-project port to avoid cross-project collisions and
+        // point the frontend at it. Surface that so a mismatched .env doesn't turn
+        // into a silent "connecting to the wrong port" debugging loop.
+        if (envFile) {
+            try {
+                const envText = fs.readFileSync(envFile, "utf-8");
+                const readEnvKey = (key: string): string | undefined => {
+                    const m = envText.match(new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`, "m"));
+                    return m ? m[1].replace(/^["']|["']$/g, "") : undefined;
+                };
+                const envPort = readEnvKey("PORT");
+                const envApiUrl = readEnvKey("VITE_API_URL");
+                const overridden: string[] = [];
+                if (envPort && envPort !== String(startPort)) overridden.push(`PORT=${envPort}`);
+                if (envApiUrl && envApiUrl !== `http://localhost:${startPort}`) overridden.push(`VITE_API_URL=${envApiUrl}`);
+                if (overridden.length > 0) {
+                    console.log(chalk.yellow(
+                        `  ⚠ Ignoring ${overridden.join(", ")} from .env in dev — using derived port ${startPort} ` +
+                        `(per-project, avoids collisions). Pass ${chalk.white("--port")} to pin a port.`
+                    ));
+                }
+            } catch { /* ignore — best-effort notice */ }
+        }
+
         /** Whether the frontend has been launched (we only launch it once). */
         let frontendLaunched = false;
 
