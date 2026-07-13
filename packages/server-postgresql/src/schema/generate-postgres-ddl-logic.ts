@@ -425,11 +425,11 @@ export const generatePostgresDdl = async (
             ddl += `\n);\n\n`;
 
             if (options.includePolicies) {
-                // Enable RLS and add Policies
+                // Enable RLS and add Policies. No FORCE: authenticated requests
+                // run as the non-owner `rebase_user` role, which plain ENABLE
+                // already binds. The owner (server context) must bypass — it is
+                // the trusted plane (auth flows, dataAsAdmin).
                 ddl += `ALTER TABLE "${schema}"."${baseTableName}" ENABLE ROW LEVEL SECURITY;\n`;
-                if (collection.auth) {
-                    ddl += `ALTER TABLE "${schema}"."${baseTableName}" FORCE ROW LEVEL SECURITY;\n`;
-                }
                 ddl += `\n`;
 
                 const securityRules = getEffectiveSecurityRules(collection);
@@ -470,10 +470,9 @@ export const generatePostgresPoliciesDdl = (collections: CollectionConfig[]): st
         const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
         const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
 
+        // No FORCE: user requests run as the non-owner `rebase_user` role
+        // (plain ENABLE binds them); the owner is the trusted server context.
         ddl += `ALTER TABLE "${schema}"."${baseTableName}" ENABLE ROW LEVEL SECURITY;\n`;
-        if (collection.auth) {
-            ddl += `ALTER TABLE "${schema}"."${baseTableName}" FORCE ROW LEVEL SECURITY;\n`;
-        }
         ddl += `\n`;
 
         const securityRules = getEffectiveSecurityRules(collection);

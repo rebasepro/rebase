@@ -19,7 +19,10 @@ describe("auth collection default RLS policies", () => {
 
         const ddl = generatePostgresPoliciesDdl([collection]);
 
-        expect(ddl).toContain("FORCE ROW LEVEL SECURITY");
+        // No FORCE: user requests run as the non-owner rebase_user role, which
+        // plain ENABLE binds; the owner is the trusted server context.
+        expect(ddl).toContain("ENABLE ROW LEVEL SECURITY");
+        expect(ddl).not.toContain("FORCE ROW LEVEL SECURITY");
         // Restrictive gate exists for every write op.
         expect(ddl).toContain("AS RESTRICTIVE FOR INSERT");
         expect(ddl).toContain("AS RESTRICTIVE FOR UPDATE");
@@ -94,7 +97,7 @@ describe("auth collection default RLS policies", () => {
         expect(getEffectiveSecurityRules(collection)).toHaveLength(0);
     });
 
-    it("injects the baseline server-or-admin read policy on non-auth collections", () => {
+    it("locks non-auth collections by default: server-or-admin read + write baselines", () => {
         const collection: CollectionConfig = {
             slug: "products",
             table: "products",
@@ -102,13 +105,26 @@ describe("auth collection default RLS policies", () => {
             properties: { name: { type: "string" } }
         };
 
-        // Reads run under the restricted reader role, so RLS default-denies:
-        // without this baseline, a rule-less collection would be unreadable
-        // even by the trusted server context and the admin studio.
+        // User requests run under the restricted rebase_user role, so RLS
+        // default-denies. Without these baselines a rule-less collection would
+        // be locked to everyone including the admin studio. Both are permissive
+        // (mode undefined) so author rules broaden access from here.
         const rules = getEffectiveSecurityRules(collection);
-        expect(rules).toHaveLength(1);
-        expect(rules[0].name).toBe("products_default_admin_read");
-        expect(rules[0].operations).toEqual(["select"]);
-        expect(rules[0].mode).toBeUndefined(); // permissive: author rules broaden
+        expect(rules).toHaveLength(2);
+
+        const read = rules.find(r => r.name === "products_default_admin_read");
+        expect(read?.operations).toEqual(["select"]);
+        expect(read?.mode).toBeUndefined();
+
+        const write = rules.find(r => r.name === "products_default_admin_write");
+        expect(write?.operations).toEqual(["insert", "update", "delete"]);
+        expect(write?.mode).toBeUndefined();
+
+        // Locked by default: only the server context / admins pass.
+        const ddl = generatePostgresPoliciesDdl([collection]);
+        expect(ddl).not.toContain("FORCE ROW LEVEL SECURITY");
+        expect(ddl).toContain("ENABLE ROW LEVEL SECURITY");
+        expect(ddl).toContain("FOR INSERT");
+        expect(ddl).toContain(adminWrite);
     });
 });

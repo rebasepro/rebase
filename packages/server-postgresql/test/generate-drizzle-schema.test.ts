@@ -416,8 +416,14 @@ ownerField: "user_id" }
 
             const result = await generateSchema(collections);
             expect(result).toContain('for: "select"');
-            expect(result).toContain("using:");
-            expect(result).not.toContain("withCheck:");
+            // Every SELECT policy (author + injected default read) has using and
+            // no withCheck; the injected default WRITE policies do have withCheck.
+            const selectBlocks = result.split("pgPolicy(").filter(b => b.includes('for: "select"'));
+            expect(selectBlocks.length).toBeGreaterThan(0);
+            for (const b of selectBlocks) {
+                expect(b).toContain("using:");
+                expect(b.split("})")[0]).not.toContain("withCheck:");
+            }
         });
 
         it("should generate INSERT policy with only WITH CHECK clause", async () => {
@@ -683,10 +689,13 @@ using: "{is_locked} = false" }
 
             const result = await generateSchema(collections);
             expect(result).toContain(".enableRLS()");
-            // The baseline server-or-admin read policy is injected (reads run
-            // under the restricted reader role, so RLS default-denies).
+            // Locked by default: server-or-admin read + write baselines are
+            // injected (user requests run under the restricted rebase_user role,
+            // so RLS default-denies).
             expect(result).toContain('pgPolicy("public_data_default_admin_read"');
-            expect((result.match(/pgPolicy\(/g) ?? []).length).toBe(1);
+            expect(result).toContain('pgPolicy("public_data_default_admin_write_insert"');
+            expect(result).toContain('pgPolicy("public_data_default_admin_write_update"');
+            expect(result).toContain('pgPolicy("public_data_default_admin_write_delete"');
         });
 
         it("should enable RLS on tables that do have security rules", async () => {
@@ -833,10 +842,11 @@ access: "public" }
             ]
         }];
         const result = await generateSchema(collections);
-        // operations[] should win — no "delete" policy
-        expect(result).toContain('for: "select"');
-        expect(result).toContain('for: "insert"');
-        expect(result).not.toContain('for: "delete"');
+        // operations[] should win for the author rule — select+insert, no delete.
+        // (A default_admin_write delete policy exists separately.)
+        expect(result).toContain('pgPolicy("test_select"');
+        expect(result).toContain('pgPolicy("test_insert"');
+        expect(result).not.toContain('pgPolicy("test_delete"');
     });
     it("should handle roles combined with using true for unfiltered access", async () => {
         const collections: CollectionConfig[] = [{

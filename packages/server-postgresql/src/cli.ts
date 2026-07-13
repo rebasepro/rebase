@@ -168,7 +168,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             
             if (databaseUrl) {
                 await applyPolicies(databaseUrl);
-                await ensureReadIsolation(databaseUrl);
+                await ensureRlsUserRole(databaseUrl);
             } else {
                 logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
@@ -180,7 +180,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             const extraArgs = argsList._.filter(arg => arg !== "migrate");
             await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
             if (databaseUrl) {
-                await ensureReadIsolation(databaseUrl);
+                await ensureRlsUserRole(databaseUrl);
             }
         }
 
@@ -210,13 +210,13 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
 }
 
 /**
- * Provision the restricted reader role right after schema changes land, so
- * grants cover freshly created tables (default privileges cover future ones).
- * Only needed — and only possible without extra setup — when the connection
- * would bypass RLS (superuser / BYPASSRLS / table owner).
+ * Provision the restricted `rebase_user` role right after schema changes land,
+ * so grants cover freshly created tables (default privileges cover future
+ * ones). Only needed — and only possible without extra setup — when the
+ * connection would bypass RLS (superuser / BYPASSRLS / table owner).
  */
-async function ensureReadIsolation(databaseUrl: string): Promise<void> {
-    const { detectConnectionPosture, ensureReaderRole, REBASE_READER_ROLE } = await import("./security/read-isolation");
+async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
+    const { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE } = await import("./security/rls-enforcement");
     const { Client } = await import("pg");
     const client = new Client({ connectionString: databaseUrl });
     await client.connect();
@@ -224,8 +224,8 @@ async function ensureReadIsolation(databaseUrl: string): Promise<void> {
         const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
         const posture = await detectConnectionPosture(runSql);
         if (posture.privileged) {
-            await ensureReaderRole(runSql, ["public", "rebase", "auth"]);
-            logger.info(chalk.gray(`  ✓ Read-isolation role "${REBASE_READER_ROLE}" provisioned/refreshed.`));
+            await ensureAppRole(runSql, ["public", "rebase", "auth"]);
+            logger.info(chalk.gray(`  ✓ RLS role "${REBASE_USER_ROLE}" provisioned/refreshed.`));
         }
     } finally {
         await client.end();

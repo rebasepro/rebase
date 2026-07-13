@@ -304,7 +304,7 @@ describe("generatePostgresDdl edge cases", () => {
             expect(cleanResult).toContain("(author_id)::text = auth.uid()");
         });
 
-        it("should generate only the default server-or-admin read policy for collections without security rules", () => {
+        it("locks collections without security rules to server/admin read + write defaults", () => {
             const collections: CollectionConfig[] = [
                 {
                     slug: "items",
@@ -320,10 +320,15 @@ describe("generatePostgresDdl edge cases", () => {
 
             expect(result).toContain("ALTER TABLE");
             expect(result).toContain("ENABLE ROW LEVEL SECURITY");
-            // Reads run under the restricted reader role (RLS default-denies),
-            // so the framework injects a baseline read for server/admin.
+            expect(result).not.toContain("FORCE ROW LEVEL SECURITY");
+            // User requests run under the restricted rebase_user role (RLS
+            // default-denies), so the framework injects server/admin baselines
+            // for read AND write — locked by default.
             expect(result).toContain("CREATE POLICY \"items_default_admin_read\"");
-            expect((result.match(/CREATE POLICY/g) ?? []).length).toBe(1);
+            expect(result).toContain("CREATE POLICY \"items_default_admin_write_insert\"");
+            expect(result).toContain("CREATE POLICY \"items_default_admin_write_update\"");
+            expect(result).toContain("CREATE POLICY \"items_default_admin_write_delete\"");
+            expect((result.match(/CREATE POLICY/g) ?? []).length).toBe(4);
         });
 
         it("should return only the header comment for an empty collections array", () => {

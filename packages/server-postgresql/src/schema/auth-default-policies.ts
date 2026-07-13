@@ -4,37 +4,37 @@ import { getTableName } from "@rebasepro/common";
 /**
  * Default RLS policies injected by the schema generator.
  *
- * Rebase's enforcement model: **reads** are gated by Postgres RLS (`select`
- * rules compile to policies and the runtime executes authenticated reads under
- * the restricted `rebase_reader` role), while **writes** are gated by
- * app-layer callbacks — except on auth collections, whose tables are
- * `FORCE ROW LEVEL SECURITY` so the admin write gate below binds even the
- * table owner.
+ * Rebase's enforcement model is unified: authenticated (user-context) requests
+ * run under the restricted `rebase_user` role, so Postgres RLS binds *every*
+ * statement — reads and writes. A collection's `securityRules` are the whole
+ * authorization model. The server context (auth flows, migrations,
+ * `dataAsAdmin`) runs as the owner and bypasses RLS.
  *
- * Because RLS default-denies once it actually applies, every collection needs
- * a sane baseline. The generator injects:
+ * Because RLS default-denies, every collection is **locked by default**: with
+ * no rules, only the server context and admins can touch it. The generator
+ * injects that safe baseline:
  *
  * **For every collection**
- *  1. A permissive **server-or-admin SELECT** grant. Without it, enabling RLS
- *     would blind the trusted server context and the admin studio on any
- *     collection whose author wrote no `select` rule. Author rules are
- *     permissive and OR together, so explicit rules only broaden access.
+ *  1. A permissive **server-or-admin SELECT** grant.
+ *  2. A permissive **server-or-admin write** grant (insert/update/delete).
+ *
+ * Author `securityRules` are permissive and OR together, so explicit rules only
+ * *broaden* access from this locked baseline (e.g. "users read/write their own
+ * rows").
  *
  * **For auth collections additionally**
- *  2. A permissive **self SELECT** grant (`id = auth.uid()`), so users can
- *     read their own row (profile, session bootstrap) without every app
- *     re-declaring it.
- *  3. A **restrictive** admin write gate. Restrictive policies are AND'd with
+ *  3. A permissive **self SELECT** grant (`id = auth.uid()`), so users can read
+ *     their own row (profile, session bootstrap) without every app re-declaring
+ *     it.
+ *  4. A **restrictive** admin write gate. Restrictive policies are AND'd with
  *     every other policy, so a write is rejected unless the caller is an admin
- *     (or the trusted server context) — even if the author also wrote a
- *     permissive rule such as "a user may edit their own row". Without this, a
- *     permissive owner rule would let a user change their own `roles`.
- *  4. A permissive **admin write** grant. Restrictive policies only constrain;
- *     at least one permissive policy must also pass, so this grants the
- *     baseline write so admins (and the server context) can manage users.
+ *     (or the server context) — even if the author also wrote a permissive rule
+ *     such as "a user may edit their own row". Without this, a permissive owner
+ *     rule would let a user change their own `roles`.
  *
- * The server context is recognised as `auth.uid() IS NULL` — the built-in
- * flows that run without a user (signup, migrations) set no user GUC.
+ * The server context is recognised as `auth.uid() IS NULL` — the built-in flows
+ * that run without a user (signup, migrations) set no user GUC — which also
+ * lets the owner connection satisfy these policies even under FORCE RLS.
  *
  * Opt out with `disableDefaultPolicies: true` to take full responsibility for
  * the collection's RLS.
@@ -85,13 +85,20 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
     const tableName = getTableName(collection);
     const injected: SecurityRule[] = [];
 
-    // Baseline read: the trusted server context and admins can always SELECT.
-    // RLS default-denies reads under the reader role, so without this a
-    // rule-less collection would be unreadable — including by the admin studio.
+    // Baseline read + write: the server context and admins can always operate.
+    // RLS default-denies under the user role, so without these a rule-less
+    // collection would be locked to everyone — including the admin studio.
+    // Author rules are permissive and broaden access from here.
     injected.push({
         name: `${tableName}_default_admin_read`,
         operations: ["select"],
         condition: SERVER_OR_ADMIN_EXPR
+    });
+    injected.push({
+        name: `${tableName}_default_admin_write`,
+        operations: [...DEFAULT_GUARDED_OPS],
+        condition: SERVER_OR_ADMIN_EXPR,
+        check: SERVER_OR_ADMIN_EXPR
     });
 
     if (isAuthCollection(collection)) {
@@ -103,19 +110,11 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
         });
 
         // Restrictive gate: AND'd with all other policies, so no permissive rule
-        // (e.g. an owner "edit your own row" rule) can let a non-admin through.
+        // (e.g. an owner "edit your own row" rule) can let a non-admin change
+        // privileged columns like `roles`.
         injected.push({
             name: `${tableName}_require_admin_write`,
             mode: "restrictive",
-            operations: [...DEFAULT_GUARDED_OPS],
-            condition: SERVER_OR_ADMIN_EXPR,
-            check: SERVER_OR_ADMIN_EXPR
-        });
-
-        // Permissive grant: a restrictive policy alone denies everything, so this
-        // grants the baseline write to admins / the server context.
-        injected.push({
-            name: `${tableName}_default_admin_write`,
             operations: [...DEFAULT_GUARDED_OPS],
             condition: SERVER_OR_ADMIN_EXPR,
             check: SERVER_OR_ADMIN_EXPR

@@ -10,7 +10,7 @@ import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks } from "@rebasepro/common";
-import { applyAuthReadContext } from "../security/read-isolation";
+import { applyAuthContext } from "../security/rls-enforcement";
 import { logger } from "@rebasepro/server-core";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 
@@ -104,11 +104,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /**
      * Restricted role that auth-scoped refetches run as (via `SET LOCAL ROLE`)
      * so RLS `select` policies bind. Set by the bootstrapper alongside
-     * `PostgresBackendDriver.readIsolationRole`; undefined when the connection
+     * `PostgresBackendDriver.rlsUserRole`; undefined when the connection
      * is already subject to RLS natively. Without this, realtime refetches
      * would leak rows the initial (isolated) fetch correctly hid.
      */
-    public readIsolationRole?: string;
+    public rlsUserRole?: string;
 
     /** Whether to emit verbose debug logs (disabled in production). */
     private static readonly DEBUG = process.env.NODE_ENV !== "production";
@@ -626,7 +626,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             const activeAuth = authContext || { userId: "anon",
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await applyAuthReadContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.readIsolationRole);
+                await applyAuthContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.rlsUserRole);
                 const txEntityService = new DataService(tx, this.registry);
                 let fetchedEntities;
                 if (collectionRequest.searchString) {
@@ -806,7 +806,7 @@ roles: activeAuth.roles },
             const activeAuth = authContext || { userId: "anon",
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await applyAuthReadContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.readIsolationRole);
+                await applyAuthContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.rlsUserRole);
                 const txEntityService = new DataService(tx, this.registry);
                 let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
 
