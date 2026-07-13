@@ -301,10 +301,10 @@ describe("generatePostgresDdl edge cases", () => {
             expect(cleanResult).toContain("USING (true)");
             expect(cleanResult).toContain("FOR SELECT");
             expect(cleanResult).toContain("FOR DELETE");
-            expect(cleanResult).toContain("author_id = auth.uid()");
+            expect(cleanResult).toContain("(author_id)::text = auth.uid()");
         });
 
-        it("should not generate any policies for collections without security rules", () => {
+        it("should generate only the default server-or-admin read policy for collections without security rules", () => {
             const collections: CollectionConfig[] = [
                 {
                     slug: "items",
@@ -320,7 +320,10 @@ describe("generatePostgresDdl edge cases", () => {
 
             expect(result).toContain("ALTER TABLE");
             expect(result).toContain("ENABLE ROW LEVEL SECURITY");
-            expect(result).not.toContain("CREATE POLICY");
+            // Reads run under the restricted reader role (RLS default-denies),
+            // so the framework injects a baseline read for server/admin.
+            expect(result).toContain("CREATE POLICY \"items_default_admin_read\"");
+            expect((result.match(/CREATE POLICY/g) ?? []).length).toBe(1);
         });
 
         it("should return only the header comment for an empty collections array", () => {
@@ -455,8 +458,11 @@ describe("generatePostgresDdl edge cases", () => {
             const cleanResult = cleanDdl(result);
 
             expect(cleanResult).toContain("WITH CHECK (false)");
-            // INSERT should not have USING clause
-            expect(cleanResult).not.toContain("USING");
+            // The INSERT policy itself must not carry a USING clause (the
+            // injected default read policy legitimately does).
+            const insertPolicy = cleanResult.split("CREATE POLICY").find(p => p.includes("FOR INSERT"));
+            expect(insertPolicy).toBeDefined();
+            expect(insertPolicy).not.toContain("USING");
         });
 
         it("should generate both USING and WITH CHECK for update", () => {
@@ -481,8 +487,8 @@ describe("generatePostgresDdl edge cases", () => {
             const cleanResult = cleanDdl(result);
 
             expect(cleanResult).toContain("FOR UPDATE");
-            expect(cleanResult).toContain("USING (owner_id = auth.uid())");
-            expect(cleanResult).toContain("WITH CHECK (owner_id = auth.uid())");
+            expect(cleanResult).toContain("USING ((owner_id)::text = auth.uid())");
+            expect(cleanResult).toContain("WITH CHECK ((owner_id)::text = auth.uid())");
         });
 
         it("should include DROP POLICY IF EXISTS before CREATE POLICY", () => {

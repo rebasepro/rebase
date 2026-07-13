@@ -210,7 +210,7 @@ describe("generatePostgresDdl", () => {
         expect(cleanResult).toContain("CREATE POLICY \"posts_select_");
         expect(cleanResult).toContain("USING (true)");
         expect(cleanResult).toContain("CREATE POLICY \"posts_update_");
-        expect(cleanResult).toContain("USING ((user_id = auth.uid()) AND (string_to_array(auth.roles(), ',') && ARRAY['admin','editor']))");
+        expect(cleanResult).toContain("USING (((user_id)::text = auth.uid()) AND (string_to_array(auth.roles(), ',') && ARRAY['admin','editor']))");
     });
 
     it("should generate advanced column types, constraints, and default values", async () => {
@@ -294,7 +294,7 @@ describe("generatePostgresDdl", () => {
         const result = await generatePostgresDdl(collections);
         const cleanResult = cleanDdl(result);
 
-        expect(cleanResult).toContain("CREATE POLICY \"restrict_access_select\" ON \"public\".\"documents\" AS RESTRICTIVE FOR SELECT TO \"authenticated\" USING (owner = auth.uid())");
-        expect(cleanResult).toContain("CREATE POLICY \"restrict_access_update\" ON \"public\".\"documents\" AS RESTRICTIVE FOR UPDATE TO \"authenticated\" USING (owner = auth.uid()) WITH CHECK (owner = auth.uid())");
+        expect(cleanResult).toContain("CREATE POLICY \"restrict_access_select\" ON \"public\".\"documents\" AS RESTRICTIVE FOR SELECT TO \"authenticated\" USING ((owner)::text = auth.uid())");
+        expect(cleanResult).toContain("CREATE POLICY \"restrict_access_update\" ON \"public\".\"documents\" AS RESTRICTIVE FOR UPDATE TO \"authenticated\" USING ((owner)::text = auth.uid()) WITH CHECK ((owner)::text = auth.uid())");
     });
 });

@@ -13,6 +13,7 @@ import {
     getTableExcludes
 } from "./cli-helpers";
 import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
+import { AUTH_BOOTSTRAP_SQL } from "./schema/auth-bootstrap-sql";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -121,11 +122,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     );
                     fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
 
-                    // Append RLS policies
+                    // Append RLS policies, preceded by the auth bootstrap so the
+                    // migration is self-contained: Atlas replays migrations
+                    // against a clean dev database where `auth.uid()` would not
+                    // otherwise exist.
                     const policiesFile = path.resolve(process.cwd(), "drizzle", "policies.sql");
                     if (fs.existsSync(policiesFile)) {
                         const policiesContent = fs.readFileSync(policiesFile, "utf-8");
-                        fs.appendFileSync(newestMigrationFile, "\n\n" + policiesContent);
+                        fs.appendFileSync(newestMigrationFile, "\n\n" + AUTH_BOOTSTRAP_SQL + "\n" + policiesContent);
                         logger.info(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
                         
                         // Re-hash the migration directory
@@ -164,6 +168,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             
             if (databaseUrl) {
                 await applyPolicies(databaseUrl);
+                await ensureReadIsolation(databaseUrl);
             } else {
                 logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
@@ -174,6 +179,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             }
             const extraArgs = argsList._.filter(arg => arg !== "migrate");
             await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
+            if (databaseUrl) {
+                await ensureReadIsolation(databaseUrl);
+            }
         }
 
         logger.info("");
@@ -188,30 +196,39 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
         const client = new Client({ connectionString: databaseUrl });
         await client.connect();
         try {
-            await client.query(`
-                CREATE SCHEMA IF NOT EXISTS auth;
-                CREATE SCHEMA IF NOT EXISTS rebase;
-
-                CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
-                    SELECT NULLIF(current_setting('app.user_id', true), '');
-                $$ LANGUAGE sql STABLE;
-
-                CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
-                    SELECT COALESCE(
-                        NULLIF(current_setting('app.jwt', true), ''),
-                        '{}'
-                    )::jsonb;
-                $$ LANGUAGE sql STABLE;
-
-                CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
-                    SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
-                $$ LANGUAGE sql STABLE;
-            `);
+            await client.query(AUTH_BOOTSTRAP_SQL);
+            // Runtime-only: pre-create the schema Atlas uses for its revision
+            // table (`--revisions-schema rebase`). Kept out of
+            // AUTH_BOOTSTRAP_SQL so it never enters the migration stream.
+            await client.query("CREATE SCHEMA IF NOT EXISTS rebase");
         } finally {
             await client.end();
         }
     } catch (err) {
         logger.warn(chalk.yellow(`  ⚠️  Failed to bootstrap auth schema and helper functions: ${err instanceof Error ? err.message : String(err)}`));
+    }
+}
+
+/**
+ * Provision the restricted reader role right after schema changes land, so
+ * grants cover freshly created tables (default privileges cover future ones).
+ * Only needed — and only possible without extra setup — when the connection
+ * would bypass RLS (superuser / BYPASSRLS / table owner).
+ */
+async function ensureReadIsolation(databaseUrl: string): Promise<void> {
+    const { detectConnectionPosture, ensureReaderRole, REBASE_READER_ROLE } = await import("./security/read-isolation");
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
+        const posture = await detectConnectionPosture(runSql);
+        if (posture.privileged) {
+            await ensureReaderRole(runSql, ["public", "rebase", "auth"]);
+            logger.info(chalk.gray(`  ✓ Read-isolation role "${REBASE_READER_ROLE}" provisioned/refreshed.`));
+        }
+    } finally {
+        await client.end();
     }
 }
 

@@ -32,6 +32,7 @@ import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server-core";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
+import { applyAuthReadContext } from "./security/read-isolation";
 import { classifyTable, detectJunctionTables } from "./utils/table-classification";
 
 export class PostgresBackendDriver implements DataDriver {
@@ -53,6 +54,16 @@ export class PostgresBackendDriver implements DataDriver {
      * learned at runtime.
      */
     private _roleSwitchingDisabled = false;
+
+    /**
+     * Restricted role that authenticated reads run as (via `SET LOCAL ROLE`)
+     * so RLS `select` policies bind. Set by the bootstrapper after posture
+     * detection: defined when the connection would otherwise bypass RLS
+     * (superuser / BYPASSRLS / table owner), undefined when RLS already
+     * applies natively to the connection. Writes never switch — they are
+     * authorized by app-layer callbacks and rely on the owner bypass.
+     */
+    public readIsolationRole?: string;
 
     /**
      * When true, realtime notifications are deferred until after the
@@ -1271,20 +1282,21 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             if (!this.user?.roles) {
                 logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
             }
-            const normalizedRoles = userRoles.map((r: unknown) =>
-                typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
-            );
-            const rolesString = normalizedRoles.join(",");
 
-            await tx.execute(drizzleSql`
-                SELECT 
-                    set_config('app.user_id', ${userId}, true),
-                    set_config('app.user_roles', ${rolesString}, true),
-                    set_config('app.jwt', ${JSON.stringify({
-                sub: userId,
-                roles: userRoles
-            })}, true)
-            `);
+            // Set the RLS GUCs and, for read-only transactions, downgrade to
+            // the restricted reader role so `select` policies actually apply.
+            // Writes ("read write") deliberately stay on the privileged role —
+            // they are authorized by application-layer callbacks. The GUCs are
+            // transaction-local and remain readable after the role switch, so
+            // `auth.uid()` / `auth.roles()` in policies still resolve.
+            //
+            // Fails closed: if the switch cannot be performed, the read aborts
+            // rather than falling back to an RLS-bypassing connection.
+            await applyAuthReadContext(
+                tx,
+                { userId, roles: userRoles },
+                options?.accessMode === "read only" ? this.delegate.readIsolationRole : undefined
+            );
 
             const txEntityService = new DataService(tx, this.delegate.registry);
             const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);

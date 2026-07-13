@@ -30,6 +30,7 @@ import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
+import { detectConnectionPosture, ensureReaderRole, REBASE_READER_ROLE, type RawSqlRunner } from "./security/read-isolation";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
@@ -179,6 +180,39 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 : undefined;
             const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
             realtimeService.setDataDriver(driver);
+
+            // ── Read isolation (RLS enforcement for reads) ───────────────────
+            // Reads are security-gated by RLS `select` policies, but a
+            // privileged connection (superuser / BYPASSRLS / table owner)
+            // bypasses them. Detect the posture and, when privileged, provision
+            // the restricted reader role and route authenticated reads through
+            // it. Default-on: a privileged connection that cannot be isolated
+            // fails the boot rather than serving cross-tenant reads.
+            {
+                const runSql: RawSqlRunner = async (text) => {
+                    const res = await schemaAwareDb.execute(sql.raw(text));
+                    return (res.rows ?? []) as Record<string, unknown>[];
+                };
+                const posture = await detectConnectionPosture(runSql);
+                if (posture.privileged) {
+                    const collectionSchemas = registry.getCollections()
+                        .map((c) => (c as { schema?: string }).schema)
+                        .filter((s): s is string => typeof s === "string");
+                    await ensureReaderRole(runSql, ["public", "rebase", "auth", ...collectionSchemas]);
+                    driver.readIsolationRole = REBASE_READER_ROLE;
+                    realtimeService.readIsolationRole = REBASE_READER_ROLE;
+                    logger.info(`🔐 Read isolation active: authenticated reads run as "${REBASE_READER_ROLE}" (connection "${posture.role}" bypasses RLS: ${posture.superuser ? "superuser" : posture.bypassRLS ? "BYPASSRLS" : "table owner"})`);
+                    if (posture.superuser || posture.bypassRLS) {
+                        logger.warn(
+                            `⚠️ The database connection runs as ${posture.superuser ? "a superuser" : "a BYPASSRLS role"} ("${posture.role}"). ` +
+                            `Reads are isolated, but FORCE ROW LEVEL SECURITY write gates on auth collections do not bind this role. ` +
+                            `Connect as a non-superuser table-owner role in production.`
+                        );
+                    }
+                } else {
+                    logger.info(`🔐 Read isolation: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`);
+                }
+            }
 
             // Ensure branch metadata table exists when branching is available
             if (driver.branchService) {

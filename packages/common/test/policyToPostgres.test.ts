@@ -40,7 +40,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE`);
         // inner `field` binds to the aliased join table
         expect(sql).toContain(`"_ex0".team_id`);
-        expect(sql).toContain(`"_ex0".user_id = auth.uid()`);
+        expect(sql).toContain(`("_ex0".user_id)::text = auth.uid()`);
         // `outerField` binds to the outer RLS row, table-qualified
         expect(sql).toContain(`"public"."documents".team_id`);
     });
@@ -52,12 +52,12 @@ describe("policyToPostgres — existsIn (membership)", () => {
         });
         const sql = policyToPostgres(expr, documents);
         expect(sql).toContain(`FROM "public"."team_members" "_ex0"`);
-        expect(sql).toContain(`"_ex0".user_id = auth.uid()`);
+        expect(sql).toContain(`("_ex0".user_id)::text = auth.uid()`);
     });
 
     it("does not regress non-existsIn compilation (bare columns at top level)", () => {
         const expr = policy.compare(policy.field("team_id"), "eq", policy.authUid());
-        expect(policyToPostgres(expr, documents)).toBe("team_id = auth.uid()");
+        expect(policyToPostgres(expr, documents)).toBe("(team_id)::text = auth.uid()");
     });
 
     it("is treated as server-authoritative (unknown) by the JS evaluator", () => {

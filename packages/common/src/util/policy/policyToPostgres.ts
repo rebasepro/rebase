@@ -71,8 +71,18 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // Render the common `auth.uid() IS NULL` (unauthenticated) form directly.
             if (expr.operand.kind === "authenticated") return "auth.uid() IS NULL";
             return `NOT (${compile(expr.operand, scope)})`;
-        case "compare":
-            return `${operandToSql(expr.left, scope)} ${COMPARE_SQL[expr.op]} ${operandToSql(expr.right, scope)}`;
+        case "compare": {
+            // `auth.uid()` returns text; cast the column side so uuid / integer
+            // id columns compare cleanly instead of failing with
+            // "operator does not exist: uuid = text" at CREATE POLICY time.
+            const castForAuthUid = (operand: PolicyOperand, sqlText: string, other: PolicyOperand): string =>
+                other.kind === "authUid" && (operand.kind === "field" || operand.kind === "outerField")
+                    ? `(${sqlText})::text`
+                    : sqlText;
+            const leftSql = castForAuthUid(expr.left, operandToSql(expr.left, scope), expr.right);
+            const rightSql = castForAuthUid(expr.right, operandToSql(expr.right, scope), expr.left);
+            return `${leftSql} ${COMPARE_SQL[expr.op]} ${rightSql}`;
+        }
         case "rolesOverlap":
             return `string_to_array(auth.roles(), ',') && ${rolesArraySql(expr.roles)}`;
         case "rolesContain":

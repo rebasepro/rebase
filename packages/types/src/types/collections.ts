@@ -179,24 +179,23 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     auth?: boolean | AuthCollectionConfig;
 
     /**
-     * Opt out of the framework's default Row Level Security policies for
-     * authentication collections.
+     * Opt out of the framework's default Row Level Security policies.
      *
-     * When a collection has `auth` enabled, the schema generator automatically
-     * injects an admin-only write policy (INSERT/UPDATE/DELETE require the
-     * `admin` role, or the trusted server context) for any write operation that
-     * the collection does not already cover with an explicit `securityRules`
-     * entry. This makes privileged columns such as `roles` safe by default — a
-     * non-admin cannot modify the user row through the data API regardless of
-     * which code path issues the write.
+     * The schema generator automatically injects, for every collection, a
+     * baseline SELECT policy granting the trusted server context and the
+     * `admin` role read access (reads run under a restricted role, so RLS
+     * default-denies without it). For auth collections it additionally injects
+     * a self-read policy (`id = auth.uid()`) and an admin-only write gate
+     * (INSERT/UPDATE/DELETE require the `admin` role or the trusted server
+     * context), making privileged columns such as `roles` safe by default.
      *
-     * Defining your own write rule for an operation overrides the default for
-     * that operation. Set this flag to `true` to remove the default policies
+     * Author-defined `securityRules` are permissive and broaden access on top
+     * of these defaults. Set this flag to `true` to remove the defaults
      * entirely and take full responsibility for the collection's RLS.
      *
      * @default false
      */
-    disableDefaultAuthPolicies?: boolean;
+    disableDefaultPolicies?: boolean;
 
 
     /**

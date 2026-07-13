@@ -63,20 +63,38 @@ describe("auth collection default RLS policies", () => {
         expect(ddl).toContain("AS RESTRICTIVE FOR UPDATE");
     });
 
-    it("can be opted out with disableDefaultAuthPolicies", () => {
+    it("injects a self-read policy on auth collections (id = auth.uid())", () => {
         const collection: PostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
             auth: true,
-            disableDefaultAuthPolicies: true,
+            properties: { id: { type: "string", isId: "uuid" } }
+        };
+
+        const selfRead = getEffectiveSecurityRules(collection).find(r => r.name === "users_default_self_read");
+        expect(selfRead).toBeDefined();
+        expect(selfRead?.operations).toEqual(["select"]);
+
+        // uuid id column must compare against text auth.uid() via a cast.
+        const ddl = generatePostgresPoliciesDdl([collection]);
+        expect(ddl).toContain("(id)::text = auth.uid()");
+    });
+
+    it("can be opted out with disableDefaultPolicies", () => {
+        const collection: PostgresCollectionConfig = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            auth: true,
+            disableDefaultPolicies: true,
             properties: { id: { type: "string", isId: "uuid" } }
         };
 
         expect(getEffectiveSecurityRules(collection)).toHaveLength(0);
     });
 
-    it("leaves non-auth collections untouched", () => {
+    it("injects the baseline server-or-admin read policy on non-auth collections", () => {
         const collection: CollectionConfig = {
             slug: "products",
             table: "products",
@@ -84,6 +102,13 @@ describe("auth collection default RLS policies", () => {
             properties: { name: { type: "string" } }
         };
 
-        expect(getEffectiveSecurityRules(collection)).toHaveLength(0);
+        // Reads run under the restricted reader role, so RLS default-denies:
+        // without this baseline, a rule-less collection would be unreadable
+        // even by the trusted server context and the admin studio.
+        const rules = getEffectiveSecurityRules(collection);
+        expect(rules).toHaveLength(1);
+        expect(rules[0].name).toBe("products_default_admin_read");
+        expect(rules[0].operations).toEqual(["select"]);
+        expect(rules[0].mode).toBeUndefined(); // permissive: author rules broaden
     });
 });

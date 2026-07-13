@@ -10,6 +10,7 @@ import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks } from "@rebasepro/common";
+import { applyAuthReadContext } from "../security/read-isolation";
 import { logger } from "@rebasepro/server-core";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 
@@ -99,6 +100,15 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         super();
         this.dataService = new DataService(db, registry);
     }
+
+    /**
+     * Restricted role that auth-scoped refetches run as (via `SET LOCAL ROLE`)
+     * so RLS `select` policies bind. Set by the bootstrapper alongside
+     * `PostgresBackendDriver.readIsolationRole`; undefined when the connection
+     * is already subject to RLS natively. Without this, realtime refetches
+     * would leak rows the initial (isolated) fetch correctly hid.
+     */
+    public readIsolationRole?: string;
 
     /** Whether to emit verbose debug logs (disabled in production). */
     private static readonly DEBUG = process.env.NODE_ENV !== "production";
@@ -610,14 +620,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 searchString: collectionRequest.searchString
             });
 
-            // Always wrap in a transaction with session vars, defaulting to anonymous context if missing
+            // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
+            // Refetches are reads: apply the same GUCs + reader-role downgrade as the
+            // driver's read path, so realtime cannot leak rows the initial fetch hid.
             const activeAuth = authContext || { userId: "anon",
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${activeAuth.userId}, true)`);
-                await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
-                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
-roles: activeAuth.roles })}, true)`);
+                await applyAuthReadContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.readIsolationRole);
                 const txEntityService = new DataService(tx, this.registry);
                 let fetchedEntities;
                 if (collectionRequest.searchString) {
@@ -792,14 +801,12 @@ roles: activeAuth.roles },
                 collection
             });
 
-            // Always wrap in a transaction with session vars, defaulting to anonymous context if missing
+            // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
+            // Same read isolation as collection refetches: GUCs + reader-role downgrade.
             const activeAuth = authContext || { userId: "anon",
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await tx.execute(drizzleSql`SELECT set_config('app.user_id', ${activeAuth.userId}, true)`);
-                await tx.execute(drizzleSql`SELECT set_config('app.user_roles', ${activeAuth.roles.join(",")}, true)`);
-                await tx.execute(drizzleSql`SELECT set_config('app.jwt', ${JSON.stringify({ sub: activeAuth.userId,
-roles: activeAuth.roles })}, true)`);
+                await applyAuthReadContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.readIsolationRole);
                 const txEntityService = new DataService(tx, this.registry);
                 let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
 

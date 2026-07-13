@@ -393,7 +393,7 @@ ownerField: "user_id" }
             expect(result).toContain("pgPolicy");
             expect(result).toContain('as: "permissive"');
             expect(result).toContain('for: "all"');
-            expect(result).toContain("user_id = auth.uid()");
+            expect(result).toContain("(user_id)::text = auth.uid()");
             // 'all' needs both using and withCheck
             expect(result).toContain("using:");
             expect(result).toContain("withCheck:");
@@ -438,7 +438,11 @@ ownerField: "user_id" }
             const result = await generateSchema(collections);
             expect(result).toContain('for: "insert"');
             expect(result).toContain("withCheck:");
-            expect(result).not.toContain("using:");
+            // The INSERT policy itself has no `using:` (the injected default
+            // read policy legitimately does).
+            const insertPolicy = result.split("pgPolicy(").find(p => p.includes('for: "insert"'));
+            expect(insertPolicy).toBeDefined();
+            expect(insertPolicy).not.toContain("using:");
         });
 
         it("should generate public access policy", async () => {
@@ -679,8 +683,10 @@ using: "{is_locked} = false" }
 
             const result = await generateSchema(collections);
             expect(result).toContain(".enableRLS()");
-            // No policies should be generated
-            expect(result).not.toContain("pgPolicy(");
+            // The baseline server-or-admin read policy is injected (reads run
+            // under the restricted reader role, so RLS default-denies).
+            expect(result).toContain('pgPolicy("public_data_default_admin_read"');
+            expect((result.match(/pgPolicy\(/g) ?? []).length).toBe(1);
         });
 
         it("should enable RLS on tables that do have security rules", async () => {
@@ -862,7 +868,10 @@ pgRoles: ["app_role", "service_role"] }
         }];
         const result = await generateSchema(collections);
         expect(result).toContain('to: ["app_role", "service_role"]');
-        expect(result).not.toContain('to: ["public"]');
+        // Only the injected default read policy targets public.
+        const authorPolicy = result.split("pgPolicy(").find(p => p.includes("tenant_data_select"));
+        expect(authorPolicy).toBeDefined();
+        expect(authorPolicy).not.toContain('to: ["public"]');
     });
     it("should default to 'public' pgRole when pgRoles is not specified", async () => {
         const collections: CollectionConfig[] = [{
