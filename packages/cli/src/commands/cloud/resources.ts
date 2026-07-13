@@ -294,14 +294,32 @@ path: `payment-method/${org}` }
         // BYO-cluster projects pay a flat platform fee; the rest pay managed compute.
         let plan: string | undefined;
         try {
-            const parsed = arg({ "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+            const parsed = arg({ "--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
             const projectId = parsed["--project"] || readLink()?.projectId;
             if (projectId) {
                 const proj = (await client.data.collection("projects").findById(projectId)) as
-                    | { cluster_id?: string | number; cluster?: unknown }
+                    | { cluster_id?: string | number; cluster?: unknown; provider?: string; vmSize?: string }
                     | undefined;
                 const hasCluster = proj?.cluster_id != null || proj?.cluster != null;
                 plan = hasCluster ? "platform fee (own cluster)" : "managed compute";
+
+                // Best-effort: append the resolved monthly amount from Stripe (via
+                // the control plane's /api/functions/pricing). Keep working if the
+                // endpoint is unreachable — the label alone is still useful.
+                try {
+                    const pricing = await client.functions.invoke<{
+                        items: Array<{ lookupKey: string; amountEur: number }>;
+                    }>("pricing", undefined, { method: "GET" });
+                    const key = hasCluster
+                        ? "platform_byo"
+                        : `compute_${proj?.provider || "hetzner"}_${proj?.vmSize || "cx21"}`;
+                    const item = pricing.items?.find((i) => i.lookupKey === key);
+                    if (item) plan = `${plan} — €${item.amountEur.toFixed(2)}/mo`;
+                } catch {
+                    // pricing endpoint unreachable — keep the plan label without an amount
+                }
             }
         } catch {
             // no linked/resolvable project — skip the Plan line
