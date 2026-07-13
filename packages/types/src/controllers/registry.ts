@@ -51,6 +51,20 @@ export interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig>
      * are all auto-wired — no plugin or manual view injection needed.
      */
     collectionEditor?: boolean | CollectionEditorOptions;
+
+    /**
+     * URL path prefix the admin is mounted under, when it does not live at the
+     * site root. Set this when the admin is rendered inside a path-prefixed
+     * route (e.g. `<Route path="/admin/*">`) so URL⇄collection resolution
+     * accounts for the prefix — otherwise the current path won't be recognized
+     * as a collection path and views hang on a spinner with no data fetch.
+     *
+     * Do NOT set this when mounting via a react-router `basename` — react-router
+     * already strips the prefix from the location, so the default (`/`) is correct.
+     *
+     * @default "/"
+     */
+    basePath?: string;
 }
 
 export interface RebaseStudioConfig {

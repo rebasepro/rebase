@@ -109,8 +109,17 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         resolveKey: (slugOrPath) => resolveDataSource(getCollectionRef.current(slugOrPath), dataSources.registry).key
     }), [defaultData, dataSources]);
 
+    // Normalize the configured mount prefix to a leading-slash, no-trailing-slash
+    // form (e.g. "admin" or "/admin/" -> "/admin"); empty/"/" stays "/".
+    const basePath = useMemo(() => {
+        const raw = registry.cmsConfig?.basePath;
+        if (!raw || raw === "/") return "/";
+        const trimmed = raw.replace(/^\/+/, "").replace(/\/+$/, "");
+        return trimmed ? `/${trimmed}` : "/";
+    }, [registry.cmsConfig?.basePath]);
+
     const urlController = useBuildUrlController({
-        basePath: "/",
+        basePath,
         baseCollectionPath: "/c",
         collectionRegistryController
     });

@@ -116,6 +116,22 @@ await initializeRebaseBackend({
 });
 ```
 
+:::note[Mounting without a router `basename`]
+The `basename` approach above is the recommended one — react-router strips the
+prefix from the location, so the admin works unchanged. If instead you embed the
+admin inside a **path-prefixed route** of a larger app (e.g. `<Route path="/admin/*">`)
+with no `basename`, the current path keeps its `/admin` prefix. Tell the CMS about
+it so URL⇄collection resolution accounts for the prefix — otherwise views hang on a
+spinner with no data fetch:
+
+```tsx
+<RebaseCMS collections={collections} basePath="/admin" />
+```
+
+Set **either** the router `basename` **or** `RebaseCMS basePath` — not both, or the
+prefix is applied twice.
+:::
+
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration
