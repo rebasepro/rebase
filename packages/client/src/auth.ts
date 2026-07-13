@@ -73,6 +73,11 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     let currentSession: RebaseSession | null = null;
     const listeners = new Set<(event: AuthChangeEvent, session: RebaseSession | null) => void>();
     let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    // De-dupe concurrent refreshes. On boot (esp. cookie mode + React StrictMode)
+    // multiple callers can trigger refresh at once; without this they race — the
+    // server rotates the refresh token twice and the browser can end up with a
+    // cookie the DB no longer matches. A single in-flight promise is shared.
+    let inFlightRefresh: Promise<RebaseSession> | null = null;
     let resolveInitialized: (value: void | PromiseLike<void>) => void;
     const isInitialized = new Promise<void>((resolve) => {
         resolveInitialized = resolve;
@@ -346,7 +351,16 @@ redirectUri });
         emit("SIGNED_OUT", null);
     }
 
-    async function refreshSession() {
+    function refreshSession(): Promise<RebaseSession> {
+        // Share a single in-flight refresh across concurrent callers.
+        if (inFlightRefresh) return inFlightRefresh;
+        inFlightRefresh = doRefreshSession().finally(() => {
+            inFlightRefresh = null;
+        });
+        return inFlightRefresh;
+    }
+
+    async function doRefreshSession(): Promise<RebaseSession> {
         if (authFlowMode !== "cookie" && !currentSession?.refreshToken) {
             throw new Error("No active session to refresh");
         }

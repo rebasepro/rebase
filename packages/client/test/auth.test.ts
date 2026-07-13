@@ -532,6 +532,27 @@ json: async () => ({}) });
 
             await expect(auth.refreshSession()).rejects.toThrow("Refresh token expired");
         });
+
+        it("de-dupes concurrent refreshes into a single request", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
+            const auth = createAuth(transport, { storage });
+
+            // Only one refresh response is queued — if the two concurrent calls
+            // each hit the network, the second would find no mock and fail.
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    tokens: { accessToken: "x", refreshToken: "y", accessTokenExpiresAt: Date.now() + 3600000 }
+                })
+            });
+
+            const [a, b] = await Promise.all([auth.refreshSession(), auth.refreshSession()]);
+
+            const refreshCalls = mockFetch.mock.calls.filter(c => String(c[0]).includes("/refresh")).length;
+            expect(refreshCalls).toBe(1);
+            expect(a).toBe(b); // both callers share the one in-flight result
+        });
     });
 
     // -----------------------------------------------------------------------

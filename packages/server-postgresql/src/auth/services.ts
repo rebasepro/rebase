@@ -510,28 +510,17 @@ export class RefreshTokenService {
         }
     }
 
-    private getQualifiedRefreshTokensTableName(): string {
-        const name = getTableName(this.refreshTokensTable);
-        const schema = getTableConfig(this.refreshTokensTable).schema || "public";
-        return `"${schema}"."${name}"`;
-    }
-
     async createToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
         // Fallback to empty string because UNIQUE constraints treat NULLs as strictly distinct in standard Postgres.
         // We want (userId, NULL, NULL) to collide and overwrite, so we map undefined/null to empty strings.
         const safeUserAgent = userAgent || "";
         const safeIpAddress = ipAddress || "";
 
-        // Delete any existing session for this user/device combo, then insert.
-        // This approach doesn't require the unique_device_session constraint to exist.
-        const tableName = this.getQualifiedRefreshTokensTableName();
-        await this.db.execute(sql`
-            DELETE FROM ${sql.raw(tableName)} 
-            WHERE user_id = ${userId} 
-            AND user_agent = ${safeUserAgent} 
-            AND ip_address = ${safeIpAddress}
-        `);
-
+        // Atomic upsert keyed on the device session (user_id, user_agent, ip_address).
+        // A DELETE-then-INSERT races under concurrent refreshes — cookie-mode boot can
+        // fire two /refresh calls at once (both carrying the same refresh cookie): both
+        // DELETE, then the second INSERT violates `unique_device_session` and 500s.
+        // A single INSERT ... ON CONFLICT DO UPDATE rotates the token atomically.
         await this.db.insert(this.refreshTokensTable)
             .values({
                 userId,
@@ -539,6 +528,14 @@ export class RefreshTokenService {
                 expiresAt,
                 userAgent: safeUserAgent,
                 ipAddress: safeIpAddress
+            })
+            .onConflictDoUpdate({
+                target: [
+                    this.refreshTokensTable.userId,
+                    this.refreshTokensTable.userAgent,
+                    this.refreshTokensTable.ipAddress
+                ],
+                set: { tokenHash, expiresAt }
             });
     }
 
