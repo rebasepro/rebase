@@ -243,7 +243,7 @@ export function verifyDownloadToken(token: string): DownloadTokenPayload | null 
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as any;
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
         if (decoded && decoded.purpose === "file-read" && typeof decoded.path === "string") {
             return {
                 purpose: "file-read",

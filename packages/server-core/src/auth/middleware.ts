@@ -470,7 +470,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     const queryToken = c.req.query("token");
 
     // Local copy of helper to avoid circular imports with routes.ts
-    const extractWildcard = (ctx: any): string => {
+    const extractWildcard = (ctx: import("hono").Context): string => {
         const routePath = ctx.req.routePath;
         const prefix = routePath.replace("/*", "");
         const fullPath = ctx.req.path;

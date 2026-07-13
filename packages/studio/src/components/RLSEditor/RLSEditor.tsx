@@ -816,7 +816,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                     </Typography>
                                                     <Typography variant="caption" className="opacity-80">
                                                         This is an auto-generated junction table for a many-to-many relation.
-                                                        Its access is typically managed through the related collections' policies.
+                                                        Its access is typically managed through the related collections&apos; policies.
                                                         You can still add RLS policies directly if needed.
                                                     </Typography>
                                                 </div>
@@ -832,7 +832,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                         Unmapped Table
                                                     </Typography>
                                                     <Typography variant="caption" className="opacity-80">
-                                                        This table exists in the database but isn't mapped to a collection definition.
+                                                        This table exists in the database but isn&apos;t mapped to a collection definition.
                                                         Import it into a Schema configuration file to manage security policies visually.
                                                     </Typography>
                                                 </div>
