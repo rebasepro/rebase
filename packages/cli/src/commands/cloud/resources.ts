@@ -8,6 +8,7 @@ import {
     requireClient,
     requireProjectId,
     getContextOrg,
+    readLink,
     colorStatus,
     keyValues,
     openUrl,
@@ -289,6 +290,23 @@ path: `payment-method/${org}` }
             // status endpoint optional — fall back to the local account record
         }
 
+        // Best-effort: show which plan the linked/`--project` project is on.
+        // BYO-cluster projects pay a flat platform fee; the rest pay managed compute.
+        let plan: string | undefined;
+        try {
+            const parsed = arg({ "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+            const projectId = parsed["--project"] || readLink()?.projectId;
+            if (projectId) {
+                const proj = (await client.data.collection("projects").findById(projectId)) as
+                    | { cluster_id?: string | number; cluster?: unknown }
+                    | undefined;
+                const hasCluster = proj?.cluster_id != null || proj?.cluster != null;
+                plan = hasCluster ? "platform fee (own cluster)" : "managed compute";
+            }
+        } catch {
+            // no linked/resolvable project — skip the Plan line
+        }
+
         console.log("");
         console.log(chalk.bold(`  💳 Billing — org ${org}`));
         console.log("");
@@ -296,6 +314,7 @@ path: `payment-method/${org}` }
             ["Account", acct ? String(acct.id) : undefined],
             ["Email", acct?.billingEmail],
             ["Status", acct?.status ? colorStatus(acct.status) : undefined],
+            ["Plan", plan],
             [
                 "Payment method",
                 card.hasPaymentMethod
