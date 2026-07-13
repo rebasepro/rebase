@@ -84,6 +84,40 @@ securityRules: [
 ]
 ```
 
+### Membership / Relational Access
+
+To scope access by membership in a *related* collection — e.g. "only rows whose
+team the caller belongs to" — use the structured `condition` with
+`policy.existsIn`. It compiles to a single correlated `EXISTS` subquery (no
+per-row lookups), and is the safe, first-class alternative to hand-writing the
+raw SQL shown below.
+
+```typescript
+import { policy } from "@rebasepro/types";
+
+// documents visible only to members of the document's team:
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.existsIn({
+            collection: "team_members",         // the join / membership collection
+            where: policy.and(
+                // correlate to the row being checked:
+                policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
+                // …and to the caller:
+                policy.compare(policy.field("user_id"), "eq", policy.authUid()),
+            ),
+        }),
+    },
+]
+```
+
+Inside `where`, `policy.field(...)` refers to a column of the joined collection
+(`team_members`), while `policy.outerField(...)` refers to a column of the row
+being checked (`documents`). Combine with `policy.authUid()` to scope to the
+current user. Because it is enforced by the database, the admin UI treats it as
+server-authoritative.
+
 ## Raw SQL Expressions
 
 For complex logic, use `using` and `withCheck`:

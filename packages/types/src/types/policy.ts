@@ -27,6 +27,7 @@ export type PolicyExpression =
     | RolesOverlapPolicyExpression
     | RolesContainPolicyExpression
     | AuthenticatedPolicyExpression
+    | ExistsInPolicyExpression
     | RawPolicyExpression;
 
 /** Always allows. Compiles to `true`. @group Models */
@@ -100,6 +101,45 @@ export interface AuthenticatedPolicyExpression {
 }
 
 /**
+ * Membership / relational access: true when at least one row exists in another
+ * collection (a join/membership table) matching `where`. This is what lets you
+ * scope reads to "rows whose team the caller belongs to" without an N+1
+ * per-row lookup — it compiles to a single correlated `EXISTS` subquery.
+ *
+ * Inside `where`, {@link FieldPolicyOperand} (`policy.field`) references a column
+ * of the joined collection, while {@link OuterFieldPolicyOperand}
+ * (`policy.outerField`) references a column of the row being checked (the outer
+ * table under RLS). Combine with {@link AuthUidPolicyOperand} to correlate to
+ * the caller.
+ *
+ * @example
+ * ```ts
+ * // documents visible only to members of the document's team:
+ * policy.existsIn({
+ *   collection: "team_members",
+ *   where: policy.and(
+ *     policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
+ *     policy.compare(policy.field("user_id"), "eq", policy.authUid()),
+ *   ),
+ * })
+ * // → EXISTS (SELECT 1 FROM team_members _ex0
+ * //           WHERE _ex0.team_id = documents.team_id AND _ex0.user_id = auth.uid())
+ * ```
+ *
+ * Postgres-authoritative: like {@link RawPolicyExpression}, the JavaScript
+ * evaluator treats it as *unknown* (it cannot run a subquery client-side), so
+ * enforcement is always the database's.
+ * @group Models
+ */
+export interface ExistsInPolicyExpression {
+    kind: "existsIn";
+    /** Slug of the collection to search (the join / membership table). */
+    collection: string;
+    /** Condition evaluated against the joined collection's rows. */
+    where: PolicyExpression;
+}
+
+/**
  * A raw PostgreSQL boolean expression — the full-power escape hatch.
  *
  * Columns can be referenced as `{column_name}`. This is Postgres-only and
@@ -118,6 +158,7 @@ export interface RawPolicyExpression {
  */
 export type PolicyOperand =
     | FieldPolicyOperand
+    | OuterFieldPolicyOperand
     | LiteralPolicyOperand
     | AuthUidPolicyOperand
     | AuthRolesPolicyOperand;
@@ -126,6 +167,18 @@ export type PolicyOperand =
 export interface FieldPolicyOperand {
     kind: "field";
     /** The property/column name (resolved to its DB column when compiled). */
+    name: string;
+}
+
+/**
+ * A column value on the *outer* row when used inside {@link ExistsInPolicyExpression}
+ * — i.e. the row the RLS policy is being evaluated for, referenced from within the
+ * subquery. Outside an `existsIn` it is equivalent to {@link FieldPolicyOperand}.
+ * @group Models
+ */
+export interface OuterFieldPolicyOperand {
+    kind: "outerField";
+    /** The property/column name on the outer collection. */
     name: string;
 }
 
@@ -165,8 +218,11 @@ export const policy = {
     rolesOverlap: (roles: readonly string[]): RolesOverlapPolicyExpression => ({ kind: "rolesOverlap", roles: roles as string[] }),
     rolesContain: (roles: readonly string[]): RolesContainPolicyExpression => ({ kind: "rolesContain", roles: roles as string[] }),
     authenticated: (): AuthenticatedPolicyExpression => ({ kind: "authenticated" }),
+    existsIn: (args: { collection: string; where: PolicyExpression }): ExistsInPolicyExpression =>
+        ({ kind: "existsIn", collection: args.collection, where: args.where }),
     raw: (sql: string): RawPolicyExpression => ({ kind: "raw", sql }),
     field: (name: string): FieldPolicyOperand => ({ kind: "field", name }),
+    outerField: (name: string): OuterFieldPolicyOperand => ({ kind: "outerField", name }),
     literal: (value: string | number | boolean | null): LiteralPolicyOperand => ({ kind: "literal", value }),
     authUid: (): AuthUidPolicyOperand => ({ kind: "authUid" }),
     authRoles: (): AuthRolesPolicyOperand => ({ kind: "authRoles" })

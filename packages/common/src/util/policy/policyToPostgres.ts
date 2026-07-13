@@ -1,5 +1,38 @@
-import { CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property } from "@rebasepro/types";
+import { CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
+import { getTableName } from "../relations";
+
+/**
+ * Options for {@link policyToPostgres}.
+ */
+export interface PolicyCompileOptions {
+    /**
+     * Resolve a collection by slug. Required to compile
+     * {@link ExistsInPolicyExpression} (`policy.existsIn`) — the compiler needs
+     * the joined collection to derive its table name / schema. When omitted, the
+     * join table falls back to a snake_cased slug.
+     */
+    resolveCollection?: (slug: string) => CollectionConfig | undefined;
+}
+
+/**
+ * The lexical scope threaded through compilation. It changes when we descend
+ * into an `existsIn` subquery: inside it, `field` refers to the joined table
+ * (aliased) while `outerField` refers to the outer RLS row (table-qualified).
+ */
+interface CompileScope {
+    /** Collection whose columns a bare `field` operand resolves against. */
+    fieldCollection?: CollectionConfig;
+    /** SQL prefix for `field` operands (`""` at top level, `"alias".` in a subquery). */
+    fieldPrefix: string;
+    /** The outer RLS collection, for `outerField` operands. */
+    outerCollection?: CollectionConfig;
+    /** SQL prefix for `outerField` operands (`""` at top level, `"schema"."table".` in a subquery). */
+    outerPrefix: string;
+    resolveCollection?: (slug: string) => CollectionConfig | undefined;
+    /** Monotonic counter for generating unique subquery aliases. */
+    alias: { n: number };
+}
 
 /**
  * Compiles a {@link PolicyExpression} to a PostgreSQL boolean SQL string,
@@ -9,7 +42,18 @@ import { toSnakeCase } from "@rebasepro/utils";
  * {@link evaluatePolicy}); the Postgres schema generators call it so that DDL
  * and the admin UI derive from the exact same expression.
  */
-export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig): string {
+export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig, options?: PolicyCompileOptions): string {
+    return compile(expr, {
+        fieldCollection: collection,
+        fieldPrefix: "",
+        outerCollection: collection,
+        outerPrefix: "",
+        resolveCollection: options?.resolveCollection,
+        alias: { n: 0 }
+    });
+}
+
+function compile(expr: PolicyExpression, scope: CompileScope): string {
     switch (expr.kind) {
         case "true":
             return "true";
@@ -18,28 +62,58 @@ export function policyToPostgres(expr: PolicyExpression, collection?: Collection
         case "and":
             return expr.operands.length === 0
                 ? "true"
-                : expr.operands.map(o => `(${policyToPostgres(o, collection)})`).join(" AND ");
+                : expr.operands.map(o => `(${compile(o, scope)})`).join(" AND ");
         case "or":
             return expr.operands.length === 0
                 ? "false"
-                : expr.operands.map(o => `(${policyToPostgres(o, collection)})`).join(" OR ");
+                : expr.operands.map(o => `(${compile(o, scope)})`).join(" OR ");
         case "not":
             // Render the common `auth.uid() IS NULL` (unauthenticated) form directly.
             if (expr.operand.kind === "authenticated") return "auth.uid() IS NULL";
-            return `NOT (${policyToPostgres(expr.operand, collection)})`;
+            return `NOT (${compile(expr.operand, scope)})`;
         case "compare":
-            return `${operandToSql(expr.left, collection)} ${COMPARE_SQL[expr.op]} ${operandToSql(expr.right, collection)}`;
+            return `${operandToSql(expr.left, scope)} ${COMPARE_SQL[expr.op]} ${operandToSql(expr.right, scope)}`;
         case "rolesOverlap":
             return `string_to_array(auth.roles(), ',') && ${rolesArraySql(expr.roles)}`;
         case "rolesContain":
             return `string_to_array(auth.roles(), ',') @> ${rolesArraySql(expr.roles)}`;
         case "authenticated":
             return "auth.uid() IS NOT NULL";
+        case "existsIn":
+            return compileExistsIn(expr, scope);
         case "raw":
             // Full-power escape hatch: `{column}` references resolve to the bare
             // column name (matching the previous raw-SQL behavior).
             return expr.sql.replace(/\{(\w+)\}/g, (_, col) => col);
     }
+}
+
+/**
+ * Compiles `existsIn` to a correlated `EXISTS (SELECT 1 FROM <join> WHERE ...)`.
+ * Inside the subquery, `field` operands bind to the aliased join table and
+ * `outerField` operands bind to the (table-qualified) outer RLS row.
+ */
+function compileExistsIn(expr: ExistsInPolicyExpression, scope: CompileScope): string {
+    const join = scope.resolveCollection?.(expr.collection);
+    const joinTable = join ? getTableName(join) : toSnakeCase(expr.collection);
+    const joinSchema = schemaOf(join) ?? schemaOf(scope.outerCollection) ?? "public";
+    const alias = `_ex${scope.alias.n++}`;
+
+    // `outerField` inside the subquery must be qualified with the outer table,
+    // otherwise a bare column name would bind to the joined table instead.
+    const outerTable = scope.outerCollection ? getTableName(scope.outerCollection) : undefined;
+    const outerSchema = schemaOf(scope.outerCollection) ?? "public";
+    const outerPrefix = outerTable ? `"${outerSchema}"."${outerTable}".` : "";
+
+    const innerScope: CompileScope = {
+        fieldCollection: join,
+        fieldPrefix: `"${alias}".`,
+        outerCollection: scope.outerCollection,
+        outerPrefix,
+        resolveCollection: scope.resolveCollection,
+        alias: scope.alias
+    };
+    return `EXISTS (SELECT 1 FROM "${joinSchema}"."${joinTable}" "${alias}" WHERE ${compile(expr.where, innerScope)})`;
 }
 
 const COMPARE_SQL: Record<PolicyCompareOperator, string> = {
@@ -51,10 +125,12 @@ const COMPARE_SQL: Record<PolicyCompareOperator, string> = {
     gte: ">="
 };
 
-function operandToSql(operand: PolicyOperand, collection?: CollectionConfig): string {
+function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
     switch (operand.kind) {
         case "field":
-            return resolveColumnName(operand.name, collection);
+            return `${scope.fieldPrefix}${resolveColumnName(operand.name, scope.fieldCollection)}`;
+        case "outerField":
+            return `${scope.outerPrefix}${resolveColumnName(operand.name, scope.outerCollection)}`;
         case "literal":
             return quoteLiteral(operand.value);
         case "authUid":
@@ -62,6 +138,10 @@ function operandToSql(operand: PolicyOperand, collection?: CollectionConfig): st
         case "authRoles":
             return "string_to_array(auth.roles(), ',')";
     }
+}
+
+function schemaOf(collection?: CollectionConfig): string | undefined {
+    return (collection as { schema?: string } | undefined)?.schema || undefined;
 }
 
 function resolveColumnName(propName: string, collection?: CollectionConfig): string {

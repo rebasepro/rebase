@@ -61,7 +61,9 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
     return createHash("sha1").update(data).digest("hex").substring(0, 7);
 };
 
-const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule): string => {
+type ResolveCollection = (slug: string) => CollectionConfig | undefined;
+
+const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, resolveCollection: ResolveCollection): string => {
     const tableName = getTableName(collection);
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
@@ -74,11 +76,11 @@ const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule): st
             ? (ops.length > 1 ? `${rule.name}_${op}` : rule.name)
             : `${tableName}_${op}_${ruleHash}${ops.length > 1 ? `_${opIdx}` : ""}`;
 
-        return generateSinglePolicyDdl(collection, rule, op, policyName);
+        return generateSinglePolicyDdl(collection, rule, op, policyName, resolveCollection);
     }).join("");
 };
 
-const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string, resolveCollection: ResolveCollection): string => {
     const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
     const tableName = getTableName(collection);
     const mode = (rule.mode ?? "permissive").toUpperCase();
@@ -93,8 +95,8 @@ const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRul
     // the same normalization the client-side evaluator uses, so DDL and UI agree.
     const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
 
-    let usingClause = needsUsing && usingExpr ? policyToPostgres(usingExpr, collection) : null;
-    let withCheckClause = needsWithCheck && withCheckExpr ? policyToPostgres(withCheckExpr, collection) : null;
+    let usingClause = needsUsing && usingExpr ? policyToPostgres(usingExpr, collection, { resolveCollection }) : null;
+    let withCheckClause = needsWithCheck && withCheckExpr ? policyToPostgres(withCheckExpr, collection, { resolveCollection }) : null;
 
     if (!usingClause && needsUsing) {
         usingClause = "false";
@@ -432,8 +434,9 @@ export const generatePostgresDdl = async (
 
                 const securityRules = getEffectiveSecurityRules(collection);
                 if (securityRules.length > 0) {
+                    const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
                     securityRules.forEach((rule: SecurityRule) => {
-                        ddl += generatePolicyDdl(collection, rule);
+                        ddl += generatePolicyDdl(collection, rule, resolveCollection);
                     });
                     ddl += "\n";
                 }
@@ -475,8 +478,9 @@ export const generatePostgresPoliciesDdl = (collections: CollectionConfig[]): st
 
         const securityRules = getEffectiveSecurityRules(collection);
         if (securityRules.length > 0) {
+            const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
             securityRules.forEach((rule: SecurityRule) => {
-                ddl += generatePolicyDdl(collection, rule);
+                ddl += generatePolicyDdl(collection, rule, resolveCollection);
             });
             ddl += "\n";
         }

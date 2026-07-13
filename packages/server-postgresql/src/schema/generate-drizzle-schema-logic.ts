@@ -342,7 +342,9 @@ const getPolicyNameHash = (rule: SecurityRule): string => {
  * - operations[] array: generates one policy per operation
  * - Combinations: roles + ownerField, roles + raw SQL, etc.
  */
-const generatePolicyCode = (collection: CollectionConfig, rule: SecurityRule, index: number): string => {
+type ResolveCollection = (slug: string) => CollectionConfig | undefined;
+
+const generatePolicyCode = (collection: CollectionConfig, rule: SecurityRule, index: number, resolveCollection: ResolveCollection): string => {
     const tableName = getTableName(collection);
     // Resolve operations: operations[] takes precedence over operation (singular)
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
@@ -357,14 +359,14 @@ const generatePolicyCode = (collection: CollectionConfig, rule: SecurityRule, in
             ? (ops.length > 1 ? `${rule.name}_${op}` : rule.name)
             : `${tableName}_${op}_${ruleHash}${ops.length > 1 ? `_${opIdx}` : ""}`;
 
-        return generateSinglePolicyCode(collection, rule, op, policyName);
+        return generateSinglePolicyCode(collection, rule, op, policyName, resolveCollection);
     }).join("");
 };
 
 /**
  * Generates a single pgPolicy() call for one specific operation.
  */
-const generateSinglePolicyCode = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string): string => {
+const generateSinglePolicyCode = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string, resolveCollection: ResolveCollection): string => {
     const mode = rule.mode ?? "permissive";
 
     // Determine which clauses this operation needs:
@@ -379,8 +381,8 @@ const generateSinglePolicyCode = (collection: CollectionConfig, rule: SecurityRu
     // normalization the DDL generator and the client-side evaluator use.
     const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
 
-    let usingClause = needsUsing && usingExpr ? wrapSql(policyToPostgres(usingExpr, collection)) : null;
-    let withCheckClause = needsWithCheck && withCheckExpr ? wrapSql(policyToPostgres(withCheckExpr, collection)) : null;
+    let usingClause = needsUsing && usingExpr ? wrapSql(policyToPostgres(usingExpr, collection, { resolveCollection })) : null;
+    let withCheckClause = needsWithCheck && withCheckExpr ? wrapSql(policyToPostgres(withCheckExpr, collection, { resolveCollection })) : null;
 
     // Fallback: if we still have no clauses, deny all (safety net)
     if (!usingClause && needsUsing) {
@@ -648,8 +650,9 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
             const securityRules = getEffectiveSecurityRules(collection);
             if (!stripPolicies && securityRules.length > 0) {
                 schemaContent += "\n}, (table) => ([\n";
+                const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
                 securityRules.forEach((rule: SecurityRule, idx: number) => {
-                    schemaContent += generatePolicyCode(collection, rule, idx);
+                    schemaContent += generatePolicyCode(collection, rule, idx, resolveCollection);
                 });
                 schemaContent += "])).enableRLS();\n\n";
             } else {

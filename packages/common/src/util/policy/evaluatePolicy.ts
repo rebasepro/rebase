@@ -55,6 +55,9 @@ export function evaluatePolicy(expr: PolicyExpression, ctx: PolicyEvalContext): 
         }
         case "authenticated":
             return ctx.uid != null;
+        case "existsIn":
+            // A membership subquery cannot be run client-side — server-authoritative.
+            return "unknown";
         case "raw":
             // Arbitrary SQL cannot be evaluated client-side — never guess.
             return "unknown";
@@ -96,6 +99,9 @@ function resolveOperand(operand: PolicyOperand, ctx: PolicyEvalContext): Resolve
             // Can't resolve a row column without the row.
             if (!ctx.entity) return { known: false };
             return { known: true, value: ctx.entity.values[operand.name] };
+        case "outerField":
+            // Only meaningful inside an `existsIn` subquery (server-authoritative).
+            return { known: false };
     }
 }
 
