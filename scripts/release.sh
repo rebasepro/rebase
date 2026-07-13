@@ -13,12 +13,15 @@ set -euo pipefail
 #
 # This script:
 #   1. Reads the current version from the latest git tag
-#   2. Bumps versions in all packages
-#   3. Publishes all packages to npm
-#   4. Creates a GitHub Release using notes from CHANGELOG.md
-#     (falls back to GitHub auto-generated notes if not found)
+#   2. Stamps the CHANGELOG: promotes "## [Unreleased]" → "## [X.Y.Z] - <date>",
+#      opens a fresh [Unreleased], and syncs the docs-site mirror
+#      (via scripts/prepare-changelog.mjs)
+#   3. Bumps versions in all publishable packages (packages/* + rebase-agent-skills)
+#   4. Publishes them all to npm
+#   5. Creates a GitHub Release using notes from CHANGELOG.md
 #
-# Write your release notes in CHANGELOG.md BEFORE running this.
+# Contributors only ever add notes under "## [Unreleased]" — the version number
+# and date are stamped by this script (and the CI publish workflow), never by hand.
 # ─────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -128,21 +131,25 @@ step "Looking for release notes"
 RELEASE_NOTES=""
 USE_AUTO_NOTES=false
 
-if [ -f "CHANGELOG.md" ]; then
-  # Extract the section for this version from CHANGELOG.md
-  # Matches from "## [X.Y.Z]" or "## X.Y.Z" until the next "## " heading
-  RELEASE_NOTES=$(awk -v ver="$NEW_VERSION" '
+# Extract the notes for this release. Before the release stamps the changelog,
+# the notes live under "## [Unreleased]"; a pre-stamped "## [X.Y.Z]" also works.
+extract_notes() {
+  awk -v ver="$1" '
     BEGIN { found=0; buf="" }
     /^## / {
       if (found) exit
-      if ($0 ~ "\\[" ver "\\]" || $0 ~ "^## " ver "[ \t-]" || $0 ~ "^## " ver "$") {
-        found=1
-        next
-      }
+      if ($0 ~ "\\[" ver "\\]") { found=1; next }
     }
     found { buf = buf $0 "\n" }
     END { printf "%s", buf }
-  ' CHANGELOG.md | sed -e 's/^[[:space:]]*//' -e '/^$/N;/^\n$/d')
+  ' CHANGELOG.md | sed -e 's/^[[:space:]]*//' -e '/^$/N;/^\n$/d'
+}
+
+if [ -f "CHANGELOG.md" ]; then
+  RELEASE_NOTES=$(extract_notes "$NEW_VERSION")
+  if [ -z "$RELEASE_NOTES" ]; then
+    RELEASE_NOTES=$(extract_notes "Unreleased")
+  fi
 fi
 
 if [ -n "$RELEASE_NOTES" ]; then
@@ -172,13 +179,14 @@ fi
 # ── Confirm ─────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}Ready to release ${GREEN}v${NEW_VERSION}${RESET}${BOLD}. This will:${RESET}"
-echo "  1. Bump versions in all 21 packages"
-echo "  2. Commit, tag v$NEW_VERSION, and push to origin"
-echo "  3. Publish all packages to npm"
+echo "  1. Stamp CHANGELOG (promote [Unreleased] → [$NEW_VERSION]) + sync docs mirror"
+echo "  2. Bump versions in all packages (packages/* + rebase-agent-skills)"
+echo "  3. Commit, tag v$NEW_VERSION, and push to origin"
+echo "  4. Publish all packages to npm"
 if $USE_AUTO_NOTES; then
-  echo "  4. Create a GitHub Release (auto-generated notes)"
+  echo "  5. Create a GitHub Release (auto-generated notes)"
 else
-  echo "  4. Create a GitHub Release (from CHANGELOG.md)"
+  echo "  5. Create a GitHub Release (from CHANGELOG.md)"
 fi
 echo ""
 read -rp "Continue? (y/N) " CONFIRM
@@ -187,11 +195,22 @@ if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
   exit 1
 fi
 
+# ── Stamp changelog ────────────────────────────────────────
+step "Stamping CHANGELOG for v$NEW_VERSION"
+
+# Promote "## [Unreleased]" → "## [$NEW_VERSION] - <date>", open a fresh
+# [Unreleased], and sync the docs-site mirror. Re-extract the notes from the
+# now-stamped section for the GitHub Release body.
+node scripts/prepare-changelog.mjs "$NEW_VERSION"
+RELEASE_NOTES=$(extract_notes "$NEW_VERSION")
+ok "CHANGELOG stamped and docs mirror synced"
+
 # ── Bump versions ──────────────────────────────────────────
 step "Bumping versions to $NEW_VERSION"
 
-# Bump all publishable packages
-pnpm --filter './packages/*' -r exec node -e "
+# Bump all publishable packages — MUST match the publish filter below,
+# including rebase-agent-skills, so every published package shares the version.
+pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "
   const fs = require('fs');
   const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   p.version = '$NEW_VERSION';

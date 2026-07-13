@@ -89,6 +89,14 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Releasing: $CURRENT → $VERSION (from tag $LATEST_TAG)"
 
+      # ── Stamp changelog ─────────────────────────────────────
+      # Promote "## [Unreleased]" → "## [VERSION] - <date>", open a fresh
+      # [Unreleased], and sync the docs-site mirror. Committed back to main by
+      # the "Commit version bump" step below (skipped on dry runs). This is why
+      # contributors only ever maintain the [Unreleased] section by hand.
+      - name: Stamp changelog
+        run: node scripts/prepare-changelog.mjs "${{ steps.version.outputs.version }}"
+
       # ── Extract release notes from CHANGELOG.md ─────────────
       - name: Extract release notes
         id: notes
