@@ -4,7 +4,7 @@ title: Changelog
 ---
 # Changelog
 
-## [Unreleased]
+## [0.9.0]
 
 ### Breaking
 
@@ -15,8 +15,8 @@ title: Changelog
   | Old Name | New Name |
   |----------|----------|
   | `Entity<M>` | `Entity<M>` |
-  | `CollectionConfig<M>` | `CollectionConfig<M>` |
-  | `CollectionCallbacks<M>` | `CollectionCallbacks<M>` |
+  | `EntityCollection<M>` | `CollectionConfig<M>` |
+  | `EntityCallbacks<M>` | `CollectionCallbacks<M>` |
   | `EntityValues<M>` | `EntityValues<M>` |
   | `EntityStatus` | `EntityStatus` |
   | `EntityReference` | `EntityReference` |
@@ -28,7 +28,7 @@ title: Changelog
   | `SideEntityController` | `SideEntityController` |
   | `EntitySelectionProps` | `EntitySelectionProps` |
   | `EntityPreview` | `EntityPreview` |
-  | `DataCollectionView` | `DataCollectionView` |
+  | `EntityCollectionView` | `DataCollectionView` |
   | `EntityCard` | `EntityCard` |
   | `EntitySelectionTable` | `EntitySelectionTable` |
 
@@ -46,8 +46,8 @@ title: Changelog
 
   | Old Name | New Name |
   |----------|----------|
-  | `useSideEntityController()` | `useSidePanel()` |
-  | `useEntitySelectionDialog()` | `useSelectionDialog()` |
+  | `useSideEntityController()` | `useSideEntityController()` |
+  | `useEntitySelectionDialog()` | `useEntitySelectionDialog()` |
   | `SideEntityProvider` | `SideEntityProvider` |
   | `mergeEntityActions()` | `mergeEntityActions()` |
   | `resolveEntityAction()` | `resolveEntityAction()` |
@@ -67,8 +67,8 @@ title: Changelog
 
   Migration example:
   ```diff
-  -import type { CollectionCallbacks } from "@rebasepro/types";
-  -const callbacks: CollectionCallbacks = {
+  -import type { EntityCallbacks } from "@rebasepro/types";
+  -const callbacks: EntityCallbacks = {
   -    afterRead: ({ entity }) => {
   -        return { ...entity, values: { ...entity.values, email: "***" } };
   -    },
@@ -152,11 +152,53 @@ title: Changelog
   | `"sideEntityController"` | `"sidePanelController"` |
   | `sideEntityController` (on `StudioBridge`) | `sidePanelController` |
 
+- **Client split into server/browser variants** — `RebaseClient` is now split so the RLS-bypassing accessor is explicit: use `rebase.dataAsAdmin` (server-only) for admin-scoped, RLS-bypassing access, and `rebase.data` for user-scoped access. The public API surface was curated to hide internal plumbing.
+
+- **`update`/`delete` throw on not-found** — SDK `update()` and `delete()` now throw when the target row does not exist, instead of silently returning `undefined`.
+
+- **`deleteAll` is now internal** — removed from the public data accessors.
+
+- **Scaffold defaults to cookie auth** — new projects store the refresh token in an httpOnly cookie (`authFlowMode: "cookie"`) by default.
+
+- **`AdminUser.provider` → `providerId`** — renamed to match the canonical `User` type.
+
 ### Features & Improvements
+
+- **Membership / relational RLS predicate (`policy.existsIn`)** — a first-class access predicate for scoping reads/writes by membership in a related collection (e.g. "only rows whose team the caller belongs to"). Compiles to a single correlated `EXISTS` subquery — no per-row `afterRead` lookups. Adds `policy.existsIn({ collection, where })` and the `policy.outerField(name)` operand for correlating the subquery to the outer row.
+
+- **Built-in email → user lookup for invites** — opt-in `auth.allowUserLookup` exposes an authenticated `POST /auth/find-user` and a client `rebase.auth.findUserByEmail(email)` that returns a minimal public profile (`uid`, `displayName`, `photoURL` only). Removes the hand-rolled `dataAsAdmin` server function that invite flows previously required. Off by default (enables user enumeration by signed-in users).
+
+- **Mount the admin under a path prefix** — `RebaseCMS` accepts a `basePath` so the admin can live under a sub-path route (e.g. `/admin`) without the collection data-grid hanging on URL↔collection resolution.
+
+- **Filter operators** — LIKE family (`like`, `ilike`, etc.) and null checks, with engine-aware, customizable filter fields.
+
+- **Scoped storage tokens** — storage access is now governed by scoped, time-limited tokens, with a documented public-files + scoped-token URL model.
+
+- **Uniform server error envelope** — server error responses are routed through a central handler for a consistent `{ error: { message, code, details? } }` wire shape.
 
 - **Inferred data-source transport** — `DataSourceDefinition.transport` is now optional: entries with a client-side `driver` default to `"direct"`, entries without to `"server"`. A `"(default)"`-keyed entry without a driver can be used to declare the default source's engine/capabilities while the client keeps serving the data.
 
+- **`installShutdownHandlers`** — New `@rebasepro/server-core` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
+
 - **Honest Realtime Meta** — Added `FindResponse.meta.estimated` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
+
+### Fixes
+
+- **Concurrency-safe refresh-token rotation** — token rotation now uses an atomic `INSERT … ON CONFLICT DO UPDATE` instead of a DELETE-then-INSERT. Concurrent `/refresh` calls (which cookie-mode boot can fire at once) previously raced into a `unique_device_session` violation and returned 500, breaking the session. The client also single-flights concurrent refreshes.
+
+- **Cookie session restore** — `/auth/refresh` now returns the user object, and the client restores the user (falling back to `/me`) instead of leaving a blank `uid`. A cold start restored from an httpOnly cookie alone no longer yields an empty user.
+
+- **Resilient auto-refresh** — a transient refresh failure (network blip, backend restart, 5xx) now retries with exponential backoff instead of immediately signing the user out; only a genuine auth failure (401/403/invalid/expired token) or exhausted retries signs out.
+
+- **`server-postgresql` ships `src/`** — the driver package now packs `src` alongside `dist`, fixing `✗ Could not find CLI entry point for @rebasepro/server-postgresql` for `rebase db push` / `schema generate` in published/packed installs (the CLI runs `src/cli.ts` via tsx; no `dist/cli.js` is built).
+
+- **Malformed request bodies** — the API now rejects malformed JSON bodies with `400` and tightens the public-path check.
+
+- **Auth collection callbacks warning** — the server warns at startup when an auth collection defines `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete`, since auth-driven user creation bypasses the collection save pipeline (use the `afterUserCreate` auth hook instead).
+
+- **CLI DX** — friendly diagnostics for "SSL is not enabled on the server" (suggests `sslmode=disable`) and for dependency-drop failures that leave a schema half-migrated; a clear warning when `--collections` resolves to a missing path; and `rebase dev` now surfaces when it overrides the project's `.env` PORT / `VITE_API_URL` with its derived per-project port.
+
+- **Scaffold hardening** — the frontend Vite config ships `resolve.dedupe` for React / React Router so a locally `link:`ed Rebase checkout doesn't load duplicate React copies (which broke the admin's data router); `.env.example` documents `sslmode=disable`.
 
 ## [0.8.0] - 2026-07-01
 
@@ -166,7 +208,7 @@ title: Changelog
 
 ### Cleanup
 
-- **Removed** — Six unused FireCMS-legacy builder identity functions (`buildProperties`, `buildPropertiesOrBuilder`, `buildEnum`, `buildEnumValueConfig`, `buildCollectionCallbacks`, `buildAdditionalFieldDelegate`). Migration: remove the wrapper call — they were identity functions, so the object literal is the same value.
+- **Removed** — Six unused FireCMS-legacy builder identity functions (`buildProperties`, `buildPropertiesOrBuilder`, `buildEnum`, `buildEnumValueConfig`, `buildEntityCallbacks`, `buildAdditionalFieldDelegate`). Migration: remove the wrapper call — they were identity functions, so the object literal is the same value.
 - **Deprecated** — `buildCollection` / `buildProperty` in favor of `defineCollection`. Both are marked `@deprecated` and will be removed before 1.0.
 - **Removed** — Unused `<Rebase apiKey>` prop (it was never consumed by the component).
 - **Fixed** — Duplicated sentences in `propertiesOrder` JSDoc; rewrote `subcollection:` description to cover both Firestore and Postgres.
