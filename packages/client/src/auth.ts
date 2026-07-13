@@ -16,6 +16,24 @@ export interface PublicUserProfile {
     photoURL: string | null;
 }
 
+/** Map a raw user object from an auth response (`/login`, `/refresh`, `/me`) to a `User`. */
+function mapRawUser(raw: Record<string, unknown>): User {
+    return {
+        uid: raw.uid as string,
+        email: (raw.email as string | null) ?? null,
+        displayName: (raw.displayName as string | null) ?? null,
+        photoURL: (raw.photoURL as string | null) ?? null,
+        providerId: (raw.providerId as string | undefined) ?? "password",
+        isAnonymous: (raw.isAnonymous as boolean | undefined) ?? false,
+        emailVerified: raw.emailVerified as boolean | undefined,
+        roles: raw.roles as string[] | undefined,
+        metadata: raw.metadata as Record<string, unknown> | undefined,
+    };
+}
+
+/** Placeholder user, used only as a last resort when none can be resolved. */
+const EMPTY_USER: User = { uid: "", email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false };
+
 
 export interface AuthConfig {
     needsSetup: boolean;
@@ -187,18 +205,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     }
 
     function handleAuthResponse(data: { tokens: AuthTokens, user: Record<string, unknown> }, event?: AuthChangeEvent): RebaseSession {
-        const rawUser = data.user;
-        const user: User = {
-            uid: rawUser.uid as string,
-            email: (rawUser.email as string | null) ?? null,
-            displayName: (rawUser.displayName as string | null) ?? null,
-            photoURL: (rawUser.photoURL as string | null) ?? null,
-            providerId: (rawUser.providerId as string | undefined) ?? "password",
-            isAnonymous: (rawUser.isAnonymous as boolean | undefined) ?? false,
-            emailVerified: rawUser.emailVerified as boolean | undefined,
-            roles: rawUser.roles as string[] | undefined,
-            metadata: rawUser.metadata as Record<string, unknown> | undefined,
-        };
+        const user: User = mapRawUser(data.user);
         const session: RebaseSession = {
             accessToken: data.tokens.accessToken,
             refreshToken: data.tokens.refreshToken || (currentSession?.refreshToken) || "",
@@ -422,18 +429,7 @@ redirectUri });
         //      in-memory user and the backend didn't echo one.
         let user = currentSession?.user;
         if (body.user && typeof body.user.uid === "string") {
-            const raw = body.user as Record<string, unknown>;
-            user = {
-                uid: raw.uid as string,
-                email: (raw.email as string | null) ?? null,
-                displayName: (raw.displayName as string | null) ?? null,
-                photoURL: (raw.photoURL as string | null) ?? null,
-                providerId: (raw.providerId as string | undefined) ?? "password",
-                isAnonymous: (raw.isAnonymous as boolean | undefined) ?? false,
-                emailVerified: raw.emailVerified as boolean | undefined,
-                roles: raw.roles as string[] | undefined,
-                metadata: raw.metadata as Record<string, unknown> | undefined,
-            };
+            user = mapRawUser(body.user as Record<string, unknown>);
         } else if (!user || !user.uid) {
             try {
                 user = await getUser();
@@ -444,7 +440,7 @@ redirectUri });
             accessToken,
             refreshToken: body.tokens.refreshToken || currentSession?.refreshToken || "",
             expiresAt: body.tokens.accessTokenExpiresAt,
-            user: user ?? { uid: "", email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false }
+            user: user ?? EMPTY_USER
         };
         currentSession = session;
         saveSession(session);
