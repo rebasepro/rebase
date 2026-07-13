@@ -7,6 +7,20 @@ import { rebaseCollectionsPlugin } from "@rebasepro/core/vitePlugin";
 
 export default defineConfig({
     envDir: path.resolve(__dirname, ".."),
+    // Force a single copy of React and React Router across the app and all
+    // @rebasepro/* packages. Without this, a locally `link:`ed Rebase checkout
+    // resolves its own copies of react-router, producing "multiple copies of
+    // React" and "useBlocker must be used within a data router" errors in the
+    // admin. Safe to keep for npm-installed setups too.
+    resolve: {
+        dedupe: [
+            "react",
+            "react-dom",
+            "react-router",
+            "react-router-dom",
+            "@remix-run/router"
+        ]
+    },
     esbuild: {
         logOverride: { "this-is-undefined-in-esm": "silent" }
     },

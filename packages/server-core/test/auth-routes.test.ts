@@ -496,6 +496,28 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(body.tokens.refreshToken).toBeTruthy();
         });
 
+        it("includes the user in the response so a cookie session can be restored", async () => {
+            const app = createApp();
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
+                id: "rt-1",
+                userId: "user-1",
+                tokenHash: "old-hash",
+                expiresAt: new Date(Date.now() + 86400000),
+                createdAt: new Date(),
+                userAgent: "",
+                ipAddress: ""
+            });
+            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+            mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "user-1", email: "restore@example.com" }));
+
+            const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.user.uid).toBe("user-1");
+            expect(body.user.email).toBe("restore@example.com");
+            expect(body.user.roles).toEqual(["editor"]);
+        });
+
         it("rotates refresh token — deletes old, creates new", async () => {
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({

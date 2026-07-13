@@ -780,16 +780,19 @@ message: "Email verified successfully" });
         const roles = await authRepo.getUserRoles(storedToken.userId);
         const roleIds = roles.map(r => r.id);
 
+        // Fetch the user once, so we can both customize claims AND return the
+        // user in the response. Returning the user is what lets the client
+        // restore a session from an httpOnly cookie alone (cold start in cookie
+        // mode), where it otherwise has no user object to populate.
+        const user = await authRepo.getUserById(storedToken.userId);
+
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
-        if (ops.customizeAccessToken) {
-            const user = await authRepo.getUserById(storedToken.userId);
-            if (user) {
-                const defaultClaims: Record<string, unknown> = { userId: storedToken.userId,
+        if (ops.customizeAccessToken && user) {
+            const defaultClaims: Record<string, unknown> = { userId: storedToken.userId,
 roles: roleIds,
 aal: "aal1" };
-                customClaims = await ops.customizeAccessToken(defaultClaims, user);
-            }
+            customClaims = await ops.customizeAccessToken(defaultClaims, user);
         }
 
         const newAccessToken = generateAccessToken(storedToken.userId, roleIds, "aal1", customClaims);
@@ -808,13 +811,15 @@ aal: "aal1" };
             ipAddress
         );
 
-        const refreshResponse: AuthResponsePayload = {
-            tokens: {
-                accessToken: newAccessToken,
-                refreshToken: newRefreshToken,
-                accessTokenExpiresAt: getAccessTokenExpiry()
-            }
-        };
+        const refreshResponse: AuthResponsePayload = user
+            ? buildAuthResponse(user, roleIds, newAccessToken, newRefreshToken, "password")
+            : {
+                tokens: {
+                    accessToken: newAccessToken,
+                    refreshToken: newRefreshToken,
+                    accessTokenExpiresAt: getAccessTokenExpiry()
+                }
+            };
         const transformedResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.userId);
         const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
         return c.json(finalResponse);

@@ -49,6 +49,45 @@ export function isAuthFailure(err: unknown): boolean {
 }
 
 /**
+ * Detect the "SSL is not enabled on the server" failure — the client attempted
+ * an SSL handshake against a Postgres server that doesn't support it (common
+ * with a plain local dev database). The fix is `?sslmode=disable` on the URL.
+ */
+export function isSslNotEnabled(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    const e = err as { message?: string; cause?: unknown };
+    if (typeof e.message === "string" && e.message.toLowerCase().includes("ssl is not enabled on the server")) {
+        return true;
+    }
+    if (e.cause && typeof e.cause === "object") {
+        return isSslNotEnabled(e.cause);
+    }
+    return false;
+}
+
+/**
+ * Detect PostgreSQL "cannot drop ... because other objects depend on it"
+ * (error code 2BP01, dependent_objects_still_exist). This is the failure that
+ * strands a declarative `db push` half-applied when a collection is removed but
+ * an enum type it defined is still referenced by another object.
+ */
+export function isDependencyDropError(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    const e = err as { code?: string; message?: string; cause?: unknown };
+    if (e.code === "2BP01") return true;
+    if (typeof e.message === "string") {
+        const msg = e.message.toLowerCase();
+        if (msg.includes("other objects depend on it") || msg.includes("cannot drop type")) {
+            return true;
+        }
+    }
+    if (e.cause && typeof e.cause === "object") {
+        return isDependencyDropError(e.cause);
+    }
+    return false;
+}
+
+/**
  * Parse host:port from a DATABASE_URL for display purposes.
  */
 function parseHostInfo(databaseUrl: string): string {
@@ -109,6 +148,60 @@ function formatAuthFailureBanner(databaseUrl: string): string {
 }
 
 /**
+ * Format a diagnostic banner for "SSL is not enabled on the server".
+ */
+function formatSslNotEnabledBanner(databaseUrl: string): string {
+    const hostInfo = parseHostInfo(databaseUrl);
+    const suggestion = databaseUrl.includes("?") ? "&sslmode=disable" : "?sslmode=disable";
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  SSL is not enabled on the PostgreSQL server at ${hostInfo}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `  The client tried to connect over SSL, but the server does not\n` +
+        `  support it. This is normal for a plain local dev database.\n` +
+        `\n` +
+        `  Fix: append ${chalk.bold("sslmode=disable")} to DATABASE_URL, e.g.\n` +
+        `\n` +
+        `    DATABASE_URL=...${suggestion}\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
+/**
+ * Format a diagnostic banner for a dependency-drop failure during `db push`.
+ * Explains that the database may be left partially migrated and how to recover.
+ */
+function formatDependencyDropBanner(): string {
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  Schema push failed: a type/table could not be dropped\n` +
+        `      because other objects still depend on it.\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `  ${chalk.yellow("The database may now be partially migrated.")} Atlas applies\n` +
+        `  statements individually, so earlier changes in this push may\n` +
+        `  already be committed while later ones failed.\n` +
+        `\n` +
+        `  This commonly happens when a collection is removed but an enum\n` +
+        `  type it defined is still referenced. To recover:\n` +
+        `\n` +
+        `    1. Inspect the leftover object named in the error above.\n` +
+        `    2. Drop it with CASCADE, e.g.:\n` +
+        `         psql "$DATABASE_URL" -c 'DROP TYPE "<name>" CASCADE;'\n` +
+        `    3. Re-run:  ${chalk.bold.green("rebase db push")}\n` +
+        `\n` +
+        `  Prefer a safe, versioned workflow? Use ${chalk.bold("rebase db generate")}\n` +
+        `  + ${chalk.bold("rebase db migrate")} instead of push for destructive changes.\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
+/**
  * Pre-flight check: verify that the database is reachable before running
  * a heavy subprocess (Atlas, migrations, etc.).
  *
@@ -134,6 +227,10 @@ export async function checkDatabaseConnectivity(databaseUrl: string): Promise<vo
             logger.error(formatAuthFailureBanner(databaseUrl));
             process.exit(1);
         }
+        if (isSslNotEnabled(err)) {
+            logger.error(formatSslNotEnabledBanner(databaseUrl));
+            process.exit(1);
+        }
         // Unknown error — warn but don't block; let the downstream tool surface details
         logger.warn(chalk.yellow(`  ⚠  Could not verify database connectivity: ${err instanceof Error ? err.message : String(err)}`));
         logger.warn(chalk.gray("    Proceeding anyway — the command may fail if the database is unreachable."));
@@ -157,6 +254,12 @@ export function diagnoseDbError(err: unknown, databaseUrl?: string): string | nu
     }
     if (isAuthFailure(err)) {
         return formatAuthFailureBanner(databaseUrl || "");
+    }
+    if (isSslNotEnabled(err)) {
+        return formatSslNotEnabledBanner(databaseUrl || "");
+    }
+    if (isDependencyDropError(err)) {
+        return formatDependencyDropBanner();
     }
     return null;
 }

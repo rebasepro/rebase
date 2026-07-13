@@ -359,11 +359,41 @@ redirectUri });
         } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
+
+        const accessToken = body.tokens.accessToken;
+        transport.setToken(accessToken);
+
+        // Resolve the user, in order of preference:
+        //   1. the user returned by /refresh (modern backends include it),
+        //   2. the user already in memory,
+        //   3. a fetch of /me — required to restore a session from an httpOnly
+        //      cookie alone (cold start in cookie mode), where there is no
+        //      in-memory user and the backend didn't echo one.
+        let user = currentSession?.user;
+        if (body.user && typeof body.user.uid === "string") {
+            const raw = body.user as Record<string, unknown>;
+            user = {
+                uid: raw.uid as string,
+                email: (raw.email as string | null) ?? null,
+                displayName: (raw.displayName as string | null) ?? null,
+                photoURL: (raw.photoURL as string | null) ?? null,
+                providerId: (raw.providerId as string | undefined) ?? "password",
+                isAnonymous: (raw.isAnonymous as boolean | undefined) ?? false,
+                emailVerified: raw.emailVerified as boolean | undefined,
+                roles: raw.roles as string[] | undefined,
+                metadata: raw.metadata as Record<string, unknown> | undefined,
+            };
+        } else if (!user || !user.uid) {
+            try {
+                user = await getUser();
+            } catch { /* fall through to the empty stub below */ }
+        }
+
         const session: RebaseSession = {
-            accessToken: body.tokens.accessToken,
+            accessToken,
             refreshToken: body.tokens.refreshToken || currentSession?.refreshToken || "",
             expiresAt: body.tokens.accessTokenExpiresAt,
-            user: currentSession?.user ?? { uid: "", email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false }
+            user: user ?? { uid: "", email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false }
         };
         currentSession = session;
         saveSession(session);

@@ -608,6 +608,26 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 }
             }
 
+            // Warn if the auth collection relies on data callbacks for lifecycle
+            // side effects. User creation/updates via the auth subsystem
+            // (registration, admin user management, OAuth) write directly to the
+            // user store and do NOT go through the collection save pipeline, so
+            // `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` never fire for
+            // those paths. Use the auth hooks (`afterUserCreate`, etc.) instead.
+            if (safeAuthConfig.collection?.callbacks) {
+                const cb = safeAuthConfig.collection.callbacks as Record<string, unknown>;
+                const dataCallbacks = ["beforeSave", "afterSave", "beforeDelete", "afterDelete"].filter(k => typeof cb[k] === "function");
+                if (dataCallbacks.length > 0) {
+                    logger.warn(
+                        `[Auth] The auth collection "${safeAuthConfig.collection.slug}" defines ` +
+                        `${dataCallbacks.join("/")} callback(s), but these do NOT fire when users are ` +
+                        `created or updated through the auth system (registration, admin, OAuth) — ` +
+                        `that path bypasses the collection save pipeline. Use auth hooks ` +
+                        `(afterUserCreate, beforeUserCreate, afterUserDelete, …) for those side effects.`
+                    );
+                }
+            }
+
             // Extract the collection-level auth config (if `auth` is an object, not just `true`)
             const collectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
             const collectionAuthConfig = (typeof collectionAuth === "object" && collectionAuth !== null) ? collectionAuth : undefined;

@@ -457,6 +457,67 @@ json: async () => ({}) });
             expect(result.user.uid).toBe("usr_1");
         });
 
+        it("populates user from the /refresh response body when present", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
+            const auth = createAuth(transport, { storage });
+
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    user: {
+                        uid: "usr_2",
+                        email: "refreshed@example.com",
+                        displayName: "Refreshed User",
+                        roles: ["admin"]
+                    },
+                    tokens: {
+                        accessToken: "new",
+                        refreshToken: "new-rt",
+                        accessTokenExpiresAt: Date.now() + 3600000
+                    }
+                })
+            });
+
+            const result = await auth.refreshSession();
+            // The response body's user wins over the stale in-memory user (usr_1)
+            expect(result.user.uid).toBe("usr_2");
+            expect(result.user.email).toBe("refreshed@example.com");
+            expect(result.user.roles).toEqual(["admin"]);
+        });
+
+        it("falls back to /me when refresh returns no user and none is in memory", async () => {
+            // Simulate a cold start restored from an httpOnly cookie: a valid
+            // session token but a blank user object, and a /refresh response
+            // that (older backend) does not echo the user.
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify({
+                accessToken: "fake-jwt",
+                refreshToken: "fake-refresh",
+                expiresAt: Date.now() + 3600000,
+                user: { uid: "", email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false }
+            }));
+            const auth = createAuth(transport, { storage });
+
+            // /me returns the real user
+            mockRequest.mockResolvedValueOnce({ user: mockUser } as never);
+
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    tokens: {
+                        accessToken: "new",
+                        refreshToken: "new-rt",
+                        accessTokenExpiresAt: Date.now() + 3600000
+                    }
+                })
+            });
+
+            const result = await auth.refreshSession();
+            expect(mockRequest).toHaveBeenCalledWith("/auth/me", expect.objectContaining({ method: "GET" }));
+            expect(result.user.uid).toBe("usr_1");
+        });
+
         it("throws on refresh failure", async () => {
             const storage = createMemoryStorage();
             storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));

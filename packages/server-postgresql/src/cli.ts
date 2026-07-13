@@ -508,14 +508,30 @@ async function runAtlas(domain: "schema" | "migrate", args: string[], collection
         }
     }
 
+    // Stream stdout live but tee stderr so we can inspect Atlas's error text
+    // for known, actionable failure modes (e.g. a dependency-drop that leaves
+    // the schema half-applied) after the process exits.
+    const subprocess = execa(atlasBin, atlasArgs, {
+        cwd: process.cwd(),
+        stdout: "inherit",
+        stderr: "pipe",
+        env
+    });
+    let stderrText = "";
+    subprocess.stderr?.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        stderrText += text;
+        process.stderr.write(text);
+    });
     try {
-        await execa(atlasBin, atlasArgs, {
-            cwd: process.cwd(),
-            stdio: "inherit",
-            env
-        });
-    } catch (err: unknown) {
+        await subprocess;
+    } catch {
         logger.error(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
+        // Surface actionable recovery guidance for recognized failures.
+        const hint = diagnoseDbError({ message: stderrText }, databaseUrl);
+        if (hint) {
+            logger.error(hint);
+        }
         process.exit(1);
     }
 }

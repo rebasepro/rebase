@@ -65,6 +65,16 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+:::caution[Collection callbacks do not fire for auth users]
+User creation and updates through the auth system — registration, admin user
+management, and OAuth — write **directly** to the user store and bypass the
+collection save pipeline. A `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete`
+callback on the auth (users) collection will **not** run for these paths. For
+side effects like provisioning a personal team on signup, use the auth lifecycle
+hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
+receive the fully-populated user record.
+:::
+
 ### OAuth Providers
 
 Each OAuth provider is configured with at minimum a `clientId`. Some providers require a `clientSecret`:

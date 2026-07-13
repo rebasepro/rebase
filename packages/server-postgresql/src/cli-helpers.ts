@@ -85,8 +85,21 @@ export async function getTableIncludesFromCollections(collections: CollectionCon
 }
 
 export async function getTableIncludes(collectionsPath: string): Promise<string[]> {
+    // Note: a relative --collections path resolves against the *current working
+    // directory*, not the backend package. When invoked via the generated npm
+    // script (cwd = backend/), the script uses "../config/collections" to
+    // compensate — so running the CLI directly from the repo root with a
+    // different relative path can silently point at the wrong place.
     const resolvedPath = path.resolve(collectionsPath);
     const collections: CollectionConfig[] = [];
+    if (!fs.existsSync(resolvedPath)) {
+        logger.warn(chalk.yellow(
+            `  ⚠  Collections path not found: "${collectionsPath}"\n` +
+            `     Resolved to: ${resolvedPath}\n` +
+            `     (relative to cwd: ${process.cwd()})\n` +
+            `     Pass an absolute path, or a path relative to where you run the command.`
+        ));
+    }
     if (fs.existsSync(resolvedPath)) {
         const stats = fs.statSync(resolvedPath);
         if (stats.isDirectory()) {
