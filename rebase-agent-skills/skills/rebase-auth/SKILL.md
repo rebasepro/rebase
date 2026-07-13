@@ -45,6 +45,7 @@ Authentication is configured via the `auth` property of `initializeRebaseBackend
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token lifetime. |
 | `requireAuth` | `boolean` | `true` | When `true`, data routes return 401 for unauthenticated requests. Set to `false` to rely entirely on Postgres RLS. |
 | `allowRegistration` | `boolean` | `false` | Enable self-service registration via `POST /auth/register`. |
+| `allowUserLookup` | `boolean` | `false` | Expose `POST /auth/find-user` — an authenticated email→minimal-profile lookup (`uid`/`displayName`/`photoURL` only) for invite flows. Enables user enumeration by signed-in users, so it's off by default. See [Inviting by email](#inviting-teammates-by-email). |
 | `serviceKey` | `string` | — | Static secret for server-to-server auth. Must be ≥ 32 characters. Requests with `Authorization: Bearer <serviceKey>` get admin access. |
 | `defaultRole` | `string` | — | Role ID assigned to new users (except the first user, who always gets `"admin"`). **Must NOT be `"admin"`** — throws a security error at startup. |
 | `providers` | `OAuthProvider<unknown>[]` | `[]` | **Canonical** OAuth provider array. Use `create*Provider` factories or pass custom providers. Named shorthand fields below are merged into this array at startup. |
@@ -153,6 +154,27 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 ### First-User Bootstrap
 
 > **IMPORTANT FOR AGENTS:** The very first user registered (via `POST /auth/register` or OAuth) is automatically promoted to `"admin"`. This prevents the chicken-and-egg problem. All subsequent users receive the `defaultRole`.
+
+### Inviting teammates by email
+
+Invite flows must turn an email into a user id, but the `users` collection is
+RLS-protected from the client. **Do not** hand-roll an admin server function for
+this — enable `allowUserLookup` and use the built-in primitive:
+
+```typescript
+// backend: initializeRebaseBackend({ auth: { allowUserLookup: true } })
+
+// client:
+const profile = await rebase.auth.findUserByEmail("teammate@example.com");
+// → { uid, displayName, photoURL } | null   (never email/roles/metadata)
+if (profile) {
+    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+}
+```
+
+The `find-user` endpoint is authenticated-only and returns just the minimal
+public profile. It is off by default because it enables user enumeration by any
+signed-in user.
 
 ---
 

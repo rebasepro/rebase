@@ -9,6 +9,13 @@ export type RebaseUser = User;
 /** @deprecated Use `AuthTokens` from `@rebasepro/types` instead. */
 export type RebaseTokens = AuthTokens;
 
+/** Minimal, non-sensitive user profile returned by {@link findUserByEmail}. */
+export interface PublicUserProfile {
+    uid: string;
+    displayName: string | null;
+    photoURL: string | null;
+}
+
 
 export interface AuthConfig {
     needsSetup: boolean;
@@ -452,6 +459,20 @@ redirectUri });
         return data.user;
     }
 
+    /**
+     * Resolve an email to a minimal public profile (`uid`, `displayName`,
+     * `photoURL`) for invite-by-email flows. Returns `null` when no account
+     * matches. Requires the backend to opt in via `auth.allowUserLookup`;
+     * otherwise the endpoint is absent and this rejects.
+     */
+    async function findUserByEmail(email: string): Promise<PublicUserProfile | null> {
+        const data = await transport.request<{ user: PublicUserProfile | null }>(authPath + "/find-user", {
+            method: "POST",
+            body: JSON.stringify({ email })
+        });
+        return data.user;
+    }
+
     async function updateUser(updates: { displayName?: string, photoURL?: string }) {
         const data = await transport.request<{ user: User }>(authPath + "/me", {
             method: "PATCH",
@@ -644,6 +665,7 @@ refreshToken: session.refreshToken };
         signOut,
         refreshSession,
         getUser,
+        findUserByEmail,
         updateUser,
         resetPasswordForEmail,
         resetPassword,

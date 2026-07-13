@@ -56,6 +56,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         photoURL: z.string().url().max(2048).optional()
     });
 
+    const findUserSchema = z.object({
+        email: z.string().email("Invalid email address").max(255)
+    });
+
     const isEmailConfigured = () => !!(config.emailService && config.emailService.isConfigured());
 
     /**
@@ -186,6 +190,30 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             }
         });
     });
+
+    /**
+     * POST /auth/find-user
+     * Resolve an email to a MINIMAL public profile (uid, displayName, photoURL).
+     * Opt-in (`auth.allowUserLookup`) and authenticated-only — powers
+     * invite-by-email flows without exposing the users table or a custom admin
+     * server function. Never returns the email, roles, metadata, or any other
+     * field of the looked-up user.
+     */
+    if (config.allowUserLookup) {
+        router.post("/find-user", defaultAuthLimiter, requireAuth, async (c) => {
+            const userCtx = c.get("user") as { userId: string } | undefined;
+            if (!userCtx) {
+                throw ApiError.unauthorized("Not authenticated");
+            }
+            const { email } = parseBody(findUserSchema, await c.req.json());
+            const user = await authRepo.getUserByEmail(email.toLowerCase());
+            return c.json({
+                user: user
+                    ? { uid: user.id, displayName: user.displayName ?? null, photoURL: user.photoUrl ?? null }
+                    : null
+            });
+        });
+    }
 
     /**
      * PATCH /auth/me

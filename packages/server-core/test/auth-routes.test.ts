@@ -73,7 +73,7 @@ collectionPermissions: null };
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
-function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; isBootstrapCompleted?: () => Promise<boolean> } = {}) {
+function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; isBootstrapCompleted?: () => Promise<boolean> } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
@@ -136,6 +136,7 @@ isConfigured: jest.fn().mockReturnValue(opts.withEmail ?? false) };
     const config: AuthModuleConfig = {
         authRepo: mockAuthRepo,
         allowRegistration: opts.allowRegistration ?? true,
+        allowUserLookup: opts.allowUserLookup ?? false,
         defaultRole: opts.defaultRole,
         emailService: opts.withEmail ? mockEmailService as any : undefined,
         emailConfig: opts.withEmail ? { from: "test@test.com",
@@ -1137,6 +1138,52 @@ defaultRole: "viewer" });
                 expect.any(String), "viewer"
             );
             expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe("POST /auth/find-user (user lookup)", () => {
+        it("is not mounted unless allowUserLookup is enabled", async () => {
+            const app = createApp(); // allowUserLookup defaults to false
+            const res = await app.request("/auth/find-user", {
+                ...json({ email: "someone@test.com" }),
+                headers: { ...json({}).headers, ...authHeader() }
+            });
+            expect(res.status).toBe(404);
+        });
+
+        it("requires authentication when enabled", async () => {
+            const app = createApp({ allowUserLookup: true });
+            const res = await app.request("/auth/find-user", json({ email: "someone@test.com" }));
+            expect(res.status).toBe(401);
+        });
+
+        it("returns only a minimal public profile for a known email", async () => {
+            const app = createApp({ allowUserLookup: true });
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(
+                mockUser({ id: "user-42", email: "teammate@test.com", displayName: "Teammate", photoUrl: "https://p" })
+            );
+            const res = await app.request("/auth/find-user", {
+                ...json({ email: "teammate@test.com" }),
+                headers: { ...json({}).headers, ...authHeader() }
+            });
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            // Minimal projection only — no email, roles, metadata, or password leaked.
+            expect(body.user).toEqual({ uid: "user-42", displayName: "Teammate", photoURL: "https://p" });
+            expect(body.user.email).toBeUndefined();
+            expect(body.user.roles).toBeUndefined();
+        });
+
+        it("returns null when no account matches", async () => {
+            const app = createApp({ allowUserLookup: true });
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            const res = await app.request("/auth/find-user", {
+                ...json({ email: "nobody@test.com" }),
+                headers: { ...json({}).headers, ...authHeader() }
+            });
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.user).toBeNull();
         });
     });
 });

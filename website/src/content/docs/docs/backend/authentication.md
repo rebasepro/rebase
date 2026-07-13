@@ -109,8 +109,39 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
+| `POST` | `/api/auth/find-user` | Resolve an email to a minimal public profile (opt-in) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
+
+### Inviting teammates by email
+
+Invite flows need to turn an email address into a user id, but the `users`
+collection is RLS-protected from the client. Instead of hand-rolling an admin
+server function, opt into the built-in lookup:
+
+```typescript
+await initializeRebaseBackend({
+    auth: {
+        // ...
+        allowUserLookup: true,   // enables POST /api/auth/find-user
+    },
+});
+```
+
+Then, from the client:
+
+```typescript
+const profile = await rebase.auth.findUserByEmail("teammate@example.com");
+// → { uid, displayName, photoURL } | null   (never email/roles/metadata)
+if (profile) {
+    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+}
+```
+
+The endpoint is **authenticated-only** and returns just `uid`, `displayName`,
+and `photoURL` — never the email, roles, or metadata of the looked-up user. It
+is **off by default** because it lets any signed-in user probe which emails have
+accounts; enable it only when your invite UX needs it.
 
 ## Auto-Created Tables
 

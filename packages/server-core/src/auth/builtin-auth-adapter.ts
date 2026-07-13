@@ -53,6 +53,8 @@ export interface BuiltinAuthAdapterConfig {
     emailConfig?: EmailConfig;
     /** Whether to allow new user registration. */
     allowRegistration?: boolean;
+    /** Whether to expose the authenticated email→minimal-profile lookup route. */
+    allowUserLookup?: boolean;
     /** Default role to assign to new users. */
     defaultRole?: string;
     /** OAuth providers to register. */
@@ -82,6 +84,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         emailService,
         emailConfig,
         allowRegistration = false,
+        allowUserLookup = false,
         defaultRole,
         oauthProviders = [],
         serviceKey,
@@ -193,6 +196,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailService,
                 emailConfig,
                 allowRegistration,
+                allowUserLookup,
                 defaultRole,
                 oauthProviders,
                 authHooks,

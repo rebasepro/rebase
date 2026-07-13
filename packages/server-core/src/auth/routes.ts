@@ -29,6 +29,8 @@ export interface AuthModuleConfig {
     emailConfig?: EmailConfig;
     /** Allow new user registration (default: false). */
     allowRegistration?: boolean;
+    /** Expose the authenticated email→minimal-profile lookup route (default: false). */
+    allowUserLookup?: boolean;
     /** Default role ID to assign to new users (default: none). Must NOT be "admin". */
     defaultRole?: string;
     /** Optional array of OAuth providers */

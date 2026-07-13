@@ -82,6 +82,14 @@ export interface RebaseAuthConfig {
     requireAuth?: boolean;
     allowRegistration?: boolean;
     /**
+     * Opt-in: expose `POST /auth/find-user` so an authenticated user can resolve
+     * an email address to a minimal public profile (`uid`, `displayName`,
+     * `photoURL` only). This powers invite-by-email flows without a custom
+     * admin server function. Off by default because it enables user enumeration
+     * by any signed-in user. Available on the client as `auth.findUserByEmail`.
+     */
+    allowUserLookup?: boolean;
+    /**
      * A static secret key for server-to-server / script authentication.
      *
      * When a request includes `Authorization: Bearer <serviceKey>`, it is
@@ -745,6 +753,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 emailService: authConfigResult!.emailService as import("./email").EmailService,
                 emailConfig: safeAuthConfig.email,
                 allowRegistration: safeAuthConfig.allowRegistration ?? false,
+                allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,
                 serviceKey,

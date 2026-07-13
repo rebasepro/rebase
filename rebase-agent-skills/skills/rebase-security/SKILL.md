@@ -510,6 +510,37 @@ const hooks: BackendHooks = {
 };
 ```
 
+### Membership-Scoped Access (RLS, no N+1)
+
+When membership lives in a **join collection** (e.g. `team_members`), prefer the
+first-class `policy.existsIn` predicate over a per-row `afterRead` lookup. It is
+enforced by Postgres RLS in a single correlated `EXISTS` subquery — no N+1, and
+it cannot be bypassed by a client that skips the SDK.
+
+```typescript
+import { policy } from "@rebasepro/types";
+
+// config/collections/documents.ts — only members of the doc's team can read it:
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.existsIn({
+            collection: "team_members",
+            where: policy.and(
+                policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
+                policy.compare(policy.field("user_id"), "eq", policy.authUid()),
+            ),
+        }),
+    },
+]
+```
+
+Inside `where`: `policy.field(...)` = a column of the joined collection
+(`team_members`); `policy.outerField(...)` = a column of the row being checked
+(`documents`); `policy.authUid()` = the caller. Reach for the `afterRead`
+approach above only when access depends on data RLS can't see (e.g. an external
+service). Run `rebase db push` after editing the collection to apply the policy.
+
 ### Role-Based Collection Access
 
 ```typescript
