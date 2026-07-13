@@ -518,6 +518,28 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(body.user.roles).toEqual(["editor"]);
         });
 
+        it("still returns 200 tokens if user enrichment fails (never 500s)", async () => {
+            const app = createApp();
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
+                id: "rt-1",
+                userId: "user-1",
+                tokenHash: "old-hash",
+                expiresAt: new Date(Date.now() + 86400000),
+                createdAt: new Date(),
+                userAgent: "",
+                ipAddress: ""
+            });
+            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+            // The user lookup blows up (the regression that 500'd /refresh on CI).
+            mockAuthRepo.getUserById.mockRejectedValueOnce(new Error("db exploded"));
+
+            const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.tokens.accessToken).toBeTruthy();
+            expect(body.user).toBeUndefined();
+        });
+
         it("rotates refresh token — deletes old, creates new", async () => {
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
