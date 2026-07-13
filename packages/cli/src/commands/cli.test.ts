@@ -37,8 +37,12 @@ vi.mock("./auth", () => ({
 vi.mock("./doctor", () => ({
     doctorCommand: vi.fn()
 }));
+vi.mock("./cloud", () => ({
+    cloudCommand: vi.fn()
+}));
 
 import { entry } from "../cli";
+import { cloudCommand } from "./cloud";
 import { createRebaseApp } from "./init";
 import { schemaCommand } from "./schema";
 import { dbCommand } from "./db";
@@ -94,6 +98,18 @@ describe("CLI routing", () => {
         const args = ["node", "rebase", "auth", "reset-password"];
         await entry(args);
         expect(authCommand).toHaveBeenCalledWith("reset-password", args);
+    });
+
+    it("routes 'cloud login' to cloudCommand", async () => {
+        const args = ["node", "rebase", "cloud", "login"];
+        await entry(args);
+        expect(cloudCommand).toHaveBeenCalledWith("login", args);
+    });
+
+    it("passes --help through to cloud", async () => {
+        const args = ["node", "rebase", "cloud", "--help"];
+        await entry(args);
+        expect(cloudCommand).toHaveBeenCalledWith("--help", args);
     });
 
     it("routes 'build' to buildCommand", async () => {

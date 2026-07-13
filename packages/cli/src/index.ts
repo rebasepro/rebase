@@ -8,5 +8,6 @@ export * from "./commands/start";
 export * from "./commands/auth";
 export * from "./commands/doctor";
 export * from "./commands/generate_sdk";
+export * from "./commands/cloud";
 export * from "./utils/project";
 export * from "./utils/package-manager";

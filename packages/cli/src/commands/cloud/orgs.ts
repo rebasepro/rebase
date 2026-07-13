@@ -1,0 +1,151 @@
+/**
+ * `rebase cloud orgs` — list / create / members.
+ */
+import arg from "arg";
+import chalk from "chalk";
+import inquirer from "inquirer";
+import {
+    requireClient,
+    getContextOrg,
+    setContextOrg,
+    colorStatus,
+    success,
+    fail,
+    reportError
+} from "./context";
+
+interface OrgRow {
+    id: string | number;
+    name?: string;
+    slug?: string;
+    description?: string;
+    createdAt?: string;
+}
+
+export async function orgsCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    switch (subcommand) {
+        case "list":
+        case undefined:
+            await listOrgs(rawArgs);
+            break;
+        case "create":
+            await createOrg(rawArgs);
+            break;
+        case "members":
+            await listMembers(rawArgs);
+            break;
+        case "--help":
+            printOrgsHelp();
+            break;
+        default:
+            fail(`Unknown orgs command: ${subcommand}`);
+    }
+}
+
+async function listOrgs(rawArgs: string[]): Promise<void> {
+    const { client, url } = await requireClient(rawArgs);
+    try {
+        const orgs = (await client.data.collection("organizations").find({ limit: 100 })).data as unknown as OrgRow[];
+        const active = getContextOrg(url);
+
+        console.log("");
+        console.log(chalk.bold("  🏢 Organizations"));
+        console.log("");
+        if (orgs.length === 0) {
+            console.log(chalk.gray("  You are not a member of any organization."));
+            console.log("");
+            return;
+        }
+        for (const o of orgs) {
+            const marker = String(o.id) === active ? chalk.green(" ●") : "  ";
+            console.log(`${marker}${chalk.bold(o.name ?? "(unnamed)")} ${chalk.gray(`[${o.id}]`)}${o.slug ? chalk.gray(`  ${o.slug}`) : ""}`);
+        }
+        console.log("");
+        console.log(chalk.gray("  ● = active organization. Switch with `rebase cloud use <id>`."));
+        console.log("");
+    } catch (e) {
+        reportError(e, "Failed to list organizations");
+    }
+}
+
+async function createOrg(rawArgs: string[]): Promise<void> {
+    const args = arg(
+        { "--name": String,
+"--slug": String,
+"-n": "--name" },
+        { argv: rawArgs.slice(4),
+permissive: true }
+    );
+    const { client, url } = await requireClient(rawArgs);
+
+    const prompts: Array<Record<string, unknown>> = [];
+    if (!args["--name"]) prompts.push({ type: "input",
+name: "name",
+message: "Organization name:" });
+    const answers = prompts.length
+        ? await inquirer.prompt(prompts as unknown as Parameters<typeof inquirer.prompt>[0])
+        : {};
+
+    const name = (args["--name"] || (answers as { name?: string }).name || "").trim();
+    if (!name) fail("Organization name is required.");
+    const slug = (args["--slug"] || slugify(name)).trim();
+
+    try {
+        const created = (await client.data.collection("organizations").create({
+            name,
+            slug,
+            createdAt: new Date().toISOString()
+        })) as unknown as OrgRow;
+        setContextOrg(url, String(created.id));
+        success(`Created organization ${chalk.bold(name)} and set it active`);
+    } catch (e) {
+        reportError(e, "Failed to create organization");
+    }
+}
+
+async function listMembers(rawArgs: string[]): Promise<void> {
+    const { client, url } = await requireClient(rawArgs);
+    const org = getContextOrg(url);
+    if (!org) fail("No active organization.", "Run `rebase cloud use` first.");
+
+    try {
+        const members = (await client.data.collection("organization-members").find({
+            where: { organization: ["==", org] },
+            limit: 200
+        })).data as unknown as Array<{ id: string | number; userId?: string; role?: string }>;
+
+        console.log("");
+        console.log(chalk.bold(`  👥 Members — org ${org}`));
+        console.log("");
+        if (members.length === 0) {
+            console.log(chalk.gray("  No members found."));
+            console.log("");
+            return;
+        }
+        for (const m of members) {
+            console.log(`  ${chalk.bold(m.userId ?? "?")}  ${colorStatus(m.role)}`);
+        }
+        console.log("");
+    } catch (e) {
+        reportError(e, "Failed to list members");
+    }
+}
+
+function slugify(s: string): string {
+    return s
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function printOrgsHelp(): void {
+    console.log(`
+${chalk.bold("rebase cloud orgs")} — Manage organizations
+
+${chalk.green.bold("Commands")}
+  ${chalk.blue.bold("list")}              List organizations you belong to
+  ${chalk.blue.bold("create")}            Create a new organization ${chalk.gray("(--name, --slug)")}
+  ${chalk.blue.bold("members")}           List members of the active organization
+`);
+}

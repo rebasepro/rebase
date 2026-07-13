@@ -613,6 +613,9 @@ importers:
       '@rebasepro/agent-skills':
         specifier: workspace:*
         version: link:../../rebase-agent-skills
+      '@rebasepro/client':
+        specifier: workspace:*
+        version: link:../client
       '@rebasepro/sdk-generator':
         specifier: workspace:*
         version: link:../sdk-generator

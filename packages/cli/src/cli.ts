@@ -11,6 +11,7 @@ import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
+import { cloudCommand } from "./commands/cloud";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -54,7 +55,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys"];
+    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -125,6 +126,10 @@ export async function entry(args: string[]) {
             await apiKeysCommand(effectiveSubcommand, args);
             break;
 
+        case "cloud":
+            await cloudCommand(effectiveSubcommand, args);
+            break;
+
         default:
             console.log(chalk.red(`Unknown command: ${command}`));
             console.log("");
@@ -174,6 +179,12 @@ ${chalk.green.bold("API Keys")}
   ${chalk.blue.bold("api-keys create")}          Create a new scoped API key
   ${chalk.blue.bold("api-keys revoke")}          Revoke an existing API key
   ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}          Show API key command help
+
+${chalk.green.bold("Rebase Cloud")}
+  ${chalk.blue.bold("cloud login")}             Sign in to the hosted control plane
+  ${chalk.blue.bold("cloud link")}              Link this directory to a cloud project
+  ${chalk.blue.bold("cloud deploy")}            Deploy the linked project + stream logs
+  ${chalk.blue.bold("cloud")} ${chalk.gray("--help")}             Show all cloud commands
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--version, -v")}   Show version number

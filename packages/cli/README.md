@@ -26,8 +26,37 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
 | `rebase auth reset-password` | Reset a user's password |
 | `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
+| `rebase cloud <command>` | Manage your apps on Rebase Cloud (auth, deploy, databases, …) |
 
 Run `rebase --help` or `rebase <command> --help` for detailed usage.
+
+## Rebase Cloud
+
+`rebase cloud` talks to the hosted control plane (default `https://app.rebase.pro`,
+override with `--url` or `REBASE_CLOUD_URL`). Sign in once — credentials are stored
+in `~/.rebase/credentials.json`, keyed per host — then link a directory to a project
+so deploy/logs/status need no flags.
+
+```bash
+rebase cloud login                 # sign in (stores a session)
+rebase cloud link                  # pick a project → writes .rebase/cloud.json
+rebase cloud deploy                # deploy the linked project + stream build logs
+rebase cloud logs --runtime        # tail runtime logs
+rebase cloud status                # project status at a glance
+```
+
+| Group | Commands |
+|-------|----------|
+| Auth | `login`, `logout`, `whoami` |
+| Link/context | `link`, `unlink`, `use [org]`, `open` |
+| Projects | `projects list \| create \| info \| delete` |
+| Deploy/observe | `deploy`, `logs [--runtime] [-f]`, `status`, `metrics` |
+| Organizations | `orgs list \| create \| members` |
+| Databases | `db list \| create \| test`, `db backup list \| create \| restore` |
+| Resources | `webhooks list \| create \| delete`, `storage`, `clusters`, `billing [checkout]` |
+
+Most commands act on the linked project unless you pass `--project <id>`.
+Run `rebase cloud --help` for the full list.
 
 ## Quick Start
 

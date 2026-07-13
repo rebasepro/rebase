@@ -33,6 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "@rebasepro/agent-skills": "workspace:*",
+    "@rebasepro/client": "workspace:*",
     "@rebasepro/sdk-generator": "workspace:*",
     "@rebasepro/server-core": "workspace:*",
     "@rebasepro/server-postgresql": "workspace:*",

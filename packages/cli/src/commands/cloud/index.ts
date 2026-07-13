@@ -1,0 +1,202 @@
+/**
+ * CLI command: `rebase cloud <group> [action] [options]`
+ *
+ * A single entry point for everything you do against Rebase Cloud — the hosted
+ * control plane. Auth, project link, deploys, databases, and the rest are all
+ * dispatched from here. Individual groups live in sibling modules; this file
+ * only routes and prints help.
+ */
+import arg from "arg";
+import chalk from "chalk";
+import { loginCommand, logoutCommand, whoamiCommand } from "./auth";
+import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
+import { listProjects, createProject, projectInfo, deleteProject } from "./projects";
+import { deployCommand, logsCommand } from "./deploy";
+import { orgsCommand } from "./orgs";
+import { dbCommand } from "./databases";
+import {
+    statusCommand,
+    metricsCommand,
+    webhooksCommand,
+    storageCommand,
+    clustersCommand,
+    billingCommand
+} from "./resources";
+import { requireProjectId } from "./context";
+
+/** Positional tokens after `rebase cloud` (group, action, …). */
+function positionals(rawArgs: string[]): string[] {
+    return arg({}, { argv: rawArgs.slice(3),
+permissive: true })._;
+}
+
+export async function cloudCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    const pos = positionals(rawArgs);
+    const group = subcommand && subcommand !== "--help" ? subcommand : pos[0];
+    const action = pos[1];
+
+    if (!group || subcommand === "--help") {
+        printCloudHelp();
+        return;
+    }
+
+    switch (group) {
+        /* auth */
+        case "login":
+            await loginCommand(rawArgs);
+            break;
+        case "logout":
+            await logoutCommand(rawArgs);
+            break;
+        case "whoami":
+            await whoamiCommand(rawArgs);
+            break;
+
+        /* context / link */
+        case "link":
+            await linkCommand(rawArgs);
+            break;
+        case "unlink":
+            unlinkCommand();
+            break;
+        case "use":
+            await selectOrgCommand(rawArgs);
+            break;
+        case "open":
+            openCommand(rawArgs);
+            break;
+
+        /* projects */
+        case "projects":
+        case "project":
+            await projectsGroup(action, rawArgs);
+            break;
+
+        /* deploy + logs (operate on linked/--project) */
+        case "deploy":
+            await deployCommand(rawArgs, requireProjectId(rawArgs));
+            break;
+        case "logs":
+            await logsCommand(rawArgs, requireProjectId(rawArgs));
+            break;
+        case "status":
+            await statusCommand(rawArgs);
+            break;
+        case "metrics":
+            await metricsCommand(rawArgs);
+            break;
+
+        /* orgs */
+        case "orgs":
+        case "org":
+            await orgsCommand(action, rawArgs);
+            break;
+
+        /* databases */
+        case "db":
+        case "database":
+            await dbCommand(action, rawArgs);
+            break;
+
+        /* other resources */
+        case "webhooks":
+            await webhooksCommand(action, rawArgs);
+            break;
+        case "storage":
+            await storageCommand(rawArgs);
+            break;
+        case "clusters":
+            await clustersCommand(rawArgs);
+            break;
+        case "billing":
+            await billingCommand(rawArgs);
+            break;
+
+        default:
+            console.error(chalk.red(`Unknown cloud command: ${group}`));
+            console.log("");
+            printCloudHelp();
+            process.exit(1);
+    }
+}
+
+async function projectsGroup(action: string | undefined, rawArgs: string[]): Promise<void> {
+    switch (action) {
+        case "list":
+        case undefined:
+            await listProjects(rawArgs);
+            break;
+        case "create":
+            await createProject(rawArgs);
+            break;
+        case "info": {
+            const id = positionals(rawArgs)[2] || requireProjectId(rawArgs);
+            await projectInfo(rawArgs, id);
+            break;
+        }
+        case "delete": {
+            const id = positionals(rawArgs)[2] || requireProjectId(rawArgs);
+            await deleteProject(rawArgs, id);
+            break;
+        }
+        case "--help":
+            printCloudHelp();
+            break;
+        default:
+            console.error(chalk.red(`Unknown projects command: ${action}`));
+            process.exit(1);
+    }
+}
+
+function printCloudHelp(): void {
+    console.log(`
+${chalk.bold("rebase cloud")} — Manage your apps on Rebase Cloud
+
+${chalk.green.bold("Usage")}
+  rebase cloud ${chalk.blue("<command>")} [options]
+
+${chalk.green.bold("Auth")}
+  ${chalk.blue.bold("login")}                   Sign in to the control plane
+  ${chalk.blue.bold("logout")}                  Sign out
+  ${chalk.blue.bold("whoami")}                  Show the current session
+
+${chalk.green.bold("Project link")}
+  ${chalk.blue.bold("link")}                    Link this directory to a cloud project
+  ${chalk.blue.bold("unlink")}                  Remove the link
+  ${chalk.blue.bold("use")} ${chalk.gray("[org]")}               Select the active organization
+  ${chalk.blue.bold("open")}                    Open the dashboard in a browser
+
+${chalk.green.bold("Projects")}
+  ${chalk.blue.bold("projects list")}           List projects
+  ${chalk.blue.bold("projects create")}         Create a project ${chalk.gray("(--link to link it)")}
+  ${chalk.blue.bold("projects info")} ${chalk.gray("[id]")}      Show project details
+  ${chalk.blue.bold("projects delete")} ${chalk.gray("[id]")}    Delete a project
+
+${chalk.green.bold("Deploy & observe")}
+  ${chalk.blue.bold("deploy")} ${chalk.gray("[--source .]")}     Deploy the linked project + stream build logs
+  ${chalk.blue.bold("logs")} ${chalk.gray("[--runtime] [-f]")}   Show build (or runtime) logs
+  ${chalk.blue.bold("status")}                  One-glance project status
+  ${chalk.blue.bold("metrics")}                 Live CPU / memory / disk
+
+${chalk.green.bold("Organizations")}
+  ${chalk.blue.bold("orgs list|create|members")}
+
+${chalk.green.bold("Databases")}
+  ${chalk.blue.bold("db list|create|test")}
+  ${chalk.blue.bold("db backup list|create|restore")}
+
+${chalk.green.bold("Other resources")}
+  ${chalk.blue.bold("webhooks list|create|delete")}
+  ${chalk.blue.bold("storage")}                 List storage buckets
+  ${chalk.blue.bold("clusters")}                List compute clusters
+  ${chalk.blue.bold("billing setup")}           Attach a card to the org ${chalk.gray("(one-time, opens browser)")}
+  ${chalk.blue.bold("billing")}                 Show billing account + card on file
+
+${chalk.green.bold("Global options")}
+  ${chalk.blue("--url <origin>")}          Target a specific control plane ${chalk.gray("(or REBASE_CLOUD_URL)")}
+  ${chalk.blue("--project, -p <id>")}      Operate on a project without linking
+
+${chalk.gray("Most commands act on the linked project (.rebase/cloud.json) unless --project is given.")}
+${chalk.gray("Docs: https://rebase.pro/docs")}
+`);
+}
