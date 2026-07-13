@@ -287,13 +287,16 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 };
                 const envPort = readEnvKey("PORT");
                 const envApiUrl = readEnvKey("VITE_API_URL");
+                // Only name the keys — never echo a raw `http://localhost:<port>`
+                // value, so log scrapers don't mistake it for the dev server URL.
                 const overridden: string[] = [];
-                if (envPort && envPort !== String(startPort)) overridden.push(`PORT=${envPort}`);
-                if (envApiUrl && envApiUrl !== `http://localhost:${startPort}`) overridden.push(`VITE_API_URL=${envApiUrl}`);
+                if (envPort && envPort !== String(startPort)) overridden.push("PORT");
+                if (envApiUrl && envApiUrl !== `http://localhost:${startPort}`) overridden.push("VITE_API_URL");
                 if (overridden.length > 0) {
                     console.log(chalk.yellow(
-                        `  ⚠ Ignoring ${overridden.join(", ")} from .env in dev — using derived port ${startPort} ` +
-                        `(per-project, avoids collisions). Pass ${chalk.white("--port")} to pin a port.`
+                        `  ⚠ dev uses a derived per-project port (${startPort}); your .env ${overridden.join(" / ")} ` +
+                        `${overridden.length > 1 ? "are" : "is"} ignored here (avoids cross-project collisions). ` +
+                        `Pass ${chalk.white("--port")} to pin a port.`
                     ));
                 }
             } catch { /* ignore — best-effort notice */ }
