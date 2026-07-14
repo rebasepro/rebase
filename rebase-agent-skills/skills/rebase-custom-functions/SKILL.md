@@ -118,6 +118,33 @@ app.get("/", async (c) => {
 export default app;
 ```
 
+### Use the `rebase` singleton for platform services — not raw SDKs
+
+> **🚨 CRITICAL FOR AGENTS:** For data, storage, auth, and email inside a
+> function/hook/job, use the configured platform services on the **`rebase`**
+> singleton. **Never** import a cloud provider SDK directly to reimplement what
+> the platform already provides.
+
+```typescript
+import { rebase } from "@rebasepro/server-core";
+
+await rebase.data.collection("orders").find({ where: { status: ["==", "paid"] } });
+await rebase.storage.putObject({ key, file });   // → storageUrl (gs://|s3://|local://)
+await rebase.email.send({ to, subject, html });
+```
+
+| Need | ✅ Use | ❌ Never import directly |
+|------|--------|--------------------------|
+| Object storage | `rebase.storage` (see **rebase-storage** skill) | `@aws-sdk/client-s3`, `@google-cloud/storage` |
+| Database / collections | `rebase.data` (or `c.get("driver")`) | `pg`, `drizzle` clients by hand |
+| Email | `rebase.email` | `nodemailer`, provider SDKs |
+| Auth / users | `rebase.auth` / `c.get("user")` | custom JWT parsing |
+
+Importing a provider SDK hardcodes one backend, bypasses the app's config
+(`STORAGE_TYPE`, `DATABASE_URL`, SMTP, …), and defeats the point of the platform.
+The only code that touches provider SDKs is the adapters **inside**
+`@rebasepro/server-core`.
+
 ### Reserved Identity Values in `c.get("user")`
 
 The `user` object set by the auth middleware uses reserved values for system identities:

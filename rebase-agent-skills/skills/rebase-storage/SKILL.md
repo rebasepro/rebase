@@ -250,6 +250,62 @@ GCS_PROJECT_ID=my-gcp-project             # Optional: auto-detected on GCP
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ```
 
+## Server-Side Storage (custom functions, hooks, jobs)
+
+> **🚨 CRITICAL FOR AGENTS — do NOT hand-roll a cloud SDK.** Inside a custom
+> function, collection hook, or cron job, use the configured storage controller
+> at **`rebase.storage`**. **Never** `import "@aws-sdk/client-s3"` or
+> `import "@google-cloud/storage"` (or `new S3Client`, `new Storage()`) directly.
+> Doing so hardcodes one backend, bypasses the `storage` config, duplicates the
+> adapter layer, and breaks the local↔s3↔gcs swap. The backend is a **config
+> choice** (`STORAGE_TYPE`), not something you wire up per feature.
+
+`rebase.storage` is the same `StorageController` interface documented above
+(`putObject`, `getObject`, `getSignedUrl`, `deleteObject`, `listObjects`,
+`getType`). It is `undefined` only if no `storage` is configured — guard for that.
+
+```typescript
+import { rebase } from "@rebasepro/server-core";
+
+// Store bytes (e.g. a generated report, an uploaded build context, a thumbnail)
+if (!rebase.storage) throw new Error("Object storage is not configured");
+const file = new File([buffer], "report.pdf", { type: "application/pdf" });
+const { key, bucket, storageUrl } = await rebase.storage.putObject({
+    key: "reports/2026/q1.pdf",   // your object key
+    file,                          // a web File (Node 20+ has global File)
+});
+// storageUrl is scheme-qualified and matches the CONFIGURED backend:
+//   local://<bucket>/<key>  |  s3://<bucket>/<key>  |  gs://<bucket>/<key>
+
+// Read it back (accepts a key or a full gs://…/s3://… storageUrl)
+const back = await rebase.storage.getObject(key);
+const bytes = back ? Buffer.from(await back.arrayBuffer()) : null;
+```
+
+**Why `storageUrl` matters:** it is the portable, backend-correct URI. Hand it to
+anything that reads object storage directly (a Kaniko build context, an external
+worker, a signed-URL flow) — on GCS it's `gs://…` (read via Workload Identity on
+GKE, no keys), on S3 it's `s3://…`. You never branch on the provider yourself.
+
+**Switching backend is env only** — no code change:
+```env
+STORAGE_TYPE=gcs           # was: local (or s3)
+STORAGE_GCS_BUCKET=my-bucket
+# creds via Workload Identity/ADC on GCP, or GOOGLE_APPLICATION_CREDENTIALS
+```
+
+❌ **Anti-pattern (never do this in app/backend code):**
+```typescript
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";   // ❌
+const s3 = new S3Client({ region, endpoint });                     // ❌ hardcodes S3
+await s3.send(new PutObjectCommand({ Bucket, Key, Body }));        // ❌ bypasses rebase.storage
+```
+✅ **Correct:** `await rebase.storage.putObject({ key, file })` (above).
+
+*(The only place a cloud SDK is imported directly is inside the storage
+controllers in `@rebasepro/server-core` themselves — application code always goes
+through `rebase.storage`.)*
+
 ## REST API Endpoints
 
 All storage routes are mounted at `/api/storage` by default. Write operations require authentication when `requireAuth` is `true` (the default). Read operations also require authentication unless `publicRead` is `true`.

@@ -16,7 +16,7 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 | **Collections** | Schema-as-Code data models with full CRUD endpoints |
 | **Authentication** | Built-in JWT auth with Google OAuth support |
 | **Roles & RLS** | Application-level row-level security policies |
-| **Storage** | Local or S3-compatible file storage |
+| **Storage** | Local, S3-compatible, or Google Cloud Storage — always via `rebase.storage` (never a cloud SDK directly) |
 | **Realtime** | WebSocket-based live updates (LISTEN/NOTIFY) |
 | **Studio** | Visual admin panel (table, cards, kanban, list views) |
 | **Collection Editor** | AST-backed visual schema editing |
