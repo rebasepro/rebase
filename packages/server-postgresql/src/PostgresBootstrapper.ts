@@ -32,7 +32,7 @@ import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { buildCollectionsFromSchema, introspectSchema } from "./schema/introspect-runtime";
-import { buildDrizzleTablesFromSchema } from "./schema/dynamic-tables";
+import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
 import { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 
@@ -102,12 +102,16 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // No collection files and no generated drizzle schema exist, so read
             // the live database and build both from what is actually there.
             let introspectedCollections: CollectionConfig[] | undefined;
-            let introspectedTables: Record<string, unknown> | undefined;
+            let introspectedTables: Record<string, PgTable> | undefined;
+            let introspectedRelations: Record<string, Relations> | undefined;
             if (mode === "baas" && (!collections || collections.length === 0)) {
                 const pgSchemaName = pgConfig.introspectionSchema ?? "public";
                 const schema = await introspectSchema(rawClient, pgSchemaName);
                 introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
                 introspectedTables = buildDrizzleTablesFromSchema(schema.tablesMap, pgSchemaName);
+                // Without these, drizzle's relational path can't resolve the
+                // relations the collections above advertise.
+                introspectedRelations = buildDrizzleRelationsFromSchema(schema.tablesMap, introspectedTables);
                 logger.info(
                     `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} collections from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
                 );
@@ -135,7 +139,9 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             if (pgConfig.schema?.enums) registry.registerEnums(pgConfig.schema.enums as Record<string, PgEnum<[string, ...string[]]>>);
-            if (pgConfig.schema?.relations) registry.registerRelations(pgConfig.schema.relations as Record<string, Relations>);
+
+            const schemaRelations = introspectedRelations ?? (pgConfig.schema?.relations as Record<string, Relations> | undefined);
+            if (schemaRelations) registry.registerRelations(schemaRelations);
 
             // Patch Drizzle's PgArray columns to handle NULL values safely.
             // Drizzle's mapFromDriverValue crashes with "value.map is not a function"
@@ -147,7 +153,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // Build schema-aware Drizzle connection
             const mergedSchema: Record<string, unknown> = {
                 ...schemaTables,
-                ...(pgConfig.schema?.relations || {})
+                ...(schemaRelations || {})
             };
             const { drizzle: createDrizzle } = await import("drizzle-orm/node-postgres");
             const schemaAwareDb = createDrizzle(rawClient, { schema: mergedSchema });
