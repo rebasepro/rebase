@@ -194,16 +194,25 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
  *
  * Fails closed by construction: if the role switch errors, the transaction
  * aborts instead of proceeding privileged.
+ *
+ * SECURITY: this function is only ever called on the **user** path (the server
+ * context uses the base/owner driver and never calls it). The default policies
+ * treat `auth.uid() IS NULL` as the trusted server context, and `auth.uid()`
+ * is `NULLIF(current_setting('app.user_id'), '')` — so an EMPTY user id would
+ * be read as NULL and silently escalate a user request to server privileges.
+ * Coerce empty/blank ids to a sentinel here, at the single chokepoint, rather
+ * than trusting every caller (e.g. realtime subscription auth) to do it.
  */
 export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: string): Promise<void> {
+    const userId = typeof auth.userId === "string" && auth.userId.trim() !== "" ? auth.userId : "anonymous";
     const normalizedRoles = auth.roles.map((r: unknown) =>
         typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
     );
     await tx.execute(drizzleSql`
         SELECT
-            set_config('app.user_id', ${auth.userId}, true),
+            set_config('app.user_id', ${userId}, true),
             set_config('app.user_roles', ${normalizedRoles.join(",")}, true),
-            set_config('app.jwt', ${JSON.stringify({ sub: auth.userId, roles: auth.roles })}, true)
+            set_config('app.jwt', ${JSON.stringify({ sub: userId, roles: auth.roles })}, true)
     `);
     if (userRole) {
         await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${quoteIdent(userRole)}`));

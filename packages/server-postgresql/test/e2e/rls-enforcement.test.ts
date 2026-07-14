@@ -65,11 +65,19 @@ const secretsCollection: CollectionConfig = {
     properties: { id: { name: "ID", type: "string", isId: true }, value: { name: "V", type: "string" } }
 } as unknown as CollectionConfig;
 
+// Carries the injected default-read policy shape (null-server-or-admin).
+const docsTable = pgTable("docs", { id: varchar("id").primaryKey(), owner_id: varchar("owner_id") });
+const docsCollection: CollectionConfig = {
+    name: "Docs", slug: "docs", table: "docs",
+    properties: { id: { name: "ID", type: "string", isId: true }, owner_id: { name: "O", type: "string" } }
+} as unknown as CollectionConfig;
+
 function buildRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
-    registry.registerMultiple([tasksCollection, secretsCollection]);
+    registry.registerMultiple([tasksCollection, secretsCollection, docsCollection]);
     registry.registerTable(tasksTable, "tasks");
     registry.registerTable(secretsTable, "secrets");
+    registry.registerTable(docsTable, "docs");
     return registry;
 }
 
@@ -138,6 +146,17 @@ describe("Unified RLS enforcement (E2E)", () => {
             INSERT INTO public.tasks (id, title, owner_id) VALUES
                 ('t-a', 'A task', 'user-a'),
                 ('t-b', 'B task', 'user-b');
+
+            -- docs: carries the INJECTED default-read policy shape
+            -- (auth.uid() IS NULL = server context, OR admin) plus a per-owner
+            -- rule. This is where an empty user id could escalate to server.
+            CREATE TABLE public.docs (id VARCHAR(255) PRIMARY KEY, owner_id VARCHAR(255));
+            ALTER TABLE public.docs ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY docs_default_read ON public.docs FOR SELECT TO public
+                USING (auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+            CREATE POLICY docs_own ON public.docs FOR SELECT TO public
+                USING (owner_id = auth.uid());
+            INSERT INTO public.docs (id, owner_id) VALUES ('d-a', 'user-a'), ('d-b', 'user-b');
 
             -- secrets: RLS on, NO policy → locked to everyone but the owner/server.
             CREATE TABLE public.secrets (id VARCHAR(255) PRIMARY KEY, value VARCHAR(255));
@@ -249,6 +268,26 @@ describe("Unified RLS enforcement (E2E)", () => {
         driver.rlsUserRole = "role_that_does_not_exist";
         await expect(countAs("user-a")).rejects.toBeTruthy();
         driver.rlsUserRole = REBASE_USER_ROLE;
+    });
+
+    // Regression guard: an EMPTY user id must not be read as `auth.uid() IS NULL`
+    // (the server-context sentinel) — that would escalate a user request to
+    // server privileges. applyAuthContext coerces empty → "anonymous". The
+    // realtime path calls it directly, bypassing the driver's own guard, so
+    // exercise it there against the default-read (null-or-admin) policy.
+    it("does not escalate an empty user id to server context (realtime refetch)", async () => {
+        const rtDocs = (auth: { userId: string; roles: string[] }) =>
+            (realtime as unknown as {
+                fetchCollectionWithAuth(p: string, r: Record<string, unknown>, a?: { userId: string; roles: string[] }): Promise<unknown[]>;
+            }).fetchCollectionWithAuth("docs", {}, auth);
+
+        // Empty uid → coerced to "anonymous" → auth.uid() is NON-null → the
+        // null-server default policy does NOT match → sees 0, not all rows.
+        expect((await rtDocs({ userId: "", roles: [] })).length).toBe(0);
+        expect((await rtDocs({ userId: "   ", roles: [] })).length).toBe(0);
+        // Sanity: a real user sees only their own; an admin sees all via default read.
+        expect((await rtDocs({ userId: "user-a", roles: [] })).length).toBe(1);
+        expect((await rtDocs({ userId: "admin1", roles: ["admin"] })).length).toBe(2);
     });
 
     // A table created AFTER provisioning, using auto-generated ids. Proves the
