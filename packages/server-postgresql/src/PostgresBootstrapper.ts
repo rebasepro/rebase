@@ -24,6 +24,7 @@ import { RealtimeService } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server-core";
+import { getTableName as getCollectionTableName } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
@@ -31,6 +32,7 @@ import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
@@ -225,10 +227,86 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 }
             }
 
-            // Enable cross-instance realtime (opt-in)
-            // Prefer DATABASE_DIRECT_URL to bypass PgBouncer for LISTEN/NOTIFY
+            // ── Realtime change source ───────────────────────────────────────
+            // Prefer DATABASE_DIRECT_URL to bypass PgBouncer for LISTEN/NOTIFY.
             const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
-            if (directUrl) {
+
+            // Database-level Change Data Capture. When active, realtime events are
+            // emitted for EVERY committed write — including ones that bypass the
+            // Rebase API (psql, another service's cron, raw SQL, the Studio SQL
+            // editor) — matching Supabase Realtime's WAL-tailing model. CDC also
+            // becomes the cross-instance channel, so the legacy per-mutation
+            // LISTEN/NOTIFY is not started alongside it.
+            //   REALTIME_CDC=auto     → default: enable where the connection supports
+            //                           it; silently fall back to app-level otherwise
+            //   REALTIME_CDC=trigger  → force trigger-based capture (warns if it can't)
+            //   REALTIME_CDC=wal      → prefer WAL logical replication (degrades to trigger)
+            //   REALTIME_CDC=off      → app-level realtime only
+            const validModes = new Set(["auto", "wal", "trigger", "off"]);
+            let cdcMode = (process.env.REALTIME_CDC || "auto").trim().toLowerCase();
+            if (!validModes.has(cdcMode)) {
+                logger.warn(`⚠️ [CDC] Unknown REALTIME_CDC value "${cdcMode}" — expected auto|wal|trigger|off. Defaulting to "auto".`);
+                cdcMode = "auto";
+            }
+
+            // `auto` tries CDC but treats "can't" as a normal outcome (info log);
+            // explicit trigger/wal was asked for, so a failure is worth a warning.
+            const wantsCdc = cdcMode !== "off";
+            const explicitCdc = cdcMode === "trigger" || cdcMode === "wal";
+            let cdcEnabled = false;
+
+            if (wantsCdc && !directUrl) {
+                const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
+                if (explicitCdc) logger.warn(`⚠️ [CDC] REALTIME_CDC=${cdcMode} but ${reason} — using app-level realtime.`);
+                else logger.info(`ℹ️ [CDC] Using app-level realtime — ${reason}.`);
+            } else if (wantsCdc && directUrl) {
+                if (cdcMode === "wal") {
+                    // Native WAL logical-replication streaming requires wal_level=logical,
+                    // a replication-privileged role and a replication slot, none of which
+                    // are bundled with this adapter yet. Degrade to trigger-based capture,
+                    // which provides equivalent database-level coverage.
+                    logger.warn(
+                        "⚠️ [CDC] REALTIME_CDC=wal: native WAL streaming is not bundled in this build; " +
+                        "using trigger-based change capture instead (equivalent database-level coverage)."
+                    );
+                }
+                try {
+                    const cdcRunSql: RawSqlRunner = async (text) => {
+                        const res = await schemaAwareDb.execute(sql.raw(text));
+                        return (res.rows ?? []) as Record<string, unknown>[];
+                    };
+                    const cdcTables: CdcTableRef[] = registry.getCollections()
+                        .map((c) => ({
+                            schema: (c as { schema?: string }).schema ?? "public",
+                            table: getCollectionTableName(c)
+                        }))
+                        .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
+                    // Provisioning throws only when the connection can't create the
+                    // trigger function (insufficient privilege); enableCdc throws when
+                    // the LISTEN connection can't be established. Either → fall back.
+                    await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    await realtimeService.enableCdc(directUrl);
+                    cdcEnabled = true;
+                    logger.info(
+                        `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
+                        `All writes now emit realtime events regardless of origin.`
+                    );
+                } catch (err) {
+                    if (explicitCdc) {
+                        logger.warn("⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.", { error: err });
+                    } else {
+                        logger.info(
+                            "ℹ️ [CDC] Database-level change capture unavailable (likely insufficient privileges to create triggers, " +
+                            "or the LISTEN connection was refused) — using app-level realtime. Set REALTIME_CDC=off to silence this.",
+                            { detail: err instanceof Error ? err.message : String(err) }
+                        );
+                    }
+                }
+            }
+
+            // Legacy cross-instance realtime (app-level). Skipped when CDC is
+            // active because CDC already spans instances.
+            if (!cdcEnabled && directUrl) {
                 try {
                     await realtimeService.startListening(directUrl);
                 } catch (err) {
