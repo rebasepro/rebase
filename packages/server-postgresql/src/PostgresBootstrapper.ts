@@ -237,9 +237,6 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                         .map((c) => (c as { schema?: string }).schema)
                         .filter((s): s is string => typeof s === "string");
                     await ensureAppRole(runSql, ["public", "rebase", "auth", ...collectionSchemas]);
-                    // A policy targeting a role rebase_user can't hold would filter
-                    // every row and read as an empty collection — fail instead.
-                    await validatePolicyPgRoles(runSql, registry.getCollections() as never);
                     driver.rlsUserRole = REBASE_USER_ROLE;
                     realtimeService.rlsUserRole = REBASE_USER_ROLE;
                     logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${posture.superuser ? "superuser" : posture.bypassRLS ? "BYPASSRLS" : "table owner"})`);
@@ -253,6 +250,16 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 } else {
                     logger.info(`🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`);
                 }
+
+                // Independent of posture: a policy targeting a role the request
+                // never runs as filters every row, so the collection reads as
+                // empty rather than erroring. Applies to both branches — the
+                // role that matters is whichever one requests actually use.
+                await validatePolicyPgRoles(
+                    runSql,
+                    registry.getCollections() as never,
+                    driver.rlsUserRole ?? posture.role
+                );
             }
 
             // Ensure branch metadata table exists when branching is available

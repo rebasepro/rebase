@@ -240,7 +240,10 @@ const FOREIGN_CONVENTION_ROLES: Record<string, string> = {
  */
 export async function validatePolicyPgRoles(
     run: RawSqlRunner,
-    collections: { slug?: string; securityRules?: readonly { name?: string; pgRoles?: readonly string[] }[] }[]
+    collections: { slug?: string; securityRules?: readonly { name?: string; pgRoles?: readonly string[] }[] }[],
+    /** The role requests actually run as: `rebase_user` when the connection is
+     *  privileged enough to switch, otherwise the connection role itself. */
+    requestRole: string = REBASE_USER_ROLE
 ): Promise<void> {
     const wanted = new Map<string, string[]>();
     for (const collection of collections) {
@@ -254,9 +257,10 @@ export async function validatePolicyPgRoles(
     if (wanted.size === 0) return;
 
     const names = [...wanted.keys()].map((r) => `'${r.replace(/'/g, "''")}'`).join(",");
+    const escapedRequestRole = requestRole.replace(/'/g, "''");
     const rows = await run(`
         SELECT r.rolname AS role,
-               pg_has_role('${REBASE_USER_ROLE}', r.rolname, 'MEMBER') AS reachable
+               COALESCE(pg_has_role(to_regrole('${escapedRequestRole}'), r.oid, 'MEMBER'), false) AS reachable
         FROM pg_roles r
         WHERE r.rolname IN (${names})
     `);
@@ -268,12 +272,12 @@ export async function validatePolicyPgRoles(
         if (reachable.get(role) === true) continue;
 
         const why = reachable.has(role)
-            ? `"${REBASE_USER_ROLE}" is not a member of it`
+            ? `"${requestRole}" is not a member of it`
             : "no such role exists in this database";
         const platform = FOREIGN_CONVENTION_ROLES[role];
         const hint = platform
             ? `"${role}" is a ${platform} convention, not a PostgreSQL role. Application roles belong in \`roles: ["${role === "service_role" ? "admin" : role}"]\`, which is checked inside the policy via auth.roles().`
-            : `Either grant it (GRANT ${role} TO ${REBASE_USER_ROLE}) or drop \`pgRoles\` so the policy targets \`public\`.`;
+            : `Either grant it (GRANT ${role} TO ${requestRole}) or drop \`pgRoles\` so the policy targets \`public\`.`;
 
         problems.push(
             `  • pgRoles: ["${role}"] on ${slugs.join(", ")} — ${why}.\n    ${hint}`
@@ -283,7 +287,7 @@ export async function validatePolicyPgRoles(
     if (problems.length > 0) {
         throw new Error(
             `Security rules target PostgreSQL roles this server cannot use. Requests run as ` +
-            `"${REBASE_USER_ROLE}", so these policies would never apply and every row would be ` +
+            `"${requestRole}", so these policies would never apply and every row would be ` +
             `filtered out — the collections would look empty rather than error.\n\n` +
             problems.join("\n\n") + "\n"
         );
