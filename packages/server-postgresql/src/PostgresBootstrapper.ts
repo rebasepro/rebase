@@ -33,7 +33,7 @@ import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { buildCollectionsFromSchema, introspectSchema } from "./schema/introspect-runtime";
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
-import { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 
 export interface PostgresDriverConfig {
@@ -237,6 +237,9 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                         .map((c) => (c as { schema?: string }).schema)
                         .filter((s): s is string => typeof s === "string");
                     await ensureAppRole(runSql, ["public", "rebase", "auth", ...collectionSchemas]);
+                    // A policy targeting a role rebase_user can't hold would filter
+                    // every row and read as an empty collection — fail instead.
+                    await validatePolicyPgRoles(runSql, registry.getCollections() as never);
                     driver.rlsUserRole = REBASE_USER_ROLE;
                     realtimeService.rlsUserRole = REBASE_USER_ROLE;
                     logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${posture.superuser ? "superuser" : posture.bypassRLS ? "BYPASSRLS" : "table owner"})`);

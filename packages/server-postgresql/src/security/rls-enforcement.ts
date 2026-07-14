@@ -218,3 +218,74 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
         await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${quoteIdent(userRole)}`));
     }
 }
+
+/** Role names from other BaaS platforms that people reach for out of habit. */
+const FOREIGN_CONVENTION_ROLES: Record<string, string> = {
+    authenticated: "Supabase",
+    anon: "Supabase",
+    service_role: "Supabase"
+};
+
+/**
+ * Reject `pgRoles` that this server can never satisfy.
+ *
+ * `pgRoles` sets the `TO` clause of a generated policy, so a policy naming a
+ * role the request never runs as simply never applies — and RLS then filters
+ * every row. The table reads as empty, which is indistinguishable from having
+ * no data, so the mistake survives review and ships.
+ *
+ * Requests run as `rebase_user`, so a policy is only reachable if it targets
+ * `public` or a role `rebase_user` holds. Anything else is a configuration
+ * error worth failing the boot for.
+ */
+export async function validatePolicyPgRoles(
+    run: RawSqlRunner,
+    collections: { slug?: string; securityRules?: readonly { name?: string; pgRoles?: readonly string[] }[] }[]
+): Promise<void> {
+    const wanted = new Map<string, string[]>();
+    for (const collection of collections) {
+        for (const rule of collection.securityRules ?? []) {
+            for (const role of rule.pgRoles ?? []) {
+                if (role === "public") continue;
+                wanted.set(role, [...(wanted.get(role) ?? []), collection.slug ?? "(unnamed)"]);
+            }
+        }
+    }
+    if (wanted.size === 0) return;
+
+    const names = [...wanted.keys()].map((r) => `'${r.replace(/'/g, "''")}'`).join(",");
+    const rows = await run(`
+        SELECT r.rolname AS role,
+               pg_has_role('${REBASE_USER_ROLE}', r.rolname, 'MEMBER') AS reachable
+        FROM pg_roles r
+        WHERE r.rolname IN (${names})
+    `);
+
+    const reachable = new Map(rows.map((row) => [String(row.role), row.reachable === true]));
+    const problems: string[] = [];
+
+    for (const [role, slugs] of wanted) {
+        if (reachable.get(role) === true) continue;
+
+        const why = reachable.has(role)
+            ? `"${REBASE_USER_ROLE}" is not a member of it`
+            : "no such role exists in this database";
+        const platform = FOREIGN_CONVENTION_ROLES[role];
+        const hint = platform
+            ? `"${role}" is a ${platform} convention, not a PostgreSQL role. Application roles belong in \`roles: ["${role === "service_role" ? "admin" : role}"]\`, which is checked inside the policy via auth.roles().`
+            : `Either grant it (GRANT ${role} TO ${REBASE_USER_ROLE}) or drop \`pgRoles\` so the policy targets \`public\`.`;
+
+        problems.push(
+            `  • pgRoles: ["${role}"] on ${slugs.join(", ")} — ${why}.\n    ${hint}`
+        );
+    }
+
+    if (problems.length > 0) {
+        throw new Error(
+            `Security rules target PostgreSQL roles this server cannot use. Requests run as ` +
+            `"${REBASE_USER_ROLE}", so these policies would never apply and every row would be ` +
+            `filtered out — the collections would look empty rather than error.\n\n` +
+            problems.join("\n\n") + "\n"
+        );
+    }
+}
