@@ -9,10 +9,12 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { buildPropertyCallbacks } from "@rebasepro/common";
+import { buildPropertyCallbacks, getTableName } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { logger } from "@rebasepro/server-core";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
+import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
+import { getPrimaryKeys, buildCompositeId } from "./collection-helpers";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -95,6 +97,25 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private refetchTimers = new Map<string, ReturnType<typeof setTimeout>>();
     /** Debounce window (ms) for coalescing rapid row updates into a single correctness refetch. */
     private static readonly REFETCH_DEBOUNCE_MS = 300;
+
+    // ── Database-level Change Data Capture (CDC) ──
+    /** Dedicated LISTEN client for DB-level change events (undefined unless CDC is enabled). */
+    private cdcListener?: CdcListener;
+    /** Whether database-level CDC is the active cross-instance change source. */
+    private cdcActive = false;
+    /** Reverse lookup: `schema.table` (and bare `table`) → collection, built when CDC starts. */
+    private cdcTableMap?: Map<string, CollectionConfig>;
+    /**
+     * Short-lived record of `path/id` keys this instance just fanned out via the
+     * app path (a Rebase-API mutation). When CDC echoes the same committed change
+     * back to *this* instance, we suppress the duplicate — the change was already
+     * delivered locally. Other instances have no such record, so they still
+     * deliver the CDC event. External writes (psql, cron, SQL editor) never match
+     * and always flow through. Keyed → expiry timestamp (ms).
+     */
+    private recentAppEmits = new Map<string, number>();
+    /** How long an app-emit key suppresses its own CDC echo. Covers NOTIFY round-trip latency. */
+    private static readonly CDC_DEDUP_WINDOW_MS = 5000;
 
     constructor(private db: NodePgDatabase<any>, private registry: PostgresCollectionRegistry) {
         super();
@@ -431,9 +452,31 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * @param broadcast When true (default), also sends a pg_notify so other instances
      *                  pick up the change. Set to false when handling an incoming
      *                  cross-instance notification to avoid infinite loops.
+     * @param origin `"app"` (default) — a Rebase-API mutation on this instance;
+     *               `"cdc"` — a database-level change observed via CDC (any writer,
+     *               any instance). The origin drives de-duplication: an app emit
+     *               records the change so this instance can suppress the matching
+     *               CDC echo, while an unmatched CDC event is delivered normally.
      */
-    async notifyUpdate(path: string, id: string, row: Record<string, unknown> | null, databaseId?: string, broadcast = true) {
-        this.debugLog("🔔 [RealtimeService] notifyUpdate called for path:", path, "id:", id, "isDelete:", row === null);
+    async notifyUpdate(path: string, id: string, row: Record<string, unknown> | null, databaseId?: string, broadcast = true, origin: "app" | "cdc" = "app") {
+        this.debugLog("🔔 [RealtimeService] notifyUpdate called for path:", path, "id:", id, "isDelete:", row === null, "origin:", origin);
+
+        // De-duplicate against database-level CDC. The app path (a mutation made
+        // through the Rebase API) fans out locally AND, once CDC is active, the
+        // same committed change is echoed back to this instance via the WAL /
+        // trigger stream. Record app emits so we can drop that echo here; deliver
+        // any CDC event we did not originate (external writes, other instances).
+        if (this.cdcActive) {
+            const key = this.dedupKey(path, id, databaseId);
+            if (origin === "cdc") {
+                if (this.consumeAppEmit(key)) {
+                    this.debugLog("🔁 [RealtimeService] Suppressing CDC echo of local app mutation:", key);
+                    return;
+                }
+            } else {
+                this.markAppEmit(key);
+            }
+        }
 
         // Get all paths that need to be notified - the direct path plus any parent paths
         const pathsToNotify = [path];
@@ -450,8 +493,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             await this.notifyPathUpdate(notifyPath, path, id, row, databaseId);
         }
 
-        // Broadcast to other instances via pg_notify (only for local mutations)
-        if (broadcast && this.broadcasting) {
+        // Broadcast to other instances via pg_notify (only for local mutations).
+        // When CDC is active it IS the cross-instance channel — every instance
+        // observes every commit through the change stream — so the legacy
+        // per-mutation broadcast is redundant (and would double-deliver). Skip it.
+        if (broadcast && this.broadcasting && !this.cdcActive) {
             try {
                 await this.broadcastChange(path, id, databaseId);
             } catch (err) {
@@ -1121,13 +1167,170 @@ lastSeen: Date.now() });
             this.presenceInterval = undefined;
         }
 
-        // 4. Disconnect the dedicated LISTEN client
+        // 4. Disconnect the dedicated LISTEN client(s)
         await this.stopListening();
+        await this.stopCdc();
 
         // 5. Drop client references (don't close — server.close drains them)
         this.clients.clear();
 
         this.debugLog("🧹 [RealtimeService] destroy() complete — all resources released.");
+    }
+
+    // =============================================================================
+    // Database-level Change Data Capture (CDC)
+    // =============================================================================
+
+    /** Whether database-level change capture is currently the active source. */
+    public isCdcActive(): boolean {
+        return this.cdcActive;
+    }
+
+    /**
+     * Enable database-level change capture as the realtime source.
+     *
+     * A dedicated LISTEN client consumes committed changes from the `rebase_cdc`
+     * channel (fed by CDC triggers — see {@link provisionTriggerCdc}) and routes
+     * them into the same {@link notifyUpdate} pipeline used by API mutations. The
+     * effect: subscribers see a change no matter how it was written — psql, a
+     * cron in another service, raw SQL, or the Studio SQL editor — exactly like
+     * Supabase Realtime tailing the WAL.
+     *
+     * Because CDC observes every commit on every instance, it also *replaces* the
+     * legacy per-mutation cross-instance broadcast (see the guard in
+     * {@link notifyUpdate}); callers should not also call {@link startListening}.
+     *
+     * @param connectionString Direct Postgres connection for the LISTEN client
+     *                         (bypass PgBouncer — LISTEN needs a session connection).
+     */
+    async enableCdc(connectionString: string): Promise<void> {
+        if (this.cdcActive) {
+            logger.warn("⚠️ [CDC] enableCdc called but CDC is already active. Ignoring.");
+            return;
+        }
+        this.cdcTableMap = this.buildCdcTableMap();
+        this.cdcListener = new CdcListener(connectionString, (event) => this.handleCdcEvent(event));
+        try {
+            // start() validates the initial connection; if it can't be established
+            // it rejects here, and we leave CDC inactive so the caller can fall
+            // back to app-level realtime rather than silently dropping events.
+            await this.cdcListener.start();
+        } catch (err) {
+            await this.cdcListener.stop().catch(() => { /* best effort */ });
+            this.cdcListener = undefined;
+            this.cdcTableMap = undefined;
+            throw err;
+        }
+        this.cdcActive = true;
+        logger.info(
+            `📡 [RealtimeService] Database-level change capture ACTIVE — writes from ANY source now emit realtime events ` +
+            `(${this.cdcTableMap.size} mapped table key(s)).`
+        );
+    }
+
+    /** Stop the CDC listener and clear its state. */
+    async stopCdc(): Promise<void> {
+        this.cdcActive = false;
+        if (this.cdcListener) {
+            await this.cdcListener.stop();
+            this.cdcListener = undefined;
+        }
+        this.cdcTableMap = undefined;
+        this.recentAppEmits.clear();
+    }
+
+    /**
+     * Build the reverse map from database table → collection. A change event
+     * carries `schema` + `table`; realtime subscriptions are keyed by collection
+     * path (slug). We index by both `schema.table` and bare `table` so the lookup
+     * works whether or not the collection declares an explicit schema.
+     */
+    private buildCdcTableMap(): Map<string, CollectionConfig> {
+        const map = new Map<string, CollectionConfig>();
+        for (const collection of this.registry.getCollections()) {
+            const table = getTableName(collection);
+            if (!table) continue;
+            const schema = (collection as { schema?: string }).schema ?? "public";
+            map.set(`${schema}.${table}`, collection);
+            // Bare-table fallback; first registration wins to keep it deterministic.
+            if (!map.has(table)) map.set(table, collection);
+        }
+        return map;
+    }
+
+    private resolveCollectionForTable(schema: string, table: string): CollectionConfig | undefined {
+        if (!this.cdcTableMap) return undefined;
+        return this.cdcTableMap.get(`${schema}.${table}`) ?? this.cdcTableMap.get(table);
+    }
+
+    /**
+     * Route a captured database change into the realtime pipeline.
+     *
+     * Delivery is RLS-safe by construction: the raw tuple from the WAL/trigger is
+     * NOT forwarded to subscribers. Instead the change is marked invalidated, so
+     * every matching subscription re-reads the row under its own auth context via
+     * {@link fetchCollectionWithAuth} / {@link fetchEntityWithAuth}. A subscriber
+     * therefore only ever receives rows its RLS policies permit — filtering is per
+     * subscriber, never per publisher.
+     */
+    private async handleCdcEvent(event: CdcChangeEvent): Promise<void> {
+        const collection = this.resolveCollectionForTable(event.schema, event.table);
+        if (!collection) {
+            // Unmapped table (not backed by a collection) — nothing to deliver.
+            this.debugLog(`📡 [CDC] Ignoring change on unmapped table ${event.schema}.${event.table}`);
+            return;
+        }
+
+        const path = collection.slug;
+        const databaseId = (collection as { databaseId?: string }).databaseId;
+        const id = this.extractIdFromCdcRow(collection, event.row);
+
+        // Deletes carry a null row (subscribers drop the id); inserts/updates carry
+        // an invalidation marker that forces a per-subscriber RLS-bound refetch.
+        const row = event.op === "DELETE" ? null : { _rebase_invalidated: true };
+
+        await this.notifyUpdate(path, id, row, databaseId, /* broadcast */ false, /* origin */ "cdc");
+    }
+
+    /** Compute the canonical (possibly composite) id string from a captured row. */
+    private extractIdFromCdcRow(collection: CollectionConfig, row: Record<string, unknown>): string {
+        try {
+            const primaryKeys = getPrimaryKeys(collection, this.registry);
+            const composite = buildCompositeId(row, primaryKeys);
+            if (composite && composite !== ":::") return composite;
+        } catch {
+            /* fall through to id-field / wildcard */
+        }
+        // Fallbacks: a plain `id` column (common), else a collection-level
+        // invalidation ("*") — single-row subs won't match but collection subs refetch.
+        if (row.id !== undefined && row.id !== null) return String(row.id);
+        return "*";
+    }
+
+    // ── App/CDC de-duplication ──
+
+    private dedupKey(path: string, id: string, databaseId?: string): string {
+        return `${databaseId ?? ""}::${path}::${id}`;
+    }
+
+    /** Record that this instance just delivered `key` via the app path. */
+    private markAppEmit(key: string): void {
+        const now = Date.now();
+        this.recentAppEmits.set(key, now + RealtimeService.CDC_DEDUP_WINDOW_MS);
+        // Opportunistic purge so the map cannot grow unbounded under write load.
+        if (this.recentAppEmits.size > 1000) {
+            for (const [k, expiry] of this.recentAppEmits) {
+                if (expiry <= now) this.recentAppEmits.delete(k);
+            }
+        }
+    }
+
+    /** Consume a matching app-emit record if present and unexpired; true ⇒ suppress the CDC echo. */
+    private consumeAppEmit(key: string): boolean {
+        const expiry = this.recentAppEmits.get(key);
+        if (expiry === undefined) return false;
+        this.recentAppEmits.delete(key);
+        return expiry > Date.now();
     }
 
     // =============================================================================

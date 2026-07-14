@@ -28,6 +28,8 @@ For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to broa
 
 Realtime is enabled out of the box. There is no flag to flip or service to start — if your Rebase server is running, the WebSocket endpoint is available.
 
+> By default, Rebase also emits realtime events for writes made **outside** the API (via `psql`, another service, or Studio's SQL editor) whenever the database connection supports it — see [database-level change capture](#database-level-change-capture-cdc).
+
 ## Client SDK Subscriptions
 
 The Rebase client SDK exposes two subscription methods on every collection accessor:
@@ -287,6 +289,52 @@ When a entity is modified on Instance A, it broadcasts a notification on the `re
 - **Self-Filtering**: Upon receiving a message, each instance reads the `sid`. If it matches its own instance ID, the server discards the notification to prevent infinite routing loops.
 - **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch and relays the update to its locally connected WebSocket subscribers.
 - **Supervisor Reconnection Loop**: If the database connection drops, a background connection supervisor monitors the state and triggers an auto-reconnect sequence after a fixed **3-second** delay, restoring the `LISTEN` loop without affecting the main Hono application lifecycle.
+
+## Database-Level Change Capture (CDC)
+
+**Change Data Capture is on by default.** Rebase captures changes at the database and emits realtime events for **every committed write, regardless of how it was made** — REST, SDK, Studio, `psql`, a cron job in another service, raw Drizzle/SQL, or Studio's **SQL editor**. This is the same model as Supabase Realtime tailing the write-ahead log.
+
+No configuration is required. On a database connection that supports it, CDC self-provisions at startup; on one that doesn't (e.g. a restricted role that can't create triggers), Rebase quietly uses application-level realtime instead — nothing to turn on, nothing that breaks.
+
+### Configuration
+
+CDC is controlled by the `REALTIME_CDC` environment variable:
+
+| Value | Behavior |
+| --- | --- |
+| `auto` *(default)* | Enable database-level capture where the connection supports it; **silently fall back** to application-level realtime otherwise. Zero-config. |
+| `trigger` | Force trigger-based capture. Works on any PostgreSQL, including managed instances without logical replication. Warns (rather than silently falling back) if it can't provision. |
+| `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
+| `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. |
+
+On boot you'll see a log line stating the active mode, e.g.:
+
+```
+📡 [CDC] Realtime source = database-level change capture (mode: trigger).
+   All writes now emit realtime events regardless of origin.
+```
+
+If the connection can't support it, `auto` logs an informational line instead and continues with application-level realtime:
+
+```
+ℹ️ [CDC] Database-level change capture unavailable (likely insufficient
+   privileges to create triggers…) — using app-level realtime.
+```
+
+### How It Works
+
+1. **Self-provisioning** — At startup (server/owner context), Rebase installs an idempotent `AFTER INSERT/UPDATE/DELETE` trigger on each managed table. The trigger emits a compact change notification on the `rebase_cdc` channel. A payload that would exceed PostgreSQL's 8&nbsp;KB `NOTIFY` limit falls back to an identity-only message, so CDC can never abort the triggering write.
+2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
+3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
+4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
+5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses that echo (a short-lived record of its own emits), so subscribers never see an API write twice.
+
+### Requirements & Notes
+
+- CDC requires a direct connection string (`DATABASE_DIRECT_URL` or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
+- Triggers are installed only on tables backed by a registered collection. Writes to unmapped tables are ignored.
+- A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
+- Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.
 
 ## Pending Request Timeout
 
