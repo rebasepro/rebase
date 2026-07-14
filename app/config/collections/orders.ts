@@ -243,14 +243,12 @@ const ordersCollection = defineCollection({
             }
         }
     },
+    // Demo: anyone can read; only admins can write.
     securityRules: [
-        {
-            name: "test_policy",
-            mode: "permissive",
-            operation: "all",
-            pgRoles: ["authenticated"],
-            using: "true"
-        }
+        { operation: "select",
+access: "public" },
+        { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
     ],
     filterPresets: [
         {

@@ -43,15 +43,13 @@ const productLocalesCollection = defineCollection({
             ui: { markdown: true }
         }
     },
+    // Demo: anyone can read; only admins can write.
     securityRules: [
-        {
-            name: "product_locales_public_access",
-            mode: "permissive",
-            operation: "all",
-            pgRoles: ["authenticated"],
-            using: "true"
-        }
-    ]
+        { operation: "select",
+access: "public" },
+        { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
+    ],
 });
 
 

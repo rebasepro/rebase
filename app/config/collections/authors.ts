@@ -104,15 +104,13 @@ const authorsCollection = defineCollection({
         "email",
         "asc"
     ],
+    // Demo: anyone can read; only admins can write.
     securityRules: [
-        {
-            name: "authors_public_access",
-            mode: "permissive",
-            operation: "all",
-            pgRoles: ["public"],
-            using: "true"
-        }
-    ]
+        { operation: "select",
+access: "public" },
+        { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
+    ],
 });
 
 

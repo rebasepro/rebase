@@ -201,15 +201,13 @@ const postsCollection = defineCollection({
             return values;
         }
     },
+    // Demo: anyone can read; only admins can write.
     securityRules: [
-        {
-            name: "test_policy",
-            mode: "permissive",
-            operation: "all",
-            pgRoles: ["public"],
-            using: "true"
-        }
-    ]
+        { operation: "select",
+access: "public" },
+        { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
+    ],
 });
 
 export default postsCollection;
