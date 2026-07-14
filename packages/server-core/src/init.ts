@@ -535,8 +535,28 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
 
-        // In baas mode the driver reports what it found in the database. These
-        // never passed through the config-time steps above, so apply them here.
+        // In baas mode the driver reports what it found in the database.
+        // `undefined` means it never looked — it has no introspection support,
+        // so baas mode can only ever serve nothing. Say so at boot rather than
+        // letting every request 404 against a server that claims to be healthy.
+        if (mode === "baas") {
+            const driverName = b.id || bootstrapper.type;
+            if (!driverResult.collections) {
+                throw new Error(
+                    `Driver "${driverName}" does not support baas mode: it cannot derive collections ` +
+                    "from the database schema. Use mode: \"cms\" and declare collections explicitly, " +
+                    "or use a driver that implements introspection (e.g. @rebasepro/server-postgresql)."
+                );
+            }
+            if (driverResult.collections.length === 0) {
+                logger.warn(
+                    `Driver "${driverName}" found no tables to serve. The data API will not be mounted. ` +
+                    "Create tables (migrations, SQL, any tool) and restart."
+                );
+            }
+        }
+
+        // These never passed through the config-time steps above, so apply them here.
         if (driverResult.collections?.length) {
             applyDefaultSecurityRules(driverResult.collections);
             activeCollections = [...activeCollections, ...driverResult.collections];
