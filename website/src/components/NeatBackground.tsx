@@ -154,6 +154,13 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
     useEffect(() => {
         if (!canvasRef.current) return;
 
+        // Respect users who prefer reduced motion: skip the animated WebGL gradient entirely.
+        // The surrounding sections have their own dark backgrounds, so this degrades gracefully.
+        const prefersReducedMotion =
+            typeof window !== "undefined" &&
+            window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        if (prefersReducedMotion) return;
+
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
 
         // Add a tiny touch of randomness to position/shape so each instance feels unique (if enabled)
@@ -179,6 +186,7 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
         const canvas = canvasRef.current;
 
         scrollHandler = () => {
+            if (!neat) return;
             if (variant === "hero") {
                 neat.yOffset = baseOffset + window.scrollY * 0.3;
             } else {

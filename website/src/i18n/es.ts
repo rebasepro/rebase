@@ -1,10 +1,12 @@
 export const es = {
   "hero.badge": "Open-source · Autoalojado · Hecho para Postgres",
-  "hero.title.part1": "Un esquema TypeScript.",
-  "hero.title.part2": "Admin, APIs, SDK — al instante.",
+  "hero.title.part1": "Tu Postgres actual —",
+  "hero.title.part2": "panel de administración, APIs y SDK tipado, al instante.",
   "hero.subtitle":
-    "La plataforma open-source sobre Postgres — autoalojada y preparada para agentes.",
-  "hero.cta.demo": "Probar la Demo",
+    "Apunta Rebase a cualquier base de datos Postgres y obtén un panel de administración listo para producción, APIs REST con tipos y un SDK en tiempo real — en minutos. Open-source, autoalojado y preparado para agentes.",
+  "hero.cta.demo": "Ver la demo en vivo",
+  "hero.cta.demo.note": "Sin registro — explora un panel real generado",
+  "hero.cli.label": "¿Prefieres la terminal? Funcionando en local en menos de un minuto:",
   "hero.cta.github": "Ver en GitHub",
   "demo.badge": "Tres comandos. Cero boilerplate.",
   "demo.title": "Schema In · Platform Out",
@@ -13,7 +15,7 @@ export const es = {
   "demo.dev":
     "✔ Panel de administración, API y servidor WebSocket en ejecución.",
   "social.title":
-    "Miles de desarrolladores y startups de todo el mundo ya confían en Rebase",
+    "Equipos que ya lanzan productos con Rebase",
   "howitworks.badge": "Recupera tu tiempo",
   "howitworks.title":
     'Lo que <span class="text-primary">nunca volverás a construir.</span>',

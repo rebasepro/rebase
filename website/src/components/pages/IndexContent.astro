@@ -51,8 +51,35 @@ const translatePath = useTranslatedPath(lang);
             <p class="mb-4 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up"
                set:html={t("hero.subtitle")}/>
 
-            <!-- Hero CLI command -->
-            <div class="mt-12 max-w-md mx-auto animate-on-scroll fade-in-up">
+            <!-- Hero primary CTA: zero-friction live demo -->
+            <div class="mt-10 flex flex-col items-center gap-2.5 animate-on-scroll fade-in-up">
+                <a href="https://demo.rebase.pro"
+                   target="_blank" rel="noopener noreferrer"
+                   id="hero-try-demo"
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-7 py-3.5 text-base font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
+                    {t("hero.cta.demo")}
+                    <svg
+                            class="lucide lucide-arrow-right"
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                    >
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+                <span class="text-xs text-surface-500">{t("hero.cta.demo.note")}</span>
+            </div>
+
+            <!-- Hero secondary path: run locally via CLI -->
+            <div class="mt-10 mb-10 max-w-md mx-auto animate-on-scroll fade-in-up">
+                <p class="mb-3 text-sm text-surface-400">{t("hero.cli.label")}</p>
                 <div class="group relative">
                     <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
                          aria-hidden="true"></div>
@@ -81,43 +108,6 @@ const translatePath = useTranslatedPath(lang);
             </div>
 
 
-            <!-- Hero CTA Buttons -->
-            <div class="mt-8 mb-10 flex flex-wrap items-center justify-center gap-y-4 gap-x-6 sm:gap-x-8 animate-on-scroll fade-in-up">
-                <a href="https://demo.rebase.pro"
-                   target="_blank" rel="noopener noreferrer"
-                   id="hero-try-demo"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
-                    {t("hero.cta.demo")}
-                    <svg
-                            class="lucide lucide-arrow-right"
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                    >
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-                <a href="https://github.com/rebasepro/rebase"
-                   target="_blank" rel="noopener noreferrer"
-                   id="hero-view-github"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
-                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path fill-rule="evenodd"
-                              d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                              clip-rule="evenodd"/>
-                    </svg>
-                    {t("hero.cta.github")}
-                </a>
-            </div>
-
-
         </div>
     </section>
 
@@ -126,6 +116,151 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">{t("social.title")}</p>
             <ClientLogos/>
+        </div>
+    </section>
+
+    <!-- Product demo -->
+ <section id="s-demo-terminal" class="relative z-0 pt-32 pb-40 sm:pt-48 sm:pb-56">
+
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("demo.badge")}</p>
+                <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                    {t("demo.title")}
+                </h2>
+                <div class="mt-8 max-w-2xl mx-auto">
+                    <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
+                        <!-- Glow effect behind terminal -->
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500"
+                             aria-hidden="true"
+                             style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 0;"></div>
+
+                        <div class="relative z-10 flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            </div>
+                            <div class="text-[11px] font-mono font-medium text-surface-400 flex items-center gap-2">
+
+                                <svg
+                                        class="lucide lucide-terminal"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M12 19h8"/>
+                                    <path d="m4 17 6-6-6-6"/>
+                                </svg>
+
+                                bash
+                            </div>
+                            <div class="w-12"></div> <!-- spacer -->
+                        </div>
+
+                        <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+                                    </div>
+                                    <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init"
+                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.init")}</div>
+                            </div>
+
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm rebase db push</span>
+                                    </div>
+                                    <button data-track-copy="demo-db-push" data-command="pnpm rebase db push"
+                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.pull")}</div>
+                            </div>
+
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm dev</span>
+                                    </div>
+                                    <button data-track-copy="demo-dev" data-command="pnpm dev"
+                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-emerald-400/90 text-xs mt-1 ml-6">{t("demo.dev")}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -647,150 +782,6 @@ const translatePath = useTranslatedPath(lang);
         <CollectionPowerSection/>
     </div>
 
-    <!-- Product demo -->
- <section id="s-demo-terminal" class="relative z-0 pt-32 pb-40 sm:pt-48 sm:pb-56">
-
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("demo.badge")}</p>
-                <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
-                    {t("demo.title")}
-                </h2>
-                <div class="mt-8 max-w-2xl mx-auto">
-                    <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
-                        <!-- Glow effect behind terminal -->
-                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500"
-                             aria-hidden="true"
-                             style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 0;"></div>
-
-                        <div class="relative z-10 flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            </div>
-                            <div class="text-[11px] font-mono font-medium text-surface-400 flex items-center gap-2">
-
-                                <svg
-                                        class="lucide lucide-terminal"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                >
-                                    <path d="M12 19h8"/>
-                                    <path d="m4 17 6-6-6-6"/>
-                                </svg>
-
-                                bash
-                            </div>
-                            <div class="w-12"></div> <!-- spacer -->
-                        </div>
-
-                        <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
-                            <div>
-                                <div class="flex gap-3 items-center justify-between">
-                                    <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                        <span class="text-primary font-bold">~</span>
-                                        <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                                    </div>
-                                    <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init"
-                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                            aria-label="Copy command" title="Copy to clipboard">
-
-                                        <svg
-                                                class="lucide lucide-copy"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                        >
-                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                        </svg>
-
-                                    </button>
-                                </div>
-                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.init")}</div>
-                            </div>
-
-                            <div>
-                                <div class="flex gap-3 items-center justify-between">
-                                    <div class="flex gap-3 items-center">
-                                        <span class="text-primary font-bold">~</span>
-                                        <span class="text-white">pnpm rebase db push</span>
-                                    </div>
-                                    <button data-track-copy="demo-db-push" data-command="pnpm rebase db push"
-                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
-                                            aria-label="Copy command" title="Copy to clipboard">
-
-                                        <svg
-                                                class="lucide lucide-copy"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                        >
-                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                        </svg>
-
-                                    </button>
-                                </div>
-                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.pull")}</div>
-                            </div>
-
-                            <div>
-                                <div class="flex gap-3 items-center justify-between">
-                                    <div class="flex gap-3 items-center">
-                                        <span class="text-primary font-bold">~</span>
-                                        <span class="text-white">pnpm dev</span>
-                                    </div>
-                                    <button data-track-copy="demo-dev" data-command="pnpm dev"
-                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
-                                            aria-label="Copy command" title="Copy to clipboard">
-
-                                        <svg
-                                                class="lucide lucide-copy"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                        >
-                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                        </svg>
-
-                                    </button>
-                                </div>
-                                <div class="text-emerald-400/90 text-xs mt-1 ml-6">{t("demo.dev")}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
 
 
 
@@ -831,7 +822,6 @@ const translatePath = useTranslatedPath(lang);
                                     <path d="M8 11h6"/>
                                 </svg>
                             </div>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold ring-1 ring-primary/20 uppercase tracking-wider">New</span>
                         </div>
                         <h3 class="text-lg font-semibold text-white mb-2">Vector Similarity Search</h3>
                         <p class="text-surface-400 text-sm leading-relaxed mb-4">Native pgvector integration with
@@ -866,7 +856,6 @@ const translatePath = useTranslatedPath(lang);
                                     <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
                                 </svg>
                             </div>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold ring-1 ring-primary/20 uppercase tracking-wider">New</span>
                         </div>
                         <h3 class="text-lg font-semibold text-white mb-2">Scoped Service API Keys</h3>
                         <p class="text-surface-400 text-sm leading-relaxed mb-4">Issue keys with granular

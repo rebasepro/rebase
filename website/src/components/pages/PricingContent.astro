@@ -1,0 +1,122 @@
+---
+const { lang, t } = Astro.props;
+import { useTranslatedPath } from "../../i18n/ui";
+const translatePath = useTranslatedPath(lang);
+
+const ossFeatures = [
+    t("pricing.oss.feat1"),
+    t("pricing.oss.feat2"),
+    t("pricing.oss.feat3"),
+    t("pricing.oss.feat4"),
+    t("pricing.oss.feat5"),
+    t("pricing.oss.feat6"),
+];
+
+const entFeatures = [
+    t("pricing.ent.feat1"),
+    t("pricing.ent.feat2"),
+    t("pricing.ent.feat3"),
+    t("pricing.ent.feat4"),
+    t("pricing.ent.feat5"),
+];
+---
+
+<div class="flex flex-col isolate">
+    <section class="relative isolate overflow-hidden -mt-20 pt-44 pb-24 sm:pt-52 sm:pb-28">
+        <div class="px-4 mx-auto max-w-5xl text-center lg:px-8 relative z-10">
+            <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("pricing.badge")}</p>
+            <h1 class="mt-4 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1] text-white">
+                {t("pricing.title")}
+            </h1>
+            <p class="mt-5 text-lg leading-8 text-surface-400 max-w-2xl mx-auto">
+                {t("pricing.subtitle")}
+            </p>
+        </div>
+    </section>
+
+    <section class="relative z-0 pb-28 sm:pb-36">
+        <div class="mx-auto max-w-5xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- Open Source tier -->
+                <div class="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                    <div class="flex items-center gap-2 mb-2">
+                        <h2 class="text-xl font-semibold text-white">{t("pricing.oss.name")}</h2>
+                    </div>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="text-4xl font-bold text-white">{t("pricing.oss.price")}</span>
+                    </div>
+                    <p class="text-sm text-surface-500 mb-5">{t("pricing.oss.priceNote")}</p>
+                    <p class="text-surface-400 leading-relaxed mb-6">{t("pricing.oss.desc")}</p>
+
+                    <ul class="space-y-3 mb-8 flex-1">
+                        {ossFeatures.map((feat) => (
+                            <li class="flex items-start gap-3 text-sm text-surface-300">
+                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary" xmlns="http://www.w3.org/2000/svg"
+                                     width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6 9 17l-5-5"/>
+                                </svg>
+                                <span>{feat}</span>
+                            </li>
+                        ))}
+                    </ul>
+
+                    <a href={translatePath("/cli")}
+                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200">
+                        {t("pricing.oss.cta")}
+                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round">
+                            <path d="M5 12h14"/>
+                            <path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+
+                <!-- Enterprise tier -->
+                <div class="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_18px_44px_rgba(0,112,244,0.12)] flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-xl font-semibold text-white">{t("pricing.ent.name")}</h2>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold ring-1 ring-primary/20">{t("pricing.ent.popular")}</span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="text-4xl font-bold text-white">{t("pricing.ent.price")}</span>
+                    </div>
+                    <p class="text-sm text-surface-500 mb-5">{t("pricing.ent.priceNote")}</p>
+                    <p class="text-surface-400 leading-relaxed mb-6">{t("pricing.ent.desc")}</p>
+
+                    <ul class="space-y-3 mb-8 flex-1">
+                        {entFeatures.map((feat) => (
+                            <li class="flex items-start gap-3 text-sm text-surface-300">
+                                <svg class="lucide lucide-check mt-0.5 flex-none text-primary" xmlns="http://www.w3.org/2000/svg"
+                                     width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6 9 17l-5-5"/>
+                                </svg>
+                                <span>{feat}</span>
+                            </li>
+                        ))}
+                    </ul>
+
+                    <a href={translatePath("/contact")}
+                       class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark transition-all duration-200 btn-glow">
+                        {t("pricing.ent.cta")}
+                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round">
+                            <path d="M5 12h14"/>
+                            <path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Reassurance -->
+            <div class="mt-12 max-w-3xl mx-auto rounded-2xl border border-white/5 bg-surface-900/50 p-6 text-center">
+                <h3 class="text-white font-semibold mb-2">{t("pricing.faq.title")}</h3>
+                <p class="text-surface-400 leading-relaxed">{t("pricing.faq.desc")}</p>
+            </div>
+        </div>
+    </section>
+</div>

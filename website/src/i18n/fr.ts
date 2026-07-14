@@ -1,10 +1,12 @@
 export const fr = {
   "hero.badge": "Open-source · Auto-hébergé · Natif Postgres",
-  "hero.title.part1": "Un schéma TypeScript.",
-  "hero.title.part2": "Admin, APIs, SDK — instantanément.",
+  "hero.title.part1": "Votre Postgres existant —",
+  "hero.title.part2": "panneau d'administration, APIs et SDK typé, instantanément.",
   "hero.subtitle":
-    "La plateforme open-source sur Postgres — auto-hébergée et pensée pour les agents.",
-  "hero.cta.demo": "Tester la démo",
+    "Pointez Rebase vers n'importe quelle base Postgres et obtenez un panneau d'administration prêt pour la production, des APIs REST typées et un SDK temps réel — en quelques minutes. Open-source, auto-hébergé et pensé pour les agents.",
+  "hero.cta.demo": "Voir la démo en direct",
+  "hero.cta.demo.note": "Sans inscription — un vrai panneau d'administration généré",
+  "hero.cli.label": "Vous préférez le terminal ? Opérationnel en local en moins d'une minute :",
   "hero.cta.github": "Voir sur GitHub",
   "demo.badge": "Trois commandes. Zéro boilerplate.",
   "demo.title": "Schema In · Platform Out",
@@ -13,7 +15,7 @@ export const fr = {
   "demo.dev":
     "✔ Panel admin, API et serveur WebSocket en cours d'exécution.",
   "social.title":
-    "Des milliers de développeurs et de startups dans le monde font déjà confiance à Rebase",
+    "Des équipes qui lancent déjà des produits avec Rebase",
   "howitworks.badge": "Temps récupéré",
   "howitworks.title":
     'Ce que vous ne <span class="text-primary">construirez plus jamais.</span>',
