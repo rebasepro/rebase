@@ -1,0 +1,36 @@
+{
+    "name": "{{PROJECT_NAME}}",
+    "version": "1.0.0",
+    "description": "Rebase BaaS — headless PostgreSQL API",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "backend"
+    ],
+    "scripts": {
+        "dev": "rebase dev",
+        "build": "rebase build",
+        "start": "rebase start",
+        "db:migrate": "rebase db migrate",
+        "schema:introspect": "rebase schema introspect",
+        "generate:sdk": "rebase generate-sdk",
+        "skills:install": "rebase skills install",
+        "deploy": "rebase build && rebase start"
+    },
+    "devDependencies": {
+        "@rebasepro/cli": "workspace:*",
+        "@rebasepro/types": "workspace:*",
+        "concurrently": "^8.2.2",
+        "typescript": "^5.9.2"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "esbuild",
+            "sharp",
+            "@ariga/atlas"
+        ]
+    }
+}

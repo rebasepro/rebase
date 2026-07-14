@@ -34,6 +34,23 @@ const cliRoot = findParentDir(__dirname, "cli");
 
 export type TemplatePreset = "blog" | "ecommerce" | "blank";
 
+/**
+ * How much of Rebase to scaffold.
+ *
+ * `cms` is the full triad (config + backend + frontend). `baas` is the backend
+ * alone, serving the database over REST with no collection files and no UI.
+ */
+export type TemplateFlavor = "cms" | "baas";
+
+const FLAVOR_CHOICES: Array<{ name: string; value: TemplateFlavor; short: string }> = [
+    { name: "CMS   — API + admin UI, collections you define (like Payload/Directus)",
+value: "cms",
+short: "CMS" },
+    { name: "BaaS  — headless API over your database, no collections, no UI (like Supabase)",
+value: "baas",
+short: "BaaS" }
+];
+
 const PRESET_CHOICES: Array<{ name: string; value: TemplatePreset; short: string }> = [
     { name: "Blog         — Posts, Authors, Tags (with markdown editor)",
 value: "blog",
@@ -56,6 +73,8 @@ export interface InitOptions {
     introspect?: boolean;
     /** Starter template preset. */
     preset: TemplatePreset;
+    /** Which parts of Rebase to scaffold. */
+    flavor: TemplateFlavor;
     /** Detected package manager (pnpm or npm). */
     pm: PackageManager;
     /** Command helpers for the detected PM. */
@@ -65,6 +84,7 @@ export interface InitOptions {
 export interface BuildQuestionsParams {
     nameArg?: string;
     templateArg?: TemplatePreset;
+    flavorArg?: TemplateFlavor;
     hasGitFlag: boolean;
     hasInstallFlag: boolean;
     pm: PackageManager;
@@ -76,7 +96,7 @@ export interface BuildQuestionsParams {
  * types registered by the installed version of inquirer.
  */
 export function buildInitQuestions(params: BuildQuestionsParams): Record<string, unknown>[] {
-    const { nameArg, templateArg, hasGitFlag, hasInstallFlag, pm } = params;
+    const { nameArg, templateArg, flavorArg, hasGitFlag, hasInstallFlag, pm } = params;
     const questions: Record<string, unknown>[] = [];
 
     if (!nameArg) {
@@ -95,13 +115,25 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
         });
     }
 
+    if (!flavorArg) {
+        questions.push({
+            type: "select",
+            name: "flavor",
+            message: "What do you want to build?",
+            choices: FLAVOR_CHOICES,
+            default: "cms"
+        });
+    }
+
     if (!templateArg) {
         questions.push({
             type: "select",
             name: "preset",
             message: "Choose a starter template:",
             choices: PRESET_CHOICES,
-            default: "blog"
+            default: "blog",
+            // BaaS has no collection files, so a collections preset is moot.
+            when: (answers: Record<string, unknown>) => (flavorArg ?? answers.flavor) !== "baas"
         });
     }
 
@@ -165,10 +197,12 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             "--database-url": String,
             "--introspect": Boolean,
             "--template": String,
+            "--flavor": String,
             "--yes": Boolean,
             "-g": "--git",
             "-i": "--install",
             "-t": "--template",
+            "-f": "--flavor",
             "-y": "--yes"
         },
         {
@@ -187,6 +221,12 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         process.exit(1);
     }
 
+    const flavorArg = args["--flavor"] as TemplateFlavor | undefined;
+    if (flavorArg && !FLAVOR_CHOICES.some(f => f.value === flavorArg)) {
+        console.error(chalk.red(`Unknown flavor "${flavorArg}". Available: ${FLAVOR_CHOICES.map(f => f.value).join(", ")}`));
+        process.exit(1);
+    }
+
     if (isNonInteractive) {
         const projectName = nameArg || "my-rebase-app";
         const targetDirectory = path.resolve(process.cwd(), projectName);
@@ -202,6 +242,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             databaseUrl: args["--database-url"] || undefined,
             introspect: args["--introspect"] || false,
             preset: templateArg || "blog",
+            flavor: flavorArg || "cms",
             pm,
             pmCommands
         };
@@ -210,6 +251,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     const questions = buildInitQuestions({
         nameArg,
         templateArg,
+        flavorArg,
         hasGitFlag: !!args["--git"],
         hasInstallFlag: !!args["--install"],
         pm
@@ -232,6 +274,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
         introspect: answers.introspect || false,
         preset: templateArg || (answers.preset as TemplatePreset) || "blog",
+        flavor: flavorArg || (answers.flavor as TemplateFlavor) || "cms",
         pm,
         pmCommands
     };
@@ -273,7 +316,12 @@ async function createProject(options: InitOptions) {
     }
 
     // Apply the selected template preset (swap collection files)
-    await applyPreset(options.targetDirectory, options.preset);
+    if (options.flavor !== "baas") {
+        await applyPreset(options.targetDirectory, options.preset);
+    }
+
+    // Reduce the project to the selected flavor
+    await applyFlavor(options.targetDirectory, options.flavor);
 
     // Replace placeholder project name in package.json files
     await replacePlaceholders(options);
@@ -339,6 +387,7 @@ async function createProject(options: InitOptions) {
     console.log("");
     const runDev = pmCommands.run("dev");
     const runDbPush = pmCommands.run("db:push");
+    const isBaas = options.flavor === "baas";
     console.log(`  ${chalk.cyan("cd")} ${options.projectName}`);
     if (!options.installDeps) {
         console.log(`  ${chalk.cyan(installCmd.join(" "))}`);
@@ -358,6 +407,15 @@ async function createProject(options: InitOptions) {
             console.log(chalk.gray("  # Then start the development server:"));
             console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         }
+    } else if (isBaas) {
+        console.log(chalk.gray("  # A local database configuration has been generated in .env."));
+        console.log(chalk.gray("  # 1. Start the PostgreSQL database container:"));
+        console.log(`  ${chalk.cyan("docker compose up -d db")}`);
+        console.log("");
+        console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
+        console.log("");
+        console.log(chalk.gray("  # 3. Start the API — every table is served automatically:"));
+        console.log(`  ${chalk.cyan(runDev.join(" "))}`);
     } else {
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
         console.log(chalk.gray("  # 1. Start the PostgreSQL database container:"));
@@ -371,8 +429,11 @@ async function createProject(options: InitOptions) {
     }
 
     console.log("");
-    console.log(chalk.gray("This starts both the backend (Hono + PostgreSQL)")
-        + chalk.gray(" and the frontend (Vite + React) concurrently."));
+    console.log(isBaas
+        ? chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
+            + chalk.gray("the API is derived from your database schema. Docs at /api/swagger.")
+        : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
+            + chalk.gray(" and the frontend (Vite + React) concurrently."));
     console.log("");
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
     console.log(chalk.gray("GitHub: https://github.com/rebasepro/rebase"));
@@ -393,6 +454,38 @@ async function createProject(options: InitOptions) {
  * This function swaps the active collection files and removes the
  * presets directory so the final project is clean.
  */
+/**
+ * Reduce the scaffolded project to the chosen flavor.
+ *
+ * The base template is the full CMS triad. `baas` drops the frontend and the
+ * collections config entirely — there is nothing to define, since the server
+ * derives its API from the database — and overlays the files that differ.
+ */
+async function applyFlavor(targetDirectory: string, flavor: TemplateFlavor): Promise<void> {
+    if (flavor !== "baas") return;
+
+    for (const dir of ["frontend", "config"]) {
+        fs.rmSync(path.join(targetDirectory, dir), { recursive: true, force: true });
+    }
+    // Generated from collection files in cms mode; baas reads the live schema.
+    fs.rmSync(path.join(targetDirectory, "backend", "src", "schema.generated.ts"), { force: true });
+
+    const overlayDir = path.resolve(cliRoot!, "templates", "overlays", "baas");
+    if (!fs.existsSync(overlayDir)) {
+        console.error(`${chalk.red.bold("ERROR")} BaaS template overlay not found at ${overlayDir}`);
+        process.exit(1);
+    }
+
+    await cp(overlayDir, targetDirectory, {
+        recursive: true,
+        force: true,
+        filter: (source: string) => {
+            const basename = path.basename(source);
+            return basename !== "node_modules" && basename !== ".DS_Store";
+        }
+    });
+}
+
 async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<void> {
     const collectionsDir = path.join(targetDirectory, "config", "collections");
     const presetsDir = path.join(collectionsDir, "presets");

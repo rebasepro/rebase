@@ -68,6 +68,22 @@ pnpm run dev
 
 Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`.
 
+### Just want the API?
+
+Rebase is modular — take only the parts you want:
+
+```bash
+npx @rebasepro/cli init my-api --flavor baas
+```
+
+That scaffolds a headless backend: REST, auth, storage, realtime and backups over
+your database, with **no collection files and no UI**. Every table is served
+automatically, derived from your schema at boot — change the schema with a migration
+and the API follows. No React anywhere in the dependency tree.
+
+The three adoption modes — BaaS (like Supabase), CMS (like Payload/Directus), and
+both together — are described in [MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md).
+
 ---
 
 ## Features

@@ -1,0 +1,9 @@
+packages:
+  - "backend"
+linkWorkspacePackages: true
+blockExoticSubdeps: false
+minimumReleaseAge: 0
+allowBuilds:
+  esbuild: true
+  sharp: true
+  "@ariga/atlas": true

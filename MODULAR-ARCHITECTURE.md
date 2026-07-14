@@ -26,14 +26,19 @@ initializeRebaseBackend({
     app,
     server,
     mode: "baas",
-    database: createPostgresAdapter({ connection: process.env.DATABASE_URL })
+    database: createPostgresAdapter({ connection: db, connectionString })
 });
 ```
 
 Collections are **introspected from the database at boot** rather than imported from
 config files. Every table becomes a REST resource, with types, primary keys, and
-relations derived from `information_schema`. Nothing about the admin UI is loaded,
-imported, or installed.
+relations derived from `information_schema`. The drizzle tables the query layer needs
+are built in memory from the same metadata, so no generated `schema.generated.ts` is
+required either. Join tables are skipped — they are an edge between two collections,
+not a collection. Nothing about the admin UI is loaded, imported, or installed.
+
+Change the schema with a migration and the API follows; there is nothing to keep in
+sync. Set `introspectionSchema` on the adapter to read a schema other than `public`.
 
 What BaaS mode keeps, deliberately, because it is the control plane and not the CMS:
 
@@ -129,8 +134,21 @@ from the framework. BaaS deployments simply never call it.
 ## Scaffolding
 
 ```bash
-rebase init my-app --flavor baas    # backend only, introspected, no config/, no frontend/
-rebase init my-app --flavor full    # config/ + backend/ + frontend/ (default)
+rebase init my-app --flavor baas   # backend only, introspected: no config/, no frontend/
+rebase init my-app --flavor cms    # config/ + backend/ + frontend/ (default)
 ```
 
-`dev`, `build`, and `start` detect a missing `frontend/` and run backend-only.
+Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a missing
+`frontend/` and run backend-only.
+
+---
+
+## What enforces this
+
+- `pnpm run check:headless` — imports every collection file and every server package
+  under a Node loader hook that throws on `react`, `react-dom`, or any
+  `@rebasepro/{admin,ui,core,studio,formex}`. Runs in CI before the build, reads
+  source directly, needs no build step. Add new server packages to
+  `SERVER_PACKAGES` in `scripts/headless-guard/check.mjs`.
+- Imports that TypeScript elides because they are unused do not trip the guard, which
+  matches runtime: backends run this same TS through tsx.
