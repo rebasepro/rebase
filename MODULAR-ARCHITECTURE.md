@@ -154,5 +154,16 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
   `@rebasepro/{admin,ui,core,studio,formex}`. Runs in CI before the build, reads
   source directly, needs no build step. Add new server packages to
   `SERVER_PACKAGES` in `scripts/headless-guard/check.mjs`.
-- Imports that TypeScript elides because they are unused do not trip the guard, which
+  Imports that TypeScript elides because they are unused do not trip it, which
   matches runtime: backends run this same TS through tsx.
+- `e2e/tests/cli-init-baas-e2e.ts` — scaffolds `--flavor baas`, installs it from real
+  tarballs, creates tables the project was never told about, and checks the API serves
+  them. This is the only place a scaffolded project is installed and booted
+  (`workspace:*` deps resolve nowhere else), so it's what proves the template rather
+  than the library behind it. It also asserts no `react` in the install tree — the
+  guard above can't see templates.
+- `packages/server-core/test/init-mode.test.ts` — the mode contract: which collections
+  register, and that the schema editor follows the mode and `NODE_ENV`.
+- A driver that cannot introspect fails `baas` mode at boot rather than serving
+  nothing: reporting no collections means it never looked, so `init` throws and names
+  it. An empty database is different — that warns and boots.

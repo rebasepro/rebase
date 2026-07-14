@@ -1,9 +1,10 @@
 import { chromium } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
+import { pathToFileURL } from "url";
 import { execSync, spawn } from "child_process";
 
-function execa(command: string, args: string[], options: any = {}) {
+export function execa(command: string, args: string[], options: any = {}) {
     const cp = spawn(command, args, {
         cwd: options.cwd,
         env: options.env,
@@ -47,13 +48,13 @@ exitCode: code || 0 });
 
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 
-const rootDir = process.env.REBASE_ROOT_DIR || process.cwd();
-const cliBin = path.join(rootDir, "packages", "cli", "bin", "rebase.js");
+export const rootDir = process.env.REBASE_ROOT_DIR || process.cwd();
+export const cliBin = path.join(rootDir, "packages", "cli", "bin", "rebase.js");
 const projectPath = path.join(rootDir, "test-cli-init-project");
 const screenshotDir = process.env.SCREENSHOT_DIR || path.join(rootDir, "e2e-screenshots");
 const serviceKey = "mysupersecretkey12345678901234567890";
 
-function getCleanEnv(): Record<string, string> {
+export function getCleanEnv(): Record<string, string> {
     const cleanEnv = { ...process.env } as Record<string, string>;
     for (const key of Object.keys(cleanEnv)) {
         if (
@@ -69,7 +70,7 @@ function getCleanEnv(): Record<string, string> {
     return cleanEnv;
 }
 
-function packLocalPackages(projectPath: string): Record<string, string> {
+export function packLocalPackages(projectPath: string): Record<string, string> {
     const tarballsDir = path.join(projectPath, "tarballs");
     fs.mkdirSync(tarballsDir, { recursive: true });
 
@@ -167,7 +168,7 @@ stdio: "pipe" });
     return packageTarballs;
 }
 
-function rewritePackagesToTarballs(projectPath: string, packageTarballs: Record<string, string>) {
+export function rewritePackagesToTarballs(projectPath: string, packageTarballs: Record<string, string>) {
     console.log("🔗 Rewriting package.json dependencies to use local packed tarballs with absolute paths...");
     const pkgPaths = [
         path.join(projectPath, "package.json"),
@@ -243,7 +244,7 @@ function rewritePackagesToTarballs(projectPath: string, packageTarballs: Record<
     console.log("✅ Rewrote package.json files successfully with absolute paths.");
 }
 
-function modifyDockerfilesForTarballs(projectPath: string) {
+export function modifyDockerfilesForTarballs(projectPath: string) {
     const dockerfiles = [
         path.join(projectPath, "backend", "Dockerfile"),
         path.join(projectPath, "frontend", "Dockerfile")
@@ -261,7 +262,7 @@ function modifyDockerfilesForTarballs(projectPath: string) {
     }
 }
 
-function configureServiceKey(projectPath: string, key: string) {
+export function configureServiceKey(projectPath: string, key: string) {
     const envPath = path.join(projectPath, ".env");
     if (!fs.existsSync(envPath)) return;
     let content = fs.readFileSync(envPath, "utf-8");
@@ -274,7 +275,7 @@ function configureServiceKey(projectPath: string, key: string) {
     console.log("🔑 Configured REBASE_SERVICE_KEY in .env file");
 }
 
-function configureAllowLocalhostInEnv(projectPath: string) {
+export function configureAllowLocalhostInEnv(projectPath: string) {
     const envPath = path.join(projectPath, ".env");
     if (!fs.existsSync(envPath)) return;
     let content = fs.readFileSync(envPath, "utf-8");
@@ -360,13 +361,13 @@ export default booksCollection;
     console.log("✅ Created 'books' collection and registered in index.ts.");
 }
 
-interface PgContainer {
+export interface PgContainer {
     containerName: string;
     connectionString: string;
     port: number;
 }
 
-async function startPgContainer(): Promise<PgContainer> {
+export async function startPgContainer(): Promise<PgContainer> {
     const containerName = `rebase-test-postgres-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     console.log(`Starting PostgreSQL container: ${containerName}...`);
@@ -442,7 +443,7 @@ async function startPgContainer(): Promise<PgContainer> {
     };
 }
 
-async function stopPgContainer(containerName: string): Promise<void> {
+export async function stopPgContainer(containerName: string): Promise<void> {
     console.log(`Stopping and removing PostgreSQL container: ${containerName}...`);
     try {
         await execa("docker", ["rm", "-f", containerName]);
@@ -908,7 +909,15 @@ stdio: "inherit" });
     }
 }
 
-run().catch((err) => {
-    console.error("Fatal error:", err);
-    process.exit(1);
-});
+// Only run the CMS scenario when this file is executed directly, so sibling
+// scenarios can import the helpers above without triggering it.
+const isDirectRun = process.argv[1]
+    ? import.meta.url === pathToFileURL(process.argv[1]).href
+    : false;
+
+if (isDirectRun) {
+    run().catch((err) => {
+        console.error("Fatal error:", err);
+        process.exit(1);
+    });
+}
