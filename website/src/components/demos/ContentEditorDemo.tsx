@@ -178,26 +178,6 @@ export function ContentEditorDemo() {
 
     return (
         <div className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative" style={{ height: 520, width: "100%" }}>
-            {/* ═══ AppBar ═══ */}
-            <div className="w-full h-14 absolute top-0 flex flex-row gap-2 px-4 items-center pl-24 z-10">
-                <div className="mr-8 hidden lg:block">
-                    <div className="flex flex-row gap-2 items-center">
-                        <MI size={18} className="text-surface-400">home</MI>
-                        <span className="text-xs text-surface-500">/</span>
-                        <span className="text-sm text-surface-200">Posts</span>
-                        <span className="text-xs text-surface-400 bg-surface-700 px-1 rounded">7</span>
-                    </div>
-                </div>
-                <div className="grow" />
-                <div className="mr-2 hidden sm:flex bg-surface-800 rounded-lg p-0.5 border border-surface-700">
-                    <button className="px-3 py-1 text-xs font-semibold rounded-md bg-surface-900 shadow-sm text-primary">Content</button>
-                    <button className="px-3 py-1 text-xs font-semibold rounded-md text-surface-500">Studio</button>
-                </div>
-                <button aria-label="Change language" className="p-2 text-surface-400"><MI size={20}>translate</MI></button>
-                <button aria-label="Toggle dark mode" className="p-2 text-surface-400"><MI size={20}>dark_mode</MI></button>
-                <div className="w-9 h-9 rounded-full bg-surface-700 flex items-center justify-center text-sm font-medium text-white">F</div>
-            </div>
-
             {/* ═══ Drawer ═══ */}
             <div className="z-20 relative hidden sm:block" style={{ width: 72 }}>
                 <div className="h-full overflow-hidden relative bg-surface-900" style={{ width: 72 }}>
@@ -233,7 +213,6 @@ export function ContentEditorDemo() {
 
             {/* ═══ Main ═══ */}
             <main className="flex flex-col grow overflow-auto">
-                <div className="flex flex-col min-h-14" />
                 <div className="border-surface-700/30 bg-surface-900 grow overflow-auto lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
                     {/* Toolbar */}
                     <div className="min-h-[44px] px-2 md:px-4 bg-surface-900 border-b border-surface-700/40 flex flex-row justify-between items-center shrink-0">

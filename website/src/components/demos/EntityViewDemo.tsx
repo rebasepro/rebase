@@ -423,8 +423,7 @@ width: 240 }}
 
 /* ═══════════════════════════════════════════════════════════
    MAIN COMPONENT
-   Exact Scaffold.tsx + DefaultDrawer.tsx + DefaultAppBar.tsx
-   layout from production
+   Exact Scaffold.tsx + DefaultDrawer.tsx layout from production
    ═══════════════════════════════════════════════════════════ */
 export type DemoViewMode = "list" | "table" | "cards" | "kanban";
 
@@ -805,57 +804,6 @@ active: activeCollection === "tags" }
       style={{ height,
 width: "100%" }}
     >
-      {/* ═══ AppBar — exact DefaultAppBar.tsx: absolute top-0, h-16, pl-24 ═══ */}
-      <div
-        className="w-full h-16 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar flex flex-row gap-2 px-4 items-center pl-24 z-10"
-      >
-        {/* Breadcrumbs — exact DefaultAppBar.tsx line 160-198 */}
-        <div className="mr-8 hidden lg:block">
-          <div className="flex flex-row gap-2 items-center">
-            {/* HomeIcon */}
-            <div className="flex flex-row items-center justify-center -mt-0.5 opacity-80 hover:opacity-100 transition-opacity">
-              <MI size={18} className="text-text-secondary dark:text-surface-400">home</MI>
-            </div>
-            {/* / */}
-            <span className="text-xs text-text-secondary dark:text-surface-500">/</span>
-            {/* Breadcrumb entry */}
-            <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-              <span className="text-sm text-surface-900 dark:text-surface-200">{activeCollection === "posts" ? "Products" : "Orders"}</span>
-              <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-700 px-1 py-0 rounded">
-                {activeCollection === "posts" ? "9" : "8"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grow"/>
-
-        {/* Content / Studio toggle — exact DefaultAppBar.tsx line 214-234 */}
-        <div className="mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
-          <button className="px-3 py-1 text-xs font-semibold rounded-md bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400">
-            Content
-          </button>
-          <button className="px-3 py-1 text-xs font-semibold rounded-md text-surface-500 hover:text-surface-900 dark:hover:text-white">
-            Studio
-          </button>
-        </div>
-
-        {/* Language toggle placeholder */}
-        <button aria-label="Change language" className="p-2 text-surface-400 rounded-full">
-          <MI size={20}>translate</MI>
-        </button>
-
-        {/* Dark mode — DarkModeIcon */}
-        <button aria-label="Toggle dark mode" className="p-2 text-surface-400 rounded-full">
-          <MI size={20}>dark_mode</MI>
-        </button>
-
-        {/* Avatar — exact DefaultAppBar.tsx Avatar */}
-        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-surface-200 dark:bg-surface-700 text-sm font-medium text-surface-700 dark:text-white">
-          F
-        </div>
-      </div>
-
       {/* ═══ DrawerWrapper — exact Scaffold.tsx DrawerWrapper (large layout, collapsed) ═══ */}
       {/* z-20 relative, width: 72, inner has no-scrollbar overflow-y-auto border-r */}
       <div
@@ -935,9 +883,6 @@ width: "100%" }}
 
       {/* ═══ Main — exact Scaffold.tsx line 131-148 ═══ */}
       <main className="flex flex-col grow overflow-auto">
-        {/* DrawerHeader spacer — exact Scaffold.tsx line 157: min-h-16 */}
-        <div className="flex flex-col min-h-16"/>
-
         {/* Collection container — exact Scaffold.tsx line 137 */}
         <div className="border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
           {/* ── Collection Toolbar ── */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Settings, Trash2, Plus, Filter, ChevronDown,
-  Home, Languages, Moon, ChevronsRight, User,
+  ChevronsRight, User,
   Folder, ShoppingCart,
   LayoutList, Upload, Download, ArrowUpRight, ArrowDownRight,
   Info, Package, X, Maximize2, Code
@@ -346,30 +346,6 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
       className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative"
       style={{ height, width: "100%" }}
     >
-      {/* AppBar */}
-      <div className="w-full h-16 transition-all ease-in duration-75 absolute top-0 max-w-full overflow-x-auto no-scrollbar flex flex-row gap-2 px-4 items-center pl-24 z-10">
-        <div className="mr-8 hidden lg:block">
-          <div className="flex flex-row gap-2 items-center">
-            <div className="flex flex-row items-center justify-center -mt-0.5 opacity-80">
-              <Home size={18} className="text-surface-400" />
-            </div>
-            <span className="text-xs text-surface-500">/</span>
-            <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-              <span className="text-sm text-surface-900 dark:text-surface-200">Orders</span>
-              <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-700 px-1 py-0 rounded">80</span>
-            </div>
-          </div>
-        </div>
-        <div className="grow" />
-        <div className="mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
-          <button className="px-3 py-1 text-xs font-semibold rounded-md bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400">Content</button>
-          <button className="px-3 py-1 text-xs font-semibold rounded-md text-surface-500 hover:text-surface-900 dark:hover:text-white">Studio</button>
-        </div>
-        <button aria-label="Change language" className="p-2 text-surface-400 rounded-full"><Languages size={20} /></button>
-        <button aria-label="Toggle dark mode" className="p-2 text-surface-400 rounded-full"><Moon size={20} /></button>
-        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-surface-200 dark:bg-surface-700 text-sm font-medium text-surface-700 dark:text-white">F</div>
-      </div>
-
       {/* Drawer */}
       <div className="z-20 relative hidden sm:block" style={{ width: 72 }}>
         <div className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-50 dark:bg-surface-900" style={{ width: 72 }}>
@@ -412,7 +388,6 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
 
       {/* Main */}
       <main className="flex flex-col grow overflow-auto">
-        <div className="flex flex-col min-h-16" />
         <div className="border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
           {/* Toolbar */}
           <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-50 dark:bg-surface-900 border-b border-surface-200/40 dark:border-surface-700/40 flex flex-row justify-between items-center w-full shrink-0">
