@@ -736,6 +736,14 @@ export interface InitializedDriver {
     /** A collection registry to register schema / tables into. */
     collectionRegistry?: CollectionRegistryInterface;
 
+    /**
+     * Collections the driver derived from the live database schema.
+     *
+     * Set by drivers that introspect in `baas` mode; the server serves these
+     * instead of collections loaded from config files.
+     */
+    collections?: import("./collections").CollectionConfig[];
+
     /** The underlying database connection (for lifecycle management). */
     connection?: DatabaseConnection;
 

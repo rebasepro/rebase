@@ -1,5 +1,4 @@
 import { defineCollection } from "@rebasepro/common";
-import { resetPasswordAction } from "@rebasepro/admin";
 import { maskEmail, maskName, maskValues } from "../masking";
 
 const usersCollection = defineCollection({
@@ -13,9 +12,6 @@ const usersCollection = defineCollection({
     group: "Settings",
     openEntityMode: "dialog",
     disableDefaultActions: ["copy"],
-    entityActions: [
-        resetPasswordAction
-    ],
     sort: ["createdAt", "desc"],
     properties: {
         id: {

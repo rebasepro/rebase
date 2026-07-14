@@ -11,9 +11,7 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "dependencies": {
-    "@rebasepro/core": "workspace:*",
-    "@rebasepro/types": "workspace:*",
-    "@rebasepro/ui": "workspace:*"
+    "@rebasepro/types": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=19.0.0",

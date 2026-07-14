@@ -118,4 +118,13 @@ export interface DatabaseAdapterInitConfig {
     collections: CollectionConfig[];
     /** The shared collection registry to register into. */
     collectionRegistry: CollectionRegistryInterface;
+    /**
+     * How the server is being run — see `RebaseBackendConfig.mode`.
+     *
+     * In `"baas"` mode `collections` is empty by design: a driver that can
+     * describe its own schema should introspect the database and report the
+     * collections it found back on `InitializedDriver.collections`. Drivers
+     * that cannot introspect may ignore this.
+     */
+    mode?: "cms" | "baas";
 }

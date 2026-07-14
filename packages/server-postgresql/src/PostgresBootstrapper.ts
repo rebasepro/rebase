@@ -31,6 +31,8 @@ import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
+import { buildCollectionsFromSchema, introspectSchema } from "./schema/introspect-runtime";
+import { buildDrizzleTablesFromSchema } from "./schema/dynamic-tables";
 import { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 
@@ -44,6 +46,11 @@ export interface PostgresDriverConfig {
         enums?: Record<string, unknown>;
         relations?: Record<string, unknown>;
     };
+    /**
+     * PostgreSQL schema to read when deriving collections from the database
+     * (BaaS mode). Defaults to `public`.
+     */
+    introspectionSchema?: string;
 }
 
 /**
@@ -79,22 +86,47 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             // config is passed from coordinator, we merge it with our internal pgConfig if needed
-            // Currently config from init.ts is `{ collections, collectionRegistry }`
-            const { collections, collectionRegistry } = config as {
+            // Currently config from init.ts is `{ collections, collectionRegistry, mode }`
+            const { collections, collectionRegistry, mode } = config as {
                 collections?: CollectionConfig[];
                 collectionRegistry?: unknown;
+                mode?: "cms" | "baas";
             };
+
+            const connection = pgConfig.connection;
+            const rawClient = (connection && typeof connection === "object" && "$client" in connection
+                ? (connection as Record<string, unknown>).$client
+                : connection) as import("pg").Pool;
+
+            // ── BaaS mode: derive the schema from the database ───────────────
+            // No collection files and no generated drizzle schema exist, so read
+            // the live database and build both from what is actually there.
+            let introspectedCollections: CollectionConfig[] | undefined;
+            let introspectedTables: Record<string, unknown> | undefined;
+            if (mode === "baas" && (!collections || collections.length === 0)) {
+                const pgSchemaName = pgConfig.introspectionSchema ?? "public";
+                const schema = await introspectSchema(rawClient, pgSchemaName);
+                introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
+                introspectedTables = buildDrizzleTablesFromSchema(schema.tablesMap, pgSchemaName);
+                logger.info(
+                    `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} collections from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
+                );
+            }
+
+            const activeCollections = introspectedCollections ?? collections;
 
             // Create a fresh registry for this driver
             const registry = new PostgresCollectionRegistry();
-            if (collections) {
-                registry.registerMultiple(collections);
+            if (activeCollections) {
+                registry.registerMultiple(activeCollections);
                 logger.info(`📋 [PostgresRegistry] Registered ${registry.getCollections().length} collections: [${registry.getCollections().map(c => c.slug).join(", ")}]`);
             }
 
+            const schemaTables = introspectedTables ?? pgConfig.schema?.tables;
+
             // Register tables
-            if (pgConfig.schema?.tables) {
-                Object.values(pgConfig.schema.tables).forEach((table) => {
+            if (schemaTables) {
+                Object.values(schemaTables).forEach((table) => {
                     if (isTable(table)) {
                         const tableName = getTableName(table);
                         registry.registerTable(table as PgTable, tableName);
@@ -108,20 +140,16 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // Patch Drizzle's PgArray columns to handle NULL values safely.
             // Drizzle's mapFromDriverValue crashes with "value.map is not a function"
             // when a native array column (text[], integer[], etc.) contains NULL.
-            if (pgConfig.schema?.tables) {
-                patchPgArrayNullSafety(pgConfig.schema.tables as Record<string, unknown>);
+            if (schemaTables) {
+                patchPgArrayNullSafety(schemaTables as Record<string, unknown>);
             }
 
             // Build schema-aware Drizzle connection
             const mergedSchema: Record<string, unknown> = {
-                ...pgConfig.schema?.tables,
+                ...schemaTables,
                 ...(pgConfig.schema?.relations || {})
             };
             const { drizzle: createDrizzle } = await import("drizzle-orm/node-postgres");
-            const connection = pgConfig.connection;
-            const rawClient = (connection && typeof connection === "object" && "$client" in connection
-                ? (connection as Record<string, unknown>).$client
-                : connection) as import("pg").Pool;
             const schemaAwareDb = createDrizzle(rawClient, { schema: mergedSchema });
 
             // Verify connection — fail fast if the database is unreachable
@@ -393,6 +421,9 @@ table: checkName });
                 driver,
                 realtimeProvider: realtimeService,
                 collectionRegistry: registry,
+                // Only set in baas mode — tells the server which collections the
+                // database turned out to have.
+                collections: introspectedCollections,
                 internals
             };
         },

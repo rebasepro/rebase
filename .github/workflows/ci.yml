@@ -41,6 +41,12 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # Proves BaaS mode stays honest: imports every collection file and server
+      # package under a loader hook that rejects React and @rebasepro UI packages.
+      # Reads source directly, so it needs no build and fails fast.
+      - name: Headless guard
+        run: pnpm run check:headless
+
       - name: Build packages
         run: pnpm run build
         env:
