@@ -97,10 +97,14 @@ module graph reaches `react`, `react-dom`, or any `@rebasepro/{admin,ui,core,stu
 Studio is the **BaaS console**: SQL editor, schema visualizer, RLS editor, storage
 browser, logs, API explorer, API keys, backups, cron. Its views target the BaaS
 control plane, not the CMS — it talks to the backend over HTTP through
-`@rebasepro/client` and works with an empty collection registry. `@rebasepro/admin` is
-an *optional* peer dependency of `@rebasepro/studio`; when collections are present
-Studio enriches its views with them, and when they are absent it degrades to pure
-database views.
+`@rebasepro/client`, and `@rebasepro/admin` is an *optional* peer dependency it never
+imports.
+
+Where Studio wants CMS capabilities (jumping from a SQL result to an entity, say) it
+asks for them through the **Studio bridge** (`useStudioBridge` in `@rebasepro/core`),
+whose context defaults to `NOOP_BRIDGE`. With a CMS present the app provides the real
+controllers and the views light up; without one they no-op and Studio stays a pure
+database console.
 
 That means Studio can ship on top of BaaS mode with no CMS at all.
 
