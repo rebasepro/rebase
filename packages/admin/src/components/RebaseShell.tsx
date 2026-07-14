@@ -11,6 +11,7 @@ import { RebaseRouteDefs } from "./RebaseRouteDefs";
 
 export interface RebaseShellProps {
     title?: string;
+    /** Top bar. Only rendered if provided — pass `<AppBar/>` for the default one. */
     appBar?: React.ReactNode;
     drawer?: React.ReactNode;
     autoOpenDrawer?: boolean;

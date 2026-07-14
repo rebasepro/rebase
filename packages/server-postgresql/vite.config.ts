@@ -1,6 +1,6 @@
 import path from "path";
 
-import { defineConfig } from "vite";
+import { defaultServerConditions, defineConfig } from "vite";
 import react from "@vitejs/plugin-react"
 
 const ReactCompilerConfig = {
@@ -65,6 +65,9 @@ export default defineConfig(() => ({
         }
     },
     resolve: {
+        // This is a Node-only library: resolve package exports with the "node"
+        // condition (not "browser"), e.g. unicorn-magic via execa/npm-run-path.
+        conditions: [...defaultServerConditions],
         alias: {
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
             "@rebasepro/server-core": path.resolve(__dirname, "../server-core/src"),

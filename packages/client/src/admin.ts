@@ -54,7 +54,7 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
     }
 
     async function resetPassword(userId: string, options?: { password?: string }) {
-        return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean }>(
+        return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>(
             adminPath + "/users/" + encodeURIComponent(userId) + "/reset-password",
             {
                 method: "POST",

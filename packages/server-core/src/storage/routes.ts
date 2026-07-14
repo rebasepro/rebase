@@ -136,7 +136,12 @@ function buildAdapterAuthMiddleware(
                 });
             }
 
-            if (enforce && !authenticatedUser) {
+            // Respect a user already resolved by an upstream middleware
+            // (e.g. `fileTokenAuth` for scoped `?token=` download tokens, or
+            // `publicObjectAuth` for public paths). The adapter does not
+            // understand these file-read tokens, so enforcing purely on
+            // `authenticatedUser` would 401 an otherwise-valid file request.
+            if (enforce && !authenticatedUser && !c.get("user")) {
                 return c.json({ error: { message: "Unauthorized: Authentication required", code: "UNAUTHORIZED" } }, 401);
             }
 

@@ -26,6 +26,7 @@ import {
     FilterCondition,
     NULL_OPS
 } from "@rebasepro/types";
+import { normalizeToEntityRelation } from "../util/entities";
 
 // ---------------------------------------------------------------------------
 // Value stringification
@@ -34,9 +35,14 @@ import {
 /**
  * Serialize a JS value to its querystring representation.
  * `null` is serialized as the literal string `"null"`.
+ * Relation values (`EntityRelation` instances or `{ __type: "relation", id, path }`
+ * objects) are serialized as their raw id — the wire format only carries the
+ * value to compare against the FK column.
  */
 function stringifyValue(value: unknown): string {
     if (value === null) return "null";
+    const relation = normalizeToEntityRelation(value);
+    if (relation) return String(relation.id);
     return String(value);
 }
 

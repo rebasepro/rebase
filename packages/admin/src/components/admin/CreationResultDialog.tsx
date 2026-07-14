@@ -90,8 +90,11 @@ export function CreationResultDialog({
                     <div className="flex flex-col gap-4 py-2">
                         <Alert color="warning">
                             <Typography variant="body2">
-                                {t("temporary_password_description") ??
-                                    "Email is not configured. Share this temporary password with the user securely. It will not be shown again."}
+                                {result.emailDeliveryFailed
+                                    ? (t("temporary_password_email_failed_description") ??
+                                        "The email could not be delivered. Share this temporary password with the user securely. It will not be shown again.")
+                                    : (t("temporary_password_description") ??
+                                        "Email is not configured. Share this temporary password with the user securely. It will not be shown again.")}
                             </Typography>
                         </Alert>
 

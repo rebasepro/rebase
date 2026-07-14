@@ -3,6 +3,7 @@ import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
+import type { BackupInfo, BackupDestinationKind } from "../types/backup";
 import type { ApiKeysAPI } from "../types/api_keys";
 import type { StorageSourceDefinition } from "../types/storage_source";
 
@@ -142,7 +143,7 @@ export interface AdminAPI {
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(userId: string): Promise<{ success: boolean }>;
-    resetPassword(userId: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean }>;
+    resetPassword(userId: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
     listRoles(): Promise<{ roles: Array<{ id: string; name: string }> }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }
@@ -159,6 +160,19 @@ export interface CronAPI {
     triggerJob(jobId: string): Promise<{ log: CronJobLogEntry; job: CronJobStatus }>;
     getJobLogs(jobId: string, options?: { limit?: number }): Promise<{ logs: CronJobLogEntry[] }>;
     toggleJob(jobId: string, enabled: boolean): Promise<{ job: CronJobStatus }>;
+}
+
+// ─── Backups API ─────────────────────────────────────────────────────────────
+
+/**
+ * Client-side database-backup management interface.
+ * @group Backups
+ */
+export interface BackupsAPI {
+    /** List available backups at the configured destination, newest first. */
+    list(): Promise<{ backups: BackupInfo[]; destinationKind: BackupDestinationKind; configured: boolean }>;
+    /** Fetch a backup's bytes for download (authenticated). */
+    download(key: string): Promise<Blob>;
 }
 
 // ─── Functions API ───────────────────────────────────────────────────────────
@@ -294,6 +308,9 @@ export interface RebaseClient<DB = unknown> {
     /** Cron job management API */
     cron?: CronAPI;
 
+    /** Database backup management API */
+    backups?: BackupsAPI;
+
     /** Custom backend functions API */
     functions?: FunctionsAPI;
 
@@ -408,6 +425,9 @@ export interface RebaseBrowserClient<DB = unknown> {
 
     /** Cron job management API */
     cron?: CronAPI;
+
+    /** Database backup management API */
+    backups?: BackupsAPI;
 
     /** Custom backend functions API */
     functions?: FunctionsAPI;

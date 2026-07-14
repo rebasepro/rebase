@@ -1,6 +1,5 @@
 import { defineCollection } from "@rebasepro/common";
 import postsCollection from "./posts";
-import { maskEmail, maskName, maskHandle, maskValues } from "../masking";
 
 const authorsCollection = defineCollection({
     name: "Authors",
@@ -105,17 +104,6 @@ const authorsCollection = defineCollection({
         "email",
         "asc"
     ],
-    // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
-    callbacks: {
-        afterRead: ({ row }) => maskValues(row, {
-            email: maskEmail,
-            name: maskName,
-            twitter: maskHandle,
-            github: maskHandle,
-            website: () => "https://***",
-            picture: null
-        })
-    },
     securityRules: [
         {
             name: "authors_public_access",

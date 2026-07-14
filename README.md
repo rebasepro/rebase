@@ -85,6 +85,17 @@ An incredibly fast, windowed spreadsheet view to manage your database with inlin
 
 Define your data models using pure TypeScript collections. Rebase automatically generates your Drizzle ORM schema, handles PostgreSQL migrations, and keeps your live database perfectly in sync using built-in tooling like `rebase doctor`.
 
+### 💾 Backups & Restore
+
+First-class database backups for self-hosted Postgres, built on `pg_dump` / `pg_restore`:
+
+- `rebase db backup --out <path|s3://…>` — compressed, custom-format dumps
+- `rebase db restore <backup>` — confirmation-gated, with `--create-db` / `--target-db` to restore into a fresh database
+- **Scheduled backups** via the built-in cron system, uploading to your configured storage backend with retention pruning
+- **Studio Backups panel** — browse and download backups from the admin UI
+
+See **[docs/backups.md](docs/backups.md)** for the full guide, including security and PITR notes.
+
 ### 🔐 Authentication & Access Control
 
 Built-in authentication with multiple providers:

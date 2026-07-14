@@ -505,6 +505,7 @@ export const en: RebaseTranslations = {
     invitation_sent_title: "Invitation Sent",
     temporary_password: "Temporary Password",
     temporary_password_description: "Email is not configured. Share this temporary password with the user securely. It will not be shown again.",
+    temporary_password_email_failed_description: "The email could not be delivered. Share this temporary password with the user securely. It will not be shown again.",
     copy_password: "Copy password",
     password_copied: "Password copied to clipboard",
 
@@ -516,6 +517,9 @@ export const en: RebaseTranslations = {
     reset_password: "Reset Password",
     reset_password_success: "Password reset successfully",
     reset_password_confirmation: "Are you sure you want to reset this user's password?",
+    reset_password_send_email: "Send a password reset email",
+    reset_password_set_manually: "Set a password manually",
+    reset_password_set_manually_description: "The password is updated immediately and no email is sent. Share it with the user securely.",
 
     /** Permission-denied empty states */
     no_permission_to_view_users: "You don't have permission to view users",

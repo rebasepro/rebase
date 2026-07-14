@@ -141,8 +141,12 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
                         <div
                             className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-800", "grow overflow-auto m-0", {
-                                "lg:mt-4": !hasAppBar,
                                 "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border-t lg:border-x lg:border-solid": padding,
+                                // No app bar means no DrawerHeader spacer above, so inset the
+                                // panel by the same amount as its sides and bottom.
+                                // Must come after the padding classes, which reset lg margins.
+                                "lg:mt-2": !hasAppBar && padding,
+                                "lg:mt-4": !hasAppBar && !padding,
                                 "border-t": hasAppBar && !padding
                             })}>
 

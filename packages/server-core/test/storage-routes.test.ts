@@ -15,7 +15,7 @@ import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
 import { createStorageRoutes, extractWildcardPath } from "../src/storage/routes";
-import { configureJwt } from "../src/auth/jwt";
+import { configureJwt, generateDownloadToken } from "../src/auth/jwt";
 
 // ──────────────────────────────────────────────────────────────────────
 // Unit tests for extractWildcardPath
@@ -381,5 +381,76 @@ describe("Storage routes — multi-backend routing (registry)", () => {
         const keys = body.data.map((s) => s.key);
         expect(keys).toEqual(expect.arrayContaining(["(default)", "secondary"]));
         expect(body.data.find((s) => s.key === "secondary")?.label).toBe("Secondary");
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Scoped download tokens under an AuthAdapter (requireAuth + private reads)
+//
+// Regression: when storage routes run with an `authAdapter` and private
+// reads (requireAuth: true, publicRead: false), the adapter-backed read
+// middleware must honor the user that `fileTokenAuth` sets from a scoped
+// `?token=` download token. The adapter cannot understand file-read tokens,
+// so enforcing purely on its own result would 401 an otherwise-valid `<img>`
+// request — exactly what broke image serving in the demo.
+// ──────────────────────────────────────────────────────────────────────
+describe("Storage routes — scoped download token under AuthAdapter", () => {
+    let app: Hono<HonoEnv>;
+    let tempDir: string;
+    let controller: LocalStorageController;
+
+    beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
+        tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-token-adapter-"));
+        controller = new LocalStorageController({ basePath: tempDir });
+
+        await controller.putObject({
+            file: new File([Buffer.from("secret image bytes")], "logo.png", { type: "image/png" }),
+            key: "author_pictures/logo.png"
+        });
+
+        // Adapter that only understands access JWTs — it returns null for the
+        // scoped file-read `?token=`, mirroring the demo's custom auth.
+        const authAdapter = {
+            verifyRequest: async (_req: Request) => null
+        };
+
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/api/storage", createStorageRoutes({
+            controller,
+            requireAuth: true,
+            publicRead: false,
+            authAdapter
+        }));
+    });
+
+    afterEach(async () => {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+    });
+
+    it("serves a private file via a valid scoped ?token=", async () => {
+        const token = generateDownloadToken("default/author_pictures/logo.png", 300);
+        const res = await app.fetch(
+            new Request(`http://localhost/api/storage/file/author_pictures/logo.png?token=${token}`)
+        );
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("secret image bytes");
+    });
+
+    it("rejects a request with no token as unauthorized", async () => {
+        const res = await app.fetch(
+            new Request("http://localhost/api/storage/file/author_pictures/logo.png")
+        );
+        expect(res.status).toBe(401);
+    });
+
+    it("rejects a scoped token for a different path", async () => {
+        const token = generateDownloadToken("default/author_pictures/other.png", 300);
+        const res = await app.fetch(
+            new Request(`http://localhost/api/storage/file/author_pictures/logo.png?token=${token}`)
+        );
+        expect(res.status).toBe(403);
     });
 });

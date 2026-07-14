@@ -1,7 +1,6 @@
 import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
-import { maskValues } from "../masking";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
 const getRelationId = (val: unknown): string | number | undefined => {
@@ -231,10 +230,6 @@ const ordersCollection = defineCollection({
             values.total = subtotal + tax + shipping - discount;
             return values;
         },
-        // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
-        afterRead: ({ row }) => maskValues(row, {
-            shipping_address: () => "Redacted Address"
-        }),
         afterSave: async ({ values, previousValues, context }) => {
             const customerId = getRelationId(values.customer) ?? getRelationId(previousValues?.customer);
             if (customerId) {

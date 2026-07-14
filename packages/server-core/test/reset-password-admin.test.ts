@@ -110,4 +110,131 @@ accessExpiresIn: "1h" });
         expect(mockAuthRepo.createPasswordResetToken).not.toHaveBeenCalled();
         expect(mockEmailService.send).not.toHaveBeenCalled();
     });
+
+    describe("temporary password fallbacks", () => {
+        beforeEach(() => {
+            mockAuthRepo.getUserById.mockResolvedValue({
+                id: "user-123",
+                email: "user@example.com",
+                displayName: "User One"
+            } as any);
+        });
+
+        it("flags emailDeliveryFailed when the email service is configured but sending fails", async () => {
+            mockEmailService.send.mockRejectedValue(new Error("SMTP 421 try again later"));
+
+            const app = createApp();
+            const adminToken = generateAccessToken("admin-user", ["admin"]);
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${adminToken}` }
+            });
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.invitationSent).toBe(false);
+            expect(body.emailDeliveryFailed).toBe(true);
+            expect(typeof body.temporaryPassword).toBe("string");
+            expect(mockAuthRepo.updatePassword).toHaveBeenCalled();
+        });
+
+        it("omits emailDeliveryFailed when no email service is configured", async () => {
+            mockEmailService.isConfigured.mockReturnValue(false);
+
+            const app = createApp();
+            const adminToken = generateAccessToken("admin-user", ["admin"]);
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${adminToken}` }
+            });
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.invitationSent).toBe(false);
+            expect(body.emailDeliveryFailed).toBeUndefined();
+            expect(typeof body.temporaryPassword).toBe("string");
+            expect(mockEmailService.send).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("setting a password directly", () => {
+        beforeEach(() => {
+            mockAuthRepo.getUserById.mockResolvedValue({
+                id: "user-123",
+                email: "user@example.com",
+                displayName: "User One"
+            } as any);
+        });
+
+        it("updates the password without sending an email or returning a temporary one", async () => {
+            const app = createApp();
+            const adminToken = generateAccessToken("admin-user", ["admin"]);
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${adminToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ password: "StrongPass123" })
+            });
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.invitationSent).toBe(false);
+            expect(body.temporaryPassword).toBeUndefined();
+            expect(mockEmailService.send).not.toHaveBeenCalled();
+
+            // The stored hash must not be the cleartext password.
+            expect(mockAuthRepo.updatePassword).toHaveBeenCalledTimes(1);
+            const [userId, passwordHash] = mockAuthRepo.updatePassword.mock.calls[0];
+            expect(userId).toBe("user-123");
+            expect(passwordHash).not.toBe("StrongPass123");
+        });
+
+        it("rejects a weak password without touching the stored one", async () => {
+            const app = createApp();
+            const adminToken = generateAccessToken("admin-user", ["admin"]);
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${adminToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ password: "weakpass" })
+            });
+
+            expect(res.status).toBe(400);
+            const body = await res.json() as any;
+            expect(body.error.message).toContain("Password too weak");
+            expect(mockAuthRepo.updatePassword).not.toHaveBeenCalled();
+        });
+
+        it("takes precedence over a configured onAdminResetPassword hook", async () => {
+            const onAdminResetPasswordMock = jest.fn().mockResolvedValue({
+                temporaryPassword: "hook-temp-password",
+                invitationSent: false
+            });
+
+            const app = createApp({ onAdminResetPassword: onAdminResetPasswordMock });
+            const adminToken = generateAccessToken("admin-user", ["admin"]);
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${adminToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ password: "StrongPass123" })
+            });
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.temporaryPassword).toBeUndefined();
+            expect(onAdminResetPasswordMock).not.toHaveBeenCalled();
+        });
+    });
 });

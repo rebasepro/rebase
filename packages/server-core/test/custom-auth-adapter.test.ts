@@ -115,12 +115,24 @@ describe("createCustomAuthAdapter", () => {
             emailPasswordLogin: false,
             registration: false,
             passwordReset: false,
+            adminPasswordReset: false,
             sessionManagement: false,
             profileUpdate: false,
             emailVerification: false,
             magicLink: false,
             enabledProviders: []
         });
+    });
+
+    it("lets an adapter opt in to adminPasswordReset once it mounts the route", async () => {
+        const adapter = createCustomAuthAdapter({
+            verifyRequest: async () => null,
+            capabilities: { adminPasswordReset: true }
+        });
+        const caps = await adapter.getCapabilities!();
+        expect(caps.adminPasswordReset).toBe(true);
+        // Opting in to admin reset must not imply the self-service email flow.
+        expect(caps.passwordReset).toBe(false);
     });
 
     it("merges user-provided capabilities with defaults", async () => {

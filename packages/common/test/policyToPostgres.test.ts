@@ -68,3 +68,28 @@ describe("policyToPostgres — existsIn (membership)", () => {
         expect(evaluatePolicy(expr, { uid: "u1", roles: [] })).toBe("unknown");
     });
 });
+
+describe("policyToPostgres — raw escape hatch", () => {
+    it("qualifies {column} with the outer table so it cannot bind to a subquery alias", () => {
+        // Regression: `{team_id}` used to compile to a bare `team_id`, which
+        // Postgres resolves against the innermost scope — turning the correlation
+        // into `m.team_id = m.team_id`, a tautology that matched every row and
+        // leaked other tenants' data.
+        const expr = policy.raw(
+            "EXISTS (SELECT 1 FROM team_members m WHERE m.team_id = {team_id} AND m.user_id = auth.uid())"
+        );
+        const sql = policyToPostgres(expr, documents);
+        expect(sql).toContain(`m.team_id = "public"."documents".team_id`);
+        expect(sql).not.toContain("m.team_id = team_id");
+    });
+
+    it("qualifies {column} at the top level too", () => {
+        const expr = policy.raw("{team_id} IS NOT NULL");
+        expect(policyToPostgres(expr, documents)).toBe(`"public"."documents".team_id IS NOT NULL`);
+    });
+
+    it("leaves raw SQL without placeholders untouched", () => {
+        const expr = policy.raw("auth.uid() IS NOT NULL");
+        expect(policyToPostgres(expr, documents)).toBe("auth.uid() IS NOT NULL");
+    });
+});

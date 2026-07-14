@@ -1,7 +1,24 @@
-import { CopyIcon, iconSize, KeyRoundIcon, PencilIcon, Trash2Icon } from "@rebasepro/ui";
+import {
+    Alert,
+    Button,
+    CopyIcon,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    iconSize,
+    KeyRoundIcon,
+    Label,
+    LoadingButton,
+    PencilIcon,
+    RadioGroup,
+    RadioGroupItem,
+    TextField,
+    Trash2Icon,
+    Typography
+} from "@rebasepro/ui";
 import type { EntityAction, User, UserCreationResult } from "@rebasepro/types";
 import {
-    ConfirmationDialog,
     useAuthController,
     useRebaseClient,
     useSnackbarController,
@@ -193,9 +210,23 @@ export function ResetPasswordActionDialog({
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [creationResult, setCreationResult] = useState<UserCreationResult | null>(null);
+    const [mode, setMode] = useState<"email" | "manual">("email");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [error, setError] = useState<string | null>(null);
+
+    // Strength rules are enforced server side, and are overridable through auth
+    // hooks, so only the match is checked here; the server's message is surfaced.
+    const passwordsMatch = password === confirmPassword;
+    const canSubmit = mode === "email" || (password.length > 0 && passwordsMatch);
 
     const handleConfirm = async () => {
+        if (mode === "manual" && !passwordsMatch) {
+            setError(t("passwords_dont_match") || "Passwords don't match");
+            return;
+        }
         setLoading(true);
+        setError(null);
         try {
             const baseUrl = client?.baseUrl || "";
             const token = await getAuthToken?.();
@@ -204,28 +235,32 @@ export function ResetPasswordActionDialog({
                 headers: {
                     "Content-Type": "application/json",
                     ...(token ? { "Authorization": `Bearer ${token}` } : {})
-                }
+                },
+                body: JSON.stringify(mode === "manual" ? { password } : {})
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.message || "Failed to reset password");
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(errorBody.error?.message || errorBody.message || "Failed to reset password");
             }
             const data = await response.json();
-            setCreationResult({
-                user,
-                invitationSent: data.invitationSent ?? false,
-                temporaryPassword: data.temporaryPassword
-            });
             snackbarController.open({
                 type: "success",
                 message: t("reset_password_success") || "Password reset successfully"
             });
-        } catch (error: unknown) {
-            snackbarController.open({
-                type: "error",
-                message: error instanceof Error ? error.message : (t("error_resetting_password") || "Error resetting password")
-            });
-            onClose();
+            // Setting a password directly returns neither an invitation nor a
+            // temporary password, so there is no result to show.
+            if (data.invitationSent || data.temporaryPassword) {
+                setCreationResult({
+                    user,
+                    invitationSent: data.invitationSent ?? false,
+                    temporaryPassword: data.temporaryPassword,
+                    emailDeliveryFailed: data.emailDeliveryFailed ?? false
+                });
+            } else {
+                onClose();
+            }
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : (t("error_resetting_password") || "Error resetting password"));
         } finally {
             setLoading(false);
         }
@@ -244,14 +279,77 @@ export function ResetPasswordActionDialog({
     }
 
     return (
-        <ConfirmationDialog
-            open={open}
-            loading={loading}
-            onAccept={handleConfirm}
-            onCancel={onClose}
-            title={<>{t("reset_password") || "Reset Password"}</>}
-            body={<>{t("reset_password_confirmation") || "Are you sure you want to reset this user's password?"}</>}
-        />
+        <Dialog open={open} onOpenChange={(o) => !o ? onClose() : undefined} maxWidth="xl">
+            <DialogTitle variant="h5" gutterBottom={false}>
+                {t("reset_password") || "Reset Password"}
+            </DialogTitle>
+            <DialogContent>
+                <div className="flex flex-col gap-4 py-2">
+                    <Typography variant="body2" color="secondary">
+                        {user.email}
+                    </Typography>
+
+                    <RadioGroup value={mode} onValueChange={(v) => {
+                        setMode(v as "email" | "manual");
+                        setError(null);
+                    }}>
+                        <div className="flex items-center gap-2">
+                            <RadioGroupItem value="email" id="reset-password-mode-email"/>
+                            <Label htmlFor="reset-password-mode-email">
+                                {t("reset_password_send_email") || "Send a password reset email"}
+                            </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <RadioGroupItem value="manual" id="reset-password-mode-manual"/>
+                            <Label htmlFor="reset-password-mode-manual">
+                                {t("reset_password_set_manually") || "Set a password manually"}
+                            </Label>
+                        </div>
+                    </RadioGroup>
+
+                    {mode === "manual" && <>
+                        <TextField
+                            type="password"
+                            value={password}
+                            autoFocus
+                            autoComplete="new-password"
+                            label={t("new_password") || "New password"}
+                            onChange={(e) => {
+                                setPassword(e.target.value);
+                                setError(null);
+                            }}
+                        />
+                        <TextField
+                            type="password"
+                            value={confirmPassword}
+                            autoComplete="new-password"
+                            error={confirmPassword.length > 0 && !passwordsMatch}
+                            label={t("confirm_password") || "Confirm password"}
+                            onChange={(e) => {
+                                setConfirmPassword(e.target.value);
+                                setError(null);
+                            }}
+                        />
+                        <Typography variant="caption" color="secondary">
+                            {t("reset_password_set_manually_description") ||
+                                "The password is updated immediately and no email is sent. Share it with the user securely."}
+                        </Typography>
+                    </>}
+
+                    {error && <Alert color="error">
+                        <Typography variant="body2">{error}</Typography>
+                    </Alert>}
+                </div>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text" onClick={onClose} disabled={loading}>
+                    {t("cancel")}
+                </Button>
+                <LoadingButton variant="filled" onClick={handleConfirm} loading={loading} disabled={!canSubmit}>
+                    {t("reset_password") || "Reset Password"}
+                </LoadingButton>
+            </DialogActions>
+        </Dialog>
     );
 }
 

@@ -10,8 +10,14 @@ export interface UserCreationResult<USER extends User = User> {
     /** Whether an invitation email was sent to the user */
     invitationSent: boolean;
     /**
-     * Temporary password (only present when email service is not configured).
-     * This is returned one-time and should be shown to the admin to share manually.
+     * Temporary password, present when no invitation email could be delivered —
+     * either because no email service is configured, or because delivery failed
+     * (see `emailDeliveryFailed`). Returned one-time, to be shared manually.
      */
     temporaryPassword?: string;
+    /**
+     * Whether an email service was configured but delivery failed, causing the
+     * fallback to `temporaryPassword`. Absent when no email service is configured.
+     */
+    emailDeliveryFailed?: boolean;
 }

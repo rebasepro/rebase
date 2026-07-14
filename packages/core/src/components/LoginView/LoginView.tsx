@@ -83,6 +83,11 @@ export interface LoginViewProps {
     additionalComponent?: ReactNode;
 
     /**
+     * Display this component above the sign-in buttons
+     */
+    topComponent?: ReactNode;
+
+    /**
      * Error message when user is not allowed access
      */
     notAllowedError?: string | Error;
@@ -140,6 +145,12 @@ export interface LoginViewProps {
 type AuthMode = "buttons" | "login" | "register" | "forgot";
 
 /**
+ * The shared field background mixin (`dark:bg-black/30`) is invisible on the
+ * near-black login card, so login inputs get an explicit border in dark mode.
+ */
+const loginFieldClasses = "w-full dark:border dark:border-surface-700/70 dark:hover:border-surface-600";
+
+/**
  * Generic login view component that works with any AuthControllerExtended.
  * Feature-detects capabilities to show/hide login methods.
  * @group Core
@@ -159,6 +170,7 @@ export function LoginView({
     needsSetup,
     registrationEnabled,
     additionalComponent,
+    topComponent,
     defaultEmail,
     defaultPassword
 }: LoginViewProps) {
@@ -248,13 +260,9 @@ export function LoginView({
     return (
         <div
             className={cls(
-                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-50 dark:bg-surface-950 overflow-hidden",
+                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-50 dark:bg-surface-900 overflow-hidden",
                 fadeIn ? "opacity-100" : "opacity-0"
             )}>
-
-            {/* Glowing background blobs */}
-            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-500/10 blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
 
             {/* Top-right controls */}
             <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
@@ -273,7 +281,7 @@ export function LoginView({
                 </Menu>
             </div>
 
-            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-white/70 dark:bg-surface-900/60 backdrop-blur-xl border border-surface-200/50 dark:border-surface-800/50 rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary-500/5">
+            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-white/70 dark:bg-surface-800/70 backdrop-blur-xl border border-surface-200/50 dark:border-surface-700/50 rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary-500/5">
                 {/* Logo */}
                 <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
                     {logoComponent}
@@ -322,6 +330,11 @@ export function LoginView({
                                                     {subtitle}
                                                 </Typography>
                                             )}
+                                        </div>
+                                    )}
+                                    {topComponent && (
+                                        <div className="w-full">
+                                            {topComponent}
                                         </div>
                                     )}
                                     <LoginButton
@@ -689,7 +702,7 @@ function LoginForm({
                         Display Name
                     </Typography>
                     <TextField placeholder="Jane Doe (optional)"
-                        className="w-full"
+                        className={loginFieldClasses}
                         value={displayName ?? ""}
                         disabled={authController.initialLoading}
                         type="text"
@@ -703,7 +716,7 @@ function LoginForm({
                     Email
                 </Typography>
                 <TextField placeholder="you@example.com"
-                    className="w-full"
+                    className={loginFieldClasses}
                     autoFocus
                     value={email ?? ""}
                     disabled={authController.initialLoading}
@@ -717,7 +730,7 @@ function LoginForm({
                     Password
                 </Typography>
                 <TextField placeholder="••••••••"
-                    className="w-full"
+                    className={loginFieldClasses}
                     value={password ?? ""}
                     disabled={authController.initialLoading}
                     inputRef={passwordRef}
@@ -851,7 +864,7 @@ function ForgotPasswordForm({
                     </IconButton>
                 </div>
 
-                <div className="text-center rounded-xl p-6 bg-surface-50 dark:bg-surface-950">
+                <div className="text-center rounded-xl p-6 bg-surface-50 dark:bg-surface-900/60 dark:border dark:border-surface-700/50">
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">
                         Check your email
@@ -895,7 +908,7 @@ function ForgotPasswordForm({
                 </Typography>
                 <TextField
                     placeholder="you@example.com"
-                    className="w-full"
+                    className={loginFieldClasses}
                     autoFocus
                     value={email}
                     type="email"

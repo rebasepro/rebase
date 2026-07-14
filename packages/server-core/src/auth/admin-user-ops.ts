@@ -188,6 +188,7 @@ export async function finalizeAdminUserCreation(
 ): Promise<{
     temporaryPassword?: string;
     invitationSent: boolean;
+    emailDeliveryFailed?: boolean;
 }> {
     // If an explicit password was provided (clearPassword is undefined), nothing to do
     if (!clearPassword) {
@@ -226,7 +227,8 @@ displayName: entity.values.displayName as string }, appName);
             logger.error("Failed to send reset email", { error: emailError instanceof Error ? emailError.message : emailError });
             // Fall back to returning the temporary password
             return { temporaryPassword: clearPassword,
-invitationSent: false };
+invitationSent: false,
+emailDeliveryFailed: true };
         }
     }
 

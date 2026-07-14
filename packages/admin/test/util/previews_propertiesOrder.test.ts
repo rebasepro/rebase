@@ -192,3 +192,55 @@ describe("resolveCollectionSlotKeys with propertiesOrder (databases collection)"
         expect(slotKeys.subtitleKey).not.toBe("project");
     });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: a storage/image property first in propertiesOrder must not
+// become the title slot — it belongs to the dedicated image slot, and using
+// it for both would render the same image twice per row.
+// ---------------------------------------------------------------------------
+describe("getEntityTitlePropertyKey does not pick a storage/image property as title", () => {
+
+    const exercisesCollection: CollectionConfig = {
+        id: "exercises",
+        name: "Exercises",
+        singularName: "Exercise",
+        slug: "exercises",
+        path: "exercises",
+        properties: {
+            medico_enabled: {
+                name: "Medico enabled",
+                type: "boolean"
+            } as Property,
+            image: {
+                name: "Image",
+                type: "string",
+                storage: {
+                    storagePath: "images",
+                    acceptedFiles: ["image/*"]
+                }
+            } as unknown as Property,
+            exercise_type: {
+                name: "Exercise type",
+                type: "string"
+            } as Property
+        },
+        propertiesOrder: [
+            "medico_enabled",
+            "image",
+            "exercise_type"
+        ]
+    } as unknown as CollectionConfig;
+
+    it("skips the storage image and picks the next string property as title", () => {
+        const titleKey = getEntityTitlePropertyKey(exercisesCollection, fields);
+        expect(titleKey).toBe("exercise_type");
+        expect(titleKey).not.toBe("image");
+    });
+
+    it("resolveCollectionSlotKeys keeps title and image slots distinct", () => {
+        const slotKeys = resolveCollectionSlotKeys(exercisesCollection, mockAuthController, fields);
+        expect(slotKeys.imageKey).toBe("image");
+        expect(slotKeys.titleKey).toBe("exercise_type");
+        expect(slotKeys.titleKey).not.toBe(slotKeys.imageKey);
+    });
+});

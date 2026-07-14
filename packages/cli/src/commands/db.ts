@@ -81,6 +81,9 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations
   ${chalk.blue.bold("branch")}     Database branching (create, list, delete, info)
+  ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
+  ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; needs --yes)
+  ${chalk.blue.bold("backups")}    List stored backups (backups list)
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Quick development workflow")}
@@ -92,5 +95,12 @@ ${chalk.green.bold("Examples")}
 
   ${chalk.gray("# Create a database branch")}
   rebase db branch create feature_auth
+
+  ${chalk.gray("# Back up to a local directory, then to object storage")}
+  rebase db backup --out ./backups
+  rebase db backup --out s3://my-private-bucket/backups
+
+  ${chalk.gray("# Restore into a fresh database (safe: does not touch the live one)")}
+  rebase db restore ./backups/rebase-app-20260714T030000Z.dump --create-db --target-db app_restored
 `);
 }

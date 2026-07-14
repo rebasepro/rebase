@@ -54,6 +54,16 @@
     --color-surface-accent-950: #0f172a;
 }
 
+/* Native UI (scrollbars, form controls) must follow the active theme,
+   otherwise Chrome renders light scrollbars in dark mode */
+html {
+    color-scheme: light;
+}
+
+html.dark {
+    color-scheme: dark;
+}
+
 /* Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
     display: none;

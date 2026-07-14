@@ -66,7 +66,9 @@ export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(col
     const hasExplicitOrder = !!(collection.propertiesOrder as string[] | undefined);
     const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
 
-    // If explicit propertiesOrder is set, allow the first non-ID relation or string to be the titleKey
+    // If explicit propertiesOrder is set, allow the first non-ID relation or string to be the titleKey.
+    // Storage/image properties are excluded — they are rendered by the dedicated image slot,
+    // so using one here would duplicate the same image in both the image and title slots.
     if (hasExplicitOrder) {
         for (const key of orderToSearch) {
             const property = collection.properties[key];
@@ -76,7 +78,7 @@ export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(col
                 if (isIdProp || key === "id" || isHiddenProperty(prop)) {
                     continue;
                 }
-                if (prop.type === "relation" || prop.type === "string") {
+                if (prop.type === "relation" || (prop.type === "string" && !isStorageProperty(prop))) {
                     return key;
                 }
             }

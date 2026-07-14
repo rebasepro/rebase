@@ -272,6 +272,10 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 registration: allowRegistration || needsSetup,
                 registrationEnabled: allowRegistration || needsSetup,
                 passwordReset: !!emailService?.isConfigured(),
+                // Always available: createAdminRoutes() unconditionally mounts the
+                // reset-password route, which falls back to returning a one-time
+                // temporary password when no email service is configured.
+                adminPasswordReset: true,
                 sessionManagement: true,
                 profileUpdate: true,
                 emailVerification: !!emailService?.isConfigured(),

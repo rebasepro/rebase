@@ -1,6 +1,6 @@
 import path from "path";
 
-import { defineConfig } from "vite";
+import { defaultServerConditions, defineConfig } from "vite";
 import react from "@vitejs/plugin-react"
 
 const ReactCompilerConfig = {
@@ -71,6 +71,9 @@ export default defineConfig(() => ({
         }
     },
     resolve: {
+        // This is a Node-only library: resolve package exports with the "node"
+        // condition (not "browser").
+        conditions: [...defaultServerConditions],
         alias: {
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src")

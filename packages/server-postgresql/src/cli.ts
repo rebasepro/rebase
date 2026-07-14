@@ -65,7 +65,7 @@ export async function runPluginCommand(args: string[]) {
 }
 
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
-    const VALID_ACTIONS = ["push", "generate", "migrate", "branch"];
+    const VALID_ACTIONS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
         logger.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);
@@ -73,6 +73,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
     if (subcommand === "branch") {
         await branchCommand(rawArgs);
+        return;
+    }
+
+    if (subcommand === "backup" || subcommand === "restore" || subcommand === "backups") {
+        const { backupCommand, restoreCommand, backupsCommand } = await import("./backup/backup-cli");
+        if (subcommand === "backup") await backupCommand(rawArgs);
+        else if (subcommand === "restore") await restoreCommand(rawArgs);
+        else await backupsCommand(rawArgs);
         return;
     }
 

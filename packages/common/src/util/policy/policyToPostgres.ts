@@ -92,9 +92,12 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
         case "existsIn":
             return compileExistsIn(expr, scope);
         case "raw":
-            // Full-power escape hatch: `{column}` references resolve to the bare
-            // column name (matching the previous raw-SQL behavior).
-            return expr.sql.replace(/\{(\w+)\}/g, (_, col) => col);
+            // Full-power escape hatch: `{column}` denotes a column of the outer
+            // RLS row. It must be table-qualified, not bare: raw SQL may open its
+            // own subquery over the same table, and there a bare name binds to the
+            // inner scope, collapsing `m.x = {x}` into the tautology `m.x = m.x`.
+            return expr.sql.replace(/\{(\w+)\}/g, (_, col) =>
+                `${outerQualifier(scope)}${resolveColumnName(col, scope.outerCollection)}`);
     }
 }
 
@@ -111,9 +114,7 @@ function compileExistsIn(expr: ExistsInPolicyExpression, scope: CompileScope): s
 
     // `outerField` inside the subquery must be qualified with the outer table,
     // otherwise a bare column name would bind to the joined table instead.
-    const outerTable = scope.outerCollection ? getTableName(scope.outerCollection) : undefined;
-    const outerSchema = schemaOf(scope.outerCollection) ?? "public";
-    const outerPrefix = outerTable ? `"${outerSchema}"."${outerTable}".` : "";
+    const outerPrefix = outerQualifier(scope);
 
     const innerScope: CompileScope = {
         fieldCollection: join,
@@ -148,6 +149,16 @@ function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
         case "authRoles":
             return "string_to_array(auth.roles(), ',')";
     }
+}
+
+/**
+ * SQL prefix that qualifies a column of the outer RLS row (`"schema"."table".`),
+ * or `""` when the collection is unknown.
+ */
+function outerQualifier(scope: CompileScope): string {
+    const table = scope.outerCollection ? getTableName(scope.outerCollection) : undefined;
+    if (!table) return "";
+    return `"${schemaOf(scope.outerCollection) ?? "public"}"."${table}".`;
 }
 
 function schemaOf(collection?: CollectionConfig): string | undefined {

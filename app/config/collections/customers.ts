@@ -1,6 +1,5 @@
 import { defineCollection } from "@rebasepro/common";
 import ordersCollection from "./orders";
-import { maskEmail, maskName, maskPhone, maskValues } from "../masking";
 
 const customersCollection = defineCollection({
     name: "Customers",
@@ -129,18 +128,6 @@ hideFromCollection: true }
             inverseRelationName: "customer"
         }
     ],
-    // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
-    callbacks: {
-        afterRead: ({ row }) => maskValues(row, {
-            email: maskEmail,
-            first_name: maskName,
-            last_name: maskName,
-            phone: maskPhone,
-            shipping_address: () => "Redacted Address",
-            billing_address: () => "Redacted Address",
-            avatar: null
-        })
-    },
     securityRules: [
         {
             name: "test_policy",

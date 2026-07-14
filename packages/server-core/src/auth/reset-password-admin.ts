@@ -53,6 +53,9 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
 
         let invitationSent = false;
         let temporaryPassword: string | undefined;
+        // Distinguishes "email was never configured" from "email is configured but
+        // the send failed" — both fall back to a temporary password.
+        let emailDeliveryFailed = false;
 
         // Parse optional body — if a password is provided, set it directly
         const body = await c.req.json().catch(() => ({}));
@@ -132,6 +135,7 @@ displayName: existing.displayName }, appName);
                     const passwordHash = await ops.hashPassword(clearPassword);
                     await authRepo.updatePassword(existing.id, passwordHash);
                     temporaryPassword = clearPassword;
+                    emailDeliveryFailed = true;
                 }
             } else {
                 // No email service — generate password, set it, and return one-time
@@ -152,7 +156,8 @@ displayName: existing.displayName }, appName);
                 roles: userRoles
             },
             invitationSent,
-            ...(temporaryPassword ? { temporaryPassword } : {})
+            ...(temporaryPassword ? { temporaryPassword } : {}),
+            ...(emailDeliveryFailed ? { emailDeliveryFailed } : {})
         }, 200);
     });
 

@@ -221,7 +221,8 @@ values: entity.values as Record<string, unknown> },
                     return c.json({
                         ...response,
                         invitationSent: result.invitationSent,
-                        ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {})
+                        ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {}),
+                        ...("emailDeliveryFailed" in result && result.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
                     }, 201);
                 }
 

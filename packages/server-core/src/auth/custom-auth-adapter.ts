@@ -48,6 +48,9 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
         emailPasswordLogin: false,
         registration: false,
         passwordReset: false,
+        // Off unless the adapter's own createAdminRoutes() mounts a
+        // reset-password route and opts in via `capabilities`.
+        adminPasswordReset: false,
         sessionManagement: false,
         profileUpdate: false,
         emailVerification: false,

@@ -10,7 +10,13 @@ export interface AuthCapabilities {
     emailPasswordLogin?: boolean;
     googleLogin?: boolean;
     registration?: boolean;
+    /** Self-service password reset (emailing a reset link) is available. */
     passwordReset?: boolean;
+    /**
+     * An admin can reset another user's password. Gates the "Reset Password"
+     * entity action in the admin UI. See `AuthAdapterCapabilities`.
+     */
+    adminPasswordReset?: boolean;
     sessionManagement?: boolean;
     profileUpdate?: boolean;
     emailVerification?: boolean;

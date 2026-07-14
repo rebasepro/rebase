@@ -3,6 +3,7 @@ import { RebaseClientError } from "./errors";
 import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
+import { createBackups } from "./backups";
 import { createApiKeys, CreateApiKeysOptions } from "./api-keys";
 import { CollectionClient, createCollectionClient } from "./collection";
 import { createFunctionsClient } from "./functions";
@@ -59,6 +60,8 @@ export type { RebaseUser, RebaseTokens } from "./auth";
 export type { CreateAdminOptions } from "./admin";
 export type { AdminUser } from "./admin";
 export type { CreateCronOptions } from "./cron";
+export { createBackups } from "./backups";
+export type { CreateBackupsOptions } from "./backups";
 export type {
     ApiKeyMasked,
     ApiKeyPermission,
@@ -135,6 +138,7 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     auth: ReturnType<typeof createAuth>;
     admin: ReturnType<typeof createAdmin>;
     cron: ReturnType<typeof createCron>;
+    backups: ReturnType<typeof createBackups>;
     apiKeys: ReturnType<typeof createApiKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
@@ -187,6 +191,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
     const cron = createCron(transport, options.cron);
+    const backups = createBackups(transport);
     const apiKeys = createApiKeys(transport, options.apiKeys);
     const storage = createStorage(transport);
     const functions = createFunctionsClient(transport);
@@ -395,6 +400,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         auth,
         admin,
         cron,
+        backups,
         apiKeys,
         functions,
         storage,

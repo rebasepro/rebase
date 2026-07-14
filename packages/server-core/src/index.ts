@@ -54,10 +54,11 @@ export {
     queryTokenAuth,
     fileTokenAuth,
     extractUserFromToken,
-    // Password helpers (custom user creation)
+    // Password helpers (custom user creation / admin password reset)
     hashPassword,
     verifyPassword,
     validatePasswordStrength,
+    generateSecurePassword,
     // Auth customization hooks
     resolveAuthHooks,
     // Pluggable auth adapters
@@ -135,6 +136,12 @@ export type { LoadedFunction, RebaseFunctionContext } from "./functions";
 // =============================================================================
 export { loadCronJobsFromDirectory, CronScheduler, validateCronExpression, createCronRoutes, createCronStore, defineCron } from "./cron";
 export type { LoadedCronJob, CronStore } from "./cron";
+
+// =============================================================================
+// Backups (admin routes + storage-generic helpers)
+// =============================================================================
+export { createBackupRoutes, parseBackupDestination, parseBackupTimestamp, listBackupObjects, readBackupBytes } from "./backup";
+export type { BackupRoutesConfig, BackupDestination } from "./backup";
 
 // =============================================================================
 // SQL Helpers (for RLS policies)

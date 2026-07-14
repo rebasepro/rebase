@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq } from "drizzle-orm";
 import { integer, pgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
-import { CollectionConfig, Relation } from "@rebasepro/types";
+import { CollectionConfig, EntityRelation, Relation } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { getColumnMeta } from "../src/services/collection-helpers";
@@ -1159,6 +1159,61 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
                 "users"
             );
             expect(conditions).toHaveLength(0);
+        });
+    });
+
+    describe("buildFilterConditions - relation wire objects (regression)", () => {
+        const { PgDialect } = require("drizzle-orm/pg-core");
+        const pgDialect = new PgDialect();
+
+        it("should unwrap a serialized relation object to its id when filtering an FK column", () => {
+            // Admin relation filter arrives over the wire as a plain JSON object
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { author: ["==", { __type: "relation", id: "167", path: "authors" }] },
+                mockPostsTable,
+                "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            const query = pgDialect.sqlToQuery(conditions[0]);
+            expect(query.sql).toBe('"posts"."author_id" = $1');
+            expect(query.params).toEqual(["167"]);
+        });
+
+        it("should unwrap an EntityRelation instance to its id", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockPostsTable.author_id,
+                "==",
+                new EntityRelation(42, "authors")
+            );
+            expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.sql).toBe('"posts"."author_id" = $1');
+            expect(query.params).toEqual([42]);
+        });
+
+        it("should unwrap relation objects element-wise for list operators", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockPostsTable.author_id,
+                "in",
+                [
+                    { __type: "relation", id: "1", path: "authors" },
+                    new EntityRelation("2", "authors")
+                ]
+            );
+            expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.params).toEqual(["1", "2"]);
+        });
+
+        it("should leave non-relation values untouched", () => {
+            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockPostsTable.author_id,
+                "==",
+                167
+            );
+            expect(condition).not.toBeNull();
+            const query = pgDialect.sqlToQuery(condition!);
+            expect(query.params).toEqual([167]);
         });
     });
 });

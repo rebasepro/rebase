@@ -7,7 +7,6 @@ import {
 } from "@rebasepro/core";
 
 import { Scaffold } from "./app/Scaffold";
-import { AppBar } from "./app/AppBar";
 import { Drawer } from "./app/Drawer";
 import { SideDialogs } from "./SideDialogs";
 import { AdminModeSyncer } from "./AdminModeSyncer";
@@ -16,7 +15,7 @@ import type { AppView } from "@rebasepro/types";
 export interface RebaseLayoutProps {
     /** Title shown in the drawer. */
     title?: string;
-    /** Custom AppBar to override the default. */
+    /** Top bar. Only rendered if provided — pass `<AppBar/>` for the default one. */
     appBar?: React.ReactNode;
     /** Custom Drawer to override the default. */
     drawer?: React.ReactNode;
@@ -27,17 +26,18 @@ export interface RebaseLayoutProps {
 }
 
 /**
- * Layout layer — provides the Scaffold, AppBar, Drawer, and SideDialogs.
+ * Layout layer — provides the Scaffold, Drawer, and SideDialogs.
  *
  * Wraps the route outlet with the standard Rebase admin layout.
- * Override individual pieces (appBar, drawer) via props.
+ * Override the drawer via props; pass `appBar` to add a top bar (there is
+ * none by default — the drawer owns navigation and user actions).
  *
  * **Independently usable**: Use this when you want the Rebase layout
  * without its default route definitions.
  *
  * @example
  * ```tsx
- * <RebaseLayout title="My Admin">
+ * <RebaseLayout title="My Admin" appBar={<AppBar/>}>
  *   <Route path="/" element={<MyHomePage />} />
  *   <Route path="/custom" element={<CustomView />} />
  * </RebaseLayout>
@@ -53,14 +53,8 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     } = props;
 
     const adminModeController = useAdminModeController();
-    const ResolvedAppBar = useComponentOverride("Shell.AppBar", AppBar);
     const ResolvedDrawer = useComponentOverride("Shell.Drawer", Drawer);
 
-    const ActiveAppBar = appBar ?? <ResolvedAppBar
-        includeLanguageToggle={false}
-        includeModeToggle={false}
-        includeUserMenu={false}
-    />;
     const ActiveDrawer = drawer ?? (
         <ResolvedDrawer
             title={title}
@@ -71,7 +65,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     return (
         <Scaffold autoOpenDrawer={autoOpenDrawer}>
             <AdminModeSyncer devViews={devViews}/>
-            {ActiveAppBar}
+            {appBar}
             {ActiveDrawer}
             <Outlet/>
             <SideDialogs/>

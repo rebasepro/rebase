@@ -74,8 +74,14 @@ export interface AuthConfigResponse {
     registrationEnabled: boolean;
     /** Whether email service is configured */
     emailServiceEnabled?: boolean;
-    /** Whether password reset is supported */
+    /** Whether the self-service password reset flow (email link) is supported */
     passwordReset?: boolean;
+    /**
+     * Whether an admin can reset another user's password, i.e. the adapter
+     * mounts `POST /admin/users/:userId/reset-password`. Absent on backends
+     * predating this field, which the frontend treats as supported.
+     */
+    adminPasswordReset?: boolean;
     /** Whether email verification is supported */
     emailVerification?: boolean;
     /** Complete list of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */

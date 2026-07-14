@@ -68,7 +68,7 @@ export interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig>
 }
 
 export interface RebaseStudioConfig {
-    tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron" | "schema-visualizer" | "branches" | "api" | "logs" | "api-keys")[];
+    tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron" | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys")[];
     homePage?: ReactNode;
     devViews?: AppView[];
 }

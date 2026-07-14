@@ -549,6 +549,7 @@ export interface RebaseTranslations {
     invitation_sent_title?: string;
     temporary_password?: string;
     temporary_password_description?: string;
+    temporary_password_email_failed_description?: string;
     copy_password?: string;
     password_copied?: string;
 
@@ -560,6 +561,9 @@ export interface RebaseTranslations {
     reset_password?: string;
     reset_password_success?: string;
     reset_password_confirmation?: string;
+    reset_password_send_email?: string;
+    reset_password_set_manually?: string;
+    reset_password_set_manually_description?: string;
     error_resetting_password?: string;
 
     /** Permission-denied empty states */

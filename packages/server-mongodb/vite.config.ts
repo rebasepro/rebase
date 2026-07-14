@@ -1,6 +1,6 @@
 import path from "path";
 
-import { defineConfig } from "vite";
+import { defaultServerConditions, defineConfig } from "vite";
 
 /**
  * Only externalize true third-party deps that the consumer app would install.
@@ -44,6 +44,9 @@ export default defineConfig(() => ({
         }
     },
     resolve: {
+        // This is a Node-only library: resolve package exports with the "node"
+        // condition (not "browser").
+        conditions: [...defaultServerConditions],
         alias: {
             "@rebasepro/server-core": path.resolve(__dirname, "../server-core/src"),
             "@rebasepro/core": path.resolve(__dirname, "../core/src"),

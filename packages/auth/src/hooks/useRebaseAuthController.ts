@@ -316,6 +316,9 @@ export function useRebaseAuthController(
             googleLogin: !!(props.googleClientId),
             registration: authConfig?.registrationEnabled ?? false,
             passwordReset: authConfig?.passwordReset ?? false,
+            // Defaults to true so backends predating this field keep showing the
+            // action. Adapters that don't support it report `false` explicitly.
+            adminPasswordReset: authConfig?.adminPasswordReset ?? true,
             sessionManagement: true,
             profileUpdate: true,
             emailVerification: authConfig?.emailVerification ?? false,

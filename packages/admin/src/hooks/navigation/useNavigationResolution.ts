@@ -53,13 +53,20 @@ export function applyPluginModifyCollection(resolvedCollections: CollectionConfi
  * with `auth: true` or `auth: { enabled: true }`.
  *
  * Injections:
- * 1. **resetPasswordAction** — adds the entity action unless explicitly disabled
+ * 1. **resetPasswordAction** — adds the entity action unless explicitly disabled,
+ *    or unless the auth adapter reports no `adminPasswordReset` support. Custom
+ *    adapters mount their own admin routes and may not implement
+ *    `POST /admin/users/:userId/reset-password`; injecting the action anyway
+ *    would show a button that can only ever 404.
  * 2. **afterSave callback** — shows the `CreationResultDialog` when a new user
  *    is created with `invitationSent` or `temporaryPassword` in the response
  *
  * Skips injection if the collection already has the action/callback present.
  */
-function injectAuthCollectionConfig(collections: CollectionConfig[]): CollectionConfig[] {
+function injectAuthCollectionConfig(
+    collections: CollectionConfig[],
+    adminPasswordResetSupported: boolean
+): CollectionConfig[] {
     return collections.map((collection) => {
         const authProp = collection.auth;
         if (!authProp) return collection;
@@ -78,7 +85,11 @@ function injectAuthCollectionConfig(collections: CollectionConfig[]): Collection
         if (resetPref === false) {
             actionToInject = undefined;
         } else if (typeof resetPref === "object") {
+            // An explicitly supplied action is the collection author's own; they
+            // own its backend, so the adapter capability doesn't apply.
             actionToInject = resetPref;
+        } else if (!adminPasswordResetSupported) {
+            actionToInject = undefined;
         } else {
             actionToInject = resetPasswordAction;
         }
@@ -129,7 +140,8 @@ function injectAuthCollectionConfig(collections: CollectionConfig[]): Collection
                             isAnonymous: false
                         },
                         invitationSent: !!values.invitationSent,
-                        temporaryPassword: typeof values.temporaryPassword === "string" ? values.temporaryPassword : undefined
+                        temporaryPassword: typeof values.temporaryPassword === "string" ? values.temporaryPassword : undefined,
+                        emailDeliveryFailed: !!values.emailDeliveryFailed
                     };
 
                     const { closeDialog } = dialogsController.open({
@@ -179,7 +191,10 @@ export async function resolveCollections(
     }
 
     // Auto-inject auth entity actions and callbacks (resetPassword, creation dialog, etc.)
-    resolvedCollections = injectAuthCollectionConfig(resolvedCollections);
+    resolvedCollections = injectAuthCollectionConfig(
+        resolvedCollections,
+        authController.capabilities?.adminPasswordReset ?? true
+    );
 
     resolvedCollections = filterOutNotAllowedCollections(resolvedCollections, authController);
     return resolvedCollections;

@@ -85,8 +85,25 @@ export interface AuthAdapterCapabilities {
     emailPasswordLogin: boolean;
     /** Supports new user registration. */
     registration: boolean;
-    /** Supports password reset flow. */
+    /**
+     * Supports the end-user password reset flow (emailing a reset link).
+     *
+     * This is about *self-service* reset, so it is typically tied to whether an
+     * email service is configured. It says nothing about whether an admin can
+     * reset someone else's password — see `adminPasswordReset`.
+     */
     passwordReset: boolean;
+    /**
+     * Whether the adapter exposes `POST /admin/users/:userId/reset-password`,
+     * letting an admin reset another user's password.
+     *
+     * Independent of `passwordReset`: the built-in adapter supports this even
+     * with no email service configured (it returns a one-time temporary
+     * password instead of sending a link). Adapters that mount their own admin
+     * routes must set this to `true` only once that route actually exists —
+     * the admin UI hides the "Reset Password" action when it is `false`.
+     */
+    adminPasswordReset: boolean;
     /** Supports session listing/revocation. */
     sessionManagement: boolean;
     /** Supports profile updates (display name, photo). */
@@ -218,6 +235,11 @@ export interface UserCreationFinalizeResult {
     temporaryPassword?: string;
     /** Whether an invitation email was sent. */
     invitationSent: boolean;
+    /**
+     * Whether an email service was configured but delivery failed, causing the
+     * fallback to `temporaryPassword`. Absent when no email service is configured.
+     */
+    emailDeliveryFailed?: boolean;
 }
 
 // ─── Auth Response Transform ─────────────────────────────────────────────────

@@ -1174,6 +1174,33 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // 6b. Mount Backup admin routes (for the Studio Backups panel).
+    // Read the destination lazily from env so config changes don't need a
+    // rebuild. Only enabled when BACKUP_DESTINATION is set.
+    {
+        const { createBackupRoutes, parseBackupDestination } = await import("./backup");
+        const backupRouter = new Hono<HonoEnv>();
+
+        if (authAdapter && !isAuthAdapter(config.auth!)) {
+            const safeAuth = config.auth as RebaseAuthConfig;
+            if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
+                backupRouter.use("/*", requireAuth, requireAdmin);
+            }
+        } else if (authAdapter) {
+            backupRouter.use("/*", requireAuth, requireAdmin);
+        }
+
+        backupRouter.route("/", createBackupRoutes({
+            getDestination: () => {
+                const out = process.env.BACKUP_DESTINATION?.trim();
+                return out ? parseBackupDestination(out) : null;
+            },
+            storage: storageController
+        }));
+        config.app.route(`${basePath}/admin/backups`, backupRouter);
+        logger.info("Backup admin routes mounted", { path: `${basePath}/admin/backups` });
+    }
+
     // With multiple realtime-capable engines, route subscriptions to the
     // provider owning each collection (the realtime counterpart of the data
     // router). The single WebSocket server is driven by this composite.

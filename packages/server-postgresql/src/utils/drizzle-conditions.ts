@@ -1,11 +1,23 @@
 import { and, eq, or, sql, SQL, ilike, inArray } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
 import { FilterValues, WhereFilterOp, Relation, JoinStep, LogicalCondition, FilterCondition } from "@rebasepro/types";
-import { getColumnName, resolveCollectionRelations } from "@rebasepro/common";
+import { getColumnName, normalizeToEntityRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { logger } from "@rebasepro/server-core";
 import { getColumnMeta } from "../services/collection-helpers";
+
+/**
+ * Filter values may arrive as relation wire objects — `EntityRelation`
+ * instances or their JSON form `{ __type: "relation", id, path }` — e.g. when
+ * the admin filters a relation column. SQL comparisons need the raw id, so
+ * unwrap them here (element-wise for list operators like `in` / `not-in`).
+ */
+function unwrapRelationFilterValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(unwrapRelationFilterValue);
+    const relation = normalizeToEntityRelation(value);
+    return relation ? relation.id : value;
+}
 
 /** Drizzle dynamic query builder — accepts innerJoin + where chaining */
 
@@ -107,6 +119,7 @@ export class DrizzleConditionBuilder {
         op: WhereFilterOp,
         value: unknown
     ): SQL | null {
+        value = unwrapRelationFilterValue(value);
         switch (op) {
             case "==":
                 if (value === null || value === undefined) {

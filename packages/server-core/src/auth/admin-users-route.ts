@@ -214,7 +214,8 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             {
                 user: adminUser,
                 invitationSent: finalizeResult.invitationSent,
-                ...(finalizeResult.temporaryPassword ? { temporaryPassword: finalizeResult.temporaryPassword } : {})
+                ...(finalizeResult.temporaryPassword ? { temporaryPassword: finalizeResult.temporaryPassword } : {}),
+                ...(finalizeResult.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
             },
             201
         );

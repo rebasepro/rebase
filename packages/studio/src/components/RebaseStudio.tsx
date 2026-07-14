@@ -12,6 +12,7 @@ const StorageView = lazy(() => import("./StorageView/StorageView").then(m => ({ 
 const CronJobsView = lazy(() => import("./CronJobs/CronJobsView").then(m => ({ default: m.CronJobsView })));
 const SchemaVisualizer = lazy(() => import("./SchemaVisualizer/SchemaVisualizer").then(m => ({ default: m.SchemaVisualizer })));
 const BranchesView = lazy(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
+const BackupsView = lazy(() => import("./Backups/BackupsView").then(m => ({ default: m.BackupsView })));
 const ApiExplorer = lazy(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
 const LogsExplorer = lazy(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
 const ApiKeysView = lazy(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
@@ -35,7 +36,7 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
 
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
-        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "api", "logs", "api-keys"];
+        const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "api", "logs", "api-keys"];
         const suspense = (el: React.ReactNode) => <Suspense fallback={<CircularProgressCenter/>}>{el}</Suspense>;
 
         if (activeTools.includes("sql")) {
@@ -93,6 +94,14 @@ group: "Database",
 icon: "GitBranch",
 description: "Create and manage database branches",
 view: suspense(<BranchesView/>) });
+        }
+        if (activeTools.includes("backups")) {
+            views.push({ slug: "backups",
+name: "Backups",
+group: "Database",
+icon: "Database",
+description: "Download database backups",
+view: suspense(<BackupsView/>) });
         }
         if (activeTools.includes("api")) {
             views.push({ slug: "api",
