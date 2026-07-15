@@ -26,15 +26,15 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
             defaultPassword={DEMO_PASSWORD}
             disabled={!privacyAccepted}
             topComponent={
-                <div className={cls(
-                    "rounded-lg px-4 py-3 text-sm mb-1",
-                    "bg-surface-100 text-surface-600 dark:bg-surface-900 dark:text-surface-300"
-                )}>
-                    No account needed — demo credentials are pre-filled. Just click <strong>Sign in with email</strong>.
-                </div>
-            }
-            additionalComponent={
-                <div className="flex flex-col gap-3 mt-2">
+                <div className="flex flex-col gap-3 mb-1">
+                    {/* Demo info */}
+                    <div className={cls(
+                        "rounded-lg px-4 py-3 text-sm",
+                        "bg-surface-100 text-surface-600 dark:bg-surface-900 dark:text-surface-300"
+                    )}>
+                        No account needed — demo credentials are pre-filled. Just click <strong>Sign in with email</strong>.
+                    </div>
+
                     {/* Privacy policy checkbox */}
                     <label className="flex items-center gap-2 cursor-pointer">
                         <Checkbox
