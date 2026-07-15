@@ -50,8 +50,8 @@ import {
     Avatar, SearchBar, ErrorBoundary,
     // Utilities
     cls, defaultBorderMixin, cardMixin, cardClickableMixin, paperMixin,
-    // Icons (all from @rebasepro/ui)
-    AddIcon, DeleteIcon
+    // Icons (all from @rebasepro/ui, under their lucide names)
+    PlusIcon, Trash2Icon
 } from "@rebasepro/ui";
 ```
 

@@ -327,12 +327,13 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication configuration or external adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration |
 | `history` | `true \| { retention?: number }` | — | Enable entity audit trail. Pass `true` or `{ retention: 90 }` for TTL in days |
-| `defaultSecurityRules` | `SecurityRule[]` | — | Default RLS rules for collections without explicit rules |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI/Swagger documentation |
 | `cronPersistence` | `boolean` | `true` | Persist cron execution logs to database |
 | `maxBodySize` | `number` | `10485760` (10MB) | Max request body size in bytes. `0` to disable |
 | `csrf` | `{ origin: string \| string[] \| (origin: string) => boolean }` | — | CSRF protection (opt-in, disabled by default) |
-| `hooks` | `BackendHooks` | — | Backend-level hooks for intercepting admin data |
+| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection, on every data path (REST, realtime, server-side `rebase.data`) |
+| `mode` | `"cms" \| "baas"` | `"cms"` | `baas` derives collections from the live database at boot instead of config files, and turns the schema editor off |
+| `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table without RLS has no authorization model, so serving it would hand every row to every logged-in user. `"serve"` overrides, for trusted callers only |
 | `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | — | Log level configuration |
 
 ### Auth Configuration (RebaseAuthConfig)

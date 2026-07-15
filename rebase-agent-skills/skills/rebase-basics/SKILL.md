@@ -168,11 +168,27 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 
 | Option | Alias | Description |
 |--------|-------|-------------|
+| `--flavor` | `-f` | `baas` or `cms`. Picks what you get — see below. Prompts when omitted |
+| `--template` | `-t` | Starter template to scaffold from |
 | `--git` | `-g` | Initialize a git repository |
 | `--install` | `-i` | Install dependencies with the detected PM |
 | `--database-url` | — | PostgreSQL connection string (skip prompt) |
 | `--introspect` | — | Auto-introspect the database after init |
 | `--yes` | `-y` | Non-interactive mode (use all defaults) |
+
+#### Flavors
+
+```bash
+rebase init my-api   --flavor baas   # backend/ alone — REST, auth, storage, realtime, backups. No config files, no UI, no React
+rebase init my-app   --flavor cms    # config/ + backend/ + frontend/ — BaaS plus the admin panel (default)
+```
+
+`baas` introspects the collections from the database at boot rather than reading
+config files, so there is nothing to declare and nothing to keep in sync. It
+serves only tables with `ENABLE ROW LEVEL SECURITY` — a table without RLS has no
+authorization model, so serving it would hand every row to every logged-in user.
+
+`dev`, `build` and `start` detect a missing `frontend/` and run backend-only.
 
 ```bash
 # Interactive mode
@@ -436,6 +452,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 |----------|------|---------|-------------|
 | `server` | `Server` (Node `http.Server`) | — | **Required.** The HTTP server instance |
 | `app` | `Hono<HonoEnv>` | — | **Required.** The Hono application instance |
+| `mode` | `"cms" \| "baas"` | `"cms"` | How much of Rebase to run. `cms` takes collections from `collections`/`collectionsDir`; `baas` takes no collection config at all and derives them from the live database at boot, so every RLS-protected table is served with nothing to define. The schema editor is off in `baas` — it exists to write collection files back to disk. Both serve the same control plane (auth, storage, realtime, backups, cron, functions, OpenAPI); neither serves the admin SPA, which is the application's call via `serveSPA` |
 | `collections` | `CollectionConfig[]` | `[]` | Inline collection definitions |
 | `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty) |
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
@@ -445,14 +462,16 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
 | `history` | `unknown` | — | Entity history/audit-log configuration |
-| `defaultSecurityRules` | `SecurityRule[]` | — | Default RLS rules for collections without their own |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI spec at `/api/docs` and Swagger UI at `/api/swagger` (dev only) |
 | `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers |
 | `cronsDir` | `string` | — | Directory for auto-discovered cron job handlers |
 | `cronPersistence` | `boolean` | `true` | Persist cron job execution logs to the database |
 | `maxBodySize` | `number` | `10485760` (10 MB) | Max request body size in bytes. Set `0` to disable |
 | `csrf` | `{ origin: string \| string[] \| ((origin: string) => boolean) }` | — | CSRF protection (opt-in, disabled by default) |
-| `hooks` | `BackendHooks` | — | Backend-level hooks for intercepting admin data at the API boundary |
+| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection. Same type as per-collection `callbacks`, and fires on **every** data path (REST, realtime/WebSocket, server-side `rebase.data`). Order: global → collection → property |
+| `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table with RLS disabled carries no authorization model, and every authenticated request runs as `rebase_user`, so serving one hands every row to every logged-in user. Excluded tables are logged with the SQL to protect them. `"serve"` serves them anyway; only sensible when every caller is already trusted |
+| `schemaEditor` | `boolean` | — | Force the schema-editor routes on or off. Defaults to enabled when `collectionsDir` is set, outside production, in `cms` mode |
+| `storageSources` | `StorageSourceDefinition[]` | — | Named storage backends for multi-source setups. Each has a `key` that collection properties point at via `StorageConfig.storageSource` |
 | `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | `"info"` | Log level configuration |
 
 > **IMPORTANT FOR AGENTS:** `maxBodySize` applies to all API routes under `basePath`. Storage upload routes have their **own** limit derived from the storage config's `maxFileSize` property (default: 50 MB), which overrides the global limit.
@@ -554,14 +573,36 @@ await initializeRebaseBackend({
     // Single backend: { type: "local" | "s3" | "gcs" }
     // Multi-backend: Record<string, StorageController> with named sources
     storage: { type: env.STORAGE_TYPE },
-    defaultSecurityRules: [
-        { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], roles: ["admin"] },
-    ],
 });
 
 console.log(`Server running at http://localhost:${env.PORT}`);
 ```
+
+## Default security rules live with the collections, not here
+
+`defaultSecurityRules` is **not** a `RebaseBackendConfig` option. Declare it in
+`config/collections/index.ts`, beside the collections it applies to:
+
+```typescript
+// config/collections/index.ts
+import type { SecurityRule } from "@rebasepro/types";
+
+export const defaultSecurityRules: SecurityRule[] = [
+    { operation: "select", access: "public" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+];
+```
+
+Any collection in that directory that declares no `securityRules` inherits these;
+one that declares its own keeps them; one with neither is **locked by default**
+(admin-only).
+
+It belongs there because `db push` generates the Postgres policies — the only
+thing that actually enforces access — from the collection *files*, and never sees
+the running server. A default on the backend config could never reach the
+database while reading exactly like an authorization setting. In `baas` mode there
+are no collection files and no `db push`, so the database's own RLS is the whole
+model and there is nothing to default.
 
 # The `rebase` Singleton
 

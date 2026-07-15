@@ -146,7 +146,7 @@ import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
 The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseAdmin>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the `RebaseRegistry`. `<RebaseShell>` then reads the registry and builds the actual UI.
 
 ```tsx
-import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/app";
+import { useRebaseAuthController, RebaseAuth } from "@rebasepro/app";
 import { Rebase } from "@rebasepro/app";
 import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
@@ -159,11 +159,10 @@ const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://l
 export function App() {
     const rebaseClient = React.useMemo(() => createRebaseClient({ baseUrl: API_URL }), []);
     const authController = useRebaseAuthController({ client: rebaseClient });
-    const userManagement = useBackendUserManagement({ client: rebaseClient, currentUser: authController.user });
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
     return (
-        <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={[dataEnhancementPlugin]}>
+        <Rebase client={rebaseClient} authController={authController} plugins={[dataEnhancementPlugin]}>
             <RebaseAuth/>
             <RebaseAdmin collections={collections} collectionEditor={true}/>
             <RebaseStudio tools={undefined} homePage={undefined} />

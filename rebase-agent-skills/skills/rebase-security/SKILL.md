@@ -1,6 +1,6 @@
 ---
 name: rebase-security
-description: Comprehensive guide to the Rebase backend security architecture. Use this skill when the user asks about securing their application, backend-level access control, request interception, DataHooks for security, fail-closed design, or how security works without database-level RLS. Also use when the user needs to implement PII masking, tenant isolation, role-based access control at the API layer, or cross-cutting security concerns.
+description: Comprehensive guide to the Rebase backend security architecture. Use this skill when the user asks about securing their application, backend-level access control, request interception, global callbacks for security, fail-closed design, or how security works without database-level RLS. Also use when the user needs to implement PII masking, tenant isolation, role-based access control at the API layer, or cross-cutting security concerns.
 ---
 
 # Rebase Security Architecture
@@ -15,7 +15,7 @@ Rebase implements a **multi-layered, defense-in-depth** security architecture. S
 - [Request Pipeline](#request-pipeline)
 - [Layer 1: Auth Middleware](#layer-1-auth-middleware)
 - [Layer 2: API Key Permission Guard](#layer-2-api-key-permission-guard)
-- [Layer 3: DataHooks (API Boundary)](#layer-3-datahooks-api-boundary)
+- [Layer 3: Global callbacks (every data path)](#layer-3-global-callbacks-every-data-path)
 - [Layer 4: Scoped DataDriver](#layer-4-scoped-datadriver)
 - [Layer 5: Collection Callbacks](#layer-5-collection-callbacks)
 - [Fail-Closed Design](#fail-closed-design)
@@ -49,8 +49,8 @@ Every request — REST, GraphQL, and WebSocket — passes through **5 security l
 └──────────────┬───────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────┐
-│  Layer 3: DataHooks (API Boundary)                   │
-│  Cross-cutting interception for ALL collections      │
+│  Layer 3: Global callbacks (every data path)         │
+│  Cross-cutting, for ALL collections                  │
 │  afterRead / beforeSave / beforeDelete               │
 └──────────────┬───────────────────────────────────────┘
                │
@@ -67,7 +67,9 @@ Every request — REST, GraphQL, and WebSocket — passes through **5 security l
 └──────────────────────────────────────────────────────┘
 ```
 
-> **KEY INSIGHT:** Layers 1–3 and Layer 5 are **application-level** — they don't depend on the database. Even if you cannot configure database-level RLS policies, these layers provide full security coverage.
+> **KEY INSIGHT:** Layers 1–3 and Layer 5 are **application-level** — they don't depend on the database. They are what secures a backend whose database has no native RLS.
+>
+> **But on Postgres, RLS is the authorization model, and Layer 4 is where it happens.** A collection's `securityRules` are a *source for code generation* — `db push` turns them into `pg_policies` — and nothing on the data path reads them at runtime. The application layers redact and validate; only the database decides who may see a row, and only it still applies when a cron, psql, or the SQL editor reaches the table. `rebase doctor --policies` diffs the deployed policies against what your collections generate, because a stale policy outlives any config fix.
 
 ---
 
@@ -77,7 +79,7 @@ All three protocols share the same security middleware stack:
 
 ### REST
 ```
-HTTP Request → Auth Middleware → API Key Guard → DataHooks → Scoped Driver → Collection Callbacks → Response
+HTTP Request → Auth Middleware → API Key Guard → Scoped Driver → global callbacks → collection callbacks → property callbacks → Response
 ```
 
 ### GraphQL
@@ -136,13 +138,13 @@ export async function scopeDataDriver(
 | Anonymous (`requireAuth: false`) | `"anon"` | `["anon"]` | RLS with anonymous identity |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
-> **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing DataHooks or Collection Callbacks, developers should use these identities to gate behavior:
+> **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing callbacks, developers should use these identities to gate behavior:
 > - `uid: "service"` + `roles: ["admin"]` — Server-side `rebase.data` calls (cron jobs, custom functions using `rebase.data`, webhooks). These go through the full middleware pipeline authenticated with the service key.
 > - `uid: "anon"` + `roles: ["anon"]` — Unauthenticated requests when `requireAuth: false`. **Note:** for anonymous REST requests, `context.user` in Collection Callbacks may be `undefined`; only the DataDriver is scoped with the anon identity. For WebSocket connections, a full `User` object with `uid: "anon"` is provided.
 > - `uid: "api-key:{id}"` + `roles: ["service"]` (or `["admin", "service"]`) — API key requests.
 > - Real user IDs and roles for JWT-authenticated requests.
 >
-> **Key insight:** `rebase.data` (the server-side singleton) is NOT a raw admin driver — it round-trips through the REST API using the service key, so all DataHooks and Collection Callbacks fire with `uid: "service"`, `roles: ["admin"]`. This means callbacks can distinguish server-internal reads from end-user reads by checking `context.user?.roles?.includes("admin")`.
+> **Key insight:** `rebase.data` (the server-side singleton) is NOT a raw admin driver — it round-trips through the REST API using the service key, so all callbacks fire with `uid: "service"`, `roles: ["admin"]`. This means callbacks can distinguish server-internal reads from end-user reads by checking `context.user?.roles?.includes("admin")`.
 
 ---
 
@@ -165,39 +167,37 @@ This layer runs in both REST and GraphQL. If the API key lacks the required perm
 
 ---
 
-## Layer 3: DataHooks (API Boundary)
+## Layer 3: Global callbacks (every data path)
 
-DataHooks are the **primary mechanism for backend-level security** when you cannot or do not want to use database-level RLS. They intercept **all** collection operations at the REST API boundary — a single cross-cutting point for every collection.
+Global callbacks are the **primary mechanism for backend-level security** when you cannot or do not want to use database-level RLS. They apply to **every** collection — a single cross-cutting point — and, unlike an API-boundary interceptor, they fire on *every* data path: REST, WebSocket/realtime, and server-side `rebase.data`. There is no read path that bypasses `afterRead`, which is what makes it safe to rely on for redaction.
 
 ### Configuration
 
-DataHooks are configured via the `hooks` property of `initializeRebaseBackend()`:
+They are configured via the `callbacks` property of `initializeRebaseBackend()`, and take the **same** `CollectionCallbacks` type as a per-collection `callbacks` block:
 
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server";
-import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
+import type { CollectionCallbacks } from "@rebasepro/types";
 
-const hooks: BackendHooks = {
-    data: {
-        // Intercept ALL reads across ALL collections
-        afterRead(slug, entity, ctx) {
-            // Return entity to allow, return null to filter out
-        },
-
-        // Intercept ALL writes across ALL collections
-        beforeSave(slug, values, entityId, ctx) {
-            // Return values to allow, throw to reject
-        },
-
-        // Intercept ALL deletes across ALL collections
-        beforeDelete(slug, entityId, ctx) {
-            // Return void to allow, throw to reject
-        },
-
-        // Post-write side effects
-        afterSave(slug, entity, ctx) { /* fire-and-forget */ },
-        afterDelete(slug, entityId, ctx) { /* fire-and-forget */ },
+const callbacks: CollectionCallbacks = {
+    // Every read, across every collection.
+    // Return the row; redact by returning a modified copy.
+    afterRead({ row, collection, path, context }) {
+        return row;
     },
+
+    // Every write. Return the values to save, or throw to reject.
+    // Runs after schema validation.
+    beforeSave({ values, id, collection, context }) {
+        return values;
+    },
+
+    // Every delete. Throw to prevent it.
+    beforeDelete({ id, collection, context }) { /* ... */ },
+
+    // Post-write side effects.
+    afterSave({ id, values, collection, context }) { /* ... */ },
+    afterDelete({ id, collection, context }) { /* ... */ },
 };
 
 await initializeRebaseBackend({
@@ -205,52 +205,59 @@ await initializeRebaseBackend({
     app,
     database: createPostgresAdapter({ connection: db, schema }),
     auth: { jwtSecret: "...", /* ... */ },
-    hooks,  // ← Backend-level security hooks
+    callbacks,  // ← global, applied to every collection
 });
 ```
 
-### DataHooks Interface
+> **FOR AGENTS:** callbacks take a **single props object**, not positional
+> arguments, and the read payload is a flat `row` — not an `Entity`. `Entity` is
+> an admin-UI view model and never reaches this layer.
+
+### CollectionCallbacks Interface
 
 ```typescript
-interface DataHooks {
-    afterRead?(slug: string, entity: Record<string, unknown>, context: BackendHookContext):
-        Record<string, unknown> | null | Promise<Record<string, unknown> | null>;
+type CollectionCallbacks<M, USER> = {
+    afterRead?(props: AfterReadProps<M, USER>):
+        Promise<Record<string, unknown>> | Record<string, unknown>;
 
-    beforeSave?(slug: string, values: Record<string, unknown>, entityId: string | undefined, context: BackendHookContext):
-        Record<string, unknown> | Promise<Record<string, unknown>>;
+    beforeSave?(props: BeforeSaveProps<M, USER>):
+        Promise<Partial<EntityValues<M>>> | Partial<EntityValues<M>>;
 
-    afterSave?(slug: string, entity: Record<string, unknown>, context: BackendHookContext):
-        void | Promise<void>;
+    afterSave?(props: AfterSaveProps<M, USER>): Promise<void> | void;
+    afterSaveError?(props: AfterSaveErrorProps<M, USER>): Promise<void> | void;
+    beforeDelete?(props: BeforeDeleteProps<M, USER>): Promise<boolean | void> | boolean | void;
+    afterDelete?(props: AfterDeleteProps<M, USER>): Promise<void> | void;
+};
 
-    beforeDelete?(slug: string, entityId: string, context: BackendHookContext):
-        void | Promise<void>;
-
-    afterDelete?(slug: string, entityId: string, context: BackendHookContext):
-        void | Promise<void>;
+interface AfterReadProps<M, USER> {
+    collection: CollectionConfig<M>;
+    path: string;
+    row: Record<string, unknown>;
+    context: RebaseCallContext<USER>;
 }
 
-interface BackendHookContext {
-    requestUser?: { userId: string; roles: string[] };
-    method: "GET" | "POST" | "PUT" | "DELETE";
-}
+// AfterSaveProps adds `id` and `values`; BeforeSaveProps is the same with `id` optional
+// (there is no id yet on a create).
 ```
 
 ### Blocking vs Fire-and-Forget
 
-| Hook | Can Block? | How to Block |
+| Callback | Can Block? | How to Block |
 |---|---|---|
-| `afterRead` | Yes | Return `null` to filter out the entity |
-| `beforeSave` | Yes | Throw an error to abort the save |
+| `beforeSave` | Yes | Throw an error to abort the save (returns an HTTP error) |
 | `beforeDelete` | Yes | Throw an error to prevent deletion |
-| `afterSave` | No | Fire-and-forget (errors are caught and logged) |
-| `afterDelete` | No | Fire-and-forget |
+| `afterRead` | Redacts, does not block | Return a modified `row`. It returns a row, not `null` — filter rows out with RLS, not here |
+| `afterSave` | No | Post-write side effect |
+| `afterSaveError` | No | Fires when a save fails |
+| `afterDelete` | No | Post-delete side effect |
 
 ### Execution Order
 
-DataHooks run **after** per-collection `CollectionCallbacks` (which execute inside the DataDriver, closer to the database) and **before** the API response is sent to the client. This gives you two opportunities to enforce security:
+**global callbacks → collection callbacks → property callbacks.**
 
-1. **CollectionCallbacks** — per-collection, inside the driver
-2. **DataHooks** — cross-cutting, at the API boundary
+The global block you pass to `initializeRebaseBackend` runs first, then any
+`callbacks` declared on the collection itself, then per-property ones. All three
+are the same mechanism at different scopes, which is why they share one type.
 
 ---
 
@@ -327,71 +334,69 @@ Rebase follows a **fail-closed** security model throughout the stack:
 
 ## Securing Without Database RLS
 
-If you cannot modify database-level RLS policies — or your database doesn't support them — use **DataHooks** and **Collection Callbacks** to enforce security entirely at the application level.
+If you cannot modify database-level RLS policies — or your database doesn't support them — use **global callbacks** to enforce security entirely at the application level.
 
-### Strategy: DataHooks as Your Security Layer
+### Strategy: global callbacks as your security layer
 
 ```typescript
 import { ApiError } from "@rebasepro/server";
-import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
+import type { CollectionCallbacks } from "@rebasepro/types";
 
-const hooks: BackendHooks = {
-    data: {
-        // ── READ SECURITY ──
-        // Filter entities based on user role and ownership
-        afterRead(slug, entity, ctx) {
-            const user = ctx.requestUser;
+const callbacks: CollectionCallbacks = {
+    // ── READ SECURITY ──
+    // Redact rows based on user role. `afterRead` returns a row, so use it to
+    // mask fields; to withhold rows entirely, prefer RLS.
+    afterRead({ row, collection, context }) {
+        const user = context.user;
+        if (user?.roles?.includes("admin")) return row;
 
-            // Admins see everything
-            if (user?.roles.includes("admin")) return entity;
-
-            // For the "orders" collection, users only see their own
-            if (slug === "orders") {
-                if (entity.user_id !== user?.userId) return null;
-            }
-
-            // For "internal_notes", non-admins never see them
-            if (slug === "internal_notes") return null;
-
-            return entity;
-        },
-
-        // ── WRITE SECURITY ──
-        // Validate and enforce ownership on creates/updates
-        beforeSave(slug, values, entityId, ctx) {
-            const user = ctx.requestUser;
-            if (!user) throw ApiError.unauthorized("Authentication required");
-
-            // Enforce ownership: stamp the user_id on creation
-            if (!entityId) {
-                values.user_id = user.userId;
-            }
-
-            // Prevent role escalation: non-admins can't set role fields
-            if (!user.roles.includes("admin")) {
-                delete values.role;
-                delete values.is_admin;
-            }
-
-            return values;
-        },
-
-        // ── DELETE SECURITY ──
-        // Only admins can delete, or owners of their own records
-        beforeDelete(slug, entityId, ctx) {
-            const user = ctx.requestUser;
-            if (!user) throw ApiError.unauthorized("Authentication required");
-
-            if (!user.roles.includes("admin")) {
-                // For non-admins, you may need to fetch the entity first
-                // to verify ownership. Use Collection Callbacks for this pattern
-                // since they receive the full entity.
-                throw ApiError.forbidden("Only admins can delete records");
-            }
-        },
+        // Mask PII on the "customers" collection for non-admins
+        if (collection.slug === "customers") {
+            return { ...row, email: "***", phone: "***" };
+        }
+        return row;
     },
+
+    // ── WRITE SECURITY ──
+    // Validate and enforce ownership on creates/updates
+    beforeSave({ values, id, collection, context }) {
+        const user = context.user;
+        if (!user) throw ApiError.unauthorized("Authentication required");
+
+        // Enforce ownership: stamp the user id on creation (no id yet = create)
+        if (id === undefined) {
+            values.user_id = user.uid;
+        }
+
+        // Prevent role escalation: non-admins can't set role fields
+        if (!user.roles?.includes("admin")) {
+            delete values.role;
+            delete values.is_admin;
+        }
+
+        return values;
+    },
+
+    // ── DELETE SECURITY ──
+    // Throw to prevent the delete
+    beforeDelete({ id, collection, context }) {
+        const user = context.user;
+        if (!user) throw ApiError.unauthorized("Authentication required");
+
+        if (!user.roles?.includes("admin")) {
+            throw ApiError.forbidden("Only admins can delete records");
+        }
+    }
 };
 ```
+
+> **The honest caveat:** on Postgres this is defence in depth, not the
+> authorization model. Authorization is RLS — `securityRules` in a collection are
+> a *source for code generation* (`db push` → `policies.sql` → `pg_policies`), and
+> nothing on the data path reads them at runtime. Callbacks run in the
+> application, so anything reaching the database by another route (psql, a cron,
+> the SQL editor) never sees them. Use them for redaction and validation; use RLS
+> to decide who may see a row.
 
 ### Strategy: Collection Callbacks for Ownership Checks
 
@@ -437,16 +442,16 @@ const ordersCollection: PostgresCollectionConfig = {
 
 ### Combining Both Layers
 
-For maximum security, use both DataHooks and Collection Callbacks together:
+Global and per-collection callbacks are the same mechanism at two scopes. Pick by blast radius:
 
 | Concern | Best Layer | Why |
 |---|---|---|
-| Cross-cutting read filtering | DataHooks `afterRead` | Applies to ALL collections in one place |
-| Cross-cutting write validation | DataHooks `beforeSave` | Single enforcement point for all writes |
-| PII masking / field redaction | DataHooks `afterRead` | Cross-cutting, role-based |
-| Ownership checks on writes/deletes | Collection Callbacks | Has access to the full entity for comparison |
-| Business rule validation | Collection Callbacks | Collection-specific, typed values |
-| Audit logging | DataHooks `afterSave` / `afterDelete` | Cross-cutting, fire-and-forget |
+| Cross-cutting field redaction | global `afterRead` | Applies to ALL collections in one place |
+| Cross-cutting write validation | global `beforeSave` | Single enforcement point for all writes |
+| Withholding rows entirely | **RLS policy** | `afterRead` returns a row and cannot drop one |
+| Ownership checks on writes/deletes | collection `callbacks` | Collection-scoped, has the row's values |
+| Business rule validation | collection `callbacks` | Collection-specific, typed values |
+| Audit logging | global `afterSave` / `afterDelete` | Cross-cutting, post-write |
 
 ---
 
@@ -454,61 +459,57 @@ For maximum security, use both DataHooks and Collection Callbacks together:
 
 ### PII Masking
 
+This is what `afterRead` is for: it fires on every read path, and it returns a
+row, so masking fields is exactly its shape.
+
 ```typescript
-const hooks: BackendHooks = {
-    data: {
-        afterRead(slug, entity, ctx) {
-            if (ctx.requestUser?.roles.includes("admin")) return entity;
+const callbacks: CollectionCallbacks = {
+    afterRead({ row, context }) {
+        if (context.user?.roles?.includes("admin")) return row;
 
-            // Mask sensitive fields across all collections
-            if (entity.email) entity.email = "***@***.***";
-            if (entity.phone) entity.phone = "***-***-****";
-            if (entity.ssn) entity.ssn = "***-**-****";
-
-            return entity;
-        },
-    },
+        // Mask sensitive fields across all collections
+        const masked = { ...row };
+        if (masked.email) masked.email = "***@***.***";
+        if (masked.phone) masked.phone = "***-***-****";
+        if (masked.ssn) masked.ssn = "***-**-****";
+        return masked;
+    }
 };
 ```
 
 ### Tenant Isolation (Multi-Tenancy)
 
+**Withholding rows is RLS's job, not a callback's.** `afterRead` returns a row —
+it cannot drop one — so tenant *filtering* belongs in a policy, where Postgres
+applies it inside the query. Use a callback only to stamp the tenant on write.
+
+```sql
+-- The filter: enforced by the database on every read, for every caller.
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY documents_tenant ON documents FOR ALL TO public
+    USING (tenant_id = (auth.jwt() -> 'tenant_id')::text);
+```
+
 ```typescript
-const hooks: BackendHooks = {
-    data: {
-        afterRead(slug, entity, ctx) {
-            const userTenantId = ctx.requestUser?.roles
-                .find(r => r.startsWith("tenant:"))
-                ?.replace("tenant:", "");
+// The stamp: make sure a row can only be created inside the caller's tenant.
+const callbacks: CollectionCallbacks = {
+    beforeSave({ values, id, context }) {
+        const tenantId = context.user?.roles
+            ?.find(r => r.startsWith("tenant:"))
+            ?.replace("tenant:", "");
 
-            if (!userTenantId) return null;
-            if (entity.tenant_id !== userTenantId) return null;
+        if (!tenantId) throw ApiError.forbidden("No tenant assigned");
 
-            return entity;
-        },
-
-        beforeSave(slug, values, entityId, ctx) {
-            const userTenantId = ctx.requestUser?.roles
-                .find(r => r.startsWith("tenant:"))
-                ?.replace("tenant:", "");
-
-            if (!userTenantId) throw ApiError.forbidden("No tenant assigned");
-
-            // Stamp tenant on creation, prevent cross-tenant writes
-            if (!entityId) {
-                values.tenant_id = userTenantId;
-            }
-
-            return values;
-        },
-
-        beforeDelete(slug, entityId, ctx) {
-            // Tenant isolation on deletes is best handled in Collection Callbacks
-            // where you have access to the entity's tenant_id
-        },
-    },
+        if (id === undefined) values.tenant_id = tenantId;   // create
+        else if (values.tenant_id && values.tenant_id !== tenantId) {
+            throw ApiError.forbidden("Cross-tenant write");   // update
+        }
+        return values;
+    }
 };
 ```
+
+Run `rebase db push` after adding the policy — the config is only its source.
 
 ### Membership-Scoped Access (RLS, no N+1)
 
@@ -544,71 +545,52 @@ service). Run `rebase db push` after editing the collection to apply the policy.
 ### Role-Based Collection Access
 
 ```typescript
-const hooks: BackendHooks = {
-    data: {
-        // Define which roles can access which collections
-        beforeSave(slug, values, entityId, ctx) {
-            const roleAccess: Record<string, string[]> = {
-                "financial_reports": ["admin", "finance"],
-                "hr_records": ["admin", "hr"],
-                "system_config": ["admin"],
-            };
+const ROLE_ACCESS: Record<string, string[]> = {
+    "financial_reports": ["admin", "finance"],
+    "hr_records": ["admin", "hr"],
+    "system_config": ["admin"]
+};
 
-            const allowedRoles = roleAccess[slug];
-            if (allowedRoles) {
-                const userRoles = ctx.requestUser?.roles || [];
-                const hasAccess = allowedRoles.some(r => userRoles.includes(r));
-                if (!hasAccess) {
-                    throw ApiError.forbidden(`Insufficient permissions for ${slug}`);
-                }
-            }
-
-            return values;
-        },
-
-        afterRead(slug, entity, ctx) {
-            const roleAccess: Record<string, string[]> = {
-                "financial_reports": ["admin", "finance"],
-                "hr_records": ["admin", "hr"],
-                "system_config": ["admin"],
-            };
-
-            const allowedRoles = roleAccess[slug];
-            if (allowedRoles) {
-                const userRoles = ctx.requestUser?.roles || [];
-                if (!allowedRoles.some(r => userRoles.includes(r))) return null;
-            }
-
-            return entity;
-        },
-    },
+const callbacks: CollectionCallbacks = {
+    // Writes: throw to reject.
+    beforeSave({ values, collection, context }) {
+        const allowed = ROLE_ACCESS[collection.slug];
+        const roles = context.user?.roles ?? [];
+        if (allowed && !allowed.some(r => roles.includes(r))) {
+            throw ApiError.forbidden(`Insufficient permissions for ${collection.slug}`);
+        }
+        return values;
+    }
 };
 ```
+
+For the **read** side of this, write the same role check as an RLS policy on the
+collection. `afterRead` cannot withhold a row, so gating reads there is not an
+option — see the note under Tenant Isolation.
 
 ### Immutable Records (Soft Delete Only)
 
 ```typescript
-const hooks: BackendHooks = {
-    data: {
-        beforeDelete(slug, entityId, ctx) {
-            const immutableCollections = ["audit_logs", "transactions", "invoices"];
-            if (immutableCollections.includes(slug)) {
-                throw ApiError.forbidden(
-                    `Records in "${slug}" cannot be deleted. Use soft-delete instead.`
-                );
-            }
-        },
-
-        beforeSave(slug, values, entityId, ctx) {
-            const appendOnlyCollections = ["audit_logs"];
-            if (appendOnlyCollections.includes(slug) && entityId) {
-                throw ApiError.forbidden(
-                    `Records in "${slug}" are append-only and cannot be updated.`
-                );
-            }
-            return values;
-        },
+const callbacks: CollectionCallbacks = {
+    beforeDelete({ collection }) {
+        const immutable = ["audit_logs", "transactions", "invoices"];
+        if (immutable.includes(collection.slug)) {
+            throw ApiError.forbidden(
+                `Records in "${collection.slug}" cannot be deleted. Use soft-delete instead.`
+            );
+        }
     },
+
+    beforeSave({ values, id, collection }) {
+        const appendOnly = ["audit_logs"];
+        // An id means update; a create has none yet.
+        if (appendOnly.includes(collection.slug) && id !== undefined) {
+            throw ApiError.forbidden(
+                `Records in "${collection.slug}" are append-only and cannot be updated.`
+            );
+        }
+        return values;
+    }
 };
 ```
 
@@ -622,7 +604,7 @@ Use this checklist when setting up security for a Rebase project:
 - [ ] **`requireAuth` is `true`** — The default. Only set to `false` if you explicitly need unauthenticated access
 - [ ] **Service key is set** — `auth.serviceKey` with ≥ 32 chars for server-to-server auth
 - [ ] **Default role is NOT admin** — `auth.defaultRole` must never be `"admin"` (startup error)
-- [ ] **DataHooks enforce access control** — If not using database RLS, `hooks.data` enforces read/write/delete permissions
+- [ ] **Callbacks enforce what RLS cannot** — `callbacks` on `initializeRebaseBackend` redact and validate on every data path. Deciding *who may see a row* is RLS's job
 - [ ] **Sensitive fields are masked** — `afterRead` masks PII for non-admin users
 - [ ] **Ownership is enforced** — `beforeSave` stamps `user_id` on creation; Collection Callbacks verify ownership on update/delete
 - [ ] **API keys are scoped** — API keys have minimal permissions (specific collections + operations)
@@ -638,9 +620,9 @@ Use this checklist when setting up security for a Rebase project:
 - **Auth Middleware**: `packages/server/src/auth/middleware.ts` — JWT/service key/API key middleware
 - **Adapter Middleware**: `packages/server/src/auth/adapter-middleware.ts` — Custom auth adapter middleware
 - **API Key Guard**: `packages/server/src/auth/api-keys/api-key-permission-guard.ts`
-- **REST API Generator**: `packages/server/src/api/rest/api-generator.ts` — DataHooks integration
-- **Backend Hooks Types**: `packages/types/src/types/backend_hooks.ts` — `DataHooks`, `BackendHooks` interfaces
+- **REST API Generator**: `packages/server/src/api/rest/api-generator.ts` — request/response path
+- **Callback Types**: `packages/types/src/types/entity_callbacks.ts` — `CollectionCallbacks`, `AfterReadProps`, `BeforeSaveProps`
 - **Backend Init**: `packages/server/src/init.ts` — `hooks` config property
-- **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anon"`, `"api-key:{id}"` are system-assigned identities in `context.user` / `ctx.requestUser`
+- **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anon"`, `"api-key:{id}"` are system-assigned identities in `context.user`
 - **Collection Callbacks**: See `rebase-collections` skill → Collection Callbacks section
 - **Auth Configuration**: See `rebase-auth` skill → Server-Side Configuration section

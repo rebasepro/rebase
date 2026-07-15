@@ -269,47 +269,47 @@ app.post("/webhooks/rebase", express.raw({ type: "application/json" }), (req, re
 
 #### Rebase Custom Function Receiver
 
+Author it with `defineFunction`, which hands you a typed `Hono` app and the
+`rebase` singleton. Mount no auth middleware on this route — external services
+need to reach it, and the HMAC check *is* the authentication.
+
 ```typescript
 // backend/functions/webhook-receiver.ts
-import type { RebaseFunctionDefinition } from "@rebasepro/types";
+import { defineFunction } from "@rebasepro/server";
 import { createHmac, timingSafeEqual } from "crypto";
 
 const WEBHOOK_SECRET = process.env.EXTERNAL_WEBHOOK_SECRET!;
 
-const fn: RebaseFunctionDefinition = {
-    method: "POST",
-    path: "/incoming-webhook",
-    public: true, // External services need to reach this
+export default defineFunction((app, { rebase }) => {
+    // No requireAuth here — the signature below is what authenticates the caller.
+    app.post("/incoming-webhook", async (c) => {
+        const signature = c.req.header("x-webhook-signature");
+        const rawBody = await c.req.text();
 
-    async handler(ctx) {
-        const signature = ctx.req.header("x-webhook-signature");
-        const rawBody = await ctx.req.text();
+        if (!signature) return c.json({ error: "Missing signature" }, 401);
 
-        if (!signature) {
-            return ctx.json({ error: "Missing signature" }, 401);
-        }
-
-        const expectedSig = createHmac("sha256", WEBHOOK_SECRET)
+        const expected = `sha256=${createHmac("sha256", WEBHOOK_SECRET)
             .update(rawBody)
-            .digest("hex");
-        const expected = `sha256=${expectedSig}`;
+            .digest("hex")}`;
 
+        // Compare lengths first: timingSafeEqual throws on a length mismatch.
         if (
             signature.length !== expected.length ||
             !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
         ) {
-            return ctx.json({ error: "Invalid signature" }, 401);
+            return c.json({ error: "Invalid signature" }, 401);
         }
 
         const payload = JSON.parse(rawBody);
-        // Process payload...
+        void payload; // Process it — `rebase.data` is available here.
 
-        return ctx.json({ received: true });
-    },
-};
-
-export default fn;
+        return c.json({ received: true });
+    });
+});
 ```
+
+The route is served at `/api/functions/webhook-receiver/incoming-webhook` — the
+file name is the mount point.
 
 ## Retry Logic
 
@@ -413,7 +413,7 @@ Trigger webhooks from a custom function endpoint:
 
 ```typescript
 // backend/functions/process-payment.ts
-import type { RebaseFunctionDefinition } from "@rebasepro/types";
+import { defineFunction } from "@rebasepro/server";
 import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
@@ -428,18 +428,15 @@ dispatcher.setWebhooks([
     },
 ]);
 
-const fn: RebaseFunctionDefinition = {
-    method: "POST",
-    path: "/process-payment",
-
-    async handler(ctx) {
-        const { orderId, amount } = await ctx.req.json();
+export default defineFunction((app, { rebase }) => {
+    app.post("/process-payment", async (c) => {
+        const { orderId, amount } = await c.req.json();
 
         // Create the payment record
-        const payment = await ctx.client.collection("payments").create({
+        const payment = await rebase.data.collection("payments").create({
             orderId,
             amount,
-            status: "completed",
+            status: "completed"
         });
 
         // Manually dispatch the webhook
@@ -450,17 +447,13 @@ const fn: RebaseFunctionDefinition = {
             payment
         );
 
-        const allSuccess = results.every(r => r.success);
-
-        return ctx.json({
+        return c.json({
             payment,
             webhooksDelivered: results.length,
-            webhooksSucceeded: allSuccess,
+            webhooksSucceeded: results.every(r => r.success)
         });
-    },
-};
-
-export default fn;
+    });
+});
 ```
 
 ### Shared Dispatcher Instance
