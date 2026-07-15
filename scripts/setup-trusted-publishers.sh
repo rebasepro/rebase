@@ -94,20 +94,27 @@ trust_call() {
   # captured — see the note above about npm and a non-TTY stdout.
   local current parsed file id
   current=$(npm trust list "$pkg" --json 2>/dev/null || true)
-  # Single-quoted so the JS may use double quotes; "- -" means no config, or
-  # output npm did not shape as JSON.
+  # Single-quoted so the JS may use double quotes. Emits "<file> <id>", or
+  # "! <code>" when npm reported an error rather than a config.
   parsed=$(printf '%s' "$current" | node -e '
     let s = "";
     process.stdin.on("data", (d) => (s += d)).on("end", () => {
-      try {
-        const j = JSON.parse(s);
-        console.log((j.file || "-") + " " + (j.id || "-"));
-      } catch {
-        console.log("- -");
-      }
+      let j;
+      try { j = JSON.parse(s) } catch { console.log("! unparseable"); return }
+      if (j.error) { console.log("! " + (j.error.code || "unknown")); return }
+      console.log((j.file || "-") + " " + (j.id || "-"));
     })')
   file=${parsed%% *}
   id=${parsed##* }
+
+  # An error is not "no config". npm answers EOTP once the browser session has
+  # lapsed, and reading that as "nothing is configured" would report every
+  # already-correct package as needing one — which is exactly how this script
+  # once claimed all 21 were unconfigured minutes after OIDC published all 21.
+  if [ "$file" = "!" ]; then
+    echo "     ✗ Could not read $pkg's trust config (npm said: $id)." >&2
+    return 1
+  fi
 
   if [ "$file" = "$workflow" ]; then
     echo "     ✓ Already trusts $workflow — nothing to do."
@@ -206,6 +213,24 @@ if ! $ASSUME_YES; then
     exit 1
   fi
 fi
+
+# Authenticate once, here, with npm connected to the terminal.
+#
+# npm's 2FA browser flow needs a TTY on stdout, and every `npm trust list` in
+# the loop below is captured — a pipe. npm would answer those with EOTP instead
+# of opening the browser, and each would read as "nothing configured": the run
+# would then try to add a config to packages that already have a correct one and
+# report the resulting 409s as failures. Priming the session here is what makes
+# the reads in the loop meaningful.
+echo "🔓 Checking npm access — a browser may open for your passkey..."
+FIRST_PKG=$(printf '%s\n' "$PACKAGES" | head -n1)
+if ! npm trust list "$FIRST_PKG" < /dev/tty; then
+  echo ""
+  echo "❌ npm would not authenticate, so what each package trusts cannot be read." >&2
+  echo "   Run 'npm login' and try again." >&2
+  exit 1
+fi
+echo ""
 
 for pkg in $PACKAGES; do
   echo "------------------------------------------------------------"
