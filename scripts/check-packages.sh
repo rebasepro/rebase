@@ -127,15 +127,13 @@ section "5. ESM bundle health (no CJS globals in ES output)"
 # ──────────────────────────────────────────────────────────────
 PREV=$(error_count)
 for pkg in "${SERVER_PKGS[@]}"; do
-    # Check all .js files in dist (main + chunks)
+    # Check all .js files in dist (main + chunks). Everything here is ESM —
+    # the UMD/CJS output is gone, so there is no longer a format to exempt.
     for js_file in "$PACKAGES_DIR/$pkg/dist/"*.js; do
         [ -f "$js_file" ] || continue
         fname="$(basename "$js_file")"
-        # Skip UMD (CJS globals are expected there)
-        echo "$fname" | grep -q "umd" && continue
 
         if grep -qE '\b__filename\b|\b__dirname\b' "$js_file" 2>/dev/null; then
-            offender=$(grep -oE '[a-zA-Z_-]+' <<< "$(grep -l '__filename\|__dirname' "$js_file")")
             err "$pkg/$fname contains __filename/__dirname (CJS globals crash in ESM)"
         fi
     done
