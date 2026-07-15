@@ -348,3 +348,79 @@ describe("transformCollectionSource — unit tests", () => {
         expect(result).toBeNull();
     });
 });
+
+/**
+ * The virtual module is emitted as a *string*, so nothing typechecks it — a
+ * syntax error there ships and only fails in a user's browser build. These
+ * execute the emitted code.
+ */
+describe("rebaseCollectionsPlugin — virtual collections module", () => {
+    function emit(collectionsDir = "/project/config/collections"): string {
+        const plugin = rebaseCollectionsPlugin({ collectionsDir });
+        (plugin as { configResolved: (c: { root: string }) => void }).configResolved({ root: "/project" });
+        const id = (plugin as { resolveId: (s: string) => string | undefined }).resolveId("virtual:rebase-collections");
+        return (plugin as { load: (id: string) => string | null }).load(id as string) as string;
+    }
+
+    /** Run the emitted module with a stubbed `import.meta.glob`. */
+    function run(source: string, modules: Record<string, unknown>): { collections: Record<string, unknown>[] } {
+        const body = source
+            .replace("import.meta.glob(", "__glob(")
+            .replace(/export const collections =/, "const collections =");
+        // eslint-disable-next-line no-new-func
+        const fn = new Function("__glob", `${body}; return { collections };`);
+        return fn(() => modules) as { collections: Record<string, unknown>[] };
+    }
+
+    it("emits syntactically valid JavaScript", () => {
+        expect(() => run(emit(), {})).not.toThrow();
+    });
+
+    it("collects the default export of every collection file", () => {
+        const { collections } = run(emit(), {
+            "/project/config/collections/posts.ts": { default: { slug: "posts" } },
+            "/project/config/collections/authors.ts": { default: { slug: "authors" } }
+        });
+
+        expect(collections.map((c) => c.slug).sort()).toEqual(["authors", "posts"]);
+    });
+
+    it("drops index, which exports defaults rather than a collection", () => {
+        const { collections } = run(emit(), {
+            "/project/config/collections/posts.ts": { default: { slug: "posts" } },
+            "/project/config/collections/index.ts": { collections: [], defaultSecurityRules: [] }
+        });
+
+        expect(collections.map((c) => c.slug)).toEqual(["posts"]);
+    });
+
+    it("applies defaultSecurityRules from index, matching the backend loader", () => {
+        // Otherwise the admin shows a collection as unprotected while the
+        // database enforces the rules it inherited.
+        const defaults = [{ operation: "select", access: "public" }];
+        const { collections } = run(emit(), {
+            "/project/config/collections/posts.ts": { default: { slug: "posts" } },
+            "/project/config/collections/index.ts": { defaultSecurityRules: defaults }
+        });
+
+        expect(collections[0].securityRules).toEqual(defaults);
+    });
+
+    it("never overrides a collection's own rules", () => {
+        const own = [{ operation: "all", roles: ["admin"] }];
+        const { collections } = run(emit(), {
+            "/project/config/collections/posts.ts": { default: { slug: "posts", securityRules: own } },
+            "/project/config/collections/index.ts": { defaultSecurityRules: [{ operation: "select", access: "public" }] }
+        });
+
+        expect(collections[0].securityRules).toEqual(own);
+    });
+
+    it("leaves rules unset when index declares no defaults", () => {
+        const { collections } = run(emit(), {
+            "/project/config/collections/posts.ts": { default: { slug: "posts" } }
+        });
+
+        expect(collections[0].securityRules).toBeUndefined();
+    });
+});
