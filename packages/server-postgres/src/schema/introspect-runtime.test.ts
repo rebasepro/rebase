@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { buildCollectionsFromSchema, introspectSchema, IntrospectedSchema, Queryable } from "./introspect-runtime";
+import { buildCollectionsFromSchema, introspectSchema, readRlsStatus, IntrospectedSchema, Queryable } from "./introspect-runtime";
 import { buildTablesMap, identifyJoinTables, TableColumn, ForeignKeyRow, PrimaryKeyRow } from "./introspect-db-logic";
 
 function column(overrides: Partial<TableColumn> & { table_name: string; column_name: string }): TableColumn {
@@ -174,5 +174,39 @@ describe("introspectSchema", () => {
         for (const values of calls) {
             expect(values).toEqual(["analytics"]);
         }
+    });
+});
+
+describe("readRlsStatus", () => {
+    it("reports RLS state and policy count per table", async () => {
+        const client: Queryable = {
+            query: async () => ({
+                rows: [
+                    { table: "posts", rls_enabled: true, policy_count: "2" },
+                    { table: "secrets", rls_enabled: false, policy_count: "0" },
+                    { table: "locked", rls_enabled: true, policy_count: 0 }
+                ] as never[]
+            })
+        };
+
+        const status = await readRlsStatus(client, "public");
+
+        // Unprotected: no authorization model, so baas must not serve it.
+        expect(status.get("secrets")).toEqual({ table: "secrets", rlsEnabled: false, policyCount: 0 });
+        // Protected and policied.
+        expect(status.get("posts")).toEqual({ table: "posts", rlsEnabled: true, policyCount: 2 });
+        // RLS on, no policies — legal, and returns nothing at all.
+        expect(status.get("locked")).toEqual({ table: "locked", rlsEnabled: true, policyCount: 0 });
+    });
+
+    it("scopes the lookup to the requested schema", async () => {
+        const calls: unknown[][] = [];
+        const client: Queryable = {
+            query: async (_t: string, v?: unknown[]) => { calls.push(v ?? []); return { rows: [] as never[] }; }
+        };
+
+        await readRlsStatus(client, "analytics");
+
+        expect(calls[0]).toEqual(["analytics"]);
     });
 });

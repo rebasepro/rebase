@@ -31,7 +31,7 @@ import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
-import { buildCollectionsFromSchema, introspectSchema } from "./schema/introspect-runtime";
+import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
 import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
@@ -87,11 +87,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             // config is passed from coordinator, we merge it with our internal pgConfig if needed
             // Currently config from init.ts is `{ collections, collectionRegistry, mode }`
-            const { collections, collectionRegistry, mode } = config as {
+            const { collections, collectionRegistry, mode, baas } = config as {
                 collections?: CollectionConfig[];
                 collectionRegistry?: unknown;
                 mode?: "cms" | "baas";
+                baas?: { unprotectedTables?: "exclude" | "serve" };
             };
+            // Secure by default: a table with no RLS is not served.
+            const unprotectedTables = baas?.unprotectedTables ?? "exclude";
 
             const connection = pgConfig.connection;
             const rawClient = (connection && typeof connection === "object" && "$client" in connection
@@ -107,6 +110,46 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             if (mode === "baas" && (!collections || collections.length === 0)) {
                 const pgSchemaName = pgConfig.introspectionSchema ?? "public";
                 const schema = await introspectSchema(rawClient, pgSchemaName);
+
+                // ── Only serve what the database protects ────────────────
+                // Requests run as rebase_user, which is granted DML on the
+                // schema. A table with RLS disabled therefore has no
+                // authorization model at all: serving it hands every row to
+                // every authenticated user. baas never runs `db push`, so
+                // nothing here would have enabled RLS on the user's behalf.
+                const rlsStatus = await readRlsStatus(rawClient, pgSchemaName);
+                const unprotected = [...schema.tablesMap.keys()].filter(
+                    (t) => !schema.joinTables.has(t) && !rlsStatus.get(t)?.rlsEnabled
+                );
+                const policyless = [...schema.tablesMap.keys()].filter(
+                    (t) => !schema.joinTables.has(t) && rlsStatus.get(t)?.rlsEnabled && rlsStatus.get(t)?.policyCount === 0
+                );
+
+                if (unprotected.length > 0) {
+                    if (unprotectedTables === "serve") {
+                        logger.warn(
+                            `🔓 [rls] Serving ${unprotected.length} table(s) with row-level security DISABLED: ${unprotected.join(", ")}. ` +
+                            "Every authenticated request can read and write every row of these. " +
+                            "This is baas.unprotectedTables: \"serve\"."
+                        );
+                    } else {
+                        logger.warn(
+                            `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
+                            `authorization model: ${unprotected.join(", ")}\n` +
+                            unprotected.map((t) => `      ALTER TABLE "${pgSchemaName}"."${t}" ENABLE ROW LEVEL SECURITY;  -- then add a policy`).join("\n") +
+                            "\n      Set baas.unprotectedTables: \"serve\" to expose them regardless."
+                        );
+                        for (const t of unprotected) schema.tablesMap.delete(t);
+                    }
+                }
+                if (policyless.length > 0) {
+                    // Legal, and silently returns nothing — worth saying out loud,
+                    // since an empty table reads exactly like one with no rows.
+                    logger.warn(
+                        `🔒 [rls] ${policyless.length} table(s) have RLS enabled but no policies, so they will return no rows: ${policyless.join(", ")}`
+                    );
+                }
+
                 introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
                 introspectedTables = buildDrizzleTablesFromSchema(schema.tablesMap, pgSchemaName);
                 // Without these, drizzle's relational path can't resolve the

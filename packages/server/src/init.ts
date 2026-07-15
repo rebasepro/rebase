@@ -189,6 +189,26 @@ export interface RebaseAuthConfig {
     cookieAuth?: import("./auth").CookieAuthConfig;
 }
 
+/** @see RebaseBackendConfig.baas */
+export interface BaasOptions {
+    /**
+     * What to do with introspected tables that have row-level security
+     * disabled.
+     *
+     * Such a table carries no authorization model. Every authenticated request
+     * runs as `rebase_user`, which is granted DML on the schema, so serving one
+     * hands every row to every logged-in user — the API would be an open door
+     * onto whatever the database happens to contain.
+     *
+     * - `"exclude"` (default) — do not serve it. Each excluded table is logged
+     *   with the SQL to protect it. Secure by default, consistent with the rest
+     *   of the driver, which fails a boot rather than serve unenforced requests.
+     * - `"serve"` — serve it anyway. Only sensible when every caller is already
+     *   trusted, e.g. an internal service behind its own authorization.
+     */
+    unprotectedTables?: "exclude" | "serve";
+}
+
 export interface RebaseBackendConfig {
     collections?: CollectionConfig[];
     collectionsDir?: string;
@@ -221,6 +241,9 @@ export interface RebaseBackendConfig {
      * `collectionsDir` to write to.
      */
     schemaEditor?: boolean;
+
+    /** Options that only apply in `baas` mode. */
+    baas?: BaasOptions;
 
     /**
      * Declared data sources, shared with the frontend `<Rebase dataSources>`.
@@ -531,7 +554,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const driverResult = await bootstrapper.initializeDriver({
             collections: activeCollections,
             collectionRegistry,
-            mode
+            mode,
+            baas: config.baas
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
 

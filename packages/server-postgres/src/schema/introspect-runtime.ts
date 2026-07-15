@@ -35,6 +35,42 @@ export interface IntrospectedSchema {
     joinTables: Set<string>;
 }
 
+/** Whether a table carries an authorization model of its own. */
+export interface TableRlsStatus {
+    table: string;
+    /** ALTER TABLE … ENABLE ROW LEVEL SECURITY has been run. */
+    rlsEnabled: boolean;
+    /** Policies attached to it. RLS enabled with none = nothing is visible. */
+    policyCount: number;
+}
+
+/**
+ * Read the RLS posture of each table in a schema.
+ *
+ * This is what decides whether baas mode may serve a table. A table with RLS
+ * disabled has no authorization model: since every authenticated request runs
+ * as `rebase_user`, and that role is granted DML on the schema, serving such a
+ * table hands every row to every logged-in user.
+ */
+export async function readRlsStatus(client: Queryable, pgSchema: string): Promise<Map<string, TableRlsStatus>> {
+    const { rows } = await client.query<{ table: string; rls_enabled: boolean; policy_count: string | number }>(
+        `SELECT c.relname AS table,
+                c.relrowsecurity AS rls_enabled,
+                (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policy_count
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = $1 AND c.relkind = 'r'`,
+        [pgSchema]
+    );
+
+    return new Map(
+        rows.map((r) => [
+            r.table,
+            { table: r.table, rlsEnabled: r.rls_enabled === true, policyCount: Number(r.policy_count ?? 0) }
+        ])
+    );
+}
+
 /** Minimal query surface — satisfied by pg.Client and pg.Pool alike. */
 export interface Queryable {
     query<R>(text: string, values?: unknown[]): Promise<{ rows: R[] }>;

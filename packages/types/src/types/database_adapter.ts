@@ -127,4 +127,9 @@ export interface DatabaseAdapterInitConfig {
      * that cannot introspect may ignore this.
      */
     mode?: "cms" | "baas";
+    /**
+     * `baas`-mode options — see `RebaseBackendConfig.baas`. Drivers that
+     * introspect should honour `unprotectedTables`.
+     */
+    baas?: { unprotectedTables?: "exclude" | "serve" };
 }
