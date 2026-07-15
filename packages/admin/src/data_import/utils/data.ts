@@ -2,8 +2,8 @@ import { getPropertyInPath } from "../../util";
 import { AuthController, Entity, CollectionConfig, EntityReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./file_to_json";
-import { getIn } from "@rebasepro/formex";
-import { inferTypeFromValue } from "@rebasepro/schema-inference";
+import { getIn } from "@rebasepro/forms";
+import { inferTypeFromValue } from "@rebasepro/inference";
 import { mergeDeep } from "@rebasepro/utils";
 
 export function convertDataToEntity(authController: AuthController,

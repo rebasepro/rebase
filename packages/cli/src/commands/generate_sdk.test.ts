@@ -3,9 +3,9 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { generateSdkCommand } from "./generate_sdk";
-import * as sdkGen from "@rebasepro/sdk-generator";
+import * as sdkGen from "@rebasepro/codegen";
 
-vi.mock("@rebasepro/sdk-generator", () => ({
+vi.mock("@rebasepro/codegen", () => ({
     generateSDK: vi.fn(() => [
         { path: "database.types.ts",
 content: "export type Database = {};" },

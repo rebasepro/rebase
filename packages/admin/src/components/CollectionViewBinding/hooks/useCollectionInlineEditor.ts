@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { setIn } from "@rebasepro/formex";
+import { setIn } from "@rebasepro/forms";
 import { CollectionConfig, RebaseData, RebaseContext } from "@rebasepro/types";
 import { OnCellValueChange, saveEntityWithCallbacks, SaveEntityWithCallbacksProps, UniqueFieldValidator } from "@rebasepro/core";
 

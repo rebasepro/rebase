@@ -1,5 +1,5 @@
 /**
- * @rebasepro/sdk-generator
+ * @rebasepro/codegen
  *
  * Generates a purely typed Typescript database definition.
  */

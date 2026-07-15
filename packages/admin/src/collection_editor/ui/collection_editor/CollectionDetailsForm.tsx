@@ -24,7 +24,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 
-import { Field, getIn, useFormex } from "@rebasepro/formex";
+import { Field, getIn, useFormex } from "@rebasepro/forms";
 import { useCollectionEditorController } from "../../useCollectionEditorController";
 import { LayoutModeSwitch } from "./LayoutModeSwitch";
 import { ViewModeSwitch } from "./ViewModeSwitch";

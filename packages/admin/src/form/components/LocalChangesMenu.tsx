@@ -18,7 +18,7 @@ import {
     Typography,
     XCircleIcon
 } from "@rebasepro/ui";
-import { FormexController } from "@rebasepro/formex";
+import { FormexController } from "@rebasepro/forms";
 import { useSnackbarController, useTranslation } from "@rebasepro/core";
 import { flattenKeys, removeEntityFromCache } from "@rebasepro/core";
 ;

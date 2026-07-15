@@ -1,7 +1,7 @@
 import { FieldCaption } from "../../../_cms_internals";
 import React from "react";
 import { TextField } from "@rebasepro/ui";
-import { getIn, useFormex } from "@rebasepro/formex";
+import { getIn, useFormex } from "@rebasepro/forms";
 
 export function VectorPropertyField({ disabled }: {
     disabled: boolean;

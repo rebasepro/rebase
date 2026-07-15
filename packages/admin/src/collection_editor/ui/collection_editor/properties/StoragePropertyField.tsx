@@ -12,7 +12,7 @@ import {
     UploadCloudIcon
 } from "@rebasepro/ui";
 
-import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
+import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/forms";
 import { useStorageSources, useTranslation } from "@rebasepro/core";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";

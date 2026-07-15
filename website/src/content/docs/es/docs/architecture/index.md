@@ -81,10 +81,10 @@ Al igual que los controladores, los backends de almacenamiento se registran en u
 | `@rebasepro/auth` | Vistas de inicio de sesión, hooks del controlador de autenticación, gestión de usuarios | Frontend |
 | `@rebasepro/studio` | Editor de colecciones, consola SQL, consola JS, editor RLS, navegador de almacenamiento | Frontend |
 | `@rebasepro/cli` | CLI para generación de esquemas, migraciones de DB, generación de SDK | Herramientas de desarrollo |
-| `@rebasepro/formex` | Gestión ligera del estado de formularios de React | Frontend |
+| `@rebasepro/forms` | Gestión ligera del estado de formularios de React | Frontend |
 | `@rebasepro/plugin-data-enhancement` | Plugin de autocompletado de campos impulsado por IA | Frontend |
 | `@rebasepro/plugin-data-import-export` | Importación y exportación de CSV/JSON/Excel | Frontend |
-| `@rebasepro/schema-inference` | Detección automática de esquemas a partir de datos de base de datos existentes | Backend/CLI |
+| `@rebasepro/inference` | Detección automática de esquemas a partir de datos de base de datos existentes | Backend/CLI |
 
 ## Flujo de Datos
 

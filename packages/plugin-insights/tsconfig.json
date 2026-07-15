@@ -49,7 +49,7 @@
       "@rebasepro/common": [
         "../common/src"
       ],
-      "@rebasepro/formex": [
+      "@rebasepro/forms": [
         "../formex/src"
       ]
     }

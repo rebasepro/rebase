@@ -1,7 +1,7 @@
 import React from "react";
 
 import { BooleanSwitchWithLabel, Tooltip } from "@rebasepro/ui";
-import { FormexFieldProps } from "@rebasepro/formex";
+import { FormexFieldProps } from "@rebasepro/forms";
 
 export function SwitchControl({
     field,

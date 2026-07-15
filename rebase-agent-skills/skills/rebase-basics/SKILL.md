@@ -106,10 +106,10 @@ rebase/
 │   ├── client-firebase/      # @rebasepro/client-firebase
 │   ├── client-postgresql/    # @rebasepro/client-postgresql
 │   ├── common/               # @rebasepro/common
-│   ├── formex/               # @rebasepro/formex
+│   ├── formex/               # @rebasepro/forms
 │   ├── mcp-server/           # @rebasepro/mcp
-│   ├── sdk-generator/        # @rebasepro/sdk-generator
-│   ├── schema-inference/     # @rebasepro/schema-inference
+│   ├── sdk-generator/        # @rebasepro/codegen
+│   ├── schema-inference/     # @rebasepro/inference
 │   ├── plugin-data-enhancement/ # @rebasepro/plugin-data-enhancement
 │   └── utils/                # @rebasepro/utils
 ├── pnpm-workspace.yaml
@@ -134,10 +134,10 @@ rebase/
 | `@rebasepro/client-firebase` | Firebase client adapter | When connecting to a Firebase backend |
 | `@rebasepro/client-postgresql` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
 | `@rebasepro/common` | Shared utilities, `defaultUsersCollection` | Shared constants and default collection exports |
-| `@rebasepro/formex` | Form engine | Building dynamic forms from collection schemas |
+| `@rebasepro/forms` | Form engine | Building dynamic forms from collection schemas |
 | `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |
-| `@rebasepro/sdk-generator` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
-| `@rebasepro/schema-inference` | Auto-infer schema from data / database introspection | Used by `rebase schema introspect` |
+| `@rebasepro/codegen` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
+| `@rebasepro/inference` | Auto-infer schema from data / database introspection | Used by `rebase schema introspect` |
 | `@rebasepro/plugin-data-enhancement` | AI-powered data autofill | Studio plugin for auto-completing fields |
 | `@rebasepro/cli` | CLI tool | The `rebase` CLI binary |
 | `@rebasepro/utils` | Utility functions | Low-level shared helpers |

@@ -2,7 +2,7 @@ import { FieldCaption } from "../../../_cms_internals";
 import React from "react";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
-import { getIn, useFormex } from "@rebasepro/formex";
+import { getIn, useFormex } from "@rebasepro/forms";
 import { useTranslation } from "@rebasepro/core";
 ;
 import { Select, SelectItem, TextField } from "@rebasepro/ui";

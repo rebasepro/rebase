@@ -23,7 +23,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { Field, getIn, useFormex } from "@rebasepro/formex";
+import { Field, getIn, useFormex } from "@rebasepro/forms";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { singular, toSnakeCase } from "@rebasepro/utils";
 import type { ExtraCollectionFieldsParams } from "../../extensibility_types";

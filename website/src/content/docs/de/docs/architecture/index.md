@@ -81,10 +81,10 @@ Wie Treiber werden auch Speicher-Backends in einer Registrierung erfasst. Sie k�
 | `@rebasepro/auth` | Login-Ansichten, Auth-Controller-Hooks, Benutzerverwaltung | Frontend |
 | `@rebasepro/studio` | Sammlungseditor, SQL-Konsole, JS-Konsole, RLS-Editor, Speicherbrowser | Frontend |
 | `@rebasepro/cli` | CLI für Schema-Generierung, DB-Migrationen, SDK-Generierung | Entwicklertools |
-| `@rebasepro/formex` | Leichtes React-Formularstatusmanagement | Frontend |
+| `@rebasepro/forms` | Leichtes React-Formularstatusmanagement | Frontend |
 | `@rebasepro/plugin-data-enhancement` | KI-gestütztes Plugin zur automatischen Feldvervollständigung | Frontend |
 | `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel-Import und -Export | Frontend |
-| `@rebasepro/schema-inference` | Automatische Schemaerkennung aus vorhandenen Datenbankdaten | Backend/CLI |
+| `@rebasepro/inference` | Automatische Schemaerkennung aus vorhandenen Datenbankdaten | Backend/CLI |
 
 ## Datenfluss
 

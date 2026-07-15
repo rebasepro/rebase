@@ -5,7 +5,7 @@ import React from "react";
 import JSON5 from "json5";
 import { Highlight, themes } from "prism-react-renderer"
 import { camelCase } from "./utils/strings";
-import { clone } from "@rebasepro/formex";
+import { clone } from "@rebasepro/forms";
 import { isEmptyObject } from "@rebasepro/utils";
 
 export function GetCodeDialog({

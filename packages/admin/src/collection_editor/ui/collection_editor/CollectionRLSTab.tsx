@@ -37,7 +37,7 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 import { useRebaseContext } from "@rebasepro/core";
 
 /** Postgres RLS policy shape — defined inline to avoid depending on @rebasepro/studio */

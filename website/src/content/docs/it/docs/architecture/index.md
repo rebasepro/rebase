@@ -81,10 +81,10 @@ Come i driver, i backend di storage sono registrati in un registro. Puoi avere p
 | `@rebasepro/auth` | Viste di login, hook del controller di autenticazione, gestione utenti | Frontend |
 | `@rebasepro/studio` | Editor di collezioni, console SQL, console JS, editor RLS, browser di storage | Frontend |
 | `@rebasepro/cli` | CLI per generazione schema, migrazioni DB, generazione SDK | Strumenti di sviluppo |
-| `@rebasepro/formex` | Gestione dello stato dei form React leggera | Frontend |
+| `@rebasepro/forms` | Gestione dello stato dei form React leggera | Frontend |
 | `@rebasepro/plugin-data-enhancement` | Plugin di autocompletamento campi basato su AI | Frontend |
 | `@rebasepro/plugin-data-import-export` | Importazione ed esportazione CSV/JSON/Excel | Frontend |
-| `@rebasepro/schema-inference` | Rilevamento automatico dello schema dai dati del database esistenti | Backend/CLI |
+| `@rebasepro/inference` | Rilevamento automatico dello schema dai dati del database esistenti | Backend/CLI |
 
 ## Flusso dei Dati
 

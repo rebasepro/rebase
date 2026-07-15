@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { CollectionConfig } from "@rebasepro/types";
-import { generateSDK, GeneratedFile } from "@rebasepro/sdk-generator";
+import { generateSDK, GeneratedFile } from "@rebasepro/codegen";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 
 interface GenerateSDKArgs {

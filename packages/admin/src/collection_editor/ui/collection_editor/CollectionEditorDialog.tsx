@@ -52,11 +52,11 @@ import { CollectionPropertiesEditorForm } from "./CollectionPropertiesEditorForm
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionEditorWelcomeView } from "./CollectionEditorWelcomeView";
 import { CollectionInference } from "../../types/collection_inference";
-import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
+import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { CollectionEditorImportMapping } from "./import/CollectionEditorImportMapping";
 import { CollectionEditorImportDataPreview } from "./import/CollectionEditorImportDataPreview";
 import { cleanPropertiesFromImport } from "./import/clean_import_data";
-import { Formex, FormexController, useCreateFormex } from "@rebasepro/formex";
+import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 import { getFullIdPath } from "./util";
 import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { AIModifiedPathsProvider, useAIModifiedPaths } from "./AIModifiedPathsContext";

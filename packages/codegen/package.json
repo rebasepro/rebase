@@ -1,5 +1,5 @@
 {
-  "name": "@rebasepro/sdk-generator",
+  "name": "@rebasepro/codegen",
   "version": "0.9.0",
   "description": "Generate a typed JS SDK from Rebase collection definitions",
   "main": "./dist/index.cjs",
@@ -56,6 +56,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "packages/sdk-generator"
+    "directory": "packages/codegen"
   }
 }

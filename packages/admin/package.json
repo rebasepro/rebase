@@ -66,8 +66,8 @@
     "@floating-ui/dom": "^1.7.6",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/core": "workspace:*",
-    "@rebasepro/formex": "workspace:*",
-    "@rebasepro/schema-inference": "workspace:*",
+    "@rebasepro/forms": "workspace:*",
+    "@rebasepro/inference": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",
@@ -166,7 +166,7 @@
       "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/formex$": "<rootDir>/../formex/src/index.ts",
+      "^@rebasepro/forms$": "<rootDir>/../formex/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
     }
   }

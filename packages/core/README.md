@@ -170,5 +170,5 @@ function ProductList() {
 - [`@rebasepro/ui`](../ui) — Design system components
 - [`@rebasepro/common`](../common) — Shared utilities and collection registry
 - [`@rebasepro/types`](../types) — TypeScript type definitions
-- [`@rebasepro/formex`](../formex) — Form state management
+- [`@rebasepro/forms`](../formex) — Form state management
 - [`@rebasepro/client`](../client) — HTTP client SDK

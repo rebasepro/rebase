@@ -26,7 +26,7 @@ import { blogCollectionTemplate } from "./templates/blog_template";
 import { usersCollectionTemplate } from "./templates/users_template";
 import { ImportFileUpload } from "../../_cms_internals";
 import { pagesCollectionTemplate } from "./templates/pages_template";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 import { useCollectionEditorController } from "../../useCollectionEditorController";
 import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { CollectionGenerationCallback } from "../../api/generateCollectionApi";

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button, Paper, PlusIcon, Typography } from "@rebasepro/ui";
-import { getIn, useFormex } from "@rebasepro/formex";
+import { getIn, useFormex } from "@rebasepro/forms";
 import { OnPropertyChangedParams, PropertyFormDialog } from "../PropertyEditView";
 import {
     getFullId,

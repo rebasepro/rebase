@@ -18,7 +18,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 import { LayoutModeSwitch } from "./LayoutModeSwitch";
 import { ViewModeSwitch } from "./ViewModeSwitch";
 import { KanbanConfigSection } from "./KanbanConfigSection";

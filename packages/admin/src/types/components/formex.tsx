@@ -1,2 +1,2 @@
-export type { FormexController, FormexResetProps } from "@rebasepro/formex";
+export type { FormexController, FormexResetProps } from "@rebasepro/forms";
 

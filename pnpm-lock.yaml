@@ -398,12 +398,12 @@ importers:
       '@rebasepro/core':
         specifier: workspace:*
         version: link:../core
-      '@rebasepro/formex':
+      '@rebasepro/forms':
         specifier: workspace:*
-        version: link:../formex
-      '@rebasepro/schema-inference':
+        version: link:../forms
+      '@rebasepro/inference':
         specifier: workspace:*
-        version: link:../schema-inference
+        version: link:../inference
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -607,9 +607,9 @@ importers:
       '@rebasepro/client':
         specifier: workspace:*
         version: link:../client
-      '@rebasepro/sdk-generator':
+      '@rebasepro/codegen':
         specifier: workspace:*
-        version: link:../sdk-generator
+        version: link:../codegen
       '@rebasepro/server-core':
         specifier: workspace:*
         version: link:../server-core
@@ -828,6 +828,40 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
+  packages/codegen:
+    dependencies:
+      '@rebasepro/client':
+        specifier: workspace:*
+        version: link:../client
+    devDependencies:
+      '@jest/globals':
+        specifier: ^30.4.1
+        version: 30.4.1
+      '@rebasepro/common':
+        specifier: workspace:*
+        version: link:../common
+      '@rebasepro/types':
+        specifier: workspace:*
+        version: link:../types
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
+      '@types/node':
+        specifier: ^25.9.3
+        version: 25.9.3
+      jest:
+        specifier: ^30.4.2
+        version: 30.4.2(@types/node@25.9.3)
+      ts-jest:
+        specifier: ^29.4.11
+        version: 29.4.11(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(esbuild@0.28.1)(jest-util@30.4.1)(jest@30.4.2(@types/node@25.9.3))(typescript@6.0.3)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+
   packages/common:
     dependencies:
       '@rebasepro/types':
@@ -900,9 +934,9 @@ importers:
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
-      '@rebasepro/formex':
+      '@rebasepro/forms':
         specifier: workspace:*
-        version: link:../formex
+        version: link:../forms
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -1004,7 +1038,7 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
-  packages/formex:
+  packages/forms:
     dependencies:
       fast-equals:
         specifier: 6.0.0
@@ -1037,6 +1071,33 @@ importers:
       babel-plugin-react-compiler:
         specifier: 19.0.0-beta-ebf51a3-20250411
         version: 19.0.0-beta-ebf51a3-20250411
+      jest:
+        specifier: ^30.4.2
+        version: 30.4.2(@types/node@25.9.3)
+      ts-jest:
+        specifier: ^29.4.11
+        version: 29.4.11(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(esbuild@0.28.1)(jest-util@30.4.1)(jest@30.4.2(@types/node@25.9.3))(typescript@6.0.3)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+
+  packages/inference:
+    devDependencies:
+      '@rebasepro/types':
+        specifier: workspace:*
+        version: link:../types
+      '@rebasepro/utils':
+        specifier: workspace:*
+        version: link:../utils
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
+      '@types/node':
+        specifier: ^25.9.3
+        version: 25.9.3
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@25.9.3)
@@ -1197,67 +1258,6 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
-  packages/schema-inference:
-    devDependencies:
-      '@rebasepro/types':
-        specifier: workspace:*
-        version: link:../types
-      '@rebasepro/utils':
-        specifier: workspace:*
-        version: link:../utils
-      '@types/jest':
-        specifier: ^30.0.0
-        version: 30.0.0
-      '@types/node':
-        specifier: ^25.9.3
-        version: 25.9.3
-      jest:
-        specifier: ^30.4.2
-        version: 30.4.2(@types/node@25.9.3)
-      ts-jest:
-        specifier: ^29.4.11
-        version: 29.4.11(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(esbuild@0.28.1)(jest-util@30.4.1)(jest@30.4.2(@types/node@25.9.3))(typescript@6.0.3)
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vite:
-        specifier: ^8.0.16
-        version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
-
-  packages/sdk-generator:
-    dependencies:
-      '@rebasepro/client':
-        specifier: workspace:*
-        version: link:../client
-    devDependencies:
-      '@jest/globals':
-        specifier: ^30.4.1
-        version: 30.4.1
-      '@rebasepro/common':
-        specifier: workspace:*
-        version: link:../common
-      '@rebasepro/types':
-        specifier: workspace:*
-        version: link:../types
-      '@types/jest':
-        specifier: ^30.0.0
-        version: 30.0.0
-      '@types/node':
-        specifier: ^25.9.3
-        version: 25.9.3
-      jest:
-        specifier: ^30.4.2
-        version: 30.4.2(@types/node@25.9.3)
-      ts-jest:
-        specifier: ^29.4.11
-        version: 29.4.11(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(esbuild@0.28.1)(jest-util@30.4.1)(jest@30.4.2(@types/node@25.9.3))(typescript@6.0.3)
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vite:
-        specifier: ^8.0.16
-        version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
-
   packages/server-core:
     dependencies:
       '@aws-sdk/client-s3':
@@ -1403,12 +1403,12 @@ importers:
       '@ariga/atlas':
         specifier: ^1.2.2
         version: 1.2.2
+      '@rebasepro/codegen':
+        specifier: workspace:*
+        version: link:../codegen
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
-      '@rebasepro/sdk-generator':
-        specifier: workspace:*
-        version: link:../sdk-generator
       '@rebasepro/server-core':
         specifier: workspace:*
         version: link:../server-core

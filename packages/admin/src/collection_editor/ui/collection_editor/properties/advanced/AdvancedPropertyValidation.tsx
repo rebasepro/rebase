@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Field, FormexFieldProps } from "@rebasepro/formex";
+import { Field, FormexFieldProps } from "@rebasepro/forms";
 import { SwitchControl } from "../../SwitchControl";
 
 export function AdvancedPropertyValidation({ disabled }: {

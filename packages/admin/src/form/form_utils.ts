@@ -1,7 +1,7 @@
 import type { CollectionConfig, PropertyConfig } from "@rebasepro/types";
 import type { AuthController, Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
-import { getIn, setIn } from "@rebasepro/formex";
+import { getIn, setIn } from "@rebasepro/forms";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import { isObject, mergeDeep } from "@rebasepro/utils";
 import { z } from "zod";

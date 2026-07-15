@@ -34,7 +34,7 @@
   "dependencies": {
     "@rebasepro/agent-skills": "workspace:*",
     "@rebasepro/client": "workspace:*",
-    "@rebasepro/sdk-generator": "workspace:*",
+    "@rebasepro/codegen": "workspace:*",
     "@rebasepro/server-core": "workspace:*",
     "@rebasepro/server-postgresql": "workspace:*",
     "@rebasepro/types": "workspace:*",

@@ -77,7 +77,7 @@
   "dependencies": {
     "@ariga/atlas": "^1.2.2",
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/sdk-generator": "workspace:*",
+    "@rebasepro/codegen": "workspace:*",
     "@rebasepro/server-core": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",

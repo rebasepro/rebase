@@ -1,7 +1,7 @@
 import { IconForView, useTranslation } from "@rebasepro/core";
 import { FieldCaption, useCollectionRegistryController } from "../../../_cms_internals";
 import React from "react";
-import { Field, getIn, useFormex } from "@rebasepro/formex";
+import { Field, getIn, useFormex } from "@rebasepro/forms";
 ;
 import { NumberProperty, StringProperty } from "@rebasepro/types";
 import { CircularProgress, Select, SelectItem, Typography } from "@rebasepro/ui";

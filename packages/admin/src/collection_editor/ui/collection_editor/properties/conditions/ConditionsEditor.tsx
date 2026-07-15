@@ -1,6 +1,6 @@
 
 import React from "react";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 import {
     BooleanSwitchWithLabel,
     Button,

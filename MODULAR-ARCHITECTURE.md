@@ -71,7 +71,7 @@ The same files are consumed twice:
   (`rebaseCollectionsPlugin` from `@rebasepro/core/vitePlugin`)
 
 Install: the BaaS set plus `@rebasepro/core`, `@rebasepro/admin`, `@rebasepro/ui`,
-`@rebasepro/auth`, `@rebasepro/formex`.
+`@rebasepro/auth`, `@rebasepro/forms`.
 
 ### The collection-file import rule
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 
 export const ErrorFocus = ({ containerRef }:
     {

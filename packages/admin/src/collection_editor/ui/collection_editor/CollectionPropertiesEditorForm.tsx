@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 
-import { Field, getIn, useFormex } from "@rebasepro/formex";
+import { Field, getIn, useFormex } from "@rebasepro/forms";
 import {
     useLargeLayout
 } from "@rebasepro/core";

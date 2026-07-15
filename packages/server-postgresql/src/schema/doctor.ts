@@ -14,7 +14,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
-import { generateTypedefs } from "@rebasepro/sdk-generator";
+import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server-core";

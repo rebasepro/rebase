@@ -2,7 +2,7 @@ import type { FieldProps, FormContext, PropertyFieldBindingProps } from "../../t
 import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useEffect, useState } from "react";
 
-import { Field, useFormex } from "@rebasepro/formex";
+import { Field, useFormex } from "@rebasepro/forms";
 
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";

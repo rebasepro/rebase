@@ -226,7 +226,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/types` | Core TypeScript type definitions |
 | `@rebasepro/utils` | Shared utility functions |
 | `@rebasepro/common` | Common modules shared across packages |
-| `@rebasepro/formex` | Lightweight form management library |
+| `@rebasepro/forms` | Lightweight form management library |
 | `@rebasepro/ui` | Standalone React component library (Tailwind + Radix) |
 | `@rebasepro/core` | Core CMS logic and controllers |
 | `@rebasepro/client` | Client-side data access layer |
@@ -239,9 +239,9 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/admin` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, RLS editor, schema visualizer, API explorer |
 | `@rebasepro/cli` | CLI for project scaffolding and management |
-| `@rebasepro/sdk-generator` | TypeScript SDK code generation |
+| `@rebasepro/codegen` | TypeScript SDK code generation |
 | `@rebasepro/mcp` | MCP server for AI integrations |
-| `@rebasepro/schema-inference` | Database schema introspection and inference |
+| `@rebasepro/inference` | Database schema introspection and inference |
 | `@rebasepro/plugin-data-enhancement` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |
 

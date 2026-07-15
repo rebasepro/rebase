@@ -78,11 +78,11 @@
       "@rebasepro/core/*": [
         "packages/core/src/*"
       ],
-      "@rebasepro/formex": [
-        "packages/formex/src"
+      "@rebasepro/forms": [
+        "packages/forms/src"
       ],
-      "@rebasepro/formex/*": [
-        "packages/formex/src/*"
+      "@rebasepro/forms/*": [
+        "packages/forms/src/*"
       ],
       "@rebasepro/mcp": [
         "packages/mcp/src"
@@ -102,17 +102,17 @@
       "@rebasepro/plugin-insights/*": [
         "packages/plugin-insights/src/*"
       ],
-      "@rebasepro/schema-inference": [
-        "packages/schema-inference/src"
+      "@rebasepro/inference": [
+        "packages/inference/src"
       ],
-      "@rebasepro/schema-inference/*": [
-        "packages/schema-inference/src/*"
+      "@rebasepro/inference/*": [
+        "packages/inference/src/*"
       ],
-      "@rebasepro/sdk-generator": [
-        "packages/sdk-generator/src"
+      "@rebasepro/codegen": [
+        "packages/codegen/src"
       ],
-      "@rebasepro/sdk-generator/*": [
-        "packages/sdk-generator/src/*"
+      "@rebasepro/codegen/*": [
+        "packages/codegen/src/*"
       ],
       "@rebasepro/server-core": [
         "packages/server-core/src"
@@ -175,12 +175,12 @@
     "packages/client-postgresql/src",
     "packages/common/src",
     "packages/core/src",
-    "packages/formex/src",
+    "packages/forms/src",
     "packages/mcp/src",
     "packages/plugin-data-enhancement/src",
     "packages/plugin-insights/src",
-    "packages/schema-inference/src",
-    "packages/sdk-generator/src",
+    "packages/inference/src",
+    "packages/codegen/src",
     "packages/server-core/src",
     "packages/server-mongodb/src",
     "packages/server-postgresql/src",

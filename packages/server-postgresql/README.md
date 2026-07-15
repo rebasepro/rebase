@@ -82,5 +82,5 @@ process.on("SIGTERM", async () => {
 |---------|------|
 | `@rebasepro/server-core` | Backend orchestrator that consumes this adapter |
 | `@rebasepro/types` | Shared interfaces (`DatabaseAdapter`, `BackendBootstrapper`, `DataDriver`) |
-| `@rebasepro/sdk-generator` | Generates typed SDKs from collections |
+| `@rebasepro/codegen` | Generates typed SDKs from collections |
 | `@rebasepro/common` | Default collections and shared utilities |

@@ -74,5 +74,5 @@ pnpm run dev
 |---------|------|
 | `@rebasepro/server-core` | Backend framework used by `dev` and `start` |
 | `@rebasepro/server-postgresql` | PostgreSQL driver used by schema/db commands |
-| `@rebasepro/sdk-generator` | Powers `generate-sdk` |
+| `@rebasepro/codegen` | Powers `generate-sdk` |
 | `@rebasepro/types` | Shared type definitions |

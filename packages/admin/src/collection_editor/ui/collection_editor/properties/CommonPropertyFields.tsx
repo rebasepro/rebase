@@ -1,5 +1,5 @@
 import { FieldCaption } from "../../../_cms_internals";
-import { Field, getIn, useFormex } from "@rebasepro/formex";
+import { Field, getIn, useFormex } from "@rebasepro/forms";
 import { DebouncedTextField } from "@rebasepro/ui";
 import { PropertyWithId } from "../PropertyEditView";
 import React from "react";

@@ -13,7 +13,7 @@ import { getDefaultValuesFor, isHidden, isReadOnly } from "@rebasepro/common";
 import { useCustomizationController } from "@rebasepro/core";
 import { getFormFieldKeys } from "@rebasepro/core";
 import { Alert, Button, Chip, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
-import { Formex, FormexController, useCreateFormex } from "@rebasepro/formex";
+import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
 import { FormEntry, FormLayout, LabelWithIconAndTooltip, PropertyFieldBinding } from "../form";
 import { flattenKeys } from "@rebasepro/core";

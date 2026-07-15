@@ -43,7 +43,7 @@
       "@rebasepro/common": [
         "../common/src"
       ],
-      "@rebasepro/formex": [
+      "@rebasepro/forms": [
         "../formex/src"
       ],
       "@rebasepro/admin": [
@@ -53,7 +53,7 @@
       "@rebasepro/plugin-data-enhancement": [
         "../plugin-data-enhancement/src"
       ],
-      "@rebasepro/schema-inference": [
+      "@rebasepro/inference": [
         "../schema-inference/src"
       ],
       "@rebasepro/ui": [

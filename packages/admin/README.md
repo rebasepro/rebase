@@ -135,5 +135,5 @@ function App() {
 - [`@rebasepro/ui`](../ui) — Design system components (buttons, dialogs, inputs, etc.)
 - [`@rebasepro/common`](../common) — Shared utilities, collection registry, query builder
 - [`@rebasepro/types`](../types) — TypeScript type definitions
-- [`@rebasepro/formex`](../formex) — Form state management
-- [`@rebasepro/schema-inference`](../schema-inference) — Schema introspection from databases
+- [`@rebasepro/forms`](../formex) — Form state management
+- [`@rebasepro/inference`](../schema-inference) — Schema introspection from databases

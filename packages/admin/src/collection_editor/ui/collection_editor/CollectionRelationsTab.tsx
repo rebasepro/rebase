@@ -21,7 +21,7 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 import { PostgresCollectionConfig, Relation } from "@rebasepro/types";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 

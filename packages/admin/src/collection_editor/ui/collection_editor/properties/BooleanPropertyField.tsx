@@ -1,5 +1,5 @@
 import React from "react";
-import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/formex";
+import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/forms";
 
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";

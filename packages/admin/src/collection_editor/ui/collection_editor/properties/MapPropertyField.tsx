@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { MapProperty, Property, PropertyConfig } from "@rebasepro/types";
 import { BooleanSwitchWithLabel, Button, Paper, PlusIcon, Typography } from "@rebasepro/ui";
 import { PropertyFormDialog } from "../PropertyEditView";
-import { getIn, useFormex } from "@rebasepro/formex";
+import { getIn, useFormex } from "@rebasepro/forms";
 import { useTranslation } from "@rebasepro/core";
 import { PropertyTree } from "../PropertyTree";
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath, namespaceToPropertiesPath } from "../util";

@@ -35,7 +35,7 @@ import {
     useSlot
 } from "@rebasepro/core";
 import { useAnalyticsController } from "@rebasepro/core";
-import { setIn } from "@rebasepro/formex";
+import { setIn } from "@rebasepro/forms";
 import { useBoardDataController } from "./useBoardDataController";
 import { useKanbanDragAndDrop } from "./hooks/useKanbanDragAndDrop";
 import { useSidePanel } from "../../index";

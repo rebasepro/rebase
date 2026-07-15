@@ -763,7 +763,7 @@ This starts both frontend and backend. The Studio is accessible at `http://local
 | `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
 | `@rebasepro/types` | Shared TypeScript types |
 | `@rebasepro/plugin-data-enhancement` | AI-powered autofill |
-| `@rebasepro/schema-inference` | Auto-infer schema from data |
+| `@rebasepro/inference` | Auto-infer schema from data |
 
 ## References
 

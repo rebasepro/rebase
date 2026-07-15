@@ -16,7 +16,7 @@ import {
     useTranslation
 } from "@rebasepro/core";
 import { SideDialogController, useSideDialogContext } from "./SideDialogs";
-import { FormexController } from "@rebasepro/formex";
+import { FormexController } from "@rebasepro/forms";
 import { ErrorTooltip } from "@rebasepro/core";
 import { usePermissions } from "@rebasepro/core";
 import { useCMSContext } from "../index";

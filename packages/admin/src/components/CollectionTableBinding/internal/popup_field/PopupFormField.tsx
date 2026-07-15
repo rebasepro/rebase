@@ -8,7 +8,7 @@ import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@r
 
 import { Entity, EntityValues } from "@rebasepro/types";
 import { PluginProviderStack } from "@rebasepro/core";
-import { Formex, FormexController, useCreateFormex } from "@rebasepro/formex";
+import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";
 import { CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
 import { useWindowSize } from "./useWindowSize";

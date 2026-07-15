@@ -612,6 +612,6 @@ export function useAuth() {
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
 - **Client package source:** `packages/client/src/`
-- **SDK generator source:** `packages/sdk-generator/src/`
+- **SDK generator source:** `packages/codegen/src/`
 - **QueryBuilder source:** `packages/common/src/data/query_builder.ts`
 - **SDK demo example:** `examples/sdk-demo/`

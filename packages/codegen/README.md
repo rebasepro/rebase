@@ -1,11 +1,11 @@
-# @rebasepro/sdk-generator
+# @rebasepro/codegen
 
 Generates typed TypeScript definitions from Rebase collection definitions — produces `Database` interface with `Row`, `Insert`, and `Update` types for each collection.
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/sdk-generator
+pnpm add @rebasepro/codegen
 ```
 
 ### Peer Dependencies
@@ -15,7 +15,7 @@ pnpm add @rebasepro/sdk-generator
 
 ## What This Package Does
 
-`@rebasepro/sdk-generator` takes an array of `CollectionConfig` definitions and produces TypeScript type files that provide full autocompletion when used with `@rebasepro/client`. It handles property types, enums, relations, maps, arrays, geopoints, vectors, and validation-based optionality.
+`@rebasepro/codegen` takes an array of `CollectionConfig` definitions and produces TypeScript type files that provide full autocompletion when used with `@rebasepro/client`. It handles property types, enums, relations, maps, arrays, geopoints, vectors, and validation-based optionality.
 
 This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than called directly.
 
@@ -62,7 +62,7 @@ This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than ca
 ## Quick Start
 
 ```typescript
-import { generateSDK } from "@rebasepro/sdk-generator";
+import { generateSDK } from "@rebasepro/codegen";
 import type { CollectionConfig } from "@rebasepro/types";
 
 const collections: CollectionConfig[] = [/* your collections */];

@@ -1,16 +1,16 @@
-# @rebasepro/schema-inference
+# @rebasepro/inference
 
 Automatically infer Rebase collection property schemas from sample data — analyzes field types, detects enums, references, validation rules, and nested structures.
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/schema-inference
+pnpm add @rebasepro/inference
 ```
 
 ## What This Package Does
 
-`@rebasepro/schema-inference` examines arrays of data objects and produces `Properties` definitions compatible with the Rebase collection schema. It uses statistical analysis to determine the most probable type for each field, detect enum values, identify reference patterns, and build nested map/array structures. Used by the Rebase introspection pipeline and data import tools.
+`@rebasepro/inference` examines arrays of data objects and produces `Properties` definitions compatible with the Rebase collection schema. It uses statistical analysis to determine the most probable type for each field, detect enum values, identify reference patterns, and build nested map/array structures. Used by the Rebase introspection pipeline and data import tools.
 
 ## Key Exports
 
@@ -50,7 +50,7 @@ pnpm add @rebasepro/schema-inference
 import {
     buildSnapshotPropertiesFromData,
     inferTypeFromValue
-} from "@rebasepro/schema-inference";
+} from "@rebasepro/inference";
 
 const sampleData = [
     { name: "Alice", age: 30, active: true, role: "admin" },

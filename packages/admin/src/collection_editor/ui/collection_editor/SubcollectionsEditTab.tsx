@@ -27,7 +27,7 @@ import { CollectionEditorDialog } from "./CollectionEditorDialog";
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionInference } from "../../types/collection_inference";
 import { EntityCustomViewsSelectDialog } from "./EntityCustomViewsSelectDialog";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 
 export function SubcollectionsEditTab({
     collection,

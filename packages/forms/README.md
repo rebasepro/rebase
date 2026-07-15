@@ -1,11 +1,11 @@
-# @rebasepro/formex
+# @rebasepro/forms
 
 Lightweight React form state management with undo/redo support.
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/formex
+pnpm add @rebasepro/forms
 ```
 
 **Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`
@@ -64,7 +64,7 @@ Formex is a minimal, Formik-inspired form library used throughout the Rebase adm
 ## Quick Start
 
 ```tsx
-import { useCreateFormex, Formex, useFormex, Field } from "@rebasepro/formex";
+import { useCreateFormex, Formex, useFormex, Field } from "@rebasepro/forms";
 
 function MyForm() {
     const controller = useCreateFormex({

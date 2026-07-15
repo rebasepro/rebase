@@ -16,7 +16,7 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { getIn, setIn } from "@rebasepro/formex";
+import { getIn, setIn } from "@rebasepro/forms";
 import { ImportConfig } from "../types";
 
 export interface DataPropertyMappingProps {

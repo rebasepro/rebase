@@ -66,11 +66,11 @@
       "@rebasepro/client": [
         "../../packages/client/src"
       ],
-      "@rebasepro/formex": [
-        "../../packages/formex/src"
+      "@rebasepro/forms": [
+        "../../packages/forms/src"
       ],
-      "@rebasepro/schema-inference": [
-        "../../packages/schema-inference/src"
+      "@rebasepro/inference": [
+        "../../packages/inference/src"
       ],
       "config": [
         "../config"

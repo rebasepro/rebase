@@ -25,7 +25,7 @@ const FORBIDDEN_PACKAGES = [
     "@rebasepro/ui",
     "@rebasepro/core",
     "@rebasepro/studio",
-    "@rebasepro/formex"
+    "@rebasepro/forms"
 ];
 
 /** Resolved-URL fragments identifying the same packages once on disk. */
@@ -38,7 +38,7 @@ const FORBIDDEN_PATHS = [
     "/packages/ui/",
     "/packages/core/",
     "/packages/studio/",
-    "/packages/formex/"
+    "/packages/forms/"
 ];
 
 /** package name -> source entry file, built by scanning packages/ * /package.json. */

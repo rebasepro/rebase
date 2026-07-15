@@ -6,7 +6,7 @@ import { deepEqual as equal } from "fast-equals"
 
 import { resolveComponentRef } from "@rebasepro/core";
 
-import { Field, FormexFieldProps, getIn } from "@rebasepro/formex";
+import { Field, FormexFieldProps, getIn } from "@rebasepro/forms";
 
 ;
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";

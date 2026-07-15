@@ -29,7 +29,7 @@ import {
     Typography,
     UploadIcon
 } from "@rebasepro/ui";
-import { buildEntityPropertiesFromData } from "@rebasepro/schema-inference";
+import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { useImportConfig } from "../hooks";
 import { convertDataToEntity, getInferenceType } from "../utils";
 import { DataNewPropertiesMapping, ImportFileUpload, ImportSaveInProgress } from "../components";

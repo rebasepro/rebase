@@ -16,7 +16,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { FormexController } from "@rebasepro/formex";
+import { FormexController } from "@rebasepro/forms";
 
 export function EntityFormActions({
     path,

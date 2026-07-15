@@ -16,7 +16,7 @@ import {
     useTranslation,
     useSlot
 } from "@rebasepro/core";
-import { FormexController } from "@rebasepro/formex";
+import { FormexController } from "@rebasepro/forms";
 import { useAnalyticsController } from "@rebasepro/core";
 
 import {

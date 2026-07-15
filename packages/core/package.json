@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/formex": "workspace:*",
+    "@rebasepro/forms": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",
@@ -140,7 +140,7 @@
       "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/formex$": "<rootDir>/../formex/src/index.ts"
+      "^@rebasepro/forms$": "<rootDir>/../formex/src/index.ts"
     }
   }
 }

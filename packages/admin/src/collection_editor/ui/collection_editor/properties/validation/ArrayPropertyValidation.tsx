@@ -1,6 +1,6 @@
 import React from "react";
 
-import { getIn, useFormex } from "@rebasepro/formex";
+import { getIn, useFormex } from "@rebasepro/forms";
 import { DebouncedTextField } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/core";
 import { GeneralPropertyValidation } from "./GeneralPropertyValidation";

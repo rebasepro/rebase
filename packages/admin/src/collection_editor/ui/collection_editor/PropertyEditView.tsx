@@ -2,7 +2,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/formex";
+import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
 import { ConfirmationDialog } from "@rebasepro/core";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";

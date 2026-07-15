@@ -2,7 +2,7 @@ import { DataNewPropertiesMapping } from "../../../../data_import/components/Dat
 import { getInferenceType } from "../../../../data_import/utils/get_import_inference_type";
 import { ImportConfig } from "../../../../data_import/types";
 import { ImportNewPropertyFieldPreview } from "../../../../data_import/components/ImportNewPropertyFieldPreview";
-import { getIn, useFormex } from "@rebasepro/formex";
+import { getIn, useFormex } from "@rebasepro/forms";
 
 import { getFieldConfig, getFieldId } from "../../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../../components/PropertyConfigBadge";
@@ -13,7 +13,7 @@ import { OnPropertyChangedParams, PropertyFormDialog, PropertyWithId } from "../
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "../util";
 import { updatePropertyFromWidget } from "../utils/update_property_for_widget";
 import { supportedFields } from "../utils/supported_fields";
-import { buildPropertyFromData } from "@rebasepro/schema-inference";
+import { buildPropertyFromData } from "@rebasepro/inference";
 
 export function CollectionEditorImportMapping({
     importConfig,

@@ -6,7 +6,7 @@ import { CollectionConfig, Property } from "@rebasepro/types";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { getFieldConfig } from "../../../components/field_configs";
 import { Button, IconButton, iconSize, Select, SelectItem, Typography, XIcon } from "@rebasepro/ui";
-import { useFormex } from "@rebasepro/formex";
+import { useFormex } from "@rebasepro/forms";
 import { PropertyFormDialog } from "./PropertyEditView";
 import { unslugify } from "@rebasepro/utils";
 

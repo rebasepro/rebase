@@ -1,4 +1,4 @@
-import { FormexController } from "@rebasepro/formex";
+import { FormexController } from "@rebasepro/forms";
 
 export function createFormexStub<T extends object>(values: T): FormexController<T> {
     const errorMessage = "You are in a read-only context. You cannot modify the formex controller.";
