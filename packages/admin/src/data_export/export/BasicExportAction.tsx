@@ -1,7 +1,7 @@
 
 import React, { useCallback } from "react";
 
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { Entity, Properties } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,

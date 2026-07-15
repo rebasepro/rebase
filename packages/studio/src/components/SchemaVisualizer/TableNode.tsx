@@ -2,7 +2,7 @@ import React, { memo, useMemo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import { Typography, Chip, Tooltip, cls } from "@rebasepro/ui";
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import type { TableNodeData, ColumnInfo } from "./useSchemaGraph";
 import { getColumnRowY, getHeaderHeight } from "./schema-visualizer.utils";
 

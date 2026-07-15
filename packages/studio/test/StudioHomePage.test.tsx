@@ -3,8 +3,8 @@ import { render, screen } from "@testing-library/react";
 import { StudioHomePage } from "../src/components/StudioHomePage";
 import "@testing-library/jest-dom";
 
-// Mock @rebasepro/core hooks and components
-jest.mock("@rebasepro/core", () => ({
+// Mock @rebasepro/app hooks and components
+jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => ({
         baseUrl: "http://localhost:3001",
         collections: []

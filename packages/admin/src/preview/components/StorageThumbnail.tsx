@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
-import { ErrorView, useStorageSource, useStorageSources } from "@rebasepro/core";
+import { ErrorView, useStorageSource, useStorageSources } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";

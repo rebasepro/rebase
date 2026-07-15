@@ -128,7 +128,7 @@ await roleService.assignRole(userId, roleId);
 Rebase fornece visualizações integradas para gerenciar usuários e funções:
 
 ```tsx
-import { UsersView, RolesView } from "@rebasepro/core";
+import { UsersView, RolesView } from "@rebasepro/app";
 import { useBackendUserManagement } from "@rebasepro/auth";
 
 const userManagement = useBackendUserManagement({
@@ -148,7 +148,7 @@ const userManagement = useBackendUserManagement({
 No modo de desenvolvedor, você pode simular diferentes funções sem sair da sua conta:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/core";
+import { useBuildEffectiveRoleController } from "@rebasepro/app";
 
 const effectiveRoleController = useBuildEffectiveRoleController();
 

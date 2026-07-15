@@ -10,8 +10,8 @@ import {
     resolveDefaultSelectedView
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
-import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/core";
-import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
+import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/app";
+import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EditViewBinding";
 import React from "react";
 import { SidePanelBinding } from "../components/SidePanelBinding";

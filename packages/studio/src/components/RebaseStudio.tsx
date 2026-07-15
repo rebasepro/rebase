@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useLayoutEffect, useMemo } from "react";
-import { useRebaseRegistryDispatch } from "@rebasepro/core";
+import { useRebaseRegistryDispatch } from "@rebasepro/app";
 import type { RebaseStudioConfig, AppView } from "@rebasepro/types";
 import { CircularProgressCenter } from "@rebasepro/ui";
 

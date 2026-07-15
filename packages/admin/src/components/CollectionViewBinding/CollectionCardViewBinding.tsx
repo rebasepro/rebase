@@ -8,7 +8,7 @@ import {
     Typography,
     CardView
 } from "@rebasepro/ui";
-import { useComponentOverride } from "@rebasepro/core";
+import { useComponentOverride } from "@rebasepro/app";
 
 export type CollectionCardViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: CollectionConfig<M>;

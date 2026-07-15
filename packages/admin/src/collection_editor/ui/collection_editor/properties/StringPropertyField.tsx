@@ -3,7 +3,7 @@ import React from "react";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 import { getIn, useFormex } from "@rebasepro/forms";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 ;
 import { Select, SelectItem, TextField } from "@rebasepro/ui";
 

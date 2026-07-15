@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useApiConfig } from "@rebasepro/core";
+import { useApiConfig } from "@rebasepro/app";
 
 export interface HistoryEntryData {
     id: string;

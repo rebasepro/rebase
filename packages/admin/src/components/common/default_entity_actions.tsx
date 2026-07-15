@@ -23,7 +23,7 @@ import {
     useRebaseClient,
     useSnackbarController,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../CollectionViewBinding/utils";
 import { navigateToEntity } from "../../util/navigation_utils";

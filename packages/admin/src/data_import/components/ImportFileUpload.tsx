@@ -1,6 +1,6 @@
 import { FileUpload, UploadIcon } from "@rebasepro/ui";
 import { convertFileToJson } from "../utils/file_to_json";
-import { useSnackbarController } from "@rebasepro/core";
+import { useSnackbarController } from "@rebasepro/app";
 
 export function ImportFileUpload({ onDataAdded }: {
     onDataAdded: (data: object[], propertiesOrder?: string[]) => void

@@ -19,7 +19,7 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { MonacoEditor } from "../SQLEditor/MonacoEditor";
 import { PostgresPolicy } from "./RLSEditor";
 

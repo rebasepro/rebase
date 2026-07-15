@@ -82,7 +82,7 @@ const userManagement = useBackendUserManagement({
 Render the built-in user management interface:
 
 ```tsx
-import { UsersView } from "@rebasepro/core";
+import { UsersView } from "@rebasepro/app";
 
 // In your routes:
 <Route path="/users" element={<UsersView userManagement={userManagement} />} />
@@ -125,7 +125,7 @@ To add or remove role options, update the `enum` map in your users collection an
 In developer mode, you can simulate different roles without logging out. This is useful for testing RLS policies:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/core";
+import { useBuildEffectiveRoleController } from "@rebasepro/app";
 
 const effectiveRoleController = useBuildEffectiveRoleController();
 

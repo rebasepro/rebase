@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useRef } from "react";
 import { CollectionSize, Entity, RebaseContext, User, Property } from "@rebasepro/types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { useRebaseContext, useLargeLayout } from "@rebasepro/core";
+import { useRebaseContext, useLargeLayout } from "@rebasepro/app";
 import { CellRendererParams, VirtualTableColumn } from "@rebasepro/ui";
 import { CollectionRowActions } from "./CollectionRowActions";
 import { CollectionTableToolbar } from "./internal/CollectionTableToolbar";
@@ -12,10 +12,10 @@ import { EntityTableCell } from "./internal/EntityTableCell";
 import { CustomFieldValidator } from "../../form/validation";
 import { renderSkeletonText } from "../../preview";
 import { propertiesToColumns } from "./column_utils";
-import { ErrorView } from "@rebasepro/core";
+import { ErrorView } from "@rebasepro/app";
 import { SelectableTable } from "../SelectableTable/SelectableTable";
 import { cls } from "@rebasepro/ui";
-import { getRowHeight } from "@rebasepro/core";
+import { getRowHeight } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 
 /**

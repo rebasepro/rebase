@@ -11,7 +11,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 import { EnumValueConfig } from "@rebasepro/types";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 interface StringNumberFilterFieldProps {
     name: string,

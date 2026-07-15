@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useData, useRebaseContext } from "@rebasepro/core";
+import { useData, useRebaseContext } from "@rebasepro/app";
 
 const DEFAULT_PAGE_SIZE = 20;
 

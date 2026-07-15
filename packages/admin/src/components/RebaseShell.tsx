@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import {
     useRebaseRegistry
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { ErrorBoundary } from "@rebasepro/ui";
 
 import { RebaseAuthGate } from "./RebaseAuthGate";

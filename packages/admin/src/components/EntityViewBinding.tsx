@@ -5,8 +5,8 @@ import React from "react";
 import { Entity } from "@rebasepro/types";
 import { cls, defaultBorderMixin, ExternalLinkIcon, IconButton, Typography } from "@rebasepro/ui";
 ;
-import { useCustomizationController } from "@rebasepro/core";
-import { useAuthController } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/app";
+import { useAuthController } from "@rebasepro/app";
 import { PropertyCollectionView } from "./PropertyCollectionView";
 
 /**

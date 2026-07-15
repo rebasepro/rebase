@@ -18,7 +18,7 @@ import {
 import {
     AIIcon,
     useLargeLayout
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { EntityStatus, PluginFormActionProps, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder, stripCollectionPath } from "@rebasepro/common";
 import { useDataEnhancementController } from "./DataEnhancementControllerProvider";

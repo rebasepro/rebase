@@ -8,7 +8,7 @@ import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContaine
 import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, resolveRelationProperty } from "@rebasepro/common";
 
-import { ErrorView, useTranslation } from "@rebasepro/core";
+import { ErrorView, useTranslation } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { RelationPreview } from "../../preview";
 

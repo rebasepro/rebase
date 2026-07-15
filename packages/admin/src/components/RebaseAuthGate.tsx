@@ -2,9 +2,9 @@ import React from "react";
 import {
     useRebaseRegistry,
     useAuthController
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import { LoginView } from "@rebasepro/core";
+import { LoginView } from "@rebasepro/app";
 import type { AuthControllerExtended } from "@rebasepro/types";
 
 /**

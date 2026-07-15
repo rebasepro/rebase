@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 ;
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-import { useAdminModeController } from "@rebasepro/core";
+import { useAdminModeController } from "@rebasepro/app";
 export interface AdminModeSyncerProps {
     /**
      * Map of views designated as 'Studio' views.

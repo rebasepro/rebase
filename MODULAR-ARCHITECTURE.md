@@ -68,9 +68,9 @@ The same files are consumed twice:
 
 - **backend**, at runtime, via `loadCollectionsFromDirectory` (`collectionsDir`)
 - **frontend**, at build time, via `virtual:rebase-collections`
-  (`rebaseCollectionsPlugin` from `@rebasepro/core/vitePlugin`)
+  (`rebaseCollectionsPlugin` from `@rebasepro/app/vitePlugin`)
 
-Install: the BaaS set plus `@rebasepro/core`, `@rebasepro/admin`, `@rebasepro/ui`,
+Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/admin`, `@rebasepro/ui`,
 `@rebasepro/auth`, `@rebasepro/forms`.
 
 ### The collection-file import rule
@@ -101,7 +101,7 @@ control plane, not the CMS — it talks to the backend over HTTP through
 imports.
 
 Where Studio wants CMS capabilities (jumping from a SQL result to an entity, say) it
-asks for them through the **Studio bridge** (`useStudioBridge` in `@rebasepro/core`),
+asks for them through the **Studio bridge** (`useStudioBridge` in `@rebasepro/app`),
 whose context defaults to `NOOP_BRIDGE`. With a CMS present the app provides the real
 controllers and the views light up; without one they no-op and Studio stays a pure
 database console.

@@ -3,7 +3,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, getCollectionDataPath, Property } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 
 import { CollectionViewBinding, EntityViewBinding } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
@@ -25,7 +25,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { ErrorView, createFormexStub, usePermissions, useTranslation, getIcon } from "@rebasepro/core";
+import { ErrorView, createFormexStub, usePermissions, useTranslation, getIcon } from "@rebasepro/app";
 import {
     getSubcollections,
     removeInitialAndTrailingSlashes,
@@ -38,7 +38,7 @@ import {
     useRebaseContext,
     useLargeLayout,
     useSlot
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { useUrlController, useCollectionRegistryController } from "../index";
 import { useNavigate } from "react-router-dom";
 import { getValueInPath } from "@rebasepro/utils";

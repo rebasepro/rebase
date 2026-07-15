@@ -28,7 +28,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@rebasepro/core": ["../core/src"],
+      "@rebasepro/app": ["../app/src"],
       "@rebasepro/client": ["../client/src"],
       "@rebasepro/types": [
         "../types/src"

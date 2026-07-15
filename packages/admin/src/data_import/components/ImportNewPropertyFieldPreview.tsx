@@ -1,5 +1,5 @@
 import React from "react";
-import { useCustomizationController } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/app";
 import { Property } from "@rebasepro/types";
 import {
     getFieldConfig,

@@ -4,7 +4,7 @@ import type { RebasePlugin, PluginFieldBuilderParams, Property } from "@rebasepr
 import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { resolveComponentRef } from "@rebasepro/core";
+import { resolveComponentRef } from "@rebasepro/app";
 
 import { Field, FormexFieldProps, getIn } from "@rebasepro/forms";
 
@@ -12,7 +12,7 @@ import { Field, FormexFieldProps, getIn } from "@rebasepro/forms";
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 
 import { isHidden, isPropertyBuilder, isReadOnly, resolveProperty } from "@rebasepro/common";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { Typography } from "@rebasepro/ui";
 import { getFieldConfig, getFieldId } from "../components/field_configs";
 import { ErrorBoundary } from "@rebasepro/ui";

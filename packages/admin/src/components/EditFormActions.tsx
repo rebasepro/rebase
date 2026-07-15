@@ -14,11 +14,11 @@ import {
     useCustomizationController,
     useSnackbarController,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { SideDialogController, useSideDialogContext } from "./SideDialogs";
 import { FormexController } from "@rebasepro/forms";
-import { ErrorTooltip } from "@rebasepro/core";
-import { usePermissions } from "@rebasepro/core";
+import { ErrorTooltip } from "@rebasepro/app";
+import { usePermissions } from "@rebasepro/app";
 import { useCMSContext } from "../index";
 
 export function EditFormActions({

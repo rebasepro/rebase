@@ -110,6 +110,6 @@ const insightsPlugin = useInsightsPlugin({
 
 ## Related Packages
 
-- `@rebasepro/core` — Core framework providing the plugin system
+- `@rebasepro/app` — Core framework providing the plugin system
 - `@rebasepro/types` — Shared types (`RebasePlugin`, `SlotContribution`)
 - `@rebasepro/ui` — UI components used by insight widgets

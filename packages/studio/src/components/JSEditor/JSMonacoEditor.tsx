@@ -3,7 +3,7 @@ import React, { useRef, useEffect } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { cls, defaultBorderMixin, FileIcon } from "@rebasepro/ui";
-import { useModeController } from "@rebasepro/core";
+import { useModeController } from "@rebasepro/app";
 
 /**
  * Shape of `monaco.languages.typescript` at runtime.

@@ -1,4 +1,4 @@
-import { IconForView, useTranslation } from "@rebasepro/core";
+import { IconForView, useTranslation } from "@rebasepro/app";
 import { FieldCaption, useCollectionRegistryController } from "../../../_cms_internals";
 import React from "react";
 import { Field, getIn, useFormex } from "@rebasepro/forms";

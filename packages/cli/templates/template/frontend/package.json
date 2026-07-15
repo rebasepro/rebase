@@ -5,7 +5,7 @@
     "type": "module",
     "dependencies": {
         "@rebasepro/auth": "workspace:*",
-        "@rebasepro/core": "workspace:*",
+        "@rebasepro/app": "workspace:*",
         "@rebasepro/plugin-data-enhancement": "workspace:*",
         "@rebasepro/client": "workspace:*",
         "@rebasepro/admin": "workspace:*",

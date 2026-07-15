@@ -12,9 +12,9 @@ import { PropertyPreview } from "../../preview";
 import {
     useAuthController,
     useCustomizationController
-} from "@rebasepro/core";
-import { useAnalyticsController } from "@rebasepro/core";
-import { IconForView } from "@rebasepro/core";
+} from "@rebasepro/app";
+import { useAnalyticsController } from "@rebasepro/app";
+import { IconForView } from "@rebasepro/app";
 import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
 
 export type EntityCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {

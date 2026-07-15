@@ -6,7 +6,7 @@ import { PropertyPreview } from "../../preview";
 
 import { cls, IconButton, paperMixin, Tooltip } from "@rebasepro/ui";
 import { ErrorBoundary, FileTextIcon, MinusIcon } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 interface StorageItemPreviewProps {
     name: string;

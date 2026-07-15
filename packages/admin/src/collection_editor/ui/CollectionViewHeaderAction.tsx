@@ -1,4 +1,4 @@
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { CollectionConfig, EntityTableController, Property } from "@rebasepro/types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 import React from "react";

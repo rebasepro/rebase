@@ -3,7 +3,7 @@ import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { autoUpdate, computePosition, flip, offset, shift, type VirtualElement, type Placement } from "@floating-ui/dom";
 import { NodeSelection } from "prosemirror-state";
 import { TextField, defaultBorderMixin, Typography, cls } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 export interface ImageBubbleProps {
     options?: { placement?: Placement; offset?: number };

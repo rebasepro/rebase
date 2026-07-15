@@ -102,4 +102,4 @@ function SubmitButton() {
 ## Related Packages
 
 - `@rebasepro/admin` — Uses Formex for all snapshot editing forms
-- `@rebasepro/core` — Core Rebase framework
+- `@rebasepro/app` — Core Rebase framework

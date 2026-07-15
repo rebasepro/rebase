@@ -10,13 +10,13 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { AlignLeftIcon, CheckIcon, LoaderIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor, isHidden, isReadOnly } from "@rebasepro/common";
 
-import { useCustomizationController } from "@rebasepro/core";
-import { getFormFieldKeys } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/app";
+import { getFormFieldKeys } from "@rebasepro/app";
 import { Alert, Button, Chip, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
 import { FormEntry, FormLayout, LabelWithIconAndTooltip, PropertyFieldBinding } from "../form";
-import { flattenKeys } from "@rebasepro/core";
+import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
 import { CustomFieldValidator, getEntitySchema } from "./validation";
 import { EntityFormActions } from "./EntityFormActions";

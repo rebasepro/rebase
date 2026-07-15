@@ -3,7 +3,7 @@ import React, { useMemo } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { Typography } from "@rebasepro/ui";
-import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
+import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 
 /**
  * Props for the {@link CollectionPanel} component.

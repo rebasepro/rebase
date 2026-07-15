@@ -3,7 +3,7 @@ import {
     useAuthController,
     useCustomizationController,
     useSnackbarController
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
 import { CollectionActionsProps, Properties, Property, User, CollectionConfig } from "@rebasepro/types";
 import {

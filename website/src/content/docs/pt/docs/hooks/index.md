@@ -13,7 +13,7 @@ Rebase fornece hooks React para acessar a funcionalidade do framework a partir d
 O hook principal — acesse tudo:
 
 ```typescript
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 
 function MyComponent() {
     const context = useRebaseContext();
@@ -32,7 +32,7 @@ function MyComponent() {
 Acesse o estado de autenticação:
 
 ```typescript
-import { useAuthController } from "@rebasepro/core";
+import { useAuthController } from "@rebasepro/app";
 
 function UserMenu() {
     const auth = useAuthController();
@@ -50,7 +50,7 @@ function UserMenu() {
 Abra entidades programaticamente em um painel lateral:
 
 ```typescript
-import { useSideEntityController } from "@rebasepro/core";
+import { useSideEntityController } from "@rebasepro/app";
 
 function OpenProductButton({ productId }) {
     const sideEntityController = useSideEntityController();
@@ -82,7 +82,7 @@ Métodos:
 Mostrar notificações toast:
 
 ```typescript
-import { useSnackbarController } from "@rebasepro/core";
+import { useSnackbarController } from "@rebasepro/app";
 
 function SaveButton() {
     const snackbar = useSnackbarController();
@@ -103,7 +103,7 @@ function SaveButton() {
 Acessar operações de armazenamento de arquivos:
 
 ```typescript
-import { useStorageSource } from "@rebasepro/core";
+import { useStorageSource } from "@rebasepro/app";
 
 function FileUploader() {
     const storage = useStorageSource();
@@ -125,7 +125,7 @@ function FileUploader() {
 Controlar tema claro/escuro:
 
 ```typescript
-import { useModeController } from "@rebasepro/core";
+import { useModeController } from "@rebasepro/app";
 
 function ThemeToggle() {
     const mode = useModeController();
@@ -143,7 +143,7 @@ function ThemeToggle() {
 Abra um diálogo lateral para selecionar entidades de uma coleção. Este é o mesmo hook usado internamente quando uma propriedade de relação é renderizada:
 
 ```typescript
-import { useEntitySelectionDialog } from "@rebasepro/core";
+import { useEntitySelectionDialog } from "@rebasepro/app";
 
 function SelectProduct() {
     const selectionDialog = useEntitySelectionDialog({
@@ -163,7 +163,7 @@ function SelectProduct() {
 Acessar estado de navegação e coleções resolvidas:
 
 ```typescript
-import { useNavigationController } from "@rebasepro/core";
+import { useNavigationController } from "@rebasepro/app";
 
 function MyComponent() {
     const navigation = useNavigationController();

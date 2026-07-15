@@ -19,7 +19,7 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/core";
+import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/types";
 

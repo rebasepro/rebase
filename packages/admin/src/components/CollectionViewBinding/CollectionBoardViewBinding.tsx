@@ -33,8 +33,8 @@ import {
     useRebaseContext,
     useTranslation,
     useSlot
-} from "@rebasepro/core";
-import { useAnalyticsController } from "@rebasepro/core";
+} from "@rebasepro/app";
+import { useAnalyticsController } from "@rebasepro/app";
 import { setIn } from "@rebasepro/forms";
 import { useBoardDataController } from "./useBoardDataController";
 import { useKanbanDragAndDrop } from "./hooks/useKanbanDragAndDrop";

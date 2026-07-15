@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { getIn, useFormex } from "@rebasepro/forms";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { useSafeSnackbarController } from "../../../useSafeSnackbarController";
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";

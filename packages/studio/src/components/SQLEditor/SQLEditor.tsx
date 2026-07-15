@@ -1,6 +1,6 @@
 
-import { IconForView } from "@rebasepro/core";
-import { useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
+import { useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -42,7 +42,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 
-import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/core";
+import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
 import { MonacoEditor } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { parseFirst } from "pgsql-ast-parser";

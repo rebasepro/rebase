@@ -9,7 +9,7 @@ import { EditViewBinding } from "./EditViewBinding";
 import { DetailViewBinding } from "./DetailViewBinding";
 import { useSideDialogContext } from "./SideDialogs";
 import { useNavigate } from "react-router-dom";
-import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/core";
+import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/app";
 import { useCollectionRegistryController, useSidePanel } from "../index";
 import { useUrlController } from "../index";
 import { resolveDefaultSelectedView } from "@rebasepro/common";

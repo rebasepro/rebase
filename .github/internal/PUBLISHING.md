@@ -73,7 +73,7 @@ Every push to `main` triggers `.github/workflows/publish-canary.yml`, which publ
 
 Install the latest canary:
 ```bash
-pnpm add @rebasepro/core@canary
+pnpm add @rebasepro/app@canary
 ```
 
 ## Pre-releases

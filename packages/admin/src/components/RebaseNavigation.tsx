@@ -13,7 +13,7 @@ import {
     useBridgeRegistration,
     CustomizationControllerContext,
     RebaseDataContext
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, CollectionConfig, RebasePlugin } from "@rebasepro/types";

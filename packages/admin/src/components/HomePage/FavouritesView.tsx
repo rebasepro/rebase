@@ -2,7 +2,7 @@ import type { NavigationEntry } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 ;
 import { Chip, Collapse, StarIcon } from "@rebasepro/ui";
-import { useUserConfigurationPersistence } from "@rebasepro/core";
+import { useUserConfigurationPersistence } from "@rebasepro/app";
 import { useNavigationStateController } from "../../index";
 
 function NavigationChip({ entry }: { entry: NavigationEntry }) {

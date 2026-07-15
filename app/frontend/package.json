@@ -9,7 +9,7 @@
         "@rebasepro/admin": "workspace:*",
         "@rebasepro/auth": "workspace:*",
         "@rebasepro/client": "workspace:*",
-        "@rebasepro/core": "workspace:*",
+        "@rebasepro/app": "workspace:*",
         "@rebasepro/plugin-data-enhancement": "workspace:*",
         "@rebasepro/plugin-insights": "workspace:*",
         "@rebasepro/studio": "workspace:*",

@@ -24,7 +24,7 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/core";
+import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/app";
 import { isBranchAdmin } from "@rebasepro/types";
 import type { BranchInfo } from "@rebasepro/types";
 

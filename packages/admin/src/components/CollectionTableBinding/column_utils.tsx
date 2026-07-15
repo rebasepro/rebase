@@ -4,7 +4,7 @@ import { getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/c
 import { FilterValues } from "@rebasepro/types";
 import { VirtualTableColumn } from "@rebasepro/ui";
 import { getIconForProperty, getResolvedPropertyInPath } from "../../util/property_utils";
-import { getColumnKeysForProperty } from "@rebasepro/core";
+import { getColumnKeysForProperty } from "@rebasepro/app";
 
 export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
     return {

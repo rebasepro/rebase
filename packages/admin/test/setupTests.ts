@@ -6,7 +6,7 @@ import { TextEncoder, TextDecoder } from "util";
 Object.assign(global, { TextDecoder,
 TextEncoder });
 
-// Mock window.matchMedia for jsdom environment (used by useLargeLayout in @rebasepro/core)
+// Mock window.matchMedia for jsdom environment (used by useLargeLayout in @rebasepro/app)
 Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: jest.fn().mockImplementation((query: string) => ({

@@ -317,7 +317,7 @@ const client = createRebaseClient({ baseUrl: API_URL, websocketUrl: WS_URL });
 Accedilo da qualsiasi componente:
 
 ```tsx
-import { useRebaseClient } from "@rebasepro/core";
+import { useRebaseClient } from "@rebasepro/app";
 
 function MyComponent() {
     const client = useRebaseClient();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useApiConfig, useAuthController } from "@rebasepro/core";
+import { useApiConfig, useAuthController } from "@rebasepro/app";
 import {
     CircularProgress,
     Typography,

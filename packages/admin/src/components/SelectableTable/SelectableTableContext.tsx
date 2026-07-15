@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { DataCollectionTableController } from "@rebasepro/core";
+import { DataCollectionTableController } from "@rebasepro/app";
 
 export const SelectableTableContext = React.createContext<DataCollectionTableController<Record<string, unknown>>>(null! as DataCollectionTableController<Record<string, unknown>>);
 

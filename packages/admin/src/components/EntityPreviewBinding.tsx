@@ -21,9 +21,9 @@ import {
     useCustomizationController,
     useData,
     ErrorView
-} from "@rebasepro/core";
-import { useAnalyticsController } from "@rebasepro/core";
-import { IconForView } from "@rebasepro/core";
+} from "@rebasepro/app";
+import { useAnalyticsController } from "@rebasepro/app";
+import { IconForView } from "@rebasepro/app";
 import { getPropertyInPath } from "../util/property_utils";
 import { getEntityPreviewKeys, getEntityTitlePropertyKey } from "../util/previews";
 import { getValueInPath } from "@rebasepro/utils";

@@ -1,7 +1,7 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
 import React, { useMemo } from "react";
 
-import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, useComponentOverride } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, useComponentOverride } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 
@@ -29,7 +29,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
-import { LanguageToggle, RebaseLogo } from "@rebasepro/core";
+import { LanguageToggle, RebaseLogo } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
 
 /**

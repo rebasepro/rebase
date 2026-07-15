@@ -8,11 +8,11 @@ import { BreadcrumbsProvider } from "../contexts/BreacrumbsContext";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 import { useCollectionRegistryController, useUrlController } from "../index";
 import { useNavigationStateController } from "../index";
-import { useAuthController, useBridgeRegistration } from "@rebasepro/core";
+import { useAuthController, useBridgeRegistration } from "@rebasepro/app";
 
 /**
  * Provider that builds the SidePanelController and makes it available
- * via the SidePanelControllerContext from @rebasepro/core.
+ * via the SidePanelControllerContext from @rebasepro/app.
  *
  * After the CMS extraction refactor, `useBuildSidePanel` lives
  * in the CMS package while the context it feeds into lives in core.

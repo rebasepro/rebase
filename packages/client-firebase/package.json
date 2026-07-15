@@ -12,7 +12,7 @@
   "dependencies": {
     "@rebasepro/admin": "workspace:*",
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/core": "workspace:*",
+    "@rebasepro/app": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",

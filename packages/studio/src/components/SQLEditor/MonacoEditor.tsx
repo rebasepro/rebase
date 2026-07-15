@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor, Position, IRange } from "monaco-editor";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
-import { useModeController } from "@rebasepro/core";
+import { useModeController } from "@rebasepro/app";
 
 export type MonacoEditorProps = {
     value: string;

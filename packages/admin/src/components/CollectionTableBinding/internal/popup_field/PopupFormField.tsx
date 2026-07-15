@@ -7,15 +7,15 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } fro
 import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
 
 import { Entity, EntityValues } from "@rebasepro/types";
-import { PluginProviderStack } from "@rebasepro/core";
+import { PluginProviderStack } from "@rebasepro/app";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";
 import { CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
 import { useWindowSize } from "./useWindowSize";
 import { getPropertyInPath } from "../../../../util/property_utils";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
-import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/core";
-import type { OnCellValueChangeParams } from "@rebasepro/core";
+import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/app";
+import type { OnCellValueChangeParams } from "@rebasepro/app";
 import { isReadOnly } from "@rebasepro/common";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {

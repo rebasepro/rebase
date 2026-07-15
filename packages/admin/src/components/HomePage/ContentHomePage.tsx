@@ -19,10 +19,10 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { restrictToVerticalAxis, restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { RenameGroupDialog } from "./RenameGroupDialog";
 import { toArray } from "@rebasepro/utils";
-import { useCollapsedGroups, buildCollapsedDefaults, useCustomizationController, useTranslation, useSlot, useAdminModeController, useRebaseRegistry } from "@rebasepro/core";
-import { useRestoreScroll } from "@rebasepro/core";
+import { useCollapsedGroups, buildCollapsedDefaults, useCustomizationController, useTranslation, useSlot, useAdminModeController, useRebaseRegistry } from "@rebasepro/app";
+import { useRestoreScroll } from "@rebasepro/app";
 
-import { SchemaDriftBanner } from "@rebasepro/core";
+import { SchemaDriftBanner } from "@rebasepro/app";
 import { useBreadcrumbsController, useCMSContext } from "../../index";
 
 export const DEFAULT_GROUP_NAME = "Views";

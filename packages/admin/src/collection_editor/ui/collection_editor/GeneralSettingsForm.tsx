@@ -1,5 +1,5 @@
 
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
 

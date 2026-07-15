@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { EditorState, Selection } from "prosemirror-state";
 import { cls, defaultBorderMixin, Separator, TextareaAutosize, useInjectStyles } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { EditorBubble, ImageBubble, SlashCommandMenu, TableBubble, type JSONContent } from "./components";
 import { NodeSelector } from "./selectors/node-selector";
 import { LinkSelector } from "./selectors/link-selector";

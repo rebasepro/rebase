@@ -6,7 +6,7 @@ import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../../preview";
 import { Button, Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { getReferenceFrom } from "@rebasepro/common";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../../index";
 
 interface ReferenceFilterFieldProps {

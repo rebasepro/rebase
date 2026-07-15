@@ -15,7 +15,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { TableInfo } from "./SQLEditor";
-import { ErrorView, useTranslation } from "@rebasepro/core";
+import { ErrorView, useTranslation } from "@rebasepro/app";
 
 export const SchemaBrowser = ({
     onTableClick,

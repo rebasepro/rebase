@@ -2,7 +2,7 @@ import type { ArrayProperty, Property } from "@rebasepro/types";
 import React from "react";
 
 import type { PropertyPreviewProps, PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { PropertyPreview } from "../PropertyPreview";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";

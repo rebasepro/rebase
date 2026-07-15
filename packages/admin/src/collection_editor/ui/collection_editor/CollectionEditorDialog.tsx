@@ -7,7 +7,7 @@ import {
     useAuthController,
     useCustomizationController,
     useUnsavedChangesDialog
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import {
     getInferenceType,
     ImportSaveInProgress,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { InsightDefinition, InsightDataResult, InsightContext } from "../types";
 import { useInsightsEngine } from "./InsightsProvider";
-import { useAuthController } from "@rebasepro/core";
+import { useAuthController } from "@rebasepro/app";
 
 /**
  * Hook that fetches and caches data for a single insight definition.

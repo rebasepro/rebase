@@ -139,4 +139,4 @@ function MyForm() {
 
 - `@rebasepro/studio` — Dev tools layer (depends on this package)
 - `@rebasepro/admin` — CMS layer (depends on this package)
-- `@rebasepro/core` — Core framework (uses this for shared UI)
+- `@rebasepro/app` — Core framework (uses this for shared UI)

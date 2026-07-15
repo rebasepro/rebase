@@ -1,6 +1,6 @@
 import React from "react";
 import { ArrayProperty, DateProperty, Entity, EntityReference, EntityRelation, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/types";
-import { TableSize, useCustomizationController } from "@rebasepro/core";
+import { TableSize, useCustomizationController } from "@rebasepro/app";
 import {
     VirtualTableInput,
     VirtualTableNumberInput,

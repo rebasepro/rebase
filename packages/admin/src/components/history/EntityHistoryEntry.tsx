@@ -7,7 +7,7 @@ import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getPropertyInPath } from "../../util/property_utils";
 import { PropertyPreview } from "../../preview/PropertyPreview";
 import { SkeletonPropertyComponent } from "../../preview/property_previews/SkeletonPropertyComponent";
-import { useAuthController } from "@rebasepro/core";
+import { useAuthController } from "@rebasepro/app";
 import { UserChip } from "./UserChip";
 import { HistoryEntryData } from "../../hooks";
 import { getValueInPath } from "@rebasepro/utils";

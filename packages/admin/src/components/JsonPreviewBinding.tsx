@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { Highlight, themes } from "prism-react-renderer";
-import { useModeController } from "@rebasepro/core";
+import { useModeController } from "@rebasepro/app";
 
 export function JsonPreviewBinding({ values }: { values: object }) {
     const code = JSON.stringify(values, null, "\t");

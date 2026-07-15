@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Field, getIn, useFormex } from "@rebasepro/forms";
 import {
     useLargeLayout
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { ErrorBoundary } from "@rebasepro/ui";
 import {

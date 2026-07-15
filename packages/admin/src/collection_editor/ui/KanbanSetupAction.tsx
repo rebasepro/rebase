@@ -1,5 +1,5 @@
 import React from "react";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { CollectionConfig } from "@rebasepro/types";
 import { Button } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";

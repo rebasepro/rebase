@@ -41,7 +41,7 @@ import {
     VideoIcon,
     XIcon
 } from "@rebasepro/ui";
-import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/core";
+import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
 import { useSearchParams } from "react-router-dom";
 import { useDropzone } from "react-dropzone";

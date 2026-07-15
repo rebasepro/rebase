@@ -113,7 +113,7 @@ const client = createRebaseClient({ baseUrl: API_URL });
 Access it from any component:
 
 ```tsx
-import { useRebaseClient } from "@rebasepro/core";
+import { useRebaseClient } from "@rebasepro/app";
 
 function MyComponent() {
     const client = useRebaseClient();

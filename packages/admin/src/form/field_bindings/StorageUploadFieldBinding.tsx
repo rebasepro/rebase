@@ -9,8 +9,8 @@ import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 
 import { isReadOnly } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
-import { useAuthController, useSnackbarController, useStorageSource, useTranslation } from "@rebasepro/core";
-import { StorageSourceContext } from "@rebasepro/core";
+import { useAuthController, useSnackbarController, useStorageSource, useTranslation } from "@rebasepro/app";
+import { StorageSourceContext } from "@rebasepro/app";
 import {
     closestCenter,
     DndContext,
@@ -28,7 +28,7 @@ import {
     useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { StorageFieldItem, useStorageUploadController } from "@rebasepro/core";
+import { StorageFieldItem, useStorageUploadController } from "@rebasepro/app";
 import { StorageUploadProgress } from "../components/StorageUploadProgress";
 import { StorageItemPreview } from "../components/StorageItemPreview";
 import {

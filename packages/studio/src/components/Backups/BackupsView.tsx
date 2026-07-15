@@ -13,7 +13,7 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/core";
+import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { BackupInfo, RebaseClient } from "@rebasepro/types";
 
 function formatSize(bytes: number | undefined): string {

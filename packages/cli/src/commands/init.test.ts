@@ -373,7 +373,7 @@ describe("template package.json contracts", () => {
 
     it("frontend package.json has required dependencies", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "package.json"), "utf-8"));
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/core");
+        expect(pkg.dependencies).toHaveProperty("@rebasepro/app");
         expect(pkg.dependencies).toHaveProperty("@rebasepro/auth");
         expect(pkg.dependencies).toHaveProperty("@rebasepro/client");
         expect(pkg.dependencies).toHaveProperty("react");

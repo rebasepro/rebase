@@ -1,7 +1,7 @@
 import React from "react";
 
 import { CircularProgress, cls, defaultBorderMixin, SearchBar } from "@rebasepro/ui";
-import { useLargeLayout, useTranslation } from "@rebasepro/core";
+import { useLargeLayout, useTranslation } from "@rebasepro/app";
 
 interface CollectionTableToolbarProps {
     loading: boolean;

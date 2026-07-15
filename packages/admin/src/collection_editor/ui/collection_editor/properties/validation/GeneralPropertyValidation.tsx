@@ -2,7 +2,7 @@ import React from "react";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/forms";
 import { DebouncedTextField } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { SwitchControl } from "../../SwitchControl";
 
 export function GeneralPropertyValidation({ disabled }: {

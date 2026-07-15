@@ -3,7 +3,7 @@ import { cls, defaultBorderMixin, IconButton, Sheet, Tooltip } from "@rebasepro/
 import { ChevronLeftIcon, ErrorBoundary, MenuIcon } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
-import { useLargeLayout, useAdminModeController, useTranslation } from "@rebasepro/core";
+import { useLargeLayout, useAdminModeController, useTranslation } from "@rebasepro/app";
 import { AppContext } from "./useApp";
 
 export const DRAWER_WIDTH = 280;

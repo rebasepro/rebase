@@ -5,7 +5,7 @@ import { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { FilterIcon, VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { resolveFilterOperators } from "@rebasepro/common";
-import { useCollectionScope, useTranslation } from "@rebasepro/core";
+import { useCollectionScope, useTranslation } from "@rebasepro/app";
 import { FilterFieldBinding } from "../SelectableTable/filters/FilterFieldBinding";
 
 export interface FiltersDialogProps {

@@ -38,7 +38,7 @@ my-app/
 Das Frontend ist eine Standard **Vite + React + TypeScript** Anwendung. Die Schlüsselfile ist `App.tsx`, welche alle Rebase-Controller miteinander verbindet:
 
 ```typescript title="frontend/src/App.tsx"
-import { Rebase, Scaffold, AppBar, Drawer, ... } from "@rebasepro/core";
+import { Rebase, Scaffold, AppBar, Drawer, ... } from "@rebasepro/app";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 

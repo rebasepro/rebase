@@ -5,7 +5,7 @@ import { deepEqual as equal } from "fast-equals"
 import { EntityReference, EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
 import { resolveProperty, normalizeToEntityRelation } from "@rebasepro/common";
-import { useAuthController, useCustomizationController, resolveComponentRef } from "@rebasepro/core";
+import { useAuthController, useCustomizationController, resolveComponentRef } from "@rebasepro/app";
 import { EmptyValue } from "./components/EmptyValue";
 import { UrlComponentPreview } from "./components/UrlComponentPreview";
 import { StorageThumbnail } from "./components/StorageThumbnail";
@@ -23,7 +23,7 @@ import { ReferencePreview } from "./components/ReferencePreview";
 import { DatePreview } from "./components/DatePreview";
 import { BooleanPreview } from "./components/BooleanPreview";
 import { NumberPropertyPreview } from "./property_previews/NumberPropertyPreview";
-import { ErrorView } from "@rebasepro/core";
+import { ErrorView } from "@rebasepro/app";
 import { RelationPreview } from "./components/RelationPreview";
 import { UserPreview } from "./components/UserPreview";
 

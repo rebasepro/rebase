@@ -1,18 +1,18 @@
-# @rebasepro/core
+# @rebasepro/app
 
 Framework-agnostic runtime for data-driven admin panels — React hooks, providers, contexts, and shared components used by `@rebasepro/admin` and `@rebasepro/studio`.
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/core
+pnpm add @rebasepro/app
 ```
 
 **Peer dependencies:** `react >= 19`, `react-dom >= 19`, `react-router ^7`, `react-router-dom ^7`
 
 ## What This Package Does
 
-`@rebasepro/core` is the shared runtime layer that powers the Rebase CMS. It provides:
+`@rebasepro/app` is the shared runtime layer that powers the Rebase CMS. It provides:
 
 - **App bootstrapping** — `Rebase`, `RebaseRouter`, `RebaseRoutes`, `PluginProviderStack`
 - **React contexts** — auth, data driver, storage, snackbar, dialogs, mode, admin mode, role, analytics, customization
@@ -139,13 +139,13 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 Available as a separate entry point:
 
 ```ts
-import { rebaseVitePlugin } from "@rebasepro/core/vitePlugin";
+import { rebaseVitePlugin } from "@rebasepro/app/vitePlugin";
 ```
 
 ## Quick Start
 
 ```tsx
-import { Rebase, useAuthController, useCollection } from "@rebasepro/core";
+import { Rebase, useAuthController, useCollection } from "@rebasepro/app";
 
 function App() {
     return (

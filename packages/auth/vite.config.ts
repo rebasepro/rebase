@@ -39,7 +39,7 @@ export default defineConfig(() => ({
     resolve: {
         alias: {
             "@rebasepro/client": path.resolve(__dirname, "../client/src"),
-            "@rebasepro/core": path.resolve(__dirname, "../core/src"),
+            "@rebasepro/app": path.resolve(__dirname, "../app/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src"),
             "@rebasepro/ui": path.resolve(__dirname, "../ui/src")
         }

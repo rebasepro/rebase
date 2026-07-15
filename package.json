@@ -14,7 +14,7 @@
     "packages/common",
     "packages/forms",
     "packages/ui",
-    "packages/core",
+    "packages/app",
     "packages/client",
     "packages/server",
     "packages/auth",

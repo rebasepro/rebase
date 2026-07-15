@@ -1,5 +1,5 @@
 
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import React, { useState, useEffect } from "react";
 import {
     Button,

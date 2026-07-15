@@ -566,7 +566,7 @@ context.authController; // from RebaseContext
 context.data;           // DataSource from RebaseContext
 ```
 
-> **TIP:** Use `useCMSContext()` instead of `useRebaseContext()` when you need CMS controllers (side panels, navigation, URL). Use `useRebaseContext()` from `@rebasepro/core` when you only need core context (auth, data, storage).
+> **TIP:** Use `useCMSContext()` instead of `useRebaseContext()` when you need CMS controllers (side panels, navigation, URL). Use `useRebaseContext()` from `@rebasepro/app` when you only need core context (auth, data, storage).
 
 ---
 

@@ -17,10 +17,10 @@ import { PropertyPreview } from "../../preview";
 import {
     useAuthController,
     useCustomizationController
-} from "@rebasepro/core";
-import { useAnalyticsController } from "@rebasepro/core";
+} from "@rebasepro/app";
+import { useAnalyticsController } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
 import { useCMSContext } from "../../hooks/useCMSContext";

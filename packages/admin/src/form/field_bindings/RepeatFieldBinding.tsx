@@ -10,7 +10,7 @@ import { getIconForProperty } from "../../util/property_utils";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { useAuthController, useTranslation } from "@rebasepro/core";
+import { useAuthController, useTranslation } from "@rebasepro/app";
 import { mergeDeep } from "@rebasepro/utils";
 
 /**

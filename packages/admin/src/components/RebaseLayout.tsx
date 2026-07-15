@@ -4,7 +4,7 @@ import {
     useAdminModeController,
     useComponentOverride,
     useRebaseRegistry
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 
 import { Scaffold } from "./app/Scaffold";
 import { Drawer } from "./app/Drawer";

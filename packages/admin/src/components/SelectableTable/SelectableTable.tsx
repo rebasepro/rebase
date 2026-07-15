@@ -3,11 +3,11 @@ import type { Property, WhereFilterOp } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { CollectionSize, Entity, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
 import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams } from "@rebasepro/ui";
-import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/core";
+import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/app";
 import { FilterFormFieldProps } from "@rebasepro/ui";
 import { useOutsideAlerter } from "@rebasepro/ui";
 import { SelectableTableContext } from "./SelectableTableContext";
-import { getRowHeight } from "@rebasepro/core";
+import { getRowHeight } from "@rebasepro/app";
 import { FilterFieldBinding } from "./filters/FilterFieldBinding";
 
 export type SelectableTableProps<M extends Record<string, unknown>> = {

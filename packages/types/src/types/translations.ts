@@ -7,7 +7,7 @@ export type DeepPartial<T> = T extends object
     : T;
 
 /**
- * All user-visible strings used internally by @rebasepro/core.
+ * All user-visible strings used internally by @rebasepro/app.
  * Pass a `DeepPartial<RebaseTranslations>` via the `translations` prop
  * on your Rebase entry-point component to override any key, or to add
  * a new locale.

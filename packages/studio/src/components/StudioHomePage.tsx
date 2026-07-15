@@ -1,9 +1,9 @@
 import type { HomePageSection, PluginGenericProps } from "@rebasepro/types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
-import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/core";
+import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/app";
 import { useNavigate } from "react-router-dom";
-import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/core";
+import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
 /* ═══════════════════════════════════════════════════════════════
    Static studio tool definitions

@@ -163,7 +163,7 @@ export default [
         // public API — nobody reviewing the barrel diff would notice. Named
         // re-exports (`export { x } from "./internal/y"`) are fine: they
         // make the internal-to-public boundary an explicit, reviewable list
-        // (see packages/core/src/index.ts for the pattern — pair with an
+        // (see packages/app/src/index.ts for the pattern — pair with an
         // `@internal` JSDoc tag on each re-exported symbol).
         files: ["packages/*/src/index.{ts,tsx}"],
         rules: {

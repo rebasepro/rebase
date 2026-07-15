@@ -1,4 +1,4 @@
-import { useCustomizationController } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/app";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import React from "react";
 

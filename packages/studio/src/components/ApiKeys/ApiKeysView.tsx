@@ -27,7 +27,7 @@ import {
     AlertCircleIcon,
     CheckCircleIcon
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/core";
+import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { RebaseClient } from "@rebasepro/types";
 
 /* ═══════════════════════════════════════════════════════════════

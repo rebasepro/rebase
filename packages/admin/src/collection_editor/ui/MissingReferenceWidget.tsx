@@ -1,5 +1,5 @@
 import { useCollectionRegistryController } from "../_cms_internals";
-import { ErrorView, useTranslation } from "@rebasepro/core";
+import { ErrorView, useTranslation } from "@rebasepro/app";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { Button } from "@rebasepro/ui";
 import { prettifyIdentifier } from "@rebasepro/utils";

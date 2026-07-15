@@ -77,7 +77,7 @@ export {
     mergeEntityActions,
     resolveEntityAction,
     resolveEntityView,
-    // Property utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
+    // Property utilities (moved from @rebasepro/app — property-aware logic belongs in CMS)
     isReferenceProperty,
     isRelationProperty,
     getIconForWidget,
@@ -87,7 +87,7 @@ export {
     getBracketNotation,
     getPropertiesWithPropertiesOrder,
     getDefaultPropertiesOrder,
-    // Preview utilities (moved from @rebasepro/core — property-aware logic belongs in CMS)
+    // Preview utilities (moved from @rebasepro/app — property-aware logic belongs in CMS)
     getEntityPreviewKeys,
     getEntityTitlePropertyKey
 } from "./util";

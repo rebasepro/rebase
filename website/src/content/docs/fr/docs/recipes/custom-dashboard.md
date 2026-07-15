@@ -11,7 +11,7 @@ Créez une vue de tableau de bord personnalisée qui affiche les analyses à cô
 ## Créer le composant de tableau de bord
 
 ```tsx
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
 function DashboardView() {

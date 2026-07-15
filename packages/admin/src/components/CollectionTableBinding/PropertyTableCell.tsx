@@ -17,7 +17,7 @@ import { EntityTableCellActions } from "./internal/EntityTableCellActions";
 
 import { useSelectableTableController } from "../SelectableTable/SelectableTableContext";
 import { useClearRestoreValue } from "../../form/useClearRestoreValue";
-import { getRowHeight } from "@rebasepro/core";
+import { getRowHeight } from "@rebasepro/app";
 import { isReadOnly } from "@rebasepro/common";
 import { TableRelationField } from "./fields/TableRelationField";
 import { TableRelationSelectorField } from "./fields/TableRelationSelectorField";

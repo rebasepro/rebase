@@ -4,8 +4,8 @@ import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";
 import { EntityHistoryEntry } from "./EntityHistoryEntry";
-import { useSnackbarController, useAuthController } from "@rebasepro/core";
-import { ConfirmationDialog } from "@rebasepro/core";
+import { useSnackbarController, useAuthController } from "@rebasepro/app";
+import { ConfirmationDialog } from "@rebasepro/app";
 import { useState } from "react";
 import { useHistory } from "../../index";
 

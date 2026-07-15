@@ -95,7 +95,7 @@ rebase/
 │   ├── server-core/          # @rebasepro/server
 │   ├── server-postgresql/    # @rebasepro/server-postgres
 │   ├── server-mongodb/       # @rebasepro/server-mongo
-│   ├── core/                 # @rebasepro/core
+│   ├── core/                 # @rebasepro/app
 │   ├── types/                # @rebasepro/types
 │   ├── ui/                   # @rebasepro/ui
 │   ├── admin/                # @rebasepro/admin
@@ -124,7 +124,7 @@ rebase/
 | `@rebasepro/server` | Hono server coordinator, API generation, auth middleware, storage, email, cron, custom functions | Backend entry point — every Rebase backend imports this |
 | `@rebasepro/server-postgres` | PostgreSQL bootstrapper and Drizzle ORM data driver | Backend setup when using PostgreSQL |
 | `@rebasepro/server-mongo` | MongoDB bootstrapper and data driver | Backend setup when using MongoDB |
-| `@rebasepro/core` | Core framework, types, hooks, and React components | Frontend — React integration, hooks, providers |
+| `@rebasepro/app` | Core framework, types, hooks, and React components | Frontend — React integration, hooks, providers |
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, `CollectionConfig`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
 | `@rebasepro/admin` | CMS frontend application | The Studio admin panel frontend |

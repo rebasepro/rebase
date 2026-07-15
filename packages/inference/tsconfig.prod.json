@@ -11,6 +11,6 @@
     "dist",
     "src/test",
     "../ui/src",
-    "../core/src"
+    "../app/src"
   ]
 }

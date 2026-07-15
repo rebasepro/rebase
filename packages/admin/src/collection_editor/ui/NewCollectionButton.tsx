@@ -1,6 +1,6 @@
 import { Button, PlusIcon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
-import { useAdminModeController, useTranslation } from "@rebasepro/core";
+import { useAdminModeController, useTranslation } from "@rebasepro/app";
 
 export function NewCollectionButton() {
     const adminModeController = useAdminModeController();

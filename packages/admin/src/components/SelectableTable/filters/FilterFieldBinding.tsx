@@ -8,7 +8,7 @@ import {
     WhereFilterOp
 } from "@rebasepro/types";
 import { enumToObjectEntries, resolveFilterOperators } from "@rebasepro/common";
-import { useCollectionScope, useComponentOverride, useResolvedComponent } from "@rebasepro/core";
+import { useCollectionScope, useComponentOverride, useResolvedComponent } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";
 import { BooleanFilterField } from "./BooleanFilterField";
 import { DateTimeFilterField } from "./DateTimeFilterField";

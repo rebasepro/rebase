@@ -1,5 +1,5 @@
 import { AlertCircleIcon, IconButton } from "@rebasepro/ui";
-import { ErrorTooltip } from "@rebasepro/core";
+import { ErrorTooltip } from "@rebasepro/app";
 import { useCallback, useEffect, useRef } from "react";
 
 export interface EntityTableCellActionsProps {

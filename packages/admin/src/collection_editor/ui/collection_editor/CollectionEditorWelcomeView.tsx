@@ -1,4 +1,4 @@
-import { AIIcon } from "@rebasepro/core";
+import { AIIcon } from "@rebasepro/app";
 ;
 import React, { useState } from "react";
 ;

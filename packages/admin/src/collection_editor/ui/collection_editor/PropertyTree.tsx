@@ -2,7 +2,7 @@
 import React from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { AIModifiedIndicator } from "@rebasepro/core";
+import { AIModifiedIndicator } from "@rebasepro/app";
 import { AdditionalFieldDelegate, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import {

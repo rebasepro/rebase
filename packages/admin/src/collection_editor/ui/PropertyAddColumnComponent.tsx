@@ -1,7 +1,7 @@
 import {
     useAuthController,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { getDefaultPropertiesOrder } from "../_cms_internals";
 import { CollectionConfig, EntityTableController } from "@rebasepro/types";
 import { PlusIcon, Tooltip } from "@rebasepro/ui";

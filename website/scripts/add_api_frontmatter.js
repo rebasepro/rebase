@@ -95,7 +95,7 @@ function generateTitle(relativePath) {
 
     // Special case for README
     if (filename === "README") {
-        return "@rebasepro/core API";
+        return "@rebasepro/app API";
     }
 
     // Return the filename as title

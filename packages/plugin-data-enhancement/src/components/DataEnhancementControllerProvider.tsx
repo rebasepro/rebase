@@ -10,7 +10,7 @@ import {
     useAuthController,
     useCustomizationController,
     useSnackbarController
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { useUrlController } from "@rebasepro/admin";
 import { DataDriver, Entity, CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
 import { enhanceDataAPIStream, fetchEntityPromptSuggestion } from "../api";

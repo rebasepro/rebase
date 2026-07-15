@@ -10,7 +10,7 @@ import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContaine
 import { getIconForProperty } from "../../util/property_utils";
 import { getReferenceFrom } from "@rebasepro/common";
 
-import { useTranslation, ErrorView } from "@rebasepro/core";
+import { useTranslation, ErrorView } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useCollectionRegistryController } from "../../index";

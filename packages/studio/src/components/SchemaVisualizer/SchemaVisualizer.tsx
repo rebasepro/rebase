@@ -28,7 +28,7 @@ import {
 import {
     useStudioCollectionRegistry,
     IconForView
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import type { CollectionConfig } from "@rebasepro/types";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { useSchemaGraph } from "./useSchemaGraph";

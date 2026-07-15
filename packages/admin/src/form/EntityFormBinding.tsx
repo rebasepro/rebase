@@ -15,16 +15,16 @@ import {
     useSnackbarController,
     useTranslation,
     useSlot
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { FormexController } from "@rebasepro/forms";
-import { useAnalyticsController } from "@rebasepro/core";
+import { useAnalyticsController } from "@rebasepro/app";
 
 import {
     getEntityFromCache,
     removeEntityFromCache,
     removeEntityFromMemoryCache,
     saveEntityToCache
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 
 import { useCollectionRegistryController, useSidePanel, useCMSContext } from "../index";
 import { EntityForm } from "./EntityForm";

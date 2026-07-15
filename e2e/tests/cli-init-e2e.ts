@@ -97,7 +97,7 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
         "server-mongodb"
     ];
 
-    const currentVersion = JSON.parse(fs.readFileSync(path.join(rootDir, "packages/core/package.json"), "utf-8")).version;
+    const currentVersion = JSON.parse(fs.readFileSync(path.join(rootDir, "packages/app/package.json"), "utf-8")).version;
     const tempVersion = `${currentVersion}-e2e-${Date.now()}`;
     console.log(`📦 Packing local workspace packages with version ${tempVersion}...`);
     const packageTarballs: Record<string, string> = {};

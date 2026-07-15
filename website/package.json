@@ -25,7 +25,7 @@
     "@google/generative-ai": "0.24.1",
     "@rebasepro/admin": "workspace:^",
     "@rebasepro/client-firebase": "workspace:^",
-    "@rebasepro/core": "workspace:^",
+    "@rebasepro/app": "workspace:^",
     "@rebasepro/plugin-data-enhancement": "workspace:^",
     "@rebasepro/ui": "workspace:^",
     "@rollup/plugin-yaml": "^5.0.0",

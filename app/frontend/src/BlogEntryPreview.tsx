@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import type { EntityCustomViewParams } from "@rebasepro/types";
-import { useStorageSource } from "@rebasepro/core";
+import { useStorageSource } from "@rebasepro/app";
 import { Container, Markdown, Typography } from "@rebasepro/ui";
 
 /**

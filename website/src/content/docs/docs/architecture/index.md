@@ -12,7 +12,7 @@ Rebase is a full-stack platform with four layers:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Frontend Layer                           │
 │  React Admin UI  •  Custom Views  •  Plugins  •  Your App      │
-│  @rebasepro/core  •  @rebasepro/ui  •  @rebasepro/studio       │
+│  @rebasepro/app  •  @rebasepro/ui  •  @rebasepro/studio       │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP + WebSocket
                             ▼
@@ -76,7 +76,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
 | `@rebasepro/server` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
 | `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
-| `@rebasepro/core` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
+| `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
 | `@rebasepro/auth` | Login views, auth controller hooks, user management | Frontend |
 | `@rebasepro/studio` | Collection editor, SQL console, JS console, RLS editor, storage browser | Frontend |

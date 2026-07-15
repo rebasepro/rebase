@@ -4,7 +4,7 @@ import { getIn, useFormex } from "@rebasepro/forms";
 ;
 import { NumberProperty, StringProperty } from "@rebasepro/types";
 import { Select, SelectItem } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 

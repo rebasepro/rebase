@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { CollectionConfig, Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, PropertyConfig, EntityRelation } from "@rebasepro/types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
-import { getEntityFromCache } from "@rebasepro/core";
+import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/types";

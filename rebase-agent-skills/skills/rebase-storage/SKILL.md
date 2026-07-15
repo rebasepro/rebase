@@ -843,7 +843,7 @@ The `<Rebase>` component accepts a `storageSources` prop to register client-side
 ### Registering Storage Sources
 
 ```tsx
-import type { RebaseStorageSource } from "@rebasepro/core";
+import type { RebaseStorageSource } from "@rebasepro/app";
 import { myExternalStorageSource } from "./my-external-storage";
 
 <Rebase
@@ -882,7 +882,7 @@ import { myExternalStorageSource } from "./my-external-storage";
 Registered storage sources are exposed to the component tree via `StorageSourcesContext`, mirroring the `DataSourcesContext` pattern:
 
 ```typescript
-import { useStorageSources } from "@rebasepro/core";
+import { useStorageSources } from "@rebasepro/app";
 
 function MyUploadComponent() {
     const storageSources = useStorageSources();

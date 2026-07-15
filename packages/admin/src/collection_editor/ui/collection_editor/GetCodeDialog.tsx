@@ -17,7 +17,7 @@ export function GetCodeDialog({
     const snackbarController = useSafeSnackbarController();
 
     const code = collection
-        ? "import { CollectionConfig } from \"@rebasepro/core\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:CollectionConfig = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
+        ? "import { CollectionConfig } from \"@rebasepro/app\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:CollectionConfig = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
         : "No collection selected";
     return <Dialog open={open}
         onOpenChange={onOpenChange}

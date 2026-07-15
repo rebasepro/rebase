@@ -11,7 +11,7 @@ import {
     useBuildAdminModeController,
     AdminModeControllerProvider,
     RebaseRoutes
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import {
     AppBar,
     Drawer,

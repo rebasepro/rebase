@@ -65,7 +65,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/dom": "^1.7.6",
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/core": "workspace:*",
+    "@rebasepro/app": "workspace:*",
     "@rebasepro/forms": "workspace:*",
     "@rebasepro/inference": "workspace:*",
     "@rebasepro/types": "workspace:*",
@@ -163,7 +163,7 @@
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
       "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
-      "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
+      "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/forms$": "<rootDir>/../forms/src/index.ts",

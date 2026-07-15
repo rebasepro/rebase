@@ -5,7 +5,7 @@ import { ValidationPanel } from "./validation/ValidationPanel";
 ;
 import { Select, SelectItem, TextField } from "@rebasepro/ui";
 import { getIn, useFormex } from "@rebasepro/forms";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 export function NumberPropertyField({ disabled }: {
     disabled: boolean;

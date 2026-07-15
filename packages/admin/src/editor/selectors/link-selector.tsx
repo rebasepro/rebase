@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Button, CheckIcon, cls, focusedDisabled, iconSize, Popover, TextField, Trash2Icon } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { getMarkAttributes, isMarkActive, setMark, unsetMark } from "../utils/prosemirror-utils";
 import { schema } from "../schema";

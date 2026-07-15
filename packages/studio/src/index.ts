@@ -1,5 +1,5 @@
 // ─── Bridge ─────────────────────────────────────────────────────────
-// Re-export the Studio Bridge from @rebasepro/core.
+// Re-export the Studio Bridge from @rebasepro/app.
 // The bridge lives in core so both studio and CMS can access it
 // without circular dependencies.
 export {
@@ -10,12 +10,12 @@ export {
     useStudioUrlController,
     useStudioNavigationState,
     useStudioBreadcrumbs
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 export type {
     StudioBridge,
     BreadcrumbEntry,
     BreadcrumbsController
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 
 // ─── Studio Entry Point ─────────────────────────────────────────────
 // Only export the lightweight orchestrator & home page.

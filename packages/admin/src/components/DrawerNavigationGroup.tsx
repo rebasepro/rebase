@@ -2,9 +2,9 @@ import type { NavigationEntry } from "@rebasepro/types";
 import React from "react";
 import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
-import { useTranslation, useComponentOverride } from "@rebasepro/core";
+import { useTranslation, useComponentOverride } from "@rebasepro/app";
 
 export interface DrawerNavigationGroupProps {
     /**

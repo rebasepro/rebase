@@ -8,7 +8,7 @@ import { ExpandablePanel, Typography } from "@rebasepro/ui";
 import { getArrayResolvedProperties, isReadOnly } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { useAuthController } from "@rebasepro/core";
+import { useAuthController } from "@rebasepro/app";
 
 /**
  * Array field used for custom

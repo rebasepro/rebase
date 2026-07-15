@@ -1,7 +1,7 @@
 // import {
 //     type,
 //     getPropertyInPath
-// } from "@rebasepro/core";
+// } from "@rebasepro/app";
 import { Properties, Property } from "@rebasepro/types";
 // import { typeMapping } from "@rebasepro/types";
 //

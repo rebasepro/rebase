@@ -45,7 +45,7 @@ export default defineConfig(() => ({
     resolve: {
         alias: {
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
-            "@rebasepro/core": path.resolve(__dirname, "../core/src"),
+            "@rebasepro/app": path.resolve(__dirname, "../app/src"),
             "@rebasepro/plugin-data-enhancement": path.resolve(__dirname, "../plugin-data-enhancement/src"),
             "@rebasepro/inference": path.resolve(__dirname, "../inference/src"),
             "@rebasepro/studio": path.resolve(__dirname, "../studio/src"),

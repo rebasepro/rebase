@@ -91,5 +91,5 @@ const { data: filtered } = await data.products
 
 - [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Snapshot`, `FindResponse`, etc.
 - [`@rebasepro/utils`](../utils) — Low-level utilities (`toSnakeCase`, etc.)
-- [`@rebasepro/core`](../core) — Runtime layer that consumes `@rebasepro/common`
+- [`@rebasepro/app`](../core) — Runtime layer that consumes `@rebasepro/common`
 - [`@rebasepro/client`](../client) — HTTP client that re-exports and extends the `QueryBuilder`

@@ -3,7 +3,7 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseCollectionsPlugin } from "@rebasepro/core/vitePlugin";
+import { rebaseCollectionsPlugin } from "@rebasepro/app/vitePlugin";
 import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
@@ -55,7 +55,7 @@ export default defineConfig({
                     if (id.includes("node_modules/lucide-react/")) return "vendor-lucide-react";
 
                     if (id.includes("packages/ui/")) return "rebase-ui";
-                    if (id.includes("packages/core/")) return "rebase-core";
+                    if (id.includes("packages/app/")) return "rebase-core";
 
                     // Split admin into sub-chunks to stay under size limits
                     if (id.includes("packages/admin/src/editor/")) return "rebase-admin-editor";
@@ -92,7 +92,7 @@ template: "raw-data" })
         alias: {
             "react": path.resolve(__dirname, "./node_modules/react"),
             "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
-            "@rebasepro/core": path.resolve(__dirname, "../../packages/core/src"),
+            "@rebasepro/app": path.resolve(__dirname, "../../packages/app/src"),
             "@rebasepro/types": path.resolve(__dirname, "../../packages/types/src"),
             "@rebasepro/common": path.resolve(__dirname, "../../packages/common/src"),
             "@rebasepro/client": path.resolve(__dirname, "../../packages/client/src"),

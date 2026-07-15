@@ -7,7 +7,7 @@ import {
     UIReferenceView,
     NotFoundPage,
     useComponentOverride
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
 
 import { ContentHomePage as DefaultHomePage } from "./HomePage/ContentHomePage";
@@ -17,7 +17,7 @@ import { CustomViewRoute } from "../routes/CustomViewRoute";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { CollectionEditorDialogs } from "./CollectionEditorDialogs";
 import { useEffect } from "react";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { useBreadcrumbsController } from "../index";
 
 function SettingsView() {

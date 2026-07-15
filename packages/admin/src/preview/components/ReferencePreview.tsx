@@ -3,10 +3,10 @@ import * as React from "react";
 
 import { Entity, EntityReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
+import { useCustomizationController, useFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { ErrorView } from "@rebasepro/core";
+import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { useCollectionRegistryController } from "../../index";
 import { getEntityTitlePropertyKey } from "../../util/previews";

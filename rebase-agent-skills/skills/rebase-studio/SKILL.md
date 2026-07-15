@@ -30,7 +30,7 @@ The admin mode is controlled by `AdminModeController` and persisted in `localSto
 ### Mode Controller API
 
 ```typescript
-import { useAdminModeController } from "@rebasepro/core";
+import { useAdminModeController } from "@rebasepro/app";
 
 interface AdminModeController {
     mode: "content" | "studio" | "settings";
@@ -62,7 +62,7 @@ When `<RebaseStudio>` is registered, the drawer automatically renders a segmente
 In Studio mode, developers can select an "effective role" to preview the application as a specific role would see it. The role is persisted in `localStorage` under `rebase-effective-role`.
 
 ```typescript
-import { useEffectiveRoleController } from "@rebasepro/core";
+import { useEffectiveRoleController } from "@rebasepro/app";
 
 interface EffectiveRoleController {
     effectiveRole: string | null;
@@ -147,7 +147,7 @@ The Studio is mounted using the declarative composition API. All four components
 
 ```tsx
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
-import { Rebase } from "@rebasepro/core";
+import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
 import { RebaseStudio } from "@rebasepro/studio";
@@ -187,8 +187,8 @@ Pass `tools={undefined} homePage={undefined}` explicitly:
 
 | Component | Package | Purpose | Renders UI? |
 |-----------|---------|---------|-------------|
-| `<Rebase>` | `@rebasepro/core` | Root provider (client, auth, user management, plugins) | Yes (providers) |
-| `<RebaseAuth>` | `@rebasepro/core` | Authentication config (custom login view) | No — registers into registry |
+| `<Rebase>` | `@rebasepro/app` | Root provider (client, auth, user management, plugins) | Yes (providers) |
+| `<RebaseAuth>` | `@rebasepro/app` | Authentication config (custom login view) | No — registers into registry |
 | `<RebaseCMS>` | `@rebasepro/admin` | CMS config (collections, views, editor) | No — registers into registry |
 | `<RebaseStudio>` | `@rebasepro/studio` | Studio config (tools, home page) | No — registers into registry |
 | `<RebaseShell>` | `@rebasepro/admin` | App shell (drawer, navigation, routes, layout) | Yes — the actual UI |
@@ -198,7 +198,7 @@ Pass `tools={undefined} homePage={undefined}` explicitly:
 Rebase allows you to override default UI components globally by passing a `components` prop to the `<Rebase>` provider. This implements Docusaurus-style component swizzling, supporting both **Eject** and **Wrap** patterns.
 
 ```tsx
-import { Rebase } from "@rebasepro/core";
+import { Rebase } from "@rebasepro/app";
 import { MyAppBar } from "./MyAppBar";
 
 <Rebase
@@ -529,7 +529,7 @@ interface StudioBridge {
 | `useStudioNavigationState()` | `NavigationStateController` | Access navigation state from Studio |
 | `useStudioBreadcrumbs()` | `BreadcrumbsController` | Set breadcrumbs from Studio tools |
 
-All bridge hooks are exported from `@rebasepro/studio` (re-exported from `@rebasepro/core`):
+All bridge hooks are exported from `@rebasepro/studio` (re-exported from `@rebasepro/app`):
 
 ```typescript
 import {
@@ -578,7 +578,7 @@ import { StudioBridgeProvider } from "@rebasepro/studio";
 
 ## Core Hooks Reference
 
-These hooks are exported from `@rebasepro/core` and available inside any `<Rebase>` provider tree:
+These hooks are exported from `@rebasepro/app` and available inside any `<Rebase>` provider tree:
 
 ### Primary Hooks
 
@@ -614,8 +614,8 @@ These hooks are exported from `@rebasepro/core` and available inside any `<Rebas
 | `useNavigationStateController()` | `@rebasepro/admin` | Navigate between views |
 | `useUrlController()` | `@rebasepro/admin` | Build URLs and navigate |
 | `useBreadcrumbsController()` | `@rebasepro/admin` | Set breadcrumbs |
-| `useRebaseRegistry()` | `@rebasepro/core` | Access the full registry (CMS + Studio + Auth configs) |
-| `useRebaseClient()` | `@rebasepro/core` | Access the `RebaseClient` instance |
+| `useRebaseRegistry()` | `@rebasepro/app` | Access the full registry (CMS + Studio + Auth configs) |
+| `useRebaseClient()` | `@rebasepro/app` | Access the `RebaseClient` instance |
 
 ### ModeController (Color Theme)
 
@@ -757,7 +757,7 @@ This starts both frontend and backend. The Studio is accessible at `http://local
 
 | Package | Description |
 |---------|-------------|
-| `@rebasepro/core` | Core framework, hooks, types, `<Rebase>` provider |
+| `@rebasepro/app` | Core framework, hooks, types, `<Rebase>` provider |
 | `@rebasepro/studio` | Studio admin panel (`<RebaseStudio>`, `StudioHomePage`, bridge hooks) |
 | `@rebasepro/admin` | CMS frontend (`<RebaseCMS>`, `<RebaseShell>`, `CollectionPanel`, collection editor) |
 | `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |

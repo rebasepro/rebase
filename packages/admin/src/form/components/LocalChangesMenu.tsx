@@ -19,8 +19,8 @@ import {
     XCircleIcon
 } from "@rebasepro/ui";
 import { FormexController } from "@rebasepro/forms";
-import { useSnackbarController, useTranslation } from "@rebasepro/core";
-import { flattenKeys, removeEntityFromCache } from "@rebasepro/core";
+import { useSnackbarController, useTranslation } from "@rebasepro/app";
+import { flattenKeys, removeEntityFromCache } from "@rebasepro/app";
 ;
 import { PropertyCollectionView } from "../../components/PropertyCollectionView";
 import { mergeDeep } from "@rebasepro/utils";

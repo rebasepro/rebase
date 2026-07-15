@@ -38,7 +38,7 @@ import {
     useSlot,
     useTranslation,
     useUserConfigurationPersistence
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { CollectionViewActions } from "./CollectionViewActions";
 import { CollectionCardViewBinding } from "./CollectionCardViewBinding";
 import { CollectionListViewBinding } from "./CollectionListViewBinding";

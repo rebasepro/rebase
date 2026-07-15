@@ -5,9 +5,9 @@ import { IconButton, StarIcon, Tooltip } from "@rebasepro/ui";
 import { NavigationCard } from "./NavigationCard";
 import { SmallNavigationCard } from "./SmallNavigationCard";
 import React from "react";
-import { useRebaseContext, useSlot } from "@rebasepro/core";
-import { IconForView } from "@rebasepro/core";
-import { useUserConfigurationPersistence } from "@rebasepro/core";
+import { useRebaseContext, useSlot } from "@rebasepro/app";
+import { IconForView } from "@rebasepro/app";
+import { useUserConfigurationPersistence } from "@rebasepro/app";
 
 /**
  * This is the component used in the home page to render a card for each

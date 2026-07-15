@@ -1,4 +1,4 @@
-import { useCustomizationController } from "@rebasepro/core";
+import { useCustomizationController } from "@rebasepro/app";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { ErrorBoundary } from "@rebasepro/ui";

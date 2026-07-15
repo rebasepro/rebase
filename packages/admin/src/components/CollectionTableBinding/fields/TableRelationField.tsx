@@ -8,8 +8,8 @@ import { RelationPreview } from "../../../preview";
 import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
-import { } from "@rebasepro/core";
-import { ErrorView } from "@rebasepro/core";
+import { } from "@rebasepro/app";
+import { ErrorView } from "@rebasepro/app";
 import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";

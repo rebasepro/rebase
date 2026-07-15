@@ -5,7 +5,7 @@ import { Entity, getCollectionDataPath, getDataSourceCapabilities, Relation } fr
 import React, { useCallback } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
-import { ErrorView, IconForView } from "@rebasepro/core";
+import { ErrorView, IconForView } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { getRelationFrom, normalizeToEntityRelation, resolveRelationProperty } from "@rebasepro/common";
 import { cls } from "@rebasepro/ui";

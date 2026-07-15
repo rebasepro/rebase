@@ -2,7 +2,7 @@
 import React from "react";
 
 import { Link, useNavigate } from "react-router-dom";
-import { RebaseLogo, LanguageToggle } from "@rebasepro/core";
+import { RebaseLogo, LanguageToggle } from "@rebasepro/app";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import {
     Avatar,
@@ -18,12 +18,12 @@ import {
     SunMoonIcon,
     Typography
 } from "@rebasepro/ui";
-import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation } from "@rebasepro/core";
+import { useAuthController, useLargeLayout, useModeController, useAdminModeController, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { User } from "@rebasepro/types";
 import { useApp } from "./app/useApp";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
-import { UserSettingsView } from "@rebasepro/core";
+import { UserSettingsView } from "@rebasepro/app";
 
 export type DefaultAppBarProps<ADDITIONAL_PROPS = object> = {
 

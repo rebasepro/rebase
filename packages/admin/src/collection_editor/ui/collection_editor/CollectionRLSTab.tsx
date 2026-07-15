@@ -38,7 +38,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 
 /** Postgres RLS policy shape — defined inline to avoid depending on @rebasepro/studio */
 export interface PostgresPolicy {

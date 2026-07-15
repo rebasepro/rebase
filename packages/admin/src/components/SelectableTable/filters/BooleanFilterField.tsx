@@ -1,7 +1,7 @@
 import React from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { BooleanSwitchWithLabel } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 interface BooleanFieldProps {
     name: string,

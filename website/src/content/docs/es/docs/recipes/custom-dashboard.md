@@ -11,7 +11,7 @@ Construya una vista de panel de control personalizada que muestre análisis junt
 ## Crear el componente de panel de control
 
 ```tsx
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
 function DashboardView() {

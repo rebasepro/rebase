@@ -4,8 +4,8 @@ import useMeasure from "react-use-measure";
 
 import { cls, Tooltip, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MinusCircleIcon } from "@rebasepro/ui";
-import { getRowHeight, TableSize } from "@rebasepro/core";
-import { ErrorTooltip } from "@rebasepro/core";
+import { getRowHeight, TableSize } from "@rebasepro/app";
+import { ErrorTooltip } from "@rebasepro/app";
 
 interface EntityTableCellProps {
     children: React.ReactNode;

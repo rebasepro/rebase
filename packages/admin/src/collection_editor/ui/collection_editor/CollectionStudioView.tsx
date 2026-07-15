@@ -1,5 +1,5 @@
 
-import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
+import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/app";
 import * as React from "react";
 import { useState } from "react";
 import { Button, PlusIcon, Typography } from "@rebasepro/ui";

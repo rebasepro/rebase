@@ -21,7 +21,7 @@ import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { User } from "@rebasepro/types";
-import { useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/core";
+import { useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/app";
 import { EmptyValue } from "../preview";
 
 interface UserSelectorItem {

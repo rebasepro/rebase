@@ -13,7 +13,7 @@ Rebase provides React hooks to access framework functionality from any component
 The master hook — access everything:
 
 ```typescript
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 
 function MyComponent() {
     const context = useRebaseContext();
@@ -32,7 +32,7 @@ function MyComponent() {
 Access authentication state and capabilities:
 
 ```typescript
-import { useAuthController } from "@rebasepro/core";
+import { useAuthController } from "@rebasepro/app";
 
 function UserMenu() {
     const auth = useAuthController();
@@ -52,7 +52,7 @@ function UserMenu() {
 Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
 
 ```typescript
-import { useCollection } from "@rebasepro/core";
+import { useCollection } from "@rebasepro/app";
 import { productsCollection } from "../config/collections";
 
 function ProductList() {
@@ -109,7 +109,7 @@ function ProductList() {
 Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
 
 ```typescript
-import { useEntityFetch } from "@rebasepro/core";
+import { useEntityFetch } from "@rebasepro/app";
 import { productsCollection } from "../config/collections";
 
 function ProductDetail({ productId }) {
@@ -153,7 +153,7 @@ Rebase maintains a global memory cache to prevent UI flashing. You can manipulat
 Hook to evaluate roles and permissions for the current user. It abstracts away the need to manually pass the `authController` to permission checking functions.
 
 ```typescript
-import { usePermissions } from "@rebasepro/core";
+import { usePermissions } from "@rebasepro/app";
 import { productsCollection } from "../config/collections";
 
 function CreateProductButton() {
@@ -186,7 +186,7 @@ Utility hook to copy or cut text to the clipboard, with automatic support for fa
 > Note the exact spelling of `isCoppied` (with two `p`s) in the return payload.
 
 ```typescript
-import { useClipboard } from "@rebasepro/core";
+import { useClipboard } from "@rebasepro/app";
 
 function CopyButton({ text }) {
     const { copy, isCoppied } = useClipboard({ copiedDuration: 2000 });
@@ -223,7 +223,7 @@ function CopyButton({ text }) {
 Programmatically open entities in a side panel:
 
 ```typescript
-import { useSidePanel } from "@rebasepro/core";
+import { useSidePanel } from "@rebasepro/app";
 
 function OpenProductButton({ productId }) {
     const sidePanel = useSidePanel();
@@ -255,7 +255,7 @@ Methods:
 Show toast notifications:
 
 ```typescript
-import { useSnackbarController } from "@rebasepro/core";
+import { useSnackbarController } from "@rebasepro/app";
 
 function SaveButton() {
     const snackbar = useSnackbarController();
@@ -276,7 +276,7 @@ function SaveButton() {
 Access file storage operations:
 
 ```typescript
-import { useStorageSource } from "@rebasepro/core";
+import { useStorageSource } from "@rebasepro/app";
 
 function FileUploader() {
     const storage = useStorageSource();
@@ -298,7 +298,7 @@ function FileUploader() {
 Control light/dark theme:
 
 ```typescript
-import { useModeController } from "@rebasepro/core";
+import { useModeController } from "@rebasepro/app";
 
 function ThemeToggle() {
     const mode = useModeController();
@@ -316,7 +316,7 @@ function ThemeToggle() {
 Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
-import { useSelectionDialog } from "@rebasepro/core";
+import { useSelectionDialog } from "@rebasepro/app";
 
 function SelectProduct() {
     const selectionDialog = useSelectionDialog({
@@ -336,7 +336,7 @@ function SelectProduct() {
 Access navigation state and resolved collections:
 
 ```typescript
-import { useNavigationController } from "@rebasepro/core";
+import { useNavigationController } from "@rebasepro/app";
 
 function MyComponent() {
     const navigation = useNavigationController();
@@ -353,7 +353,7 @@ function MyComponent() {
 Manage complex relation selections with built-in search, debouncing, and pagination.
 
 ```typescript
-import { useRelationSelector } from "@rebasepro/core";
+import { useRelationSelector } from "@rebasepro/app";
 import { categoriesCollection } from "../config/collections";
 
 function CategorySelector({ onSelect }) {
@@ -395,7 +395,7 @@ function CategorySelector({ onSelect }) {
 Manage user account selection with server-side search and pagination, automatically falling back to client-side filtering if the backend delegate doesn't support server-side search.
 
 ```typescript
-import { useUserSelector } from "@rebasepro/core";
+import { useUserSelector } from "@rebasepro/app";
 
 function AssigneeSelector({ onSelect }) {
     const { items, isLoading, search, loadMore, hasMore } = useUserSelector({
@@ -441,7 +441,7 @@ function AssigneeSelector({ onSelect }) {
 Retrieve the backing client SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.
 
 ```typescript
-import { useRebaseClient } from "@rebasepro/core";
+import { useRebaseClient } from "@rebasepro/app";
 
 function CustomAction() {
     const client = useRebaseClient();
@@ -460,7 +460,7 @@ function CustomAction() {
 Prevent navigation or page unload when form data has unsaved changes. It automatically intercepts internal React Router navigation via `useBlocker` as well as browser-level reloads via `beforeunload`.
 
 ```typescript
-import { useUnsavedChangesDialog } from "@rebasepro/core";
+import { useUnsavedChangesDialog } from "@rebasepro/app";
 import { useState } from "react";
 
 function EditForm() {
@@ -494,7 +494,7 @@ function EditForm() {
 Switch roles at runtime to preview permissions and test Row-Level Security (RLS) policies locally without signing out.
 
 ```typescript
-import { useEffectiveRoleController } from "@rebasepro/core";
+import { useEffectiveRoleController } from "@rebasepro/app";
 
 function RoleSwitcher() {
     const { effectiveRole, setEffectiveRole } = useEffectiveRoleController();
@@ -515,7 +515,7 @@ function RoleSwitcher() {
 Switch the admin layout view modes within the admin panel.
 
 ```typescript
-import { useAdminModeController } from "@rebasepro/core";
+import { useAdminModeController } from "@rebasepro/app";
 
 function ModeToggle() {
     const { mode, setMode } = useAdminModeController(); // mode is "content" | "studio" | "settings"
@@ -529,7 +529,7 @@ function ModeToggle() {
 Open dialog screens imperatively from anywhere in the component tree.
 
 ```typescript
-import { useDialogsController } from "@rebasepro/core";
+import { useDialogsController } from "@rebasepro/app";
 import { MyCustomDialog } from "./MyCustomDialog";
 
 function OpenModalButton() {
@@ -552,7 +552,7 @@ function OpenModalButton() {
 Capture CMS UI actions and user events globally.
 
 ```typescript
-import { useAnalyticsController } from "@rebasepro/core";
+import { useAnalyticsController } from "@rebasepro/app";
 import { useEffect } from "react";
 
 function AnalyticsLogger() {

@@ -35,8 +35,8 @@ import {
     VirtualTableColumn,
     XIcon
 } from "@rebasepro/ui";
-import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/core";
-import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/core";
+import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/app";
+import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/app";
 import { CollectionConfig } from "@rebasepro/types";
 import { createRebaseClient } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
@@ -65,7 +65,7 @@ interface EditorTab {
     code: string;
 }
 
-// SelectedUser is now SelectableUser from @rebasepro/core
+// SelectedUser is now SelectableUser from @rebasepro/app
 
 // ─── Constants ───────────────────────────────────────────────────────
 

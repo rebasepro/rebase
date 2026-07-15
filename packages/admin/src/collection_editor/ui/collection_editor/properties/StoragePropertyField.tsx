@@ -13,7 +13,7 @@ import {
 } from "@rebasepro/ui";
 
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/forms";
-import { useStorageSources, useTranslation } from "@rebasepro/core";
+import { useStorageSources, useTranslation } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";
 import { ArrayPropertyValidation } from "./validation/ArrayPropertyValidation";

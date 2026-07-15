@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/forms";
 import { CollectionConfig, RebaseData, RebaseContext, AnalyticsController, Entity } from "@rebasepro/types";
-import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps } from "@rebasepro/core";
+import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps } from "@rebasepro/app";
 import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";

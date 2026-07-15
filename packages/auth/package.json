@@ -62,7 +62,7 @@
     ],
     "testEnvironment": "jsdom",
     "moduleNameMapper": {
-      "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
+      "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts"
     }

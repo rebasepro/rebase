@@ -11,7 +11,7 @@ Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht, die Analysen neben Ihre
 ## Die Dashboard-Komponente erstellen
 
 ```tsx
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
 function DashboardView() {

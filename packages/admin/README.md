@@ -12,7 +12,7 @@ pnpm add @rebasepro/admin
 
 ## What This Package Does
 
-`@rebasepro/admin` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, snapshot editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/core` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
+`@rebasepro/admin` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, snapshot editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
 
 ## Key Exports
 
@@ -131,7 +131,7 @@ function App() {
 
 ## Related Packages
 
-- [`@rebasepro/core`](../core) — Runtime hooks, providers, auth components, and context
+- [`@rebasepro/app`](../core) — Runtime hooks, providers, auth components, and context
 - [`@rebasepro/ui`](../ui) — Design system components (buttons, dialogs, inputs, etc.)
 - [`@rebasepro/common`](../common) — Shared utilities, collection registry, query builder
 - [`@rebasepro/types`](../types) — TypeScript type definitions

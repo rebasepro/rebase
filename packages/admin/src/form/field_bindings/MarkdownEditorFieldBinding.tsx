@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
-import { useAuthController, useStorageSource } from "@rebasepro/core";
-import { useStorageSources } from "@rebasepro/core";
+import { useAuthController, useStorageSource } from "@rebasepro/app";
+import { useStorageSources } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";

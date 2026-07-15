@@ -8,7 +8,7 @@ import {
     defaultBorderMixin,
     ResizablePanels
 } from "@rebasepro/ui";
-import { useLargeLayout } from "@rebasepro/core";
+import { useLargeLayout } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../index";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUrlController } from "../../index";

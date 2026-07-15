@@ -5,12 +5,12 @@ import type { Property, ReferenceProperty } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 
 import { Entity, EntityReference } from "@rebasepro/types";
-import { ErrorView } from "@rebasepro/core";
+import { ErrorView } from "@rebasepro/app";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
 import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useClearRestoreValue } from "../useClearRestoreValue";

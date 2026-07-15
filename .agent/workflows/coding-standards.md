@@ -44,9 +44,9 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Use explicit variable transport**: Pass metadata through function parameters, context objects, or dedicated transport structures — never by mutating data payloads.
 
 ## 9. Localization (i18n)
-- **All user-facing strings must use the `t()` hook**: Import `useRebaseLocaleContext` from `@rebasepro/core` and use the `t()` function for all visible text (labels, messages, tooltips, placeholders).
-- **Never hardcode English strings in UI components**: If a translation key is missing, add it to `packages/core/src/locales/en.ts` first, then use `t("your_key")`.
-- **Locale files are the single source of truth**: All translation strings live in the locale files under `packages/core/src/locales/`.
+- **All user-facing strings must use the `t()` hook**: Import `useRebaseLocaleContext` from `@rebasepro/app` and use the `t()` function for all visible text (labels, messages, tooltips, placeholders).
+- **Never hardcode English strings in UI components**: If a translation key is missing, add it to `packages/app/src/locales/en.ts` first, then use `t("your_key")`.
+- **Locale files are the single source of truth**: All translation strings live in the locale files under `packages/app/src/locales/`.
 
 ## 10. No Process or Legacy Comments
 - **Clean state documentation**: Documentation and comments must describe what the code *is* and what it *does*, not what it *used to be* or the *process* of how it evolved.

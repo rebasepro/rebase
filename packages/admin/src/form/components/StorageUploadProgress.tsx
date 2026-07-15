@@ -1,8 +1,8 @@
 import React, { useCallback } from "react";
 
-import { useSnackbarController, useStorageSource } from "@rebasepro/core";
-import { StorageFieldItem } from "@rebasepro/core";
-import { ErrorView } from "@rebasepro/core";
+import { useSnackbarController, useStorageSource } from "@rebasepro/app";
+import { StorageFieldItem } from "@rebasepro/app";
+import { ErrorView } from "@rebasepro/app";
 import type { StorageSource } from "@rebasepro/types";
 import { cls, paperMixin, Skeleton } from "@rebasepro/ui";
 

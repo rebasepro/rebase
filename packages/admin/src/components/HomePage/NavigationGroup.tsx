@@ -1,6 +1,6 @@
 import React, { PropsWithChildren, useState } from "react";
 import { cls, ExpandablePanel, IconButton, iconSize, PencilIcon, Typography } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 export function NavigationGroup({
     children,

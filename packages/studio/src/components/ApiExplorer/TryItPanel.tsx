@@ -12,7 +12,7 @@ import {
     Typography,
     XIcon
 } from "@rebasepro/ui";
-import { useRebaseContext, UserSelectPopover, SelectableUser } from "@rebasepro/core";
+import { useRebaseContext, UserSelectPopover, SelectableUser } from "@rebasepro/app";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import type { ParsedEndpoint } from "./types";
 import type { User } from "@rebasepro/types";

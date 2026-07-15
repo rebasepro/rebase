@@ -8,7 +8,7 @@ import { useDropzone } from "react-dropzone";
 import { PropertyPreview } from "../../../preview";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { cls, IconButton, PencilIcon, Typography } from "@rebasepro/ui";
-import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController, StorageSourceContext } from "@rebasepro/core";
+import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController, StorageSourceContext } from "@rebasepro/app";
 import { getThumbnailMeasure } from "../../../preview/util";
 import { StorageUploadProgress } from "../../../form/components/StorageUploadProgress";
 import { EntityTableCellActions } from "../internal/EntityTableCellActions";

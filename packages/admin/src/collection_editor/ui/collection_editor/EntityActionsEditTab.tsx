@@ -3,7 +3,7 @@ import React from "react";
 import {
     ConfirmationDialog,
     useCustomizationController
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { resolveEntityAction } from "../../_cms_internals";
 import { type CollectionConfig } from "@rebasepro/types";
 import { EntityAction } from "@rebasepro/types";

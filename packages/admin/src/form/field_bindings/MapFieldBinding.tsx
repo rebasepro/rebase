@@ -2,7 +2,7 @@ import type { FieldProps, PropertyFieldBindingProps } from "../../types/fields";
 import type { MapProperty } from "@rebasepro/types";
 import React from "react";
 ;
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";

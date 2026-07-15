@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 import type {
     AuthController,
     RebaseContext,

@@ -1,7 +1,7 @@
 import { RebaseTranslations } from "@rebasepro/types";
 
 /**
- * Spanish baseline translations for @rebasepro/core.
+ * Spanish baseline translations for @rebasepro/app.
  *
  * This is the single source of truth for all default UI strings in Spanish.
  * Override any key via the `translations` prop on Rebase entry-point components.

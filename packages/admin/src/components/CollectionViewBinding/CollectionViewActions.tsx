@@ -2,11 +2,11 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { lazy, Suspense } from "react";
 
-import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/core";
+import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
-import { usePermissions } from "@rebasepro/core";
+import { usePermissions } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
 // Lazy-load import/export — pulls in exceljs only on demand
 const ImportCollectionAction = lazy(() => import("../../data_import/import").then(m => ({ default: m.ImportCollectionAction })));

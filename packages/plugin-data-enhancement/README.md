@@ -77,5 +77,5 @@ await aiController.autocomplete(
 ## Related Packages
 
 - `@rebasepro/admin` — The admin panel this plugin extends
-- `@rebasepro/core` — Core framework providing the plugin system
+- `@rebasepro/app` — Core framework providing the plugin system
 - `@rebasepro/types` — Shared types (`RebasePlugin`, `CollectionConfig`, etc.)

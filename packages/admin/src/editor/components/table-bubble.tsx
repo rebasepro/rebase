@@ -10,7 +10,7 @@ import {
     type Placement
 } from "@floating-ui/dom";
 import { IconButton, Tooltip, defaultBorderMixin, cls } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import {
     addColumnBefore,
     addColumnAfter,

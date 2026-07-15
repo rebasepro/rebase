@@ -9,7 +9,7 @@ import {
     useData,
     useSnackbarController,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { useCMSContext } from "../hooks";
 import { EntityViewBinding } from "./EntityViewBinding";
 

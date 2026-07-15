@@ -23,7 +23,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
-import { useCustomizationController, useTranslation } from "@rebasepro/core";
+import { useCustomizationController, useTranslation } from "@rebasepro/app";
 import { getIn } from "@rebasepro/forms";
 import { getDefaultValueFortype } from "@rebasepro/common";
 

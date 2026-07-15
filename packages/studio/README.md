@@ -42,8 +42,8 @@ All 9 tools are enabled by default. The `schema` tool (collection editor) is aut
 |---|---|---|
 | `RebaseStudio` | Component | Main entry point — registers tools into the Rebase registry |
 | `StudioHomePage` | Component | Default home page with tool cards and SDK quick-start snippet |
-| `StudioBridgeProvider` | Component | Re-exported from `@rebasepro/core` |
-| `StudioBridgeContext` | Context | Re-exported from `@rebasepro/core` |
+| `StudioBridgeProvider` | Component | Re-exported from `@rebasepro/app` |
+| `StudioBridgeContext` | Context | Re-exported from `@rebasepro/app` |
 | `useStudioCollectionRegistry` | Hook | Access the collection registry |
 | `useStudioSidePanelController` | Hook | Control the side snapshot panel |
 | `useStudioUrlController` | Hook | URL state management |
@@ -86,7 +86,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 
 ## Related Packages
 
-- `@rebasepro/core` — Bridge, registry, and navigation primitives
+- `@rebasepro/app` — Bridge, registry, and navigation primitives
 - `@rebasepro/ui` — Component library used by Studio tools
 - `@rebasepro/admin` — The CMS layer (optional peer dep)
 - `@rebasepro/types` — Shared type definitions

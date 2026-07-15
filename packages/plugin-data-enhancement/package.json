@@ -18,7 +18,7 @@
   "dependencies": {
     "@rebasepro/admin": "workspace:*",
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/core": "workspace:*",
+    "@rebasepro/app": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*"
@@ -76,7 +76,7 @@
       "node"
     ],
     "moduleNameMapper": {
-      "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
+      "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",

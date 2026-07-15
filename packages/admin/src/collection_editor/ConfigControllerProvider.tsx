@@ -4,7 +4,7 @@ import { Entity, CollectionConfig, Property, TableMetadata, User } from "@rebase
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
-import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController } from "@rebasepro/core";
+import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController } from "@rebasepro/app";
 import { getTableName } from "@rebasepro/common";
 import { useNavigate } from "react-router-dom";
 import { CollectionEditorController } from "./types/collection_editor_controller";

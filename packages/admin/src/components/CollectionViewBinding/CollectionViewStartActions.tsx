@@ -1,7 +1,7 @@
 import type { Properties } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/types";
 import React, { useState, useCallback } from "react";
-import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/core";
+import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { ArrowLeftIcon, Badge, Button, cls, FilterIcon, IconButton, Tooltip } from "@rebasepro/ui";

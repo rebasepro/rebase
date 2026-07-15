@@ -3,8 +3,8 @@ import React, { memo, useCallback, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
 import { Checkbox, Chip, cls, defaultBorderMixin, Markdown } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
-import { IconForView } from "@rebasepro/core";
+import { useAuthController, useCustomizationController } from "@rebasepro/app";
+import { IconForView } from "@rebasepro/app";
 import { BoardItemViewProps } from "@rebasepro/ui";
 import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
 

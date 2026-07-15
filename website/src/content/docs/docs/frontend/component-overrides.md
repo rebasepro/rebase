@@ -19,7 +19,7 @@ Component overrides can be applied **globally** at the application level (on the
 To override components globally across your entire application, pass a `components` object to the root `<Rebase>` provider.
 
 ```tsx
-import { Rebase } from "@rebasepro/core";
+import { Rebase } from "@rebasepro/app";
 import { MyAppBar } from "./components/MyAppBar";
 
 function App() {

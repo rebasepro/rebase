@@ -1,5 +1,5 @@
 
-import { AIIcon } from "@rebasepro/core";
+import { AIIcon } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../_cms_internals";
 import React, { useState } from "react";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";

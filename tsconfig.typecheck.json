@@ -72,11 +72,11 @@
       "@rebasepro/common/*": [
         "packages/common/src/*"
       ],
-      "@rebasepro/core": [
-        "packages/core/src"
+      "@rebasepro/app": [
+        "packages/app/src"
       ],
-      "@rebasepro/core/*": [
-        "packages/core/src/*"
+      "@rebasepro/app/*": [
+        "packages/app/src/*"
       ],
       "@rebasepro/forms": [
         "packages/forms/src"
@@ -174,7 +174,7 @@
     "packages/client-firebase/src",
     "packages/client-postgres/src",
     "packages/common/src",
-    "packages/core/src",
+    "packages/app/src",
     "packages/forms/src",
     "packages/mcp/src",
     "packages/plugin-data-enhancement/src",

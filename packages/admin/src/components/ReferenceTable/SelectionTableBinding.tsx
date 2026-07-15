@@ -14,15 +14,15 @@ import {
     useDataTableController,
     useLargeLayout,
     usePermissions
-} from "@rebasepro/core";
-import { ErrorView } from "@rebasepro/core";
+} from "@rebasepro/app";
+import { ErrorView } from "@rebasepro/app";
 import { Button, DialogActions, PlusIcon, Typography } from "@rebasepro/ui";
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import { useSelectionController } from "../CollectionViewBinding/useSelectionController";
 
-import { useColumnIds } from "@rebasepro/core";
+import { useColumnIds } from "@rebasepro/app";
 import { useSideDialogContext } from "../SideDialogs";
-import { useAnalyticsController } from "@rebasepro/core";
+import { useAnalyticsController } from "@rebasepro/app";
 import { useUrlController, useSidePanel } from "../../index";
 
 /**

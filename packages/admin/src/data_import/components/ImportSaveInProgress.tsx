@@ -1,4 +1,4 @@
-import { useData } from "@rebasepro/core";
+import { useData } from "@rebasepro/app";
 import { Entity, CollectionConfig } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";

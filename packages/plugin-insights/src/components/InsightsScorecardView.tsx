@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { getIcon } from "@rebasepro/core";
+import { getIcon } from "@rebasepro/app";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import type { DataRow, ScorecardConfig, ScorecardFormat } from "../types";
 
@@ -31,7 +31,7 @@ function formatNumber(value: number, format?: ScorecardFormat): string {
  *
  * Renders a single KPI metric with optional comparison value and icon.
  * Uses Tailwind `dark:` classes — no JS dark mode detection.
- * Icons are resolved via `getIcon` from `@rebasepro/core`.
+ * Icons are resolved via `getIcon` from `@rebasepro/app`.
  */
 export function InsightsScorecardView({
     config,

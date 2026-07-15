@@ -5,8 +5,8 @@ import React from "react";
 import { describe, expect, test, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 
-// Mock @rebasepro/core hooks and LoginView component
-jest.mock("@rebasepro/core", () => ({
+// Mock @rebasepro/app hooks and LoginView component
+jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: jest.fn(),
     useAuthController: jest.fn(),
     LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>
@@ -50,7 +50,7 @@ import { FieldCaption } from "../../src/components/FieldCaption";
 import { RebaseAuthGate } from "../../src/components/RebaseAuthGate";
 import { PropertyIdCopyTooltip, PropertyIdCopyTooltipContent } from "../../src/components/PropertyIdCopyTooltip";
 import { PropertyConfigBadge } from "../../src/components/PropertyConfigBadge";
-import { useRebaseRegistry, useAuthController } from "@rebasepro/core";
+import { useRebaseRegistry, useAuthController } from "@rebasepro/app";
 import { PropertyConfig } from "@rebasepro/types";
 
 describe("React Components Tests", () => {

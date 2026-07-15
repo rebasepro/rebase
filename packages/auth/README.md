@@ -12,7 +12,7 @@ pnpm add @rebasepro/auth
 
 ## What This Package Does
 
-`@rebasepro/auth` connects the Rebase CMS frontend to the backend's JWT authentication system. It provides a React hook (`useRebaseAuthController`) that manages login, registration, token refresh, session persistence, and user profile updates, plus a lower-level API module for direct HTTP calls to auth endpoints. For the generic `LoginView` and `RebaseAuth` UI components, see `@rebasepro/core`.
+`@rebasepro/auth` connects the Rebase CMS frontend to the backend's JWT authentication system. It provides a React hook (`useRebaseAuthController`) that manages login, registration, token refresh, session persistence, and user profile updates, plus a lower-level API module for direct HTTP calls to auth endpoints. For the generic `LoginView` and `RebaseAuth` UI components, see `@rebasepro/app`.
 
 ## Key Exports
 
@@ -70,7 +70,7 @@ function App() {
 
 ## Related Packages
 
-- [`@rebasepro/core`](../core) — `LoginView`, `RebaseAuth` UI components, `AuthController` base type
+- [`@rebasepro/app`](../core) — `LoginView`, `RebaseAuth` UI components, `AuthController` base type
 - [`@rebasepro/client`](../client) — HTTP client with its own `auth` module for direct API calls
 - [`@rebasepro/types`](../types) — Base `AuthController` and `User` types
 - [`@rebasepro/ui`](../ui) — UI components used by auth views

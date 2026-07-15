@@ -13,7 +13,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { useSnackbarController, useTranslation } from "@rebasepro/core";
+import { useSnackbarController, useTranslation } from "@rebasepro/app";
 import { UserCreationResult } from "@rebasepro/types";
 
 export function CreationResultDialog({

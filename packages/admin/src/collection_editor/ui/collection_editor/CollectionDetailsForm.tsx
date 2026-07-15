@@ -1,8 +1,8 @@
 
-import { IconForView } from "@rebasepro/core";
+import { IconForView } from "@rebasepro/app";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
 import { CollectionConfig, Property } from "@rebasepro/types";
 import {

@@ -6,7 +6,7 @@ import {
     useCustomizationController,
     useData,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { useCMSContext } from "../../hooks";
 import { CollectionActionsProps, Entity, CollectionConfig, ExportConfig, RebaseContext, User } from "@rebasepro/types";
 import { getDefaultValuesFor } from "@rebasepro/common";

@@ -2,7 +2,7 @@ import type { SideDialogPanelProps } from "../hooks/useSideDialogsController";
 import React, { useCallback, useContext, useEffect, useState, useMemo } from "react";
 import { useSideDialogsController } from "../hooks";
 import { Sheet, Dialog } from "@rebasepro/ui";
-import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/core";
+import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/app";
 import { ErrorBoundary } from "@rebasepro/ui";
 import type { SidePanelBindingProps } from "@rebasepro/types";
 

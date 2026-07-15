@@ -10,8 +10,8 @@ import {
     SearchBar,
     Tooltip
 } from "@rebasepro/ui";
-import { iconsSearch } from "@rebasepro/core";
-import { useTranslation } from "@rebasepro/core";
+import { iconsSearch } from "@rebasepro/app";
+import { useTranslation } from "@rebasepro/app";
 
 const UPDATE_SEARCH_INDEX_WAIT_MS = 220;
 

@@ -133,7 +133,7 @@ photos: {
 Pour les opérations de fichiers programmatiques :
 
 ```typescript
-import { useStorageSource } from "@rebasepro/core";
+import { useStorageSource } from "@rebasepro/app";
 
 const storageSource = useStorageSource();
 

@@ -9,8 +9,8 @@ import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
 import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
-import { } from "@rebasepro/core";
-import { ErrorView } from "@rebasepro/core";
+import { } from "@rebasepro/app";
+import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 
 type TableMultipleRelationFieldProps = {

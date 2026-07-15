@@ -1,4 +1,4 @@
-import { useSnackbarController } from "@rebasepro/core";
+import { useSnackbarController } from "@rebasepro/app";
 
 export function useSafeSnackbarController(): ReturnType<typeof useSnackbarController> | undefined {
     try {

@@ -3,7 +3,7 @@ import {
     useAuthController,
     useSnackbarController,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { PluginHomePageActionsProps } from "@rebasepro/types";
 import { CopyIcon, IconButton, Menu, MenuItem, MoreVerticalIcon, SettingsIcon, Trash2Icon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";

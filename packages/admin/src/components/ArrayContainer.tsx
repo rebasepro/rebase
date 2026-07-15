@@ -29,7 +29,7 @@ import {
     Tooltip,
     useOutsideAlerter
 } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { getHashValue } from "@rebasepro/utils";
 
 export type ArrayEntryParams = {

@@ -4,7 +4,7 @@ import React from "react";
 import { Field, FormexFieldProps, getIn, useFormex } from "@rebasepro/forms";
 ;
 import { DebouncedTextField } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 import { GeneralPropertyValidation } from "./GeneralPropertyValidation";
 import { SwitchControl } from "../../SwitchControl";
 import { serializeRegExp } from "@rebasepro/utils";

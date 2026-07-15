@@ -10,7 +10,7 @@
     "@rebasepro/auth": "workspace:*",
     "@rebasepro/client-firebase": "workspace:*",
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/core": "workspace:*",
+    "@rebasepro/app": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "firebase": "^12.15.0",

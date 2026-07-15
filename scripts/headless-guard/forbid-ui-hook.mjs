@@ -23,7 +23,7 @@ const FORBIDDEN_PACKAGES = [
     "react-router-dom",
     "@rebasepro/admin",
     "@rebasepro/ui",
-    "@rebasepro/core",
+    "@rebasepro/app",
     "@rebasepro/studio",
     "@rebasepro/forms"
 ];
@@ -36,7 +36,7 @@ const FORBIDDEN_PATHS = [
     "/node_modules/react-router-dom/",
     "/packages/admin/",
     "/packages/ui/",
-    "/packages/core/",
+    "/packages/app/",
     "/packages/studio/",
     "/packages/forms/"
 ];

@@ -4,7 +4,7 @@ import "@fontsource/jetbrains-mono";
 import "@fontsource/rubik";
 
 import { useRebaseAuthController } from "@rebasepro/auth";
-import { Rebase, RebaseAuth } from "@rebasepro/core";
+import { Rebase, RebaseAuth } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";

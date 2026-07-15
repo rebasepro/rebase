@@ -105,7 +105,7 @@ image: {
 For **direct** storage backends (e.g., Firebase Storage where the browser uploads straight to the cloud), register them via the `storageSources` prop on `<Rebase>`:
 
 ```tsx
-import type { RebaseStorageSource } from "@rebasepro/core";
+import type { RebaseStorageSource } from "@rebasepro/app";
 
 <Rebase
     client={rebaseClient}
@@ -129,7 +129,7 @@ The system automatically resolves the correct source per-property — collection
 For programmatic file operations outside of collection forms:
 
 ```typescript
-import { useStorageSource } from "@rebasepro/core";
+import { useStorageSource } from "@rebasepro/app";
 
 // Returns the default storage source
 const storageSource = useStorageSource();

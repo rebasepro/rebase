@@ -4,7 +4,7 @@ import {
     useAuthController,
     useSnackbarController,
     useTranslation
-} from "@rebasepro/core";
+} from "@rebasepro/app";
 import { CollectionConfig, CollectionActionsProps } from "@rebasepro/types";
 import { Button, SaveIcon, Tooltip, UndoIcon } from "@rebasepro/ui";
 

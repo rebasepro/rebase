@@ -11,7 +11,7 @@ Crie uma visualização de dashboard personalizada que exiba análises juntament
 ## Criar o Componente do Dashboard
 
 ```tsx
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
 function DashboardView() {

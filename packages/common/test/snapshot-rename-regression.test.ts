@@ -53,7 +53,7 @@ function scanFiles(dirs: string[], pattern: RegExp): string[] {
 const PACKAGE_SRC_DIRS = [
     path.join(REPO_ROOT, "packages/types/src"),
     path.join(REPO_ROOT, "packages/common/src"),
-    path.join(REPO_ROOT, "packages/core/src"),
+    path.join(REPO_ROOT, "packages/app/src"),
     path.join(REPO_ROOT, "packages/admin/src"),
     path.join(REPO_ROOT, "packages/server/src"),
     path.join(REPO_ROOT, "packages/server-postgres/src"),

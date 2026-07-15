@@ -1,5 +1,5 @@
 import React, { useLayoutEffect } from "react";
-import { useRebaseRegistryDispatch } from "@rebasepro/core";
+import { useRebaseRegistryDispatch } from "@rebasepro/app";
 import type { RebaseCMSConfig } from "@rebasepro/types";
 
 /**

@@ -1,7 +1,7 @@
 
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useRef, useState } from "react";
-import { useAuthController, useCustomizationController } from "@rebasepro/core";
+import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { CollectionConfig, Property } from "@rebasepro/types";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { getFieldConfig } from "../../../components/field_configs";

@@ -38,7 +38,7 @@ my-app/
 El frontend es una aplicación estándar de **Vite + React + TypeScript**. El archivo clave es `App.tsx`, que conecta todos los controladores de Rebase:
 
 ```typescript title="frontend/src/App.tsx"
-import { Rebase, Scaffold, AppBar, Drawer, ... } from "@rebasepro/core";
+import { Rebase, Scaffold, AppBar, Drawer, ... } from "@rebasepro/app";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 

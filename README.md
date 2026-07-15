@@ -20,9 +20,9 @@
 
 <p align="center">
   <a href="https://github.com/rebasepro/rebase/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rebasepro/rebase/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
-  <a href="https://www.npmjs.com/package/@rebasepro/core"><img src="https://img.shields.io/npm/v/@rebasepro/core.svg?style=flat-square&color=orange" alt="NPM Version" /></a>
+  <a href="https://www.npmjs.com/package/@rebasepro/app"><img src="https://img.shields.io/npm/v/@rebasepro/app.svg?style=flat-square&color=orange" alt="NPM Version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-purple.svg?style=flat-square" alt="License: MIT" /></a>
-  <a href="https://www.npmjs.com/package/@rebasepro/core"><img src="https://img.shields.io/npm/dw/@rebasepro/core?style=flat-square&color=blue" alt="NPM Downloads" /></a>
+  <a href="https://www.npmjs.com/package/@rebasepro/app"><img src="https://img.shields.io/npm/dw/@rebasepro/app?style=flat-square&color=blue" alt="NPM Downloads" /></a>
   <a href="https://discord.gg/fxy7xsQm3m"><img src="https://img.shields.io/discord/1013768502458470442?style=flat-square&logo=discord&logoColor=white&label=Discord" alt="Discord" /></a>
 </p>
 
@@ -228,7 +228,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/common` | Common modules shared across packages |
 | `@rebasepro/forms` | Lightweight form management library |
 | `@rebasepro/ui` | Standalone React component library (Tailwind + Radix) |
-| `@rebasepro/core` | Core CMS logic and controllers |
+| `@rebasepro/app` | Core CMS logic and controllers |
 | `@rebasepro/client` | Client-side data access layer |
 | `@rebasepro/client-postgres` | PostgreSQL client adapter |
 | `@rebasepro/client-firebase` | Firebase/Firestore client adapter |

@@ -1,5 +1,5 @@
 
-import { useStudioCollectionRegistry } from "@rebasepro/core";
+import { useStudioCollectionRegistry } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Alert,
@@ -25,7 +25,7 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/core";
+import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";

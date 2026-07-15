@@ -1,5 +1,5 @@
 {
-  "extends": "../../packages/core/tsconfig.json",
+  "extends": "../../packages/app/tsconfig.json",
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
     "rootDir": "../..",
@@ -27,8 +27,8 @@
       "@rebasepro/auth": [
         "../../packages/auth/src"
       ],
-      "@rebasepro/core": [
-        "../../packages/core/src"
+      "@rebasepro/app": [
+        "../../packages/app/src"
       ],
       "@rebasepro/client-firebase": [
         "../../packages/client-firebase/src"

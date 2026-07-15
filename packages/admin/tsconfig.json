@@ -46,8 +46,8 @@
       "@rebasepro/admin": [
         "./src"
       ],
-      "@rebasepro/core": [
-        "../core/src"
+      "@rebasepro/app": [
+        "../app/src"
       ],
       "@rebasepro/forms": [
         "../forms/src"

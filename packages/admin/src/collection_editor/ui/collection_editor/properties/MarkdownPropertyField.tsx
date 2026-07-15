@@ -3,7 +3,7 @@ import React, { useCallback } from "react";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
 import { Field, getIn, useFormex } from "@rebasepro/forms";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 import {
     BooleanSwitchWithLabel,

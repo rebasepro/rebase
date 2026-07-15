@@ -15,7 +15,7 @@ import {
     ToggleButtonGroup,
     ToggleButtonOption
 } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 
 export type KanbanPropertyOption = {
     key: string;

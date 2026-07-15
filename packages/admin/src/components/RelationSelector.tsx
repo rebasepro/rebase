@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
 import { EntityPreviewBindingData } from "./EntityPreviewBinding";
-import { useData, useRelationSelector } from "@rebasepro/core";
+import { useData, useRelationSelector } from "@rebasepro/app";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";

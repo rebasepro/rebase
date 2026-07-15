@@ -21,7 +21,7 @@ import { ComponentOverrideContext } from "../contexts/ComponentOverrideContext";
  *
  * @example
  * ```tsx
- * import { useComponentOverride } from "@rebasepro/core";
+ * import { useComponentOverride } from "@rebasepro/app";
  *
  * function EntityFormWrapper(props: EntityFormProps) {
  *     const ResolvedForm = useComponentOverride("Entity.Form", DefaultEntityForm);

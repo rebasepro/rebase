@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, cls, iconSize, KeyRoundIcon, Typography } from "@rebasepro/ui";
-import { UserSelectPopover, SelectableUser } from "@rebasepro/core";
+import { UserSelectPopover, SelectableUser } from "@rebasepro/app";
 
 export interface AuthSimulationSelectorProps {
     authMode: "jwt" | "none";

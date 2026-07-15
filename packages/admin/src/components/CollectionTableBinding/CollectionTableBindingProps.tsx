@@ -3,7 +3,7 @@ import type { AdditionalFieldDelegate } from "@rebasepro/types";
 import type { Property } from "@rebasepro/types";
 import React from "react";
 import { CollectionSize, Entity, EntityTableController, FilterValues, SelectionController, User } from "@rebasepro/types";
-import { OnCellValueChange, OnColumnResizeParams, UniqueFieldValidator } from "@rebasepro/core";
+import { OnCellValueChange, OnColumnResizeParams, UniqueFieldValidator } from "@rebasepro/app";
 import { VirtualTableColumn } from "@rebasepro/ui";
 
 /**

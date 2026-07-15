@@ -51,7 +51,7 @@
       "node"
     ],
     "moduleNameMapper": {
-      "^@rebasepro/core$": "<rootDir>/../core/src/index.ts",
+      "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts"
     }

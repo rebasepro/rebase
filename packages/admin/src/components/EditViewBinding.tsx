@@ -3,7 +3,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, getCollectionDataPath } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/core";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 
 import { CollectionViewBinding, EntityViewBinding } from "../components";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
@@ -23,7 +23,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { ErrorView } from "@rebasepro/core";
+import { ErrorView } from "@rebasepro/app";
 import {
     getSubcollections,
     removeInitialAndTrailingSlashes,
@@ -37,8 +37,8 @@ import {
     useLargeLayout,
     useSlot,
     getIcon
-} from "@rebasepro/core";
-import { getEntityFromMemoryCache } from "@rebasepro/core";
+} from "@rebasepro/app";
+import { getEntityFromMemoryCache } from "@rebasepro/app";
 import { EntityFormBinding } from "../form";
 import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
@@ -46,8 +46,8 @@ import { EditFormActions } from "./EditFormActions";
 import { JsonPreviewBinding } from "../components/JsonPreviewBinding";
 // Lazy-load history view — only loaded when user clicks the HistoryIcon tab
 const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
-import { createFormexStub, getEntityFromCache } from "@rebasepro/core";
-import { usePermissions } from "@rebasepro/core";
+import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
+import { usePermissions } from "@rebasepro/app";
 import { useUrlController } from "../index";
 import { useNavigate } from "react-router-dom";
 

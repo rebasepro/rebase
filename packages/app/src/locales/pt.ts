@@ -1,7 +1,7 @@
 import { RebaseTranslations } from "@rebasepro/types";
 
 /**
- * Portuguese (pt) translations for @rebasepro/core.
+ * Portuguese (pt) translations for @rebasepro/app.
  *
  * @group Core
  */

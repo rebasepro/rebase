@@ -3,7 +3,7 @@ import { Field, getIn, useFormex } from "@rebasepro/forms";
 import { DebouncedTextField } from "@rebasepro/ui";
 import { PropertyWithId } from "../PropertyEditView";
 import React from "react";
-import { useTranslation } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
 ;
 import { prettifyIdentifier, toSnakeCase } from "@rebasepro/utils";
 

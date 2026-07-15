@@ -11,7 +11,7 @@ Build a custom dashboard view that displays analytics alongside your admin panel
 ## Create the Dashboard Component
 
 ```tsx
-import { useRebaseContext } from "@rebasepro/core";
+import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
 function DashboardView() {

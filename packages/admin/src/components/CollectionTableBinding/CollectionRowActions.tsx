@@ -14,8 +14,8 @@ import {
     Skeleton,
     Tooltip
 } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/core";
-import { getEntityFromCache } from "@rebasepro/core";
+import { useTranslation } from "@rebasepro/app";
+import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/common";
 import { useCMSContext } from "../../index";
 

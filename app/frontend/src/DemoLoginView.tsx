@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LoginView } from "@rebasepro/core";
+import { LoginView } from "@rebasepro/app";
 import { Checkbox, cls, Typography } from "@rebasepro/ui";
 import type { RebaseAuthController } from "@rebasepro/auth";
 

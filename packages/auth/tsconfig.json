@@ -32,8 +32,8 @@
         ],
         "baseUrl": ".",
         "paths": {
-            "@rebasepro/core": [
-                "../core/src"
+            "@rebasepro/app": [
+                "../app/src"
             ],
             "@rebasepro/types": [
                 "../types/src"

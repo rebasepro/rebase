@@ -9,7 +9,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "../core/src",
+    "../app/src",
     "../plugin-data-enhancement/src",
     "../inference/src"
   ]
