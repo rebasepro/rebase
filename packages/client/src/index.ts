@@ -238,7 +238,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         return storageSourcesPromise;
     };
 
-    const resolvedWsUrl = options.websocketUrl ?? deriveWebSocketUrl(options.baseUrl);
+    // Opting out has to happen before the URL is derived: `deriveWebSocketUrl`
+    // always produces one, so a truthy check alone can never leave the socket
+    // closed.
+    const realtimeEnabled = options.realtime !== false;
+    const resolvedWsUrl = realtimeEnabled
+        ? (options.websocketUrl ?? deriveWebSocketUrl(options.baseUrl))
+        : undefined;
 
     let ws: RebaseWebSocketClient | undefined;
     if (resolvedWsUrl) {
@@ -408,6 +414,16 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         createStorageSource,
         fetchStorageSources,
         ws,
+        /**
+         * Release the realtime socket and its reconnect timer.
+         *
+         * Until this returns, the open socket keeps the Node event loop alive
+         * and the process will not exit on its own. Safe to call when realtime
+         * was never started, and safe to call twice.
+         */
+        close: () => {
+            ws?.disconnect();
+        },
         setToken: transport.setToken,
         setAuthTokenGetter: transport.setAuthTokenGetter,
         setOnUnauthorized: transport.setOnUnauthorized,

@@ -131,7 +131,10 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      */
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
         if (!this.collection.listen) {
-            throw new Error("Listen is only available when RebaseClient is configured with a websocketUrl.");
+            throw new Error(
+                "Listen is only available when RebaseClient is configured with a websocketUrl, " +
+                "and not when it was created with realtime: false."
+            );
         }
         return this.collection.listen(this.params, onUpdate, onError);
     }

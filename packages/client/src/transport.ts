@@ -15,6 +15,19 @@ export interface RebaseClientConfig {
     fetch?: typeof globalThis.fetch;
     onUnauthorized?: () => Promise<boolean>;
     websocketUrl?: string; // Optional real-time WebSocket connection
+    /**
+     * Open the realtime WebSocket. **Defaults to `true`.**
+     *
+     * The socket connects as soon as the client is constructed and keeps the
+     * Node event loop alive, so a one-shot script (CLI, cron job, ETL) will not
+     * exit on its own. Set this to `false` for any process that reads or writes
+     * and then terminates — `.listen()` and `.listenById()` then throw instead
+     * of silently doing nothing.
+     *
+     * Long-lived processes that do want realtime can instead call
+     * `client.close()` when shutting down.
+     */
+    realtime?: boolean;
 }
 
 /**
