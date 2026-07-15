@@ -71,7 +71,7 @@ The same files are consumed twice:
   (`rebaseCollectionsPlugin` from `@rebasepro/app/vitePlugin`)
 
 Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/admin`, `@rebasepro/ui`,
-`@rebasepro/app`, `@rebasepro/forms`.
+`@rebasepro/forms`.
 
 ### The collection-file import rule
 
@@ -90,7 +90,7 @@ is injected **frontend-side** by `@rebasepro/admin`, not imported into config.
 
 This rule is enforced in CI by `pnpm run check:headless`, which imports every
 collection file and every server package under a Node loader hook that throws if the
-module graph reaches `react`, `react-dom`, or any `@rebasepro/{admin,ui,core,studio,formex}`.
+module graph reaches `react`, `react-dom`, or any `@rebasepro/{admin,ui,app,studio,forms}`.
 
 ## 3. Full mode — Studio
 
@@ -115,19 +115,28 @@ That means Studio can ship on top of BaaS mode with no CMS at all.
 ```
 Shared kernel   types → utils → common → client        (isomorphic, no UI, no node)
 
-BaaS            server-core → client, common, types, utils
-                server-postgresql / server-mongodb → server-core
-                cli, sdk-generator, schema-inference
+BaaS            server → client, common, types, utils
+                server-postgres / server-mongo → server
+                cli, codegen, inference
 
-CMS             ui, formex (leaves)
-                core → common, formex, types, ui, utils
-                admin → core, common, formex, schema-inference, types, ui, utils
-                auth → types (React binding over client.auth)
+CMS             ui, forms (leaves)
+                app → common, forms, types, ui, utils
+                admin → app, common, forms, inference, types, ui, utils
 
-Full            studio → client, common, core, types, ui, utils
+Full            studio → client, common, app, types, ui, utils
                         (admin: optional peer)
-                plugin-insights, plugin-data-enhancement
+                plugin-insights, plugin-ai
 ```
+
+Names describe **role**, not position or framework. `server` pairs with `client`;
+`app` is the runtime that `admin`, `studio` and the plugins register into. React is a
+peer dependency of the frontend tier, not an identity — `ui`, `admin` and `studio` are
+every bit as React as `app`, so none of them carry it in the name.
+
+The React auth controller (`useRebaseAuthController`) lives in `app`, beside the
+`RebaseAuth` and `LoginView` components it is used with. It was once its own
+`@rebasepro/auth` package, which turned out to be one hook whose only dependency was
+`types`. The auth *system* is in `client` (`client.auth`) and `server`.
 
 `serveSPA` (`packages/server/src/serve-spa.ts`) is the only place the backend
 touches the admin bundle, and it is called from the *application* entry point, never
@@ -151,7 +160,7 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
 
 - `pnpm run check:headless` — imports every collection file and every server package
   under a Node loader hook that throws on `react`, `react-dom`, or any
-  `@rebasepro/{admin,ui,core,studio,formex}`. Runs in CI before the build, reads
+  `@rebasepro/{admin,ui,app,studio,forms}`. Runs in CI before the build, reads
   source directly, needs no build step. Add new server packages to
   `SERVER_PACKAGES` in `scripts/headless-guard/check.mjs`.
   Imports that TypeScript elides because they are unused do not trip it, which
@@ -167,3 +176,9 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
 - A driver that cannot introspect fails `baas` mode at boot rather than serving
   nothing: reporting no collections means it never looked, so `init` throws and names
   it. An empty database is different — that warns and boots.
+- `rebase doctor` diffs `pg_policies` against the policies your collections generate,
+  and exits non-zero on drift. **RLS fails silently by design**: a policy that never
+  matches filters every row, and an empty table is indistinguishable from a table with
+  no data. Policies live in Postgres and the config is only their source, so a stale
+  policy from an old push outlives any config fix — which is exactly how the demo
+  served empty collections for months. Run it in CI against a deployed database.
