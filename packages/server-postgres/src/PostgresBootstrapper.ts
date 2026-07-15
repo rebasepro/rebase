@@ -573,7 +573,7 @@ authRepository };
                 server as import("http").Server,
                 realtimeService as RealtimeService,
                 driver as PostgresBackendDriver,
-                config as { requireAuth?: boolean },
+                config as { requireAuth?: boolean; jwtSecret?: string; serviceKey?: string },
                 adapter as AuthAdapter | undefined
             );
         }

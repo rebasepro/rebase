@@ -7,13 +7,20 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
 interface WsAuthConfig {
     requireAuth?: boolean;
     jwtSecret?: string;
+    /**
+     * Same static server-to-server secret the HTTP middleware accepts. Without
+     * it here, a service key authenticates over HTTP but not over the socket —
+     * so any SDK client using one (scripts, cron, server-to-server) connects,
+     * fails realtime auth with "jwt malformed", and silently gets no events.
+     */
+    serviceKey?: string;
 }
 
 /**
@@ -184,6 +191,11 @@ code } }
                         } catch {
                             // Adapter threw — treat as invalid token
                         }
+                    } else if (authConfig?.serviceKey && safeCompare(token, authConfig.serviceKey)) {
+                        // Service key: a static secret, not a JWT. Checked
+                        // before verification, mirroring the HTTP middleware —
+                        // verifying it as a JWT can only ever fail.
+                        verifiedUser = { userId: "service", roles: ["admin"], isAdmin: true };
                     } else {
                         // Standard JWT path
                         const jwtPayload = extractUserFromToken(token);

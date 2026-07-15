@@ -5,6 +5,9 @@ export { configureJwt, generateAccessToken, verifyAccessToken, generateRefreshTo
 export type { JwtConfig, AccessTokenPayload, DownloadTokenPayload } from "./jwt";
 
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
+// Constant-time compare for static secrets (service keys), so token checks
+// outside this package cannot accidentally use ===.
+export { safeCompare } from "./crypto-utils";
 export type { PasswordValidationResult } from "./password";
 
 export type { AuthHooks, AuthMethod, ResolvedAuthHooks } from "./auth-hooks";

@@ -15,13 +15,19 @@
         "schema:introspect": "rebase schema introspect",
         "generate:sdk": "rebase generate-sdk",
         "skills:install": "rebase skills install",
+        "example": "tsx scripts/example.ts",
         "deploy": "rebase build && rebase start"
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "concurrently": "^8.2.2",
+        "tsx": "^4.20.6",
         "typescript": "^5.9.2"
+    },
+    "dependencies": {
+        "@rebasepro/client": "workspace:*",
+        "dotenv": "^16.0.0"
     },
     "engines": {
         "node": ">=18.0.0"

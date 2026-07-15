@@ -62,6 +62,20 @@ CREATE TABLE posts_tags (
     tag_id uuid NOT NULL REFERENCES tags(id),
     PRIMARY KEY (post_id, tag_id)
 );
+
+-- baas serves only what the database protects: requests run as rebase_user,
+-- so a table without RLS would have no authorization model at all.
+ALTER TABLE authors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE posts   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags    ENABLE ROW LEVEL SECURITY;
+CREATE POLICY authors_all ON authors FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY posts_all   ON posts   FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY tags_all    ON tags    FOR ALL TO public USING (true) WITH CHECK (true);
+
+-- Deliberately left unprotected: must NOT reach the API.
+CREATE TABLE secrets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), api_key text NOT NULL);
+INSERT INTO secrets (api_key) VALUES ('SHOULD-NEVER-BE-SERVED');
+
 INSERT INTO authors (name) VALUES ('Ada Lovelace');
 INSERT INTO posts (title, status, views, tags, author_id)
 SELECT 'Hello BaaS', 'published', 42, ARRAY['a','b'], id FROM authors;
@@ -182,11 +196,58 @@ async function run() {
         const join = await api(base, "/api/data/posts_tags");
         check("join table is not served", join.status === 404, `status ${join.status}`);
 
+        // A table with RLS disabled has no authorization model — serving it
+        // would hand every row to every authenticated caller.
+        const secrets = await api(base, "/api/data/secrets");
+        check("table without RLS is not served", secrets.status === 404, `status ${secrets.status}`);
+
         const editor = await api(base, "/api/schema-editor/collection/save", { method: "POST" });
         check("schema editor is off", editor.status === 404, `status ${editor.status}`);
 
         const swagger = await fetch(`${base}/api/swagger`);
         check("swagger is served", swagger.ok, `status ${swagger.status}`);
+
+        // ── 7. The SDK, with no collections defined anywhere ──────────────
+        // The whole baas promise: a user never learns what a collection is.
+        // Run it as a real script inside the scaffolded project, so it proves
+        // @rebasepro/client resolves from a baas install — not just that the
+        // API answers curl.
+        console.log("\n📦 Step 7: Using the SDK against the derived API...");
+        const sdkScript = path.join(projectPath, "sdk-check.ts");
+        fs.writeFileSync(sdkScript, `
+import { createRebaseClient } from "@rebasepro/client";
+
+const rebase = createRebaseClient({ baseUrl: "${base}", token: "${serviceKey}" });
+
+// No collections option, no config, no generated types — just a table name.
+const posts = await rebase.data.collection("posts").find({ limit: 5 });
+const rows = (posts as { data?: unknown[] }).data ?? posts;
+const first = (Array.isArray(rows) ? rows[0] : undefined) as Record<string, unknown> | undefined;
+if (first?.title !== "Hello BaaS") {
+    console.error("SDK_FAIL " + JSON.stringify(rows).slice(0, 200));
+    process.exit(1);
+}
+
+// A write, so this isn't read-only proof.
+const created = await rebase.data.collection("authors").create({ name: "Grace Hopper" });
+if (!created) { console.error("SDK_FAIL create returned nothing"); process.exit(1); }
+
+// The typed proxy accessor, still with no collections map configured.
+const viaProxy = await rebase.data.posts.find({ limit: 1 });
+if (!((viaProxy as { data?: unknown[] }).data ?? []).length) { console.error("SDK_FAIL proxy accessor"); process.exit(1); }
+
+console.log("SDK_OK");
+process.exit(0);
+`);
+        let sdkOk = false;
+        try {
+            const res = await execa("npx", ["tsx", "sdk-check.ts"], { cwd: projectPath, env: cleanEnv });
+            sdkOk = String((res as unknown as { stdout?: string }).stdout ?? "").includes("SDK_OK");
+        } catch (err) {
+            console.log("  SDK script failed:", (err as Error).message.slice(0, 1200));
+        }
+        check("SDK reads and writes with zero collections configured", sdkOk);
+        fs.rmSync(sdkScript, { force: true });
 
         console.log(failures === 0 ? "\n✅ BaaS e2e passed" : `\n❌ ${failures} check(s) failed`);
         if (failures > 0) process.exit(1);

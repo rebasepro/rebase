@@ -728,6 +728,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
             "--collections": String,
             "--schema": String,
             "--sdk": String,
+            "--policies": Boolean,
             "-c": "--collections",
             "-s": "--schema",
             "-k": "--sdk"
@@ -759,7 +760,10 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         doctorScript,
         `--collections=${collectionsPath}`,
         `--schema=${schemaPath}`,
-        `--sdk=${sdkPath}`
+        `--sdk=${sdkPath}`,
+        // Only the RLS checks: skips the schema/SDK diff, so it can run against
+        // a deployed database as a CI gate.
+        ...(parsedArgs["--policies"] ? ["--policies"] : [])
     ];
 
     try {

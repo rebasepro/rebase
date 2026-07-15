@@ -81,7 +81,10 @@ export {
     isApiKeyToken,
     validateApiKey,
     httpMethodToOperation,
-    isOperationAllowed
+    isOperationAllowed,
+    // Constant-time compare for static secrets — drivers checking a service key
+    // must not fall back to ===.
+    safeCompare
 } from "./auth";
 export type {
     AccessTokenPayload,
