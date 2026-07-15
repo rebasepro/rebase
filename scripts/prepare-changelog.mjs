@@ -5,7 +5,7 @@
 //   node scripts/prepare-changelog.mjs <version>
 //
 // Single source of truth for changelog version handling, called by both
-// scripts/release.sh and .github/workflows/publish-stable.yml so the two
+// scripts/release.sh and .github/workflows/publish.yml so the two
 // release paths never diverge. It:
 //
 //   1. Promotes the "## [Unreleased]" section to "## [<version>] - <date>"

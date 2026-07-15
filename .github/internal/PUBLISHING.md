@@ -53,19 +53,24 @@ Commits that don't match a prefix go under "Other".
 
 ## CI: GitHub Actions
 
+Both releases live in one workflow, `.github/workflows/publish.yml`, as two jobs
+selected by trigger. They are not split into two files because npm allows only
+one trusted publisher per package, naming a single workflow file — two files
+could never both be trusted.
+
 ### Stable Release (manual trigger)
 
-The **Publish Stable Release** workflow in `.github/workflows/publish-stable.yml` can be triggered from the GitHub Actions tab:
-
-1. Go to **Actions** → **Publish Stable Release** → **Run workflow**
-2. Enter the version bump type (`patch`, `minor`, `major`, or explicit version)
-3. Optionally enable **dry run** to preview
+1. Go to **Actions** → **Publish** → **Run workflow**
+2. Leave **channel** on `stable`
+3. Enter the version bump type (`patch`, `minor`, `major`, or explicit version)
+4. Optionally enable **dry run** to preview
 
 This does everything the local script does, but in CI.
 
 ### Canary Release (automatic)
 
-Every push to `main` triggers `.github/workflows/publish-canary.yml`, which publishes a canary version:
+Every push to `main` runs the canary job in `.github/workflows/publish.yml`, which
+publishes a canary version (or run it manually with **channel** set to `canary`):
 
 ```
 0.0.1-canary.<short-sha>

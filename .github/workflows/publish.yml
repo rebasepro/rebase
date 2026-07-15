@@ -1,26 +1,151 @@
-name: Publish Stable Release
+name: Publish
+
+# One workflow file, two jobs, because npm allows exactly one trusted publisher
+# per package: `npm trust github <pkg> --file <one-file>`. Stable and canary
+# used to live in publish-stable.yml and publish-canary.yml, which could never
+# both be trusted for the same package — the second `npm trust` call collides
+# with the first. Keeping both jobs here means one trust config covers both.
+#
+#   push to main            → canary
+#   workflow_dispatch       → stable (or canary, via the channel input)
 
 on:
   workflow_dispatch:
     inputs:
+      channel:
+        description: "Which release to publish"
+        required: false
+        type: choice
+        options: [stable, canary]
+        default: stable
       version:
-        description: "Version bump: patch, minor, major, or explicit (e.g. 0.2.0)"
-        required: true
+        description: "Stable only — version bump: patch, minor, major, or explicit (e.g. 0.2.0)"
+        required: false
         type: string
         default: "patch"
       dry_run:
-        description: "Dry run — skip npm publish and GitHub release"
+        description: "Stable only — dry run: skip npm publish and GitHub release"
         required: false
         type: boolean
         default: false
-
-concurrency:
-  group: stable-publish
-  cancel-in-progress: false
+  push:
+    branches:
+      - main
 
 jobs:
-  publish-stable:
+  # ══════════════════════════════════════════════════════════════
+  # Canary — every push to main, and manual runs with channel=canary
+  # ══════════════════════════════════════════════════════════════
+  publish-canary:
+    if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: canary-publish-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Set canary version
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          CANARY_VERSION="0.0.1-canary.${SHORT_SHA}"
+          echo "CANARY_VERSION=$CANARY_VERSION" >> $GITHUB_ENV
+          echo "Publishing canary version: $CANARY_VERSION"
+
+          # Bump version in all publishable packages (node, not npm, to avoid workspace:* validation)
+          pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$CANARY_VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+          # Commit version changes locally so pnpm publish doesn't complain about dirty git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: canary version $CANARY_VERSION" --no-verify
+
+      - name: Validate no workspace protocol in packed output
+        run: |
+          echo "Packing and validating all publishable packages..."
+          PACK_DIR=$(mktemp -d)
+          trap 'rm -rf "$PACK_DIR"' EXIT
+          ERRORS=0
+
+          for pkg_dir in packages/*/ rebase-agent-skills/; do
+            [ -f "$pkg_dir/package.json" ] || continue
+            is_private=$(node -e "console.log(require('./$pkg_dir/package.json').private || false)")
+            [ "$is_private" = "true" ] && continue
+            pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)")
+
+            (cd "$pkg_dir" && pnpm pack --pack-destination "$PACK_DIR") > /dev/null 2>&1
+            tarball=$(ls -t "$PACK_DIR"/*.tgz 2>/dev/null | head -1)
+            if [ -n "$tarball" ]; then
+              packed=$(tar -xzf "$tarball" -O package/package.json 2>/dev/null)
+              if echo "$packed" | grep -q '"workspace:'; then
+                echo "❌ $pkg_name has workspace: references in packed tarball!"
+                echo "$packed" | grep '"workspace:'
+                ERRORS=$((ERRORS + 1))
+              else
+                echo "✅ $pkg_name"
+              fi
+              rm -f "$tarball"
+            fi
+          done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "❌ $ERRORS package(s) have workspace: references. ABORTING."
+            exit 1
+          fi
+          echo "✅ All packages clean — safe to publish."
+
+      - name: Publish to npm
+        run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --tag canary --no-git-checks --access public --report-summary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "### 🐤 Canary Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ env.CANARY_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Install with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm add @rebasepro/app@canary" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ══════════════════════════════════════════════════════════════
+  # Stable — manual runs only
+  # ══════════════════════════════════════════════════════════════
+  publish-stable:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'stable' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: stable-publish
+      cancel-in-progress: false
     permissions:
       contents: write   # push tags + create release
       id-token: write   # npm provenance

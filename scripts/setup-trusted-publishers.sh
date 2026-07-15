@@ -20,8 +20,11 @@ if [ "$MAJOR" -lt 11 ] || { [ "$MAJOR" -eq 11 ] && [ "$MINOR" -lt 10 ]; }; then
 fi
 
 REPO="rebasepro/rebase"
-WORKFLOW_STABLE="publish-stable.yml"
-WORKFLOW_CANARY="publish-canary.yml"
+# npm allows exactly one trusted publisher per package, and `npm trust github`
+# takes exactly one --file. Stable and canary therefore live as two jobs in one
+# workflow: trusting two files was never possible, and asking for it made npm
+# answer the second call with a 409 that this script read as "already done".
+WORKFLOW="publish.yml"
 
 # ─────────────────────────────────────────────────────────────
 # 2FA
@@ -42,6 +45,7 @@ WORKFLOW_CANARY="publish-canary.yml"
 OTP="${NPM_OTP:-}"
 ASSUME_YES=false
 DRY_RUN=false
+CONFLICTS=()  # packages that already had a trusted publisher; see trust_call
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -64,11 +68,16 @@ while [ $# -gt 0 ]; do
 done
 
 # Ask for a fresh code. Reads the terminal directly so it still works when the
-# script's stdin is a pipe.
+# script's stdin is a pipe. Re-asks on an empty line rather than giving up, and
+# keeps only the digits, since authenticators display the code as "123 456".
 prompt_for_otp() {
   local code=""
   if [ -t 0 ] || [ -r /dev/tty ]; then
-    read -rp "$1" code < /dev/tty || true
+    for _ in 1 2 3; do
+      read -rp "$1" code < /dev/tty || { code=""; break; }  # real EOF: give up
+      code="${code//[^0-9]/}"
+      [ -n "$code" ] && break
+    done
   fi
   echo "$code"
 }
@@ -85,22 +94,31 @@ trust_call() {
     return 0
   fi
 
-  for attempt in 1 2; do
+  for attempt in 1 2 3; do
     if [ -n "$OTP" ]; then
       out=$("${cmd[@]}" --otp="$OTP" 2>&1) && return 0
     else
       out=$("${cmd[@]}" 2>&1) && return 0
     fi
 
-    # Already configured — the desired end state, not a failure.
+    # A package already has a trusted publisher. npm permits only one, and the
+    # 409 does not say which workflow it names — an older publish-stable.yml
+    # config conflicts here exactly like a correct publish.yml one. Reported,
+    # not swallowed: silently calling this success is how a package ends up
+    # trusting a workflow that no longer exists.
     if echo "$out" | grep -q "409 Conflict"; then
-      echo "     ℹ️  Already configured."
+      echo "     ⚠️  A trusted publisher already exists for $pkg."
+      echo "        npm allows only one and will not say which workflow it names."
+      echo "        Confirm it is '$WORKFLOW' at:"
+      echo "        https://www.npmjs.com/package/$pkg/access"
+      CONFLICTS+=("$pkg")
       return 0
     fi
 
-    # Expired or missing code: ask for another and retry once.
+    # Expired or missing code: ask for another and retry. A code can expire
+    # while it is being typed, so the last attempt is not the first one.
     if echo "$out" | grep -qE "EOTP|one-time password|OTP"; then
-      if [ "$attempt" -eq 1 ]; then
+      if [ "$attempt" -lt 3 ]; then
         echo "     🔑 npm wants a 2FA code (they rotate every ~30s)."
         OTP=$(prompt_for_otp "     Enter your current npm 2FA code: ")
         if [ -z "$OTP" ]; then
@@ -173,8 +191,10 @@ else
 fi
 echo ""
 if ! $ASSUME_YES; then
-  read -p "Proceed to configure Trusted Publishers for these packages? (y/N) " -n 1 -r < /dev/tty
-  echo ""
+  # Reads the whole line, not one character: a bare `-n 1` takes the "y" and
+  # leaves the Enter behind, and the next read of /dev/tty consumes that stale
+  # newline as an empty answer instead of waiting for the 2FA code.
+  read -p "Proceed to configure Trusted Publishers for these packages? (y/N) " -r < /dev/tty
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Aborted."
     exit 1
@@ -184,21 +204,24 @@ fi
 for pkg in $PACKAGES; do
   echo "------------------------------------------------------------"
   echo "🔐 Configuring OIDC trust for $pkg..."
-  
-  # Configure for stable releases
-  echo "  🔹 Stable Release workflow ($WORKFLOW_STABLE)..."
-  if ! trust_call "$pkg" "$WORKFLOW_STABLE"; then
-    echo "❌ Failed configuring $pkg ($WORKFLOW_STABLE)" >&2
-    exit 1
-  fi
-  
-  # Configure for canary releases
-  echo "  🔹 Canary Release workflow ($WORKFLOW_CANARY)..."
-  if ! trust_call "$pkg" "$WORKFLOW_CANARY"; then
-    echo "❌ Failed configuring $pkg ($WORKFLOW_CANARY)" >&2
+  echo "  🔹 Publish workflow ($WORKFLOW) — covers stable and canary..."
+  if ! trust_call "$pkg" "$WORKFLOW"; then
+    echo "❌ Failed configuring $pkg ($WORKFLOW)" >&2
     exit 1
   fi
 done
 
 echo ""
-echo "✅ Success! All trusted publisher configurations have been set up on npmjs.com."
+if [ ${#CONFLICTS[@]} -gt 0 ]; then
+  echo "⚠️  Finished, but ${#CONFLICTS[@]} package(s) already had a trusted publisher"
+  echo "   that npm would not let this script replace or inspect:"
+  for pkg in "${CONFLICTS[@]}"; do
+    echo "     - $pkg → https://www.npmjs.com/package/$pkg/access"
+  done
+  echo ""
+  echo "   Check each one names '$WORKFLOW'. If it names an old workflow"
+  echo "   (publish-stable.yml, publish-canary.yml), edit it there — publishing"
+  echo "   will fail otherwise."
+else
+  echo "✅ Success! All trusted publisher configurations have been set up on npmjs.com."
+fi
