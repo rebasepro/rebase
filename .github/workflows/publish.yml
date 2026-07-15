@@ -119,10 +119,14 @@ jobs:
           fi
           echo "✅ All packages clean — safe to publish."
 
+      # No NODE_AUTH_TOKEN. pnpm exchanges the OIDC id-token (granted by the
+      # id-token: write permission above) for a short-lived registry token,
+      # against the trusted publisher each package has for this workflow file.
+      # A token here would be a standing credential doing what OIDC already
+      # does per-run, and pnpm prefers it, so its presence would silently mask
+      # a broken trust config.
       - name: Publish to npm
         run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --tag canary --no-git-checks --access public --report-summary
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Summary
         run: |
@@ -305,11 +309,10 @@ jobs:
           echo "✅ All packages clean — safe to publish."
 
       # ── Publish ─────────────────────────────────────────────
+      # No NODE_AUTH_TOKEN — see the canary job's publish step.
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
         run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --no-git-checks --access public --report-summary
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit version bump, tag, and push
         if: ${{ !inputs.dry_run }}

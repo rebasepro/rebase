@@ -29,23 +29,22 @@ WORKFLOW="publish.yml"
 # ─────────────────────────────────────────────────────────────
 # 2FA
 # ─────────────────────────────────────────────────────────────
-# Every `npm trust` call is an account write, so npm demands a one-time
-# password. Its browser flow prints an auth URL that npm's own redactor masks
-# to `***` — the URL carries the session id, npm cannot tell "secret to hide"
-# from "secret to click", and the debug log is redacted too. So the URL flow is
-# unusable and the code is passed directly instead.
+# Every `npm trust` call is a 2FA-gated account write, and npm handles that
+# itself: it opens the browser, you approve with the passkey, and the session is
+# reused for the packages that follow. This script's job is to stay out of its
+# way — see trust_call for why that is harder than it sounds.
 #
-# Codes rotate every ~30s and this loop makes 2 calls per package, so a single
-# code will not survive the whole run. Each call is retried with a freshly
-# prompted code when npm reports EOTP.
+# --otp exists only as an escape hatch. There is no authenticator app on this
+# account and there cannot be one (npm ended TOTP enrolment), so the only code
+# that can be passed here is an unused single-use recovery code. Do not reach
+# for it unless npm's own browser flow is unavailable.
 #
-#   ./scripts/setup-trusted-publishers.sh --otp 123456
-#   NPM_OTP=123456 ./scripts/setup-trusted-publishers.sh
-#   ./scripts/setup-trusted-publishers.sh            # prompts when needed
+#   ./scripts/setup-trusted-publishers.sh              # npm asks, via browser
+#   ./scripts/setup-trusted-publishers.sh --otp <recovery-code>
 OTP="${NPM_OTP:-}"
 ASSUME_YES=false
 DRY_RUN=false
-CONFLICTS=()  # packages that already had a trusted publisher; see trust_call
+FAILED=()  # packages npm refused; see the summary at the end
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -56,84 +55,88 @@ while [ $# -gt 0 ]; do
     -h|--help)
       echo "Usage: $0 [--otp <code>] [--dry-run] [-y]"
       echo ""
-      echo "Configures npm Trusted Publishers (OIDC) for every publishable"
-      echo "package, for both the stable and canary workflows."
+      echo "Points every publishable package's npm trusted publisher at this"
+      echo "repo's $WORKFLOW, which runs both the stable and canary jobs."
+      echo "npm opens a browser for the passkey; no code is needed."
       echo ""
-      echo "  --otp <code>  2FA code. Prompted for when omitted or expired."
-      echo "  --dry-run     Print what would be configured; contact no registry."
+      echo "  --otp <code>  Escape hatch. This account has no authenticator app,"
+      echo "                so the only valid code is an unused recovery code."
+      echo "  --dry-run     Audit: read what each package trusts, change nothing."
       echo "  -y, --yes     Skip the confirmation prompt."
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
-# Ask for a fresh code. Reads the terminal directly so it still works when the
-# script's stdin is a pipe. Re-asks on an empty line rather than giving up, and
-# keeps only the digits, since authenticators display the code as "123 456".
-prompt_for_otp() {
-  local code=""
-  if [ -t 0 ] || [ -r /dev/tty ]; then
-    for _ in 1 2 3; do
-      read -rp "$1" code < /dev/tty || { code=""; break; }  # real EOF: give up
-      code="${code//[^0-9]/}"
-      [ -n "$code" ] && break
-    done
-  fi
-  echo "$code"
-}
-
-# One `npm trust` call, retried once with a fresh code if the code has expired.
-# Prints nothing on success; returns non-zero with the error on the stdout of
-# the caller's command substitution otherwise.
+# One `npm trust` call, with npm left connected to the terminal.
+#
+# npm's output is deliberately NOT captured. `out=$(npm trust ... 2>&1)` makes
+# npm's stdout a pipe; npm reads a non-TTY stdout as "nobody is watching", and
+# so instead of opening the browser for the passkey it prints its auth URL and
+# exits with EOTP. The redactor then masks that URL to `***` — which looked like
+# npm making the browser flow unusable, and cost this script a detour into
+# --otp, a code that cannot exist on a passkey-only account.
+#
+# The capture was the bug. Given a terminal, npm runs its own web auth once and
+# reuses the session for the packages that follow.
+#
+# Each failure is recorded and the loop continues rather than aborting on the
+# first one, so one refusal cannot strand the rest.
 trust_call() {
-  local pkg="$1" workflow="$2" out=""
-  local -a cmd=(npm trust github "$pkg" --file "$workflow" --repo "$REPO" --allow-publish -y)
+  local pkg="$1" workflow="$2" rc=0
 
-  if $DRY_RUN; then
-    echo "     (dry run) ${cmd[*]} --otp=****"
+  # npm permits exactly one trusted publisher per package and `npm trust github`
+  # will not replace an existing one — it answers 409. So read before writing:
+  # a package configured before the workflows were merged still names
+  # publish-stable.yml, a file that no longer exists, and would fail to publish.
+  #
+  # `list` is a read, so capturing it is safe. The writes below must NOT be
+  # captured — see the note above about npm and a non-TTY stdout.
+  local current parsed file id
+  current=$(npm trust list "$pkg" --json 2>/dev/null || true)
+  # Single-quoted so the JS may use double quotes; "- -" means no config, or
+  # output npm did not shape as JSON.
+  parsed=$(printf '%s' "$current" | node -e '
+    let s = "";
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      try {
+        const j = JSON.parse(s);
+        console.log((j.file || "-") + " " + (j.id || "-"));
+      } catch {
+        console.log("- -");
+      }
+    })')
+  file=${parsed%% *}
+  id=${parsed##* }
+
+  if [ "$file" = "$workflow" ]; then
+    echo "     ✓ Already trusts $workflow — nothing to do."
     return 0
   fi
 
-  for attempt in 1 2 3; do
-    if [ -n "$OTP" ]; then
-      out=$("${cmd[@]}" --otp="$OTP" 2>&1) && return 0
+  if $DRY_RUN; then
+    if [ "$id" = "-" ]; then
+      echo "     (dry run) would ADD    → --file $workflow"
     else
-      out=$("${cmd[@]}" 2>&1) && return 0
+      echo "     (dry run) would REVOKE → '$file' (id $id), then ADD → '$workflow'"
     fi
+    return 0
+  fi
 
-    # A package already has a trusted publisher. npm permits only one, and the
-    # 409 does not say which workflow it names — an older publish-stable.yml
-    # config conflicts here exactly like a correct publish.yml one. Reported,
-    # not swallowed: silently calling this success is how a package ends up
-    # trusting a workflow that no longer exists.
-    if echo "$out" | grep -q "409 Conflict"; then
-      echo "     ⚠️  A trusted publisher already exists for $pkg."
-      echo "        npm allows only one and will not say which workflow it names."
-      echo "        Confirm it is '$WORKFLOW' at:"
-      echo "        https://www.npmjs.com/package/$pkg/access"
-      CONFLICTS+=("$pkg")
-      return 0
-    fi
+  # Stale config: revoke it, since only one may exist and it names a workflow
+  # that is gone.
+  if [ "$id" != "-" ]; then
+    echo "     ↻ Trusts '$file', which no longer exists — revoking it first."
+    npm trust revoke "$pkg" --id="$id" < /dev/tty || {
+      echo "     ✗ Could not revoke $pkg's existing trust." >&2
+      return 1
+    }
+  fi
 
-    # Expired or missing code: ask for another and retry. A code can expire
-    # while it is being typed, so the last attempt is not the first one.
-    if echo "$out" | grep -qE "EOTP|one-time password|OTP"; then
-      if [ "$attempt" -lt 3 ]; then
-        echo "     🔑 npm wants a 2FA code (they rotate every ~30s)."
-        OTP=$(prompt_for_otp "     Enter your current npm 2FA code: ")
-        if [ -z "$OTP" ]; then
-          echo "     ✗ No code supplied." >&2
-          echo "$out" >&2
-          return 1
-        fi
-        continue
-      fi
-    fi
-
-    echo "$out" >&2
-    return 1
-  done
-  return 1
+  local -a cmd=(npm trust github "$pkg" --file "$workflow" --repo "$REPO" --allow-publish -y)
+  [ -n "$OTP" ] && cmd+=(--otp="$OTP")
+  "${cmd[@]}" < /dev/tty || rc=$?
+  return $rc
 }
 
 echo "🔍 Finding publishable packages in the workspace..."
@@ -172,6 +175,8 @@ if [ -z "$PACKAGES" ]; then
   exit 1
 fi
 
+PKG_COUNT=$(echo "$PACKAGES" | grep -c .)
+
 echo "📦 Found publishable packages:"
 for pkg in $PACKAGES; do
   echo "  - $pkg"
@@ -180,14 +185,15 @@ echo ""
 
 echo "⚠️  Before running, make sure you:"
 echo "   1. Are logged into npm locally (run 'npm login' if needed)"
-echo "   2. Have 2FA enabled on npm"
-echo "   3. Have npm v11.10.0 or higher installed (you have: $(npm --version))"
+echo "   2. Have npm v11.10.0 or higher installed (you have: $(npm --version))"
 echo ""
 if $DRY_RUN; then
-  echo "🧪 Dry run — no registry calls will be made."
+  echo "🧪 Dry run — reads each package's current trust from npm and prints what"
+  echo "   would change. Writes nothing. Use it to audit what each package trusts."
 else
-  echo "⚠️  Each call needs a 2FA code. Pass one with --otp, or this will ask."
-  echo "   Codes rotate every ~30s, so it re-asks whenever one expires."
+  echo "🔐 Each 'npm trust' call is a 2FA-gated account write. npm handles that"
+  echo "   itself: it will open your browser, you approve with your passkey, and"
+  echo "   the session carries the remaining packages. Nothing to look up here."
 fi
 echo ""
 if ! $ASSUME_YES; then
@@ -205,23 +211,26 @@ for pkg in $PACKAGES; do
   echo "------------------------------------------------------------"
   echo "🔐 Configuring OIDC trust for $pkg..."
   echo "  🔹 Publish workflow ($WORKFLOW) — covers stable and canary..."
+  # Not fatal: one package npm refuses (often a 409 — it already has a trusted
+  # publisher, and only one is allowed) must not strand the other 20.
   if ! trust_call "$pkg" "$WORKFLOW"; then
-    echo "❌ Failed configuring $pkg ($WORKFLOW)" >&2
-    exit 1
+    echo "     ⚠️  npm refused $pkg — its output is above."
+    FAILED+=("$pkg")
   fi
 done
 
 echo ""
-if [ ${#CONFLICTS[@]} -gt 0 ]; then
-  echo "⚠️  Finished, but ${#CONFLICTS[@]} package(s) already had a trusted publisher"
-  echo "   that npm would not let this script replace or inspect:"
-  for pkg in "${CONFLICTS[@]}"; do
+if [ ${#FAILED[@]} -gt 0 ]; then
+  echo "⚠️  Finished, but npm refused ${#FAILED[@]} of $PKG_COUNT package(s):"
+  for pkg in "${FAILED[@]}"; do
     echo "     - $pkg → https://www.npmjs.com/package/$pkg/access"
   done
   echo ""
-  echo "   Check each one names '$WORKFLOW'. If it names an old workflow"
-  echo "   (publish-stable.yml, publish-canary.yml), edit it there — publishing"
-  echo "   will fail otherwise."
-else
-  echo "✅ Success! All trusted publisher configurations have been set up on npmjs.com."
+  echo "   A 409 means the package already has a trusted publisher — npm allows"
+  echo "   only one and will not say which workflow it names. Open the links and"
+  echo "   confirm each names '$WORKFLOW'; a config still naming a workflow that"
+  echo "   no longer exists (publish-stable.yml, publish-canary.yml) will fail to"
+  echo "   publish. Re-running is safe: configured packages just 409 again."
+  exit 1
 fi
+echo "✅ Success! All $PKG_COUNT packages now trust $REPO's $WORKFLOW."
