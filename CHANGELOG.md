@@ -24,6 +24,18 @@
 
 - **`@rebasepro/auth` removed** — it was one hook and an API helper whose only dependency was `@rebasepro/types`, and it always had to be installed alongside `core` anyway. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` and `clearAuthConfigCache` now come from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they are used with. The auth *system* was never here — it lives in `@rebasepro/client` (`client.auth`) and `@rebasepro/server`.
 
+- **`defaultSecurityRules` moved off the server config** — it lived on `RebaseBackendConfig`, was applied to the in-memory registry, and enforced nothing: `db push` generates the Postgres policies — the only thing that actually enforces access — from the collection *files*, and never sees the running server. Declare it in `config/collections/index.ts` instead, where the loader reads it and both the runtime and `db push` see the same thing. Its old doc also claimed collections without rules were "unrestricted"; they are locked to admin-only by the generator. In `baas` mode there are no collection files and no `db push`, so the database's own RLS is the whole model and there is nothing to default.
+
+  ```ts
+  // config/collections/index.ts
+  export const defaultSecurityRules: SecurityRule[] = [
+      { operation: "select", access: "public" },
+      { operations: ["insert", "update", "delete"], roles: ["admin"] }
+  ];
+  ```
+
+- **A collection file that fails to import is now a hard error** — the loader used to log and continue, which turns a broken file into a missing API route and a missing policy, with a successful exit code. Both read as "no data" rather than as a failure.
+
 - **`RebaseCMS` → `RebaseAdmin`** — the component now matches the package it ships from. `mode: "cms"` on `RebaseBackendConfig` is unchanged: it describes where collections come from (config vs database), not the UI.
 
 - **BaaS mode does not serve tables without row-level security** — see Fixes. A table with RLS disabled is skipped and named at boot; `baas: { unprotectedTables: "serve" }` restores the old behavior.
@@ -37,6 +49,8 @@
 - **`rebase init --flavor baas`** — scaffolds a headless project: `backend/` alone, no `config/`, no `frontend/`, and no UI package in the install tree. Without `--flavor`, `init` asks: *BaaS + admin* (default) or *BaaS only*.
 
 - **`rebase doctor --policies`** — diffs `pg_policies` against the policies your collections generate, reporting missing, orphaned and diverged, and exits non-zero so CI can gate it. Policies live in Postgres and the config is only their source; nothing reconciled the two, so a stale policy outlived every config fix. Reuses `generatePostgresPoliciesDdl` — the same function `db push` applies — so it compares against what would really be written. It also reports policy roles this server can never assume, without booting one. Policy *expressions* are deliberately not compared: Postgres rewrites `qual`/`with_check` on storage, and a check that cries wolf gets ignored.
+
+- **One definition of "the collections"** — the runtime, the drizzle-schema generator, the policy generator and the doctor each scanned the collections directory themselves, four copy-pasted filters agreeing by discipline rather than construction. A drift between them would serve one set of collections while pushing policies for another. They now share one loader, exported from `@rebasepro/server`.
 
 - **Guards for the two failure modes that ship silently** — `pnpm run check:headless` imports every collection file and server package under a loader hook that rejects React, so a UI import cannot creep back into the backend. `pnpm run check:names` fails on references to renamed packages and duplicate dependency keys. Both run in CI. A new BaaS e2e installs a scaffolded project from real tarballs and boots it against tables it was never told about — the only place `workspace:*` resolves, so the only thing that proves the templates rather than the library.
 
