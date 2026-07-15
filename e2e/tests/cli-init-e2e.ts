@@ -74,28 +74,11 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
     const tarballsDir = path.join(projectPath, "tarballs");
     fs.mkdirSync(tarballsDir, { recursive: true });
 
-    const packages = [
-        "types",
-        "common",
-        "utils",
-        "auth",
-        "formex",
-        "core",
-        "ui",
-        "client",
-        "admin",
-        "studio",
-        "sdk-generator",
-        "server-core",
-        "server-postgresql",
-        "plugin-data-enhancement",
-        "cli",
-        "schema-inference",
-        "client-firebase",
-        "plugin-insights",
-        "mcp-server",
-        "server-mongodb"
-    ];
+    const packagesDir = path.join(rootDir, "packages");
+    const packages = fs
+        .readdirSync(packagesDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && fs.existsSync(path.join(packagesDir, e.name, "package.json")))
+        .map((e) => e.name);
 
     const currentVersion = JSON.parse(fs.readFileSync(path.join(rootDir, "packages/app/package.json"), "utf-8")).version;
     const tempVersion = `${currentVersion}-e2e-${Date.now()}`;

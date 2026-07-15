@@ -6,7 +6,8 @@
 import path from "path";
 import chalk from "chalk";
 import fs from "fs";
-import { runDoctor } from "./doctor";
+import { runDoctor, loadCollections } from "./doctor";
+import { checkPolicyDrift, formatPolicyDrift, hasDrift } from "../security/policy-drift";
 import { logger } from "@rebasepro/server";
 
 async function main() {
@@ -40,8 +41,36 @@ async function main() {
         databaseUrl: databaseUrl ?? undefined
     });
 
+    // ── RLS policy drift ─────────────────────────────────────────────────
+    // Policies live in the database; the collections are only their source.
+    // Nothing else reconciles the two, so a stale policy from an old push keeps
+    // filtering rows and the collection just reads as empty.
+    let policiesDrifted = false;
+    if (databaseUrl) {
+        try {
+            const { Pool } = await import("pg");
+            const pool = new Pool({ connectionString: databaseUrl });
+            try {
+                const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+                const drift = await checkPolicyDrift(pool as never, collections);
+                policiesDrifted = hasDrift(drift);
+                logger.info("");
+                if (policiesDrifted) {
+                    logger.info(chalk.yellow("  RLS policies: database does not match your collections"));
+                    logger.info(formatPolicyDrift(drift));
+                } else {
+                    logger.info(chalk.green("  ✓ RLS policies match your collections"));
+                }
+            } finally {
+                await pool.end();
+            }
+        } catch (err) {
+            logger.warn(chalk.yellow("  ⚠ Could not check RLS policy drift"), { error: err });
+        }
+    }
+
     // Exit with non-zero code if there are errors
-    if (report.summary.errors > 0) {
+    if (report.summary.errors > 0 || policiesDrifted) {
         process.exit(1);
     }
 }
