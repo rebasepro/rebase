@@ -18,7 +18,10 @@ export {
 export type {
     RebaseBackendConfig,
     RebaseBackendInstance,
-    RebaseAuthConfig
+    RebaseAuthConfig,
+    // The type of the `baas` option, exported for the same reason
+    // RebaseAuthConfig is: a backend author cannot name the shape otherwise.
+    BaasOptions
 } from "./init";
 
 // =============================================================================
