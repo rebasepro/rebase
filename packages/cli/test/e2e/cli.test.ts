@@ -47,6 +47,26 @@ function getPackageDir(name: string, paths: string[]): string {
     throw new Error(`Could not find package root for ${name}`);
 }
 
+/**
+ * Kill a spawned server *and everything it started*.
+ *
+ * `pnpm run dev` is a supervisor: it spawns `tsx watch`, which spawns the
+ * backend. `.kill()` signals only pnpm, so the grandchildren are reparented to
+ * init and outlive the run — this suite left backends alive for days, holding
+ * the port until a later run reused it and tested a stale server.
+ *
+ * Signalling a negative pid delivers to the whole process group, which only
+ * exists because the process is spawned `detached`.
+ */
+function killTree(cp: { pid?: number; kill: (signal?: NodeJS.Signals) => void }, signal: NodeJS.Signals = "SIGTERM") {
+    if (!cp.pid) return;
+    try {
+        process.kill(-cp.pid, signal);
+    } catch {
+        try { cp.kill(signal); } catch { /* already gone */ }
+    }
+}
+
 function linkLocalPackages(projectPath: string) {
     const pkgPaths = [
         path.join(projectPath, "package.json"),
@@ -234,7 +254,8 @@ force: true });
         console.log("6.5. Bootstrapping Rebase backend briefly to initialize auth tables...");
         const backendProcess = execa("pnpm", ["run", "dev"], {
             cwd: path.join(scaffoldedDir, "backend"),
-            env: cleanEnv
+            env: cleanEnv,
+            detached: true // so killTree can reap the tsx/backend it spawns
         });
 
         await new Promise<void>((resolve, reject) => {
@@ -242,7 +263,7 @@ force: true });
             const timeout = setTimeout(() => {
                 if (!resolved) {
                     resolved = true;
-                    backendProcess.kill();
+                    killTree(backendProcess, "SIGKILL");
                     reject(new Error("Timeout waiting for backend to bootstrap auth tables"));
                 }
             }, 45000);
@@ -255,7 +276,7 @@ force: true });
                         resolved = true;
                         clearTimeout(timeout);
                         setTimeout(() => {
-                            backendProcess.kill();
+                            killTree(backendProcess, "SIGKILL");
                             resolve();
                         }, 2000);
                     }

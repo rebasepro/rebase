@@ -14,6 +14,7 @@ import * as path from "path";
 
 import {
     execa,
+    killTree,
     getCleanEnv,
     packLocalPackages,
     rewritePackagesToTarballs,
@@ -102,15 +103,14 @@ async function waitForApi(url: string, timeoutMs = 90_000): Promise<boolean> {
 }
 
 async function run() {
-    let container: PgContainer | undefined;
-    let devProcess: { kill(signal?: string): void } | undefined;
+    let devProcess: { pid?: number; kill(signal?: string): void } | undefined;
 
     if (fs.existsSync(projectPath)) {
         fs.rmSync(projectPath, { recursive: true, force: true });
     }
 
     console.log("Starting temporary Postgres container...");
-    container = await startPgContainer();
+    const container = await startPgContainer();
 
     try {
         // ── 1. Scaffold ──────────────────────────────────────────────────
@@ -167,8 +167,9 @@ async function run() {
         devProcess = execa("node", [cliBin, "dev", "--port", "3098"], {
             cwd: projectPath,
             env: cleanEnv,
-            stdio: "inherit"
-        }) as unknown as { kill(signal?: string): void };
+            stdio: "inherit",
+            detached: true // so killTree can reap the backend it spawns
+        }) as unknown as { pid?: number; kill(signal?: string): void };
 
         const base = "http://localhost:3098";
         const up = await waitForApi(`${base}/health`);
@@ -252,10 +253,8 @@ process.exit(0);
         console.log(failures === 0 ? "\n✅ BaaS e2e passed" : `\n❌ ${failures} check(s) failed`);
         if (failures > 0) process.exit(1);
     } finally {
-        if (devProcess) {
-            try { devProcess.kill("SIGTERM"); } catch { /* already gone */ }
-        }
-        if (container) await stopPgContainer(container.containerName);
+        killTree(devProcess, "SIGTERM");
+        await stopPgContainer(container.containerName);
     }
 }
 

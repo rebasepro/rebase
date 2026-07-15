@@ -4,12 +4,38 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import { execSync, spawn } from "child_process";
 
+/**
+ * Tracks the detached groups, so that a crash between spawn and killTree still
+ * reaps them.
+ *
+ * A detached group outlives its parent by definition — that is what detaching
+ * buys us — so `detached` without this net would leak more than the bug it is
+ * here to fix, not less.
+ */
+const detachedGroups = new Set<number>();
+for (const signal of ["exit", "SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+        for (const pid of detachedGroups) {
+            try { process.kill(-pid, "SIGKILL"); } catch { /* already gone */ }
+        }
+        detachedGroups.clear();
+    });
+}
+
 export function execa(command: string, args: string[], options: any = {}) {
     const cp = spawn(command, args, {
         cwd: options.cwd,
         env: options.env,
-        stdio: options.stdio || "pipe"
+        stdio: options.stdio || "pipe",
+        // Long-running servers pass detached so they get their own process
+        // group and killTree can take the whole thing down. See killTree.
+        detached: options.detached ?? false
     }) as any;
+
+    if (options.detached && cp.pid) {
+        detachedGroups.add(cp.pid);
+        cp.on("close", () => detachedGroups.delete(cp.pid));
+    }
 
     let stdoutData = "";
     let stderrData = "";
@@ -44,6 +70,28 @@ exitCode: code || 0 });
     result.then = promise.then.bind(promise);
     result.catch = promise.catch.bind(promise);
     return result;
+}
+
+/**
+ * Kill a spawned server *and everything it started*.
+ *
+ * `cp.kill()` signals only the direct child. `rebase dev` is a supervisor: it
+ * spawns the backend and the frontend, which spawn `tsx watch` in turn. Kill
+ * the supervisor alone and the grandchildren are reparented to init and run
+ * forever — this suite left backends alive for days, holding ports 3098/3099
+ * until a later run reused the port and tested a stale server.
+ *
+ * Signalling a negative pid delivers to the whole process group, which only
+ * exists if the process was spawned with `detached: true` — hence the pairing.
+ */
+export function killTree(cp: { pid?: number | undefined; kill?: (signal?: any) => void } | undefined, signal: NodeJS.Signals = "SIGTERM") {
+    if (!cp?.pid) return;
+    try {
+        process.kill(-cp.pid, signal);
+    } catch {
+        // No process group (not detached), or it is already gone.
+        try { cp.kill?.(signal); } catch { /* already gone */ }
+    }
 }
 
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
@@ -581,7 +629,8 @@ force: true });
             "3099"
         ], {
             cwd: projectPath,
-            env: cleanEnv
+            env: cleanEnv,
+            detached: true // so killTree can reap the backend/frontend it spawns
         });
 
         let frontendUrl = "";
@@ -591,7 +640,7 @@ force: true });
         // Listen for frontend and backend readiness
         await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
-                devProcess.kill("SIGKILL");
+                killTree(devProcess, "SIGKILL");
                 reject(new Error("Timeout waiting for dev server to start"));
             }, 90000);
 
@@ -752,9 +801,9 @@ timeout: 10000 });
             throw error;
         } finally {
             await browser.close();
-            // Kill dev server
+            // Kill the dev server and the backend/frontend it spawned.
             console.log("Stopping dev server process...");
-            devProcess.kill("SIGKILL");
+            killTree(devProcess, "SIGKILL");
             await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
