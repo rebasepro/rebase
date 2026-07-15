@@ -32,6 +32,7 @@ const RENAMED = {
     auth: "app (folded in — it was one hook)"
 };
 
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "pnpm-store"]);
 // Changelogs record what shipped under the old names; the architecture doc
 // explains why `auth` is gone; the publish summary is a generated record.
 const SKIP_FILES = new Set([
@@ -43,16 +44,30 @@ const SKIP_FILES = new Set([
 ]);
 
 /**
- * Only files git tracks. Build output, lint dumps and scaffolded test projects
- * quote old paths from past runs; they are not references to fix, and walking
- * the filesystem drowns the real hits in them.
+ * Files git tracks — here and in any nested repository.
+ *
+ * Build output, lint dumps and scaffolded test projects quote old paths from
+ * past runs, and walking the filesystem drowns the real hits in them. But
+ * `saas/` is its own git repo, so the outer `git ls-files` cannot see it: a
+ * stale import there built fine until vite failed at chunk-rendering. Nested
+ * repos are asked for their own tracked files.
  */
+function nestedRepos() {
+    return fs
+        .readdirSync(repoRoot, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !SKIP_DIRS.has(e.name))
+        .filter((e) => fs.existsSync(path.join(repoRoot, e.name, ".git")))
+        .map((e) => e.name);
+}
+
 function trackedFiles() {
-    return execSync("git ls-files -z", { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 })
-        .toString()
-        .split("\0")
-        .filter(Boolean)
-        .filter((f) => !SKIP_FILES.has(f) && !SKIP_FILES.has(path.basename(f)));
+    const roots = [{ cwd: repoRoot, prefix: "" }, ...nestedRepos().map((r) => ({ cwd: path.join(repoRoot, r), prefix: `${r}/` }))];
+    const files = [];
+    for (const { cwd, prefix } of roots) {
+        const out = execSync("git ls-files -z", { cwd, maxBuffer: 64 * 1024 * 1024 }).toString();
+        for (const f of out.split("\0").filter(Boolean)) files.push(prefix + f);
+    }
+    return files.filter((f) => !SKIP_FILES.has(f) && !SKIP_FILES.has(path.basename(f)));
 }
 
 const hits = [];
@@ -115,6 +130,14 @@ for (const rel of trackedFiles()) {
             }
         }
     }
+}
+
+if (dupKeyHits.length > 0) {
+    console.error(`\n${dupKeyHits.length} duplicate dependency key(s):\n`);
+    for (const h of dupKeyHits) {
+        console.error(`  ${h.file}: "${h.key}" listed twice in ${h.block}`);
+    }
+    console.error("");
 }
 
 if (hits.length > 0 || dupKeyHits.length > 0) {
