@@ -1,4 +1,4 @@
-import { CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 
@@ -68,8 +68,6 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
                 ? "false"
                 : expr.operands.map(o => `(${compile(o, scope)})`).join(" OR ");
         case "not":
-            // Render the common `auth.uid() IS NULL` (unauthenticated) form directly.
-            if (expr.operand.kind === "authenticated") return "auth.uid() IS NULL";
             return `NOT (${compile(expr.operand, scope)})`;
         case "compare": {
             // `auth.uid()` returns text; cast the column side so uuid / integer
@@ -88,7 +86,14 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
         case "rolesContain":
             return `string_to_array(auth.roles(), ',') @> ${rolesArraySql(expr.roles)}`;
         case "authenticated":
-            return "auth.uid() IS NOT NULL";
+            // `IS NOT NULL` alone is a tautology on the user path: every
+            // user-context request sets `app.user_id`, and an anonymous one sets
+            // it to the sentinel. Excluding the sentinel is what makes this mean
+            // "signed in" rather than "anyone at all".
+            return `auth.uid() IS NOT NULL AND auth.uid() <> ${quoteLiteral(ANONYMOUS_USER_ID)}`;
+        case "serverContext":
+            // Only the built-in server flows leave `app.user_id` unset.
+            return "auth.uid() IS NULL";
         case "existsIn":
             return compileExistsIn(expr, scope);
         case "raw":

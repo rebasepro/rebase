@@ -25,6 +25,10 @@ export interface PolicyRef {
     roles: string[];
     /** SELECT / INSERT / UPDATE / DELETE / ALL. */
     command: string;
+    /** Whether a USING clause is present at all (not what it says). */
+    hasUsing: boolean;
+    /** Whether a WITH CHECK clause is present at all (not what it says). */
+    hasWithCheck: boolean;
 }
 
 export interface PolicyDrift {
@@ -40,18 +44,57 @@ export interface Queryable {
     query<R>(text: string, values?: unknown[]): Promise<{ rows: R[] }>;
 }
 
-const CREATE_POLICY = /CREATE POLICY "([^"]+)" ON "([^"]+)"\."([^"]+)"\s+AS (\w+)\s+FOR (\w+)\s+TO ([^\n]+?)(?:\s+USING|\s+WITH CHECK|;)/gi;
+// The trailing group captures whichever clause follows the TO list, which is
+// what tells us the clause is present.
+const CREATE_POLICY = /CREATE POLICY "([^"]+)" ON "([^"]+)"\."([^"]+)"\s+AS (\w+)\s+FOR (\w+)\s+TO ([^\n]+?)(\s+USING\s*\(|\s+WITH CHECK\s*\(|;)/gi;
+
+const WITH_CHECK_NEXT = /^\s+WITH CHECK\s*\(/i;
+
+/**
+ * Index just past the `)` closing a clause whose `(` ends at `open`.
+ *
+ * Needed because a policy expression nests parens and can contain a quoted
+ * literal holding either character, so "find the next `)`" would stop early and
+ * miss the `WITH CHECK` that follows.
+ */
+function clauseEnd(ddl: string, open: number): number {
+    let depth = 1;
+    let inQuote = false;
+    for (let i = open; i < ddl.length; i++) {
+        const c = ddl[i];
+        if (inQuote) {
+            // '' is an escaped quote inside a string, not a close.
+            if (c === "'") {
+                if (ddl[i + 1] === "'") i++;
+                else inQuote = false;
+            }
+            continue;
+        }
+        if (c === "'") inQuote = true;
+        else if (c === "(") depth++;
+        else if (c === ")" && --depth === 0) return i + 1;
+    }
+    return ddl.length;
+}
 
 /** Parse the generated DDL rather than rebuilding the shape by hand. */
 export function parseExpectedPolicies(ddl: string): PolicyRef[] {
     const found: PolicyRef[] = [];
     for (const m of ddl.matchAll(CREATE_POLICY)) {
-        const [, name, schema, table, , command, rolesRaw] = m;
+        const [, name, schema, table, , command, rolesRaw, clause] = m;
         const roles = rolesRaw
             .split(",")
             .map((r) => r.trim().replace(/^"|"$/g, ""))
             .filter(Boolean);
-        found.push({ schema, table, name, roles, command: command.toUpperCase() });
+
+        // The generator emits USING before WITH CHECK, so what follows the TO
+        // list settles USING; WITH CHECK is then whatever follows that clause.
+        const hasUsing = /USING/i.test(clause);
+        const hasWithCheck = hasUsing
+            ? WITH_CHECK_NEXT.test(ddl.slice(clauseEnd(ddl, m.index + m[0].length)))
+            : /WITH CHECK/i.test(clause);
+
+        found.push({ schema, table, name, roles, command: command.toUpperCase(), hasUsing, hasWithCheck });
     }
     return found;
 }
@@ -59,8 +102,9 @@ export function parseExpectedPolicies(ddl: string): PolicyRef[] {
 async function readLivePolicies(client: Queryable, schemas: string[]): Promise<PolicyRef[]> {
     const { rows } = await client.query<{
         schemaname: string; tablename: string; policyname: string; roles: string[] | string; cmd: string;
+        qual: string | null; with_check: string | null;
     }>(
-        `SELECT schemaname, tablename, policyname, roles, cmd
+        `SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check
          FROM pg_policies
          WHERE schemaname = ANY($1)`,
         [schemas]
@@ -74,7 +118,11 @@ async function readLivePolicies(client: Queryable, schemas: string[]): Promise<P
         roles: Array.isArray(r.roles)
             ? r.roles
             : String(r.roles ?? "").replace(/^\{|\}$/g, "").split(",").filter(Boolean),
-        command: (r.cmd ?? "ALL").toUpperCase()
+        command: (r.cmd ?? "ALL").toUpperCase(),
+        // Presence only. Postgres rewrites the text, but it does not invent or
+        // drop a clause: NULL here means the policy genuinely has none.
+        hasUsing: r.qual != null,
+        hasWithCheck: r.with_check != null
     }));
 }
 
@@ -85,11 +133,18 @@ const sameRoles = (a: string[], b: string[]) =>
 /**
  * Diff expected against live.
  *
- * Compares names, roles and command only — all exact values. Policy
- * *expressions* are deliberately not compared: Postgres rewrites `qual`/
- * `with_check` when storing them (parenthesising, casting, schema-qualifying),
- * so text comparison reports drift that does not exist, and a check that cries
- * wolf gets ignored. Roles alone catch the failure this exists for.
+ * Compares names, roles, command, and whether each clause exists — all exact
+ * values. Policy expression *text* is deliberately not compared: Postgres
+ * rewrites `qual`/`with_check` when storing them (parenthesising, casting,
+ * schema-qualifying), so text comparison reports drift that does not exist, and
+ * a check that cries wolf gets ignored.
+ *
+ * Presence is not text, though. A NULL `qual` is not a rewrite of an
+ * expression, it is the absence of one, and absence has no false-positive risk:
+ * either the generator emitted a clause or it did not. That distinction is worth
+ * the extra comparison — a production database was found with a SELECT policy
+ * whose `qual` was NULL, matching on every field this checked and denying 100%
+ * of reads. The same blindness would hide a policy that fails open.
  */
 export async function checkPolicyDrift(
     client: Queryable,
@@ -119,6 +174,13 @@ export async function checkPolicyDrift(
         }
         if (want.command !== got.command) {
             differences.push(`command: expected ${want.command}, database has ${got.command}`);
+        }
+        for (const clause of ["USING", "WITH CHECK"] as const) {
+            const key = clause === "USING" ? "hasUsing" : "hasWithCheck";
+            if (want[key] === got[key]) continue;
+            differences.push(want[key]
+                ? `${clause}: expected an expression, database has none — this policy matches no rows`
+                : `${clause}: expected none, database has an expression`);
         }
         if (differences.length > 0) drift.diverged.push({ expected: want, actual: got, differences });
     }

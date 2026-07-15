@@ -8,7 +8,7 @@ import chalk from "chalk";
 import fs from "fs";
 import { runDoctor, loadCollections } from "./doctor";
 import { checkPolicyDrift, formatPolicyDrift, hasDrift } from "../security/policy-drift";
-import { validatePolicyPgRoles } from "../security/rls-enforcement";
+import { validatePolicyPgRoles, warnOnAnonymousGrants } from "../security/rls-enforcement";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -40,6 +40,10 @@ async function runPolicyChecks(collectionsPath: string, databaseUrl?: string): P
             logger.info("");
             logger.error(chalk.red(err instanceof Error ? err.message : String(err)));
         }
+
+        // A rule that reads as a lockdown but is true for every caller compiles
+        // to a grant. Report it without booting a server.
+        warnOnAnonymousGrants(collections as never);
 
         const drift = await checkPolicyDrift(pool as never, collections);
         logger.info("");

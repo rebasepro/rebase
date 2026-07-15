@@ -27,8 +27,27 @@ export type PolicyExpression =
     | RolesOverlapPolicyExpression
     | RolesContainPolicyExpression
     | AuthenticatedPolicyExpression
+    | ServerContextPolicyExpression
     | ExistsInPolicyExpression
     | RawPolicyExpression;
+
+/**
+ * The id a request without a logged-in user reports as `auth.uid()`.
+ *
+ * A user-context request always sets `app.user_id`: blank would read back as
+ * `NULL`, and `NULL` is how the trusted server context is recognised, so an
+ * anonymous visitor would be promoted to server privileges. The driver
+ * therefore substitutes this sentinel at the single chokepoint where the GUC
+ * is set.
+ *
+ * The consequence for policy authors is that **`auth.uid() IS NOT NULL` is a
+ * tautology on the user path** — it is true for anonymous visitors too. Use
+ * {@link policy.authenticated} (or `auth.uid() <> 'anonymous'`) to mean "signed
+ * in", and {@link policy.serverContext} to mean "the trusted server context".
+ *
+ * @group Models
+ */
+export const ANONYMOUS_USER_ID = "anonymous";
 
 /** Always allows. Compiles to `true`. @group Models */
 export interface TruePolicyExpression {
@@ -93,11 +112,40 @@ export interface RolesContainPolicyExpression {
 }
 
 /**
- * True when there is an authenticated user (`auth.uid() IS NOT NULL`).
+ * True when a signed-in user is making the request. Compiles to
+ * `auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'`.
+ *
+ * Both halves are load-bearing. `IS NOT NULL` excludes the server context;
+ * the {@link ANONYMOUS_USER_ID} comparison excludes anonymous visitors, who
+ * *do* carry a non-null `auth.uid()`. Checking only `IS NOT NULL` grants to
+ * everyone — see {@link ANONYMOUS_USER_ID}.
+ *
+ * `policy.not(policy.authenticated())` therefore means "anonymous visitor or
+ * the server context". To single out the server context, use
+ * {@link ServerContextPolicyExpression}.
  * @group Models
  */
 export interface AuthenticatedPolicyExpression {
     kind: "authenticated";
+}
+
+/**
+ * True only in the trusted **server context** — the built-in flows that run
+ * without a user (signup, migrations, `dataAsAdmin`) set no user GUC, so
+ * `auth.uid()` is `NULL` for them and only for them. Compiles to
+ * `auth.uid() IS NULL`.
+ *
+ * This is what lets the owner connection satisfy a policy even under FORCE RLS.
+ * It is deliberately a primitive rather than `not(authenticated())`: the two
+ * meant the same thing while `authenticated` ignored {@link ANONYMOUS_USER_ID},
+ * and conflating them is what turns a server-only grant into an anonymous one.
+ *
+ * The JavaScript evaluator always returns `false` for this node — a client is
+ * never the server context.
+ * @group Models
+ */
+export interface ServerContextPolicyExpression {
+    kind: "serverContext";
 }
 
 /**
@@ -218,6 +266,7 @@ export const policy = {
     rolesOverlap: (roles: readonly string[]): RolesOverlapPolicyExpression => ({ kind: "rolesOverlap", roles: roles as string[] }),
     rolesContain: (roles: readonly string[]): RolesContainPolicyExpression => ({ kind: "rolesContain", roles: roles as string[] }),
     authenticated: (): AuthenticatedPolicyExpression => ({ kind: "authenticated" }),
+    serverContext: (): ServerContextPolicyExpression => ({ kind: "serverContext" }),
     existsIn: (args: { collection: string; where: PolicyExpression }): ExistsInPolicyExpression =>
         ({ kind: "existsIn", collection: args.collection, where: args.where }),
     raw: (sql: string): RawPolicyExpression => ({ kind: "raw", sql }),

@@ -1,4 +1,6 @@
 import { sql as drizzleSql, SQL } from "drizzle-orm";
+import { ANONYMOUS_USER_ID, PolicyExpression, SecurityRule } from "@rebasepro/types";
+import { AnonymousGrantRisk, findAnonymousGrants, securityRuleToConditions } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -200,11 +202,13 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
  * treat `auth.uid() IS NULL` as the trusted server context, and `auth.uid()`
  * is `NULLIF(current_setting('app.user_id'), '')` — so an EMPTY user id would
  * be read as NULL and silently escalate a user request to server privileges.
- * Coerce empty/blank ids to a sentinel here, at the single chokepoint, rather
- * than trusting every caller (e.g. realtime subscription auth) to do it.
+ * Coerce empty/blank ids to `ANONYMOUS_USER_ID` here, at the single chokepoint,
+ * rather than trusting every caller (e.g. realtime subscription auth) to do it.
+ * That sentinel is exported from `@rebasepro/types` because it leaks into rule
+ * semantics: it is why `auth.uid() IS NOT NULL` is true for anonymous requests.
  */
 export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: string): Promise<void> {
-    const userId = typeof auth.userId === "string" && auth.userId.trim() !== "" ? auth.userId : "anonymous";
+    const userId = typeof auth.userId === "string" && auth.userId.trim() !== "" ? auth.userId : ANONYMOUS_USER_ID;
     const normalizedRoles = auth.roles.map((r: unknown) =>
         typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
     );
@@ -225,6 +229,63 @@ const FOREIGN_CONVENTION_ROLES: Record<string, string> = {
     anon: "Supabase",
     service_role: "Supabase"
 };
+
+/**
+ * Warn about rules that read as "signed-in users only" but admit anonymous
+ * callers — `auth.uid() IS NOT NULL`, or a comparison against another
+ * platform's magic user id such as `'anon'`.
+ *
+ * The sibling of {@link validatePolicyPgRoles}, for the more dangerous spelling
+ * of the same habit. A foreign `pgRoles` value makes a policy unreachable and
+ * the table reads empty — loud, and that guard throws. These do the opposite:
+ * the rule compiles to a grant, and nothing looks wrong until the data is
+ * already public.
+ *
+ * Warns rather than throws. Unlike an unreachable `pgRoles`, these rules are
+ * serving traffic today: refusing to boot would take an app offline to report a
+ * problem it already has, and on the read path it would take it offline
+ * *because* its data was exposed. Rewriting the author's SQL is not an option
+ * either — this is the escape hatch whose whole promise is that it means what it
+ * says. So: say so, loudly, and leave the rule alone.
+ */
+export function warnOnAnonymousGrants(
+    collections: { slug?: string; securityRules?: readonly SecurityRule[] }[]
+): void {
+    // Grouped by the mistake, not by the rule: one habit typically repeats
+    // across every collection an author wrote, and a per-rule list would repeat
+    // the same paragraph dozens of times and get skimmed.
+    const byRisk = new Map<string, { risk: AnonymousGrantRisk; sites: string[] }>();
+
+    for (const collection of collections) {
+        for (const rule of collection.securityRules ?? []) {
+            const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
+            const risks = [usingExpr, withCheckExpr]
+                .filter((e): e is PolicyExpression => e !== null)
+                .flatMap(findAnonymousGrants);
+
+            for (const risk of risks) {
+                const key = `${risk.pattern}:${risk.detail}`;
+                const site = `${collection.slug ?? "(unnamed)"} → "${rule.name ?? "(unnamed rule)"}"`;
+                const entry = byRisk.get(key) ?? { risk, sites: [] };
+                if (!entry.sites.includes(site)) entry.sites.push(site);
+                byRisk.set(key, entry);
+            }
+        }
+    }
+
+    if (byRisk.size === 0) return;
+
+    const problems = [...byRisk.values()].map(({ risk, sites }) =>
+        `  • ${risk.explanation}\n    ${sites.length} rule(s): ${sites.join(", ")}`
+    );
+
+    logger.warn(
+        `Security rules that read as a lockdown but grant access to anonymous requests. Every caller from a ` +
+        `client carries a user id ('${ANONYMOUS_USER_ID}' when nobody is signed in), so these clauses are ` +
+        `true for everyone:\n\n` +
+        problems.join("\n\n") + "\n"
+    );
+}
 
 /**
  * Reject `pgRoles` that this server can never satisfy.

@@ -33,7 +33,7 @@ import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
-import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 
 export interface PostgresDriverConfig {
@@ -303,6 +303,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     registry.getCollections() as never,
                     driver.rlsUserRole ?? posture.role
                 );
+
+                // The same habit one surface over, and the dangerous direction:
+                // a rule that reads as "signed in only" but is true for every
+                // caller grants the data away rather than hiding it.
+                warnOnAnonymousGrants(registry.getCollections() as never);
             }
 
             // Ensure branch metadata table exists when branching is available

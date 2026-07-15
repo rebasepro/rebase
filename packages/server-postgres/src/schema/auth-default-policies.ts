@@ -32,9 +32,11 @@ import { getTableName } from "@rebasepro/common";
  *     such as "a user may edit their own row". Without this, a permissive owner
  *     rule would let a user change their own `roles`.
  *
- * The server context is recognised as `auth.uid() IS NULL` — the built-in flows
- * that run without a user (signup, migrations) set no user GUC — which also
- * lets the owner connection satisfy these policies even under FORCE RLS.
+ * The server context is recognised as `auth.uid() IS NULL` (`policy.serverContext()`)
+ * — the built-in flows that run without a user (signup, migrations) set no user
+ * GUC — which also lets the owner connection satisfy these policies even under
+ * FORCE RLS. A *user* request never reaches that state: an anonymous one carries
+ * `ANONYMOUS_USER_ID`, precisely so it cannot pass for the server here.
  *
  * Opt out with `disableDefaultPolicies: true` to take full responsibility for
  * the collection's RLS.
@@ -43,8 +45,13 @@ import { getTableName } from "@rebasepro/common";
 // exactly — the framework's most security-critical policies must be reflected
 // precisely, not left as un-evaluable raw clauses. Compiles to
 // `auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`.
+//
+// `serverContext()`, emphatically not `not(authenticated())`: the server arm of
+// this grant must match the server context and nothing else. Anonymous visitors
+// are not signed in either, so a negated `authenticated()` would hand them the
+// server-or-admin grant on every collection's default policy.
 const SERVER_OR_ADMIN_EXPR: PolicyExpression = policy.or(
-    policy.not(policy.authenticated()),
+    policy.serverContext(),
     policy.rolesOverlap(["admin"])
 );
 

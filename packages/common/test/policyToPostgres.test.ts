@@ -1,7 +1,8 @@
 import { describe, it, expect } from "@jest/globals";
 import { policyToPostgres } from "../src/util/policy/policyToPostgres";
 import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
-import { policy, CollectionConfig } from "@rebasepro/types";
+import { findAnonymousGrants, sqlToPolicy } from "../src/util/policy/sqlToPolicy";
+import { ANONYMOUS_USER_ID, policy, CollectionConfig } from "@rebasepro/types";
 
 const documents: CollectionConfig = {
     id: "documents",
@@ -91,5 +92,106 @@ describe("policyToPostgres — raw escape hatch", () => {
     it("leaves raw SQL without placeholders untouched", () => {
         const expr = policy.raw("auth.uid() IS NOT NULL");
         expect(policyToPostgres(expr, documents)).toBe("auth.uid() IS NOT NULL");
+    });
+});
+
+describe("policy.authenticated()", () => {
+    // `IS NOT NULL` alone is a tautology on the user path: the driver reports an
+    // anonymous request as ANONYMOUS_USER_ID, never NULL. A rule reading as
+    // "logged-in users only" therefore used to grant to anonymous visitors.
+    it("excludes the anonymous sentinel, not just NULL", () => {
+        expect(policyToPostgres(policy.authenticated()))
+            .toBe("auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'");
+    });
+
+    it("is false for an anonymous caller", () => {
+        expect(evaluatePolicy(policy.authenticated(), { uid: null, entity: null })).toBe(false);
+        expect(evaluatePolicy(policy.authenticated(), { uid: ANONYMOUS_USER_ID, entity: null })).toBe(false);
+    });
+
+    it("is true for a signed-in caller", () => {
+        expect(evaluatePolicy(policy.authenticated(), { uid: "u1", entity: null })).toBe(true);
+    });
+
+    it("negates honestly — no special case rewriting it to the server context", () => {
+        // `not(authenticated())` used to compile to `auth.uid() IS NULL`, i.e.
+        // "is the server context". It means "anonymous or server" now, and
+        // `serverContext()` is how you ask the narrower question.
+        expect(policyToPostgres(policy.not(policy.authenticated())))
+            .toBe("NOT (auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous')");
+    });
+});
+
+describe("policy.serverContext()", () => {
+    it("compiles to the only state a user request cannot reach", () => {
+        expect(policyToPostgres(policy.serverContext())).toBe("auth.uid() IS NULL");
+    });
+
+    it("is false client-side for every caller — a client is never the server", () => {
+        expect(evaluatePolicy(policy.serverContext(), { uid: null, entity: null })).toBe(false);
+        expect(evaluatePolicy(policy.serverContext(), { uid: "u1", entity: null })).toBe(false);
+    });
+
+    it("keeps the default server-or-admin grant away from anonymous callers", () => {
+        // The framework's own baseline policy, on every collection. With
+        // `not(authenticated())` in place of `serverContext()` this is true.
+        const serverOrAdmin = policy.or(policy.serverContext(), policy.rolesOverlap(["admin"]));
+        expect(evaluatePolicy(serverOrAdmin, { uid: null, roles: [], entity: null })).toBe(false);
+        expect(evaluatePolicy(serverOrAdmin, { uid: "u1", roles: ["admin"], entity: null })).toBe(true);
+    });
+});
+
+describe("authUid operand", () => {
+    it("resolves to the sentinel for an anonymous caller, matching auth.uid()", () => {
+        // Postgres compares against 'anonymous'; resolving to null here would
+        // make the two disagree on exactly the rules that test for it.
+        const notAnon = policy.compare(policy.authUid(), "neq", policy.literal(ANONYMOUS_USER_ID));
+        expect(evaluatePolicy(notAnon, { uid: null, entity: null })).toBe(false);
+        expect(evaluatePolicy(notAnon, { uid: "u1", entity: null })).toBe(true);
+    });
+});
+
+describe("findAnonymousGrants", () => {
+    const patterns = (sql: string) => findAnonymousGrants(sqlToPolicy(sql)).map(r => r.pattern);
+
+    it("catches the bare tautology, which has no literal to give it away", () => {
+        // `auth.uid() IS NOT NULL` is the most natural way to write "logged in",
+        // and it is true for every caller including anonymous ones.
+        expect(patterns("auth.uid() IS NOT NULL")).toEqual(["uid-not-null"]);
+    });
+
+    it("catches the Supabase habit that inverts a rule", () => {
+        // `auth.uid() != 'anon'` compares against a string no caller ever has.
+        expect(findAnonymousGrants(sqlToPolicy("auth.uid() != 'anon'")))
+            .toEqual([expect.objectContaining({ pattern: "foreign-uid-literal", detail: "anon" })]);
+    });
+
+    it("catches both halves of the rule from the wild", () => {
+        // The exact `using:` string found across 8 collections of PII, which
+        // reads as a lockdown and grants everything to anonymous visitors.
+        expect(patterns("auth.uid() IS NOT NULL AND auth.uid() != 'anon'").sort())
+            .toEqual(["foreign-uid-literal", "uid-not-null"]);
+    });
+
+    it("finds them nested inside AND/OR and in structured rules", () => {
+        const expr = policy.and(
+            policy.compare(policy.field("owner_id"), "eq", policy.authUid()),
+            policy.or(
+                policy.compare(policy.authUid(), "neq", policy.literal("service_role")),
+                policy.compare(policy.literal("authenticated"), "eq", policy.authUid())
+            )
+        );
+        expect(findAnonymousGrants(expr).map(r => r.detail).sort())
+            .toEqual(["authenticated", "service_role"]);
+    });
+
+    it("says nothing about correct rules", () => {
+        // The sentinel itself is the right thing to compare against.
+        expect(patterns(`auth.uid() != '${ANONYMOUS_USER_ID}'`)).toEqual([]);
+        expect(patterns("owner_id = auth.uid()")).toEqual([]);
+        // A literal not compared against auth.uid() is just a value.
+        expect(patterns("role = 'anon'")).toEqual([]);
+        // And the primitive that exists precisely to get this right.
+        expect(findAnonymousGrants(policy.authenticated())).toEqual([]);
     });
 });
