@@ -6,7 +6,7 @@
   "mcpServers": {
     "rebase": {
       "command": "node",
-      "args": ["node_modules/@rebasepro/mcp-server/dist/cli.js"],
+      "args": ["node_modules/@rebasepro/mcp/dist/cli.js"],
       "env": {
         "IS_GEMINI_CLI_EXTENSION": "true"
       }

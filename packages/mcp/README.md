@@ -1,11 +1,11 @@
-# @rebasepro/mcp-server
+# @rebasepro/mcp
 
 Model Context Protocol (MCP) server that exposes Rebase schema, database, document CRUD, user management, and dev server tools to AI assistants.
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/mcp-server
+pnpm add @rebasepro/mcp
 ```
 
 Or run directly:
@@ -16,7 +16,7 @@ npx rebase-mcp
 
 ## What This Package Does
 
-`@rebasepro/mcp-server` implements the [Model Context Protocol](https://modelcontextprotocol.io) over stdio, allowing AI assistants (Gemini, Claude, Cursor, etc.) to interact with a Rebase project. It provides tools and exposes collection definitions and generated schemas as MCP resources. It has native support for managing multiple local and remote projects.
+`@rebasepro/mcp` implements the [Model Context Protocol](https://modelcontextprotocol.io) over stdio, allowing AI assistants (Gemini, Claude, Cursor, etc.) to interact with a Rebase project. It provides tools and exposes collection definitions and generated schemas as MCP resources. It has native support for managing multiple local and remote projects.
 
 ## Multi-Project Support
 

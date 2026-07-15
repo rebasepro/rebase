@@ -84,11 +84,11 @@
       "@rebasepro/formex/*": [
         "packages/formex/src/*"
       ],
-      "@rebasepro/mcp-server": [
-        "packages/mcp-server/src"
+      "@rebasepro/mcp": [
+        "packages/mcp/src"
       ],
-      "@rebasepro/mcp-server/*": [
-        "packages/mcp-server/src/*"
+      "@rebasepro/mcp/*": [
+        "packages/mcp/src/*"
       ],
       "@rebasepro/plugin-data-enhancement": [
         "packages/plugin-data-enhancement/src"
@@ -176,7 +176,7 @@
     "packages/common/src",
     "packages/core/src",
     "packages/formex/src",
-    "packages/mcp-server/src",
+    "packages/mcp/src",
     "packages/plugin-data-enhancement/src",
     "packages/plugin-insights/src",
     "packages/schema-inference/src",

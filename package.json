@@ -29,7 +29,7 @@
     "packages/plugin-insights",
     "packages/schema-inference",
     "packages/sdk-generator",
-    "packages/mcp-server",
+    "packages/mcp",
     "app",
     "app/frontend",
     "app/backend",

@@ -107,7 +107,7 @@ rebase/
 │   ├── client-postgresql/    # @rebasepro/client-postgresql
 │   ├── common/               # @rebasepro/common
 │   ├── formex/               # @rebasepro/formex
-│   ├── mcp-server/           # @rebasepro/mcp-server
+│   ├── mcp-server/           # @rebasepro/mcp
 │   ├── sdk-generator/        # @rebasepro/sdk-generator
 │   ├── schema-inference/     # @rebasepro/schema-inference
 │   ├── plugin-data-enhancement/ # @rebasepro/plugin-data-enhancement
@@ -135,7 +135,7 @@ rebase/
 | `@rebasepro/client-postgresql` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
 | `@rebasepro/common` | Shared utilities, `defaultUsersCollection` | Shared constants and default collection exports |
 | `@rebasepro/formex` | Form engine | Building dynamic forms from collection schemas |
-| `@rebasepro/mcp-server` | AI agent MCP tools | The MCP server that agents use |
+| `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |
 | `@rebasepro/sdk-generator` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
 | `@rebasepro/schema-inference` | Auto-infer schema from data / database introspection | Used by `rebase schema introspect` |
 | `@rebasepro/plugin-data-enhancement` | AI-powered data autofill | Studio plugin for auto-completing fields |

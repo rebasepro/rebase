@@ -3,7 +3,7 @@
     "rebase": {
       "command": "node",
       "args": [
-        "node_modules/@rebasepro/mcp-server/dist/cli.js"
+        "node_modules/@rebasepro/mcp/dist/cli.js"
       ]
     }
   }
