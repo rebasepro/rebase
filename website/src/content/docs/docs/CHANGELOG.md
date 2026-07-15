@@ -147,7 +147,7 @@ title: Changelog
   | `useEntityPreviewSlots` | `usePreviewSlots` |
   | `SideEntityControllerContext` | `SidePanelControllerContext` |
 
-  **Bridge key (`@rebasepro/core`)**
+  **Bridge key (`@rebasepro/app`)**
 
   | Old Key | New Key |
   |---------|---------|
@@ -180,7 +180,7 @@ title: Changelog
 
 - **Inferred data-source transport** — `DataSourceDefinition.transport` is now optional: entries with a client-side `driver` default to `"direct"`, entries without to `"server"`. A `"(default)"`-keyed entry without a driver can be used to declare the default source's engine/capabilities while the client keeps serving the data.
 
-- **`installShutdownHandlers`** — New `@rebasepro/server-core` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
+- **`installShutdownHandlers`** — New `@rebasepro/server` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
 
 - **Honest Realtime Meta** — Added `FindResponse.meta.estimated` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
 
@@ -192,7 +192,7 @@ title: Changelog
 
 - **Resilient auto-refresh** — a transient refresh failure (network blip, backend restart, 5xx) now retries with exponential backoff instead of immediately signing the user out; only a genuine auth failure (401/403/invalid/expired token) or exhausted retries signs out.
 
-- **`server-postgresql` ships `src/`** — the driver package now packs `src` alongside `dist`, fixing `✗ Could not find CLI entry point for @rebasepro/server-postgresql` for `rebase db push` / `schema generate` in published/packed installs (the CLI runs `src/cli.ts` via tsx; no `dist/cli.js` is built).
+- **`server-postgresql` ships `src/`** — the driver package now packs `src` alongside `dist`, fixing `✗ Could not find CLI entry point for @rebasepro/server-postgres` for `rebase db push` / `schema generate` in published/packed installs (the CLI runs `src/cli.ts` via tsx; no `dist/cli.js` is built).
 
 - **Malformed request bodies** — the API now rejects malformed JSON bodies with `400` and tightens the public-path check.
 
@@ -224,7 +224,7 @@ title: Changelog
 - **Property Schema Consolidation** — Refactored the property system to unify how database-level schemas, UI configurations, and validation rules are defined. Removed overlapping property types and introduced a more robust `PropertyConfig` system that handles complex relations and references consistently across all data drivers (Postgres, MongoDB, Firestore).
 - **Editable UI Table** — Significantly enhanced `VirtualTable` with native editable cells (`VirtualTableInput`, `VirtualTableSelect`, `VirtualTableNumberInput`, `VirtualTableDateField`). Added a new `SelectionStore` and `SelectionContext` for robust multi-row selection, keyboard navigation, and batch operations within the CMS.
 - **Expanded Agent Skills** — Massive overhaul of the Rebase AI coding skills. Added new specialized skills for `rebase-custom-functions`, `rebase-ui-components`, and `rebase-storage`. Expanded existing skills for auth, security, and SDK with deep architectural context, common patterns, and safety rules.
-- **Public API Refinement** — Cleaned up the public API surface of `@rebasepro/client` and `@rebasepro/core`, simplifying integration into existing applications. Consolidated data controllers, improved type inference, and refined the `Rebase` component props for better developer experience.
+- **Public API Refinement** — Cleaned up the public API surface of `@rebasepro/client` and `@rebasepro/app`, simplifying integration into existing applications. Consolidated data controllers, improved type inference, and refined the `Rebase` component props for better developer experience.
 - **NPM Publishing Safeguards** — Added `validate-no-workspace-protocol.sh` and `check-packages.sh` scripts to the release pipeline. These prevent publishing packages with `workspace:` dependencies or inconsistent versions, ensuring library consumers always get stable, resolved dependencies.
 
 ### Fixes
@@ -483,21 +483,21 @@ title: Changelog
 | `@rebasepro/types` | Core TypeScript type definitions |
 | `@rebasepro/utils` | Shared utility functions |
 | `@rebasepro/common` | Common modules shared across packages |
-| `@rebasepro/formex` | Lightweight form management library |
+| `@rebasepro/forms` | Lightweight form management library |
 | `@rebasepro/ui` | React component library |
-| `@rebasepro/core` | Core CMS logic and controllers |
+| `@rebasepro/app` | Core CMS logic and controllers |
 | `@rebasepro/client` | Client-side data access layer |
-| `@rebasepro/client-postgresql` | PostgreSQL client adapter |
-| `@rebasepro/client-firebase` | Firebase/Firestore client adapter |
-| `@rebasepro/server-core` | Server framework and middleware |
-| `@rebasepro/server-postgresql` | PostgreSQL server adapter with Drizzle |
-| `@rebasepro/server-mongodb` | MongoDB server adapter |
-| `@rebasepro/auth` | Authentication controllers and views |
+| `@rebasepro/client-postgres` | PostgreSQL client adapter |
+| `@rebasepro/firebase` | Firebase/Firestore client adapter |
+| `@rebasepro/server` | Server framework and middleware |
+| `@rebasepro/server-postgres` | PostgreSQL server adapter with Drizzle |
+| `@rebasepro/server-mongo` | MongoDB server adapter |
+| `@rebasepro/app` | Authentication controllers and views |
 | `@rebasepro/admin` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, schema tools, and developer utilities |
 | `@rebasepro/cli` | CLI for project scaffolding and management |
-| `@rebasepro/sdk-generator` | TypeScript SDK code generation |
-| `@rebasepro/mcp-server` | MCP server for AI integrations |
-| `@rebasepro/schema-inference` | Database schema introspection and inference |
-| `@rebasepro/plugin-data-enhancement` | AI-powered data enhancement plugin |
+| `@rebasepro/codegen` | TypeScript SDK code generation |
+| `@rebasepro/mcp` | MCP server for AI integrations |
+| `@rebasepro/inference` | Database schema introspection and inference |
+| `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |

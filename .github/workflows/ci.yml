@@ -47,6 +47,11 @@ jobs:
       - name: Headless guard
         run: pnpm run check:headless
 
+      # Renames leak where a codemod cannot see them: a bare name in an array,
+      # a .astro file, an extensionless .env.example, a Tailwind @source path.
+      - name: Package name guard
+        run: pnpm run check:names
+
       - name: Build packages
         run: pnpm run build
         env:

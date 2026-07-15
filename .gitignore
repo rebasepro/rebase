@@ -48,7 +48,7 @@ app/frontend/debug_trace**
 .rebase-dev-port
 .rebase/
 .test-npmrc
-packages/formex/.yarn/
+packages/forms/.yarn/
 
 # Scratch and debug artifacts (prevent root pollution)
 /scratch.*
@@ -119,3 +119,8 @@ og-template.html
 
 # Astro build cache
 .astro/
+
+# Accidentally committed build output
+build_output.txt
+tsc_output.txt
+*_results.log
