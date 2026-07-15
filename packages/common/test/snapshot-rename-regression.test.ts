@@ -108,7 +108,7 @@ describe("No Record-nouned components", () => {
 
 describe("Firebase SDK names preserved", () => {
 
-    it("should still reference DocumentSnapshot in client-firebase", () => {
+    it("should still reference DocumentSnapshot in firebase", () => {
         const firebaseDir = path.join(REPO_ROOT, "packages/firebase/src");
         const files = collectTsFiles(firebaseDir);
         const hasDocumentSnapshot = files.some(file => {
@@ -118,7 +118,7 @@ describe("Firebase SDK names preserved", () => {
         expect(hasDocumentSnapshot).toBe(true);
     });
 
-    it("should still reference onSnapshot in client-firebase", () => {
+    it("should still reference onSnapshot in firebase", () => {
         const firebaseDir = path.join(REPO_ROOT, "packages/firebase/src");
         const files = collectTsFiles(firebaseDir);
         const hasOnSnapshot = files.some(file => {

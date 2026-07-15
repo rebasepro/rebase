@@ -43,7 +43,7 @@ const { db, pool } = createPostgresDatabaseConnection(
   schema
 );
 
-// Create adapter and pass to server-core
+// Create adapter and pass to server
 const database = createPostgresAdapter({
   connection: db,
   connectionString: process.env.DATABASE_URL,

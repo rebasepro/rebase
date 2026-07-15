@@ -58,7 +58,7 @@ function linkLocalPackages(projectPath: string) {
     const rootDir = path.resolve(cliRoot, "../.."); // `/Users/francesco/rebase`
 
     // Dynamically resolve the real installation paths of hono and drizzle-orm inside the monorepo
-    const resolvePaths = [path.join(rootDir, "packages", "server-core")];
+    const resolvePaths = [path.join(rootDir, "packages", "server")];
     const honoPath = getPackageDir("hono", resolvePaths);
     const drizzlePath = getPackageDir("drizzle-orm", resolvePaths);
 

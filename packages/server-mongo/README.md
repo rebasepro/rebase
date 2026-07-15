@@ -31,7 +31,7 @@ Implements the Rebase `BackendBootstrapper` and backend interfaces for MongoDB. 
 
 ## Quick Start
 
-### With server-core (recommended)
+### With server (recommended)
 
 ```typescript
 import { MongoClient } from "mongodb";
@@ -53,7 +53,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-### Standalone (without server-core)
+### Standalone (without server)
 
 ```typescript
 import { MongoClient } from "mongodb";

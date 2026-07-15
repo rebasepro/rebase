@@ -32,6 +32,54 @@ const RENAMED = {
     auth: "app (folded in — it was one hook)"
 };
 
+/**
+ * Names distinctive enough to match on their own, with no scope or path to
+ * anchor them.
+ *
+ * `core` and `auth` are ordinary words, and `formex` outlived its package as
+ * an API name (`useFormex`, `formexController`) — matching those bare is all
+ * false positives. The rest denote nothing but a package that no longer
+ * exists, so a bare mention is a stale mention, and every form that leaked
+ * past the anchored patterns was bare: a `server-core` label rendered on the
+ * marketing site, a `path.join(root, "packages", "server-core")` no codemod
+ * could see because the name was split across arguments, a `](../formex)`
+ * link that 404s from a README already published to npm, and a directory
+ * tree in the agent skill listing twelve names that had all moved.
+ */
+const BARE = new Set([
+    "server-core",
+    "server-postgresql",
+    "server-mongodb",
+    "client-postgresql",
+    "client-firebase",
+    "plugin-data-enhancement",
+    "schema-inference",
+    "sdk-generator",
+    "mcp-server"
+]);
+
+/**
+ * How a given old name is allowed to be spelled before it counts as a hit.
+ *
+ * `-` joins the boundary class so `rebase-mcp-server` — the MCP server's own
+ * advertised name — is not read as a stale `mcp-server`.
+ *
+ * Bare names match in two spellings: as written, and with the first letter
+ * capitalized — `Server-core specific types` opens a sentence and still names
+ * the package. Not case-insensitively, though: German capitalizes the parts of
+ * a compound noun, so `MCP-Server` and `SDK-Generator` in the German docs are
+ * the words "MCP server" and "SDK generator", not the packages that once bore
+ * those names. Capitalizing the first letter only tells the two apart.
+ */
+function patternsFor(old) {
+    if (BARE.has(old)) {
+        const sentenceInitial = old[0].toUpperCase() + old.slice(1);
+        return [new RegExp(`(?<![\\w-])(?:${old}|${sentenceInitial})(?![\\w-])`)];
+    }
+    // Only the forms that actually denote the package.
+    return [new RegExp(`@rebasepro/${old}(?![\\w-])`), new RegExp(`packages/${old}/`)];
+}
+
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "pnpm-store"]);
 // Changelogs record what shipped under the old names; the architecture doc
 // explains why `auth` is gone; the publish summary is a generated record.
@@ -82,14 +130,15 @@ for (const rel of trackedFiles()) {
     // A NUL byte means binary; utf8 of it is noise, not references.
     if (text.includes("\u0000")) continue;
 
+    const lines = text.split("\n");
     for (const [old, replacement] of Object.entries(RENAMED)) {
-        // Only the forms that actually denote the package: the scoped
-        // specifier, or a path into packages/. A bare "core" is too common a
-        // word to match on.
-        for (const pattern of [`@rebasepro/${old}`, `packages/${old}/`]) {
-            if (!text.includes(pattern)) continue;
-            const line = text.split("\n").findIndex((l) => l.includes(pattern)) + 1;
-            hits.push({ file: rel, line, pattern, replacement });
+        for (const pattern of patternsFor(old)) {
+            // Every occurrence, not just the first: `check-packages.sh` held
+            // four stale names, and reporting one at a time meant each fix
+            // revealed the next. Nothing here is expensive enough to ration.
+            lines.forEach((l, i) => {
+                if (pattern.test(l)) hits.push({ file: rel, line: i + 1, pattern: old, replacement });
+            });
         }
     }
 }

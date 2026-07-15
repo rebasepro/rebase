@@ -1,6 +1,6 @@
 import type { Transport } from "./transport";
 
-// Re-define the types locally since they live in server-core, not in @rebasepro/types.
+// Re-define the types locally since they live in server, not in @rebasepro/types.
 // These match the server-side types exactly.
 
 /** A single permission entry scoping an API key to a collection and its allowed operations. */

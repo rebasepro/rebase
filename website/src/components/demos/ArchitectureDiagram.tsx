@@ -135,7 +135,7 @@ export function ArchitectureDiagram() {
                                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                             </div>
                             <span className="text-sm font-bold text-white">BaaS Core</span>
-                            <code className="text-[10px] bg-surface-900/60 border border-surface-800/60 px-1.5 py-0.5 rounded text-surface-500 font-mono">server-core</code>
+                            <code className="text-[10px] bg-surface-900/60 border border-surface-800/60 px-1.5 py-0.5 rounded text-surface-500 font-mono">server</code>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

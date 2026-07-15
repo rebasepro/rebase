@@ -6,7 +6,7 @@ export { unslugify, prettifyIdentifier, isObject, isPlainObject, mergeDeep } fro
 
 /**
  * Extract enum values from a list of sample values.
- * This is schema-inference-specific logic (not a general utility).
+ * This is inference-specific logic (not a general utility).
  */
 export function extractEnumFromValues(values: unknown[]) {
     if (!Array.isArray(values)) {

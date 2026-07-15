@@ -194,14 +194,19 @@ That means Studio can ship on top of BaaS mode with no CMS at all.
 
 ```
 Shared kernel   types → utils → common → client        (isomorphic, no UI, no node)
+                client-postgres → client, types
 
 BaaS            server → client, common, types, utils
                 server-postgres / server-mongo → server
-                cli, codegen, inference
+                cli → client, codegen, server, server-postgres, types
+                codegen → client, common, types
+                mcp → client
+                inference (leaf)
 
 CMS             ui, forms (leaves)
                 app → common, forms, types, ui, utils
                 admin → app, common, forms, inference, types, ui, utils
+                firebase → admin, app, common, types, ui, utils
 
 Full            studio → client, common, app, types, ui, utils
                         (admin: optional peer)
@@ -212,6 +217,11 @@ Names describe **role**, not position or framework. `server` pairs with `client`
 `app` is the runtime that `admin`, `studio` and the plugins register into. React is a
 peer dependency of the frontend tier, not an identity — `ui`, `admin` and `studio` are
 every bit as React as `app`, so none of them carry it in the name.
+
+`firebase` sits in the CMS tier rather than beside `client`, which is where its old
+name (`client-firebase`) filed it: it depends on `admin`, `app` and `ui`, so it is a
+UI integration, not a client SDK. `client-postgres` is the one that really is an
+adapter over `client`.
 
 The React auth controller (`useRebaseAuthController`) lives in `app`, beside the
 `RebaseAuth` and `LoginView` components it is used with. It was once its own

@@ -1,5 +1,5 @@
 /**
- * Scheduled backups, wired into the server-core cron system.
+ * Scheduled backups, wired into the server cron system.
  *
  * A backend enables nightly (or custom-schedule) backups by dropping a cron
  * file that default-exports {@link createBackupCron}. The heavy lifting —

@@ -17,7 +17,7 @@ When working on the Rebase project, adhere to the following architectural guidel
 - **Effective Role Simulation**: Use an `EffectiveRoleController` context to simulate different user roles. When in Dev Mode, developers can select an "effective role" to accurately preview what that specific role can see/execute when toggling to Editor Mode.
 
 ## 3. Package Management
-- **Do not rename packages**: Existing packages (like `core`, `admin`, `server-postgresql`, etc.) should keep their current names.
+- **Do not rename packages**: Package names are settled and describe a **role**, not a position or a framework — `server` pairs with `client`; `app` is the runtime that `admin`, `studio` and the plugins register into. Keep the names in `packages/` as they are. The rename to these names is done; `pnpm run check:names` fails on any reference to a name that no longer exists.
 - **Inner View Adaptability**: Internal views should conditionally render inline developer actions (like "Edit Schema") by checking if `mode === "developer"`.
 
 ## 4. View Modes

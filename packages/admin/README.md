@@ -131,9 +131,9 @@ function App() {
 
 ## Related Packages
 
-- [`@rebasepro/app`](../core) — Runtime hooks, providers, auth components, and context
+- [`@rebasepro/app`](../app) — Runtime hooks, providers, auth components, and context
 - [`@rebasepro/ui`](../ui) — Design system components (buttons, dialogs, inputs, etc.)
 - [`@rebasepro/common`](../common) — Shared utilities, collection registry, query builder
 - [`@rebasepro/types`](../types) — TypeScript type definitions
-- [`@rebasepro/forms`](../formex) — Form state management
-- [`@rebasepro/inference`](../schema-inference) — Schema introspection from databases
+- [`@rebasepro/forms`](../forms) — Form state management
+- [`@rebasepro/inference`](../inference) — Schema introspection from databases

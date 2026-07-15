@@ -25,8 +25,8 @@ rebase/
 │   └── generated/              # Auto-generated SDK, Drizzle schema, etc.
 ├── packages/                   # Shared libraries (workspace packages)
 │   ├── cli/                    # @rebasepro/cli — provides the `rebase` binary
-│   ├── server-core/            # Core server framework, env loading
-│   ├── server-postgresql/      # PostgreSQL adapter (Drizzle ORM)
+│   ├── server/                 # Core server framework, env loading
+│   ├── server-postgres/        # PostgreSQL adapter (Drizzle ORM)
 │   ├── studio/                 # Studio admin panel
 │   ├── ui/                     # @rebasepro/ui component library
 │   ├── client/                 # Client SDK

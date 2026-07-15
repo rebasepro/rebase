@@ -1,5 +1,5 @@
 /**
- * Regression tests for the entity naming conventions in server-postgresql.
+ * Regression tests for the entity naming conventions in server-postgres.
  *
  * These tests guard against:
  * 1. The SQL keyword IDENTITY must never be corrupted (e.g., to IDSNAPSHOT or IDENTITY).
@@ -104,7 +104,7 @@ describe("IDENTITY variable names in introspect-db-logic", () => {
     });
 });
 
-// ── 4. No Snapshot-noun types in server-postgresql ───────────────────────
+// ── 4. No Snapshot-noun types in server-postgres ─────────────────────────
 
 describe("No Snapshot as record noun", () => {
 

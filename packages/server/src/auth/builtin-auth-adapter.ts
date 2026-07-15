@@ -42,7 +42,7 @@ import { logger } from "../utils/logger";
  * Configuration for the built-in Rebase auth adapter.
  *
  * This mirrors the existing `RebaseAuthConfig` — users pass this and
- * server-core auto-wraps it in a `RebaseBuiltinAuthAdapter`.
+ * server auto-wraps it in a `RebaseBuiltinAuthAdapter`.
  */
 export interface BuiltinAuthAdapterConfig {
     /** The bootstrapper-provided auth repository (users, roles, tokens). */

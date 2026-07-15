@@ -30,7 +30,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 | Export | Description |
 |--------|-------------|
 | `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `saveSnapshot`, `deleteSnapshot`, etc.) |
-| `DatabaseAdapter` | Pluggable database adapter interface (used by `server-core`) |
+| `DatabaseAdapter` | Pluggable database adapter interface (used by `server`) |
 | `BackendBootstrapper` | Lifecycle interface for initializing database drivers, auth, history, and realtime |
 | `DatabaseAdmin` | Admin operations interface (SQL execution, collection stats, table metadata) |
 | `RealtimeProvider` | Interface for realtime subscription providers |

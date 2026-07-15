@@ -73,7 +73,7 @@ export type {
 export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
 
 // Realtime: the WebSocket client class is internal to `createRebaseClient()`,
-// but re-exported (see @internal on the class) because the `client-postgresql`
+// but re-exported (see @internal on the class) because the `client-postgres`
 // driver constructs it directly. Not a stable app-facing API.
 export { RebaseWebSocketClient } from "./websocket";
 

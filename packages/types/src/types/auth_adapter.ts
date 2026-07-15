@@ -320,7 +320,7 @@ export interface AuthAdapter {
     /**
      * Verify an incoming request and extract the authenticated user.
      *
-     * This replaces the hardcoded JWT verification in server-core's middleware.
+     * This replaces the hardcoded JWT verification in server's middleware.
      * Each adapter implements its own token verification strategy:
      * - Built-in: verify Rebase JWT
      * - Clerk: call Clerk's `verifyToken()`

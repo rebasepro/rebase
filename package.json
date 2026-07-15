@@ -1,7 +1,7 @@
 {
   "name": "rebase-parent",
   "private": true,
-  "description": "Open-source headless CMS and admin panel for Postgres",
+  "description": "Open-source backend-as-a-service for Postgres, with an optional headless CMS and admin panel",
   "author": "Rebase",
   "repository": {
     "type": "git",
@@ -17,7 +17,6 @@
     "packages/app",
     "packages/client",
     "packages/server",
-    "packages/app",
     "packages/cli",
     "packages/studio",
     "packages/admin",

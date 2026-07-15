@@ -1,5 +1,5 @@
 /**
- * Backup type definitions shared across server-core, client, and studio.
+ * Backup type definitions shared across server, client, and studio.
  */
 
 /** Where a backup lives — a local path or an object-storage bucket. */

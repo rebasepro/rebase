@@ -4,7 +4,7 @@ import type { RebaseClient } from "../controllers/client";
  * Cron Job type definitions for Rebase.
  *
  * These types define the shape of cron job definitions, their runtime
- * status, and execution log entries — used across server-core, client,
+ * status, and execution log entries — used across server, client,
  * and studio packages.
  */
 

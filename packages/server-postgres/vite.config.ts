@@ -25,7 +25,7 @@ const CONSUMER_EXTERNALS = [
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
-    // Externalize server-core to prevent singleton duplication (e.g. JWT config, etc)
+    // Externalize server to prevent singleton duplication (e.g. JWT config, etc)
     if (id === "@rebasepro/server" || id.startsWith("@rebasepro/server/")) return true;
     // Inline other @rebasepro/* packages (like common, types)
 

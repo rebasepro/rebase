@@ -1,9 +1,9 @@
 /**
  * Storage-generic backup helpers used by the admin backup routes.
  *
- * These live in server-core (which owns {@link StorageController}) so the
+ * These live in server (which owns {@link StorageController}) so the
  * admin API can list backups without depending on the Postgres driver —
- * `server-core` must not import from `server-postgresql`. The `pg_dump`-side
+ * `server` must not import from `server-postgres`. The `pg_dump`-side
  * copies of the tiny pure parsers live in `@rebasepro/server-postgres`;
  * keep the two in sync if the naming scheme ever changes.
  */

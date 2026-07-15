@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI entry point for `rebase doctor`.
- * Invoked via tsx by the server-postgresql CLI plugin.
+ * Invoked via tsx by the server-postgres CLI plugin.
  */
 import path from "path";
 import chalk from "chalk";

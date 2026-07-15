@@ -5,7 +5,7 @@ import { requireImporter } from "./helpers/require-importer";
 
 // Committed fixtures directory (test/fixtures/functions). A nested
 // package.json pins `"type": "commonjs"` so the `.js` fixtures load as CJS
-// inside server-core's ESM package, and living inside the package tree lets
+// inside server's ESM package, and living inside the package tree lets
 // them `require("hono")`. Tests inject `requireImporter` so discovery is
 // deterministic — no native-import race under jest's parallel workers, no
 // runtime temp-file churn. Fixtures: valid-app, valid-factory (loaded),

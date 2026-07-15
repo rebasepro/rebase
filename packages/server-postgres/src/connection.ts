@@ -66,7 +66,7 @@ export function createPostgresDatabaseConnection(
     const pool = new Pool(pgPoolConfig);
 
     // ── Pool event logging ────────────────────────────────────────────────
-    // Uses console.* because the structured logger lives in server-core
+    // Uses console.* because the structured logger lives in server
     // (a separate package). The caller can replace these with the structured
     // logger if desired via pool.on() after creation.
     pool.on("error", (err) => {

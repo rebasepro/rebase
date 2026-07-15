@@ -1,5 +1,5 @@
 /**
- * Email service types — portable interface shared by RebaseClient and server-core.
+ * Email service types — portable interface shared by RebaseClient and server.
  *
  * The concrete SMTP implementation lives in `@rebasepro/server/email`.
  * This file provides only the consumer-facing contract so that it can be

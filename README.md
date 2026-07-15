@@ -5,9 +5,11 @@
 </p>
 
 <h1 align="center">Rebase</h1>
-<h3 align="center">The Open-Source Headless CMS & Admin Panel for Postgres</h3>
+<h3 align="center">The Open-Source Backend-as-a-Service for Postgres — with an Admin Panel when you want one</h3>
 <p align="center">
-  <strong>Ship production-ready backends and radically extensible back-office apps in minutes.</strong><br/>
+  <strong>Point it at a database and get a production-ready backend in minutes.</strong><br/>
+  REST, auth, storage, realtime and backups over your own Postgres — then add a
+  schema-driven admin panel, or don't.<br/>
   Own your data, own your code. The absolute easiest way to build on PostgreSQL.
 </p>
 
@@ -36,13 +38,27 @@
 
 ## What is Rebase?
 
-Rebase is a **developer-first**, open-source headless CMS and admin panel framework built with **React** and **TypeScript**. It gives you a complete backend-as-a-service layer on top of PostgreSQL — including authentication, S3-compatible storage, a full admin UI, and auto-generated APIs — while letting you extend every layer with custom React components, serverless functions, and scripts. It's fully self-hosted and agent-native, with a built-in MCP server for AI-assisted development.
+Rebase is a **developer-first**, open-source backend-as-a-service built on **PostgreSQL** — authentication, S3-compatible storage, realtime, backups and auto-generated REST APIs over a database you own. It is **self-hosted** and agent-native, with a built-in MCP server for AI-assisted development.
+
+The admin panel is a **layer you opt into**, not the price of entry. Add collection definitions and you get a schema-driven back-office built from them, extensible with your own **React** components, serverless functions, and scripts.
+
+### Adopt only what you want
+
+Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](./MODULAR-ARCHITECTURE.md).
+
+| Mode | You get | Comparable to |
+| --- | --- | --- |
+| **BaaS** | REST + auth + storage + realtime + backups over your database. No config files, no UI, no React in the dependency tree. | Supabase |
+| **CMS** | BaaS + a schema-driven admin UI built from your collection definitions. | Payload, Directus |
+| **Full** | CMS + Studio (SQL editor, schema visualizer, RLS editor, logs, API explorer). | Supabase + Payload |
 
 ### ✨ Key Highlights
 
 - 🔓 **No Vendor Lock-in** — Self-host anywhere. Full control over your infrastructure, code, and database.
+- 🧱 **Modular** — Start as a pure API and add the admin panel later, or never. Nothing is bundled that you didn't ask for.
 - ⚡ **Instant Setup** — `npx @rebasepro/cli init` scaffolds a production-ready project in seconds.
 - 🗄️ **PostgreSQL First** — First-class Postgres support with Drizzle ORM, schema introspection, and automatic migrations.
+- 🔒 **Secure by Default** — Authorization is Postgres RLS, not application code. Tables without row-level security aren't served.
 - 🧩 **Radical Extensibility** — Not constrained to pre-built widgets. If you can build it in React, you can build it in Rebase.
 - 🎨 **Premium UI** — Fast, accessible design system built on Tailwind CSS v4 and Radix UI.
 - 🤖 **AI-Ready** — MCP server for AI-assisted database management, plus data enhancement and insights plugins.

@@ -31,7 +31,7 @@ import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { RebaseClient } from "@rebasepro/types";
 
 /* ═══════════════════════════════════════════════════════════════
-   Types — mirrors server-core api-key-types.ts
+   Types — mirrors server api-key-types.ts
    ═══════════════════════════════════════════════════════════════ */
 
 interface ApiKeyPermission {

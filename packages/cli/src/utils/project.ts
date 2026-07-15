@@ -69,14 +69,14 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
         const deps = { ...pkg.dependencies,
 ...pkg.devDependencies };
 
-        // Collect all @rebasepro/server-* driver plugins (exclude server-core)
+        // Collect all @rebasepro/server-* driver plugins (exclude server itself)
         const candidates = Object.keys(deps).filter(
             dep => dep.startsWith("@rebasepro/server-") && dep !== "@rebasepro/server"
         );
 
         if (candidates.length === 0) return null;
 
-        // Prefer server-postgresql — it's the primary supported driver
+        // Prefer server-postgres — it's the primary supported driver
         if (candidates.includes("@rebasepro/server-postgres")) {
             return "@rebasepro/server-postgres";
         }

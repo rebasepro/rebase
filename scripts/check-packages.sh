@@ -18,6 +18,16 @@ error_count() { wc -l < "$ERROR_LOG" | tr -d ' '; }
 
 PACKAGES_DIR="$(cd "$(dirname "$0")/../packages" && pwd)"
 
+# The packages sections 4-6 build and inspect, named once and checked here.
+# Each of those sections skips a package whose directory is absent — over a
+# missing `dist/` that is the normal case, not a failure. So when the renames
+# left this list holding names that no longer existed, all three sections
+# iterated over nothing and reported success.
+SERVER_PKGS=(server server-postgres)
+for pkg in "${SERVER_PKGS[@]}"; do
+    [ -d "$PACKAGES_DIR/$pkg" ] || err "no packages/$pkg — SERVER_PKGS is stale, sections 4-6 will check nothing"
+done
+
 # ──────────────────────────────────────────────────────────────
 section "1. Stale path aliases (vite.config.ts / tsconfig.json)"
 # ──────────────────────────────────────────────────────────────
@@ -99,9 +109,8 @@ fi
 # ──────────────────────────────────────────────────────────────
 section "4. Vite build check (server packages)"
 # ──────────────────────────────────────────────────────────────
-for pkg in server-core server-postgresql; do
+for pkg in "${SERVER_PKGS[@]}"; do
     pkg_dir="$PACKAGES_DIR/$pkg"
-    [ -d "$pkg_dir" ] || continue
     echo "  Building $pkg..."
     build_output=$( (cd "$pkg_dir" && npx vite build) 2>&1 ) || true
     if echo "$build_output" | grep -q "built in"; then
@@ -117,7 +126,7 @@ done
 section "5. ESM bundle health (no CJS globals in ES output)"
 # ──────────────────────────────────────────────────────────────
 PREV=$(error_count)
-for pkg in server-core server-postgresql; do
+for pkg in "${SERVER_PKGS[@]}"; do
     # Check all .js files in dist (main + chunks)
     for js_file in "$PACKAGES_DIR/$pkg/dist/"*.js; do
         [ -f "$js_file" ] || continue
@@ -140,7 +149,7 @@ section "6. Native/binary modules not inlined"
 # ──────────────────────────────────────────────────────────────
 PREV=$(error_count)
 NATIVE_MODULES=("fsevents" "cpu-features" "bufferutil" "utf-8-validate")
-for pkg in server-core server-postgresql; do
+for pkg in "${SERVER_PKGS[@]}"; do
     for js_file in "$PACKAGES_DIR/$pkg/dist/index.es.js" "$PACKAGES_DIR/$pkg/dist/"index-*.js; do
         [ -f "$js_file" ] || continue
         fname="$(basename "$js_file")"
@@ -161,9 +170,9 @@ section "7. workspace: protocol resolution check"
 PREV=$(error_count)
 PACK_DIR=$(mktemp -d)
 # Check a subset of packages to keep the check fast
-for pkg in server-core cli; do
+for pkg in server cli; do
     pkg_dir="$PACKAGES_DIR/$pkg"
-    [ -d "$pkg_dir" ] || continue
+    [ -d "$pkg_dir" ] || { err "no packages/$pkg — this list is stale, and a workspace: leak would ship unnoticed"; continue; }
     pkg_name=$(node -e "console.log(require('$pkg_dir/package.json').name)" 2>/dev/null)
 
     pack_out=$( (cd "$pkg_dir" && pnpm pack --pack-destination "$PACK_DIR") 2>&1 ) || {

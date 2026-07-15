@@ -8,7 +8,7 @@ import {
     readBackupBytes
 } from "./backup-common";
 
-describe("server-core backup-common", () => {
+describe("server backup-common", () => {
     describe("parseBackupDestination", () => {
         it("parses s3 / gs URLs and local paths", () => {
             expect(parseBackupDestination("s3://bucket/nightly")).toEqual({ kind: "s3", bucket: "bucket", prefix: "nightly" });

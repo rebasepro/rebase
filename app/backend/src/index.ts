@@ -122,7 +122,7 @@ pass: env.SMTP_PASS! }
         history: true,
         csrf: isProduction
             ? { origin: allowedOrigins }
-            : undefined // dev defaults are applied by server-core
+            : undefined // dev defaults are applied by server
     });
 
     // ─── Health check ─────────────────────────────────────────────

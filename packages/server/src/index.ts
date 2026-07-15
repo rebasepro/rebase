@@ -44,7 +44,7 @@ export * from "./db/interfaces";
 // Auth — curated public surface (NOT `export *`).
 //
 // `./auth` (auth/index.ts) intentionally exports its internal plumbing so
-// server-core's own init/wiring can consume it: token generation & JWT config,
+// server's own init/wiring can consume it: token generation & JWT config,
 // password/token crypto, route mounters (`createAuthRoutes`, `mountMagicLink…`),
 // rate limiters, and the low-level middleware factories. None of that is a
 // backend-author API and none of it has external consumers, so it must not be
@@ -53,7 +53,7 @@ export * from "./db/interfaces";
 // guards, password helpers, auth hooks, and API-key types. Add here on purpose.
 // =============================================================================
 // Driver contract: repositories + auth data types (implemented by the
-// server-postgresql / server-mongodb drivers).
+// server-postgres / server-mongo drivers).
 export * from "./auth/interfaces";
 export {
     // Route guards for custom functions/routes
@@ -173,7 +173,7 @@ export { loadEnv } from "./env";
 export type { RebaseEnv } from "./env";
 
 // =============================================================================
-// Server-core specific types (subscription types)
+// Server-specific types (subscription types)
 // =============================================================================
 export * from "./types";
 

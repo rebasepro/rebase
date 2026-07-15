@@ -47,7 +47,7 @@ describe("defineCron", () => {
 describe("loadCronJobsFromDirectory (defineCron fixture)", () => {
     // Load from a committed fixtures directory (test/fixtures/crons) rather
     // than writing a temp file at runtime. The fixture is a CJS module (a
-    // nested package.json pins `"type": "commonjs"` inside server-core's ESM
+    // nested package.json pins `"type": "commonjs"` inside server's ESM
     // package) exporting the same shape defineCron() returns. Using a stable
     // on-disk fixture avoids the mkdtemp→write→native-import→rmSync lifecycle,
     // which raced under jest's parallel workers and intermittently yielded an

@@ -91,31 +91,33 @@ rebase/
 │   ├── backend/              # Hono backend server
 │   └── config/               # Application configuration
 │       └── collections/      # TypeScript collection files (one per collection)
-├── packages/
-│   ├── server-core/          # @rebasepro/server
-│   ├── server-postgresql/    # @rebasepro/server-postgres
-│   ├── server-mongodb/       # @rebasepro/server-mongo
-│   ├── core/                 # @rebasepro/app
-│   ├── types/                # @rebasepro/types
-│   ├── ui/                   # @rebasepro/ui
-│   ├── admin/                # @rebasepro/admin
-│   ├── studio/               # @rebasepro/studio
-│   ├── auth/                 # @rebasepro/app
-│   ├── cli/                  # @rebasepro/cli
-│   ├── client/               # @rebasepro/client
-│   ├── client-firebase/      # @rebasepro/firebase
-│   ├── client-postgresql/    # @rebasepro/client-postgres
-│   ├── common/               # @rebasepro/common
-│   ├── formex/               # @rebasepro/forms
-│   ├── mcp-server/           # @rebasepro/mcp
-│   ├── sdk-generator/        # @rebasepro/codegen
-│   ├── schema-inference/     # @rebasepro/inference
-│   ├── plugin-data-enhancement/ # @rebasepro/plugin-ai
-│   └── utils/                # @rebasepro/utils
+├── packages/                 # each directory is its package: `@rebasepro/<dir>`
+│   ├── types/                # shared kernel — isomorphic, no UI, no node
+│   ├── utils/
+│   ├── common/
+│   ├── client/               # the SDK
+│   ├── server/               # BaaS — Hono coordinator. Never imports a UI package
+│   ├── server-postgres/      # database driver
+│   ├── server-mongo/         # database driver
+│   ├── client-postgres/
+│   ├── cli/
+│   ├── codegen/
+│   ├── inference/
+│   ├── mcp/
+│   ├── ui/                   # CMS — React tier
+│   ├── forms/
+│   ├── app/                  # the runtime admin/studio/plugins register into
+│   ├── admin/
+│   ├── firebase/
+│   ├── studio/               # Full — BaaS console (admin is an optional peer)
+│   ├── plugin-ai/
+│   └── plugin-insights/
 ├── pnpm-workspace.yaml
-├── lerna.json
 └── package.json
 ```
+
+The tiers are adoption modes, not separate products — see `MODULAR-ARCHITECTURE.md`.
+A BaaS install is `server` + a driver + `client`, with no React in the tree.
 
 ## Package Reference
 
@@ -124,12 +126,11 @@ rebase/
 | `@rebasepro/server` | Hono server coordinator, API generation, auth middleware, storage, email, cron, custom functions | Backend entry point — every Rebase backend imports this |
 | `@rebasepro/server-postgres` | PostgreSQL bootstrapper and Drizzle ORM data driver | Backend setup when using PostgreSQL |
 | `@rebasepro/server-mongo` | MongoDB bootstrapper and data driver | Backend setup when using MongoDB |
-| `@rebasepro/app` | Core framework, types, hooks, and React components | Frontend — React integration, hooks, providers |
+| `@rebasepro/app` | The frontend runtime: hooks, providers, context, the auth controller (`useRebaseAuthController`) and `LoginView` | Frontend — React integration, hooks, providers, auth flows |
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, `CollectionConfig`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
-| `@rebasepro/admin` | CMS frontend application | The Studio admin panel frontend |
-| `@rebasepro/studio` | Admin panel, collection editor, visual schema editor | Studio-specific features and customization |
-| `@rebasepro/app` | Authentication module (client-side) | Frontend auth flows, login forms |
+| `@rebasepro/admin` | The CMS: `RebaseAdmin`, collection views, entity forms, collection editor — built from your collection definitions | The admin panel. Needs collection files |
+| `@rebasepro/studio` | The BaaS console: SQL editor, schema visualizer, RLS editor, storage browser, logs, API explorer, API keys, backups, cron | Database tooling. Ships on BaaS with no CMS — `admin` is an optional peer |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/firebase` | Firebase client adapter | When connecting to a Firebase backend |
 | `@rebasepro/client-postgres` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
@@ -139,6 +140,7 @@ rebase/
 | `@rebasepro/codegen` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
 | `@rebasepro/inference` | Auto-infer schema from data / database introspection | Used by `rebase schema introspect` |
 | `@rebasepro/plugin-ai` | AI-powered data autofill | Studio plugin for auto-completing fields |
+| `@rebasepro/plugin-insights` | Usage and data insights views | Plugin for analytics over your collections |
 | `@rebasepro/cli` | CLI tool | The `rebase` CLI binary |
 | `@rebasepro/utils` | Utility functions | Low-level shared helpers |
 
