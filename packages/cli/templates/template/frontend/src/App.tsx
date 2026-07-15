@@ -3,8 +3,7 @@ import React from "react";
 import "@fontsource/jetbrains-mono";
 import "@fontsource/rubik";
 
-import { useRebaseAuthController } from "@rebasepro/app";
-import { Rebase, RebaseAuth } from "@rebasepro/app";
+import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
 import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";

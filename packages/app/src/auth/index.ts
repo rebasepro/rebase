@@ -1,11 +1,12 @@
 /**
- * @rebasepro/app
+ * Authentication controller for Rebase frontends.
  *
- * React authentication controller for Rebase frontends.
- * Provides the `useRebaseAuthController` hook and API utilities
- * for communicating with a Rebase backend's JWT auth endpoints.
+ * Provides the `useRebaseAuthController` hook and API utilities for
+ * communicating with a Rebase backend's JWT auth endpoints.
  *
- * For the generic LoginView and RebaseAuth components, see @rebasepro/app.
+ * The generic LoginView and RebaseAuth components that render on top of this
+ * controller are in `../components`. Both are re-exported from the package
+ * root, which is where applications should import them from.
  */
 
 // Types
