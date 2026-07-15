@@ -82,13 +82,17 @@ function patternsFor(old) {
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "pnpm-store"]);
 // Changelogs record what shipped under the old names; the architecture doc
-// explains why `auth` is gone; the publish summary is a generated record.
+// explains why `auth` is gone; the publish summary is a generated record. The
+// two scripts below have to name the old packages to do their job — this one to
+// find them, the other to deprecate them on npm — so they are the exceptions
+// that make the rule enforceable.
 const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "pnpm-lock.yaml",
     "pnpm-publish-summary.json",
     "MODULAR-ARCHITECTURE.md",
-    "scripts/headless-guard/check-package-names.mjs"
+    "scripts/headless-guard/check-package-names.mjs",
+    "scripts/deprecate-old-packages.sh"
 ]);
 
 /**
