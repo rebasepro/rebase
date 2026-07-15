@@ -49,7 +49,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # tags: the canary version is derived from the last release
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -69,10 +69,35 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # ── Canary version ──────────────────────────────────────
+      # Derived from the last release tag, the same source the stable job reads,
+      # so the two cannot disagree about what shipped.
+      #
+      # The base is the NEXT patch, not the current release: semver orders a
+      # prerelease BELOW its own version, so 0.9.0-canary.abc would sort under
+      # 0.9.0 and `@canary` would resolve older than `@latest`. 0.9.1-canary.abc
+      # sorts above 0.9.0 and below a future 0.9.1, which is what a build of
+      # "main since 0.9.0" should mean. Ranges like ^0.9.0 still never select it
+      # — semver excludes prereleases unless the range names one.
       - name: Set canary version
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          CANARY_VERSION="0.0.1-canary.${SHORT_SHA}"
+
+          LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            # No release yet: 0.0.1-canary.x, which is what canary published
+            # before it tracked releases at all.
+            BASE="0.0.0"
+            echo "No release tag found — basing canary on $BASE"
+          else
+            BASE="${LATEST_TAG#v}"
+            echo "Last release: $LATEST_TAG"
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+          NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
+          CANARY_VERSION="${NEXT}-canary.${SHORT_SHA}"
+
           echo "CANARY_VERSION=$CANARY_VERSION" >> $GITHUB_ENV
           echo "Publishing canary version: $CANARY_VERSION"
 
