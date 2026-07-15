@@ -46,7 +46,7 @@ export * from "./DrawerNavigationGroup";
 export * from "./SideDialogs";
 
 export * from "./app/useApp";
-export * from "./RebaseCMS";
+export * from "./RebaseAdmin";
 export * from "./RebaseShell";
 
 // Composable shell layers — each independently usable

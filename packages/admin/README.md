@@ -20,7 +20,7 @@ pnpm add @rebasepro/admin
 
 | Export | Description |
 |---|---|
-| `RebaseCMS` | Top-level CMS component — wires routing, auth, and layout together |
+| `RebaseAdmin` | Top-level CMS component — wires routing, auth, and layout together |
 | `RebaseShell` | Outer shell (providers + chrome) without opinionated routing |
 | `RebaseAuthGate` | Auth-gated wrapper — shows login or the CMS based on session state |
 | `RebaseNavigation` | Renders the sidebar navigation from resolved collections/views |
@@ -116,11 +116,11 @@ import { RichTextEditor } from "@rebasepro/admin/editor";
 ## Quick Start
 
 ```tsx
-import { RebaseCMS } from "@rebasepro/admin";
+import { RebaseAdmin } from "@rebasepro/admin";
 
 function App() {
     return (
-        <RebaseCMS
+        <RebaseAdmin
             collections={[/* your collection configs */]}
             authController={authController}
             dataSource={dataSource}

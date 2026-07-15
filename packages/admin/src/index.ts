@@ -46,7 +46,7 @@ export {
     DrawerFooterActions,
     AdminModeSyncer,
     // ContentHomePage is lazy-loaded — not re-exported here
-    RebaseCMS,
+    RebaseAdmin,
     RebaseShell,
     RebaseAuthGate,
     RebaseNavigation,

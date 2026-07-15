@@ -99,7 +99,7 @@ The Studio ships 9 built-in dev tools, all **lazy-loaded** (code-split) so they 
 | `"api"` | `ApiExplorer` | API Explorer | API | `BookOpen` | Interactive API documentation with live request testing |
 | `"logs"` | `LogsExplorer` | Logs Explorer | Database | `Activity` | Real-time system, query, and authentication logs |
 
-> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseCMS>`. Do not try to register it manually.
+> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseAdmin>`. Do not try to register it manually.
 
 ### Enabling/Disabling Tools
 
@@ -143,12 +143,12 @@ import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
 
 ## Frontend Composition
 
-The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the `RebaseRegistry`. `<RebaseShell>` then reads the registry and builds the actual UI.
+The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseAdmin>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the `RebaseRegistry`. `<RebaseShell>` then reads the registry and builds the actual UI.
 
 ```tsx
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/app";
 import { Rebase } from "@rebasepro/app";
-import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
+import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
@@ -165,7 +165,7 @@ export function App() {
     return (
         <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={[dataEnhancementPlugin]}>
             <RebaseAuth/>
-            <RebaseCMS collections={collections} collectionEditor={true}/>
+            <RebaseAdmin collections={collections} collectionEditor={true}/>
             <RebaseStudio tools={undefined} homePage={undefined} />
             <RebaseShell title="My App"/>
         </Rebase>
@@ -189,7 +189,7 @@ Pass `tools={undefined} homePage={undefined}` explicitly:
 |-----------|---------|---------|-------------|
 | `<Rebase>` | `@rebasepro/app` | Root provider (client, auth, user management, plugins) | Yes (providers) |
 | `<RebaseAuth>` | `@rebasepro/app` | Authentication config (custom login view) | No — registers into registry |
-| `<RebaseCMS>` | `@rebasepro/admin` | CMS config (collections, views, editor) | No — registers into registry |
+| `<RebaseAdmin>` | `@rebasepro/admin` | CMS config (collections, views, editor) | No — registers into registry |
 | `<RebaseStudio>` | `@rebasepro/studio` | Studio config (tools, home page) | No — registers into registry |
 | `<RebaseShell>` | `@rebasepro/admin` | App shell (drawer, navigation, routes, layout) | Yes — the actual UI |
 
@@ -251,12 +251,12 @@ These components can be overridden globally on `<Rebase>` (which acts as a fallb
 - `"Entity.Preview"` — Reference / relation preview chip.
 - `"Entity.MissingReference"` — Placeholder view when a relation references a deleted/non-existent entity.
 
-## RebaseCMS Configuration
+## RebaseAdmin Configuration
 
-`<RebaseCMS>` accepts the full `RebaseCMSConfig`:
+`<RebaseAdmin>` accepts the full `RebaseAdminConfig`:
 
 ```typescript
-interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig> {
+interface RebaseAdminConfig<EC extends CollectionConfig = CollectionConfig> {
     collections?: EC[] | CollectionConfigsBuilder<EC>;
     views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
@@ -296,7 +296,7 @@ interface NavigationGroupMapping {
 }
 
 // Usage
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     navigationGroupMappings={[
         { name: "Content", entries: ["posts", "pages", "media"] },
@@ -396,7 +396,7 @@ Use `<RebaseAuth>` with the `loginView` prop to replace the default login UI:
 ```tsx
 <Rebase client={rebaseClient} authController={authController}>
     <RebaseAuth loginView={<MyCustomLoginPage />} />
-    <RebaseCMS collections={collections} />
+    <RebaseAdmin collections={collections} />
     <RebaseStudio />
     <RebaseShell title="My App" />
 </Rebase>
@@ -422,11 +422,11 @@ interface AppView {
 }
 ```
 
-Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They can also be contributed by plugins via `plugin.views`.
+Custom top-level views are added through the `views` prop on `<RebaseAdmin>`. They can also be contributed by plugins via `plugin.views`.
 
 ```tsx
 // Static array
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     views={[
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
@@ -435,7 +435,7 @@ Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They
 />
 
 // Builder function (role-aware, async-capable)
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     views={({ user, authController, data }) => [
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
@@ -721,10 +721,10 @@ Under the hood, it uses **AST manipulation** (via `ts-morph`) to modify the Type
 
 ```tsx
 // Simple — uses authController.getAuthToken automatically
-<RebaseCMS collections={collections} collectionEditor={true} />
+<RebaseAdmin collections={collections} collectionEditor={true} />
 
 // With options
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     collectionEditor={{
         getAuthToken: authController.getAuthToken,
@@ -759,7 +759,7 @@ This starts both frontend and backend. The Studio is accessible at `http://local
 |---------|-------------|
 | `@rebasepro/app` | Core framework, hooks, types, `<Rebase>` provider |
 | `@rebasepro/studio` | Studio admin panel (`<RebaseStudio>`, `StudioHomePage`, bridge hooks) |
-| `@rebasepro/admin` | CMS frontend (`<RebaseCMS>`, `<RebaseShell>`, `CollectionPanel`, collection editor) |
+| `@rebasepro/admin` | CMS frontend (`<RebaseAdmin>`, `<RebaseShell>`, `CollectionPanel`, collection editor) |
 | `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
 | `@rebasepro/types` | Shared TypeScript types |
 | `@rebasepro/plugin-ai` | AI-powered autofill |

@@ -5,7 +5,7 @@ import "@fontsource/rubik";
 
 import { useRebaseAuthController } from "@rebasepro/app";
 import { Rebase, RebaseAuth } from "@rebasepro/app";
-import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
+import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
@@ -35,7 +35,7 @@ export function App() {
                 authController={authController}
             >
                 <RebaseAuth />
-                <RebaseCMS
+                <RebaseAdmin
                     collections={collections}
                 />
                 <RebaseStudio/>

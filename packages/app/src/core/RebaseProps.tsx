@@ -109,7 +109,7 @@ export interface EffectiveRoleController {
 export type RebaseProps<USER extends User> = {
 
     /**
-     * The root components of your application. Use RebaseCMS, RebaseStudio, and RebaseShell.
+     * The root components of your application. Use RebaseAdmin, RebaseStudio, and RebaseShell.
      * Alternatively, pass a render function that receives { context, loading }.
      */
     children: React.ReactNode | ((props: { context: RebaseContext; loading: boolean }) => React.ReactNode);

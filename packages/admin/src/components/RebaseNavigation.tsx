@@ -220,7 +220,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 
     // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
     // The <Rebase> component builds the customizationController from its own props,
-    // but entity views passed to <RebaseCMS> are stored in the registry and not
+    // but entity views passed to <RebaseAdmin> are stored in the registry and not
     // automatically merged. We re-provide an enriched controller here so that
     // downstream consumers (EditViewBinding, side panels, etc.) can resolve
     // string-keyed entity views like "blog_preview".

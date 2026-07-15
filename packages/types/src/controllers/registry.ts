@@ -7,7 +7,7 @@ import type { AppView, NavigationGroupMapping } from "./navigation";
 
 /**
  * Options to enable the built-in collection editor.
- * When provided to `<RebaseCMS>`, the editor is auto-wired as a native feature.
+ * When provided to `<RebaseAdmin>`, the editor is auto-wired as a native feature.
  */
 export interface CollectionEditorOptions {
     /**
@@ -21,7 +21,7 @@ export interface CollectionEditorOptions {
     pathSuggestions?: string[];
 }
 
-export interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig> {
+export interface RebaseAdminConfig<EC extends CollectionConfig = CollectionConfig> {
     collections?: EC[] | CollectionConfigsBuilder<EC>;
 
     /**
@@ -79,12 +79,12 @@ export interface RebaseAuthConfig {
 
 export interface RebaseRegistryController {
     // Current state
-    cmsConfig: RebaseCMSConfig | null;
+    cmsConfig: RebaseAdminConfig | null;
     studioConfig: RebaseStudioConfig | null;
     authConfig: RebaseAuthConfig | null;
 
     // Registration functions
-    registerCMS: (config: RebaseCMSConfig) => void;
+    registerCMS: (config: RebaseAdminConfig) => void;
     unregisterCMS: () => void;
 
     registerStudio: (config: RebaseStudioConfig) => void;

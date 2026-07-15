@@ -17,7 +17,7 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 | Navigate to a collection view | `useUrlController()` | `@rebasepro/admin` |
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/admin` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/admin` |
-| Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/admin` |
+| Add custom top-level views | `<RebaseAdmin views={[...]}>` | `@rebasepro/admin` |
 | Open a entity selection dialog | `useSelectionDialog()` | `@rebasepro/admin` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/admin` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/admin` |
@@ -642,7 +642,7 @@ function CreateButton() {
 
 ## 10. Custom Top-Level Views
 
-Add custom pages to the main CMS navigation using the `views` prop on `<RebaseCMS>`. Views appear alongside collections in the sidebar and home page.
+Add custom pages to the main CMS navigation using the `views` prop on `<RebaseAdmin>`. Views appear alongside collections in the sidebar and home page.
 
 ### AppView Interface
 
@@ -663,7 +663,7 @@ interface AppView {
 ### Static Views
 
 ```tsx
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     views={[
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
@@ -678,7 +678,7 @@ interface AppView {
 Pass a function instead of an array to dynamically resolve views based on the current user:
 
 ```tsx
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     views={({ user, authController, data }) => [
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
@@ -703,7 +703,7 @@ const myPlugin: RebasePlugin = {
     ]
 };
 
-<RebaseCMS plugins={[myPlugin]} />
+<RebaseAdmin plugins={[myPlugin]} />
 ```
 
 All views (CMS, builder, plugin) are merged in order: **CMS views → Studio dev views → Plugin views**.
@@ -730,7 +730,7 @@ The `roles` field provides declarative access control. When set, the view is exc
 Views participate in the same navigation group system as collections. Use the `group` property on the view, or control grouping centrally via `navigationGroupMappings`:
 
 ```tsx
-<RebaseCMS
+<RebaseAdmin
     collections={collections}
     views={[
         { slug: "dashboard", name: "Dashboard", view: <Dashboard />, group: "Analytics" },
@@ -751,7 +751,7 @@ The admin package exports the following components (from `@rebasepro/admin`):
 
 | Component | Description |
 |-----------|-------------|
-| `RebaseCMS` | Declarative CMS config (collections, views, editor) — renders nothing |
+| `RebaseAdmin` | Declarative CMS config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages |
 | `DataCollectionView` | The collection view component |

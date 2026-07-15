@@ -33,7 +33,7 @@ The frontend uses a declarative composition pattern:
 ```tsx
 <Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={plugins}>
     <RebaseAuth/>
-    <RebaseCMS collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
+    <RebaseAdmin collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
     <RebaseStudio/>
     <RebaseShell title="Rebase"/>
 </Rebase>
@@ -42,7 +42,7 @@ The frontend uses a declarative composition pattern:
 Key components:
 - `<Rebase>` — Root provider (client, auth, user management, plugins)
 - `<RebaseAuth/>` — Authentication UI (login/register screens)
-- `<RebaseCMS>` — CMS frontend (collections, entity views, collection editor)
+- `<RebaseAdmin>` — CMS frontend (collections, entity views, collection editor)
 - `<RebaseStudio/>` — Admin panel (visual schema editor, settings)
 - `<RebaseShell>` — App shell (drawer, navigation, title)
 

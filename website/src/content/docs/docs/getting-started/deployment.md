@@ -125,10 +125,10 @@ it so URL⇄collection resolution accounts for the prefix — otherwise views ha
 spinner with no data fetch:
 
 ```tsx
-<RebaseCMS collections={collections} basePath="/admin" />
+<RebaseAdmin collections={collections} basePath="/admin" />
 ```
 
-Set **either** the router `basename` **or** `RebaseCMS basePath` — not both, or the
+Set **either** the router `basename` **or** `RebaseAdmin basePath` — not both, or the
 prefix is applied twice.
 :::
 

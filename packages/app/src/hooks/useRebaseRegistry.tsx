@@ -1,18 +1,18 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
-import type { RebaseRegistryController, RebaseCMSConfig, RebaseStudioConfig, RebaseAuthConfig } from "@rebasepro/types";
+import type { RebaseRegistryController, RebaseAdminConfig, RebaseStudioConfig, RebaseAuthConfig } from "@rebasepro/types";
 
 /**
  * Split into two contexts to prevent infinite re-render loops:
  * - DispatchContext: stable register/unregister functions (never changes identity)
  * - StateContext: the current config values (changes when modules register)
  *
- * Feature components (RebaseAuth, RebaseCMS, RebaseStudio) only consume
+ * Feature components (RebaseAuth, RebaseAdmin, RebaseStudio) only consume
  * the dispatch context, so registering does NOT cause them to re-render.
  * RebaseShell consumes state context to read the collected configs.
  */
 
 interface RegistryDispatch {
-    registerCMS: (config: RebaseCMSConfig) => void;
+    registerCMS: (config: RebaseAdminConfig) => void;
     unregisterCMS: () => void;
     registerStudio: (config: RebaseStudioConfig) => void;
     unregisterStudio: () => void;
@@ -21,7 +21,7 @@ interface RegistryDispatch {
 }
 
 interface RegistryState {
-    cmsConfig: RebaseCMSConfig | null;
+    cmsConfig: RebaseAdminConfig | null;
     studioConfig: RebaseStudioConfig | null;
     authConfig: RebaseAuthConfig | null;
 }
@@ -34,13 +34,13 @@ const RegistryStateContext = createContext<RegistryState>({
 });
 
 export function RebaseRegistryProvider({ children }: { children: React.ReactNode }) {
-    const [cmsConfig, setCmsConfig] = useState<RebaseCMSConfig | null>(null);
+    const [cmsConfig, setCmsConfig] = useState<RebaseAdminConfig | null>(null);
     const [studioConfig, setStudioConfig] = useState<RebaseStudioConfig | null>(null);
     const [authConfig, setAuthConfig] = useState<RebaseAuthConfig | null>(null);
 
     // Dispatch functions are stable — never change identity
     const dispatch = useMemo<RegistryDispatch>(() => ({
-        registerCMS: (config: RebaseCMSConfig) => setCmsConfig(config),
+        registerCMS: (config: RebaseAdminConfig) => setCmsConfig(config),
         unregisterCMS: () => setCmsConfig(null),
         registerStudio: (config: RebaseStudioConfig) => setStudioConfig(config),
         unregisterStudio: () => setStudioConfig(null),
@@ -79,7 +79,7 @@ export function useRebaseRegistry(): RebaseRegistryController {
 
 /**
  * Returns only the stable dispatch functions.
- * Use this in feature components (RebaseAuth, RebaseCMS, RebaseStudio)
+ * Use this in feature components (RebaseAuth, RebaseAdmin, RebaseStudio)
  * to avoid re-render loops.
  */
 export function useRebaseRegistryDispatch(): RegistryDispatch {

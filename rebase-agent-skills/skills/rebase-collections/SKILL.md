@@ -1147,7 +1147,7 @@ The `onClick` and `isEnabled` handlers receive:
 Collections support `entityViews` — custom React components that appear as **tabs** in the entity detail view. Use these for previews, analytics, related items, or any custom UI per entity.
 
 Entity views can be registered:
-1. **Globally** in the `<RebaseCMS>` component via the `entityViews` prop
+1. **Globally** in the `<RebaseAdmin>` component via the `entityViews` prop
 2. **Per-collection** by referencing view keys in the collection's `entityViews` array
 
 ```typescript
@@ -1161,7 +1161,7 @@ const entityViews = [
     }
 ];
 
-<RebaseCMS collections={collections} entityViews={entityViews}/>
+<RebaseAdmin collections={collections} entityViews={entityViews}/>
 
 // Per-collection reference in collection definition
 const postsCollection: PostgresCollectionConfig = {

@@ -8,7 +8,7 @@ declare function gtag(...args: unknown[]): void;
 
 import { useRebaseAuthController } from "@rebasepro/app";
 import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/app";
-import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
+import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
 import type { RebasePlugin } from "@rebasepro/types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { useAppInsightsPlugin } from "./useAppInsightsPlugin";
@@ -80,7 +80,7 @@ export function App() {
             onAnalyticsEvent={onAnalyticsEvent}
         >
             <RebaseAuth loginView={<DemoLoginView authController={authController} googleClientId={GOOGLE_CLIENT_ID}/>}/>
-            <RebaseCMS
+            <RebaseAdmin
                 collections={collections}
                 collectionEditor={collectionEditor}
                 entityViews={entityViews}

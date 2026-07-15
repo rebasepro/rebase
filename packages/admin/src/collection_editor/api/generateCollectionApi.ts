@@ -75,7 +75,7 @@ export interface BuildCollectionGenerationCallbackProps {
  *
  * @example
  * ```tsx
- * import { RebaseCMS } from "@rebasepro/admin";
+ * import { RebaseAdmin } from "@rebasepro/admin";
  * import { buildCollectionGenerationCallback } from "@rebasepro/admin/collection_editor";
  * import { useFirebaseAuthController } from "@rebasepro/firebase";
  *
@@ -83,7 +83,7 @@ export interface BuildCollectionGenerationCallbackProps {
  *
  * export function App() {
  *     return (
- *         <RebaseCMS
+ *         <RebaseAdmin
  *             collectionEditor={{
  *                 generateCollection: buildCollectionGenerationCallback({
  *                     getAuthToken: authController.getAuthToken

@@ -64,7 +64,7 @@ export function ContentHomePage({
     } = navigationStateController.topLevelNavigation || {};
 
     // Build a set of Studio-only dev view slugs so we can distinguish them from
-    // CMS custom views added via <RebaseCMS views={...}> or plugins.
+    // CMS custom views added via <RebaseAdmin views={...}> or plugins.
     const studioViewSlugs = useMemo(() => {
         const slugs = new Set<string>();
         (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
