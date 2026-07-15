@@ -6,7 +6,7 @@ import type { AnalyticsEvent } from "@rebasepro/types";
 // Global gtag function injected by the GA4 script in index.html
 declare function gtag(...args: unknown[]): void;
 
-import { useRebaseAuthController } from "@rebasepro/auth";
+import { useRebaseAuthController } from "@rebasepro/app";
 import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import type { RebasePlugin } from "@rebasepro/types";

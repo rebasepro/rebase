@@ -1,5 +1,6 @@
 export * from "./core";
 export * from "./hooks";
+export * from "./auth";
 export * from "./components";
 export * from "./util";
 export * from "./contexts";

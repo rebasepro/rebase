@@ -1,5 +1,5 @@
 /**
- * @rebasepro/auth
+ * @rebasepro/app
  *
  * React authentication controller for Rebase frontends.
  * Provides the `useRebaseAuthController` hook and API utilities
@@ -19,7 +19,7 @@ export type {
     RefreshResponse
 } from "./types";
 
-export { useRebaseAuthController } from "./hooks/useRebaseAuthController";
+export { useRebaseAuthController } from "./useRebaseAuthController";
 // API utilities
 export { fetchAuthConfig, clearAuthConfigCache, createAuthConfigCache, AuthApiError } from "./api";
 export type { AuthConfigResponse, AuthConfigCache } from "./api";

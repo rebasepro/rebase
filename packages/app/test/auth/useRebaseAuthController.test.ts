@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
-import { useRebaseAuthController } from "../../src/hooks/useRebaseAuthController";
-import type { ClientAuth } from "../../src/types";
+import { useRebaseAuthController } from "../../src/auth/useRebaseAuthController";
+import type { ClientAuth } from "../../src/auth/types";
 
 /**
  * Creates a fully-mocked ClientAuth that satisfies the structural interface.

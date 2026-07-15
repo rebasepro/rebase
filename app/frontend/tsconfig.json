@@ -24,8 +24,8 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@rebasepro/auth": [
-        "../../packages/auth/src"
+      "@rebasepro/app": [
+        "../../packages/app/src"
       ],
       "@rebasepro/app": [
         "../../packages/app/src"

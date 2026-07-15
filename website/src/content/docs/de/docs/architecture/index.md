@@ -78,7 +78,7 @@ Wie Treiber werden auch Speicher-Backends in einer Registrierung erfasst. Sie k�
 | `@rebasepro/client` | Client-SDK — HTTP-Transport, WebSocket, Auth | Frontend |
 | `@rebasepro/app` | React-Framework — Scaffold, Controller, Formulare, Routen, Hooks | Frontend |
 | `@rebasepro/ui` | Eigenständige UI-Komponentenbibliothek (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/auth` | Login-Ansichten, Auth-Controller-Hooks, Benutzerverwaltung | Frontend |
+| `@rebasepro/app` | Login-Ansichten, Auth-Controller-Hooks, Benutzerverwaltung | Frontend |
 | `@rebasepro/studio` | Sammlungseditor, SQL-Konsole, JS-Konsole, RLS-Editor, Speicherbrowser | Frontend |
 | `@rebasepro/cli` | CLI für Schema-Generierung, DB-Migrationen, SDK-Generierung | Entwicklertools |
 | `@rebasepro/forms` | Leichtes React-Formularstatusmanagement | Frontend |

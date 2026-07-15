@@ -1,4 +1,4 @@
-import * as authApi from "../src/api";
+import * as authApi from "../../src/auth/api";
 import { RebaseApiError } from "@rebasepro/types";
 
 const API_URL = "https://api.test.rebase.pro";

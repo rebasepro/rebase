@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "dependencies": {
-        "@rebasepro/auth": "workspace:*",
+        "@rebasepro/app": "workspace:*",
         "@rebasepro/app": "workspace:*",
         "@rebasepro/plugin-data-enhancement": "workspace:*",
         "@rebasepro/client": "workspace:*",

@@ -78,7 +78,7 @@ Pour les **déploiements multi-instances** (par exemple, Cloud Run avec plusieur
 | `@rebasepro/client` | SDK client — Transport HTTP, WebSocket, authentification | Frontend |
 | `@rebasepro/app` | Framework React — Générateur, contrôleurs, formulaires, routes, hooks | Frontend |
 | `@rebasepro/ui` | Bibliothèque de composants UI autonome (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/auth` | Vues de connexion, hooks du contrôleur d'authentification, gestion des utilisateurs | Frontend |
+| `@rebasepro/app` | Vues de connexion, hooks du contrôleur d'authentification, gestion des utilisateurs | Frontend |
 | `@rebasepro/studio` | Éditeur de collection, console SQL, console JS, éditeur RLS, navigateur de stockage | Frontend |
 | `@rebasepro/cli` | CLI pour la génération de schéma, les migrations de DB, la génération de SDK | Outils de développement |
 | `@rebasepro/forms` | Gestion légère de l'état des formulaires React | Frontend |

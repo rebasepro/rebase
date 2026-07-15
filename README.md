@@ -235,7 +235,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/server` | Server framework and middleware (Hono) |
 | `@rebasepro/server-postgres` | PostgreSQL server adapter with Drizzle |
 | `@rebasepro/server-mongo` | MongoDB server adapter |
-| `@rebasepro/auth` | Authentication controllers and login views |
+| `@rebasepro/app` | Authentication controllers and login views |
 | `@rebasepro/admin` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, RLS editor, schema visualizer, API explorer |
 | `@rebasepro/cli` | CLI for project scaffolding and management |

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { LoginView } from "@rebasepro/app";
 import { Checkbox, cls, Typography } from "@rebasepro/ui";
-import type { RebaseAuthController } from "@rebasepro/auth";
+import type { RebaseAuthController } from "@rebasepro/app";
 
 const DEMO_EMAIL = "demo@rebase.pro";
 const DEMO_PASSWORD = "DemoRebase2026!";

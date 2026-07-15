@@ -161,4 +161,4 @@ const unsubscribe = client.data.products.listen(
 - [`@rebasepro/common`](../common) — `QueryBuilder`, `buildRebaseData`, shared utilities
 - [`@rebasepro/types`](../types) — `Snapshot`, `FindResponse`, `CollectionAccessor`, etc.
 - [`@rebasepro/utils`](../utils) — `toSnakeCase` and other helpers
-- [`@rebasepro/auth`](../auth) — React hook adapter that wraps `client.auth` for CMS integration
+- [`@rebasepro/app`](../auth) — React hook adapter that wraps `client.auth` for CMS integration

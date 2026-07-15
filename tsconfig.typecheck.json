@@ -36,11 +36,11 @@
       "@rebasepro/admin/*": [
         "packages/admin/src/*"
       ],
-      "@rebasepro/auth": [
-        "packages/auth/src"
+      "@rebasepro/app": [
+        "packages/app/src"
       ],
-      "@rebasepro/auth/*": [
-        "packages/auth/src/*"
+      "@rebasepro/app/*": [
+        "packages/app/src/*"
       ],
       "@rebasepro/cli": [
         "packages/cli/src"
@@ -168,7 +168,7 @@
   },
   "include": [
     "packages/admin/src",
-    "packages/auth/src",
+    "packages/app/src",
     "packages/cli/src",
     "packages/client/src",
     "packages/client-firebase/src",

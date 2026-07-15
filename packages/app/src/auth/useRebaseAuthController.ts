@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
-import type { AuthConfigResponse } from "../api";
-import { RebaseAuthController, RebaseAuthControllerProps } from "../types";
+import type { AuthConfigResponse } from "./api";
+import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
 
 /**
  * Auth controller hook for JWT-based authentication.

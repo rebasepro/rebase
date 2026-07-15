@@ -104,7 +104,7 @@ template: "raw-data" })
             "@rebasepro/plugin-data-enhancement": path.resolve(__dirname, "../../packages/plugin-data-enhancement/src"),
             "@rebasepro/plugin-insights": path.resolve(__dirname, "../../packages/plugin-insights/src"),
             "@rebasepro/inference": path.resolve(__dirname, "../../packages/inference/src"),
-            "@rebasepro/auth": path.resolve(__dirname, "../../packages/auth/src"),
+            "@rebasepro/app": path.resolve(__dirname, "../../packages/app/src"),
             "@rebasepro/admin": path.resolve(__dirname, "../../packages/admin/src"),
             "@rebasepro/studio": path.resolve(__dirname, "../../packages/studio/src"),
             "config": path.resolve(__dirname, "../config")

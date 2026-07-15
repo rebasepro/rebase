@@ -100,7 +100,7 @@ rebase/
 │   ├── ui/                   # @rebasepro/ui
 │   ├── admin/                # @rebasepro/admin
 │   ├── studio/               # @rebasepro/studio
-│   ├── auth/                 # @rebasepro/auth
+│   ├── auth/                 # @rebasepro/app
 │   ├── cli/                  # @rebasepro/cli
 │   ├── client/               # @rebasepro/client
 │   ├── client-firebase/      # @rebasepro/client-firebase
@@ -129,7 +129,7 @@ rebase/
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
 | `@rebasepro/admin` | CMS frontend application | The Studio admin panel frontend |
 | `@rebasepro/studio` | Admin panel, collection editor, visual schema editor | Studio-specific features and customization |
-| `@rebasepro/auth` | Authentication module (client-side) | Frontend auth flows, login forms |
+| `@rebasepro/app` | Authentication module (client-side) | Frontend auth flows, login forms |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/client-firebase` | Firebase client adapter | When connecting to a Firebase backend |
 | `@rebasepro/client-postgres` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |

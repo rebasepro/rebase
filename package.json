@@ -17,7 +17,7 @@
     "packages/app",
     "packages/client",
     "packages/server",
-    "packages/auth",
+    "packages/app",
     "packages/cli",
     "packages/studio",
     "packages/admin",

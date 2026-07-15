@@ -74,7 +74,7 @@ As tabelas de autenticação (`rebase.users`, `rebase.roles`, `rebase.user_roles
 ### Controlador de Autenticação
 
 ```typescript
-import { useRebaseAuthController } from "@rebasepro/auth";
+import { useRebaseAuthController } from "@rebasepro/app";
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: API_URL, websocketUrl: WS_URL });
@@ -94,7 +94,7 @@ authController.getAuthToken() // Obter JWT atual para chamadas de API
 ### Visualização de Login
 
 ```tsx
-import { RebaseLoginView } from "@rebasepro/auth";
+import { RebaseLoginView } from "@rebasepro/app";
 
 if (!authController.user) {
     return (
@@ -129,7 +129,7 @@ Rebase fornece visualizações integradas para gerenciar usuários e funções:
 
 ```tsx
 import { UsersView, RolesView } from "@rebasepro/app";
-import { useBackendUserManagement } from "@rebasepro/auth";
+import { useBackendUserManagement } from "@rebasepro/app";
 
 const userManagement = useBackendUserManagement({
     client: rebaseClient,

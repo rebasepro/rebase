@@ -19,7 +19,7 @@ Rebase provides ready-to-use React components and hooks for authentication:
 The `useRebaseAuthController` hook is the core of frontend authentication. It manages the current user, tokens, and session:
 
 ```typescript
-import { useRebaseAuthController } from "@rebasepro/auth";
+import { useRebaseAuthController } from "@rebasepro/app";
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: API_URL, websocketUrl: WS_URL });
@@ -43,7 +43,7 @@ Pass the `authController` to the Rebase navigation controller to gate the entire
 The `RebaseLoginView` component provides a complete login and registration form:
 
 ```tsx
-import { RebaseLoginView } from "@rebasepro/auth";
+import { RebaseLoginView } from "@rebasepro/app";
 
 if (!authController.user) {
     return (
@@ -69,7 +69,7 @@ The login view handles:
 This hook connects to the backend user management API:
 
 ```tsx
-import { useBackendUserManagement } from "@rebasepro/auth";
+import { useBackendUserManagement } from "@rebasepro/app";
 
 const userManagement = useBackendUserManagement({
     client: rebaseClient,

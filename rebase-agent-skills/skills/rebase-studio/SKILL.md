@@ -146,7 +146,7 @@ import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
 The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the `RebaseRegistry`. `<RebaseShell>` then reads the registry and builds the actual UI.
 
 ```tsx
-import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/auth";
+import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/app";
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";

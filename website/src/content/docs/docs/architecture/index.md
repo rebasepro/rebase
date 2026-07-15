@@ -78,7 +78,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/client` | Client SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/auth` | Login views, auth controller hooks, user management | Frontend |
+| `@rebasepro/app` | Login views, auth controller hooks, user management | Frontend |
 | `@rebasepro/studio` | Collection editor, SQL console, JS console, RLS editor, storage browser | Frontend |
 | `@rebasepro/cli` | CLI for schema generation, DB migrations, SDK generation | Dev tooling |
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |

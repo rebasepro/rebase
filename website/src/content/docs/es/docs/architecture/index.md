@@ -78,7 +78,7 @@ Al igual que los controladores, los backends de almacenamiento se registran en u
 | `@rebasepro/client` | SDK del cliente — Transporte HTTP, WebSocket, autenticación | Frontend |
 | `@rebasepro/app` | Framework React — Scaffold, controladores, formularios, rutas, hooks | Frontend |
 | `@rebasepro/ui` | Librería de componentes de UI autónoma (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/auth` | Vistas de inicio de sesión, hooks del controlador de autenticación, gestión de usuarios | Frontend |
+| `@rebasepro/app` | Vistas de inicio de sesión, hooks del controlador de autenticación, gestión de usuarios | Frontend |
 | `@rebasepro/studio` | Editor de colecciones, consola SQL, consola JS, editor RLS, navegador de almacenamiento | Frontend |
 | `@rebasepro/cli` | CLI para generación de esquemas, migraciones de DB, generación de SDK | Herramientas de desarrollo |
 | `@rebasepro/forms` | Gestión ligera del estado de formularios de React | Frontend |

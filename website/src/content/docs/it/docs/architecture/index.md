@@ -78,7 +78,7 @@ Come i driver, i backend di storage sono registrati in un registro. Puoi avere p
 | `@rebasepro/client` | SDK client — Trasporto HTTP, WebSocket, autenticazione | Frontend |
 | `@rebasepro/app` | Framework React — Scaffold, controller, moduli, routing, hook | Frontend |
 | `@rebasepro/ui` | Libreria di componenti UI standalone (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/auth` | Viste di login, hook del controller di autenticazione, gestione utenti | Frontend |
+| `@rebasepro/app` | Viste di login, hook del controller di autenticazione, gestione utenti | Frontend |
 | `@rebasepro/studio` | Editor di collezioni, console SQL, console JS, editor RLS, browser di storage | Frontend |
 | `@rebasepro/cli` | CLI per generazione schema, migrazioni DB, generazione SDK | Strumenti di sviluppo |
 | `@rebasepro/forms` | Gestione dello stato dei form React leggera | Frontend |

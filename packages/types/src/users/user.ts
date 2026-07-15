@@ -3,7 +3,7 @@
  * The canonical representation of an authenticated user in the Rebase ecosystem.
  *
  * Used by {@link AuthController}, collections, callbacks, and both the
- * `@rebasepro/client` and `@rebasepro/auth` packages. All other user types
+ * `@rebasepro/client` and `@rebasepro/app` packages. All other user types
  * (`RebaseUser`, `UserInfo`) are deprecated aliases of this type.
  *
  * **Backend-managed fields** (`uid`, `email`, `roles`, `metadata`, `createdAt`)
