@@ -13,7 +13,6 @@ import {
     cleanupDevPortFile,
     logger
 } from "@rebasepro/server";
-import type { SecurityRule } from "@rebasepro/types";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env.js";
 
@@ -58,19 +57,16 @@ async function startServer() {
     const PORT = env.PORT;
     const server = createServer(getRequestListener(app.fetch));
 
-    // Default security rules for tables that define none of their own.
-    // Authenticated users can read all rows; only admins can write.
-    const defaultSecurityRules: SecurityRule[] = [
-        { operation: "select",
-access: "public" },
-        { operations: ["insert", "update", "delete"],
-roles: ["admin"] }
-    ];
-
     const backend = await initializeRebaseBackend({
-        // BaaS mode: every table in the database is served over REST. There
-        // are no collection files to write or keep in sync — change the
-        // schema with a migration and the API follows.
+        // BaaS mode: every RLS-protected table is served over REST. There are
+        // no collection files to write or keep in sync — change the schema with
+        // a migration and the API follows.
+        //
+        // Your database's own row-level security is the whole authorization
+        // model here: requests run as the `rebase_user` role, so a table
+        // without RLS has no rules at all and is not served. Protect one with:
+        //   ALTER TABLE mytable ENABLE ROW LEVEL SECURITY;
+        //   CREATE POLICY mytable_read ON mytable FOR SELECT TO public USING (true);
         mode: "baas",
         functionsDir: path.resolve(__dirname, "../functions"),
         server,
@@ -125,8 +121,7 @@ pass: env.SMTP_PASS! }
                 basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
             },
         history: true,
-        enableSwagger: true,
-        defaultSecurityRules
+        enableSwagger: true
     });
 
     // ─── Health check ─────────────────────────────────────────────

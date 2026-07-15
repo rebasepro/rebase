@@ -1,3 +1,4 @@
+import type { SecurityRule } from "@rebasepro/types";
 import authorsCollection from "./authors";
 import postsCollection from "./posts";
 import tagsCollection from "./tags";
@@ -22,4 +23,18 @@ export const collections = [
     productLocalesCollection,
     exercisesCollection,
     usersCollection
+];
+
+/**
+ * Applied to any collection here that declares no `securityRules` of its own:
+ * anyone can read, only admins can write.
+ *
+ * Declared beside the collections because `rebase db push` generates the
+ * Postgres policies from these files — that is what enforces access.
+ */
+export const defaultSecurityRules: SecurityRule[] = [
+    { operation: "select",
+access: "public" },
+    { operations: ["insert", "update", "delete"],
+roles: ["admin"] }
 ];

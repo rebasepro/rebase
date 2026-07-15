@@ -1,50 +1,131 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, SecurityRule, isPostgresCollectionConfig } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import { logger } from "../utils/logger";
 
 /**
- * Asynchronously load collection files from a directory for backend initialization
+ * The one definition of "the collections".
+ *
+ * Four copies of this scan used to exist — the runtime, the drizzle-schema
+ * generator, the policy generator and the doctor — each deciding for itself
+ * which files counted. They agreed only by discipline, and any drift between
+ * them would silently serve one set of collections while pushing policies for
+ * another. Everything that needs to know what the collections are calls this.
  */
-export async function loadCollectionsFromDirectory(directory: string): Promise<CollectionConfig[]> {
-    const collections: CollectionConfig[] = [];
-    try {
-        if (!fs.existsSync(directory)) {
-            logger.warn(`[loadCollectionsFromDirectory] Collections directory not found: ${directory}`);
-            return collections;
+
+/** Read from a directory's `index` module, or from a single-file source. */
+export interface CollectionDefaults {
+    /**
+     * Applied to every collection that declares no `securityRules` of its own.
+     *
+     * This lives with the collections rather than in the server config because
+     * `db push` generates the actual Postgres policies from these files and
+     * never sees the running server — a default declared on the server could
+     * never reach the database, and would look like an authorization setting
+     * while enforcing nothing.
+     */
+    defaultSecurityRules?: SecurityRule[];
+}
+
+function isCollectionFile(file: string): boolean {
+    return (file.endsWith(".ts") || file.endsWith(".js")) &&
+        !file.includes(".test.") &&
+        !file.endsWith(".d.ts") &&
+        // index is the directory's own module: defaults live there, not a collection.
+        file !== "index.ts" && file !== "index.js";
+}
+
+async function importModule(filePath: string): Promise<Record<string, unknown>> {
+    // Plain import() so tsx/loader hooks resolve .ts and workspace specifiers.
+    return await import(pathToFileURL(filePath).href);
+}
+
+/** Read `defaultSecurityRules` from a collections directory's index module. */
+async function readDefaults(directory: string): Promise<CollectionDefaults> {
+    for (const name of ["index.ts", "index.js"]) {
+        const indexPath = path.join(directory, name);
+        if (!fs.existsSync(indexPath)) continue;
+        try {
+            const mod = await importModule(indexPath);
+            return { defaultSecurityRules: mod.defaultSecurityRules as SecurityRule[] | undefined };
+        } catch (err) {
+            // The index usually just re-exports the collections for the frontend;
+            // a failure to read it must not take the whole load down.
+            logger.warn(`[collections] Could not read defaults from ${name}: ${err instanceof Error ? err.message : String(err)}`);
+            return {};
         }
+    }
+    return {};
+}
 
-        const files = fs.readdirSync(directory);
-        for (const file of files) {
-            // Only load .ts and .js files, ignore test files and declaration files
-            if ((file.endsWith(".ts") || file.endsWith(".js")) &&
-                !file.includes(".test.") &&
-                !file.endsWith(".d.ts") &&
-                file !== "index.ts" && file !== "index.js") {
-
-                const filePath = path.join(directory, file);
-                try {
-                    const fileUrl = pathToFileURL(filePath).href;
-
-                    // Use standard import() so that tsx/loader hooks can
-                    // resolve .ts files and workspace bare-specifiers.
-                    const module = await import(fileUrl);
-
-                    // Expect the collection to be the default export
-                    if (module && module.default) {
-                        collections.push(module.default);
-                    } else {
-                        logger.warn(`[loadCollectionsFromDirectory] File ${file} does not have a default export. Skipping.`);
-                    }
-                } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : String(err);
-                    logger.error(`[loadCollectionsFromDirectory] Failed to load collection from ${file}: ${message}`);
-                }
-            }
+/**
+ * Apply directory-level defaults. A collection declaring its own rules is left
+ * alone; one declaring none inherits these. Declaring neither leaves
+ * `securityRules` unset, which the policy generator treats as locked-by-default.
+ */
+export function applyCollectionDefaults(
+    collections: CollectionConfig[],
+    defaults: CollectionDefaults
+): CollectionConfig[] {
+    if (!defaults.defaultSecurityRules?.length) return collections;
+    for (const collection of collections) {
+        if (isPostgresCollectionConfig(collection) && !collection.securityRules?.length) {
+            collection.securityRules = defaults.defaultSecurityRules;
         }
-    } catch (err) {
-        logger.error(`[loadCollectionsFromDirectory] Error reading collections directory: ${err}`);
     }
     return collections;
+}
+
+/**
+ * Load collections from a directory of collection files, or from a single
+ * module exporting `backendCollections` / `collections`.
+ *
+ * Throws if any file fails to import. A collection that cannot be loaded is a
+ * configuration error, and continuing produces the worst outcome available: an
+ * API missing a route, or a policy file missing a table, with a successful exit
+ * code. Both read as "no data" rather than as a failure.
+ */
+export async function loadCollectionsFromDirectory(source: string): Promise<CollectionConfig[]> {
+    const resolved = path.resolve(source);
+
+    if (!fs.existsSync(resolved)) {
+        logger.warn(`[collections] Not found: ${resolved}`);
+        return [];
+    }
+
+    // A single module exports the collections, and may export the defaults.
+    if (!fs.statSync(resolved).isDirectory()) {
+        const mod = await importModule(resolved);
+        const collections = (mod.backendCollections || mod.collections || []) as CollectionConfig[];
+        return applyCollectionDefaults([...collections], {
+            defaultSecurityRules: mod.defaultSecurityRules as SecurityRule[] | undefined
+        });
+    }
+
+    const collections: CollectionConfig[] = [];
+    const failures: string[] = [];
+
+    for (const file of fs.readdirSync(resolved).filter(isCollectionFile)) {
+        try {
+            const mod = await importModule(path.join(resolved, file));
+            if (mod?.default) {
+                collections.push(mod.default as CollectionConfig);
+            } else {
+                failures.push(`${file}: no default export`);
+            }
+        } catch (err) {
+            failures.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
+
+    if (failures.length > 0) {
+        throw new Error(
+            `Could not load ${failures.length} collection file(s) from ${resolved}:\n` +
+            failures.map((f) => `  • ${f}`).join("\n") +
+            "\n\nEvery collection file must import cleanly and default-export a collection."
+        );
+    }
+
+    return applyCollectionDefaults(collections, await readDefaults(resolved));
 }

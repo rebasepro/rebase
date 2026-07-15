@@ -5,7 +5,7 @@ import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generatePostgresDdl, generatePostgresPoliciesDdl } from "./generate-postgres-ddl-logic";
 import { CollectionConfig } from "@rebasepro/types";
-import { logger } from "@rebasepro/server";
+import { logger, loadCollectionsFromDirectory } from "@rebasepro/server";
 
 
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
@@ -16,35 +16,11 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         }
 
         const resolvedPath = path.resolve(collectionsFilePath);
-        let collections: CollectionConfig[] = [];
-        const stats = fs.statSync(resolvedPath);
 
-        if (stats.isDirectory()) {
-            const files = fs.readdirSync(resolvedPath);
-            for (const file of files) {
-                if ((file.endsWith(".ts") || file.endsWith(".js")) &&
-                    !file.includes(".test.") &&
-                    !file.endsWith(".d.ts") &&
-                    file !== "index.ts" && file !== "index.js") {
+        // Shared with the runtime and the doctor: what gets generated here must
+        // be exactly what the server serves, including directory-level defaults.
+        let collections: CollectionConfig[] = await loadCollectionsFromDirectory(resolvedPath);
 
-                    const filePath = path.join(resolvedPath, file);
-                    try {
-                        const fileUrl = pathToFileURL(filePath).href;
-                        const module = await import(fileUrl);
-                        if (module && module.default) {
-                            collections.push(module.default);
-                        }
-                    } catch (err: unknown) {
-                        const message = err instanceof Error ? err.message : String(err);
-                        logger.error(`Error loading ${file}`, { detail: message });
-                    }
-                }
-            }
-        } else {
-            const fileUrl = pathToFileURL(resolvedPath).href + `?t=${Date.now()}`;
-            const imported = await import(fileUrl);
-            collections = imported.backendCollections || imported.collections;
-        }
 
         if (!collections || !Array.isArray(collections)) {
             collections = [];

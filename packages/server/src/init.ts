@@ -314,20 +314,6 @@ export interface RebaseBackendConfig {
      * - `{ retention?: number }` — enable with optional retention period (days)
      */
     history?: HistoryConfig;
-    /**
-     * Default security rules applied to any collection that does not define
-     * its own `securityRules`. Opt-in — if not set, collections without
-     * explicit rules remain unrestricted (beyond `requireAuth`).
-     *
-     * @example
-     * ```ts
-     * defaultSecurityRules: [
-     *     { operation: "select", access: "public" },
-     *     { operations: ["insert", "update", "delete"], roles: ["admin"] }
-     * ]
-     * ```
-     */
-    defaultSecurityRules?: SecurityRule[];
     enableSwagger?: boolean;
     functionsDir?: string;
     cronsDir?: string;
@@ -496,19 +482,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         });
     }
 
-    // Apply default security rules to collections that don't define their own.
-    // Also called for collections introspected in baas mode, which are created
-    // after this point and would otherwise be served without the defaults.
-    const applyDefaultSecurityRules = (collections: CollectionConfig[]) => {
-        if (!config.defaultSecurityRules?.length) return;
-        for (const collection of collections) {
-            if (isPostgresCollectionConfig(collection) && (!collection.securityRules || collection.securityRules.length === 0)) {
-                collection.securityRules = config.defaultSecurityRules;
-            }
-        }
-        logger.info("Default security rules applied to collections without explicit rules");
-    };
-    applyDefaultSecurityRules(activeCollections);
+    // Directory-level `defaultSecurityRules` are applied by the collection
+    // loader, so the server and `db push` agree on what a collection's rules
+    // are. They cannot be set here: the generators that write the actual
+    // Postgres policies never see this config.
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
     const delegates: Record<string, DataDriver> = {};
@@ -582,7 +559,6 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         // These never passed through the config-time steps above, so apply them here.
         if (driverResult.collections?.length) {
-            applyDefaultSecurityRules(driverResult.collections);
             activeCollections = [...activeCollections, ...driverResult.collections];
         }
 

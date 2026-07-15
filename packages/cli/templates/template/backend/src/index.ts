@@ -14,7 +14,6 @@ import {
     cleanupDevPortFile,
     logger
 } from "@rebasepro/server";
-import type { SecurityRule } from "@rebasepro/types";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
@@ -60,15 +59,6 @@ async function startServer() {
     const jwtSecret = env.JWT_SECRET;
     const PORT = env.PORT;
     const server = createServer(getRequestListener(app.fetch));
-
-    // Default security rules for collections that don't define their own.
-    // Authenticated users can read all rows; only admins can write.
-    const defaultSecurityRules: SecurityRule[] = [
-        { operation: "select",
-access: "public" },
-        { operations: ["insert", "update", "delete"],
-roles: ["admin"] }
-    ];
 
     const backend = await initializeRebaseBackend({
         collectionsDir: path.resolve(__dirname, "../../config/collections"),
@@ -131,8 +121,7 @@ pass: env.SMTP_PASS! }
                 type: "local",
                 basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
             },
-        history: true,
-        defaultSecurityRules
+        history: true
     });
 
     // ─── Health check ─────────────────────────────────────────────

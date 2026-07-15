@@ -17,7 +17,7 @@ import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
-import { logger } from "@rebasepro/server";
+import { logger, loadCollectionsFromDirectory } from "@rebasepro/server";
 
 /**
  * Resolve the SQL column name for a property.
@@ -124,48 +124,14 @@ export function getExpectedColumnType(prop: Property): string | null {
 
 // ── Collection loading ───────────────────────────────────────────────────
 
+/**
+ * Re-exported so callers keep importing it from here, but the implementation is
+ * now shared with the runtime and the generators — a doctor that disagreed with
+ * the policy generator about which files are collections would compare the
+ * wrong thing.
+ */
 export async function loadCollections(collectionsPath: string): Promise<CollectionConfig[]> {
-    const resolvedPath = path.resolve(collectionsPath);
-    const collections: CollectionConfig[] = [];
-
-    const stats = fs.statSync(resolvedPath);
-
-    if (stats.isDirectory()) {
-        const files = fs.readdirSync(resolvedPath);
-        for (const file of files) {
-            if (
-                (file.endsWith(".ts") || file.endsWith(".js")) &&
-                !file.includes(".test.") &&
-                !file.endsWith(".d.ts") &&
-                file !== "index.ts" &&
-                file !== "index.js"
-            ) {
-                const filePath = path.join(resolvedPath, file);
-                try {
-                    const fileUrl = pathToFileURL(filePath).href;
-                    const mod = await import(fileUrl);
-                    if (mod?.default) {
-                        collections.push(mod.default);
-                    }
-                } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : String(err);
-                    logger.error(chalk.yellow(`  ⚠ Could not load ${file}: ${message}`));
-                }
-            }
-        }
-    } else {
-        const fileUrl = pathToFileURL(resolvedPath).href + `?t=${Date.now()}`;
-        const imported = await import(fileUrl);
-        const loaded = imported.backendCollections || imported.collections;
-        if (Array.isArray(loaded)) {
-            collections.push(...loaded);
-        }
-    }
-
-    // Sort collections by slug alphabetically to ensure deterministic comparison
-    collections.sort((a, b) => a.slug.localeCompare(b.slug));
-
-    return collections;
+    return loadCollectionsFromDirectory(collectionsPath);
 }
 
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────

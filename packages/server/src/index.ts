@@ -26,6 +26,15 @@ export type {
 // =============================================================================
 export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 
+// The single definition of "the collections" — the runtime, the schema and
+// policy generators, and the doctor all load them through this, so what gets
+// served and what gets pushed can never drift apart.
+export {
+    loadCollectionsFromDirectory,
+    applyCollectionDefaults,
+    type CollectionDefaults
+} from "./collections/loader";
+
 // =============================================================================
 // DB Abstractions (for database driver implementations)
 // =============================================================================

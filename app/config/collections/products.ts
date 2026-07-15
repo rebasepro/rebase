@@ -270,13 +270,6 @@ hideFromCollection: true }
             sort: ["rating", "desc"]
         }
     ],
-    // Demo: anyone can read; only admins can write.
-    securityRules: [
-        { operation: "select",
-access: "public" },
-        { operations: ["insert", "update", "delete"],
-roles: ["admin"] }
-    ],
 });
 
 

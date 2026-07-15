@@ -113,6 +113,46 @@ The same files are consumed twice:
 Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/admin`, `@rebasepro/ui`,
 `@rebasepro/forms`.
 
+### One definition of "the collections"
+
+The runtime, the drizzle-schema generator, the policy generator and the doctor all
+load collections through the **same** loader (`loadCollectionsFromDirectory`, exported
+from `@rebasepro/server`). Four copies of that scan used to exist, agreeing only by
+discipline — and a drift between them would serve one set of collections while pushing
+policies for another, which reads as an empty table rather than an error. A file that
+fails to import is now a hard error for the same reason: skipping it silently produces
+a missing route and a missing policy with a successful exit code.
+
+### Where security rules live, and what enforces them
+
+**Collections do not enforce anything at runtime.** Nothing on the data path reads
+`securityRules`. Authorization is entirely Postgres RLS:
+
+```
+collection files → generatePostgresPoliciesDdl → drizzle/policies.sql → db push → pg_policies
+                                                                                       ↓
+                                           every request: SET LOCAL ROLE rebase_user → RLS decides
+```
+
+`securityRules` are a **source for code generation**, not a runtime check. That is why
+`policies.sql` is committed, why fixing a config cannot fix a database that already has
+the old policy, and why `rebase doctor --policies` exists.
+
+Directory-level defaults live with the collections, in `config/collections/index.ts`:
+
+```ts
+export const defaultSecurityRules: SecurityRule[] = [
+    { operation: "select", access: "public" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+];
+```
+
+Any collection in that directory declaring no `securityRules` inherits them; one
+declaring its own keeps them; one with neither is **locked by default** (admin-only).
+They belong here, not on `RebaseBackendConfig`, because `db push` generates the
+policies from these files and never sees the running server — a default on the server
+could never reach the database, while reading exactly like an authorization setting.
+
 ### The collection-file import rule
 
 Because the Node backend imports these files, **collection files must never import a

@@ -196,13 +196,6 @@ hideFromCollection: true }
             }
         }
     ],
-    // Demo: anyone can read; only admins can write.
-    securityRules: [
-        { operation: "select",
-access: "public" },
-        { operations: ["insert", "update", "delete"],
-roles: ["admin"] }
-    ],
 });
 
 export default ticketsCollection;

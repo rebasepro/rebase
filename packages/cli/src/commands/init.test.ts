@@ -645,12 +645,28 @@ describe("scaffold security defaults", () => {
         });
     });
 
-    describe("backend template", () => {
-        it("configures defaultSecurityRules", () => {
+    describe("collections defaults", () => {
+        it("declares defaultSecurityRules beside the collections", () => {
+            // They must live here, not in the backend config: `db push`
+            // generates the Postgres policies from these files and never sees
+            // the running server.
+            const indexPath = path.join(TEMPLATE_DIR, "config", "collections", "index.ts");
+            const content = fs.readFileSync(indexPath, "utf-8");
+
+            expect(content).toContain("export const defaultSecurityRules");
+            expect(content).toContain('access: "public"');
+            expect(content).toContain('roles: ["admin"]');
+        });
+
+        it("does not set defaultSecurityRules on the backend, where it would not reach the database", () => {
             const indexPath = path.join(TEMPLATE_DIR, "backend", "src", "index.ts");
             const content = fs.readFileSync(indexPath, "utf-8");
-            expect(content).toContain("defaultSecurityRules");
+
+            expect(content).not.toContain("defaultSecurityRules");
         });
+    });
+
+    describe("backend template", () => {
 
         it("does not silently fallback to a placeholder CORS domain", () => {
             const indexPath = path.join(TEMPLATE_DIR, "backend", "src", "index.ts");
