@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`ui`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
+
+  | Old | New |
+  |----------|----------|
+  | `@rebasepro/core` | `@rebasepro/app` |
+  | `@rebasepro/server-core` | `@rebasepro/server` |
+  | `@rebasepro/server-postgresql` | `@rebasepro/server-postgres` |
+  | `@rebasepro/server-mongodb` | `@rebasepro/server-mongo` |
+  | `@rebasepro/client-postgresql` | `@rebasepro/client-postgres` |
+  | `@rebasepro/client-firebase` | `@rebasepro/firebase` |
+  | `@rebasepro/formex` | `@rebasepro/forms` |
+  | `@rebasepro/sdk-generator` | `@rebasepro/codegen` |
+  | `@rebasepro/schema-inference` | `@rebasepro/inference` |
+  | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
+  | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
+
+  Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`, `cli`, `plugin-insights`.
+
+- **`@rebasepro/auth` removed** — it was one hook and an API helper whose only dependency was `@rebasepro/types`, and it always had to be installed alongside `core` anyway. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` and `clearAuthConfigCache` now come from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they are used with. The auth *system* was never here — it lives in `@rebasepro/client` (`client.auth`) and `@rebasepro/server`.
+
+- **`RebaseCMS` → `RebaseAdmin`** — the component now matches the package it ships from. `mode: "cms"` on `RebaseBackendConfig` is unchanged: it describes where collections come from (config vs database), not the UI.
+
+- **BaaS mode does not serve tables without row-level security** — see Fixes. A table with RLS disabled is skipped and named at boot; `baas: { unprotectedTables: "serve" }` restores the old behavior.
+
+### Features & Improvements
+
+- **BaaS mode — a REST API over your database with no collections at all** — `mode: "baas"` derives collections from the live database at boot instead of loading config files. Every protected table becomes a REST resource, with types, primary keys and relations read from `information_schema`; the drizzle tables the query layer needs are built in memory, so no generated `schema.generated.ts` is required either. Change the schema with a migration and the API follows. Join tables are skipped, the schema editor is off (it exists to write config files), and no React enters the backend's module graph. `introspectionSchema` on the Postgres adapter selects a schema other than `public`.
+
+- **The SDK works with no collections** — `rebase.data.collection("posts").find()` needs only a table name against a BaaS backend: no collections map, no generated types, nothing to declare. The optional `collections` option exists only to pin non-obvious slugs.
+
+- **`rebase init --flavor baas`** — scaffolds a headless project: `backend/` alone, no `config/`, no `frontend/`, and no UI package in the install tree. Without `--flavor`, `init` asks: *BaaS + admin* (default) or *BaaS only*.
+
+- **`rebase doctor --policies`** — diffs `pg_policies` against the policies your collections generate, reporting missing, orphaned and diverged, and exits non-zero so CI can gate it. Policies live in Postgres and the config is only their source; nothing reconciled the two, so a stale policy outlived every config fix. Reuses `generatePostgresPoliciesDdl` — the same function `db push` applies — so it compares against what would really be written. It also reports policy roles this server can never assume, without booting one. Policy *expressions* are deliberately not compared: Postgres rewrites `qual`/`with_check` on storage, and a check that cries wolf gets ignored.
+
+- **Guards for the two failure modes that ship silently** — `pnpm run check:headless` imports every collection file and server package under a loader hook that rejects React, so a UI import cannot creep back into the backend. `pnpm run check:names` fails on references to renamed packages and duplicate dependency keys. Both run in CI. A new BaaS e2e installs a scaffolded project from real tarballs and boots it against tables it was never told about — the only place `workspace:*` resolves, so the only thing that proves the templates rather than the library.
+
+### Fixes
+
+- **BaaS mode served every table to every authenticated user** — it introspects all tables, `ensureAppRole` grants `rebase_user` `SELECT/INSERT/UPDATE/DELETE` across the schema, and nothing enabled RLS, because that only happens via `db push`, which BaaS never runs. Pointing Rebase at an ordinary database therefore exposed every row of every table. A table with RLS disabled has no authorization model, so it is now excluded and logged with the `ALTER TABLE` needed to protect it. Tables with RLS enabled but no policies are served and return nothing — legal, and indistinguishable from an empty table, so that is called out at boot too.
+
+- **Security rules targeting an unusable Postgres role now fail the boot** — `pgRoles` sets a policy's `TO` clause, so naming a role requests never run as means the policy never applies and RLS filters every row. The table reads as empty, which is indistinguishable from having no data, so the mistake shipped. Boot now throws, naming the collection and role, with a specific hint for Supabase's `authenticated`/`anon`/`service_role`.
+
+- **The demo app's collections were empty** — every collection but `users` granted `pgRoles: ["authenticated"]`, a Supabase role name, while requests run as `rebase_user`. RLS filtered every row; `authors` and `posts` granted `TO public`, which is why they were the only two showing data. They now use the documented API (`select: public`, writes `admin`), the same shape `rebase init` scaffolds. The generated `drizzle/policies.sql` carried the same policies and is regenerated — it is what `db push` applies, so the config alone would have changed nothing.
+
+- **The service key did not authenticate websockets** — the HTTP middleware compares it before JWT verification; the websocket path went straight to `extractUserFromToken`, and a static secret can only ever fail that. Any SDK client using a service key (scripts, cron, server-to-server) got `jwt malformed` on every connect and silently received no realtime events.
+
+- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
+
 ## [0.9.0] - 2026-07-13
 
 ### Breaking
