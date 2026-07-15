@@ -5,7 +5,7 @@ description: Guide for setting up and managing the Rebase PostgreSQL backend wit
 
 # Rebase PostgreSQL Backend
 
-> **WARNING FOR AGENTS**: If you are writing a script or performing data tasks (e.g., seeding, migrating content), **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server-core`). **NEVER** use `psql` or raw SQL to manipulate data directly unless specifically instructed to do so for low-level debugging. Bypassing the SDK circumvents schema validation, access controls, and lifecycle hooks.
+> **WARNING FOR AGENTS**: If you are writing a script or performing data tasks (e.g., seeding, migrating content), **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`). **NEVER** use `psql` or raw SQL to manipulate data directly unless specifically instructed to do so for low-level debugging. Bypassing the SDK circumvents schema validation, access controls, and lifecycle hooks.
 
 Rebase uses PostgreSQL as its primary database, with Drizzle ORM for type-safe schema management and migrations.
 
@@ -67,20 +67,20 @@ rebase db migrate
 
 | Package | Purpose |
 |---------|---------|
-| `@rebasepro/server-core` | Hono server coordinator, API generation, auth, storage, env validation |
-| `@rebasepro/server-postgresql` | PostgreSQL bootstrapper, data driver, connection helpers, realtime (LISTEN/NOTIFY) |
+| `@rebasepro/server` | Hono server coordinator, API generation, auth, storage, env validation |
+| `@rebasepro/server-postgres` | PostgreSQL bootstrapper, data driver, connection helpers, realtime (LISTEN/NOTIFY) |
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, etc.) |
 
 ## Connection Functions
 
-All connection functions are exported from `@rebasepro/server-postgresql`.
+All connection functions are exported from `@rebasepro/server-postgres`.
 
 ### createPostgresDatabaseConnection()
 
 The primary connection factory. Creates a Drizzle-backed Postgres connection with a production-grade pool.
 
 ```typescript
-import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 
 const { db, pool, connectionString } = createPostgresDatabaseConnection(
     process.env.DATABASE_URL!,
@@ -110,7 +110,7 @@ function createPostgresDatabaseConnection(
 Creates a connection to a read replica for distributing read queries. Uses a default pool max of **10**.
 
 ```typescript
-import { createReadReplicaConnection } from "@rebasepro/server-postgresql";
+import { createReadReplicaConnection } from "@rebasepro/server-postgres";
 
 const readResources = createReadReplicaConnection(
     process.env.DATABASE_READ_URL!,
@@ -135,7 +135,7 @@ function createReadReplicaConnection(
 Creates a direct (non-pooled) connection for session-level features incompatible with PgBouncer transaction mode: **LISTEN/NOTIFY**, prepared statements, advisory locks. Uses a smaller default pool max of **5**.
 
 ```typescript
-import { createDirectDatabaseConnection } from "@rebasepro/server-postgresql";
+import { createDirectDatabaseConnection } from "@rebasepro/server-postgres";
 
 const directResources = createDirectDatabaseConnection(
     process.env.DATABASE_DIRECT_URL!,
@@ -173,7 +173,7 @@ All three connection functions accept an optional `PostgresPoolConfig` for progr
 The `DatabasePoolManager` manages multiple database connection pools dynamically. Used internally by the bootstrapper when `adminConnectionString` is configured — enables cross-database operations like branching and SQL execution against arbitrary databases.
 
 ```typescript
-import { DatabasePoolManager } from "@rebasepro/server-postgresql";
+import { DatabasePoolManager } from "@rebasepro/server-postgres";
 
 const poolManager = new DatabasePoolManager(process.env.ADMIN_CONNECTION_STRING!);
 
@@ -223,8 +223,8 @@ import path from "path";
 import {
     initializeRebaseBackend,
     HonoEnv
-} from "@rebasepro/server-core";
-import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
+} from "@rebasepro/server";
+import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { tables, enums, relations } from "./schema.generated.js";
 
 const app = new Hono<HonoEnv>();
@@ -266,7 +266,7 @@ server.listen(3001);
 The bootstrapper protocol — database-specific logic is encapsulated in bootstrapper objects:
 
 ```typescript
-import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgres";
 import { tables, enums, relations } from "./schema.generated.js";
 
 const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
@@ -369,13 +369,13 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 
 ### loadEnv()
 
-The `loadEnv()` function validates all environment variables at startup using Zod. It is exported from `@rebasepro/server-core`.
+The `loadEnv()` function validates all environment variables at startup using Zod. It is exported from `@rebasepro/server`.
 
 **Basic usage:**
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 
 dotenv.config({ path: "../../.env" });
 
@@ -386,7 +386,7 @@ export const env = loadEnv();
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv, z } from "@rebasepro/server-core";
+import { loadEnv, z } from "@rebasepro/server";
 
 dotenv.config({ path: "../../.env" });
 
@@ -581,11 +581,11 @@ The `shutdown(timeoutMs?: number)` method (default timeout: 15000ms) performs:
 
 > [!WARNING]
 > **JWT Dual-Package Hazard (Monorepos / pnpm)**
-> When running a backend inside a monorepo workspace (especially with `tsx` and `--preserve-symlinks`), you may encounter a `RebaseApiError: JWT secret not configured. Call configureJwt() first` error. This occurs because Node.js resolves two different module instances of `@rebasepro/server-core`.
+> When running a backend inside a monorepo workspace (especially with `tsx` and `--preserve-symlinks`), you may encounter a `RebaseApiError: JWT secret not configured. Call configureJwt() first` error. This occurs because Node.js resolves two different module instances of `@rebasepro/server`.
 >
 > **Fix:** Explicitly call `configureJwt` in your backend's entry point **before** `initializeRebaseBackend`:
 > ```typescript
-> import { initializeRebaseBackend, configureJwt } from "@rebasepro/server-core";
+> import { initializeRebaseBackend, configureJwt } from "@rebasepro/server";
 >
 > configureJwt({
 >     secret: process.env.JWT_SECRET!,

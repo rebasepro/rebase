@@ -5,7 +5,7 @@
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --watch=\"../config/**/*\" --watch=\"../../packages/server-core/src/**/*\" --conditions development src/index.ts",
+    "dev": "tsx watch --watch=\"../config/**/*\" --watch=\"../../packages/server/src/**/*\" --conditions development src/index.ts",
     "build": "tsc",
     "start": "node dist/src/index.js",
     "start:dev": "tsx src/index.ts"
@@ -13,8 +13,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",
     "@hono/node-server": "^2.0.4",
-    "@rebasepro/server-core": "workspace:*",
-    "@rebasepro/server-postgresql": "workspace:*",
+    "@rebasepro/server": "workspace:*",
+    "@rebasepro/server-postgres": "workspace:*",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.25",

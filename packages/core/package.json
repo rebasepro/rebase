@@ -140,7 +140,7 @@
       "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/forms$": "<rootDir>/../formex/src/index.ts"
+      "^@rebasepro/forms$": "<rootDir>/../forms/src/index.ts"
     }
   }
 }

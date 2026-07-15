@@ -54,8 +54,8 @@ export default defineConfig(() => ({
             "@rebasepro/client": path.resolve(__dirname, "../client/src"),
             "@rebasepro/common": path.resolve(__dirname, "../common/src"),
             "@rebasepro/core": path.resolve(__dirname, "../core/src"),
-            "@rebasepro/forms": path.resolve(__dirname, "../formex/src"),
-            "@rebasepro/inference": path.resolve(__dirname, "../schema-inference/src"),
+            "@rebasepro/forms": path.resolve(__dirname, "../forms/src"),
+            "@rebasepro/inference": path.resolve(__dirname, "../inference/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src"),
             "@rebasepro/ui": path.resolve(__dirname, "../ui/src")
         }

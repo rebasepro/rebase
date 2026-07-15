@@ -47,13 +47,13 @@
         "../admin/src"
       ],
       "@rebasepro/inference": [
-        "../schema-inference/src"
+        "../inference/src"
       ],
       "@rebasepro/ui": [
         "../ui/src"
       ],
       "@rebasepro/forms": [
-        "../formex/src"
+        "../forms/src"
       ]
     }
   },

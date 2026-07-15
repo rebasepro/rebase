@@ -19,7 +19,7 @@ Rebase é uma plataforma full-stack com quatro camadas:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Backend Layer                            │
 │  Hono HTTP Server  •  REST API  •  Auth  •  Storage  •  WS     │
-│  @rebasepro/server-core                                             │
+│  @rebasepro/server                                             │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ Drizzle ORM
                             ▼
@@ -36,7 +36,7 @@ Rebase é uma plataforma full-stack com quatro camadas:
 O backend inicializa através de um sistema bootstrapper baseado em plugins. A lógica específica do banco de dados é desacoplada em seu próprio pacote, e os bootstrappers lidam com a inicialização do banco de dados, autenticação e serviços internos.
 
 ```typescript
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 
 database: createPostgresAdapter({
         connectionString: process.env.DATABASE_URL!
@@ -74,7 +74,7 @@ Assim como os drivers, os backends de armazenamento são registrados em um regis
 | Pacote | Função | Usado Por |
 |---------|------|---------|
 | `@rebasepro/types` | Interfaces TypeScript para coleções, propriedades, entidades, plugins | Tudo |
-| `@rebasepro/server-core` | Inicialização do servidor backend, API REST, autenticação, armazenamento, WebSocket | Backend |
+| `@rebasepro/server` | Inicialização do servidor backend, API REST, autenticação, armazenamento, WebSocket | Backend |
 | `@rebasepro/client` | SDK do Cliente — Transporte HTTP, WebSocket, autenticação | Frontend |
 | `@rebasepro/core` | Framework React — Scaffold, controladores, formulários, rotas, hooks | Frontend |
 | `@rebasepro/ui` | Biblioteca de componentes de UI autônomos (Tailwind v4 + Radix) | Frontend |

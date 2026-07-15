@@ -86,8 +86,8 @@ Every `@rebasepro/*` package depends on this one. Key consumers:
 
 | Package | Uses |
 |---------|------|
-| `@rebasepro/server-core` | `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
-| `@rebasepro/server-postgresql` | `BackendBootstrapper`, `InitializedDriver`, `RealtimeProvider` |
-| `@rebasepro/server-mongodb` | `BackendBootstrapper`, `DataDriver`, `CollectionConfig` |
+| `@rebasepro/server` | `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
+| `@rebasepro/server-postgres` | `BackendBootstrapper`, `InitializedDriver`, `RealtimeProvider` |
+| `@rebasepro/server-mongo` | `BackendBootstrapper`, `DataDriver`, `CollectionConfig` |
 | `@rebasepro/client` | `RebaseClient`, `DataSourceDelegate`, `StorageSource` |
 | `@rebasepro/admin` | `CollectionConfig`, `Property`, `PluginConfig`, controller interfaces |

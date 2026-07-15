@@ -87,12 +87,12 @@ importers:
       '@hono/node-server':
         specifier: ^2.0.4
         version: 2.0.4(hono@4.12.25)
-      '@rebasepro/server-core':
+      '@rebasepro/server':
         specifier: workspace:*
-        version: link:../../packages/server-core
-      '@rebasepro/server-postgresql':
+        version: link:../../packages/server
+      '@rebasepro/server-postgres':
         specifier: workspace:*
-        version: link:../../packages/server-postgresql
+        version: link:../../packages/server-postgres
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -610,12 +610,12 @@ importers:
       '@rebasepro/codegen':
         specifier: workspace:*
         version: link:../codegen
-      '@rebasepro/server-core':
+      '@rebasepro/server':
         specifier: workspace:*
-        version: link:../server-core
-      '@rebasepro/server-postgresql':
+        version: link:../server
+      '@rebasepro/server-postgres':
         specifier: workspace:*
-        version: link:../server-postgresql
+        version: link:../server-postgres
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -785,7 +785,7 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
-  packages/client-postgresql:
+  packages/client-postgres:
     dependencies:
       '@rebasepro/client':
         specifier: workspace:*
@@ -1258,7 +1258,7 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
-  packages/server-core:
+  packages/server:
     dependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.1068.0
@@ -1352,14 +1352,14 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
-  packages/server-mongodb:
+  packages/server-mongo:
     dependencies:
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
-      '@rebasepro/server-core':
+      '@rebasepro/server':
         specifier: workspace:*
-        version: link:../server-core
+        version: link:../server
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -1398,7 +1398,7 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
-  packages/server-postgresql:
+  packages/server-postgres:
     dependencies:
       '@ariga/atlas':
         specifier: ^1.2.2
@@ -1409,9 +1409,9 @@ importers:
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
-      '@rebasepro/server-core':
+      '@rebasepro/server':
         specifier: workspace:*
-        version: link:../server-core
+        version: link:../server
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -1856,12 +1856,12 @@ importers:
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@rebasepro/server-core':
+      '@rebasepro/server':
         specifier: workspace:*
-        version: link:../../packages/server-core
-      '@rebasepro/server-postgresql':
+        version: link:../../packages/server
+      '@rebasepro/server-postgres':
         specifier: workspace:*
-        version: link:../../packages/server-postgresql
+        version: link:../../packages/server-postgres
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -9941,11 +9941,6 @@ packages:
 
   semver@7.5.3:
     resolution: {integrity: sha512-QBlUtyVk/5EeHbi7X0fw6liDZc7BBmEaSYn01fMU1OUYbf6GPsbTtd8WmnqbI20SeycoHSeiybkE/q1Q+qlThQ==}
-    engines: {node: '>=10'}
-    hasBin: true
-
-  semver@7.7.2:
-    resolution: {integrity: sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -19371,7 +19366,7 @@ snapshots:
     dependencies:
       hosted-git-info: 4.1.0
       is-core-module: 2.16.2
-      semver: 7.7.2
+      semver: 7.8.4
       validate-npm-package-license: 3.0.4
 
   normalize-path@3.0.0: {}
@@ -20541,8 +20536,6 @@ snapshots:
   semver@7.5.3:
     dependencies:
       lru-cache: 6.0.0
-
-  semver@7.7.2: {}
 
   semver@7.8.4: {}
 

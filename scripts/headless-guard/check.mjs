@@ -37,13 +37,13 @@ const COLLECTION_DIRS = [path.join(repoRoot, "app", "config", "collections")];
 // packages aren't linked into the root node_modules, and this way the guard
 // inspects src/ directly and needs no prior build.
 const SERVER_PACKAGES = [
-    "packages/server-core/src/index.ts",
-    "packages/server-postgresql/src/index.ts",
-    "packages/server-mongodb/src/index.ts",
+    "packages/server/src/index.ts",
+    "packages/server-postgres/src/index.ts",
+    "packages/server-mongo/src/index.ts",
     "packages/client/src/index.ts"
 ];
 
-/** Mirrors the filter in packages/server-core/src/collections/loader.ts. */
+/** Mirrors the filter in packages/server/src/collections/loader.ts. */
 function collectionFilesIn(directory) {
     if (!fs.existsSync(directory)) return [];
     return fs

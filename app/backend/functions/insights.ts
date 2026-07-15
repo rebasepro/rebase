@@ -1,4 +1,4 @@
-import { defineFunction, requireAuth } from "@rebasepro/server-core";
+import { defineFunction, requireAuth } from "@rebasepro/server";
 
 /**
  * Insights function — server-side KPI aggregations.

@@ -43,7 +43,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 7. **Never deploy unless explicitly asked:** Agents should never run `rebase deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
 
-8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server-core`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server-core"` singleton. For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
+8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server"` singleton. For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
 
 # Project Structure
 
@@ -92,9 +92,9 @@ rebase/
 │   └── config/               # Application configuration
 │       └── collections/      # TypeScript collection files (one per collection)
 ├── packages/
-│   ├── server-core/          # @rebasepro/server-core
-│   ├── server-postgresql/    # @rebasepro/server-postgresql
-│   ├── server-mongodb/       # @rebasepro/server-mongodb
+│   ├── server-core/          # @rebasepro/server
+│   ├── server-postgresql/    # @rebasepro/server-postgres
+│   ├── server-mongodb/       # @rebasepro/server-mongo
 │   ├── core/                 # @rebasepro/core
 │   ├── types/                # @rebasepro/types
 │   ├── ui/                   # @rebasepro/ui
@@ -104,7 +104,7 @@ rebase/
 │   ├── cli/                  # @rebasepro/cli
 │   ├── client/               # @rebasepro/client
 │   ├── client-firebase/      # @rebasepro/client-firebase
-│   ├── client-postgresql/    # @rebasepro/client-postgresql
+│   ├── client-postgresql/    # @rebasepro/client-postgres
 │   ├── common/               # @rebasepro/common
 │   ├── formex/               # @rebasepro/forms
 │   ├── mcp-server/           # @rebasepro/mcp
@@ -121,9 +121,9 @@ rebase/
 
 | Package | Purpose | When to use |
 |---------|---------|-------------|
-| `@rebasepro/server-core` | Hono server coordinator, API generation, auth middleware, storage, email, cron, custom functions | Backend entry point — every Rebase backend imports this |
-| `@rebasepro/server-postgresql` | PostgreSQL bootstrapper and Drizzle ORM data driver | Backend setup when using PostgreSQL |
-| `@rebasepro/server-mongodb` | MongoDB bootstrapper and data driver | Backend setup when using MongoDB |
+| `@rebasepro/server` | Hono server coordinator, API generation, auth middleware, storage, email, cron, custom functions | Backend entry point — every Rebase backend imports this |
+| `@rebasepro/server-postgres` | PostgreSQL bootstrapper and Drizzle ORM data driver | Backend setup when using PostgreSQL |
+| `@rebasepro/server-mongo` | MongoDB bootstrapper and data driver | Backend setup when using MongoDB |
 | `@rebasepro/core` | Core framework, types, hooks, and React components | Frontend — React integration, hooks, providers |
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, `CollectionConfig`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
@@ -132,7 +132,7 @@ rebase/
 | `@rebasepro/auth` | Authentication module (client-side) | Frontend auth flows, login forms |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/client-firebase` | Firebase client adapter | When connecting to a Firebase backend |
-| `@rebasepro/client-postgresql` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
+| `@rebasepro/client-postgres` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
 | `@rebasepro/common` | Shared utilities, `defaultUsersCollection` | Shared constants and default collection exports |
 | `@rebasepro/forms` | Form engine | Building dynamic forms from collection schemas |
 | `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |
@@ -236,7 +236,7 @@ rebase start
 | `rebase schema introspect` | Introspect a live database → generate Rebase collection files |
 | `rebase schema --help` | Show schema command help |
 
-> **IMPORTANT FOR AGENTS:** Schema commands are delegated to the active database driver plugin (e.g. `@rebasepro/server-postgresql`). The plugin must be installed in `backend/package.json` or the command will fail with `Could not detect an active database plugin`.
+> **IMPORTANT FOR AGENTS:** Schema commands are delegated to the active database driver plugin (e.g. `@rebasepro/server-postgres`). The plugin must be installed in `backend/package.json` or the command will fail with `Could not detect an active database plugin`.
 
 #### `schema generate` Options
 
@@ -327,7 +327,7 @@ rebase auth reset-password user@example.com MyNewPass!
 
 ## `loadEnv()` Function
 
-Rebase provides `loadEnv()` from `@rebasepro/server-core` to validate and load environment variables with Zod. Call it **after** your `.env` file has been loaded (e.g. via `dotenv.config()`). It does NOT load `.env` files itself.
+Rebase provides `loadEnv()` from `@rebasepro/server` to validate and load environment variables with Zod. Call it **after** your `.env` file has been loaded (e.g. via `dotenv.config()`). It does NOT load `.env` files itself.
 
 ### Behavior
 
@@ -338,7 +338,7 @@ Rebase provides `loadEnv()` from `@rebasepro/server-core` to validate and load e
 ### Signature
 
 ```typescript
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 
 // Basic — just Rebase env vars:
 export const env = loadEnv();
@@ -427,7 +427,7 @@ The main entry point for initializing a Rebase backend server. Returns a `Rebase
 ### `RebaseBackendConfig` — Full Interface
 
 ```typescript
-import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server-core";
+import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server";
 ```
 
 | Property | Type | Default | Description |
@@ -518,8 +518,8 @@ When `shutdown()` is called, it performs these steps in order:
 ```typescript
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { initializeRebaseBackend, loadEnv } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
 import collections from "../config/collections";
 import dotenv from "dotenv";
@@ -566,7 +566,7 @@ console.log(`Server running at http://localhost:${env.PORT}`);
 After `initializeRebaseBackend()` completes, a server-side singleton is available:
 
 ```typescript
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 ```
 
 > **WARNING FOR AGENTS:** The singleton is a **lazy proxy** — accessing it at module import time (top-level) will throw. Only use it inside request handlers, cron jobs, hooks, or functions that run after the server has started.
@@ -597,7 +597,7 @@ The `rebase` singleton implements the `RebaseClient` interface:
 ### Usage Examples
 
 ```typescript
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 // In a cron job, custom function, or hook:
 
@@ -621,7 +621,7 @@ if (rebase.sql) {
 ### Testing
 
 ```typescript
-import { _setRebaseMock, _resetRebaseMock } from "@rebasepro/server-core";
+import { _setRebaseMock, _resetRebaseMock } from "@rebasepro/server";
 
 // Only works when NODE_ENV=test
 beforeEach(() => {
@@ -734,9 +734,9 @@ The `where` parameter accepts a filter object with PostgREST-style operators:
 - **pnpm not found:** Install with `npm install -g pnpm`.
 - **Node.js version mismatch:** Rebase requires Node.js v20+. Use `nvm install 20 && nvm use 20`.
 - **`Could not find tsx binary`:** Install tsx in your project: `pnpm add -D tsx`.
-- **`Could not detect an active database plugin`:** Ensure `@rebasepro/server-postgresql` (or another driver) is listed in `backend/package.json` dependencies.
+- **`Could not detect an active database plugin`:** Ensure `@rebasepro/server-postgres` (or another driver) is listed in `backend/package.json` dependencies.
 - **`No bootstrappers or database adapter provided`:** The `initializeRebaseBackend()` call is missing the `database` (or `bootstrappers`) property. See the backend configuration section above.
-- **`Could not find CLI entry point for <plugin>`:** The database driver plugin's CLI script is missing or not found. Reinstall the plugin: `pnpm add @rebasepro/server-postgresql`.
+- **`Could not find CLI entry point for <plugin>`:** The database driver plugin's CLI script is missing or not found. Reinstall the plugin: `pnpm add @rebasepro/server-postgres`.
 
 ### Singleton Errors
 

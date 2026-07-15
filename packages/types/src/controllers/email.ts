@@ -1,7 +1,7 @@
 /**
  * Email service types — portable interface shared by RebaseClient and server-core.
  *
- * The concrete SMTP implementation lives in `@rebasepro/server-core/email`.
+ * The concrete SMTP implementation lives in `@rebasepro/server/email`.
  * This file provides only the consumer-facing contract so that it can be
  * referenced from `RebaseClient` without dragging in nodemailer.
  */

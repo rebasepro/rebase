@@ -61,7 +61,7 @@ Stellen Sie vor der Bereitstellung in der Produktion sicher:
 In der Produktion kann das Backend das Frontend als statische SPA bereitstellen:
 
 ```typescript
-import { serveSPA } from "@rebasepro/server-core";
+import { serveSPA } from "@rebasepro/server";
 
 // After initializeRebaseBackend()
 import path from "path";

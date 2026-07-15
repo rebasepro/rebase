@@ -5,7 +5,7 @@ description: Guide for working with Rebase auto-generated REST and GraphQL APIs.
 
 # Rebase Auto-Generated APIs
 
-> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server-core`) instead of making raw REST or GraphQL API calls (`fetch` / `curl`). For custom backend functions, use `client.functions.invoke('function-name', payload)` — **NEVER** manually construct `/api/functions/` URLs or extract tokens from localStorage. Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
+> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`) instead of making raw REST or GraphQL API calls (`fetch` / `curl`). For custom backend functions, use `client.functions.invoke('function-name', payload)` — **NEVER** manually construct `/api/functions/` URLs or extract tokens from localStorage. Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
 
 Every collection defined in Rebase automatically gets full REST CRUD and GraphQL endpoints. No manual route creation needed.
 
@@ -662,12 +662,12 @@ GET /api/collections
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
-- **REST API Generator:** `packages/server-core/src/api/rest/api-generator.ts`
-- **Query Parser:** `packages/server-core/src/api/rest/query-parser.ts`
-- **GraphQL Generator:** `packages/server-core/src/api/graphql/graphql-schema-generator.ts`
-- **OpenAPI Generator:** `packages/server-core/src/api/openapi-generator.ts`
-- **Error Handling:** `packages/server-core/src/api/errors.ts`
-- **Server Setup:** `packages/server-core/src/api/server.ts`
-- **API Types:** `packages/server-core/src/api/types.ts`
-- **Auth Middleware:** `packages/server-core/src/auth/middleware.ts`
+- **REST API Generator:** `packages/server/src/api/rest/api-generator.ts`
+- **Query Parser:** `packages/server/src/api/rest/query-parser.ts`
+- **GraphQL Generator:** `packages/server/src/api/graphql/graphql-schema-generator.ts`
+- **OpenAPI Generator:** `packages/server/src/api/openapi-generator.ts`
+- **Error Handling:** `packages/server/src/api/errors.ts`
+- **Server Setup:** `packages/server/src/api/server.ts`
+- **API Types:** `packages/server/src/api/types.ts`
+- **Auth Middleware:** `packages/server/src/auth/middleware.ts`
 - **DataHooks Types:** `packages/types/src/types/backend_hooks.ts`

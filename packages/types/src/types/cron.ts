@@ -62,7 +62,7 @@ export interface CronJobContext {
 
     /**
      * The server-side {@link RebaseClient}. This is the **same singleton**
-     * exposed as `rebase` (imported from `@rebasepro/server-core`) and as
+     * exposed as `rebase` (imported from `@rebasepro/server`) and as
      * `context` in collection callbacks — it is only named `client` here.
      *
      * Its data plane (`client.data`) runs with **admin privileges and bypasses

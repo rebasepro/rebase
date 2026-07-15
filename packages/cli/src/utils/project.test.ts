@@ -188,18 +188,18 @@ describe("findEnvFile", () => {
 // =============================================================================
 
 describe("getActiveBackendPlugin", () => {
-    it("detects @rebasepro/server-postgresql from dependencies", () => {
+    it("detects @rebasepro/server-postgres from dependencies", () => {
         const backendDir = createDir("plugin-app", "backend");
         writeJSON(path.join(backendDir, "package.json"), {
             name: "my-backend",
             dependencies: {
-                "@rebasepro/server-core": "workspace:*",
-                "@rebasepro/server-postgresql": "workspace:*",
+                "@rebasepro/server": "workspace:*",
+                "@rebasepro/server-postgres": "workspace:*",
                 "hono": "^4.0.0"
             }
         });
 
-        expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-postgresql");
+        expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-postgres");
     });
 
     it("detects plugin from devDependencies", () => {
@@ -207,22 +207,22 @@ describe("getActiveBackendPlugin", () => {
         writeJSON(path.join(backendDir, "package.json"), {
             name: "my-backend",
             dependencies: {
-                "@rebasepro/server-core": "workspace:*"
+                "@rebasepro/server": "workspace:*"
             },
             devDependencies: {
-                "@rebasepro/server-mongodb": "^1.0.0"
+                "@rebasepro/server-mongo": "^1.0.0"
             }
         });
 
-        expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-mongodb");
+        expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-mongo");
     });
 
-    it("ignores @rebasepro/server-core (not a driver)", () => {
+    it("ignores @rebasepro/server (not a driver)", () => {
         const backendDir = createDir("core-only", "backend");
         writeJSON(path.join(backendDir, "package.json"), {
             name: "my-backend",
             dependencies: {
-                "@rebasepro/server-core": "workspace:*",
+                "@rebasepro/server": "workspace:*",
                 "hono": "^4.0.0"
             }
         });

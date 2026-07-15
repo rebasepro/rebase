@@ -112,7 +112,7 @@ The scoped driver is placed into `c.set("driver", scopedDriver)`. The raw, unsco
 ### How Scoping Works
 
 ```typescript
-// From packages/server-core/src/auth/rls-scope.ts
+// From packages/server/src/auth/rls-scope.ts
 export async function scopeDataDriver(
     driver: DataDriver,
     user: { uid: string; roles?: string[] }
@@ -174,7 +174,7 @@ DataHooks are the **primary mechanism for backend-level security** when you cann
 DataHooks are configured via the `hooks` property of `initializeRebaseBackend()`:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { initializeRebaseBackend } from "@rebasepro/server";
 import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
 
 const hooks: BackendHooks = {
@@ -332,7 +332,7 @@ If you cannot modify database-level RLS policies — or your database doesn't su
 ### Strategy: DataHooks as Your Security Layer
 
 ```typescript
-import { ApiError } from "@rebasepro/server-core";
+import { ApiError } from "@rebasepro/server";
 import type { BackendHooks, BackendHookContext } from "@rebasepro/types";
 
 const hooks: BackendHooks = {
@@ -634,13 +634,13 @@ Use this checklist when setting up security for a Rebase project:
 
 ## References
 
-- **RLS Scope**: `packages/server-core/src/auth/rls-scope.ts` — `scopeDataDriver()` implementation
-- **Auth Middleware**: `packages/server-core/src/auth/middleware.ts` — JWT/service key/API key middleware
-- **Adapter Middleware**: `packages/server-core/src/auth/adapter-middleware.ts` — Custom auth adapter middleware
-- **API Key Guard**: `packages/server-core/src/auth/api-keys/api-key-permission-guard.ts`
-- **REST API Generator**: `packages/server-core/src/api/rest/api-generator.ts` — DataHooks integration
+- **RLS Scope**: `packages/server/src/auth/rls-scope.ts` — `scopeDataDriver()` implementation
+- **Auth Middleware**: `packages/server/src/auth/middleware.ts` — JWT/service key/API key middleware
+- **Adapter Middleware**: `packages/server/src/auth/adapter-middleware.ts` — Custom auth adapter middleware
+- **API Key Guard**: `packages/server/src/auth/api-keys/api-key-permission-guard.ts`
+- **REST API Generator**: `packages/server/src/api/rest/api-generator.ts` — DataHooks integration
 - **Backend Hooks Types**: `packages/types/src/types/backend_hooks.ts` — `DataHooks`, `BackendHooks` interfaces
-- **Backend Init**: `packages/server-core/src/init.ts` — `hooks` config property
+- **Backend Init**: `packages/server/src/init.ts` — `hooks` config property
 - **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anon"`, `"api-key:{id}"` are system-assigned identities in `context.user` / `ctx.requestUser`
 - **Collection Callbacks**: See `rebase-collections` skill → Collection Callbacks section
 - **Auth Configuration**: See `rebase-auth` skill → Server-Side Configuration section

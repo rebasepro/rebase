@@ -61,7 +61,7 @@ Before deploying to production, ensure:
 In production, the backend can serve the frontend as a static SPA:
 
 ```typescript
-import { serveSPA } from "@rebasepro/server-core";
+import { serveSPA } from "@rebasepro/server";
 import path from "path";
 
 // After initializeRebaseBackend()

@@ -13,8 +13,8 @@ import {
     listenWithPortRetry,
     logger,
     serveSPA
-} from "@rebasepro/server-core";
-import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
+} from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
 import usersCollection from "../../config/collections/users.js";

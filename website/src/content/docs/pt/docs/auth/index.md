@@ -17,7 +17,7 @@ Rebase inclui um sistema de autenticação completo:
 ## Configuração do Backend
 
 ```typescript
-import { createGoogleProvider, createLinkedinProvider } from "@rebasepro/server-core";
+import { createGoogleProvider, createLinkedinProvider } from "@rebasepro/server";
 
 await initializeRebaseBackend({
     // ...

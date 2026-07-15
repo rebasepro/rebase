@@ -378,8 +378,8 @@ For standard scenarios (such as validating JWTs from a third-party service), you
 To connect a Rebase backend with **Clerk**, you can verify Clerk JWT tokens using Clerk's JSON Web Key Set (JWKS):
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createCustomAuthAdapter } from "@rebasepro/server-core";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createCustomAuthAdapter } from "@rebasepro/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 // Clerk JWKS URL
@@ -434,8 +434,8 @@ const backend = await initializeRebaseBackend({
 To verify Firebase Auth tokens using Firebase's public certificates:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createCustomAuthAdapter } from "@rebasepro/server-core";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createCustomAuthAdapter } from "@rebasepro/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const FIREBASE_JWKS_URL = "https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com";

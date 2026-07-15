@@ -60,11 +60,11 @@
       "@rebasepro/client-firebase/*": [
         "packages/client-firebase/src/*"
       ],
-      "@rebasepro/client-postgresql": [
-        "packages/client-postgresql/src"
+      "@rebasepro/client-postgres": [
+        "packages/client-postgres/src"
       ],
-      "@rebasepro/client-postgresql/*": [
-        "packages/client-postgresql/src/*"
+      "@rebasepro/client-postgres/*": [
+        "packages/client-postgres/src/*"
       ],
       "@rebasepro/common": [
         "packages/common/src"
@@ -114,23 +114,23 @@
       "@rebasepro/codegen/*": [
         "packages/codegen/src/*"
       ],
-      "@rebasepro/server-core": [
-        "packages/server-core/src"
+      "@rebasepro/server": [
+        "packages/server/src"
       ],
-      "@rebasepro/server-core/*": [
-        "packages/server-core/src/*"
+      "@rebasepro/server/*": [
+        "packages/server/src/*"
       ],
-      "@rebasepro/server-mongodb": [
-        "packages/server-mongodb/src"
+      "@rebasepro/server-mongo": [
+        "packages/server-mongo/src"
       ],
-      "@rebasepro/server-mongodb/*": [
-        "packages/server-mongodb/src/*"
+      "@rebasepro/server-mongo/*": [
+        "packages/server-mongo/src/*"
       ],
-      "@rebasepro/server-postgresql": [
-        "packages/server-postgresql/src"
+      "@rebasepro/server-postgres": [
+        "packages/server-postgres/src"
       ],
-      "@rebasepro/server-postgresql/*": [
-        "packages/server-postgresql/src/*"
+      "@rebasepro/server-postgres/*": [
+        "packages/server-postgres/src/*"
       ],
       "@rebasepro/studio": [
         "packages/studio/src"
@@ -172,7 +172,7 @@
     "packages/cli/src",
     "packages/client/src",
     "packages/client-firebase/src",
-    "packages/client-postgresql/src",
+    "packages/client-postgres/src",
     "packages/common/src",
     "packages/core/src",
     "packages/forms/src",
@@ -181,9 +181,9 @@
     "packages/plugin-insights/src",
     "packages/inference/src",
     "packages/codegen/src",
-    "packages/server-core/src",
-    "packages/server-mongodb/src",
-    "packages/server-postgresql/src",
+    "packages/server/src",
+    "packages/server-mongo/src",
+    "packages/server-postgres/src",
     "packages/studio/src",
     "packages/types/src",
     "packages/ui/src",

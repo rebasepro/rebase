@@ -298,11 +298,11 @@ Key differences from the monorepo compose:
 
 ### `loadEnv()` — Validated Environment Loading
 
-All environment variables are validated at startup via a Zod schema in `loadEnv()` from `@rebasepro/server-core`. The server **fails immediately** if required variables are missing or invalid.
+All environment variables are validated at startup via a Zod schema in `loadEnv()` from `@rebasepro/server`. The server **fails immediately** if required variables are missing or invalid.
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 
 dotenv.config({ path: "../../.env" });
 
@@ -318,7 +318,7 @@ Use the `extend` option to add your own typed env variables on top of the base R
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv, z } from "@rebasepro/server-core";
+import { loadEnv, z } from "@rebasepro/server";
 
 dotenv.config({ path: "../../.env" });
 
@@ -446,7 +446,7 @@ In production, the backend can serve the frontend SPA directly, eliminating the 
 ### `serveSPA()` Function Signature
 
 ```typescript
-import { serveSPA } from "@rebasepro/server-core";
+import { serveSPA } from "@rebasepro/server";
 
 function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
 ```
@@ -470,7 +470,7 @@ function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
 ### Usage Example
 
 ```typescript
-import { serveSPA } from "@rebasepro/server-core";
+import { serveSPA } from "@rebasepro/server";
 import path from "path";
 
 const isProduction = env.NODE_ENV === "production";
@@ -888,7 +888,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 - **Docker Compose (monorepo):** `app/backend/docker-compose.yml`
 - **Docker Compose (template):** `packages/cli/templates/template/docker-compose.yml`
 - **Entrypoint:** `app/backend/entrypoint.sh`
-- **Env Schema:** `packages/server-core/src/env.ts`
-- **serveSPA:** `packages/server-core/src/serve-spa.ts`
+- **Env Schema:** `packages/server/src/env.ts`
+- **serveSPA:** `packages/server/src/serve-spa.ts`
 - **Backend Entry:** `app/backend/src/index.ts`
 - **.env.example:** `app/.env.example`

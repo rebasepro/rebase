@@ -17,7 +17,7 @@
  *
  * @example Custom auth
  * ```ts
- * import { createCustomAuthAdapter } from "@rebasepro/server-core";
+ * import { createCustomAuthAdapter } from "@rebasepro/server";
  *
  * initializeRebaseBackend({
  *   auth: createCustomAuthAdapter({

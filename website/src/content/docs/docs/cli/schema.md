@@ -226,7 +226,7 @@ rebase db migrate
 
 | Symptom | Solution |
 |---------|----------|
-| `Could not detect an active database plugin` | Install `@rebasepro/server-postgresql` in `backend/package.json` |
+| `Could not detect an active database plugin` | Install `@rebasepro/server-postgres` in `backend/package.json` |
 | Schema file not updating | Check the `--collections` path points to the right directory |
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |

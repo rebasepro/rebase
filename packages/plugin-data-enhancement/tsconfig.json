@@ -50,7 +50,7 @@
         "../common/src"
       ],
       "@rebasepro/forms": [
-        "../formex/src"
+        "../forms/src"
       ]
     }
   },

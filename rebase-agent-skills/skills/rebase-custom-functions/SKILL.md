@@ -93,7 +93,7 @@ Custom functions run within the Hono middleware chain, so you have access to aut
 ```typescript
 // backend/functions/admin-export.ts
 import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server-core";
+import type { HonoEnv } from "@rebasepro/server";
 
 const app = new Hono<HonoEnv>();
 
@@ -126,7 +126,7 @@ export default app;
 > the platform already provides.
 
 ```typescript
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 await rebase.data.collection("orders").find({ where: { status: ["==", "paid"] } });
 await rebase.storage.putObject({ key, file });   // → storageUrl (gs://|s3://|local://)
@@ -143,7 +143,7 @@ await rebase.email.send({ to, subject, html });
 Importing a provider SDK hardcodes one backend, bypasses the app's config
 (`STORAGE_TYPE`, `DATABASE_URL`, SMTP, …), and defeats the point of the platform.
 The only code that touches provider SDKs is the adapters **inside**
-`@rebasepro/server-core`.
+`@rebasepro/server`.
 
 ### Reserved Identity Values in `c.get("user")`
 

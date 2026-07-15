@@ -252,7 +252,7 @@ La persistance est non bloquante. Si une écriture dans la base de données éch
 ```typescript
 // backend/crons/cleanup-sessions.ts
 import type { CronJobDefinition } from "@rebasepro/types";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const job: CronJobDefinition = {
     schedule: "0 3 * * *",  // daily at 3 AM

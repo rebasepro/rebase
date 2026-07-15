@@ -1,4 +1,4 @@
-import { defineFunction } from "@rebasepro/server-core";
+import { defineFunction } from "@rebasepro/server";
 
 /**
  * Example custom function route.

@@ -8,15 +8,15 @@ description: How to embed Rebase Database and Realtime services into your own cu
 
 Rebase was built to be completely modular. While the `initializeRebaseBackend` coordinator provides a full batteries-included backend using Hono, you can completely bypass it and embed the core **Database Adapter** and **Realtime WebSockets** directly into your own custom Node.js application (like Express, Fastify, or plain Node.js HTTP).
 
-The `@rebasepro/server-postgresql` package is completely framework-agnostic. It depends only on Drizzle ORM and standard Node.js `http.Server`.
+The `@rebasepro/server-postgres` package is completely framework-agnostic. It depends only on Drizzle ORM and standard Node.js `http.Server`.
 
 ## Environment Configuration
 
-Rebase provides a centralized `loadEnv()` utility in `@rebasepro/server-core` that validates your environment variables against a strict Zod schema. Call it **after** loading your `.env` file:
+Rebase provides a centralized `loadEnv()` utility in `@rebasepro/server` that validates your environment variables against a strict Zod schema. Call it **after** loading your `.env` file:
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 
 dotenv.config({ path: "../../.env" });
 
@@ -52,7 +52,7 @@ Here is a complete example of how to initialize the Rebase PostgreSQL adapter an
 Install the required core packages along with Express:
 
 ```bash
-npm install @rebasepro/server-postgresql @rebasepro/types express pg
+npm install @rebasepro/server-postgres @rebasepro/types express pg
 ```
 
 ### 2. Initialization and Graceful Shutdown Example
@@ -61,7 +61,7 @@ npm install @rebasepro/server-postgresql @rebasepro/types express pg
 import express from "express";
 import { createServer } from "http";
 import pg from "pg";
-import { createPostgresBootstrapper } from "@rebasepro/server-postgresql";
+import { createPostgresBootstrapper } from "@rebasepro/server-postgres";
 
 async function startServer() {
     const app = express();
@@ -181,7 +181,7 @@ startServer();
 > **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, guards against repeated signals, and force-exits if shutdown hangs:
 >
 > ```ts
-> import { installShutdownHandlers } from "@rebasepro/server-core";
+> import { installShutdownHandlers } from "@rebasepro/server";
 >
 > const backend = await initializeRebaseBackend({ ... });
 > installShutdownHandlers(backend, { onCleanup: () => pool.end() });

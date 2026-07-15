@@ -67,8 +67,8 @@ Authentication is configured via the `auth` property of `initializeRebaseBackend
 ### Minimal Example
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 
 await initializeRebaseBackend({
   server,
@@ -230,7 +230,7 @@ You can register any OAuth provider by implementing the `OAuthProvider<T>` inter
 
 ```typescript
 import { z } from "zod";
-import type { OAuthProvider, OAuthProviderProfile } from "@rebasepro/server-core";
+import type { OAuthProvider, OAuthProviderProfile } from "@rebasepro/server";
 
 const myProvider: OAuthProvider<{ token: string }> = {
   id: "my-provider",
@@ -936,7 +936,7 @@ API keys have their own per-key rate limiter. The `rate_limit` on each key speci
 ### Custom Rate Limiter
 
 ```typescript
-import { createRateLimiter } from "@rebasepro/server-core";
+import { createRateLimiter } from "@rebasepro/server";
 
 const myLimiter = createRateLimiter({
   windowMs: 60 * 1000,         // 1 minute
@@ -990,7 +990,7 @@ interface AuthenticatedUser {
 The simplest way to plug an existing auth system into Rebase. Only `verifyRequest` is required:
 
 ```typescript
-import { createCustomAuthAdapter } from "@rebasepro/server-core";
+import { createCustomAuthAdapter } from "@rebasepro/server";
 import jwt from "jsonwebtoken";
 
 const auth = createCustomAuthAdapter({
@@ -1310,14 +1310,14 @@ All auth endpoints validate input with Zod schemas:
 
 ## References
 
-- Source: `packages/server-core/src/auth/` — All auth implementation
-- Source: `packages/server-core/src/auth/routes.ts` — REST auth endpoints
-- Source: `packages/server-core/src/auth/auth-hooks.ts` — Lifecycle hooks
-- Source: `packages/server-core/src/auth/api-keys/` — API key system
-- Source: `packages/server-core/src/auth/rate-limiter.ts` — Rate limiting
-- Source: `packages/server-core/src/init.ts` — `RebaseAuthConfig` and backend init
+- Source: `packages/server/src/auth/` — All auth implementation
+- Source: `packages/server/src/auth/routes.ts` — REST auth endpoints
+- Source: `packages/server/src/auth/auth-hooks.ts` — Lifecycle hooks
+- Source: `packages/server/src/auth/api-keys/` — API key system
+- Source: `packages/server/src/auth/rate-limiter.ts` — Rate limiting
+- Source: `packages/server/src/init.ts` — `RebaseAuthConfig` and backend init
 - Source: `packages/client/src/auth.ts` — Client SDK auth module
 - Source: `packages/types/src/types/auth_adapter.ts` — `AuthAdapter` interface
-- Source: `packages/server-core/src/auth/rls-scope.ts` — RLS scoping
-- Source: `packages/server-core/src/email/types.ts` — Email configuration
+- Source: `packages/server/src/auth/rls-scope.ts` — RLS scoping
+- Source: `packages/server/src/email/types.ts` — Email configuration
 - **Reserved Identities**: `"service"` / `"anon"` / `"api-key:{id}"` — see [Row-Level Security > Reserved System Identities](#reserved-system-identities)

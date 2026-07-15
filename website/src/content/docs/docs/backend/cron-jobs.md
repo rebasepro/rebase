@@ -18,11 +18,11 @@ Cron jobs follow the same **file-based discovery** pattern as custom functions: 
 
 ## Defining a Cron Job
 
-Create a file in your `backend/crons/` directory that default-exports a cron definition. Use the `defineCron` helper from `@rebasepro/server-core` for type inference and autocomplete:
+Create a file in your `backend/crons/` directory that default-exports a cron definition. Use the `defineCron` helper from `@rebasepro/server` for type inference and autocomplete:
 
 ```typescript
 // backend/crons/health-check.ts
-import { defineCron } from "@rebasepro/server-core";
+import { defineCron } from "@rebasepro/server";
 
 export default defineCron({
     schedule: "*/5 * * * *",     // every 5 minutes
@@ -151,7 +151,7 @@ The `ctx.client` parameter provides direct, server-side access to all Rebase ser
 
 ```typescript
 // backend/crons/expire-users.ts
-import { defineCron } from "@rebasepro/server-core";
+import { defineCron } from "@rebasepro/server";
 
 export default defineCron({
     schedule: "0 0 * * *", // Daily at midnight
@@ -349,7 +349,7 @@ On startup, the scheduler reads stats from this table via aggregate queries (`CO
 ```typescript
 // backend/crons/cleanup-sessions.ts
 import type { CronJobDefinition } from "@rebasepro/types";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const job: CronJobDefinition = {
     schedule: "0 3 * * *",  // daily at 3 AM

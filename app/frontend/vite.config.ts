@@ -99,7 +99,7 @@ template: "raw-data" })
             "@rebasepro/ui": path.resolve(__dirname, "../../packages/ui/src"),
             "@rebasepro/ui/index.css": path.resolve(__dirname, "../../packages/ui/index.css"),
             "@rebasepro/forms": path.resolve(__dirname, "../../packages/forms/src"),
-            "@rebasepro/client-postgresql": path.resolve(__dirname, "../../packages/client-postgresql/src"),
+            "@rebasepro/client-postgres": path.resolve(__dirname, "../../packages/client-postgres/src"),
             "@rebasepro/client-firebase": path.resolve(__dirname, "../../packages/client-firebase/src"),
             "@rebasepro/plugin-data-enhancement": path.resolve(__dirname, "../../packages/plugin-data-enhancement/src"),
             "@rebasepro/plugin-insights": path.resolve(__dirname, "../../packages/plugin-insights/src"),

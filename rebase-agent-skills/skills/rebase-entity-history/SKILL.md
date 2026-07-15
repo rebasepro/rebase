@@ -16,7 +16,7 @@ Rebase includes a built-in entity history system that records entities of every 
 Add `history: true` (or a configuration object) to `initializeRebaseBackend()`:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { initializeRebaseBackend } from "@rebasepro/server";
 
 await initializeRebaseBackend({
     app,
@@ -354,7 +354,7 @@ The `HistoryService` also exposes a `pruneExpired()` method for global TTL-based
 
 ```typescript
 // In a cron job handler (e.g., backend/src/crons/prune-history.ts)
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 export default {
     schedule: "0 3 * * *",  // Daily at 3 AM
@@ -395,8 +395,8 @@ For custom client applications, use `fetch()` directly against the REST endpoint
 // backend/src/index.ts
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { initializeRebaseBackend, loadEnv } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
 import dotenv from "dotenv";
 

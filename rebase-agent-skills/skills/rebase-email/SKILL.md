@@ -14,7 +14,7 @@ Rebase includes a built-in email system that powers password reset, email verifi
 Email is configured via the `email` property inside `auth` in `initializeRebaseBackend()`:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { initializeRebaseBackend } from "@rebasepro/server";
 
 const backend = await initializeRebaseBackend({
     server, app,
@@ -137,7 +137,7 @@ smtp: { host: "smtp.mailgun.org", port: 587, auth: { user: "postmaster@your-doma
 A common pattern is to use `loadEnv` with extended variables:
 
 ```typescript
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 import { z } from "zod";
 
 export const env = loadEnv({
@@ -204,7 +204,7 @@ Rebase ships four built-in HTML email templates. All templates include both HTML
 
 ### Template Functions
 
-Each built-in template is a standalone function exported from `@rebasepro/server-core`:
+Each built-in template is a standalone function exported from `@rebasepro/server`:
 
 ```typescript
 import {
@@ -212,7 +212,7 @@ import {
     getEmailVerificationTemplate,
     getUserInvitationTemplate,
     getWelcomeEmailTemplate,
-} from "@rebasepro/server-core";
+} from "@rebasepro/server";
 ```
 
 #### getPasswordResetTemplate
@@ -411,7 +411,7 @@ auth: {
 When email is configured, the email service is automatically attached to the `rebase` server-side singleton as `rebase.email`. This allows sending emails programmatically from custom functions, cron jobs, and collection callbacks.
 
 ```typescript
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 // Check if email is available
 if (rebase.email) {
@@ -428,7 +428,7 @@ if (rebase.email) {
 
 ```typescript
 // functions/send-report.ts
-import { defineFunction } from "@rebasepro/server-core";
+import { defineFunction } from "@rebasepro/server";
 
 export default defineFunction({
     method: "POST",
@@ -454,7 +454,7 @@ export default defineFunction({
 
 ```typescript
 // crons/weekly-digest.ts
-import { defineCron } from "@rebasepro/server-core";
+import { defineCron } from "@rebasepro/server";
 
 export default defineCron({
     schedule: "0 9 * * 1",  // Every Monday at 9 AM
@@ -483,7 +483,7 @@ export default defineCron({
 ### Checking Email Configuration
 
 ```typescript
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 // rebase.email is undefined when no email config is provided at all
 if (!rebase.email) {
@@ -604,8 +604,8 @@ When using a custom `sendEmail` function instead of SMTP, `verifyConnection()` s
 ```typescript
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { initializeRebaseBackend, loadEnv } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
 import { z } from "zod";
 

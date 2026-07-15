@@ -12,9 +12,9 @@ import {
     listenWithPortRetry,
     cleanupDevPortFile,
     logger
-} from "@rebasepro/server-core";
+} from "@rebasepro/server";
 import type { SecurityRule } from "@rebasepro/types";
-import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env.js";
 
 const __filename = fileURLToPath(import.meta.url);

@@ -55,9 +55,9 @@ const PACKAGE_SRC_DIRS = [
     path.join(REPO_ROOT, "packages/common/src"),
     path.join(REPO_ROOT, "packages/core/src"),
     path.join(REPO_ROOT, "packages/admin/src"),
-    path.join(REPO_ROOT, "packages/server-core/src"),
-    path.join(REPO_ROOT, "packages/server-postgresql/src"),
-    path.join(REPO_ROOT, "packages/server-mongodb/src"),
+    path.join(REPO_ROOT, "packages/server/src"),
+    path.join(REPO_ROOT, "packages/server-postgres/src"),
+    path.join(REPO_ROOT, "packages/server-mongo/src"),
     path.join(REPO_ROOT, "packages/client/src"),
     path.join(REPO_ROOT, "packages/studio/src"),
 ];

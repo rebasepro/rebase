@@ -5,7 +5,7 @@ description: Guide for sending outbound HTTP webhooks on entity changes in a Reb
 
 # Rebase Webhooks
 
-> **IMPORTANT FOR AGENTS**: The `WebhookDispatcher` is a **standalone service class** exported from `@rebasepro/server-core`. It is **not** auto-wired into the backend init pipeline — you must instantiate it yourself and call `onEntityChange()` from your application code (e.g. collection callbacks, custom functions, or cron jobs). Do NOT look for a `webhooks` key in `RebaseBackendConfig`.
+> **IMPORTANT FOR AGENTS**: The `WebhookDispatcher` is a **standalone service class** exported from `@rebasepro/server`. It is **not** auto-wired into the backend init pipeline — you must instantiate it yourself and call `onEntityChange()` from your application code (e.g. collection callbacks, custom functions, or cron jobs). Do NOT look for a `webhooks` key in `RebaseBackendConfig`.
 
 > **IMPORTANT FOR AGENTS**: Webhooks are **outbound** HTTP POST requests sent by your Rebase backend to external URLs. They are NOT inbound endpoints. To receive webhooks FROM external services, use Rebase custom functions instead (see `rebase-custom-functions` skill).
 
@@ -25,8 +25,8 @@ Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notificatio
 ### Import and Instantiate
 
 ```typescript
-import { WebhookDispatcher } from "@rebasepro/server-core/services/webhook-service";
-import type { WebhookConfig } from "@rebasepro/server-core/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
+import type { WebhookConfig } from "@rebasepro/server/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
 ```
@@ -362,7 +362,7 @@ The most common pattern is to wire the dispatcher into Rebase collection callbac
 ```typescript
 // backend/collections/orders.ts
 import type { CollectionConfig, CollectionCallbacks } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server-core/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
 dispatcher.setWebhooks([
@@ -414,7 +414,7 @@ Trigger webhooks from a custom function endpoint:
 ```typescript
 // backend/functions/process-payment.ts
 import type { RebaseFunctionDefinition } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server-core/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
 dispatcher.setWebhooks([
@@ -469,8 +469,8 @@ For applications with many collections, create a single shared dispatcher:
 
 ```typescript
 // backend/lib/webhooks.ts
-import { WebhookDispatcher } from "@rebasepro/server-core/services/webhook-service";
-import type { WebhookConfig } from "@rebasepro/server-core/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
+import type { WebhookConfig } from "@rebasepro/server/services/webhook-service";
 
 const dispatcher = new WebhookDispatcher();
 

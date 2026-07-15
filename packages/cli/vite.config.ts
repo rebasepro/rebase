@@ -33,8 +33,8 @@ export default defineConfig(() => ({
     },
         resolve: {
         alias: {
-            "@rebasepro/server-core": path.resolve(__dirname, "../server-core/src"),
-            "@rebasepro/codegen": path.resolve(__dirname, "../sdk-generator/src"),
+            "@rebasepro/server": path.resolve(__dirname, "../server/src"),
+            "@rebasepro/codegen": path.resolve(__dirname, "../codegen/src"),
             "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },

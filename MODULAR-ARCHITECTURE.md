@@ -54,7 +54,7 @@ What it drops:
 - The admin SPA (`serveSPA` is never called)
 - Every React package
 
-Install: `@rebasepro/server-core` + a driver (`@rebasepro/server-postgresql`) +
+Install: `@rebasepro/server` + a driver (`@rebasepro/server-postgres`) +
 `@rebasepro/client` for the SDK. No `react` in the dependency tree.
 
 ## 2. CMS mode — collections drive the UI
@@ -129,7 +129,7 @@ Full            studio → client, common, core, types, ui, utils
                 plugin-insights, plugin-data-enhancement
 ```
 
-`serveSPA` (`packages/server-core/src/serve-spa.ts`) is the only place the backend
+`serveSPA` (`packages/server/src/serve-spa.ts`) is the only place the backend
 touches the admin bundle, and it is called from the *application* entry point, never
 from the framework. BaaS deployments simply never call it.
 
@@ -162,7 +162,7 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
   (`workspace:*` deps resolve nowhere else), so it's what proves the template rather
   than the library behind it. It also asserts no `react` in the install tree — the
   guard above can't see templates.
-- `packages/server-core/test/init-mode.test.ts` — the mode contract: which collections
+- `packages/server/test/init-mode.test.ts` — the mode contract: which collections
   register, and that the schema editor follows the mode and `NODE_ENV`.
 - A driver that cannot introspect fails `baas` mode at boot rather than serving
   nothing: reporting no collections means it never looked, so `init` throws and names

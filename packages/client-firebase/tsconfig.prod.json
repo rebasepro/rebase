@@ -11,6 +11,6 @@
     "dist",
     "../core/src",
     "../plugin-data-enhancement/src",
-    "../schema-inference/src"
+    "../inference/src"
   ]
 }

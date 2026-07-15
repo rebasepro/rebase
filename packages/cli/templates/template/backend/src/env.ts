@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);

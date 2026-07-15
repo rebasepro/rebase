@@ -93,14 +93,14 @@ binary with `PG_DUMP_PATH` / `PG_RESTORE_PATH`.
 
 ## Scheduled backups
 
-Scheduled backups plug into the built-in [cron system](../packages/server-core/src/cron).
+Scheduled backups plug into the built-in [cron system](../packages/server/src/cron).
 Drop a cron file into your backend's `crons/` directory that default-exports a
 backup job. The job dumps the database, uploads it via your **already-configured
 storage backend**, and prunes old backups by retention policy.
 
 ```ts
 // backend/crons/backup.ts
-import { createBackupCron, backupCronConfigFromEnv } from "@rebasepro/server-postgresql";
+import { createBackupCron, backupCronConfigFromEnv } from "@rebasepro/server-postgres";
 import { storage } from "../src/storage"; // your configured StorageController
 
 const resolved = backupCronConfigFromEnv(process.env);

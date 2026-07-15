@@ -252,7 +252,7 @@ Die Persistenz ist nicht blockierend. Schlägt ein Datenbank-Schreibvorgang fehl
 ```typescript
 // backend/crons/cleanup-sessions.ts
 import type { CronJobDefinition } from "@rebasepro/types";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const job: CronJobDefinition = {
     schedule: "0 3 * * *",  // täglich um 3 Uhr morgens

@@ -70,8 +70,8 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 Das an `initializeRebaseBackend()` übergebene `RebaseBackendConfig`-Objekt bietet programmatische Steuerung:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env";
 
 await initializeRebaseBackend({

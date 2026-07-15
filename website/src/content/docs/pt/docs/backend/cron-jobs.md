@@ -252,7 +252,7 @@ A persistência não é bloqueante. Se uma gravação no banco de dados falhar, 
 ```typescript
 // backend/crons/cleanup-sessions.ts
 import type { CronJobDefinition } from "@rebasepro/types";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const job: CronJobDefinition = {
     schedule: "0 3 * * *",  // daily at 3 AM

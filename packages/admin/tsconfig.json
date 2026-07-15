@@ -50,7 +50,7 @@
         "../core/src"
       ],
       "@rebasepro/forms": [
-        "../formex/src"
+        "../forms/src"
       ],
       "@rebasepro/utils": [
         "../utils/src"

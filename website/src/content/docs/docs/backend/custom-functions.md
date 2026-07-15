@@ -206,7 +206,7 @@ Using the driver ensures that users can only query or update records they are au
 ```typescript
 // backend/functions/my-products.ts
 import { Hono } from "hono";
-import { HonoEnv } from "@rebasepro/server-core"; // Import types for typing Hono context
+import { HonoEnv } from "@rebasepro/server"; // Import types for typing Hono context
 
 const app = new Hono<HonoEnv>();
 
@@ -232,12 +232,12 @@ export default app;
 
 ### 2. Via the Rebase Singleton (Bypasses RLS - Admin Access)
 
-The `@rebasepro/server-core` package provides a `rebase` singleton that has **full administrative privileges** (no RLS). Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
+The `@rebasepro/server` package provides a `rebase` singleton that has **full administrative privileges** (no RLS). Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
 
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const app = new Hono();
 

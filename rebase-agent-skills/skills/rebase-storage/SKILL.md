@@ -75,7 +75,7 @@ These options are set internally when mounting routes but are derived from the b
 Store files on the local filesystem. Best for development and simple single-server deployments.
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
+import { initializeRebaseBackend } from "@rebasepro/server";
 
 const backend = await initializeRebaseBackend({
     server, app,
@@ -265,7 +265,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 `getType`). It is `undefined` only if no `storage` is configured — guard for that.
 
 ```typescript
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 // Store bytes (e.g. a generated report, an uploaded build context, a thumbnail)
 if (!rebase.storage) throw new Error("Object storage is not configured");
@@ -303,7 +303,7 @@ await s3.send(new PutObjectCommand({ Bucket, Key, Body }));        // ❌ bypass
 ✅ **Correct:** `await rebase.storage.putObject({ key, file })` (above).
 
 *(The only place a cloud SDK is imported directly is inside the storage
-controllers in `@rebasepro/server-core` themselves — application code always goes
+controllers in `@rebasepro/server` themselves — application code always goes
 through `rebase.storage`.)*
 
 ## REST API Endpoints
@@ -937,7 +937,7 @@ File type application/zip is not allowed. Allowed types: image/jpeg, image/png
 The storage module exports two convenience arrays:
 
 ```typescript
-import { IMAGE_MIME_TYPES, DOCUMENT_MIME_TYPES } from "@rebasepro/server-core";
+import { IMAGE_MIME_TYPES, DOCUMENT_MIME_TYPES } from "@rebasepro/server";
 
 // IMAGE_MIME_TYPES:
 // ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff"]

@@ -148,12 +148,12 @@ Benutzerdefinierte Funktionen laufen neben Rebase, sodass Sie über zwei Ansätz
 
 ### 1. Über das Rebase Singleton (Empfohlen)
 
-Das Paket `@rebasepro/server-core` stellt ein `rebase`-Singleton bereit, das Ihnen von überall in Ihrem Backend Administratorzugriff auf alle app-spezifischen Dienste (Daten, Authentifizierung, Speicher, E-Mail) ermöglicht.
+Das Paket `@rebasepro/server` stellt ein `rebase`-Singleton bereit, das Ihnen von überall in Ihrem Backend Administratorzugriff auf alle app-spezifischen Dienste (Daten, Authentifizierung, Speicher, E-Mail) ermöglicht.
 
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const app = new Hono();
 

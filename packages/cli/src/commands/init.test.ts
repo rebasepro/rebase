@@ -365,8 +365,8 @@ describe("template package.json contracts", () => {
 
     it("backend package.json has required dependencies", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "backend", "package.json"), "utf-8"));
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/server-core");
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/server-postgresql");
+        expect(pkg.dependencies).toHaveProperty("@rebasepro/server");
+        expect(pkg.dependencies).toHaveProperty("@rebasepro/server-postgres");
         expect(pkg.dependencies).toHaveProperty("hono");
         expect(pkg.dependencies).toHaveProperty("drizzle-orm");
     });

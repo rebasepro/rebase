@@ -230,11 +230,11 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/ui` | Standalone React component library (Tailwind + Radix) |
 | `@rebasepro/core` | Core CMS logic and controllers |
 | `@rebasepro/client` | Client-side data access layer |
-| `@rebasepro/client-postgresql` | PostgreSQL client adapter |
+| `@rebasepro/client-postgres` | PostgreSQL client adapter |
 | `@rebasepro/client-firebase` | Firebase/Firestore client adapter |
-| `@rebasepro/server-core` | Server framework and middleware (Hono) |
-| `@rebasepro/server-postgresql` | PostgreSQL server adapter with Drizzle |
-| `@rebasepro/server-mongodb` | MongoDB server adapter |
+| `@rebasepro/server` | Server framework and middleware (Hono) |
+| `@rebasepro/server-postgres` | PostgreSQL server adapter with Drizzle |
+| `@rebasepro/server-mongo` | MongoDB server adapter |
 | `@rebasepro/auth` | Authentication controllers and login views |
 | `@rebasepro/admin` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, RLS editor, schema visualizer, API explorer |

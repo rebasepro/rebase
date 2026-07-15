@@ -252,7 +252,7 @@ La persistencia no es bloqueante. Si una escritura en la base de datos falla, el
 ```typescript
 // backend/crons/cleanup-sessions.ts
 import type { CronJobDefinition } from "@rebasepro/types";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const job: CronJobDefinition = {
     schedule: "0 3 * * *",  // daily at 3 AM

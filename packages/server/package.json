@@ -1,0 +1,116 @@
+{
+  "name": "@rebasepro/server",
+  "type": "module",
+  "version": "0.9.0",
+  "description": "Database-Agnostic Backend Core for Rebase",
+  "funding": {
+    "url": "https://github.com/sponsors/rebaseco"
+  },
+  "author": "Rebase",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/server"
+  },
+  "main": "./dist/index.umd.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "source": "src/index.ts",
+  "engines": {
+    "node": ">=14"
+  },
+  "keywords": [
+    "rebase",
+    "cms",
+    "admin",
+    "admin panel",
+    "postgresql",
+    "drizzle",
+    "backend",
+    "database"
+  ],
+  "scripts": {
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "watch": "vite build --watch",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json",
+    "test:lint": "eslint \"src/**\" --quiet",
+    "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --passWithNoTests --forceExit",
+    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./dist/index.es.js",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.umd.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.0.4",
+    "@rebasepro/client": "workspace:*",
+    "@rebasepro/common": "workspace:*",
+    "@rebasepro/types": "workspace:*",
+    "@rebasepro/utils": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.25",
+    "jsonwebtoken": "^9.0.3",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.9.3",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "cross-env": "^10.1.0",
+    "jest": "^30.4.2",
+    "ts-jest": "29.4.11",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-s3": "^3.1068.0",
+    "@aws-sdk/s3-request-presigner": "^3.1068.0",
+    "@google-cloud/storage": "^7.0.0",
+    "google-auth-library": "^10.7.0",
+    "nodemailer": "^9.0.0",
+    "sharp": "^0.35.1",
+    "ts-morph": "28.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@aws-sdk/s3-request-presigner": {
+      "optional": true
+    },
+    "@google-cloud/storage": {
+      "optional": true
+    },
+    "google-auth-library": {
+      "optional": true
+    },
+    "nodemailer": {
+      "optional": true
+    },
+    "sharp": {
+      "optional": true
+    },
+    "ts-morph": {
+      "optional": true
+    }
+  },
+  "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ]
+}

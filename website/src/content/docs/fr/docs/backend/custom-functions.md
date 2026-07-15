@@ -148,12 +148,12 @@ Les fonctions personnalisées s'exécutent aux côtés de Rebase, vous pouvez do
 
 ### 1. Via le Singleton Rebase (Recommandé)
 
-Le package `@rebasepro/server-core` fournit un singleton `rebase` qui vous donne un accès de niveau administrateur à tous les services (données, authentification, stockage, e-mail) liés à l'application, depuis n'importe où dans votre backend.
+Le package `@rebasepro/server` fournit un singleton `rebase` qui vous donne un accès de niveau administrateur à tous les services (données, authentification, stockage, e-mail) liés à l'application, depuis n'importe où dans votre backend.
 
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
-import { rebase } from "@rebasepro/server-core";
+import { rebase } from "@rebasepro/server";
 
 const app = new Hono();
 

@@ -19,8 +19,8 @@ El backend de Rebase es un **servidor Node.js** construido sobre [Hono](https://
 Todo se inicializa con una única función:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env";
 
 const instance = await initializeRebaseBackend({
@@ -117,7 +117,7 @@ instance.historyService      // Entity history
 instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
 ```
 
-> **Nota:** Aunque la `instance` expone estos servicios internos, el código de la aplicación (como funciones personalizadas y tareas cron) debe usar el singleton global `rebase` de `@rebasepro/server-core` para interactuar con la API del backend.
+> **Nota:** Aunque la `instance` expone estos servicios internos, el código de la aplicación (como funciones personalizadas y tareas cron) debe usar el singleton global `rebase` de `@rebasepro/server` para interactuar con la API del backend.
 
 ## API REST
 

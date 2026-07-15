@@ -63,8 +63,8 @@ const rebaseClient = createRebaseClient({
 O backend é um **servidor Node.js** construído sobre [Hono](https://hono.dev/) (um framework HTTP rápido e leve). O ponto de entrada `index.ts` inicializa tudo:
 
 ```typescript title="backend/src/index.ts"
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { Hono } from "hono";
 
 const app = new Hono();

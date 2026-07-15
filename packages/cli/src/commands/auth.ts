@@ -197,8 +197,8 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         env.REBASE_ENV_FILE_PATH = envFile || path.join(projectRoot, ".env");
 
         const scriptContent = `
-import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
-import { hashPassword } from "@rebasepro/server-core";
+import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import { hashPassword } from "@rebasepro/server";
 import { eq } from "drizzle-orm";
 import * as dotenv from "dotenv";
 import path from "path";
@@ -225,7 +225,7 @@ async function resetPassword() {
     }
 
     if (!usersTable) {
-        const pgServer = await import("@rebasepro/server-postgresql");
+        const pgServer = await import("@rebasepro/server-postgres");
         usersTable = pgServer.users;
     }
 

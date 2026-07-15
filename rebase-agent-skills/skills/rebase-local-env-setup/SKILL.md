@@ -124,7 +124,7 @@ Then edit `app/.env` with your local values. The **minimum** required variables 
 | `PORT` | `3001` | Backend listen port (default: `3001`). |
 | `FRONTEND_URL` | `http://localhost:5173` | Used in password-reset / verification emails. |
 
-> **WARNING FOR AGENTS:** `JWT_SECRET` must be ≥ 32 characters (enforced by Zod validation in `packages/server-core/src/env.ts`). In dev mode, if `JWT_SECRET` is empty the server auto-generates a random one — but this means **all user sessions are lost on every restart**. Always recommend setting an explicit value:
+> **WARNING FOR AGENTS:** `JWT_SECRET` must be ≥ 32 characters (enforced by Zod validation in `packages/server/src/env.ts`). In dev mode, if `JWT_SECRET` is empty the server auto-generates a random one — but this means **all user sessions are lost on every restart**. Always recommend setting an explicit value:
 > ```env
 > JWT_SECRET=change-me-to-a-random-string-at-least-32-chars-long!!
 > ```
@@ -185,5 +185,5 @@ The frontend proxies API requests to the backend via `VITE_API_URL`.
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
 - **Env reference:** `app/.env.example` (69 vars with inline documentation)
-- **Env validation:** `packages/server-core/src/env.ts` (Zod schema + auto-generated secrets logic)
+- **Env validation:** `packages/server/src/env.ts` (Zod schema + auto-generated secrets logic)
 - **CLI source:** `packages/cli/src/cli.ts` (all commands and help text)

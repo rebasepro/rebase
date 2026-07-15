@@ -124,7 +124,7 @@ export default [
         files: [
             "packages/utils/src/**/*.{ts,tsx}",
             "packages/common/src/**/*.{ts,tsx}",
-            "packages/server-core/src/**/*.{ts,tsx}"
+            "packages/server/src/**/*.{ts,tsx}"
         ],
         rules: {
             "@typescript-eslint/no-explicit-any": "error"

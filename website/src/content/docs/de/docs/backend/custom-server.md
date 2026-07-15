@@ -8,15 +8,15 @@ description: So betten Sie Rebase-Datenbank- und Echtzeitdienste in Ihr eigenes 
 
 Rebase wurde so konzipiert, dass es vollständig modular ist. Während der Koordinator `initializeRebaseBackend` ein komplettes, einsatzbereites Backend mit Hono bereitstellt, können Sie diesen komplett umgehen und den Core **Datenbank-Adapter** sowie **Echtzeit-WebSockets** direkt in Ihre eigene Node.js-Anwendung (wie Express, Fastify oder reines Node.js HTTP) einbetten.
 
-Das Paket `@rebasepro/server-postgresql` ist vollständig framework-agnostisch. Es hängt nur von Drizzle ORM und dem Standard-Node.js-`http.Server` ab.
+Das Paket `@rebasepro/server-postgres` ist vollständig framework-agnostisch. Es hängt nur von Drizzle ORM und dem Standard-Node.js-`http.Server` ab.
 
 ## Umgebungskonfiguration
 
-Rebase bietet ein zentrales Hilfsprogramm `loadEnv()` in `@rebasepro/server-core`, das Ihre Umgebungsvariablen anhand eines strengen Zod-Schemas validiert. Rufen Sie es auf, **nachdem** Sie Ihre `.env`-Datei geladen haben:
+Rebase bietet ein zentrales Hilfsprogramm `loadEnv()` in `@rebasepro/server`, das Ihre Umgebungsvariablen anhand eines strengen Zod-Schemas validiert. Rufen Sie es auf, **nachdem** Sie Ihre `.env`-Datei geladen haben:
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv } from "@rebasepro/server-core";
+import { loadEnv } from "@rebasepro/server";
 
 dotenv.config({ path: "../../.env" });
 
@@ -52,7 +52,7 @@ Hier ist ein vollständiges Beispiel dafür, wie der Rebase-PostgreSQL-Adapter u
 Sie benötigen das Postgres-Server-Paket zusammen mit Express:
 
 ```bash
-npm install @rebasepro/server-postgresql @rebasepro/types express
+npm install @rebasepro/server-postgres @rebasepro/types express
 ```
 
 ### 2. Initialisierungsbeispiel
@@ -60,7 +60,7 @@ npm install @rebasepro/server-postgresql @rebasepro/types express
 ```typescript
 import express from 'express';
 import { createServer } from 'http';
-import { createPostgresBootstrapper } from '@rebasepro/server-postgresql';
+import { createPostgresBootstrapper } from '@rebasepro/server-postgres';
 
 async function startServer() {
     const app = express();

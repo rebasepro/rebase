@@ -350,7 +350,7 @@ export interface RebaseClient<DB = unknown> {
 
 /**
  * The server-side Rebase surface — the shape of the `rebase` singleton exported
- * from `@rebasepro/server-core`.
+ * from `@rebasepro/server`.
  *
  * Narrows {@link RebaseClient} to the guarantees that always hold on the server:
  * the admin-scoped {@link dataAsAdmin} accessor, raw {@link sql}, and the

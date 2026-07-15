@@ -3,7 +3,7 @@
  * Uploads static seed images to storage (local or S3/MinIO) and seeds all collections.
  * Run with: npx tsx src/seed.ts
  */
-import { createPostgresDatabaseConnection } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { env } from "./env.js";
 import {
     authors, posts, tags, products, orders,

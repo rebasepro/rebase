@@ -13,9 +13,9 @@ import {
     listenWithPortRetry,
     cleanupDevPortFile,
     logger
-} from "@rebasepro/server-core";
+} from "@rebasepro/server";
 import type { SecurityRule } from "@rebasepro/types";
-import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { enums, relations, tables } from "./schema.generated.js";
 import { env } from "./env.js";
 import usersCollection from "../../config/collections/users.js";

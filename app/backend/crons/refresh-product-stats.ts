@@ -1,4 +1,4 @@
-import { defineCron } from "@rebasepro/server-core";
+import { defineCron } from "@rebasepro/server";
 
 export default defineCron({
     name: "Refresh product stats",

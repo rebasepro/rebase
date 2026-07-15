@@ -58,7 +58,7 @@ export function findBackendDir(projectRoot: string): string | null {
 }
 
 /**
- * Detect the active backend plugin (e.g. @rebasepro/server-postgresql) from the backend's package.json.
+ * Detect the active backend plugin (e.g. @rebasepro/server-postgres) from the backend's package.json.
  */
 export function getActiveBackendPlugin(backendDir: string): string | null {
     const pkgPath = path.join(backendDir, "package.json");
@@ -71,14 +71,14 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
 
         // Collect all @rebasepro/server-* driver plugins (exclude server-core)
         const candidates = Object.keys(deps).filter(
-            dep => dep.startsWith("@rebasepro/server-") && dep !== "@rebasepro/server-core"
+            dep => dep.startsWith("@rebasepro/server-") && dep !== "@rebasepro/server"
         );
 
         if (candidates.length === 0) return null;
 
         // Prefer server-postgresql — it's the primary supported driver
-        if (candidates.includes("@rebasepro/server-postgresql")) {
-            return "@rebasepro/server-postgresql";
+        if (candidates.includes("@rebasepro/server-postgres")) {
+            return "@rebasepro/server-postgres";
         }
 
         // Fallback: return the first candidate that actually has a CLI entry point

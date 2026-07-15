@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+ * import { createPostgresAdapter } from "@rebasepro/server-postgres";
  *
  * initializeRebaseBackend({
  *   database: createPostgresAdapter({ connection: db, schema }),

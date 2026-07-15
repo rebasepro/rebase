@@ -77,8 +77,8 @@ All configuration is done via environment variables in your `.env` file at the p
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env";
 
 await initializeRebaseBackend({

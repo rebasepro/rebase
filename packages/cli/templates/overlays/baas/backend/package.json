@@ -10,8 +10,8 @@
         "start": "node dist/backend/src/index.js"
     },
     "dependencies": {
-        "@rebasepro/server-core": "workspace:*",
-        "@rebasepro/server-postgresql": "workspace:*",
+        "@rebasepro/server": "workspace:*",
+        "@rebasepro/server-postgres": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.12.10",

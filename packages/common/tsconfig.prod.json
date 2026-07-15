@@ -10,6 +10,6 @@
     "node_modules",
     "dist",
     "../ui/src",
-    "../formex/src",
+    "../forms/src",
   ]
 }

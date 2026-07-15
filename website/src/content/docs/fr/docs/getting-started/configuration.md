@@ -70,8 +70,8 @@ Toute la configuration est effectuée via des variables d'environnement dans vot
 L'objet `RebaseBackendConfig` passé à `initializeRebaseBackend()` offre un contrôle programmatique :
 
 ```typescript
-import { initializeRebaseBackend } from "@rebasepro/server-core";
-import { createPostgresAdapter } from "@rebasepro/server-postgresql";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env";
 
 await initializeRebaseBackend({
