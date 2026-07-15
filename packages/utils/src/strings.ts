@@ -37,8 +37,23 @@ export function camelCase(str: string): string {
             .join("");
 }
 
+/**
+ * A random base-36 string of exactly `strLength` characters.
+ *
+ * Not `Math.random().toString(36).slice(2, 2 + strLength)`: that has no
+ * guaranteed length. Base-36 of a double drops trailing zeros, so the source
+ * string is short about once in 36 calls and the slice quietly returns fewer
+ * characters than asked for — `randomString(10)` returning 9. These values
+ * prefix uploaded filenames to keep them apart, so a short one is a likelier
+ * collision, and it fails at the rate that makes a test look flaky.
+ */
 export function randomString(strLength = 5) {
-    return Math.random().toString(36).slice(2, 2 + strLength);
+    const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+    let result = "";
+    for (let i = 0; i < strLength; i++) {
+        result += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+    }
+    return result;
 }
 
 export function randomColor() {

@@ -95,6 +95,27 @@ describe("strings utils", () => {
 
             expect(str1).not.toBe(str2);
         });
+
+        it("should return the requested length every time", () => {
+            // Slicing a single Math.random().toString(36) came up short about
+            // once in 36 calls, which reads as a flaky test rather than the bug
+            // it is. Loop so a regression fails on every run.
+            for (let i = 0; i < 500; i++) {
+                expect(randomString(10)).toHaveLength(10);
+            }
+        });
+
+        it("should return lengths beyond what one Math.random() can supply", () => {
+            // A double gives ~11 base-36 digits, so anything longer cannot come
+            // from slicing one of them — this fails deterministically if it does.
+            for (const length of [1, 12, 24, 64]) {
+                expect(randomString(length)).toHaveLength(length);
+            }
+        });
+
+        it("should only use base-36 characters", () => {
+            expect(randomString(200)).toMatch(/^[0-9a-z]+$/);
+        });
     });
 
     describe("randomColor", () => {
