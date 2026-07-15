@@ -58,7 +58,7 @@ export interface RebaseSearchControllerOptions {
  *
  * @example
  * ```typescript
- * import { buildRebaseSearchController } from "@rebasepro/client-firebase";
+ * import { buildRebaseSearchController } from "@rebasepro/firebase";
  *
  * // Using the extension (recommended)
  * const textSearchControllerBuilder = buildRebaseSearchController();

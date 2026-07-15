@@ -10,7 +10,7 @@
     "node_modules",
     "dist",
     "../app/src",
-    "../plugin-data-enhancement/src",
+    "../plugin-ai/src",
     "../inference/src"
   ]
 }

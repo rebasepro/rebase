@@ -82,7 +82,7 @@ Assim como os drivers, os backends de armazenamento são registrados em um regis
 | `@rebasepro/studio` | Editor de coleções, console SQL, console JS, editor RLS, navegador de armazenamento | Frontend |
 | `@rebasepro/cli` | CLI para geração de esquema, migrações de BD, geração de SDK | Ferramentas de desenvolvimento |
 | `@rebasepro/forms` | Gerenciamento de estado de formulário React leve | Frontend |
-| `@rebasepro/plugin-data-enhancement` | Plugin de preenchimento automático de campo alimentado por IA | Frontend |
+| `@rebasepro/plugin-ai` | Plugin de preenchimento automático de campo alimentado por IA | Frontend |
 | `@rebasepro/plugin-data-import-export` | Importação e exportação CSV/JSON/Excel | Frontend |
 | `@rebasepro/inference` | Detecção automática de esquema a partir de dados de banco de dados existentes | Backend/CLI |
 

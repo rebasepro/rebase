@@ -10,7 +10,7 @@ import { useRebaseAuthController } from "@rebasepro/app";
 import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
 import type { RebasePlugin } from "@rebasepro/types";
-import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { useAppInsightsPlugin } from "./useAppInsightsPlugin";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";

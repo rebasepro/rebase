@@ -3,7 +3,7 @@ import React, { useCallback, useMemo } from "react";
 import "@fontsource/rubik";
 import "@fontsource/jetbrains-mono";
 
-import { FirebaseAccessGate, FirebaseUserWrapper, RebaseFirebaseApp } from "@rebasepro/client-firebase";
+import { FirebaseAccessGate, FirebaseUserWrapper, RebaseFirebaseApp } from "@rebasepro/firebase";
 import { demoCollection } from "./collections/demo";
 import { productsCollection } from "./collections/products";
 import { blogCollection } from "./collections/blog";

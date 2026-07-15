@@ -1,11 +1,11 @@
-# @rebasepro/plugin-data-enhancement
+# @rebasepro/plugin-ai
 
 AI-powered data autofill and text autocomplete plugin for Rebase.
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/plugin-data-enhancement
+pnpm add @rebasepro/plugin-ai
 ```
 
 **Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`, `react-router >= 6.28.0`, `react-router-dom >= 6.28.0`
@@ -38,7 +38,7 @@ It registers as a standard `RebasePlugin`, injecting UI slots and providers auto
 ## Quick Start
 
 ```tsx
-import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
 // In your app setup:
 const dataEnhancementPlugin = useDataEnhancementPlugin({
@@ -58,7 +58,7 @@ const dataEnhancementPlugin = useDataEnhancementPlugin({
 ### Editor AI Autocomplete
 
 ```tsx
-import { useEditorAIController } from "@rebasepro/plugin-data-enhancement";
+import { useEditorAIController } from "@rebasepro/plugin-ai";
 
 const aiController = useEditorAIController({
     getAuthToken: () => firebaseUser.getIdToken()

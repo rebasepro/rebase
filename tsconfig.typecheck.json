@@ -54,11 +54,11 @@
       "@rebasepro/client/*": [
         "packages/client/src/*"
       ],
-      "@rebasepro/client-firebase": [
-        "packages/client-firebase/src"
+      "@rebasepro/firebase": [
+        "packages/firebase/src"
       ],
-      "@rebasepro/client-firebase/*": [
-        "packages/client-firebase/src/*"
+      "@rebasepro/firebase/*": [
+        "packages/firebase/src/*"
       ],
       "@rebasepro/client-postgres": [
         "packages/client-postgres/src"
@@ -72,12 +72,6 @@
       "@rebasepro/common/*": [
         "packages/common/src/*"
       ],
-      "@rebasepro/app": [
-        "packages/app/src"
-      ],
-      "@rebasepro/app/*": [
-        "packages/app/src/*"
-      ],
       "@rebasepro/forms": [
         "packages/forms/src"
       ],
@@ -90,11 +84,11 @@
       "@rebasepro/mcp/*": [
         "packages/mcp/src/*"
       ],
-      "@rebasepro/plugin-data-enhancement": [
-        "packages/plugin-data-enhancement/src"
+      "@rebasepro/plugin-ai": [
+        "packages/plugin-ai/src"
       ],
-      "@rebasepro/plugin-data-enhancement/*": [
-        "packages/plugin-data-enhancement/src/*"
+      "@rebasepro/plugin-ai/*": [
+        "packages/plugin-ai/src/*"
       ],
       "@rebasepro/plugin-insights": [
         "packages/plugin-insights/src"
@@ -168,16 +162,14 @@
   },
   "include": [
     "packages/admin/src",
-    "packages/app/src",
     "packages/cli/src",
     "packages/client/src",
-    "packages/client-firebase/src",
+    "packages/firebase/src",
     "packages/client-postgres/src",
     "packages/common/src",
-    "packages/app/src",
     "packages/forms/src",
     "packages/mcp/src",
-    "packages/plugin-data-enhancement/src",
+    "packages/plugin-ai/src",
     "packages/plugin-insights/src",
     "packages/inference/src",
     "packages/codegen/src",

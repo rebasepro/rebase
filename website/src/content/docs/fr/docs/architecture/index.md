@@ -82,7 +82,7 @@ Pour les **déploiements multi-instances** (par exemple, Cloud Run avec plusieur
 | `@rebasepro/studio` | Éditeur de collection, console SQL, console JS, éditeur RLS, navigateur de stockage | Frontend |
 | `@rebasepro/cli` | CLI pour la génération de schéma, les migrations de DB, la génération de SDK | Outils de développement |
 | `@rebasepro/forms` | Gestion légère de l'état des formulaires React | Frontend |
-| `@rebasepro/plugin-data-enhancement` | Plugin d'auto-complétion de champ basé sur l'IA | Frontend |
+| `@rebasepro/plugin-ai` | Plugin d'auto-complétion de champ basé sur l'IA | Frontend |
 | `@rebasepro/plugin-data-import-export` | Importation et exportation CSV/JSON/Excel | Frontend |
 | `@rebasepro/inference` | Détection automatique du schéma à partir des données de base de données existantes | Backend/CLI |
 

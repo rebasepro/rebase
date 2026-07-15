@@ -8,7 +8,7 @@
     "@fontsource/rubik": "^5.2.8",
     "@rebasepro/admin": "workspace:*",
     "@rebasepro/app": "workspace:*",
-    "@rebasepro/client-firebase": "workspace:*",
+    "@rebasepro/firebase": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/types": "workspace:*",

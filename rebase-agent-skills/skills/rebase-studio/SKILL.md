@@ -149,7 +149,7 @@ The Studio is mounted using the declarative composition API. All four components
 import { useRebaseAuthController, useBackendUserManagement, RebaseAuth } from "@rebasepro/app";
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/admin";
-import { useDataEnhancementPlugin } from "@rebasepro/plugin-data-enhancement";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
@@ -762,7 +762,7 @@ This starts both frontend and backend. The Studio is accessible at `http://local
 | `@rebasepro/admin` | CMS frontend (`<RebaseCMS>`, `<RebaseShell>`, `CollectionPanel`, collection editor) |
 | `@rebasepro/ui` | Component library (Tailwind v4 + Radix) |
 | `@rebasepro/types` | Shared TypeScript types |
-| `@rebasepro/plugin-data-enhancement` | AI-powered autofill |
+| `@rebasepro/plugin-ai` | AI-powered autofill |
 | `@rebasepro/inference` | Auto-infer schema from data |
 
 ## References

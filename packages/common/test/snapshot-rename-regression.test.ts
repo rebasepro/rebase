@@ -109,7 +109,7 @@ describe("No Record-nouned components", () => {
 describe("Firebase SDK names preserved", () => {
 
     it("should still reference DocumentSnapshot in client-firebase", () => {
-        const firebaseDir = path.join(REPO_ROOT, "packages/client-firebase/src");
+        const firebaseDir = path.join(REPO_ROOT, "packages/firebase/src");
         const files = collectTsFiles(firebaseDir);
         const hasDocumentSnapshot = files.some(file => {
             const content = fs.readFileSync(file, "utf-8");
@@ -119,7 +119,7 @@ describe("Firebase SDK names preserved", () => {
     });
 
     it("should still reference onSnapshot in client-firebase", () => {
-        const firebaseDir = path.join(REPO_ROOT, "packages/client-firebase/src");
+        const firebaseDir = path.join(REPO_ROOT, "packages/firebase/src");
         const files = collectTsFiles(firebaseDir);
         const hasOnSnapshot = files.some(file => {
             const content = fs.readFileSync(file, "utf-8");

@@ -27,11 +27,8 @@
       "@rebasepro/app": [
         "../../packages/app/src"
       ],
-      "@rebasepro/app": [
-        "../../packages/app/src"
-      ],
-      "@rebasepro/client-firebase": [
-        "../../packages/client-firebase/src"
+      "@rebasepro/firebase": [
+        "../../packages/firebase/src"
       ],
       "@rebasepro/types": [
         "../../packages/types/src"

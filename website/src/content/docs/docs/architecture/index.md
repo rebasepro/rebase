@@ -82,7 +82,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/studio` | Collection editor, SQL console, JS console, RLS editor, storage browser | Frontend |
 | `@rebasepro/cli` | CLI for schema generation, DB migrations, SDK generation | Dev tooling |
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |
-| `@rebasepro/plugin-data-enhancement` | AI-powered field autocompletion plugin | Frontend |
+| `@rebasepro/plugin-ai` | AI-powered field autocompletion plugin | Frontend |
 | `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel import and export | Frontend |
 | `@rebasepro/inference` | Auto-detect schema from existing database data | Backend/CLI |
 

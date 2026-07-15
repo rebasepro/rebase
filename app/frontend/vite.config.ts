@@ -100,11 +100,10 @@ template: "raw-data" })
             "@rebasepro/ui/index.css": path.resolve(__dirname, "../../packages/ui/index.css"),
             "@rebasepro/forms": path.resolve(__dirname, "../../packages/forms/src"),
             "@rebasepro/client-postgres": path.resolve(__dirname, "../../packages/client-postgres/src"),
-            "@rebasepro/client-firebase": path.resolve(__dirname, "../../packages/client-firebase/src"),
-            "@rebasepro/plugin-data-enhancement": path.resolve(__dirname, "../../packages/plugin-data-enhancement/src"),
+            "@rebasepro/firebase": path.resolve(__dirname, "../../packages/firebase/src"),
+            "@rebasepro/plugin-ai": path.resolve(__dirname, "../../packages/plugin-ai/src"),
             "@rebasepro/plugin-insights": path.resolve(__dirname, "../../packages/plugin-insights/src"),
             "@rebasepro/inference": path.resolve(__dirname, "../../packages/inference/src"),
-            "@rebasepro/app": path.resolve(__dirname, "../../packages/app/src"),
             "@rebasepro/admin": path.resolve(__dirname, "../../packages/admin/src"),
             "@rebasepro/studio": path.resolve(__dirname, "../../packages/studio/src"),
             "config": path.resolve(__dirname, "../config")

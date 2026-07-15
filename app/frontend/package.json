@@ -10,7 +10,7 @@
         "@rebasepro/app": "workspace:*",
         "@rebasepro/client": "workspace:*",
         "@rebasepro/app": "workspace:*",
-        "@rebasepro/plugin-data-enhancement": "workspace:*",
+        "@rebasepro/plugin-ai": "workspace:*",
         "@rebasepro/plugin-insights": "workspace:*",
         "@rebasepro/studio": "workspace:*",
         "@rebasepro/types": "workspace:*",

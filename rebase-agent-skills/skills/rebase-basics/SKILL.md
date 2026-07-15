@@ -103,14 +103,14 @@ rebase/
 │   ├── auth/                 # @rebasepro/app
 │   ├── cli/                  # @rebasepro/cli
 │   ├── client/               # @rebasepro/client
-│   ├── client-firebase/      # @rebasepro/client-firebase
+│   ├── client-firebase/      # @rebasepro/firebase
 │   ├── client-postgresql/    # @rebasepro/client-postgres
 │   ├── common/               # @rebasepro/common
 │   ├── formex/               # @rebasepro/forms
 │   ├── mcp-server/           # @rebasepro/mcp
 │   ├── sdk-generator/        # @rebasepro/codegen
 │   ├── schema-inference/     # @rebasepro/inference
-│   ├── plugin-data-enhancement/ # @rebasepro/plugin-data-enhancement
+│   ├── plugin-data-enhancement/ # @rebasepro/plugin-ai
 │   └── utils/                # @rebasepro/utils
 ├── pnpm-workspace.yaml
 ├── lerna.json
@@ -131,14 +131,14 @@ rebase/
 | `@rebasepro/studio` | Admin panel, collection editor, visual schema editor | Studio-specific features and customization |
 | `@rebasepro/app` | Authentication module (client-side) | Frontend auth flows, login forms |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
-| `@rebasepro/client-firebase` | Firebase client adapter | When connecting to a Firebase backend |
+| `@rebasepro/firebase` | Firebase client adapter | When connecting to a Firebase backend |
 | `@rebasepro/client-postgres` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
 | `@rebasepro/common` | Shared utilities, `defaultUsersCollection` | Shared constants and default collection exports |
 | `@rebasepro/forms` | Form engine | Building dynamic forms from collection schemas |
 | `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |
 | `@rebasepro/codegen` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
 | `@rebasepro/inference` | Auto-infer schema from data / database introspection | Used by `rebase schema introspect` |
-| `@rebasepro/plugin-data-enhancement` | AI-powered data autofill | Studio plugin for auto-completing fields |
+| `@rebasepro/plugin-ai` | AI-powered data autofill | Studio plugin for auto-completing fields |
 | `@rebasepro/cli` | CLI tool | The `rebase` CLI binary |
 | `@rebasepro/utils` | Utility functions | Low-level shared helpers |
 

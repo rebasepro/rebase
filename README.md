@@ -231,7 +231,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/app` | Core CMS logic and controllers |
 | `@rebasepro/client` | Client-side data access layer |
 | `@rebasepro/client-postgres` | PostgreSQL client adapter |
-| `@rebasepro/client-firebase` | Firebase/Firestore client adapter |
+| `@rebasepro/firebase` | Firebase/Firestore client adapter |
 | `@rebasepro/server` | Server framework and middleware (Hono) |
 | `@rebasepro/server-postgres` | PostgreSQL server adapter with Drizzle |
 | `@rebasepro/server-mongo` | MongoDB server adapter |
@@ -242,7 +242,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/codegen` | TypeScript SDK code generation |
 | `@rebasepro/mcp` | MCP server for AI integrations |
 | `@rebasepro/inference` | Database schema introspection and inference |
-| `@rebasepro/plugin-data-enhancement` | AI-powered data enhancement plugin |
+| `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |
 
 ---

@@ -1,11 +1,11 @@
-# @rebasepro/client-firebase
+# @rebasepro/firebase
 
 Firebase client adapter for Rebase — connects the Rebase admin panel to Firebase (Firestore, Auth, Storage).
 
 ## Installation
 
 ```bash
-pnpm add @rebasepro/client-firebase
+pnpm add @rebasepro/firebase
 ```
 
 **Peer dependencies:** `firebase ^10.12.2 || ^11.0.0 || ^12.0.0`, `react >= 19.0.0`, `react-dom >= 19.0.0`, `typesense ^1.8.0` (optional)
@@ -68,7 +68,7 @@ This package provides the full Firebase integration layer for Rebase. It include
 ## Quick Start
 
 ```tsx
-import { RebaseFirebaseApp } from "@rebasepro/client-firebase";
+import { RebaseFirebaseApp } from "@rebasepro/firebase";
 
 const firebaseConfig = {
     apiKey: "...",
