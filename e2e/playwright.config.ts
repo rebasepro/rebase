@@ -1,7 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
 import { execSync } from "node:child_process";
+import path from "node:path";
 
 export const PORT = 5173;
+
+/**
+ * The API port, pinned.
+ *
+ * `rebase dev` otherwise derives one per project ("your .env PORT / VITE_API_URL
+ * are ignored here"), so the backend lands somewhere unpredictable — 3070 on
+ * this checkout. That matters because `webServer.url` below can only wait for
+ * one thing, and Vite binds 5173 whether or not the backend ever came up: the
+ * suite would start against a dead API and every login failed with
+ * ERR_CONNECTION_REFUSED, which surfaces as ten timeouts on a sidebar link.
+ * Pinning it lets globalSetup wait for the backend too. Not 3001 — that is the
+ * conventional port and the likeliest to be occupied by another project.
+ */
+export const API_PORT = 3199;
 
 /**
  * Did *this* run start the dev server, or adopt one that was already there?
@@ -32,7 +47,7 @@ export default defineConfig({
   workers: 1,
   reporter: "html",
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry"
   },
   projects: [
@@ -42,8 +57,10 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: "pnpm run dev",
-    url: "http://localhost:5173",
+    // `rebase dev` direct, rather than the root `dev` script, so --port reaches it.
+    command: `pnpm exec rebase dev --port ${API_PORT}`,
+    cwd: path.resolve(__dirname, "../app"),
+    url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI
   }
 });

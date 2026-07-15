@@ -124,3 +124,6 @@ og-template.html
 build_output.txt
 tsc_output.txt
 *_results.log
+
+# Playwright signed-in session, captured per run by e2e/global-setup.ts
+e2e/.auth/

@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { AUTH_STATE } from "../auth";
 import * as fs from "fs";
 import * as path from "path";
+
+// Signed in by globalSetup, once for the suite. See e2e/auth.ts.
+test.use({ storageState: AUTH_STATE });
 
 test.describe("Rebase Studio Features E2E", () => {
   test.afterAll(async () => {
@@ -33,17 +37,8 @@ test.describe("Rebase Studio Features E2E", () => {
       }
     });
 
-    // Perform standard demo login
     await page.goto("/");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: /Sign in with email/i }).click();
-    const signInButton = page.locator("button", { hasText: /^Sign in$/i }).first();
-    await expect(signInButton).toBeVisible();
-    await Promise.all([
-      signInButton.click(),
-      page.waitForResponse(resp => resp.url().includes("/api/") && resp.status() !== 204, { timeout: 15000 }).catch(() => {})
-    ]);
-    // Wait for the Orders link in the sidebar to appear, ensuring we are logged in
+    // Already signed in via storageState; the sidebar means the session is live.
     await expect(page.getByRole("link").filter({ hasText: "Orders" }).first()).toBeVisible({ timeout: 30000 });
   });
 
