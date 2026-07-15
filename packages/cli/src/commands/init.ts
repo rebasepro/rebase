@@ -40,15 +40,20 @@ export type TemplatePreset = "blog" | "ecommerce" | "blank";
  * `cms` is the full triad (config + backend + frontend). `baas` is the backend
  * alone, serving the database over REST with no collection files and no UI.
  */
+/**
+ * `cms` scaffolds BaaS + the admin UI; `baas` scaffolds the API alone. The
+ * values match `RebaseBackendConfig.mode`, which is what the generated backend
+ * sets — the labels below are what users actually read.
+ */
 export type TemplateFlavor = "cms" | "baas";
 
 const FLAVOR_CHOICES: Array<{ name: string; value: TemplateFlavor; short: string }> = [
-    { name: "CMS   — API + admin UI, collections you define (like Payload/Directus)",
+    { name: "BaaS + admin  — API plus an admin UI, driven by collections you define (like Payload/Directus)",
 value: "cms",
-short: "CMS" },
-    { name: "BaaS  — headless API over your database, no collections, no UI (like Supabase)",
+short: "BaaS + admin" },
+    { name: "BaaS only     — headless API over your database. No collections, no UI (like Supabase)",
 value: "baas",
-short: "BaaS" }
+short: "BaaS only" }
 ];
 
 const PRESET_CHOICES: Array<{ name: string; value: TemplatePreset; short: string }> = [

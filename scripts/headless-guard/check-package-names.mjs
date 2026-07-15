@@ -79,11 +79,51 @@ for (const rel of trackedFiles()) {
     }
 }
 
-if (hits.length > 0) {
-    console.error(`\n${hits.length} reference(s) to renamed packages:\n`);
-    for (const h of hits) {
-        console.error(`  ${h.file}:${h.line}`);
-        console.error(`    ${h.pattern}  ->  ${h.replacement}\n`);
+// ── Manifest sanity ──────────────────────────────────────────────────────
+// Folding one package into another collapses two dependency entries onto the
+// same key. JSON.parse keeps the last silently, so a scaffolded project can
+// ship a manifest listing the same dependency twice.
+const dupKeyHits = [];
+const DEP_BLOCKS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+for (const rel of trackedFiles()) {
+    if (path.basename(rel) !== "package.json") continue;
+    const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, rel), "utf8"));
+    const text = fs.readFileSync(path.join(repoRoot, rel), "utf8");
+
+    // Scoped per block: the same package appearing in both peerDependencies and
+    // peerDependenciesMeta is correct, not a duplicate.
+    for (const block of DEP_BLOCKS) {
+        if (!manifest[block]) continue;
+        const declared = Object.keys(manifest[block]).length;
+        const blockStart = text.indexOf(`"${block}"`);
+        if (blockStart === -1) continue;
+        // Count key lines between this block's braces.
+        const open = text.indexOf("{", blockStart);
+        let depth = 0, end = open;
+        for (let i = open; i < text.length; i++) {
+            if (text[i] === "{") depth++;
+            else if (text[i] === "}") { depth--; if (depth === 0) { end = i; break; } }
+        }
+        const body = text.slice(open, end);
+        const keys = [...body.matchAll(/^\s*"([^"]+)":/gm)].map((m) => m[1]);
+        // JSON.parse collapses duplicates, so more lines than keys means one repeats.
+        if (keys.length > declared) {
+            const seen = new Set();
+            for (const k of keys) {
+                if (seen.has(k)) dupKeyHits.push({ file: rel, key: k, block });
+                seen.add(k);
+            }
+        }
+    }
+}
+
+if (hits.length > 0 || dupKeyHits.length > 0) {
+    if (hits.length > 0) {
+        console.error(`${hits.length} reference(s) to renamed packages:\n`);
+        for (const h of hits) {
+            console.error(`  ${h.file}:${h.line}`);
+            console.error(`    ${h.pattern}  ->  ${h.replacement}\n`);
+        }
     }
     process.exit(1);
 }

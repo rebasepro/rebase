@@ -774,3 +774,80 @@ describe("buildInitQuestions", () => {
         }
     });
 });
+
+describe("template flavors", () => {
+    it("asks what to build when --flavor is not given", () => {
+        const questions = buildInitQuestions({
+            nameArg: "x", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+        });
+
+        const flavor = questions.find((q) => q.name === "flavor");
+        expect(flavor).toBeDefined();
+        expect((flavor as { choices: { value: string }[] }).choices.map((c) => c.value).sort())
+            .toEqual(["baas", "cms"]);
+        // BaaS + admin is the safer thing to land on for someone unsure.
+        expect((flavor as { default: string }).default).toBe("cms");
+    });
+
+    it("does not ask when --flavor is given", () => {
+        const questions = buildInitQuestions({
+            nameArg: "x", flavorArg: "baas", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+        });
+
+        expect(questions.find((q) => q.name === "flavor")).toBeUndefined();
+    });
+
+    it("skips the collections preset for baas, which has no collection files", () => {
+        const questions = buildInitQuestions({
+            nameArg: "x", flavorArg: "baas", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+        });
+
+        const preset = questions.find((q) => q.name === "preset") as
+            { when?: (a: Record<string, unknown>) => boolean } | undefined;
+        expect(preset?.when?.({})).toBe(false);
+    });
+
+    it("asks for a preset once the answer is cms", () => {
+        const questions = buildInitQuestions({
+            nameArg: "x", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+        });
+
+        const preset = questions.find((q) => q.name === "preset") as
+            { when?: (a: Record<string, unknown>) => boolean } | undefined;
+        // `when` reads the flavor answer, since --flavor was not supplied.
+        expect(preset?.when?.({ flavor: "cms" })).toBe(true);
+        expect(preset?.when?.({ flavor: "baas" })).toBe(false);
+    });
+});
+
+describe("baas overlay", () => {
+    const overlay = path.resolve(__dirname, "..", "..", "templates", "overlays", "baas");
+
+    it("runs the backend in baas mode and never serves an SPA", () => {
+        const entry = fs.readFileSync(path.join(overlay, "backend", "src", "index.ts"), "utf8");
+
+        expect(entry).toContain('mode: "baas"');
+        expect(entry).not.toContain("serveSPA(");
+        // No collection files exist, so the auth adapter owns its user table.
+        expect(entry).not.toContain("collectionsDir");
+    });
+
+    it("ships the SDK, which its example script imports", () => {
+        const pkg = JSON.parse(fs.readFileSync(path.join(overlay, "package.json"), "utf8"));
+
+        // scripts/example.ts imports @rebasepro/client; with no frontend in a
+        // baas project, nothing else would pull it in.
+        expect(pkg.dependencies?.["@rebasepro/client"]).toBeDefined();
+        expect(pkg.workspaces).toEqual(["backend"]);
+    });
+
+    it("declares no UI packages anywhere", () => {
+        const pkg = JSON.parse(fs.readFileSync(path.join(overlay, "package.json"), "utf8"));
+        const backend = JSON.parse(fs.readFileSync(path.join(overlay, "backend", "package.json"), "utf8"));
+        const all = JSON.stringify([pkg.dependencies, pkg.devDependencies, backend.dependencies, backend.devDependencies]);
+
+        for (const ui of ["react", "@rebasepro/admin", "@rebasepro/ui", "@rebasepro/app", "@rebasepro/studio"]) {
+            expect(all).not.toContain(`"${ui}"`);
+        }
+    });
+});
