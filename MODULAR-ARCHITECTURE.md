@@ -40,6 +40,34 @@ not a collection. Nothing about the admin UI is loaded, imported, or installed.
 Change the schema with a migration and the API follows; there is nothing to keep in
 sync. Set `introspectionSchema` on the adapter to read a schema other than `public`.
 
+### Which tables get served
+
+**Only the ones the database protects.** Every authenticated request runs as the
+`rebase_user` role, which is granted `SELECT/INSERT/UPDATE/DELETE` on the schema so
+that RLS — not the grant — decides who sees what. A table with RLS *disabled* has no
+authorization model at all, so serving it would hand every row to every logged-in
+user. BaaS never runs `db push`, so nothing here enables RLS on your behalf.
+
+So a table is served only when it has `ENABLE ROW LEVEL SECURITY`. Anything else is
+skipped, and named at boot with the SQL to protect it:
+
+```sql
+ALTER TABLE "public"."secrets" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY secrets_owner ON secrets FOR ALL TO public USING (owner_id = auth.uid());
+```
+
+Two escape hatches, both explicit:
+
+- `baas: { unprotectedTables: "serve" }` — serve them anyway. Only sensible when every
+  caller is already trusted; it logs loudly at boot.
+- A table with RLS enabled but **no policies** is served and returns nothing. That is
+  legal Postgres and indistinguishable from an empty table, so it is called out at
+  boot rather than left to look like missing data.
+
+Internal tables are never introspected: the `rebase` and `auth` schemas sit outside
+`introspectionSchema` (default `public`), and `rebase_*` / `drizzle_*` names are
+filtered out.
+
 What BaaS mode keeps, deliberately, because it is the control plane and not the CMS:
 
 - REST data API (`/api/data/*`) over introspected tables
@@ -56,6 +84,18 @@ What it drops:
 
 Install: `@rebasepro/server` + a driver (`@rebasepro/server-postgres`) +
 `@rebasepro/client` for the SDK. No `react` in the dependency tree.
+
+The SDK needs no collections either — there is nothing to generate or declare:
+
+```ts
+const rebase = createRebaseClient({ baseUrl, token });
+await rebase.data.collection("posts").find({ limit: 5 });   // just a table name
+await rebase.data.collection("authors").create({ name: "Ada" });
+```
+
+Typed accessors (`rebase.data.posts`) work the same way; the optional `collections`
+map only exists to pin non-obvious slugs. `rebase generate-sdk` adds types if you
+want them, but nothing requires it.
 
 ## 2. CMS mode — collections drive the UI
 
@@ -147,8 +187,8 @@ from the framework. BaaS deployments simply never call it.
 ## Scaffolding
 
 ```bash
-rebase init my-app --flavor baas   # backend only, introspected: no config/, no frontend/
-rebase init my-app --flavor cms    # config/ + backend/ + frontend/ (default)
+rebase init my-app --flavor baas   # BaaS only:    backend/ alone, introspected
+rebase init my-app --flavor cms    # BaaS + admin: config/ + backend/ + frontend/ (default)
 ```
 
 Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a missing
@@ -176,7 +216,7 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
 - A driver that cannot introspect fails `baas` mode at boot rather than serving
   nothing: reporting no collections means it never looked, so `init` throws and names
   it. An empty database is different — that warns and boots.
-- `rebase doctor` diffs `pg_policies` against the policies your collections generate,
+- `rebase doctor --policies` diffs `pg_policies` against the policies your collections generate,
   and exits non-zero on drift. **RLS fails silently by design**: a policy that never
   matches filters every row, and an empty table is indistinguishable from a table with
   no data. Policies live in Postgres and the config is only their source, so a stale
