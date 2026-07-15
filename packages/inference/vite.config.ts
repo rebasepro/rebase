@@ -14,13 +14,11 @@ export default defineConfig(() => ({
     },
     build: {
         lib: {
+            // ESM only — this is an ESM-first framework; no UMD/CJS output.
+            formats: ["es"],
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase schema inference",
-            fileName: (format) => {
-                if (format === "es") return "index.es.js";
-                if (format === "umd") return "index.umd.cjs";
-                return `index.${format}.js`;
-            }
+            fileName: (format) => `index.${format}.js`
         },
         target: "ESNEXT",
         sourcemap: true,

@@ -7,6 +7,9 @@ module.exports = {
         // "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$":
         //     "<rootDir>/__mocks__/fileMock.js",
         "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
-        "^@rebasepro/ui$": "<rootDir>/test/__mocks__/rebasepro-ui.js"
+        // Before the generic rule below, which would otherwise pull in the real
+        // component library: first match wins.
+        "^@rebasepro/ui$": "<rootDir>/test/__mocks__/rebasepro-ui.js",
+        "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
     }
 };

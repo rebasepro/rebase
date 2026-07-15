@@ -48,6 +48,9 @@ export default defineConfig(() => ({
         lib: {
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase Backend",
+            // ESM only: the output banner injects `import`/`import.meta.url`,
+            // which a UMD build cannot parse as CommonJS.
+            formats: ["es"],
             fileName: (format) => `index.${format}.js`
         },
         target: "ESNEXT",

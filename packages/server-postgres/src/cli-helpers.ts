@@ -1,29 +1,11 @@
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
-import { fileURLToPath, pathToFileURL } from "url";
+import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { logger } from "@rebasepro/server";
 import type { CollectionConfig, Relation } from "@rebasepro/types";
-
-const getHelpersDirname = () => {
-    try {
-        return eval("__dirname");
-    } catch {
-        const err = new Error();
-        const stackLine = err.stack?.split("\n")[1] || "";
-        const match = stackLine.match(/\((.*?):\d+:\d+\)/) || stackLine.match(/at (.*?):\d+:\d+/);
-        if (match && match[1]) {
-            let cleanPath = match[1];
-            if (cleanPath.startsWith("file://")) {
-                cleanPath = fileURLToPath(cleanPath);
-            }
-            return path.dirname(cleanPath);
-        }
-        return process.cwd();
-    }
-};
-const __helpersDirname = getHelpersDirname();
+import { moduleDir as __helpersDirname } from "./module-dir";
 
 
 

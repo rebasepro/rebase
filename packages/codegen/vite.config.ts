@@ -13,15 +13,11 @@ export default defineConfig(() => ({
     },
     build: {
         lib: {
+            // ESM only — this is an ESM-first framework; no UMD/CJS output.
+            formats: ["es"],
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "RebaseSDKGenerator",
-            fileName: (format) => {
-                if (format === "es")
-                    return `index.${format}.js`;
-                else if (format === "umd")
-                    return "index.cjs";
-                throw new Error("Unexpected format");
-            }
+            fileName: (format) => `index.${format}.js`
         },
         minify: false,
         target: "ESNEXT",

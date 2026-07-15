@@ -13,12 +13,12 @@
     "url": "https://github.com/rebasepro/rebase.git",
     "directory": "packages/app"
   },
-  "main": "./dist/index.umd.js",
+  "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "engines": {
-    "node": ">=14"
+    "node": ">=20"
   },
   "keywords": [
     "rebase",
@@ -43,8 +43,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js",
-      "require": "./dist/index.umd.js"
+      "import": "./dist/index.es.js"
     },
     "./vitePlugin": {
       "types": "./dist/vitePlugin.d.ts",
@@ -137,10 +136,7 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
-      "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
-      "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
-      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/forms$": "<rootDir>/../forms/src/index.ts"
+      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
     }
   }
 }

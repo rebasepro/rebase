@@ -24,6 +24,8 @@ export default defineConfig(() => ({
         sourcemap: true,
         minify: false,
         lib: {
+            // ESM only — this is an ESM-first framework; no UMD/CJS output.
+            formats: ["es"],
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Formex",
             fileName: (format) => `index.${format}.js`

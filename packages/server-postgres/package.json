@@ -13,7 +13,7 @@
     "url": "https://github.com/rebasepro/rebase.git",
     "directory": "packages/server-postgres"
   },
-  "main": "./dist/index.umd.js",
+  "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
@@ -57,11 +57,8 @@
     ],
     "moduleNameMapper": {
       "^chalk$": "<rootDir>/test/mocks/chalk.cjs",
-      "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
-      "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
-      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",
-      "^@rebasepro/server$": "<rootDir>/../server/src/index.ts",
+      "^\\.{1,2}/module-dir$": "<rootDir>/test/mocks/module-dir.cjs",
+      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
   },
@@ -69,8 +66,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js",
-      "require": "./dist/index.umd.js"
+      "import": "./dist/index.es.js"
     },
     "./package.json": "./package.json"
   },

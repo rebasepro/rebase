@@ -26,6 +26,8 @@ export default defineConfig(() => ({
     },
     build: {
         lib: {
+            // ESM only — this is an ESM-first framework; no UMD/CJS output.
+            formats: ["es"],
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase Core",
             fileName: (format) => `index.${format}.js`

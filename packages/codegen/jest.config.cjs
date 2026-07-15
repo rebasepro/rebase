@@ -7,7 +7,6 @@ module.exports = {
         "**/src/**/*.test.ts"
     ],
     moduleNameMapper: {
-        "^@rebasepro/types$": "<rootDir>/../types/src",
-        "^@rebasepro/common$": "<rootDir>/../common/src"
+        "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
     }
 };

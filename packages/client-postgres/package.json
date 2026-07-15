@@ -13,12 +13,12 @@
     "url": "https://github.com/rebasepro/rebase.git",
     "directory": "packages/client-postgres"
   },
-  "main": "./dist/index.umd.js",
+  "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "engines": {
-    "node": ">=14"
+    "node": ">=20"
   },
   "keywords": [
     "rebase",
@@ -60,8 +60,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js",
-      "require": "./dist/index.umd.js"
+      "import": "./dist/index.es.js"
     },
     "./package.json": "./package.json"
   },

@@ -18,7 +18,7 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "engines": {
-    "node": ">=14"
+    "node": ">=20"
   },
   "keywords": [
     "rebase",
@@ -162,12 +162,7 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
-      "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
-      "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
-      "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
-      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/forms$": "<rootDir>/../forms/src/index.ts",
-      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
+      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
     }
   }
 }
