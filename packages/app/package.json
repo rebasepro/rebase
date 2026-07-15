@@ -48,8 +48,7 @@
     "./vitePlugin": {
       "types": "./dist/vitePlugin.d.ts",
       "development": "./dist/vitePlugin.js",
-      "import": "./dist/vitePlugin.js",
-      "require": "./dist/vitePlugin.js"
+      "import": "./dist/vitePlugin.js"
     },
     "./package.json": "./package.json"
   },
