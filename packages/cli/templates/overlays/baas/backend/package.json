@@ -5,7 +5,7 @@
     "main": "src/index.ts",
     "type": "module",
     "scripts": {
-        "dev": "tsx watch src/index.ts",
+        "dev": "tsx watch --include=\"./functions/**/*\" src/index.ts",
         "build": "tsc",
         "start": "node dist/backend/src/index.js"
     },
