@@ -28,7 +28,8 @@ import {
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
-import { getPolicyNamesForRule, getPolicyOperations } from "@rebasepro/utils";
+import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
+import { resolveJunctionSpecs, getJunctionSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
@@ -415,8 +416,27 @@ status: "live" };
             });
         }
 
+        // Junction tables have no collection, but their policies are generated
+        // too — derived from the endpoints' relations. Recognise them so they
+        // don't show as hand-written SQL ("DB Only"). If the registry's
+        // collections don't carry resolvable relations, they simply stay "live".
+        if (!activeCollection) {
+            try {
+                const registryCollections = (collectionRegistry.collections ?? []) as unknown as Parameters<typeof resolveJunctionSpecs>[0];
+                const spec = resolveJunctionSpecs(registryCollections).get(activeTableData.tableName);
+                if (spec) {
+                    const generatedNames = getPolicyNamesForRules(getJunctionSecurityRules(spec), spec.table);
+                    for (const p of Object.values(policiesMap)) {
+                        if (generatedNames.has(p.policyname)) p.status = "both";
+                    }
+                }
+            } catch {
+                /* serialized configs without relation closures — leave as live */
+            }
+        }
+
         return Object.values(policiesMap).sort((a, b) => a.policyname.localeCompare(b.policyname));
-    }, [activeTableData, activeCollection]);
+    }, [activeTableData, activeCollection, collectionRegistry.collections]);
 
     // Stats for the info tab
     const rlsStats = useMemo(() => {
@@ -824,8 +844,10 @@ message: e instanceof Error ? e.message : String(e) });
                                                     </Typography>
                                                     <Typography variant="caption" className="opacity-80">
                                                         This is an auto-generated junction table for a many-to-many relation.
-                                                        Its access is typically managed through the related collections&apos; policies.
-                                                        You can still add RLS policies directly if needed.
+                                                        Rebase derives its policies: rows are readable when both related rows
+                                                        are, and writable following the declaring collection&apos;s update rules
+                                                        (plus the server/admin baseline). You can still add RLS policies
+                                                        directly to broaden access.
                                                     </Typography>
                                                 </div>
                                             </div>

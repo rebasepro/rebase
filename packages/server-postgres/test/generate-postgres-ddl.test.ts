@@ -1,5 +1,5 @@
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
-import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { generatePostgresDdl, generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
 
 describe("generatePostgresDdl", () => {
     const cleanDdl = (ddl: string) => {
@@ -149,6 +149,87 @@ describe("generatePostgresDdl", () => {
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts_to_tags\" ADD CONSTRAINT \"posts_to_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts_to_tags\" ADD CONSTRAINT \"posts_to_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE;");
         expect(cleanResult).toContain("PRIMARY KEY (\"post_id\", \"tag_id\")");
+    });
+
+    it("locks junction tables by default and derives their policies", async () => {
+        const tagsCollection: CollectionConfig = {
+            slug: "tags",
+            table: "tags",
+            name: "Tags",
+            properties: { name: { type: "string" } }
+        };
+        const postsCollection: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: { title: { type: "string" }, author_id: { type: "string" } },
+            securityRules: [
+                { operation: "update", ownerField: "author_id" }
+            ],
+            relations: [
+                {
+                    relationName: "tags",
+                    target: () => tagsCollection,
+                    cardinality: "many",
+                    direction: "owning",
+                    through: { table: "posts_to_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
+                }
+            ]
+        } as CollectionConfig;
+
+        const result = await generatePostgresDdl([postsCollection, tagsCollection]);
+        const cleanResult = cleanDdl(result);
+
+        // A junction is a generated table like any other: RLS on, locked
+        // baseline in place. Before this, it was the one generated table with
+        // no RLS at all — full DML for every signed-in user.
+        expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts_to_tags\" ENABLE ROW LEVEL SECURITY;");
+        expect(cleanResult).toContain("CREATE POLICY \"posts_to_tags_default_admin_read\"");
+        expect(cleanResult).toContain("CREATE POLICY \"posts_to_tags_default_admin_write_insert\"");
+
+        // Reads delegate to the endpoints' own RLS via correlated EXISTS —
+        // visibility of the edge is visibility of both rows, forever.
+        expect(cleanResult).toContain("CREATE POLICY \"posts_to_tags_default_edge_read\"");
+        expect(cleanResult).toContain("EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE \"_ex0\".id = \"public\".\"posts_to_tags\".post_id)");
+        expect(cleanResult).toContain("EXISTS (SELECT 1 FROM \"public\".\"tags\" \"_ex1\" WHERE \"_ex1\".id = \"public\".\"posts_to_tags\".tag_id)");
+
+        // Writes inherit the declaring side's update rules: tagging a post
+        // follows editing the post.
+        expect(cleanResult).toContain("CREATE POLICY \"posts_to_tags_default_edge_write_insert\"");
+        expect(cleanResult).toMatch(/posts_to_tags_default_edge_write_insert[^;]*author_id[^;]*auth\.uid\(\)/);
+    });
+
+    it("emits junction policies in the policies-only DDL as well", async () => {
+        const tagsCollection: CollectionConfig = {
+            slug: "tags",
+            table: "tags",
+            name: "Tags",
+            properties: { name: { type: "string" } }
+        };
+        const postsCollection: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: { title: { type: "string" } },
+            relations: [
+                {
+                    relationName: "tags",
+                    target: () => tagsCollection,
+                    cardinality: "many",
+                    direction: "owning",
+                    through: { table: "posts_to_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
+                }
+            ]
+        };
+
+        const result = generatePostgresPoliciesDdl([postsCollection, tagsCollection]);
+        const cleanResult = cleanDdl(result);
+
+        // `rebase db push` applies this file to existing databases — it is the
+        // rollout path that retrofits RLS onto junctions already in production.
+        expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts_to_tags\" ENABLE ROW LEVEL SECURITY;");
+        expect(cleanResult).toContain("CREATE POLICY \"posts_to_tags_default_admin_read\"");
+        expect(cleanResult).toContain("CREATE POLICY \"posts_to_tags_default_edge_read\"");
     });
 
     it("should generate column default values", async () => {

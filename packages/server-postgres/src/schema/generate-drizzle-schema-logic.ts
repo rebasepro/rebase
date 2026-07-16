@@ -1,6 +1,6 @@
 import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
-import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules } from "@rebasepro/common";
+import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
 // --- Helper Functions ---
@@ -545,6 +545,10 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
     });
     schemaContent += "\n";
 
+    // Junction policy derivation needs every declaring side of each junction,
+    // not just the first relation that reached it in the walk below.
+    const junctionSpecs = resolveJunctionSpecs(collections);
+
     // 2. Identify all tables (collections and junction tables only)
     for (const collection of collections) {
         const tableName = getTableName(collection);
@@ -601,9 +605,22 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
             schemaContent += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;
             schemaContent += `    ${sourceColumn}: ${sourceColType}(\"${sourceColumn}\").notNull().references(() => ${getTableVarName(getTableName(sourceCollection))}.${sourceId}, ${refOptions}),\n`;
             schemaContent += `    ${targetColumn}: ${targetColType}(\"${targetColumn}\").notNull().references(() => ${getTableVarName(getTableName(targetCollection))}.${targetId}, ${refOptions}),\n`;
-            schemaContent += "}, (table) => ({\n";
-            schemaContent += `    pk: primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] })\n`;
-            schemaContent += "}));\n\n";
+            schemaContent += "}, (table) => ([\n";
+            schemaContent += `    primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] }),\n`;
+
+            // Junctions are generated tables like any other: locked by default,
+            // with derived policies (reads follow the endpoints, writes follow
+            // the declaring side's update rules). RLS is enabled regardless of
+            // policy stripping — a bare junction must default-deny, not fail open.
+            const junctionSpec = junctionSpecs.get(baseTableName);
+            if (!stripPolicies && junctionSpec) {
+                const junctionCollection = getJunctionCollectionConfig(junctionSpec);
+                const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
+                getJunctionSecurityRules(junctionSpec).forEach((rule: SecurityRule, idx: number) => {
+                    schemaContent += generatePolicyCode(junctionCollection, rule, idx, resolveCollection);
+                });
+            }
+            schemaContent += "])).enableRLS();\n\n";
         } else if (!isJunction) {
             const schema = isPostgresCollectionConfig(collection) ? collection.schema : undefined;
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";

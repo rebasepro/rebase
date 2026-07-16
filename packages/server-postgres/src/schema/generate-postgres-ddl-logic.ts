@@ -1,5 +1,5 @@
 import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
-import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules } from "@rebasepro/common";
+import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 
 // --- Helper Functions ---
@@ -226,6 +226,10 @@ export const generatePostgresDdl = async (
     });
     if (ddl.endsWith(";\n")) ddl += "\n";
 
+    // Junction policy derivation needs every declaring side of each junction,
+    // not just the first relation that reached it in the walk below.
+    const junctionSpecs = resolveJunctionSpecs(collections);
+
     const allTablesToGenerate = new Map<string, {
         collection: CollectionConfig,
         isJunction?: boolean,
@@ -261,6 +265,11 @@ export const generatePostgresDdl = async (
 
     // 3. Generate tables
     const fkStatements: string[] = [];
+    // Policies are emitted after every CREATE TABLE, like the FK constraints:
+    // a policy may reference other tables (a junction's derived policies always
+    // reference both endpoints; `policy.existsIn` references a join table), and
+    // CREATE POLICY validates those relations at creation time.
+    const policyStatements: string[] = [];
     for (const [tableName, {
         collection,
         isJunction,
@@ -293,6 +302,25 @@ export const generatePostgresDdl = async (
 
             fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${baseTableName}_${sourceColumn}_fkey" FOREIGN KEY ("${sourceColumn}") REFERENCES "${sourceSchema}"."${sourceTable}" ("${sourceId}") ON DELETE ${onDelete.toUpperCase()};`);
             fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${baseTableName}_${targetColumn}_fkey" FOREIGN KEY ("${targetColumn}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDelete.toUpperCase()};`);
+
+            if (options.includePolicies) {
+                // Junction tables are generated tables like any other: locked by
+                // default, with derived policies — reads follow the endpoints'
+                // visibility, writes follow the declaring side's update rules.
+                // Without this they were the one kind of generated table with no
+                // RLS at all, readable and writable by every signed-in user.
+                ddl += `ALTER TABLE "${schema}"."${baseTableName}" ENABLE ROW LEVEL SECURITY;\n`;
+                ddl += `\n`;
+
+                const spec = junctionSpecs.get(baseTableName);
+                if (spec) {
+                    const junctionCollection = getJunctionCollectionConfig(spec);
+                    const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
+                    getJunctionSecurityRules(spec).forEach((rule: SecurityRule) => {
+                        policyStatements.push(generatePolicyDdl(junctionCollection, rule, resolveCollection));
+                    });
+                }
+            }
         } else if (!isJunction) {
             ddl += `CREATE TABLE "${schema}"."${baseTableName}" (\n`;
             const columns: string[] = [];
@@ -414,9 +442,8 @@ export const generatePostgresDdl = async (
                 if (securityRules.length > 0) {
                     const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
                     securityRules.forEach((rule: SecurityRule) => {
-                        ddl += generatePolicyDdl(collection, rule, resolveCollection);
+                        policyStatements.push(generatePolicyDdl(collection, rule, resolveCollection));
                     });
-                    ddl += "\n";
                 }
             }
         }
@@ -425,6 +452,12 @@ export const generatePostgresDdl = async (
     if (fkStatements.length > 0) {
         ddl += "-- Foreign Key Constraints\n";
         ddl += fkStatements.join("\n") + "\n\n";
+    }
+
+    if (policyStatements.length > 0) {
+        ddl += "-- Row Level Security Policies\n";
+        ddl += policyStatements.join("");
+        ddl += "\n";
     }
 
     return ddl;
@@ -471,6 +504,33 @@ export const generatePostgresPoliciesDdl = (collections: CollectionConfig[]): st
             });
             ddl += "\n";
         }
+    }
+
+    // Junction tables are generated from `through` relations, not declared as
+    // collections, so the walk above never sees them. They get the same
+    // treatment as any generated table: locked by default, with derived
+    // policies — reads follow the endpoints, writes follow the declaring
+    // side's update rules.
+    const junctionSpecs = resolveJunctionSpecs(collections);
+    for (const spec of junctionSpecs.values()) {
+        ddl += `ALTER TABLE "${spec.schema}"."${spec.table}" ENABLE ROW LEVEL SECURITY;\n`;
+        ddl += `\n`;
+
+        const junctionRules = getJunctionSecurityRules(spec);
+        if (junctionRules.length === 0) continue;
+
+        const junctionCollection = getJunctionCollectionConfig(spec);
+        const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
+        const declaringSlugs = spec.declaringSides.map(s => s.collection.slug).join('", "');
+
+        ddl += `-- Derived by Rebase for the junction "${spec.table}" (no collection declares it).\n`;
+        ddl += `-- Reads require both endpoint rows to be visible; writes follow the update\n`;
+        ddl += `-- rules of "${declaringSlugs}". Set \`disableDefaultPolicies: true\` on the\n`;
+        ddl += `-- declaring collection(s) to drop these and police the junction yourself.\n`;
+        junctionRules.forEach((rule: SecurityRule) => {
+            ddl += generatePolicyDdl(junctionCollection, rule, resolveCollection);
+        });
+        ddl += "\n";
     }
 
     return ddl;

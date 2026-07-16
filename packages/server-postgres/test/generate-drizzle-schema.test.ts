@@ -114,7 +114,17 @@ relationName: "tags" }
         expect(cleanResult).toContain("export const postsToTags = pgTable(\"posts_to_tags\",");
         expect(cleanResult).toContain("post_id: varchar(\"post_id\").notNull().references(() => posts.id, { onDelete: \"cascade\" })");
         expect(cleanResult).toContain("tag_id: varchar(\"tag_id\").notNull().references(() => tags.id, { onDelete: \"cascade\" })");
-        expect(cleanResult).toContain("(table) => ({ pk: primaryKey({ columns: [table.post_id, table.tag_id] }) })");
+        // The junction is a generated table like any other: locked by default.
+        // It gets its composite key AND the derived policy set — it used to be
+        // the one generated table with no RLS at all.
+        expect(cleanResult).toContain("primaryKey({ columns: [table.post_id, table.tag_id] })");
+        expect(cleanResult).toContain("pgPolicy(\"posts_to_tags_default_admin_read\"");
+        expect(cleanResult).toContain("pgPolicy(\"posts_to_tags_default_edge_read\"");
+        // Reads delegate to the endpoints' own RLS via correlated EXISTS.
+        expect(cleanResult).toContain("EXISTS (SELECT 1 FROM \"public\".\"posts\"");
+        expect(cleanResult).toContain("EXISTS (SELECT 1 FROM \"public\".\"tags\"");
+        // And the junction table itself enables RLS.
+        expect(cleanResult).toMatch(/posts_to_tags[\s\S]*?\]\)\)\.enableRLS\(\);/);
         expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"tags\": many(postsToTags, { relationName: \"tags\" }) }));");
         const expectedJunctionRelations = "export const postsToTagsRelations = drizzleRelations(postsToTags, ({ one, many }) => ({ \"post_id\": one(posts, { fields: [postsToTags.post_id], references: [posts.id], relationName: \"tags\" }), \"tag_id\": one(tags, { fields: [postsToTags.tag_id], references: [tags.id], relationName: \"posts_to_tags_tag_id\" }) }));";
         expect(cleanResult).toContain(cleanSchema(expectedJunctionRelations));
