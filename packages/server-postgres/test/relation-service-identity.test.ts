@@ -97,6 +97,131 @@ booking_id: 1 }
 seat_number: 12 });
     });
 
+    describe("batching parents that share their first key column", () => {
+        // `bookings` keyed on (tenant_id, ref): two bookings of the same tenant
+        // differ only in the second column.
+        const tenantBookings: CollectionConfig = {
+            slug: "tenant_bookings",
+            name: "Tenant Bookings",
+            table: "tenant_bookings",
+            properties: {
+                tenant_id: { type: "number",
+isId: true },
+                ref: { type: "string",
+isId: true },
+                seats: { type: "relation",
+relationName: "seats" }
+            },
+            relations: [
+                {
+                    relationName: "seats",
+                    target: () => seatsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    joinPath: [
+                        { table: "seats",
+on: { from: "tenant_bookings.ref",
+to: "seats.booking_ref" } }
+                    ]
+                }
+            ]
+        };
+
+        beforeEach(() => {
+            jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
+                path.startsWith("tenant_bookings") ? tenantBookings : seatsCollection);
+            jest.spyOn(registry, "getTable").mockImplementation(name => {
+                if (name === "tenant_bookings") return table("tenant_bookings", ["tenant_id", "ref"]) as any;
+                if (name === "seats") return table("seats", ["seat_row", "seat_number", "booking_ref"]) as any;
+                return undefined;
+            });
+        });
+
+        it("groups each parent's rows under its own whole-key address", async () => {
+            // Both rows are tenant 1. Grouping on `tenant_id` alone would file
+            // them under one key, and the last one written would win — every
+            // booking of the tenant showing the same seat.
+            const db = dbReturning([
+                {
+                    tenant_bookings: { tenant_id: 1,
+ref: "A" },
+                    seats: { seat_row: "A",
+seat_number: 1,
+booking_ref: "A" }
+                },
+                {
+                    tenant_bookings: { tenant_id: 1,
+ref: "B" },
+                    seats: { seat_row: "B",
+seat_number: 2,
+booking_ref: "B" }
+                }
+            ]);
+            const relationService = new RelationService(db as any, registry);
+
+            const result = await relationService.batchFetchRelatedEntitiesMany(
+                "tenant_bookings",
+                ["1:::A", "1:::B"],
+                "seats",
+                (tenantBookings.relations as any)[0]
+            );
+
+            expect([...result.keys()].sort()).toEqual(["1:::A", "1:::B"]);
+            expect(result.get("1:::A")!.map(r => r.id)).toEqual(["A:::1"]);
+            expect(result.get("1:::B")!.map(r => r.id)).toEqual(["B:::2"]);
+        });
+    });
+
+    describe("relations that cannot name a composite-keyed parent", () => {
+        // `foreignKeyOnTarget` is one column; `seats.booking_id` cannot hold the
+        // two values that identify a (tenant_id, ref) booking.
+        const viaSingleFk: CollectionConfig = {
+            slug: "tenant_bookings",
+            name: "Tenant Bookings",
+            table: "tenant_bookings",
+            properties: {
+                tenant_id: { type: "number",
+isId: true },
+                ref: { type: "string",
+isId: true },
+                seats: { type: "relation",
+relationName: "seats" }
+            },
+            relations: [
+                {
+                    relationName: "seats",
+                    target: () => seatsCollection,
+                    cardinality: "many",
+                    direction: "inverse",
+                    foreignKeyOnTarget: "booking_id"
+                }
+            ]
+        };
+
+        beforeEach(() => {
+            jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
+                path.startsWith("tenant_bookings") ? viaSingleFk : seatsCollection);
+            jest.spyOn(registry, "getTable").mockImplementation(name => {
+                if (name === "tenant_bookings") return table("tenant_bookings", ["tenant_id", "ref"]) as any;
+                if (name === "seats") return table("seats", ["seat_row", "seat_number", "booking_id"]) as any;
+                return undefined;
+            });
+        });
+
+        it("says so, instead of silently matching on the first key column", async () => {
+            // Left alone this reads `booking_id` as `tenant_id` and hands one
+            // tenant's seats to every booking they own.
+            const relationService = new RelationService(dbReturning([]) as any, registry);
+
+            await expect(relationService.batchFetchRelatedEntitiesMany(
+                "tenant_bookings",
+                ["1:::A"],
+                "seats",
+                (viaSingleFk.relations as any)[0]
+            )).rejects.toThrow(/single foreign-key column.*composite key|composite key/i);
+        });
+    });
+
     it("addresses a single-key target by that key, unchanged", async () => {
         // The ordinary case has to keep working: one key, one value, no separator.
         const guestsCollection: CollectionConfig = {

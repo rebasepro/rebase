@@ -201,14 +201,17 @@ city: "Berlin" } }]
         expect((rows[0].warehouse as Record<string, unknown>).id).toBe(77);
     });
 
-    it("uses the first key column of a composite key, and does not throw", async () => {
+    it("addresses a composite-keyed parent by its whole key", async () => {
+        // Not `[1]` — the first column alone names every membership of tenant 1,
+        // so two of them would each be handed the other's relations. The batch
+        // groups its results by this same derived token.
         setup([{ tenant_id: 1,
 user_id: 2 }]);
 
         const rows = await fetchService.fetchCollectionForRest("memberships", {}, ["warehouse"]);
 
         expect(batchFetch).toHaveBeenCalledWith(
-            "memberships", [1], "warehouse", expect.anything()
+            "memberships", ["1:::2"], "warehouse", expect.anything()
         );
         expect(rows[0]).toMatchObject({ tenant_id: 1,
 user_id: 2 });

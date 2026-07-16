@@ -10,7 +10,8 @@ import {
     requirePrimaryKeys,
     deriveRowAddress,
     parseIdValues,
-    buildCompositeId
+    buildCompositeId,
+    COMPOSITE_ID_SEPARATOR
 } from "./collection-helpers";
 import { parseDataFromServer, normalizeDbValues } from "../data-transformer";
 import { RelationService } from "./RelationService";
@@ -308,13 +309,19 @@ export class FetchService {
 
         if (joinPathRelations.length === 0) return;
 
-        const idInfo = idInfoArray[0];
-        // These rows carry their key columns verbatim, so the parent id is read
-        // straight off them. It used to be parsed back out of a synthesized
+        // These rows carry their key columns verbatim, so the parent's address
+        // is derived from them. It used to be parsed back out of a synthesized
         // `id` — which no longer exists on a row, and threw (composite: parts
         // mismatch; numeric: NaN) into the catch below, where a warning is all
         // that separates "no relations" from "relations dropped".
-        const parentIdOf = (row: Record<string, unknown>) => row[idInfo.fieldName] as string | number | undefined;
+        //
+        // The whole key, because that is what the batch groups its results by:
+        // both sides derive the token the same way, so they agree by
+        // construction rather than by both happening to pick column zero.
+        const parentIdOf = (row: Record<string, unknown>): string | undefined => {
+            const address = buildCompositeId(row, idInfoArray);
+            return address && address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "") ? address : undefined;
+        };
 
         for (const [key, relation] of joinPathRelations) {
             try {

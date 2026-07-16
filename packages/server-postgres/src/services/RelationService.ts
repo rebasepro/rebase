@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, SQL } from "drizzle-orm";
+import { and, eq, inArray, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, Relation } from "@rebasepro/types";
@@ -9,7 +9,8 @@ import {
     getTableForCollection,
     requirePrimaryKeys,
     parseIdValues,
-    buildCompositeId
+    buildCompositeId,
+    type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -55,6 +56,61 @@ export interface RelatedRow<M extends Record<string, unknown> = Record<string, u
 
 export class RelationService {
     constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) { }
+
+    /**
+     * A WHERE matching any of `parentIds`, by the whole key.
+     *
+     * A single key is an `IN (…)`. A composite one cannot be: matching
+     * `tenant_id IN (1, 1)` collects every row of tenant 1, so two parents that
+     * share their first column each receive the other's relations. It becomes
+     * an OR of ANDs — one exact address per parent — which Postgres indexes the
+     * same way it would a multi-column key lookup.
+     */
+    private parentKeyCondition(
+        parentTable: PgTable,
+        parentPks: PrimaryKeyInfo[],
+        parentIds: (string | number)[]
+    ): SQL {
+        const columnFor = (fieldName: string) => {
+            const col = parentTable[fieldName as keyof typeof parentTable] as AnyPgColumn;
+            if (!col) throw new Error(`Key column '${fieldName}' not found in parent table`);
+            return col;
+        };
+
+        if (parentPks.length === 1) {
+            const values = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
+            return inArray(columnFor(parentPks[0].fieldName), values);
+        }
+
+        const perParent = parentIds.map(id => {
+            const values = parseIdValues(id, parentPks);
+            return and(...parentPks.map(pk => eq(columnFor(pk.fieldName), values[pk.fieldName])));
+        });
+        return or(...perParent) as SQL;
+    }
+
+    /**
+     * Reject a relation that cannot express a composite-keyed parent.
+     *
+     * `localKey` and `foreignKeyOnTarget` are single column names: one column
+     * cannot reference a two-column key, so such a relation has no correct
+     * reading. Left alone it would silently match on the first key column and
+     * hand a tenant's rows to its neighbour — say so instead.
+     */
+    private assertSingleKeyAddressable(
+        parentCollection: CollectionConfig,
+        parentPks: PrimaryKeyInfo[],
+        via: string
+    ): void {
+        if (parentPks.length > 1) {
+            throw new Error(
+                `Relation on '${parentCollection.slug}' uses '${via}', a single foreign-key column, but ` +
+                `'${parentCollection.slug}' is keyed on ${parentPks.map(k => `'${k.fieldName}'`).join(" + ")}. ` +
+                `One column cannot reference a composite key — express this relation with \`joinPath\`, whose ` +
+                `\`on.from\`/\`on.to\` take every key column.`
+            );
+        }
+    }
 
     /**
      * Fetch rows related to a parent row through a specific relation
@@ -354,23 +410,22 @@ export class RelationService {
                 currentTable = joinTable;
             }
 
-            // Add where condition for ALL parent rows at once
-            const parentIdField = parentTable[requirePrimaryKeys(parentCollection, this.registry)[0].fieldName as keyof typeof parentTable] as AnyPgColumn;
-            query = query.where(inArray(parentIdField, parsedParentIds));
+            // Match every parent at once, each by its whole key.
+            query = query.where(this.parentKeyCondition(parentTable, parentPks, parentIds));
 
             const results = await query;
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>>();
 
-            // Group results by parent ID
+            // Group by the parent's address — the same token the caller looks
+            // results up by, derived the same way on both sides.
             for (const row of results as Array<Record<string, unknown>>) {
                 const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
                 const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
-                const parentId = parentRow[parentIdInfo.fieldName] as string | number;
 
                 const parsedValues = await parseDataFromServer(targetRow, targetCollection);
 
-                resultMap.set(String(parentId), {
+                resultMap.set(buildCompositeId(parentRow, parentPks), {
                     id: buildCompositeId(targetRow, targetPks),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
@@ -387,6 +442,7 @@ export class RelationService {
         //   2. Query the target table with unique FK values
         //   3. Map results back to parent rows via their FK values
         if (relation.direction === "owning" && relation.localKey) {
+            this.assertSingleKeyAddressable(parentCollection, parentPks, relation.localKey);
             const localKeyCol = parentTable[relation.localKey as keyof typeof parentTable] as AnyPgColumn;
             if (!localKeyCol) {
                 throw new Error(`Local key column '${relation.localKey}' not found in parent table`);
@@ -448,7 +504,14 @@ export class RelationService {
             return resultMap;
         }
 
-        // Handle inverse relation types with batching
+        // Handle inverse relation types with batching. The parent is named by a
+        // single FK column on the target, so a composite-keyed parent has no
+        // correct reading here either.
+        this.assertSingleKeyAddressable(
+            parentCollection,
+            parentPks,
+            relation.foreignKeyOnTarget ?? `${relation.inverseRelationName}_id`
+        );
         let query = this.db.select().from(targetTable).$dynamic();
 
         // Build the relation query with ALL parent IDs
@@ -550,8 +613,7 @@ export class RelationService {
                 currentTable = joinTable;
             }
 
-            const parentIdField = parentTable[requirePrimaryKeys(parentCollection, this.registry)[0].fieldName as keyof typeof parentTable] as AnyPgColumn;
-            query = query.where(inArray(parentIdField, parsedParentIds));
+            query = query.where(this.parentKeyCondition(parentTable, parentPks, parentIds));
 
             const results = await query;
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
@@ -560,7 +622,7 @@ export class RelationService {
             for (const row of results as Array<Record<string, unknown>>) {
                 const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
                 const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
-                const parentId = String(parentRow[parentIdInfo.fieldName]);
+                const parentId = buildCompositeId(parentRow, parentPks);
                 const parsedValues = await parseDataFromServer(targetRow, targetCollection);
 
                 const arr = resultMap.get(parentId) || [];
@@ -579,6 +641,9 @@ export class RelationService {
         // This is the standard path for posts→tags style relations where
         // sanitizeRelation populated the `through` config.
         if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
+            // The junction names its parent with one column, so the same
+            // single-key limit applies as for a direct foreign key.
+            this.assertSingleKeyAddressable(parentCollection, parentPks, `${relation.through.table}.${relation.through.sourceColumn}`);
             const junctionTable = this.registry.getTable(relation.through.table);
             if (!junctionTable) {
                 logger.warn(`[batchFetchRelatedEntitiesMany] Junction table '${relation.through.table}' not found`);
@@ -626,7 +691,13 @@ export class RelationService {
             return resultMap;
         }
 
-        // Handle FK-based relations (one-to-many inverse)
+        // Handle FK-based relations (one-to-many inverse). One column on the
+        // target names the parent, so a composite-keyed parent cannot be named.
+        this.assertSingleKeyAddressable(
+            parentCollection,
+            parentPks,
+            relation.foreignKeyOnTarget ?? `${relation.inverseRelationName}_id`
+        );
         let query = this.db.select().from(targetTable).$dynamic();
 
         query = applyDynamicRelationQuery(
