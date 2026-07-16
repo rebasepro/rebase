@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useData, useRebaseContext } from "@rebasepro/app";
+import { getRelationIncludeParams, useData, useRebaseContext } from "@rebasepro/app";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -410,18 +410,24 @@ values: { ...e.values,
 
         // Set up listener or fetch
         const accessor = currentDataClient.collection(currentResolvedPath);
+
+        // Eagerly include relations to avoid N+1 fetches.
+        const includeParams = getRelationIncludeParams(currentCollection);
+
         if (accessor.listen) {
             const unsubscribe = accessor.listen({
                 where: whereFilter,
                 limit: itemCount,
-                orderBy: orderByParam
+                orderBy: orderByParam,
+                include: includeParams
             }, res => onUpdate(res.data as Entity<M>[]), onError);
             unsubscribersRef.current[column] = unsubscribe;
         } else {
             accessor.find({
                 where: whereFilter,
                 limit: itemCount,
-                orderBy: orderByParam
+                orderBy: orderByParam,
+                include: includeParams
             })
                 .then(res => onUpdate(res.data as Entity<M>[]))
                 .catch(onError);

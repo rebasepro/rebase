@@ -1,5 +1,5 @@
-import { eq, and } from "drizzle-orm";
-import { AnyPgColumn } from "drizzle-orm/pg-core";
+import { eq, and, sql, SQL } from "drizzle-orm";
+import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Relation } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
@@ -16,7 +16,7 @@ import { RelationService } from "./RelationService";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage } from "../utils/pg-error-utils";
 
 /**
@@ -32,6 +32,49 @@ export class PersistService {
         this.fetchService = new FetchService(db, registry);
     }
 
+
+    /**
+     * Explain a write that matched no rows.
+     *
+     * Row-level security filters UPDATE and DELETE through the policy's USING
+     * clause instead of raising: a denied write is reported by Postgres exactly
+     * like a successful one that happened to match nothing. Left unchecked, a
+     * caller cannot tell "denied" from "done" — the write returns 200/204 and
+     * the row is untouched.
+     *
+     * Re-reading the target over the *same* RLS-scoped handle separates the two
+     * cases. A visible row means the policy rejected the write (403); an
+     * invisible one means there is nothing there to write for this caller (404,
+     * matching what a GET would say). The re-read is bound by the caller's own
+     * policies, so it discloses nothing a plain read wouldn't.
+     *
+     * Only reached when zero rows matched, so the happy path pays nothing.
+     */
+    private async explainZeroRowWrite(
+        handle: DrizzleClient,
+        table: PgTable,
+        conditions: SQL[],
+        collectionPath: string,
+        id: string | number,
+        operation: "update" | "delete"
+    ): Promise<ApiError> {
+        const visible = await handle
+            .select({ present: sql<number>`1` })
+            .from(table)
+            .where(and(...conditions))
+            .limit(1);
+
+        if (visible.length > 0) {
+            return ApiError.forbidden(
+                `Not allowed to ${operation} "${id}" in "${collectionPath}": a row-level security policy rejected the write.`,
+                "WRITE_DENIED"
+            );
+        }
+
+        return ApiError.notFound(
+            `No row "${id}" in "${collectionPath}" to ${operation}.`
+        );
+    }
 
     /**
      * Delete an row by ID
@@ -52,9 +95,13 @@ export class PersistService {
             conditions.push(eq(field, parsedIdObj[info.fieldName]));
         }
 
-        await this.db
+        const result = await this.db
             .delete(table)
             .where(and(...conditions));
+
+        if ((result.rowCount ?? 0) === 0) {
+            throw await this.explainZeroRowWrite(this.db, table, conditions, collectionPath, id, "delete");
+        }
     }
 
     /**
@@ -235,7 +282,15 @@ export class PersistService {
                             conditions.push(eq(field, idValues[info.fieldName]));
                         }
 
-                        await updateQuery.where(and(...conditions));
+                        const updateResult = await updateQuery.where(and(...conditions));
+
+                        // Throwing rolls the transaction back, so relation writes
+                        // already applied above do not survive a rejected update.
+                        if ((updateResult.rowCount ?? 0) === 0) {
+                            throw await this.explainZeroRowWrite(
+                                tx, table, conditions, effectiveCollectionPath, currentId, "update"
+                            );
+                        }
                     }
                 } else {
                     const dataForInsert = { ...(entityData as Record<string, unknown>) };
@@ -306,6 +361,14 @@ export class PersistService {
      * Translate raw PostgreSQL / Drizzle errors into user-friendly messages.
      */
     private toUserFriendlyError(error: unknown, collectionSlug: string): Error {
+        // Deliberate API errors already carry their own status, code and wording.
+        // Re-wrapping one flattens it into a generic Error, and the status is lost
+        // on the way out — a policy rejection would surface as a 500. Matched by
+        // name as well as instance: a duplicated module copy breaks `instanceof`.
+        if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
+            return error as Error;
+        }
+
         const pgError = extractPgError(error);
 
         if (pgError) {

@@ -11,15 +11,103 @@ import { ANONYMOUS_USER_ID, LiteralPolicyOperand, PolicyExpression, policy } fro
  * - `field = 'literal'`
  * - `field != 'literal'`
  * - `field = current_setting('app.user_id')`
- * - `A AND B`
+ * - `A AND B`, `A OR B` — only where the keyword is at the top level
  * - `true`
  * - `IN (...)` (as optimistic true)
  *
  * For anything it doesn't understand, it returns a `raw` expression, which
  * the evaluator treats as "unknown" (and usually optimistic true).
+ *
+ * **This output also round-trips back into DDL** via `policyToPostgres` (the
+ * schema/policy generators), so decomposing a clause the parser only partly
+ * understands is not a cosmetic mistake — it emits invalid SQL. When in doubt,
+ * prefer `raw`: it is reproduced verbatim.
  */
+/** True when `keyword` starts at `i` as a standalone word. */
+function isKeywordAt(upper: string, i: number, keyword: string): boolean {
+    if (!upper.startsWith(keyword, i)) return false;
+    const before = i === 0 ? " " : upper[i - 1];
+    const after = upper[i + keyword.length] ?? " ";
+    return /[\s()]/.test(before) && /[\s()]/.test(after);
+}
+
+/**
+ * Split `sql` on a boolean keyword, but only where it sits at paren depth 0 and
+ * outside a string literal. Returns null when it never does, so the caller
+ * leaves the clause alone.
+ *
+ * This used to be `sql.split(/ AND /i)`, which tore subqueries in half: the
+ * `AND` inside
+ *   `EXISTS (SELECT 1 FROM organization_members m WHERE m.org = t.org AND m.user_id = auth.uid())`
+ * split the expression, and re-emitting the halves produced
+ *   `(EXISTS (...) AND m.user_id = auth.uid())`
+ * where `m` is no longer in scope — SQL that Postgres rejects outright with
+ * "missing FROM-clause entry for table". Returning null instead keeps such a
+ * clause as a `raw` expression, which round-trips verbatim.
+ */
+function splitTopLevel(sql: string, keyword: "AND" | "OR"): string[] | null {
+    const upper = sql.toUpperCase();
+    const parts: string[] = [];
+    let depth = 0;
+    let inString = false;
+    let start = 0;
+
+    for (let i = 0; i < sql.length; i++) {
+        const ch = sql[i];
+        if (inString) {
+            if (ch === "'") {
+                if (sql[i + 1] === "'") i++; // '' escapes a quote inside a literal
+                else inString = false;
+            }
+            continue;
+        }
+        if (ch === "'") { inString = true; continue; }
+        if (ch === "(") { depth++; continue; }
+        if (ch === ")") { depth--; continue; }
+        if (depth === 0 && isKeywordAt(upper, i, keyword)) {
+            parts.push(sql.slice(start, i));
+            i += keyword.length - 1;
+            start = i + 1;
+        }
+    }
+
+    if (parts.length === 0) return null;
+    parts.push(sql.slice(start));
+    const trimmedParts = parts.map(p => p.trim()).filter(p => p.length > 0);
+    return trimmedParts.length > 1 ? trimmedParts : null;
+}
+
+/** Drop redundant wrapping parens (`(a AND b)` → `a AND b`), never `(a) AND (b)`. */
+function stripOuterParens(sql: string): string {
+    let s = sql.trim();
+    for (;;) {
+        if (!s.startsWith("(") || !s.endsWith(")")) return s;
+        let depth = 0;
+        let inString = false;
+        let wraps = true;
+        for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            if (inString) {
+                if (ch === "'") {
+                    if (s[i + 1] === "'") i++;
+                    else inString = false;
+                }
+                continue;
+            }
+            if (ch === "'") { inString = true; continue; }
+            if (ch === "(") depth++;
+            else if (ch === ")") {
+                depth--;
+                if (depth === 0 && i < s.length - 1) { wraps = false; break; }
+            }
+        }
+        if (!wraps) return s;
+        s = s.slice(1, -1).trim();
+    }
+}
+
 export function sqlToPolicy(sql: string): PolicyExpression {
-    const trimmed = sql.trim();
+    const trimmed = stripOuterParens(sql.trim());
 
     if (trimmed.toLowerCase() === "true") return policy.true();
     if (trimmed.toLowerCase() === "false") return policy.false();
@@ -40,17 +128,12 @@ export function sqlToPolicy(sql: string): PolicyExpression {
         return policy.rolesContain(roles);
     }
 
-    // Handle OR
-    if (trimmed.toUpperCase().includes(" OR ")) {
-        const parts = trimmed.split(/ OR /i);
-        return policy.or(...parts.map(sqlToPolicy));
-    }
+    // OR binds looser than AND, so it splits first.
+    const orParts = splitTopLevel(trimmed, "OR");
+    if (orParts) return policy.or(...orParts.map(sqlToPolicy));
 
-    // Handle AND (very basic split, doesn't handle nested parens properly)
-    if (trimmed.toUpperCase().includes(" AND ")) {
-        const parts = trimmed.split(/ AND /i);
-        return policy.and(...parts.map(sqlToPolicy));
-    }
+    const andParts = splitTopLevel(trimmed, "AND");
+    if (andParts) return policy.and(...andParts.map(sqlToPolicy));
 
     // Handle = and !=
     const match = trimmed.match(/^(.+?)\s*(!?=)\s*(.+)$/);

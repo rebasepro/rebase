@@ -2,12 +2,14 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { HonoEnv } from "../api/types";
+import { responseCompression } from "../utils/compression";
 import { requestId } from "../utils/request-id";
 import { requestLogger } from "../utils/request-logger";
 import { logger } from "../utils/logger";
 
 interface MiddlewareConfig {
     maxBodySize?: number;
+    compression?: boolean;
     csrf?: {
         origin: string | string[] | ((origin: string) => boolean);
     };
@@ -21,6 +23,17 @@ export function configureMiddlewares(
 ): void {
     // Request ID (correlation)
     app.use(`${basePath}/*`, requestId());
+
+    // Response Compression — registered early so it wraps the final response of
+    // every downstream handler, including error responses.
+    //
+    // Hono's `threshold` is deliberately not plumbed through: it only applies to
+    // responses declaring a Content-Length, and `c.json()` sets none, so it
+    // would silently do nothing on the very responses this exists to shrink.
+    if (config.compression !== false) {
+        app.use(`${basePath}/*`, responseCompression());
+        logger.info("Response compression enabled");
+    }
 
     // Request Body Size Limit
     const maxBodySize = config.maxBodySize ?? 10 * 1024 * 1024; // 10MB default

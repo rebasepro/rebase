@@ -170,7 +170,7 @@ relationName: "user" }
 
         // Create a mock query object that can be awaited
         const mockQuery = {
-            then: jest.fn((resolve) => resolve([]))
+            then: jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })))
         };
 
         db = {
@@ -187,8 +187,11 @@ relationName: "user" }
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
+            // UPDATE and DELETE report how many rows they matched; the driver rejects a
+            // write that matched none, so the chainable mock has to carry a row count.
+            rowCount: 1,
             transaction: jest.fn((callback) => callback(db)),
-            then: jest.fn((resolve) => resolve([]))
+            then: jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })))
         } as any;
 
         dataService = new DataService(db, collectionRegistry);

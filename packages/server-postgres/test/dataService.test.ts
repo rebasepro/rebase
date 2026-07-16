@@ -162,6 +162,9 @@ describe("DataService", () => {
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
+            // UPDATE and DELETE report how many rows they matched; the driver rejects a
+            // write that matched none, so the chainable mock has to carry a row count.
+            rowCount: 1,
             transaction: jest.fn((callback) => callback(db))
         } as unknown as jest.Mocked<NodePgDatabase>;
 
@@ -258,7 +261,7 @@ describe("DataService", () => {
                 email: "new@test.com"
             };
 
-            const mockWhere = jest.fn().mockResolvedValue([returnedSaved]);
+            const mockWhere = jest.fn().mockResolvedValue(Object.assign([returnedSaved], { rowCount: 1 }));
             const mockSet = jest.fn().mockReturnValue({
                 where: mockWhere
             });
@@ -612,11 +615,14 @@ relationName: "children" }
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
+            // UPDATE and DELETE report how many rows they matched; the driver rejects a
+            // write that matched none, so the chainable mock has to carry a row count.
+            rowCount: 1,
             transaction: jest.fn((callback) => callback(db))
         } as unknown as jest.Mocked<NodePgDatabase>;
 
         // Add a then method to make the db object awaitable when the query chain ends
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve([]));
+        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })));
 
         dataService = new DataService(db, collectionRegistry);
     });
@@ -905,13 +911,28 @@ __type: "relation" }
             expect(db.where).toHaveBeenCalled();
         });
 
-        it("should handle deletion of non-existent entity gracefully", async () => {
-            db.returning.mockResolvedValue([]);
+        it("reports a delete that matched no rows instead of reporting success", async () => {
+            // A DELETE filtered to zero rows, and the row is not readable either:
+            // nothing exists here for this caller, so it is a 404. Reporting
+            // success is what let a denied write look identical to a real one.
+            (db as unknown as Record<string, unknown>).then = jest.fn((resolve: (v: unknown) => void) =>
+                resolve(Object.assign([], { rowCount: 0 })));
 
-            // The service doesn't throw for non-existent entities
-            await dataService.delete("users", 999);
+            await expect(dataService.delete("users", 999)).rejects.toMatchObject({
+                statusCode: 404
+            });
+        });
 
-            expect(db.delete).toHaveBeenCalled();
+        it("reports a delete the database rejected as denied, not as missing", async () => {
+            // Zero rows deleted, but the row is still readable: only a policy can
+            // produce that, so the caller gets 403 rather than a misleading 404.
+            (db as unknown as Record<string, unknown>).then = jest.fn((resolve: (v: unknown) => void) =>
+                resolve(Object.assign([{ present: 1 }], { rowCount: 0 })));
+
+            await expect(dataService.delete("users", 1)).rejects.toMatchObject({
+                statusCode: 403,
+                code: "WRITE_DENIED"
+            });
         });
     });
 

@@ -53,11 +53,14 @@ dataType: "number" },
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
             delete: jest.fn().mockReturnThis(),
+            // UPDATE and DELETE report how many rows they matched; the driver rejects a
+            // write that matched none, so the chainable mock has to carry a row count.
+            rowCount: 1,
             transaction: jest.fn((callback) => callback(db))
         } as any;
 
         // Add a then method to make the db object awaitable when the query chain ends
-        (db as any).then = jest.fn((resolve) => resolve([]));
+        (db as any).then = jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })));
 
         dataService = new DataService(db, collectionRegistry);
     });

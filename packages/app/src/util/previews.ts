@@ -74,6 +74,26 @@ export function getEntityPreviewKeys(
     }
 }
 
+// Returned as-is rather than rebuilt per call, so the result is referentially
+// stable and safe to use as a hook dependency.
+const INCLUDE_ALL_RELATIONS: string[] = ["*"];
+
+/**
+ * The `include` params that eager-load a collection's relations in the same
+ * request as its rows, so previews never fetch once per relation cell.
+ *
+ * Only the REST transport reads `include`; the realtime transport embeds
+ * relation data unconditionally and ignores it. Passing it either way keeps a
+ * realtime-less deployment rendering the same cells as a realtime one.
+ */
+export function getRelationIncludeParams(collection: CollectionConfig<any>): string[] | undefined {
+    if (!collection.properties) return undefined;
+    const hasRelations = Object.values(collection.properties).some(property =>
+        property && !isPropertyBuilder(property) &&
+        (isRelationProperty(property as Property) || isReferenceProperty(property as Property)));
+    return hasRelations ? INCLUDE_ALL_RELATIONS : undefined;
+}
+
 export function getEntityTitlePropertyKey<M extends Record<string, any>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
     if (collection.titleProperty) {
         return collection.titleProperty as string;

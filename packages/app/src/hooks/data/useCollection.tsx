@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
+import { getRelationIncludeParams } from "../../util/previews";
 /**
  * @group Hooks and utilities
  */
@@ -131,10 +132,7 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
         const accessor = dataClient.collection(path);
 
         // Eagerly include relations to avoid N+1 fetches.
-        const hasRelations = collection.properties && Object.values(collection.properties).some(
-            (p) => p.type === "relation" || p.type === "reference"
-        );
-        const includeParams = hasRelations ? ["*"] : undefined;
+        const includeParams = getRelationIncludeParams(collection);
 
         if (accessor.listen) {
             return accessor.listen({

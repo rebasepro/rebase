@@ -2,6 +2,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
+import { getRelationIncludeParams } from "../../util/previews";
 export interface RelationItem {
     id: string | number;
     label: string;
@@ -133,6 +134,10 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         }
     }, []);
 
+    // Eagerly include relations to avoid N+1 fetches. Referentially stable, so
+    // it can be a dependency below without re-triggering the fetch.
+    const includeParams = getRelationIncludeParams(collection);
+
     const fetchData = useCallback(() => {
         cleanupSubscription();
         setError(undefined);
@@ -163,7 +168,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
                 where: whereParams,
                 limit: limit,
                 orderBy: undefined,
-                searchString: currentSearch
+                searchString: currentSearch,
+                include: includeParams
             }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onErrorUpdate);
         } else {
@@ -172,7 +178,8 @@ meta: res.meta }), onErrorUpdate);
                 limit: limit,
                 offset: 0,
                 orderBy: undefined,
-                searchString: currentSearch
+                searchString: currentSearch,
+                include: includeParams
             })
                 .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }))
@@ -181,7 +188,7 @@ meta: res.meta }))
         }
 
         unsubscribeRef.current = unsubscribe || null;
-    }, [dataClient, path, fixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading]);
+    }, [dataClient, path, fixedFilter, limit, currentSearch, entityToRelationItem, cleanupSubscription, setLoading, includeParams]);
 
     // Search function with debouncing
     const search = useCallback((searchString: string) => {

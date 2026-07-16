@@ -21,6 +21,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copy source packages and app
 COPY packages ./packages
 COPY app ./app
+# Every package's build ends with `node ../../scripts/assert-build-output.mjs`,
+# so the build fails without it. The build context is the workspace root, but
+# only the directories named here are actually copied in.
+COPY scripts ./scripts
 
 # Install all dependencies with flat node_modules for Docker compatibility
 # (many packages rely on hoisted devDependencies like @vitejs/plugin-react)

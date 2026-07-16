@@ -106,7 +106,11 @@ const rebaseEnvSchema = z.object({
     DATABASE_DIRECT_URL: z.string().url().optional(),
     DATABASE_READ_URL: z.string().url().optional(),
     FORCE_LOCAL_STORAGE: optionalBoolString,
-    STORAGE_TYPE: z.enum(["local", "s3"]).default("local"),
+    // `gcs` is a first-class storage backend (GCSStorageController) and a valid
+    // `type` in BackendStorageConfig, so it must validate here too — otherwise
+    // an app that selects GCS from this variable dies in loadEnv before its own
+    // config code ever runs.
+    STORAGE_TYPE: z.enum(["local", "s3", "gcs"]).default("local"),
     STORAGE_PATH: z.string().optional(),
     S3_BUCKET: z.string().optional(),
     S3_REGION: z.string().optional(),

@@ -22,6 +22,20 @@ describe("env configuration and localhost validation", () => {
         expect(env.DATABASE_URL).toBe("postgresql://localhost:5432/rebase");
     });
 
+    it.each(["local", "s3", "gcs"])("should accept STORAGE_TYPE=%s", (type) => {
+        // Every `type` BackendStorageConfig supports must validate here: an app
+        // selecting its backend from this variable never reaches its own config
+        // code if loadEnv rejects the value first.
+        process.env.STORAGE_TYPE = type;
+        expect(() => loadEnv()).not.toThrow();
+        expect(loadEnv().STORAGE_TYPE).toBe(type);
+    });
+
+    it("should reject an unknown STORAGE_TYPE", () => {
+        process.env.STORAGE_TYPE = "dropbox";
+        expect(() => loadEnv()).toThrow();
+    });
+
     it("should fail validation in production if DATABASE_URL contains localhost", () => {
         process.env.NODE_ENV = "production";
         process.env.DATABASE_URL = "postgresql://localhost:5432/rebase";

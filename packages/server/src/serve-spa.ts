@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import * as path from "path";
 import * as fs from "fs";
 import fsp from "node:fs/promises";
+import { responseCompression } from "./utils/compression.js";
 import { logger } from "./utils/logger.js";
 
 /**
@@ -58,9 +59,18 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         return;
     }
 
-    // Serve static files from frontend build
+    // Compress the bundle. The API is compressed by `configureMiddlewares`, but
+    // that is scoped to the API base path — static assets are served here, and
+    // the JS bundle is the single largest thing most apps ship.
+    //
+    // Registered before serveStatic so it wraps it. `precompressed` takes
+    // priority where the build emitted .br/.gz siblings: those cost no CPU and
+    // give brotli, and set Content-Encoding themselves, which makes the
+    // compression middleware skip them.
+    app.use("/*", responseCompression());
     app.use("/*", serveStatic({
-        root: path.relative(process.cwd(), frontendPath)
+        root: path.relative(process.cwd(), frontendPath),
+        precompressed: true
     }));
 
     // Build list of paths to exclude from SPA handling

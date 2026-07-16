@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { populateFetchCache } from "../../hooks/data/useFetch";
+import { getRelationIncludeParams } from "../../util/previews";
 import { Entity, EntityReference, EntityRelation, EntityTableController, FilterValues, RebaseContext, SelectedCellProps, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
@@ -254,19 +255,24 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         let unsubscribe: (() => void) | undefined;
 
+        // Eagerly include relations to avoid N+1 fetches.
+        const includeParams = getRelationIncludeParams(collection);
+
         if (accessor.listen) {
             unsubscribe = accessor.listen({
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString
+                searchString,
+                include: includeParams
             }, (res) => onEntitiesUpdate(res.data as Entity<M>[]), onError);
         } else {
             accessor.find({
                 where: whereParams,
                 limit: itemCount,
                 orderBy: orderByParams,
-                searchString
+                searchString,
+                include: includeParams
             })
                 .then((res) => onEntitiesUpdate(res.data as Entity<M>[]))
                 .catch(onError);

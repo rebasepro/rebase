@@ -77,11 +77,14 @@ function createMockDb() {
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
         delete: jest.fn().mockReturnThis(),
+        // UPDATE and DELETE report how many rows they matched; the driver rejects a
+        // write that matched none, so the chainable mock has to carry a row count.
+        rowCount: 1,
         transaction: jest.fn((callback: (tx: unknown) => unknown) => callback(db))
     } as unknown as jest.Mocked<NodePgDatabase>;
 
     // Make terminal operations thenable so they resolve when awaited
-    (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve([]));
+    (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
 
     return db;
 }
@@ -175,11 +178,11 @@ describe("PersistService – composite key delete bug", () => {
          * build the WHERE clause with ALL composite keys – confirming the
          * asymmetry with `delete`.
          */
-        const mockWhere = jest.fn().mockResolvedValue([{
+        const mockWhere = jest.fn().mockResolvedValue(Object.assign([{
             project_id: "proj1",
             user_id: "user1",
             role: "admin"
-        }]);
+        }], { rowCount: 1 }));
         const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
         (db.update as jest.Mock).mockReturnValue({
             set: mockSet
@@ -263,7 +266,7 @@ describe("FetchService – cursor pagination combined with filters", () => {
     });
 
     it("should apply cursor without orderBy (simple id < cursorId)", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve([]));
+        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
 
         await dataService.fetchCollection("items", {
             startAfter: { id: 10 },
@@ -274,7 +277,7 @@ describe("FetchService – cursor pagination combined with filters", () => {
     });
 
     it("should apply cursor with desc ordering", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve([]));
+        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
 
         await dataService.fetchCollection("items", {
             startAfter: { id: 20, values: { name: "Alpha" } },
@@ -289,7 +292,7 @@ describe("FetchService – cursor pagination combined with filters", () => {
     });
 
     it("should return empty array when no results match cursor + filter", async () => {
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve([]));
+        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve: (v: unknown[]) => void) => resolve(Object.assign([], { rowCount: 1 })));
 
         const entities = await dataService.fetchCollection("items", {
             filter: { name: ["==", "nonexistent"] },

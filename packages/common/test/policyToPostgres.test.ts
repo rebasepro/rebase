@@ -195,3 +195,44 @@ describe("findAnonymousGrants", () => {
         expect(findAnonymousGrants(policy.authenticated())).toEqual([]);
     });
 });
+
+describe("sqlToPolicy → policyToPostgres round-trip", () => {
+    // The parser's output is re-emitted as DDL, so a clause it only partly
+    // understands must survive verbatim rather than be decomposed. Splitting on
+    // a nested AND/OR used to hoist it out of its subquery and produce SQL that
+    // Postgres rejects with "missing FROM-clause entry for table".
+    const roundTrip = (sql: string) => policyToPostgres(sqlToPolicy(sql));
+
+    it("keeps AND inside an EXISTS subquery where it belongs", () => {
+        const sql =
+            "EXISTS (SELECT 1 FROM organizations JOIN organization_members ON organizations.id = organization_members.organization_id WHERE organizations.billing_account_id = billing_accounts.id AND organization_members.user_id = auth.uid())";
+        const out = roundTrip(sql);
+        expect(out).toContain("billing_accounts.id AND organization_members.user_id = auth.uid()");
+        // The correlated column must not escape the subquery.
+        expect(out).not.toMatch(/\)\s*AND\s*\(?organization_members\.user_id/);
+    });
+
+    it("keeps OR inside a subquery", () => {
+        const sql = "EXISTS (SELECT 1 FROM m WHERE m.a = t.a OR m.b = t.b)";
+        expect(roundTrip(sql)).toContain("m.a = t.a OR m.b = t.b");
+    });
+
+    it("does not split on AND inside a string literal", () => {
+        const sql = "status = 'draft AND pending'";
+        expect(roundTrip(sql)).toContain("'draft AND pending'");
+    });
+
+    it("still splits genuine top-level AND", () => {
+        expect(roundTrip("a = 'x' AND b = 'y'")).toBe("(a = 'x') AND (b = 'y')");
+    });
+
+    it("still splits genuine top-level OR", () => {
+        expect(roundTrip("a = 'x' OR b = 'y'")).toBe("(a = 'x') OR (b = 'y')");
+    });
+
+    it("splits a top-level AND between two parenthesised subqueries", () => {
+        const out = roundTrip("EXISTS (SELECT 1 FROM a WHERE a.x = 1) AND EXISTS (SELECT 1 FROM b WHERE b.y = 2)");
+        expect(out).toContain("EXISTS (SELECT 1 FROM a WHERE a.x = 1)");
+        expect(out).toContain("EXISTS (SELECT 1 FROM b WHERE b.y = 2)");
+    });
+});

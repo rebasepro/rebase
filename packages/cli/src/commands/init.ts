@@ -552,6 +552,8 @@ async function replacePlaceholders(options: InitOptions) {
     }
 
     const versionCache = new Map<string, string>();
+    /** Packages with no release matching the CLI's own version. */
+    const unreleased = new Map<string, string>();
 
     // Use npm view for registry queries — it's universal and works regardless of PM
     const viewBin = "npm";
@@ -584,6 +586,15 @@ async function replacePlaceholders(options: InitOptions) {
                     versionToUse = "latest";
                 }
             }
+
+            // The fallbacks above answer "what can I install?", not "what matches
+            // this CLI?". When a package has no release at the CLI's own version,
+            // they quietly pin whatever the registry last tagged — which can be a
+            // prerelease from an entirely different era of the framework. Record
+            // it so we can refuse rather than scaffold a mixed-version app.
+            if (versionToUse !== cliVersion) {
+                unreleased.set(pkgName, versionToUse);
+            }
         }
         versionCache.set(pkgName, versionToUse);
         return versionToUse;
@@ -609,6 +620,30 @@ async function replacePlaceholders(options: InitOptions) {
 
     // Resolve all versions in parallel
     await Promise.all(Array.from(allPackages).map(getPackageVersion));
+
+    // A stable CLI whose packages resolve only to a prerelease means those
+    // packages were never released at this version — the usual cause is a rename
+    // that left the new name published on the canary tag alone. Scaffolding
+    // anyway mixes eras (say @rebasepro/types@0.9.0 beside a 0.0.1 canary) and
+    // hands the user an app that fails at install or, worse, at runtime. Neither
+    // failure names this as the cause, so stop here and say it plainly.
+    const cliIsStable = cliVersion !== "latest" && !cliVersion.includes("-");
+    const prereleasePins = [...unreleased].filter(([, version]) => version === "latest" || version.includes("-"));
+
+    if (cliIsStable && prereleasePins.length > 0) {
+        const lines = prereleasePins.map(([name, version]) => `    ${name} → ${version}`).join("\n");
+        throw new Error(
+            `Rebase ${cliVersion} is not fully published to npm.\n\n` +
+            `These packages have no ${cliVersion} release, so the newest thing on the\n` +
+            `registry is a prerelease:\n\n${lines}\n\n` +
+            `Scaffolding would pin those alongside the ${cliVersion} packages and produce\n` +
+            `an app that cannot install or run. That is a release gap in Rebase itself —\n` +
+            `not a problem with your machine, your network, or your package manager.\n\n` +
+            `Stopped before writing dependency versions or installing anything. The\n` +
+            `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.\n` +
+            `Please report this with the list above.`
+        );
+    }
 
     // Perform replacements
     for (const [fullPath, originalContent] of fileContents.entries()) {

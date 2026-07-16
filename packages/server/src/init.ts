@@ -332,6 +332,20 @@ export interface RebaseBackendConfig {
      */
     maxBodySize?: number;
     /**
+     * Response compression for API routes. **Enabled by default.**
+     *
+     * Compresses responses with gzip/deflate, negotiated from the request's
+     * `Accept-Encoding`. Bodies that are already compressed (images, video),
+     * streamed (`text/event-stream`), or explicitly marked
+     * `Cache-Control: no-transform` are left untouched, so this is safe to
+     * leave on — a large JSON list response typically drops by ~20x.
+     *
+     * Set to `false` when something in front of the app already compresses
+     * (nginx, Cloudflare, or another reverse proxy / load balancer), to avoid
+     * paying for it twice.
+     */
+    compression?: boolean;
+    /**
      * CSRF protection configuration. **Opt-in** — disabled by default.
      *
      * BaaS APIs are consumed by mobile apps, SPAs on different domains,
