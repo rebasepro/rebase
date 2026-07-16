@@ -1789,6 +1789,9 @@ importers:
 
   saas/backend:
     dependencies:
+      '@google-cloud/storage':
+        specifier: ^7.0.0
+        version: 7.21.0
       '@hono/node-server':
         specifier: ^2.0.4
         version: 2.0.4(hono@4.12.25)

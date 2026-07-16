@@ -18,6 +18,7 @@ const CONSUMER_EXTERNALS = [
     "@hono/node-server",
     "@aws-sdk/client-s3",
     "@aws-sdk/s3-request-presigner",
+    "@google-cloud/storage",
     "dotenv",
     "pg",
     "chokidar",
