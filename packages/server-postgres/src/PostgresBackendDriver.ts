@@ -17,6 +17,7 @@ import {
     RebaseData,
     RebaseSdkData,
     RestFetchService,
+    SaveManyProps,
     SaveProps,
     TableColumnInfo,
     TableForeignKeyInfo,
@@ -532,7 +533,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                             id,
                                                             values,
                                                             collection,
-                                                            status
+                                                            status,
+                                                            upsert
                                                         }: SaveProps<M>): Promise<Record<string, unknown>> {
 
         const {
@@ -616,7 +618,8 @@ export class PostgresBackendDriver implements DataDriver {
                 path,
                 updatedValues,
                 id,
-                resolvedCollection?.databaseId
+                resolvedCollection?.databaseId,
+                { upsert }
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
@@ -762,6 +765,76 @@ export class PostgresBackendDriver implements DataDriver {
             }
             throw error;
         }
+    }
+
+    /**
+     * Write many rows through the same pipeline as {@link save}.
+     *
+     * The batch runs in one transaction of its own, so a failure part-way leaves
+     * nothing behind — the point of a batch is that a re-run starts from a known
+     * state. When this driver is already inside a transaction (the authenticated
+     * path, via `withTransaction`) the nested call becomes a savepoint, which is
+     * still atomic and still commits once.
+     *
+     * Rows are applied in order, so a batch that touches the same key twice ends
+     * with the last write winning, exactly as separate calls would.
+     */
+    async saveMany<M extends Record<string, unknown>>({
+                                                          path,
+                                                          rows,
+                                                          collection,
+                                                          upsert
+                                                      }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
+        return this.db.transaction(async (tx) => {
+            // Bind the whole batch to the transaction handle. Without this the
+            // rows would be written through `this.db` and survive a rollback.
+            const txDriver = new PostgresBackendDriver(
+                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
+            );
+            txDriver.dataService = new DataService(tx, this.registry);
+            txDriver.client = this.client;
+            // Carry the caller's notification batching through, so a bulk write
+            // nested in an outer transaction still holds its events until commit.
+            txDriver._deferNotifications = this._deferNotifications;
+            txDriver._pendingNotifications = this._pendingNotifications;
+
+            const saved: Record<string, unknown>[] = [];
+
+            for (let i = 0; i < rows.length; i++) {
+                const values = rows[i];
+                const id = (values as Record<string, unknown>)?.id as string | number | undefined;
+                try {
+                    saved.push(await txDriver.save<M>({
+                        path,
+                        values,
+                        // No `id` argument, deliberately: passing one selects the
+                        // UPDATE path, and an import's rows usually carry a natural
+                        // key for a row that does not exist yet — which would 404 on
+                        // every one. Leaving the key inside `values` is what
+                        // single-row `create(data, id)` does, and it inserts.
+                        // Callers who want existing rows overwritten pass `upsert`.
+                        collection,
+                        status: "new",
+                        upsert
+                    }));
+                } catch (error) {
+                    // One bad row in ten thousand is impossible to find from a
+                    // message that only says the batch failed. Say which row, and
+                    // keep the original error as the cause so its status survives.
+                    const label = id !== undefined ? `id ${JSON.stringify(id)}` : "no id";
+                    throw Object.assign(
+                        new Error(`Row ${i} of ${rows.length} (${label}) failed: ${(error as Error)?.message ?? error}`, { cause: error }),
+                        {
+                            statusCode: (error as { statusCode?: number })?.statusCode,
+                            code: (error as { code?: string })?.code,
+                            name: (error as Error)?.name
+                        }
+                    );
+                }
+            }
+
+            return saved;
+        });
     }
 
     async delete<M extends Record<string, unknown>>({
@@ -1360,6 +1433,19 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
 
     async save<M extends Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
         return this.withTransaction((delegate) => delegate.save(props));
+    }
+
+    /**
+     * One transaction for the whole batch, rather than one per row.
+     *
+     * This is the point of the method: `save` opens a transaction per call, so
+     * importing 10k rows through it means 10k transactions (and, over HTTP, 10k
+     * round trips). Here the RLS context is established once and every row lands
+     * or none does. Realtime notifications are already deferred to commit by
+     * `withTransaction`, so a batch does not flood subscribers mid-flight.
+     */
+    async saveMany<M extends Record<string, unknown>>(props: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
+        return this.withTransaction((delegate) => delegate.saveMany(props));
     }
 
     async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {

@@ -162,6 +162,14 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>>;
 
     /**
+     * Create many records in a single transaction.
+     *
+     * See {@link SDKCollectionClient.createMany}. Optional: not every driver can
+     * write in bulk, and callers should fall back to `create` per record.
+     */
+    createMany?(data: Partial<EntityValues<M>>[], options?: { upsert?: boolean }): Promise<Entity<M>[]>;
+
+    /**
      * Update an existing record by ID.
      * @returns The updated entity
      */
@@ -298,6 +306,34 @@ export interface SDKCollectionClient<
      * @returns The created row
      */
     create(data: I, id?: string | number): Promise<M>;
+
+    /**
+     * Write many records in a single request and a single transaction.
+     *
+     * Built for imports and ETL, where one call per row means one HTTP round
+     * trip and one transaction per row. Every record still runs the normal
+     * pipeline — callbacks, relations, row-level security — and the batch is
+     * all-or-nothing: if any record is rejected, none of them land and the
+     * error names the offending index.
+     *
+     * A record carrying its primary key updates that row; one without inserts.
+     * With `{ upsert: true }` each record is written as INSERT ... ON CONFLICT
+     * DO UPDATE on the primary key instead, which is what makes a re-runnable
+     * import idempotent.
+     *
+     * Batches are capped server-side (1000 rows by default) because one batch
+     * holds its locks for the whole transaction — chunk larger jobs.
+     *
+     * @returns The written rows, in the order given.
+     *
+     * @example
+     * ```ts
+     * for (const chunk of chunks(rows, 1000)) {
+     *     await client.data.products.createMany(chunk, { upsert: true });
+     * }
+     * ```
+     */
+    createMany(data: I[], options?: { upsert?: boolean }): Promise<M[]>;
 
     /**
      * Update an existing record by ID.

@@ -154,9 +154,10 @@ export class DataService implements DataRepository {
         collectionPath: string,
         values: Partial<M>,
         id?: string | number,
-        databaseId?: string
+        databaseId?: string,
+        options?: { upsert?: boolean }
     ): Promise<Record<string, unknown>> {
-        return this.persistService.save<M>(collectionPath, values, id, databaseId);
+        return this.persistService.save<M>(collectionPath, values, id, databaseId, options);
     }
 
     /**

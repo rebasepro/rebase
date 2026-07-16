@@ -77,6 +77,31 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
     previousValues?: Partial<EntityValues<M>>;
     collection?: CollectionConfig<M>;
     status: EntityStatus;
+    /**
+     * Write the row with INSERT ... ON CONFLICT DO UPDATE on the primary key
+     * instead of choosing between insert and update up front.
+     *
+     * One statement, so it does not lose the race a read-then-write can, and it
+     * succeeds whether or not the row is already there — what a re-runnable
+     * import needs. Requires every primary key column to be present; without
+     * them there is no conflict target and the row is inserted normally.
+     */
+    upsert?: boolean;
+}
+
+/**
+ * @internal
+ */
+export interface SaveManyProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    path: string;
+    /**
+     * The rows to write. A row carrying its primary key updates (or, with
+     * `upsert`, inserts-or-updates) that row; one without inserts.
+     */
+    rows: Partial<EntityValues<M>>[];
+    collection?: CollectionConfig<M>;
+    /** Apply every row as INSERT ... ON CONFLICT DO UPDATE. See {@link SaveProps.upsert}. */
+    upsert?: boolean;
 }
 
 /**
@@ -153,6 +178,20 @@ export interface DataDriver {
      * @param props
      */
     save<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveProps<M>): Promise<Record<string, unknown>>;
+
+    /**
+     * Save many rows as one unit of work.
+     *
+     * Every row runs the same pipeline as {@link save} — callbacks, relations
+     * and row-level security all still apply — but they share a single
+     * transaction, so the batch either lands whole or not at all. That, and the
+     * single round trip, is what makes importing tens of thousands of rows
+     * viable without dropping to raw SQL.
+     *
+     * Optional: drivers that cannot do this leave it undefined and callers fall
+     * back to `save` per row.
+     */
+    saveMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveManyProps<M>): Promise<Record<string, unknown>[]>;
 
     /**
      * Delete a entity

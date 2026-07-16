@@ -115,12 +115,19 @@ export class PersistService {
 
     /**
      * Save an row (create or update)
+     *
+     * With `options.upsert`, the row is written with INSERT ... ON CONFLICT DO
+     * UPDATE against the primary key rather than a plain UPDATE. That is one
+     * statement, so it cannot lose a race the way a read-then-write can, and it
+     * does not care whether the row already exists — which is what a re-runnable
+     * import needs.
      */
     async save<M extends Record<string, unknown>>(
         collectionPath: string,
         values: Partial<M>,
         id?: string | number,
-        databaseId?: string
+        databaseId?: string,
+        options?: { upsert?: boolean }
     ): Promise<Record<string, unknown>> {
         // If saving under a nested relation path, resolve the parent and inject FK
         let effectiveCollectionPath = collectionPath;
@@ -255,7 +262,7 @@ export class PersistService {
             savedId = await this.db.transaction(async (tx) => {
                 let currentId: string | number;
 
-                if (id) {
+                if (id && !options?.upsert) {
                     // Update existing row
                     currentId = id; // `id` is already the formatted composite or singular string
                     const idValues = parseIdValues(id, idInfoArray);
@@ -295,6 +302,12 @@ export class PersistService {
                 } else {
                     const dataForInsert = { ...(entityData as Record<string, unknown>) };
 
+                    // An explicit id given alongside upsert is the conflict target,
+                    // so fold it into the row before the empty-key strip below.
+                    if (id && options?.upsert) {
+                        Object.assign(dataForInsert, parseIdValues(id, idInfoArray));
+                    }
+
                     // Strip empty primary keys so the database defaults (e.g. uuid_gen(), auto-increment) can trigger
                     for (const info of idInfoArray) {
                         if (dataForInsert[info.fieldName] === "" || dataForInsert[info.fieldName] === null || dataForInsert[info.fieldName] === undefined) {
@@ -302,13 +315,46 @@ export class PersistService {
                         }
                     }
 
-                    const result = await tx
-                        .insert(table)
-                        .values(dataForInsert)
-                        .returning(returningKeys);
+                    const insertQuery = tx.insert(table).values(dataForInsert);
 
+                    // ON CONFLICT needs a real conflict target, and the only one
+                    // guaranteed to exist is the primary key. Without every key
+                    // column present there is nothing to match on, so the row is a
+                    // plain insert and a duplicate should still raise.
+                    const hasFullKey = idInfoArray.length > 0
+                        && idInfoArray.every((info) => dataForInsert[info.fieldName] !== undefined);
+
+                    let result;
+                    if (options?.upsert && hasFullKey) {
+                        const target = idInfoArray.map((info) => table[info.fieldName as keyof typeof table] as AnyPgColumn);
+                        const set = { ...dataForInsert };
+                        // Never reassign the key columns to themselves in the UPDATE
+                        // branch; Postgres rejects that against the conflict target.
+                        for (const info of idInfoArray) delete set[info.fieldName];
+
+                        result = Object.keys(set).length > 0
+                            ? await insertQuery.onConflictDoUpdate({ target, set }).returning(returningKeys)
+                            : await insertQuery.onConflictDoNothing({ target }).returning(returningKeys);
+                    } else {
+                        result = await insertQuery.returning(returningKeys);
+                    }
+
+                    // DO NOTHING returns no row when it skipped, and an upsert whose
+                    // UPDATE branch is filtered by RLS returns none either. Fall back
+                    // to the id we were given rather than reading undefined.
                     const resultRow = result[0];
-                    currentId = buildCompositeId(resultRow, idInfoArray);
+                    if (!resultRow) {
+                        if (id) {
+                            currentId = id;
+                        } else {
+                            throw ApiError.forbidden(
+                                `Not allowed to write to "${effectiveCollectionPath}": the row was rejected by a row-level security policy.`,
+                                "WRITE_DENIED"
+                            );
+                        }
+                    } else {
+                        currentId = buildCompositeId(resultRow, idInfoArray);
+                    }
 
                     // For inserts, apply joinPath after since the parent row didn't exist before
                     if (joinPathRelationUpdates.length > 0) {

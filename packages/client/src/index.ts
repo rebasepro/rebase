@@ -142,11 +142,20 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     apiKeys: ReturnType<typeof createApiKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
+    /**
+     * Release the realtime socket and its reconnect timer.
+     *
+     * An open socket keeps the Node event loop alive, so a script that does not
+     * call this will not exit on its own. Safe when realtime was never started
+     * (`realtime: false`), and safe to call twice.
+     */
+    close: () => void;
     storage: StorageSource;
     storageRegistry: StorageSourceRegistry;
     createStorageSource: (storageId: string) => StorageSource;
     fetchStorageSources: () => Promise<StorageSourceDefinition[]>;
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
+    collection: <M extends Record<string, unknown> = Record<string, unknown>>(slug: string) => CollectionClient<M>;
     data: TypedDataLayer<DB>;
 };
 

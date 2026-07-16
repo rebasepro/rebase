@@ -95,6 +95,17 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             return rowToEntity<M>(row, slug);
         },
 
+        createMany: driver.saveMany
+            ? async (data: Partial<EntityValues<M>>[], options?: { upsert?: boolean }): Promise<Entity<M>[]> => {
+                const rows = await driver.saveMany!<M>({
+                    path: slug,
+                    rows: data,
+                    upsert: options?.upsert
+                });
+                return rows.map((row) => rowToEntity<M>(row, slug));
+            }
+            : undefined,
+
         async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await driver.save<M>({
                 path: slug,
@@ -325,6 +336,20 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         },
         async create(data: Partial<M>, id?: string | number): Promise<M> {
             return entityToRow(await snap.create(data as Partial<EntityValues<M>>, id));
+        },
+        async createMany(data: Partial<M>[], options?: { upsert?: boolean }): Promise<M[]> {
+            if (!Array.isArray(data)) {
+                throw new TypeError("createMany expects an array of records.");
+            }
+            if (data.length === 0) return [];
+            if (!snap.createMany) {
+                throw new Error(
+                    "Bulk writes are not supported by this collection's data source. " +
+                    "Fall back to create() per record."
+                );
+            }
+            const rows = await snap.createMany(data as Partial<EntityValues<M>>[], options);
+            return rows.map(entityToRow);
         },
         async update(id: string | number, data: Partial<M>): Promise<M> {
             return entityToRow(await snap.update(id, data as Partial<EntityValues<M>>));

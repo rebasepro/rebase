@@ -70,6 +70,22 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             return raw as M;
         },
 
+        async createMany(data: Partial<M>[], options?: { upsert?: boolean }) {
+            if (!Array.isArray(data)) {
+                throw new TypeError("createMany expects an array of records.");
+            }
+            if (data.length === 0) return [];
+
+            const raw = await transport.request<{ data: Record<string, unknown>[] }>(`${basePath}/bulk`, {
+                method: "POST",
+                body: JSON.stringify({
+                    rows: data,
+                    ...(options?.upsert ? { upsert: true } : {})
+                })
+            });
+            return (raw.data || []) as M[];
+        },
+
         async update(id: string | number, data: Partial<M>) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PUT",

@@ -28,21 +28,27 @@ async function parseJsonBody(c: Context<HonoEnv>): Promise<Record<string, unknow
  * Lightweight REST API generator that leverages existing Rebase DataDriver.
  * Supports `include` query parameter for eager-loading relations via Drizzle.
  */
+/** Rows accepted by a single POST /<collection>/bulk. See `maxBulkRows`. */
+export const DEFAULT_MAX_BULK_ROWS = 1000;
+
 export class RestApiGenerator {
     private collections: CollectionConfig[];
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
+    private maxBulkRows: number;
 
     private authAdapter?: AuthAdapter;
 
     constructor(
         collections: CollectionConfig[],
         driver: DataDriver,
-        authAdapter?: AuthAdapter
+        authAdapter?: AuthAdapter,
+        maxBulkRows: number = DEFAULT_MAX_BULK_ROWS
     ) {
         this.collections = collections;
         this.driver = driver;
         this.authAdapter = authAdapter;
+        this.maxBulkRows = maxBulkRows;
         this.router = new Hono<HonoEnv>();
     }
 
@@ -175,6 +181,68 @@ export class RestApiGenerator {
             }
 
             return c.json(entity);
+        });
+
+        // POST /collection/bulk - Write many rows as one transaction.
+        //
+        // Registered before POST /collection/:id-shaped routes so "bulk" is never
+        // read as an id.
+        this.router.post(`${basePath}/bulk`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
+            const driver = this.getScopedDriver(c);
+            const path = collection.slug;
+
+            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown };
+
+            if (!Array.isArray(body?.rows)) {
+                throw ApiError.badRequest(
+                    "Expected a JSON body of { rows: [...] }.",
+                    "INVALID_BULK_BODY"
+                );
+            }
+            if (body.rows.length === 0) {
+                return c.json({ data: [], meta: { written: 0 } });
+            }
+            if (body.rows.some((row) => typeof row !== "object" || row === null || Array.isArray(row))) {
+                throw ApiError.badRequest(
+                    "Every entry in `rows` must be an object.",
+                    "INVALID_BULK_BODY"
+                );
+            }
+            if (body.upsert !== undefined && typeof body.upsert !== "boolean") {
+                throw ApiError.badRequest("`upsert` must be a boolean.", "INVALID_BULK_BODY");
+            }
+
+            const maxRows = this.maxBulkRows;
+            if (body.rows.length > maxRows) {
+                // A batch is one transaction, which holds locks for its whole
+                // duration; an unbounded one is a self-inflicted outage. Say the
+                // limit and the actual count so the caller can chunk to it.
+                throw ApiError.badRequest(
+                    `Too many rows: ${body.rows.length} exceeds the ${maxRows}-row limit for a single bulk write. ` +
+                    `Send it in chunks of ${maxRows} or fewer.`,
+                    "BULK_TOO_LARGE"
+                );
+            }
+
+            if (!driver.saveMany) {
+                throw ApiError.badRequest(
+                    "This collection's data source does not support bulk writes.",
+                    "BULK_UNSUPPORTED"
+                );
+            }
+
+            const rows = await driver.saveMany({
+                path,
+                rows: body.rows as Record<string, unknown>[],
+                collection: resolvedCollection,
+                upsert: body.upsert === true
+            });
+
+            return c.json({
+                data: rows.map((row) => this.formatResponse(row)),
+                meta: { written: rows.length }
+            });
         });
 
         // POST /collection - Create entity
