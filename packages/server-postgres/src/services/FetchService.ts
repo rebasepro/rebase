@@ -8,6 +8,7 @@ import {
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
+    deriveRowAddress,
     parseIdValues,
     buildCompositeId
 } from "./collection-helpers";
@@ -152,6 +153,23 @@ export class FetchService {
     }
 
     /**
+     * The address a relation ref points at.
+     *
+     * The whole key, not its first column: a composite-keyed target addressed
+     * by `tenant_id` alone points at every row that shares it. And a target
+     * whose key cannot be resolved at all used to throw here — reading
+     * `targetPks[0]` of an empty array — taking down the parent's fetch over a
+     * relation it may not even have asked for; the first column is a guess, but
+     * a ref that resolves to nothing beats no rows at all.
+     */
+    private relationTargetAddress(targetRow: Record<string, unknown>, targetCollection: CollectionConfig): string {
+        const address = deriveRowAddress(targetRow, targetCollection, this.registry);
+        if (address) return address;
+        const firstColumn = targetRow[Object.keys(targetRow)[0]];
+        return String(firstColumn ?? "");
+    }
+
+    /**
      * Convert a db.query result row (with nested relation objects) to a flat row.
      * Handles:
      * - Type normalization (dates, numbers, NaN) via normalizeDbValues
@@ -180,8 +198,6 @@ export class FetchService {
             if (relation.cardinality === "many" && Array.isArray(relData)) {
                 const targetCollection = relation.target();
                 const targetPath = targetCollection.slug;
-                const targetPks = getPrimaryKeys(targetCollection, this.registry);
-                const targetIdField = targetPks[0].fieldName;
 
                 normalizedValues[key] = relData.map((item: Record<string, unknown>) => {
                     // Handle junction table flattening:
@@ -197,7 +213,7 @@ export class FetchService {
                         }
                     }
 
-                    const relId = String(targetRow[targetIdField] ?? targetRow.id ?? targetRow[Object.keys(targetRow)[0]]);
+                    const relId = this.relationTargetAddress(targetRow, targetCollection);
                     const targetValues = normalizeDbValues(targetRow, targetCollection);
 
                     return createRelationRefWithData(relId, targetPath, {
@@ -209,11 +225,9 @@ export class FetchService {
             } else if (relation.cardinality === "one" && typeof relData === "object" && !Array.isArray(relData)) {
                 const targetCollection = relation.target();
                 const targetPath = targetCollection.slug;
-                const targetPks = getPrimaryKeys(targetCollection, this.registry);
-                const targetIdField = targetPks[0].fieldName;
                 const relObj = relData as Record<string, unknown>;
 
-                const relId = String(relObj[targetIdField] ?? relObj.id ?? relObj[Object.keys(relObj)[0]]);
+                const relId = this.relationTargetAddress(relObj, targetCollection);
                 const targetValues = normalizeDbValues(relObj, targetCollection);
 
                 normalizedValues[key] = createRelationRefWithData(relId, targetPath, {
@@ -272,57 +286,6 @@ export class FetchService {
     }
 
     /**
-     * Post-fetch joinPath relations for a batch of flat rows.
-     * Uses batch fetching to avoid N+1 queries for list views.
-     */
-    private async resolveJoinPathRelationsBatch<M extends Record<string, unknown>>(
-        rows: Record<string, unknown>[],
-        collection: CollectionConfig,
-        collectionPath: string,
-        idInfo: { fieldName: string; type: "string" | "number" },
-        _databaseId?: string
-    ): Promise<void> {
-        if (rows.length === 0) return;
-
-        const resolvedRelations = resolveCollectionRelations(collection);
-
-        const joinPathRelations = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0);
-
-        if (joinPathRelations.length === 0) return;
-
-        for (const [key, relation] of joinPathRelations) {
-            try {
-                const rowIds = rows.map(r => {
-                    const parsed = parseIdValues(String(r.id), [idInfo]);
-                    return parsed[idInfo.fieldName] as string | number;
-                });
-
-                const resultMap = await this.relationService.batchFetchRelatedEntities(
-                    collectionPath,
-                    rowIds,
-                    key,
-                    relation
-                );
-
-                for (const row of rows) {
-                    const parsed = parseIdValues(String(row.id), [idInfo]);
-                    const id = parsed[idInfo.fieldName] as string | number;
-                    const relatedRow = resultMap.get(String(id));
-
-                    if (relatedRow) {
-                        if (relation.cardinality === "one") {
-                            row[key] = createRelationRefWithData(relatedRow.id, relatedRow.path, relatedRow);
-                        }
-                    }
-                }
-            } catch (e) {
-                logger.warn(`Could not batch resolve joinPath relation '${key}'`, { error: e });
-            }
-        }
-    }
-
-    /**
      * Resolves joinPath relations for raw REST rows and directly injects them.
      * Uses RelationService to query the database and maps results back to the flattened objects.
      */
@@ -346,14 +309,18 @@ export class FetchService {
         if (joinPathRelations.length === 0) return;
 
         const idInfo = idInfoArray[0];
+        // These rows carry their key columns verbatim, so the parent id is read
+        // straight off them. It used to be parsed back out of a synthesized
+        // `id` — which no longer exists on a row, and threw (composite: parts
+        // mismatch; numeric: NaN) into the catch below, where a warning is all
+        // that separates "no relations" from "relations dropped".
+        const parentIdOf = (row: Record<string, unknown>) => row[idInfo.fieldName] as string | number | undefined;
 
         for (const [key, relation] of joinPathRelations) {
             try {
-                // Determine the parent IDs based on the parsed string ID from the REST row
-                const rowIds = rows.map(r => {
-                    const parsed = parseIdValues(String(r.id), idInfoArray);
-                    return parsed[idInfo.fieldName] as string | number;
-                });
+                const addressable = rows.filter(r => parentIdOf(r) !== undefined && parentIdOf(r) !== null);
+                if (addressable.length === 0) continue;
+                const rowIds = addressable.map(r => parentIdOf(r) as string | number);
 
                 if (relation.cardinality === "one") {
                     const resultMap = await this.relationService.batchFetchRelatedEntities(
@@ -363,19 +330,11 @@ export class FetchService {
                         relation
                     );
 
-                    for (const row of rows) {
-                        const parsed = parseIdValues(String(row.id), idInfoArray);
-                        const id = parsed[idInfo.fieldName] as string | number;
-                        const relatedRow = resultMap.get(String(id));
-
-                        if (relatedRow) {
-                            row[key] = {
-                                ...relatedRow.values,
-                                id: relatedRow.id
-                            };
-                        } else {
-                            row[key] = null;
-                        }
+                    for (const row of addressable) {
+                        const relatedRow = resultMap.get(String(parentIdOf(row)));
+                        // Columns only: the target's address is the consumer's to
+                        // derive, and merging it last overwrote a real `id` column.
+                        row[key] = relatedRow ? { ...relatedRow.values } : null;
                     }
                 } else if (relation.cardinality === "many") {
                     const resultMap = await this.relationService.batchFetchRelatedEntitiesMany(
@@ -385,14 +344,9 @@ export class FetchService {
                         relation
                     );
 
-                    for (const row of rows) {
-                        const parsed = parseIdValues(String(row.id), idInfoArray);
-                        const id = parsed[idInfo.fieldName] as string | number;
-                        const relatedList = resultMap.get(String(id)) || [];
-                        row[key] = relatedList.map(e => ({
-                            ...e.values,
-                            id: e.id
-                        }));
+                    for (const row of addressable) {
+                        const relatedList = resultMap.get(String(parentIdOf(row))) || [];
+                        row[key] = relatedList.map(e => ({ ...e.values }));
                     }
                 }
             } catch (e) {
@@ -1020,11 +974,12 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     relationKey,
                     options
                 );
-                // Convert RelatedRow[] from RelationService to flat rows
-                return rows.map(row => ({
-                    ...row.values as Record<string, unknown>,
-                    id: row.id
-                }));
+                // Flatten RelatedRow[] to rows: the target's columns, and only
+                // those. Merging `row.id` in last overwrote a real `id` column,
+                // and the address is derivable without it — a consumer resolves
+                // this path ("posts/1/comments") to the target collection and
+                // reads the key columns, which `values` carries.
+                return rows.map(row => ({ ...row.values as Record<string, unknown> }));
             }
 
             if (i + 1 < pathSegments.length) {
