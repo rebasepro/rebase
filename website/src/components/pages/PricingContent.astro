@@ -28,8 +28,8 @@ const entFeatures = [
             <h1 class="mt-4 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1] text-white">
                 {t("pricing.title")}
             </h1>
-            <p class="mt-5 text-lg leading-8 text-surface-400 max-w-2xl mx-auto">
-                {t("pricing.subtitle")}
+            <p class="mt-5 text-lg leading-8 text-surface-400 max-w-2xl mx-auto"
+               set:html={t("pricing.subtitle")}>
             </p>
         </div>
     </section>

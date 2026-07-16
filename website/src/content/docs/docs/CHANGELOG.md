@@ -6,6 +6,70 @@ title: Changelog
 
 ## [Unreleased]
 
+### Breaking
+
+- **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`ui`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
+
+  | Old | New |
+  |----------|----------|
+  | `@rebasepro/core` | `@rebasepro/app` |
+  | `@rebasepro/server-core` | `@rebasepro/server` |
+  | `@rebasepro/server-postgresql` | `@rebasepro/server-postgres` |
+  | `@rebasepro/server-mongodb` | `@rebasepro/server-mongo` |
+  | `@rebasepro/client-postgresql` | `@rebasepro/client-postgres` |
+  | `@rebasepro/client-firebase` | `@rebasepro/firebase` |
+  | `@rebasepro/formex` | `@rebasepro/forms` |
+  | `@rebasepro/sdk-generator` | `@rebasepro/codegen` |
+  | `@rebasepro/schema-inference` | `@rebasepro/inference` |
+  | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
+  | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
+
+  Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`, `cli`, `plugin-insights`.
+
+- **`@rebasepro/auth` removed** — it was one hook and an API helper whose only dependency was `@rebasepro/types`, and it always had to be installed alongside `core` anyway. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` and `clearAuthConfigCache` now come from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they are used with. The auth *system* was never here — it lives in `@rebasepro/client` (`client.auth`) and `@rebasepro/server`.
+
+- **`defaultSecurityRules` moved off the server config** — it lived on `RebaseBackendConfig`, was applied to the in-memory registry, and enforced nothing: `db push` generates the Postgres policies — the only thing that actually enforces access — from the collection *files*, and never sees the running server. Declare it in `config/collections/index.ts` instead, where the loader reads it and both the runtime and `db push` see the same thing. Its old doc also claimed collections without rules were "unrestricted"; they are locked to admin-only by the generator. In `baas` mode there are no collection files and no `db push`, so the database's own RLS is the whole model and there is nothing to default.
+
+  ```ts
+  // config/collections/index.ts
+  export const defaultSecurityRules: SecurityRule[] = [
+      { operation: "select", access: "public" },
+      { operations: ["insert", "update", "delete"], roles: ["admin"] }
+  ];
+  ```
+
+- **A collection file that fails to import is now a hard error** — the loader used to log and continue, which turns a broken file into a missing API route and a missing policy, with a successful exit code. Both read as "no data" rather than as a failure.
+
+- **`RebaseCMS` → `RebaseAdmin`** — the component now matches the package it ships from. `mode: "cms"` on `RebaseBackendConfig` is unchanged: it describes where collections come from (config vs database), not the UI.
+
+- **BaaS mode does not serve tables without row-level security** — see Fixes. A table with RLS disabled is skipped and named at boot; `baas: { unprotectedTables: "serve" }` restores the old behavior.
+
+### Features & Improvements
+
+- **BaaS mode — a REST API over your database with no collections at all** — `mode: "baas"` derives collections from the live database at boot instead of loading config files. Every protected table becomes a REST resource, with types, primary keys and relations read from `information_schema`; the drizzle tables the query layer needs are built in memory, so no generated `schema.generated.ts` is required either. Change the schema with a migration and the API follows. Join tables are skipped, the schema editor is off (it exists to write config files), and no React enters the backend's module graph. `introspectionSchema` on the Postgres adapter selects a schema other than `public`.
+
+- **The SDK works with no collections** — `rebase.data.collection("posts").find()` needs only a table name against a BaaS backend: no collections map, no generated types, nothing to declare. The optional `collections` option exists only to pin non-obvious slugs.
+
+- **`rebase init --flavor baas`** — scaffolds a headless project: `backend/` alone, no `config/`, no `frontend/`, and no UI package in the install tree. Without `--flavor`, `init` asks: *BaaS + admin* (default) or *BaaS only*.
+
+- **`rebase doctor --policies`** — diffs `pg_policies` against the policies your collections generate, reporting missing, orphaned and diverged, and exits non-zero so CI can gate it. Policies live in Postgres and the config is only their source; nothing reconciled the two, so a stale policy outlived every config fix. Reuses `generatePostgresPoliciesDdl` — the same function `db push` applies — so it compares against what would really be written. It also reports policy roles this server can never assume, without booting one. Policy *expressions* are deliberately not compared: Postgres rewrites `qual`/`with_check` on storage, and a check that cries wolf gets ignored.
+
+- **One definition of "the collections"** — the runtime, the drizzle-schema generator, the policy generator and the doctor each scanned the collections directory themselves, four copy-pasted filters agreeing by discipline rather than construction. A drift between them would serve one set of collections while pushing policies for another. They now share one loader, exported from `@rebasepro/server`.
+
+- **Guards for the two failure modes that ship silently** — `pnpm run check:headless` imports every collection file and server package under a loader hook that rejects React, so a UI import cannot creep back into the backend. `pnpm run check:names` fails on references to renamed packages and duplicate dependency keys. Both run in CI. A new BaaS e2e installs a scaffolded project from real tarballs and boots it against tables it was never told about — the only place `workspace:*` resolves, so the only thing that proves the templates rather than the library.
+
+### Fixes
+
+- **BaaS mode served every table to every authenticated user** — it introspects all tables, `ensureAppRole` grants `rebase_user` `SELECT/INSERT/UPDATE/DELETE` across the schema, and nothing enabled RLS, because that only happens via `db push`, which BaaS never runs. Pointing Rebase at an ordinary database therefore exposed every row of every table. A table with RLS disabled has no authorization model, so it is now excluded and logged with the `ALTER TABLE` needed to protect it. Tables with RLS enabled but no policies are served and return nothing — legal, and indistinguishable from an empty table, so that is called out at boot too.
+
+- **Security rules targeting an unusable Postgres role now fail the boot** — `pgRoles` sets a policy's `TO` clause, so naming a role requests never run as means the policy never applies and RLS filters every row. The table reads as empty, which is indistinguishable from having no data, so the mistake shipped. Boot now throws, naming the collection and role, with a specific hint for Supabase's `authenticated`/`anon`/`service_role`.
+
+- **The demo app's collections were empty** — every collection but `users` granted `pgRoles: ["authenticated"]`, a Supabase role name, while requests run as `rebase_user`. RLS filtered every row; `authors` and `posts` granted `TO public`, which is why they were the only two showing data. They now use the documented API (`select: public`, writes `admin`), the same shape `rebase init` scaffolds. The generated `drizzle/policies.sql` carried the same policies and is regenerated — it is what `db push` applies, so the config alone would have changed nothing.
+
+- **The service key did not authenticate websockets** — the HTTP middleware compares it before JWT verification; the websocket path went straight to `extractUserFromToken`, and a static secret can only ever fail that. Any SDK client using a service key (scripts, cron, server-to-server) got `jwt malformed` on every connect and silently received no realtime events.
+
+- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
+
 ## [0.9.0] - 2026-07-13
 
 ### Breaking
@@ -147,7 +211,7 @@ title: Changelog
   | `useEntityPreviewSlots` | `usePreviewSlots` |
   | `SideEntityControllerContext` | `SidePanelControllerContext` |
 
-  **Bridge key (`@rebasepro/app`)**
+  **Bridge key (`@rebasepro/core`)**
 
   | Old Key | New Key |
   |---------|---------|
@@ -180,7 +244,7 @@ title: Changelog
 
 - **Inferred data-source transport** — `DataSourceDefinition.transport` is now optional: entries with a client-side `driver` default to `"direct"`, entries without to `"server"`. A `"(default)"`-keyed entry without a driver can be used to declare the default source's engine/capabilities while the client keeps serving the data.
 
-- **`installShutdownHandlers`** — New `@rebasepro/server` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
+- **`installShutdownHandlers`** — New `@rebasepro/server-core` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
 
 - **Honest Realtime Meta** — Added `FindResponse.meta.estimated` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
 
@@ -192,7 +256,7 @@ title: Changelog
 
 - **Resilient auto-refresh** — a transient refresh failure (network blip, backend restart, 5xx) now retries with exponential backoff instead of immediately signing the user out; only a genuine auth failure (401/403/invalid/expired token) or exhausted retries signs out.
 
-- **`server-postgresql` ships `src/`** — the driver package now packs `src` alongside `dist`, fixing `✗ Could not find CLI entry point for @rebasepro/server-postgres` for `rebase db push` / `schema generate` in published/packed installs (the CLI runs `src/cli.ts` via tsx; no `dist/cli.js` is built).
+- **`server-postgresql` ships `src/`** — the driver package now packs `src` alongside `dist`, fixing `✗ Could not find CLI entry point for @rebasepro/server-postgresql` for `rebase db push` / `schema generate` in published/packed installs (the CLI runs `src/cli.ts` via tsx; no `dist/cli.js` is built).
 
 - **Malformed request bodies** — the API now rejects malformed JSON bodies with `400` and tightens the public-path check.
 
@@ -224,7 +288,7 @@ title: Changelog
 - **Property Schema Consolidation** — Refactored the property system to unify how database-level schemas, UI configurations, and validation rules are defined. Removed overlapping property types and introduced a more robust `PropertyConfig` system that handles complex relations and references consistently across all data drivers (Postgres, MongoDB, Firestore).
 - **Editable UI Table** — Significantly enhanced `VirtualTable` with native editable cells (`VirtualTableInput`, `VirtualTableSelect`, `VirtualTableNumberInput`, `VirtualTableDateField`). Added a new `SelectionStore` and `SelectionContext` for robust multi-row selection, keyboard navigation, and batch operations within the CMS.
 - **Expanded Agent Skills** — Massive overhaul of the Rebase AI coding skills. Added new specialized skills for `rebase-custom-functions`, `rebase-ui-components`, and `rebase-storage`. Expanded existing skills for auth, security, and SDK with deep architectural context, common patterns, and safety rules.
-- **Public API Refinement** — Cleaned up the public API surface of `@rebasepro/client` and `@rebasepro/app`, simplifying integration into existing applications. Consolidated data controllers, improved type inference, and refined the `Rebase` component props for better developer experience.
+- **Public API Refinement** — Cleaned up the public API surface of `@rebasepro/client` and `@rebasepro/core`, simplifying integration into existing applications. Consolidated data controllers, improved type inference, and refined the `Rebase` component props for better developer experience.
 - **NPM Publishing Safeguards** — Added `validate-no-workspace-protocol.sh` and `check-packages.sh` scripts to the release pipeline. These prevent publishing packages with `workspace:` dependencies or inconsistent versions, ensuring library consumers always get stable, resolved dependencies.
 
 ### Fixes
@@ -483,21 +547,21 @@ title: Changelog
 | `@rebasepro/types` | Core TypeScript type definitions |
 | `@rebasepro/utils` | Shared utility functions |
 | `@rebasepro/common` | Common modules shared across packages |
-| `@rebasepro/forms` | Lightweight form management library |
+| `@rebasepro/formex` | Lightweight form management library |
 | `@rebasepro/ui` | React component library |
-| `@rebasepro/app` | Core CMS logic and controllers |
+| `@rebasepro/core` | Core CMS logic and controllers |
 | `@rebasepro/client` | Client-side data access layer |
-| `@rebasepro/client-postgres` | PostgreSQL client adapter |
-| `@rebasepro/firebase` | Firebase/Firestore client adapter |
-| `@rebasepro/server` | Server framework and middleware |
-| `@rebasepro/server-postgres` | PostgreSQL server adapter with Drizzle |
-| `@rebasepro/server-mongo` | MongoDB server adapter |
-| `@rebasepro/app` | Authentication controllers and views |
+| `@rebasepro/client-postgresql` | PostgreSQL client adapter |
+| `@rebasepro/client-firebase` | Firebase/Firestore client adapter |
+| `@rebasepro/server-core` | Server framework and middleware |
+| `@rebasepro/server-postgresql` | PostgreSQL server adapter with Drizzle |
+| `@rebasepro/server-mongodb` | MongoDB server adapter |
+| `@rebasepro/auth` | Authentication controllers and views |
 | `@rebasepro/admin` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, schema tools, and developer utilities |
 | `@rebasepro/cli` | CLI for project scaffolding and management |
-| `@rebasepro/codegen` | TypeScript SDK code generation |
-| `@rebasepro/mcp` | MCP server for AI integrations |
-| `@rebasepro/inference` | Database schema introspection and inference |
-| `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
+| `@rebasepro/sdk-generator` | TypeScript SDK code generation |
+| `@rebasepro/mcp-server` | MCP server for AI integrations |
+| `@rebasepro/schema-inference` | Database schema introspection and inference |
+| `@rebasepro/plugin-data-enhancement` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |

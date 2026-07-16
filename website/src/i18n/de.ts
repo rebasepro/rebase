@@ -1,9 +1,9 @@
 export const de = {
   "hero.badge": "Open-Source · Self-Hosted · Postgres-nativ",
-  "hero.title.part1": "Dein bestehendes Postgres —",
-  "hero.title.part2": "Admin-Panel, APIs & typisiertes SDK, sofort.",
+  "hero.title.part1": "Das Postgres, das du schon hast.",
+  "hero.title.part2": "Das Backend, das du immer wolltest.",
   "hero.subtitle":
-    "Richte Rebase auf eine beliebige Postgres-Datenbank und erhalte ein produktionsreifes Admin-Panel, typsichere REST-APIs und ein Realtime-SDK — in Minuten. Open-source, self-hosted und agent-ready.",
+    "Richte Rebase auf deine Datenbank und erhalte REST-APIs, Auth, Storage, Realtime — und ein Admin-Panel, wenn du eines willst. Abgesichert durch Postgres Row-Level Security statt Middleware. Bereit für dein Team und deine KI-Agenten.",
   "hero.cta.demo": "Live-Demo ansehen",
   "hero.cta.demo.note": "Ohne Anmeldung — ein echtes generiertes Admin-Panel",
   "hero.cli.label": "Lieber im Terminal? In unter einer Minute lokal startklar:",
