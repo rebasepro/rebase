@@ -291,9 +291,14 @@ export interface DataDriver {
  * REST-optimised fetch service exposed by drivers that support
  * eager-loading of relations via `include`.
  *
- * The methods return flattened rows (`{ id, ...columns }`) with
- * included relations inlined as plain nested rows — the shape served
- * to app developers through the REST API / SDK client.
+ * The methods return flattened rows — exactly the table's columns, under their
+ * own names and with the types the database returned — and included relations
+ * inlined as plain nested rows. This is the shape served to app developers
+ * through the REST API / SDK client.
+ *
+ * No synthesized `id`: identity is a primary key, which may be named anything
+ * and span several columns, so an address is derived by whoever needs one (see
+ * `buildCompositeId`) rather than written into the row on top of the data.
  *
  * @group DataDriver
  */

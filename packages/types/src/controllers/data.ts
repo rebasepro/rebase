@@ -422,7 +422,7 @@ export type RebaseData<DB = unknown> = {
  * - The frontend SDK client (`client.data.products.find()`)
  * - Backend framework callbacks & scripts (`context.data.products.find()`)
  *
- * Every accessor returns flat rows (`{ id, ...columns }`) via
+ * Every accessor returns flat rows (the table's columns) via
  * {@link SDKCollectionClient} — access fields directly (`row.title`), never
  * `row.values.title`. The admin CMS uses {@link RebaseData} (Entity) instead.
  *

@@ -91,7 +91,7 @@ export interface AfterReadProps<M extends Record<string, unknown> = Record<strin
     path: string;
 
     /**
-     * Fetched row (flat — `{ id, ...columns }`)
+     * Fetched row (flat — the table's columns)
      */
     row: Record<string, unknown>
 
@@ -185,7 +185,7 @@ export interface BeforeDeleteProps<M extends Record<string, unknown> = Record<st
     id: string | number;
 
     /**
-     * Deleted row (flat — `{ id, ...columns }`)
+     * Deleted row (flat — the table's columns)
      */
     row: Record<string, unknown>;
 
@@ -217,7 +217,7 @@ export interface AfterDeleteProps<M extends Record<string, unknown> = Record<str
     id: string | number;
 
     /**
-     * Deleted row (flat — `{ id, ...columns }`)
+     * Deleted row (flat — the table's columns)
      */
     row: Record<string, unknown>;
 
