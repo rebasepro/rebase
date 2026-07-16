@@ -8,6 +8,24 @@ import { resolveFilterOperators } from "@rebasepro/common";
 import { useCollectionScope, useTranslation } from "@rebasepro/app";
 import { FilterFieldBinding } from "../SelectableTable/filters/FilterFieldBinding";
 
+/**
+ * `WhereFilterOp` is declared twice: once in `@rebasepro/types` as the canonical
+ * operator set every driver translates, and once in `@rebasepro/ui` for the
+ * table's own props. That is deliberate — `ui` is a standalone design system and
+ * depends on no Rebase package, so it cannot import the canonical one (and a
+ * type-only import would not help: `ui` emits declarations with `tsc`, which
+ * references external types rather than inlining them, so its published `.d.ts`
+ * would demand `@rebasepro/types` from every consumer).
+ *
+ * This file is where the two meet and get cast into each other, so it is where
+ * their agreement is checked. Adding an operator to one and not the other stops
+ * this line compiling instead of silently producing a filter the table can build
+ * and no driver can run — or one a driver supports and the table cannot offer.
+ */
+type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const _whereFilterOpDefinitionsAgree: MutuallyAssignable<WhereFilterOp, VirtualTableWhereFilterOp> = true;
+void _whereFilterOpDefinitionsAgree;
+
 export interface FiltersDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
