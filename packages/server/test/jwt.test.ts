@@ -86,6 +86,14 @@ accessExpiresIn: "2h" });
             expect(payload).toBeNull();
         });
 
+        it("refuses a download token, which is validly signed but is not a session", () => {
+            // Same secret signs both, so the signature proves nothing about what
+            // the token is *for*. A download token travels in URLs and is scoped
+            // to one file; it must never come back as a user.
+            const download = generateDownloadToken("default/uploads/image.png");
+            expect(verifyAccessToken(download)).toBeNull();
+        });
+
         it("should return null for token signed with different secret", () => {
             const token = generateAccessToken("user-123", ["admin"]);
             configureJwt({ secret: "different-secret-that-is-at-least-32-chars-long" });

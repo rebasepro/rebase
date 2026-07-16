@@ -138,7 +138,18 @@ export function getAccessTokenExpiry(): number {
 }
 
 /**
- * Verify and decode an access token
+ * Verify and decode an access token.
+ *
+ * Every token this server issues is signed with the same secret, so what a
+ * token *is* comes from its claims, not from its signature. A download token
+ * ({@link generateDownloadToken}) is therefore a validly-signed string that
+ * must never authenticate anybody: it is scoped to one file path and handed out
+ * in URLs, which is a far weaker thing to hold than a session.
+ *
+ * Today it is rejected below for want of an id — but only by luck, since
+ * nothing stops a future download token from carrying one. So the purpose is
+ * checked explicitly: a token minted for reading a file is not a token for
+ * being a user.
  */
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
     if (!jwtConfig.secret) {
@@ -146,7 +157,11 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[]; aal?: string };
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string };
+        if (decoded.purpose) {
+            logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
+            return null;
+        }
         const id = decoded.userId || decoded.uid || decoded.sub;
         if (!id) {
             logger.error("[JWT] Verification failed: missing id in payload", { detail: decoded });

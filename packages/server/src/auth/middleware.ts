@@ -449,8 +449,25 @@ export const publicObjectAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 /**
  * Helper to match paths for scoped file tokens.
  * Matches exact paths or prefixes (exact folder prefixes or ending with /).
+ *
+ * The traversal check is defence in depth, not the load-bearing defence.
+ *
+ * A prefix comparison is a lie for any path containing `..`: `user1/../user2/x`
+ * starts with `user1/`, so a token scoped to `user1/` would authorize reading
+ * user2's file — and the storage controller would not object, because its own
+ * guard stops a path escaping the *bucket*, and that one resolves to `user2/x`,
+ * comfortably inside it. The grant is what would be escaped, and this is the
+ * only layer that knows what was granted.
+ *
+ * Nothing arrives here in that shape today: the URL parser resolves `..` (and
+ * `%2e%2e`, which the WHATWG spec treats as a dot for normalization) before
+ * Hono routes the request, so this comparison already runs on a resolved path.
+ * But that is a guarantee of the runtime rather than of this code, and it is
+ * one line to not depend on it. The same rule already guards the public-object
+ * path — see `isPublicStoragePath`.
  */
-function isPathMatch(requested: string, allowed: string): boolean {
+export function isPathMatch(requested: string, allowed: string): boolean {
+    if (requested.split("/").some((seg) => seg === "..")) return false;
     if (requested === allowed) return true;
     if (allowed.endsWith("/")) {
         return requested.startsWith(allowed);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
-import { fileTokenAuth } from "../src/auth/middleware";
+import { fileTokenAuth, isPathMatch } from "../src/auth/middleware";
 import { configureJwt, generateDownloadToken, generateAccessToken } from "../src/auth/jwt";
 
 describe("fileTokenAuth Middleware", () => {
@@ -43,6 +43,102 @@ describe("fileTokenAuth Middleware", () => {
         expect(res.status).toBe(200);
         const body = await res.json() as any;
         expect(body.success).toBe(true);
+    });
+
+    /**
+     * A scoped token is a grant, and `..` would walk straight out of it: the
+     * prefix check is a `startsWith`, and the storage controller's own guard
+     * only stops a path leaving the *bucket* — `uploads/../secret/x` resolves
+     * to `secret/x`, which is still inside it.
+     *
+     * Two layers stop this, and these tests pin the outer one: the URL parser
+     * resolves `..` before Hono routes, so the grant is checked against an
+     * already-resolved path and the request 403s for the ordinary
+     * wrong-prefix reason. `isPathMatch` refuses traversal as well (see below),
+     * but it never gets the chance here — which is the point of testing both.
+     */
+    describe("a request cannot read outside the token's grant via traversal", () => {
+        it("denies `..` climbing out of the token's folder", async () => {
+            const token = generateDownloadToken("default/uploads/");
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/default/uploads/../secret/data.txt?token=" + token)
+            );
+
+            expect(res.status).toBe(403);
+        });
+
+        it("denies `..` when the token is scoped to an exact file", async () => {
+            const token = generateDownloadToken("default/uploads/image.png");
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/default/uploads/image.png/../../secret/data.txt?token=" + token)
+            );
+
+            expect(res.status).toBe(403);
+        });
+
+        it("denies percent-encoded `..`", async () => {
+            // `%2e` is a dot for normalization purposes per the WHATWG URL
+            // spec, so this resolves exactly like the plain `..` above.
+            const token = generateDownloadToken("default/uploads/");
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/default/uploads/%2e%2e/secret/data.txt?token=" + token)
+            );
+
+            expect(res.status).toBe(403);
+        });
+
+        it("denies `..` presented in the Authorization header too", async () => {
+            const token = generateDownloadToken("default/uploads/");
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/default/uploads/../secret/data.txt", {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            );
+
+            expect(res.status).toBe(403);
+        });
+
+        it("still allows a file whose name merely contains dots", async () => {
+            // `..` is only a traversal as a whole segment; `..hidden` is a name.
+            const token = generateDownloadToken("default/uploads/");
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/default/uploads/..hidden.txt?token=" + token)
+            );
+
+            expect(res.status).toBe(200);
+        });
+    });
+
+    /**
+     * The inner layer, tested directly because no request can deliver a `..` to
+     * it — the URL parser resolves them first. If a future runtime, adapter or
+     * proxy ever stops normalizing, this is what holds.
+     */
+    describe("isPathMatch refuses traversal on its own", () => {
+        it("refuses a traversal segment inside a granted prefix", () => {
+            expect(isPathMatch("default/uploads/../secret/data.txt", "default/uploads/")).toBe(false);
+        });
+
+        it("refuses traversal even when the grant is an exact file", () => {
+            expect(isPathMatch("default/uploads/image.png/../../secret/x", "default/uploads/image.png")).toBe(false);
+        });
+
+        it("matches an exact path", () => {
+            expect(isPathMatch("default/uploads/image.png", "default/uploads/image.png")).toBe(true);
+        });
+
+        it("matches inside a granted folder", () => {
+            expect(isPathMatch("default/uploads/a/b.txt", "default/uploads/")).toBe(true);
+        });
+
+        it("does not match a sibling folder that shares a prefix", () => {
+            // `uploads-private` must not be granted by a token for `uploads`.
+            expect(isPathMatch("default/uploads-private/x.txt", "default/uploads")).toBe(false);
+        });
+
+        it("allows dots that are part of a name", () => {
+            expect(isPathMatch("default/uploads/..hidden.txt", "default/uploads/")).toBe(true);
+        });
     });
 
     it("should deny access if token path does not match requested path", async () => {
