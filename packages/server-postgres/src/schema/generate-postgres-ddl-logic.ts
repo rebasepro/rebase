@@ -2,7 +2,7 @@ import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty,
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { createHash } from "crypto";
-import { getEffectiveSecurityRules } from "./auth-default-policies";
+import { getEffectiveSecurityRules, getInjectedSecurityRules } from "./auth-default-policies";
 
 // --- Helper Functions ---
 
@@ -478,7 +478,17 @@ export const generatePostgresPoliciesDdl = (collections: CollectionConfig[]): st
         const securityRules = getEffectiveSecurityRules(collection);
         if (securityRules.length > 0) {
             const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
+            const injectedNames = new Set(getInjectedSecurityRules(collection).map((rule) => rule.name));
+
             securityRules.forEach((rule: SecurityRule) => {
+                // Say which policies the author did not write. They are permissive,
+                // so they OR with the declared rules and widen the final ACL beyond
+                // what `securityRules` reads like — and re-appear after any manual
+                // DROP, because a push asserts the declared state.
+                if (rule.name && injectedNames.has(rule.name)) {
+                    ddl += `-- Injected by Rebase (not from this collection's securityRules).\n`;
+                    ddl += `-- Set \`disableDefaultPolicies: true\` on "${collection.slug}" to drop these and own its RLS outright.\n`;
+                }
                 ddl += generatePolicyDdl(collection, rule, resolveCollection);
             });
             ddl += "\n";

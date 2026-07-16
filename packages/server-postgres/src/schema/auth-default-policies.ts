@@ -130,3 +130,23 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
 
     return [...explicit, ...injected];
 }
+
+/**
+ * The framework defaults that {@link getEffectiveSecurityRules} would add to a
+ * collection, without the author's own rules.
+ *
+ * These policies appear in the database under names the author never wrote, and
+ * a permissive policy ORs with every other permissive policy — so someone
+ * reading their `securityRules` and then the real ACL sees more access than they
+ * declared. Dropping them by hand does nothing either: `db push` is declarative,
+ * so the next push asserts them again. Callers use this to say, in the generated
+ * DDL, which policies are injected and how to take them off.
+ */
+export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
+    if (collection.disableDefaultPolicies) return [];
+
+    const explicitCount = ((isPostgresCollectionConfig(collection) ? collection.securityRules : undefined) ?? []).length;
+    // getEffectiveSecurityRules appends the defaults after the author's rules,
+    // so everything past the author's count is injected.
+    return getEffectiveSecurityRules(collection).slice(explicitCount);
+}
