@@ -93,6 +93,24 @@ label: "Widget" });
         expect(mockDriver.save).not.toHaveBeenCalled();
     });
 
+    it("deletes by the address in the URL, not one read off the row", async () => {
+        // The row it just fetched is columns only, so `existingEntity.id` is
+        // undefined for a table not keyed on `id` — the driver was asked to
+        // delete a row called "undefined" and 404'd on a row that was right
+        // there. Every mocked test missed it; a live database found it at once.
+        const del = jest.fn(async () => undefined);
+        mockDriver.delete = del as never;
+
+        const res = await createApp().fetch(new Request("http://localhost/sku_items/ABC-1", {
+            method: "DELETE"
+        }));
+
+        expect(res.status).toBe(204);
+        expect(del).toHaveBeenCalledWith(expect.objectContaining({
+            row: expect.objectContaining({ id: "ABC-1" })
+        }));
+    });
+
     it("400s a bulk write naming the offending row, before the transaction opens", async () => {
         const res = await post("/sku_items/bulk", {
             rows: [

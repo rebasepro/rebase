@@ -403,11 +403,13 @@ values: entity.values as Record<string, unknown> },
                 throw ApiError.notFound("Entity not found");
             }
 
-
-
             await driver.delete({
                 row: {
-                    id: existingEntity.id as string | number,
+                    // The address is the one in the URL, not something read back
+                    // off the row: a row is only its columns, so `existingEntity.id`
+                    // is undefined for any table not keyed on `id` — and the delete
+                    // went looking for a row called "undefined".
+                    id: String(id),
                     path: getCollectionDataPath(collection),
                     values: existingEntity
                 },
@@ -618,11 +620,11 @@ id };
 
             if (!existingEntity) throw ApiError.notFound("Entity not found");
 
-
-
             await driver.delete({
                 row: {
-                    id: existingEntity.id as string | number,
+                    // The address from the path, for the same reason as the
+                    // collection-level delete above: a row carries no id.
+                    id: parsed.id,
                     path: parsed.collectionPath,
                     values: existingEntity
                 }
