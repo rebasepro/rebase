@@ -58,10 +58,27 @@ export function getTableForCollection(collection: CollectionConfig, registry: Po
     return table;
 }
 
+/**
+ * The key columns a collection's rows are addressed by.
+ *
+ * Three tiers, in order: properties marked `isId`, the primary keys of the
+ * drizzle schema, and finally a column literally named `id`. Only the first is
+ * visible to the browser, which is why a key known only to drizzle is reported
+ * at boot — see {@link warnOnKeysTheAdminCannotResolve}.
+ *
+ * Returns `[]` when nothing resolves, rather than throwing. It used to open by
+ * resolving the table, which throws when there is none — so the `isId` tier,
+ * which needs no table at all, was unreachable for exactly the collections
+ * most likely to have no table registered. Every caller that wanted "no keys"
+ * to mean "no keys" had to spell that out in a try/catch.
+ *
+ * Callers that cannot proceed without a key must say so themselves, naming the
+ * collection: an empty array here means "this collection has no address", which
+ * is a different answer in a notification (broadcast a wildcard) than in a save
+ * (fail).
+ */
 export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): PrimaryKeyInfo[] {
-    const table = getTableForCollection(collection, registry);
-
-    // Fallback to explicitly defined isId properties
+    // Explicitly declared `isId` properties win, and need no table.
     if (collection.properties) {
         const idProps = Object.entries(collection.properties)
             .filter(([_, prop]) => "isId" in (prop as object) && Boolean((prop as { isId?: unknown }).isId))
@@ -75,6 +92,12 @@ export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresC
             return idProps;
         }
     }
+
+    // The remaining tiers read the drizzle schema, so they need the table. A
+    // collection without one — another engine's, or simply unregistered — has
+    // nothing more to offer.
+    const table = registry.getTable(getTableName(collection));
+    if (!table) return [];
 
     // Otherwise infer from Drizzle schema
     const keys: PrimaryKeyInfo[] = [];
@@ -102,6 +125,27 @@ type,
 isUUID });
     }
 
+    return keys;
+}
+
+/**
+ * The key columns, for callers that cannot do their job without one.
+ *
+ * {@link getPrimaryKeys} answers "what keys, if any" and returns `[]` for a
+ * collection with no address. Most of this driver, though, is building a WHERE
+ * clause and has no meaning without a key — for those, an empty array is not an
+ * answer, and indexing `[0]` into it produces `Cannot read properties of
+ * undefined` three frames from where the real problem is. This says what is
+ * wrong and which collection it is wrong about.
+ */
+export function requirePrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): PrimaryKeyInfo[] {
+    const keys = getPrimaryKeys(collection, registry);
+    if (keys.length === 0) {
+        throw new Error(
+            `Collection '${collection.slug}' has no primary key, so its rows cannot be addressed. ` +
+            `Mark the key property with \`isId\` in its config, or register a table whose schema declares one.`
+        );
+    }
     return keys;
 }
 
@@ -138,14 +182,9 @@ export function findUnresolvableKeyCollections(
         // Declared `isId` is the tier both sides share: if it is there, they agree.
         if (getDeclaredPrimaryKeys(collection).length > 0) continue;
 
-        let keys: PrimaryKeyInfo[];
-        try {
-            keys = getPrimaryKeys(collection, registry);
-        } catch {
-            // No registered table — nothing resolved here either, so there is no
-            // disagreement to report.
-            continue;
-        }
+        // No registered table resolves to no keys, and a collection this cannot
+        // resolve a key for is one it has nothing to say about.
+        const keys = getPrimaryKeys(collection, registry);
         if (keys.length === 0) continue;
 
         // A single key named `id` is the last tier on both sides: they agree
@@ -207,28 +246,21 @@ export function warnOnKeysTheAdminCannotResolve(
  * The address of a row: derived from the collection's primary keys, because a
  * row does not carry one — it is exactly its columns.
  *
- * Falls back to a literal `id` column, which covers the two cases where the
- * keys cannot be resolved: a row that reached us from somewhere other than the
- * postgres driver, and a collection whose table the registry cannot look up
- * (`getPrimaryKeys` throws for an unregistered table rather than returning
- * nothing). Returns `""` when there is no key and no `id` — callers decide what
- * that means, since "unaddressable" is a different answer in a notification
- * (broadcast a wildcard) than in a save (fail).
+ * Falls back to a literal `id` column, for a row that reached us from somewhere
+ * other than this driver. Returns `""` when there is no key and no `id` —
+ * callers decide what that means, since "unaddressable" is a different answer
+ * in a notification (broadcast a wildcard) than in a save (fail).
  */
 export function deriveRowAddress(
     row: Record<string, unknown>,
     collection: CollectionConfig,
     registry: PostgresCollectionRegistry
 ): string {
-    try {
-        const composite = buildCompositeId(row, getPrimaryKeys(collection, registry));
-        // An all-empty composite is indistinguishable from a missing key, and
-        // `buildCompositeId` returns "" for no keys at all.
-        if (composite && composite.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) {
-            return composite;
-        }
-    } catch {
-        /* unresolvable table or keys — fall through to the literal column */
+    const composite = buildCompositeId(row, getPrimaryKeys(collection, registry));
+    // An all-empty composite is indistinguishable from a missing key, and
+    // `buildCompositeId` returns "" for no keys at all.
+    if (composite && composite.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) {
+        return composite;
     }
     if (row.id !== undefined && row.id !== null) return String(row.id);
     return "";

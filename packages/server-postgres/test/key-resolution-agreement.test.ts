@@ -3,6 +3,7 @@ import { resolvePrimaryKeys } from "@rebasepro/common";
 import {
     findUnresolvableKeyCollections,
     getPrimaryKeys,
+    requirePrimaryKeys,
     warnOnKeysTheAdminCannotResolve
 } from "../src/services/collection-helpers";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -98,6 +99,55 @@ isId: true },
             name: { type: "string" }
         }
     };
+
+    describe("getPrimaryKeys — the tiers, and what 'no keys' means", () => {
+        const noTable: CollectionConfig = {
+            slug: "elsewhere",
+            name: "Elsewhere",
+            table: "not_registered",
+            properties: {
+                sku: { type: "string",
+isId: true },
+                label: { type: "string" }
+            }
+        };
+
+        it("resolves a declared key without needing a registered table", () => {
+            // The `isId` tier reads the config and nothing else. This used to
+            // throw: the table was resolved first, so the one tier that needs
+            // no table was unreachable for a collection that has none — which
+            // is exactly the collection most likely to be in that state.
+            expect(getPrimaryKeys(noTable, registry).map(k => k.fieldName)).toEqual(["sku"]);
+        });
+
+        it("returns no keys, rather than throwing, when nothing resolves", () => {
+            const opaque: CollectionConfig = {
+                slug: "opaque",
+                name: "Opaque",
+                table: "not_registered",
+                properties: { label: { type: "string" } }
+            };
+
+            expect(getPrimaryKeys(opaque, registry)).toEqual([]);
+        });
+
+        it("requirePrimaryKeys names the collection it cannot address", () => {
+            // Callers building a WHERE cannot proceed without a key, and
+            // `[0]` of an empty array is a TypeError three frames away.
+            const opaque: CollectionConfig = {
+                slug: "opaque",
+                name: "Opaque",
+                table: "not_registered",
+                properties: { label: { type: "string" } }
+            };
+
+            expect(() => requirePrimaryKeys(opaque, registry)).toThrow(/opaque.*no primary key/);
+        });
+
+        it("requirePrimaryKeys returns the keys when there are some", () => {
+            expect(requirePrimaryKeys(declared, registry).map(k => k.fieldName)).toEqual(["sku"]);
+        });
+    });
 
     describe("findUnresolvableKeyCollections", () => {
         it("says nothing about a collection that declares its key", () => {

@@ -7,7 +7,7 @@ import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
     getTableForCollection,
-    getPrimaryKeys,
+    requirePrimaryKeys,
     deriveRowAddress,
     parseIdValues,
     buildCompositeId
@@ -537,7 +537,7 @@ export class FetchService {
     ): Promise<Record<string, unknown> | undefined> {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
@@ -656,7 +656,7 @@ export class FetchService {
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
@@ -1093,7 +1093,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
         const field = table[fieldName as keyof typeof table] as AnyPgColumn;
@@ -1153,7 +1153,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
@@ -1259,7 +1259,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
     ): Promise<Record<string, unknown> | null> {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
@@ -1367,7 +1367,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 

@@ -963,8 +963,10 @@ roles: activeAuth.roles },
             const keys = getPrimaryKeys(collection, this.registry);
             return keys.length > 0 ? keys : undefined;
         } catch {
-            // Unregistered table, or a relation path with no collection of its
-            // own: the client keeps its pre-existing `id` behaviour.
+            // `getCollectionByPath` throws on a path it cannot walk — and this
+            // is called for parent paths too, which include entity paths like
+            // `posts/1` that name no collection. Telling the subscriber nothing
+            // is right here; letting it throw would drop the notification.
             return undefined;
         }
     }
