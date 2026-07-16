@@ -1,10 +1,8 @@
 import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
-import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres } from "@rebasepro/common";
-import { toSnakeCase } from "@rebasepro/utils";
-import { createHash } from "crypto";
+import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules } from "@rebasepro/common";
+import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
-import { getEffectiveSecurityRules } from "./auth-default-policies";
 // --- Helper Functions ---
 
 /**
@@ -315,22 +313,6 @@ const wrapSql = (clause: string): string => `sql\`${clause}\``;
 /**
  * Generates a deterministic hash based on the rule configuration.
  */
-const getPolicyNameHash = (rule: SecurityRule): string => {
-    const data = JSON.stringify({
-        a: rule.access,
-        m: rule.mode,
-        op: rule.operation,
-        ops: rule.operations?.slice().sort(),
-        own: rule.ownerField,
-        rol: rule.roles?.slice().sort(),
-        pg: rule.pgRoles?.slice().sort(),
-        u: rule.using,
-        w: rule.withCheck,
-        c: rule.condition,
-        ch: rule.check
-    });
-    return createHash("sha1").update(data).digest("hex").substring(0, 7);
-};
 
 /**
  * Generates Drizzle pgPolicy() calls from a declarative SecurityRule definition.
@@ -351,15 +333,11 @@ const generatePolicyCode = (collection: CollectionConfig, rule: SecurityRule, in
         ? rule.operations
         : [rule.operation ?? "all"];
 
-    const ruleHash = getPolicyNameHash(rule);
+    const policyNames = getPolicyNamesForRule(rule, tableName);
 
     // Generate one pgPolicy per operation
     return ops.map((op, opIdx) => {
-        const policyName = rule.name
-            ? (ops.length > 1 ? `${rule.name}_${op}` : rule.name)
-            : `${tableName}_${op}_${ruleHash}${ops.length > 1 ? `_${opIdx}` : ""}`;
-
-        return generateSinglePolicyCode(collection, rule, op, policyName, resolveCollection);
+        return generateSinglePolicyCode(collection, rule, op, policyNames[opIdx], resolveCollection);
     }).join("");
 };
 

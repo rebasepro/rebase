@@ -8,10 +8,16 @@ function formatNumber(value: number, format?: ScorecardFormat): string {
 
     const options: Intl.NumberFormatOptions = {
         style: format?.style ?? "decimal",
-        notation: format?.notation ?? "standard",
-        maximumFractionDigits: format?.decimals ?? 1,
-        minimumFractionDigits: format?.decimals ?? 1
+        notation: format?.notation ?? "standard"
     };
+
+    // Only pin the fraction digits when the config asks for a specific count.
+    // Without this, Intl's per-style defaults apply: integers stay integers
+    // ("80", not "80.0") while currency keeps its two decimals ("$452.95").
+    if (format?.decimals !== undefined) {
+        options.maximumFractionDigits = format.decimals;
+        options.minimumFractionDigits = format.decimals;
+    }
 
     if (format?.style === "currency") {
         options.currency = format.currency ?? "USD";

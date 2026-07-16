@@ -1,6 +1,6 @@
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { getEffectiveSecurityRules } from "../src/schema/auth-default-policies";
+import { getEffectiveSecurityRules } from "@rebasepro/common";
 
 describe("auth collection default RLS policies", () => {
     const adminWrite = "string_to_array(auth.roles(), ',') && ARRAY['admin']";

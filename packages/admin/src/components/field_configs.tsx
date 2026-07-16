@@ -142,7 +142,7 @@ Field: TextFieldBinding }
     },
     user_select: {
         key: "user_select",
-        name: "UserIcon select",
+        name: "User select",
         description: "Select a user from the user management system. Store the user ID.",
         Icon: UserIcon,
         property: {

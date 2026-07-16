@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Select, SelectItem, TextField, Checkbox, Label, Typography, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { useApiConfig } from "@rebasepro/app";
 
 interface LogEntry {
     id: string;
@@ -31,8 +32,15 @@ export function LogsExplorer() {
     const [source, setSource] = useState<string>("all");
     const [search, setSearch] = useState("");
     const [autoScroll, setAutoScroll] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const apiConfig = useApiConfig();
+
     const fetchLogs = useCallback(async () => {
+        if (!apiConfig?.apiUrl) {
+            setError("No API URL configured — cannot load logs.");
+            return;
+        }
         try {
             const params = new URLSearchParams();
             if (level && level !== "all") params.set("level", level);
@@ -40,15 +48,27 @@ export function LogsExplorer() {
             if (search) params.set("search", search);
             params.set("limit", "200");
 
-            const resp = await fetch(`/api/logs?${params}`);
-            if (resp.ok) {
-                const data: { entries?: LogEntry[] } = await resp.json();
-                setLogs(data.entries || []);
+            // Logs are admin-only, so the request must carry the auth token. The
+            // URL is absolute: a relative one would resolve against the frontend
+            // origin, which serves index.html rather than the API.
+            const headers: Record<string, string> = {};
+            const token = apiConfig.getAuthToken ? await apiConfig.getAuthToken() : null;
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
+            const resp = await fetch(`${apiConfig.apiUrl}/api/logs?${params}`, { headers });
+            if (!resp.ok) {
+                setError(resp.status === 401 || resp.status === 403
+                    ? "Not authorised to read logs — an admin role is required."
+                    : `Could not load logs (HTTP ${resp.status}).`);
+                return;
             }
-        } catch {
-            /* ignore poll failures */
+            const data: { entries?: LogEntry[] } = await resp.json();
+            setLogs(data.entries || []);
+            setError(null);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Could not load logs.");
         }
-    }, [level, source, search]);
+    }, [level, source, search, apiConfig]);
 
     useEffect(() => {
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -178,8 +198,12 @@ export function LogsExplorer() {
                 ))}
                 {logs.length === 0 && (
                     <div className="p-8 text-center">
-                        <Typography variant="body2" color="secondary">
-                            No log entries yet. Logs will appear here as requests come in.
+                        <Typography
+                            variant="body2"
+                            className={error ? "text-red-600 dark:text-red-500" : undefined}
+                            color={error ? undefined : "secondary"}
+                        >
+                            {error ?? "No log entries yet. Logs will appear here as requests come in."}
                         </Typography>
                     </div>
                 )}

@@ -1296,6 +1296,27 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.info("Backup admin routes mounted", { path: `${basePath}/admin/backups` });
     }
 
+    // 6c. Mount Logs routes (for the Studio Logs Explorer). Request logs expose
+    // paths, status codes and correlation IDs, so they are admin-only — the same
+    // posture as the cron and backup admin routes above.
+    {
+        const { default: logsRoutes } = await import("./api/logs-routes");
+        const logsRouter = new Hono<HonoEnv>();
+
+        if (authAdapter && !isAuthAdapter(config.auth!)) {
+            const safeAuth = config.auth as RebaseAuthConfig;
+            if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
+                logsRouter.use("/*", requireAuth, requireAdmin);
+            }
+        } else if (authAdapter) {
+            logsRouter.use("/*", requireAuth, requireAdmin);
+        }
+
+        logsRouter.route("/", logsRoutes);
+        config.app.route(`${basePath}/logs`, logsRouter);
+        logger.info("Logs routes mounted", { path: `${basePath}/logs` });
+    }
+
     // With multiple realtime-capable engines, route subscriptions to the
     // provider owning each collection (the realtime counterpart of the data
     // router). The single WebSocket server is driven by this composite.

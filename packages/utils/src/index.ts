@@ -3,6 +3,8 @@ export * from "./objects";
 export * from "./arrays";
 export * from "./dates";
 export * from "./hash";
+export * from "./sha1";
+export * from "./policy-names";
 export * from "./regexp";
 export * from "./flatten_object";
 export * from "./plurals";

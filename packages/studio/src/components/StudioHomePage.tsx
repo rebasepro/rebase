@@ -1,19 +1,19 @@
-import type { HomePageSection, PluginGenericProps } from "@rebasepro/types";
+import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
-import { IconForView, useRebaseContext, useRestoreScroll, useSlot } from "@rebasepro/app";
+import { IconForView, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
 import { useNavigate } from "react-router-dom";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
 /* ═══════════════════════════════════════════════════════════════
-   Static studio tool definitions
+   Studio tool sections, derived from the registered Studio views
    ═══════════════════════════════════════════════════════════════ */
 
 interface StudioTool {
     path: string;
     name: string;
     description: string;
-    icon: string;
+    icon?: string | React.ReactNode;
 }
 
 interface StudioSection {
@@ -21,85 +21,44 @@ interface StudioSection {
     tools: StudioTool[];
 }
 
-const SECTIONS: StudioSection[] = [
-    {
-        label: "Database",
-        tools: [
-            { path: "/schema",
-name: "Collections",
-description: "Define and manage your data model and collection schemas",
-icon: "LayoutList" },
-            { path: "/schema-visualizer",
-name: "Schema Visualizer",
-description: "Interactive ERD showing tables, columns, and relationships",
-icon: "Network" },
-            { path: "/sql",
-name: "SQL Console",
-description: "Execute raw SQL queries directly against your database",
-icon: "terminal" },
-            { path: "/branches",
-name: "Branches",
-description: "Create and manage isolated database copies for development",
-icon: "GitBranch" },
-            { path: "/rls",
-name: "RLS Policies",
-description: "Configure Row Level Security for fine-grained data access",
-icon: "ShieldCheck" },
-            { path: "/logs",
-name: "Logs Explorer",
-description: "Real-time system, query, and authentication logs",
-icon: "Activity" }
-        ]
-    },
-    {
-        label: "Compute",
-        tools: [
-            { path: "/js",
-name: "JS Console",
-description: "Run JavaScript with the Rebase SDK in a live sandbox",
-icon: "code" },
-            { path: "/cron",
-name: "Cron Jobs",
-description: "Monitor and manage scheduled background tasks",
-icon: "Clock" }
-        ]
-    },
-    {
-        label: "API",
-        tools: [
-            { path: "/api",
-name: "API Explorer",
-description: "Interactive API documentation with live request testing",
-icon: "BookOpen" }
-        ]
-    },
-    {
-        label: "Storage",
-        tools: [
-            { path: "/storage",
-name: "Storage",
-description: "Browse, upload, and manage files in your storage bucket",
-icon: "HardDrive" }
-        ]
-    },
-    {
-        label: "Access Control",
-        tools: [
-            { path: "/users",
-name: "Users",
-description: "Manage developers and assign roles in your workspace",
-icon: "group" },
-            { path: "/roles",
-name: "Roles",
-description: "Create and configure fine-grained access permissions",
-icon: "ShieldEllipsis" },
-            { path: "/api-keys",
-name: "API Keys",
-description: "Create and manage scoped keys for machine-to-machine access",
-icon: "KeyRound" }
-        ]
+/** The view metadata the cards need — not the rendered `view` itself. */
+type StudioViewMeta = Pick<AppView, "slug" | "name" | "group" | "description" | "icon" | "hideFromNavigation">;
+
+/** Group order for the home page; unknown groups are appended in view order. */
+const GROUP_ORDER = ["Database", "Compute", "Storage", "API", "Access Control"];
+
+const UNGROUPED_LABEL = "Tools";
+
+/**
+ * Build the home page sections from the Studio views that are actually
+ * registered, so a card exists if and only if its route does. A hand-written
+ * list drifts: it used to advertise Users and Roles pages that 404, while
+ * omitting the Backups view that does exist.
+ */
+function buildSections(views: StudioViewMeta[]): StudioSection[] {
+    const byGroup = new Map<string, StudioTool[]>();
+
+    for (const view of views) {
+        if (view.hideFromNavigation) continue;
+        const label = view.group ?? UNGROUPED_LABEL;
+        const tools = byGroup.get(label) ?? [];
+        tools.push({
+            path: `/${view.slug}`,
+            name: view.name,
+            description: view.description ?? "",
+            icon: view.icon
+        });
+        byGroup.set(label, tools);
     }
-];
+
+    const ordered = [
+        ...GROUP_ORDER.filter(g => byGroup.has(g)),
+        ...[...byGroup.keys()].filter(g => !GROUP_ORDER.includes(g))
+    ];
+
+    return ordered.map(label => ({ label,
+tools: byGroup.get(label)! }));
+}
 
 /* ═══════════════════════════════════════════════════════════════ */
 
@@ -151,6 +110,7 @@ export function StudioHomePage({
     const context = useRebaseContext();
     const breadcrumbs = useStudioBreadcrumbs();
     const navigate = useNavigate();
+    const registry = useRebaseRegistry();
 
     useEffect(() => {
         breadcrumbs.set({ breadcrumbs: [] });
@@ -162,10 +122,25 @@ export function StudioHomePage({
 
     const pluginActions = useSlot("home.actions", sectionProps);
 
-    const filteredSections = useMemo(
-        () => SECTIONS.filter(s => !hiddenGroups?.includes(s.label)),
-        [hiddenGroups]
-    );
+    // The collection editor ("schema") is not part of `devViews` — RebaseNavigation
+    // injects it when the CMS enables a collection editor. Mirror that condition so
+    // the card tracks the route.
+    const schemaEnabled = Boolean(registry.studioConfig && registry.cmsConfig?.collectionEditor);
+
+    const filteredSections = useMemo(() => {
+        const views: StudioViewMeta[] = [];
+        if (schemaEnabled) {
+            views.push({
+                slug: "schema",
+                name: "Collections",
+                group: "Database",
+                icon: "LayoutList",
+                description: "Define and manage your data model and collection schemas"
+            });
+        }
+        views.push(...(registry.studioConfig?.devViews ?? []));
+        return buildSections(views).filter(s => !hiddenGroups?.includes(s.label));
+    }, [registry.studioConfig?.devViews, schemaEnabled, hiddenGroups]);
 
     const groupNames = useMemo(
         () => filteredSections.map(s => s.label),

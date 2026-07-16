@@ -11,9 +11,44 @@ import { sql } from "drizzle-orm";
 import { BranchInfo } from "@rebasepro/types";
 import { DrizzleClient } from "../interfaces";
 import { DatabasePoolManager } from "../databasePoolManager";
+import { extractPgError, extractCauseMessage } from "../utils/pg-error-utils";
 
 /** Internal prefix applied to branch database names to avoid collisions. */
 const BRANCH_DB_PREFIX = "rb_";
+
+/** `duplicate_database` — the target database name is already taken. */
+const PG_DUPLICATE_DATABASE = "42P04";
+
+/** `object_in_use` — the database still has connections attached. */
+const PG_OBJECT_IN_USE = "55006";
+
+/**
+ * Describe a failed branch DDL statement in terms a user can act on.
+ *
+ * Drizzle reports failures as `Failed query: <sql> params:` and hides the real
+ * PostgreSQL error in the `cause` chain, so matching on `err.message` never sees
+ * the actual problem. Match on the PG error code instead — it survives wrapping
+ * and, unlike the message text, is not locale-dependent.
+ */
+function describeBranchDdlError(err: unknown, fallbackContext: string): Error {
+    const pgError = extractPgError(err);
+
+    if (pgError?.code === PG_DUPLICATE_DATABASE) {
+        return new Error(`Database "${fallbackContext}" already exists on the server. Choose a different branch name.`);
+    }
+    if (pgError?.code === PG_OBJECT_IN_USE) {
+        return new Error(
+            `Cannot complete the operation: the database "${fallbackContext}" has active connections. ` +
+            "Close other clients or connections and try again."
+        );
+    }
+
+    // Unknown failure: surface the real PG message rather than the Drizzle
+    // wrapper, which would otherwise show the raw SQL and no reason at all.
+    const detail = pgError?.message ?? extractCauseMessage(err);
+    if (detail) return new Error(detail);
+    return err instanceof Error ? err : new Error(String(err));
+}
 
 /** Fully-qualified metadata table in the rebase schema. */
 const BRANCHES_TABLE = "rebase.branches";
@@ -109,18 +144,15 @@ export class BranchService {
                 sql.raw(`CREATE DATABASE "${safeDbName}" TEMPLATE "${safeSourceDb}"`)
             );
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes("already exists")) {
-                throw new Error(`Database "${dbName}" already exists on the server. Choose a different branch name.`);
-            }
-            // If template fails due to active connections, provide a helpful error
-            if (msg.includes("being accessed by other users")) {
+            const pgError = extractPgError(err);
+            if (pgError?.code === PG_OBJECT_IN_USE) {
+                // The template — not the new database — is the one still in use.
                 throw new Error(
                     `Cannot create branch: the source database "${sourceDb}" has active connections. ` +
                     "Close other clients or connections and try again."
                 );
             }
-            throw err;
+            throw describeBranchDdlError(err, dbName);
         }
 
         // Record metadata in the default database
@@ -166,14 +198,14 @@ export class BranchService {
         try {
             await this.db.execute(sql.raw(`DROP DATABASE "${safeDbName}"`));
         } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes("being accessed by other users")) {
+            const pgError = extractPgError(err);
+            if (pgError?.code === PG_OBJECT_IN_USE) {
                 throw new Error(
                     `Cannot delete branch "${sanitizedName}": the database has active connections. ` +
                     "Close other clients and try again."
                 );
             }
-            throw err;
+            throw describeBranchDdlError(err, dbName);
         }
 
         // Remove metadata

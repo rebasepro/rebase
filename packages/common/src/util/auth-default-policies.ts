@@ -1,5 +1,5 @@
 import { CollectionConfig, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollectionConfig, policy } from "@rebasepro/types";
-import { getTableName } from "@rebasepro/common";
+import { getTableName } from "./relations";
 
 /**
  * Default RLS policies injected by the schema generator.

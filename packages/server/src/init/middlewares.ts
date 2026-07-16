@@ -6,6 +6,7 @@ import { responseCompression } from "../utils/compression";
 import { requestId } from "../utils/request-id";
 import { requestLogger } from "../utils/request-logger";
 import { logger } from "../utils/logger";
+import { logMiddleware } from "../api/logs-routes";
 
 interface MiddlewareConfig {
     maxBodySize?: number;
@@ -71,4 +72,9 @@ export function configureMiddlewares(
 
     // Request Logging
     app.use(`${basePath}/*`, requestLogger());
+
+    // Record requests into the in-memory ring buffer that backs the Studio's
+    // Logs Explorer. This is a separate sink from `requestLogger` above, which
+    // writes to stdout — both observe every request, neither duplicates the other.
+    app.use(`${basePath}/*`, logMiddleware());
 }

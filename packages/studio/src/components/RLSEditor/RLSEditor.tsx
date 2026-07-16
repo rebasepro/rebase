@@ -28,6 +28,7 @@ import {
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
+import { getPolicyNamesForRule, getPolicyOperations } from "@rebasepro/utils";
 import { PolicyEditor } from "./PolicyEditor";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
@@ -387,23 +388,30 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
 status: "live" };
         });
 
-        // Merge code-based policies
+        // Merge code-based policies.
+        //
+        // A rule without an explicit `name` still produces policies — Postgres gets
+        // `<table>_<op>_<hash>`, one per operation. Skipping those rules left their
+        // live policies looking like hand-written SQL ("DB Only"), so derive the
+        // names the generator would emit and match on those.
         if (activeCollection && isPostgresCollectionConfig(activeCollection) && activeCollection.securityRules) {
             activeCollection.securityRules.forEach((rule) => {
-                const ruleName = rule.name;
-                if (!ruleName) return;
+                const ops = getPolicyOperations(rule);
+                const policyNames = getPolicyNamesForRule(rule, activeTableData.tableName);
 
-                policiesMap[ruleName] = {
-                    policyname: ruleName,
-                    tablename: activeTableData.tableName,
-                    permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
-                    cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                    roles: [...(rule.roles ?? ["public"])],
-                    qual: rule.using || null,
-                    with_check: rule.withCheck || null,
-                    // "both" = defined in code and live in Postgres (potentially edited)
-                    status: policiesMap[ruleName] ? "both" : "code_only"
-                };
+                policyNames.forEach((policyName, opIdx) => {
+                    policiesMap[policyName] = {
+                        policyname: policyName,
+                        tablename: activeTableData.tableName,
+                        permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
+                        cmd: (ops[opIdx] ?? rule.operation ?? "ALL").toUpperCase() as PostgresPolicy["cmd"],
+                        roles: [...(rule.roles ?? ["public"])],
+                        qual: rule.using || null,
+                        with_check: rule.withCheck || null,
+                        // "both" = defined in code and live in Postgres (potentially edited)
+                        status: policiesMap[policyName] ? "both" : "code_only"
+                    };
+                });
             });
         }
 

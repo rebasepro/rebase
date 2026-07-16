@@ -72,7 +72,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
 
     if (!entity) {
         return <div className="flex items-center justify-center h-full">
-            <Label>HistoryIcon is only available for existing entities</Label>
+            <Label>History is only available for existing entities</Label>
         </div>;
     }
 
@@ -117,7 +117,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
         <div className="flex flex-col gap-2 max-w-6xl mx-auto w-full">
 
             <Typography variant={"h5"} className={"mt-24 ml-4"}>
-                HistoryIcon
+                History
             </Typography>
 
             {isLoading && entries.length === 0 && (

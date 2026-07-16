@@ -620,9 +620,12 @@ roles: ["anon"] };
                 if (error instanceof Error) {
                     logger.error("Stack trace", { detail: error.stack });
                 }
+                // Unwrap the cause chain: a Drizzle failure reports itself as
+                // "Failed query: <sql> params:", which tells the user nothing and
+                // echoes the statement back at them. The reason is in the cause.
                 const errorMessage = process.env.NODE_ENV === "production"
                     ? "An unexpected error occurred"
-                    : (error instanceof Error ? error.message : "An unexpected error occurred");
+                    : extractErrorMessage(error);
                 const errorResponse = {
                     type: "ERROR",
                     requestId,

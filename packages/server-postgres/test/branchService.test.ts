@@ -13,6 +13,19 @@ function createMockDb() {
     } as unknown as jest.Mocked<NodePgDatabase>;
 }
 
+/**
+ * Build an error shaped like the ones Drizzle actually throws.
+ *
+ * Drizzle reports the statement it ran and hides the PostgreSQL error in the
+ * `cause` chain, so the top-level `message` never contains the reason. Tests
+ * that throw a bare `new Error("...already exists")` describe a shape that
+ * cannot occur, and would pass against code that only reads `err.message`.
+ */
+function createDrizzleQueryError(query: string, pgCode: string, pgMessage: string): Error {
+    const pgError = Object.assign(new Error(pgMessage), { code: pgCode });
+    return Object.assign(new Error(`Failed query: ${query}\nparams: `), { cause: pgError });
+}
+
 /** Create a minimal mock DatabasePoolManager. */
 function createMockPoolManager(defaultDbName = "my_app_db") {
     return {
@@ -135,7 +148,11 @@ describe("BranchService", () => {
         it("should throw a helpful error when CREATE DATABASE fails due to existing DB", async () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never) // existence check
-                .mockRejectedValueOnce(new Error('database "rb_staging" already exists')); // CREATE DB fails
+                .mockRejectedValueOnce(createDrizzleQueryError(
+                    'CREATE DATABASE "rb_staging" TEMPLATE "my_app_db"',
+                    "42P04",
+                    'database "rb_staging" already exists'
+                ));
 
             await expect(service.createBranch("staging")).rejects.toThrow(
                 'Database "rb_staging" already exists on the server'
@@ -145,14 +162,33 @@ describe("BranchService", () => {
         it("should throw a helpful error when CREATE DATABASE fails due to active connections", async () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never) // existence check
-                .mockRejectedValueOnce(new Error("source database is being accessed by other users"));
+                .mockRejectedValueOnce(createDrizzleQueryError(
+                    'CREATE DATABASE "rb_staging" TEMPLATE "my_app_db"',
+                    "55006",
+                    'source database "my_app_db" is being accessed by other users'
+                ));
 
             await expect(service.createBranch("staging")).rejects.toThrow(
                 "Cannot create branch"
             );
         });
 
-        it("should re-throw unknown CREATE DATABASE errors", async () => {
+        it("should surface the underlying reason, not the Drizzle wrapper, for unknown failures", async () => {
+            db.execute
+                .mockResolvedValueOnce({ rows: [] } as never)
+                .mockRejectedValueOnce(createDrizzleQueryError(
+                    'CREATE DATABASE "rb_staging" TEMPLATE "my_app_db"',
+                    "53100",
+                    "could not write to file: No space left on device"
+                ));
+
+            // The user must see the reason; "Failed query: ..." alone is useless.
+            const error = await service.createBranch("staging").catch((e: unknown) => e as Error);
+            expect(error.message).toContain("could not write to file: No space left on device");
+            expect(error.message).not.toMatch(/^Failed query:/);
+        });
+
+        it("should re-throw unknown CREATE DATABASE errors that are not query failures", async () => {
             const unknownError = new Error("disk full");
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
@@ -210,7 +246,11 @@ describe("BranchService", () => {
         it("should throw a helpful error when DROP DATABASE fails due to active connections", async () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [{ db_name: "rb_staging" }] } as never) // existence check
-                .mockRejectedValueOnce(new Error("database is being accessed by other users")); // DROP fails
+                .mockRejectedValueOnce(createDrizzleQueryError(
+                    'DROP DATABASE "rb_staging"',
+                    "55006",
+                    'database "rb_staging" is being accessed by other users'
+                )); // DROP fails
 
             await expect(service.deleteBranch("staging")).rejects.toThrow(
                 'Cannot delete branch "staging"'

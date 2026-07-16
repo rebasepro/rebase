@@ -1,6 +1,8 @@
 
-import { CollectionConfig } from "@rebasepro/types";
-import React, { useState, useEffect } from "react";
+import { CollectionConfig, SecurityRule as GeneratedSecurityRule } from "@rebasepro/types";
+import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
+import { getEffectiveSecurityRules } from "@rebasepro/common";
+import React, { useState, useEffect, useMemo } from "react";
 
 /**
  * Validates and double-quotes a SQL identifier to prevent injection.
@@ -130,7 +132,30 @@ export function CollectionRLSTab() {
         fetchLivePolicies();
     }, [databaseAdmin, values.id, values.table, values.alias]);
 
-    const unmappedPolicies = dbPolicies.filter(dp => !rules.some(r => r.name === dp.policyname));
+    const tableName = values.id || values.table || values.alias;
+
+    /**
+     * Every policy name `rebase db push` would write for this collection.
+     *
+     * Two things make this more than `rules.map(r => r.name)`:
+     *  - a rule without an explicit `name` becomes `<table>_<op>_<hash>`, so
+     *    comparing `rule.name` to `policyname` never matches for it;
+     *  - the generator also injects the safe-by-default baseline
+     *    (`<table>_default_admin_*`), which is in no collection's `securityRules`.
+     *
+     * Missing either made Rebase's own policies look hand-written, and offered to
+     * import them back into the codebase that produced them.
+     */
+    const generatedPolicyNames = useMemo(() => {
+        if (!tableName) return new Set<string>();
+        const effectiveRules = getEffectiveSecurityRules(values as CollectionConfig);
+        return getPolicyNamesForRules(
+            [...(rules as unknown as GeneratedSecurityRule[]), ...effectiveRules],
+            tableName
+        );
+    }, [rules, tableName, values]);
+
+    const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));
 
     const handleSave = async (newPolicy: Partial<PostgresPolicy>) => {
         const rule: SecurityRule = {
@@ -175,7 +200,13 @@ export function CollectionRLSTab() {
                                 <div className="flex flex-col gap-1.5 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <KeyIcon size={iconSize.smallest} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
-                                        <Typography variant="subtitle2" className="truncate">{rule.name}</Typography>
+                                        <Typography variant="subtitle2" className="truncate">
+                                            {/* Unnamed rules are still named in Postgres — show what they compile to
+                                                rather than an empty heading. */}
+                                            {rule.name || (tableName
+                                                ? getPolicyNamesForRule(rule as unknown as GeneratedSecurityRule, tableName).join(", ")
+                                                : "Unnamed policy")}
+                                        </Typography>
                                     </div>
                                     <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
                                         <Chip size="small" className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none">Action: {rule.operation || "ALL"}</Chip>

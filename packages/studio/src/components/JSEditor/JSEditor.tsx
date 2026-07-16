@@ -670,7 +670,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 items-center justify-end gap-1.5">
-                                    <Tooltip title="SaveIcon as snippet">
+                                    <Tooltip title="Save as snippet">
                                         <IconButton
                                             size="small"
                                             onClick={() => {
@@ -1009,9 +1009,9 @@ id: String(ra.entityId) })}
                 />
             </div>
 
-            {/* SaveIcon snippet dialog */}
+            {/* Save snippet dialog */}
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-                <DialogTitle>SaveIcon Snippet</DialogTitle>
+                <DialogTitle>Save Snippet</DialogTitle>
                 <DialogContent>
                     <TextField
                         label="Snippet name"

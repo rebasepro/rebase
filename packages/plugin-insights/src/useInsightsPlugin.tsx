@@ -77,6 +77,15 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                         const path = props.path as string;
                         const collectionSlug = path?.split("/").filter(Boolean).pop() ?? "";
                         if (collectionSlug !== slug) return null;
+
+                        // Skip relation-scoped views (e.g. a single product's Orders
+                        // tab). These aggregations are collection-wide — `InsightContext`
+                        // carries no parent entity id, so a definition cannot narrow to
+                        // the parent — and rendering "Revenue $36.2K" above one product's
+                        // two orders reads as a figure for those orders.
+                        const parentEntityIds = props.parentEntityIds as string[] | undefined;
+                        if (parentEntityIds && parentEntityIds.length > 0) return null;
+
                         return (
                             <CollectionInsightsInline
                                 {...props as { path: string; collection: unknown; parentCollectionSlugs: string[], parentEntityIds: string[] }}

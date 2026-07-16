@@ -306,7 +306,7 @@ export function FirebaseLoginView({
                     {resolvedSignInOptions.includes("phone") &&
                         <LoginButton
                             disabled={disabled}
-                            text={"PhoneIcon number"}
+                            text={"Phone number"}
                             icon={<PhoneIcon size={iconSize.medium}/>}
                             onClick={() => setPhoneLoginSelected(true)}/>}
 

@@ -95,6 +95,10 @@ template: "raw-data" })
             "@rebasepro/app": path.resolve(__dirname, "../../packages/app/src"),
             "@rebasepro/types": path.resolve(__dirname, "../../packages/types/src"),
             "@rebasepro/common": path.resolve(__dirname, "../../packages/common/src"),
+            // Every other workspace package resolves to source; without this one
+            // `utils` alone came from its built `dist`, so edits to it did nothing
+            // in dev until the package was rebuilt.
+            "@rebasepro/utils": path.resolve(__dirname, "../../packages/utils/src"),
             "@rebasepro/client": path.resolve(__dirname, "../../packages/client/src"),
             "@rebasepro/ui": path.resolve(__dirname, "../../packages/ui/src"),
             "@rebasepro/ui/index.css": path.resolve(__dirname, "../../packages/ui/index.css"),

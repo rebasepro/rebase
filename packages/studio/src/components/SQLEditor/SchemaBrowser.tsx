@@ -86,7 +86,7 @@ export const SchemaBrowser = ({
                                                         e.stopPropagation();
                                                         navigator.clipboard.writeText(table.tableName);
                                                     }}
-                                                    title="CopyIcon table name"
+                                                    title="Copy table name"
                                                 >
                                                     <CopyIcon size={iconSize.small}/>
                                                 </IconButton>
@@ -148,7 +148,7 @@ export const SchemaBrowser = ({
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(col.name);
                                                             }}
-                                                            title="CopyIcon column name"
+                                                            title="Copy column name"
                                                         >
                                                             <CopyIcon size={iconSize.smallest}/>
                                                         </IconButton>
