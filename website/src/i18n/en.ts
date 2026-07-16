@@ -1,9 +1,9 @@
 export const en = {
   "hero.badge": "Open-source · Self-hosted · Postgres-native",
-  "hero.title.part1": "Your existing Postgres —",
-  "hero.title.part2": "admin panel, APIs & typed SDK, instantly.",
+  "hero.title.part1": "The Postgres you already have.",
+  "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
-    "Point Rebase at any Postgres database and get a production-ready admin panel, type-safe REST APIs, and a realtime SDK — in minutes. Open-source, self-hosted, and agent-native.",
+    "Point Rebase at your database and get REST APIs, auth, storage, realtime — and an admin panel when you want one. Secured by Postgres row-level security, not middleware. Ready for your team and your AI agents.",
   "hero.cta.demo": "See the live demo",
   "hero.cta.demo.note": "No signup — explore a real generated admin panel",
   "hero.cli.label": "Prefer your terminal? Up and running locally in under a minute:",
@@ -13,7 +13,28 @@ export const en = {
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
-  "social.title": "The teams already shipping products on Rebase",
+  "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
+  "see.badge": "See it for yourself",
+  "see.title": "From connection string to control panel",
+  "see.subtitle":
+    "This is what your database becomes: a full back office your whole team can work in — generated, not built.",
+  "modes.badge": "Modular by design",
+  "modes.title": 'Adopt only <span class="text-primary">what you need.</span>',
+  "modes.subtitle":
+    "Three modes, same packages, wired differently. Start headless, add the admin panel later — or never. Nothing is bundled that you didn't ask for.",
+  "modes.baas.title": "BaaS — just the backend",
+  "modes.baas.desc":
+    "REST, auth, storage, realtime and backups over your database. No config files, no UI, no React in the dependency tree. Every protected table is served automatically, straight from your schema.",
+  "modes.baas.tag": "Like Supabase — on the Postgres you already run",
+  "modes.cms.title": "CMS — add the admin panel",
+  "modes.cms.desc":
+    "Define collections in TypeScript and get a schema-driven back office: spreadsheet editing, media, workflows — extensible with your own React components.",
+  "modes.cms.tag": "Like Payload or Directus — without the framework lock-in",
+  "modes.full.title": "Full — add the Studio",
+  "modes.full.desc":
+    "SQL editor, schema visualizer, RLS policy editor, logs and API explorer on top of everything else. The whole platform, one self-hosted app.",
+  "modes.full.tag": "Supabase + Payload, owned end to end",
+  "modes.link": "Why we built it this way",
   "howitworks.badge": "Time reclaimed",
   "howitworks.title":
     'What you\'ll <span class="text-primary">never build again.</span>',
@@ -482,10 +503,10 @@ export const en = {
   "about.values.v3.title": "Community Driven",
   "about.values.v3.desc": "Our best features come from our community. We listen, we iterate, and we build what developers actually need, not what we think they need.",
   "about.stats.title": "Rebase by the Numbers",
-  "about.stats.s1.value": "1k+",
-  "about.stats.s1.label": "GitHub Stars",
-  "about.stats.s3.value": "100+",
-  "about.stats.s3.label": "Contributors",
+  "about.stats.s1.value": "100%",
+  "about.stats.s1.label": "Open source — MIT, no feature gates",
+  "about.stats.s3.value": "1.3k+",
+  "about.stats.s3.label": "GitHub stars across our projects",
   "about.join.title": "Help Us Build the Future of Back-Office Development",
   "about.join.desc": "We're always looking for passionate developers to join our community and contribute to the project.",
   "about.join.github": "Contribute on GitHub",
@@ -542,7 +563,7 @@ export const en = {
   "pricing.badge": "Pricing",
   "pricing.title": "Free and open-source. Pay only for enterprise support.",
   "pricing.subtitle":
-    "The entire framework is MIT-licensed and free to self-host, forever. No per-seat pricing, no feature gates. When you need enterprise auth and support, we're here.",
+    'The entire framework is <strong class="text-white font-medium">MIT-licensed</strong> and free to self-host, forever. No per-seat pricing, no feature gates. When you need enterprise auth and support, we\'re here.',
   "pricing.oss.name": "Open Source",
   "pricing.oss.price": "Free",
   "pricing.oss.priceNote": "MIT-licensed, forever",

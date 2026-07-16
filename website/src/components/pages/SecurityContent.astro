@@ -21,11 +21,12 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                     <span class="text-sm font-medium">Open Source · Self-Hosted · Your Database</span>
                 </div>
                 <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-                    Security Through Transparency
+                    Secured by the database.<br/>Not by middleware.
                 </h1>
                 <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-                    Your data is <b>yours</b>. Rebase is designed to keep your data under your control —
-                    self-hosted, open-source, and never touching our servers.
+                    Authorization in Rebase is Postgres row-level security, enforced by the database itself —
+                    and it fails closed: a table without RLS is <b>refused</b>, never leaked. Self-hosted,
+                    open-source, and your data never touches our servers.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <a href="/docs"
@@ -154,6 +155,8 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                         <p class="mt-4 text-base text-surface-400 max-w-2xl">
                             Define who can read, create, update, and delete each row — enforced directly by PostgreSQL.
                             Policies are written as code in your schema, version-controlled, and applied via migrations. No middleware, no ORM hacks.
+                            And it fails closed: a table without RLS has no authorization model, so Rebase refuses to
+                            serve it — and prints the exact SQL to protect it at boot. There is no auth check to forget.
                         </p>
                     </div>
 

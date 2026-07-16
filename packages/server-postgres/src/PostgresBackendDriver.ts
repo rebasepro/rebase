@@ -29,6 +29,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { buildPropertyCallbacks, buildSdkData, resolveCollectionRelations, updateDateAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
+import { deriveRowAddress } from "./services/collection-helpers";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
@@ -652,8 +653,19 @@ export class PostgresBackendDriver implements DataDriver {
                 }
             }
 
-            const savedId = savedRow.id as string | number;
-            const { id: _savedId, ...savedValues } = savedRow;
+            // The row is exactly its columns, so its address is derived, not read
+            // off it: `savedRow.id` is undefined for every table whose key is not
+            // literally named `id`, and is ordinary data for a table that has such
+            // a column without it being the key.
+            const savedId = deriveRowAddress(
+                savedRow,
+                (resolvedCollection ?? collection) as CollectionConfig,
+                this.registry
+            );
+            // `values` are the row's columns — all of them. For an `id`-keyed table
+            // that includes `id`, which used to be stripped here because it was the
+            // synthesized address rather than the column it now is.
+            const savedValues = savedRow;
 
             if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
                 // 1. Global callbacks first
@@ -698,7 +710,7 @@ export class PostgresBackendDriver implements DataDriver {
             if (this.historyService && resolvedCollection?.history) {
                 this.historyService.recordHistory({
                     tableName: path,
-                    id: savedId.toString(),
+                    id: savedId,
                     action: status === "new" ? "create" : "update",
                     values: savedValues as Record<string, unknown>,
                     previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
@@ -710,14 +722,14 @@ export class PostgresBackendDriver implements DataDriver {
             if (this._deferNotifications) {
                 this._pendingNotifications.push({
                     path,
-                    id: savedId.toString(),
+                    id: savedId,
                     row: savedRow,
                     databaseId: resolvedCollection?.databaseId
                 });
             } else {
                 await this.realtimeService.notifyUpdate(
                     path,
-                    savedId.toString(),
+                    savedId,
                     savedRow,
                     resolvedCollection?.databaseId
                 );
@@ -843,7 +855,10 @@ export class PostgresBackendDriver implements DataDriver {
                                                           }: DeleteProps<M>): Promise<void> {
 
         const targetPath = row.path;
-        const targetRow: Record<string, unknown> = { id: row.id, ...(row.values ?? {}) };
+        // The callbacks' `row` is the row: its columns, nothing else. The address
+        // travels beside it as `id`, so merging it in here only ever invented an
+        // `id` field for tables that have no such column.
+        const targetRow: Record<string, unknown> = { ...(row.values ?? {}) };
 
         // Resolve from backend registry to restore callbacks lost during WebSocket serialization
         const {

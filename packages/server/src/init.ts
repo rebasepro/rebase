@@ -423,6 +423,22 @@ export interface RebaseBackendInstance {
     cronScheduler?: import("./cron").CronScheduler;
 
     /**
+     * Attach collection callbacks AFTER initialization.
+     *
+     * Use this instead of mutating `collectionRegistry.get(slug).callbacks`.
+     * Every registry normalizes its collections through `{ ...c }`, so the
+     * backend registry and each driver's registry hold **separate copies** of
+     * the same collection — assigning callbacks to one is invisible to the
+     * driver that actually invokes them, and the hooks silently never fire.
+     * This writes to all of them.
+     *
+     * (Assignment, not `Object.defineProperty`: the driver resolves callbacks
+     * with a spread, which copies only enumerable properties, and
+     * defineProperty defaults `enumerable` to false.)
+     */
+    setCollectionCallbacks(slug: string, callbacks: import("@rebasepro/types").CollectionCallbacks): void;
+
+    /**
      * Deep health check that verifies database connectivity.
      * Returns latency and component status.
      */
@@ -1119,6 +1135,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
     logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
 
+    // Same treatment for storage: server-side `rebase.storage` must talk to the
+    // controller directly, not loop back through `POST /api/storage/upload`. The
+    // loopback carried the service key but still 403'd (the storage route's auth
+    // is written for real user/session requests, not the internal self-call), so
+    // every backend-initiated write — e.g. the deploy build-context upload —
+    // failed at ~2ms with "Request failed with status 403". The controller
+    // exposes the same StorageSource surface (putObject/getObject/…).
+    if (storageController) {
+        Object.assign(serverClient, { storage: storageController });
+        logger.info("Native storage attached to singleton (bypasses HTTP loop)");
+    }
+
     // Attach email service to the server client when configured.
     // The email service may come from the auth bootstrapper or from the auth config directly.
     let emailService: EmailService | undefined;
@@ -1345,9 +1373,43 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         realtimeServices
     });
 
+    /**
+     * Every registry a driver might resolve callbacks from, plus the backend's
+     * own. Each holds its own normalized copy of a collection, so callbacks have
+     * to be written to all of them.
+     */
+    const callbackTargets = (): Array<{ get(slug: string): unknown }> => {
+        const targets: Array<{ get(slug: string): unknown }> = [collectionRegistry];
+        for (const key of [DEFAULT_DRIVER_ID, ...driverRegistry.list()]) {
+            const d = driverRegistry.get(key) as unknown as { registry?: { get(slug: string): unknown } };
+            if (d?.registry && typeof d.registry.get === "function" && !targets.includes(d.registry)) {
+                targets.push(d.registry);
+            }
+        }
+        return targets;
+    };
+
+    const setCollectionCallbacks = (
+        slug: string,
+        callbacks: import("@rebasepro/types").CollectionCallbacks
+    ): void => {
+        let attached = 0;
+        for (const registry of callbackTargets()) {
+            const collection = registry.get(slug) as { callbacks?: unknown } | undefined;
+            if (collection) {
+                collection.callbacks = callbacks;
+                attached++;
+            }
+        }
+        if (attached === 0) {
+            logger.warn(`[callbacks] Collection "${slug}" not found in any registry — callbacks not attached.`);
+        }
+    };
+
     return {
         driverRegistry,
         driver: defaultDriver,
+        setCollectionCallbacks,
         realtimeServices,
         realtimeService: effectiveRealtimeService,
         auth: authConfigResult,

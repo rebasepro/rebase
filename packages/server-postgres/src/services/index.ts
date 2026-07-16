@@ -8,6 +8,7 @@ export {
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
+    deriveRowAddress,
     parseIdValues,
     buildCompositeId
 } from "./collection-helpers";

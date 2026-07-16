@@ -86,11 +86,13 @@ export function resolveNavigationFrom<M extends Record<string, unknown>, USER ex
                     throw Error(`No collection defined in the navigation for the entity with path ${entry.slug}`);
                 }
                 // `context.data` is the flat SDK layer; re-wrap the row into the
-                // Entity view-model the navigation entry expects.
+                // Entity view-model the navigation entry expects. The address is
+                // the one we just fetched by — reading it back off the row would
+                // find nothing, since a row is only its columns.
                 return data.collection(entry.slug).findById(entry.entityId)
                     .then((row) => {
                         if (!row) return undefined;
-                        const entity = { id: row.id, path: entry.slug, values: row };
+                        const entity = { id: entry.entityId, path: entry.slug, values: row };
                         return { ...entry,
 entity };
                     });

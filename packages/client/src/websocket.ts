@@ -12,6 +12,7 @@ import {
     BranchInfo,
     RebaseApiError
 } from "@rebasepro/types";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, type PrimaryKeyInfo } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
 
@@ -89,6 +90,12 @@ export class RebaseWebSocketClient {
         latestData?: Record<string, unknown>[]; // Cache the latest flat rows
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
+        /**
+         * The key columns of this collection, as told by the server on a patch.
+         * Rows are columns only, and the SDK holds no collection config, so
+         * without this there is nothing to derive an address from.
+         */
+        pks?: PrimaryKeyInfo[];
     }>();
 
     private singleSubscriptions = new Map<string, {
@@ -469,11 +476,18 @@ export class RebaseWebSocketClient {
                     const wireEntities = (message.rows || []) as unknown as Record<string, unknown>[];
                     const incomingRows = wireEntities;
 
+                    // The keys arrive with the rows, so they are known before the
+                    // first merge — a CDC-driven change never sends a patch, and
+                    // learning them from patches alone would leave every
+                    // externally-written collection unable to match a thing.
+                    const updatePks = (message as unknown as { pks?: PrimaryKeyInfo[] }).pks;
+                    if (updatePks) collectionSub.pks = updatePks;
+
                     // Structural merge: preserve cached row references for rows
                     // whose values haven't changed. This prevents downstream React components
                     // from re-rendering (VirtualTableCell uses deepEqual on rowData —
                     // same reference = instant true, avoiding expensive deep comparison).
-                    const rows = this.mergeRows(collectionSub.latestData, incomingRows);
+                    const rows = this.mergeRows(collectionSub.latestData, incomingRows, collectionSub.pks);
 
                     // Cache the latest data with optimizations
                     collectionSub.latestData = rows;
@@ -504,16 +518,28 @@ export class RebaseWebSocketClient {
                 const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
                 if (collectionSub && collectionSub.isInitialDataReceived && collectionSub.latestData) {
                     const patchWireEntity = message.row ?? null;
-                    const patchEntityId = (message as unknown as { id: string }).id;
+                    const patchMessage = message as unknown as { id: string; pks?: PrimaryKeyInfo[] };
+                    const patchEntityId = patchMessage.id;
+                    // The server knows the key columns; remember them, because the
+                    // refetch reconciliation needs them too and carries no id.
+                    if (patchMessage.pks) collectionSub.pks = patchMessage.pks;
                     const patchRow = patchWireEntity ? (patchWireEntity as unknown as Record<string, unknown>) : null;
                     let updated: Record<string, unknown>[];
 
                     if (patchRow === null) {
                         // Row was deleted — remove it from the cached list
-                        updated = collectionSub.latestData.filter(e => String(e.id) !== String(patchEntityId));
+                        updated = collectionSub.latestData.filter(
+                            e => this.rowAddress(e, collectionSub.pks) !== String(patchEntityId)
+                        );
                     } else {
-                        // Row was created or updated — merge into the cached list
-                        const idx = collectionSub.latestData.findIndex(e => String(e.id) === String(patchRow.id));
+                        // Row was created or updated — merge into the cached list.
+                        // Matched against the patch's own address rather than
+                        // anything read off the row: `patchRow.id` is undefined
+                        // for a table not keyed on `id`, so every update looked
+                        // like a new row and was prepended as a duplicate.
+                        const idx = collectionSub.latestData.findIndex(
+                            e => this.rowAddress(e, collectionSub.pks) === String(patchEntityId)
+                        );
                         if (idx >= 0) {
                             // Update in place (preserve array position)
                             updated = [...collectionSub.latestData];
@@ -1017,22 +1043,47 @@ options }
     }
 
     /**
+     * The address of a row, for matching it against another copy of itself.
+     *
+     * A row is exactly its columns and carries no address, so it is derived
+     * from the key columns the server named — including the ordinary case where
+     * that key is `id`, which the server reports like any other.
+     *
+     * Undefined when there are no keys, which means the server could not
+     * resolve any: such rows genuinely cannot be recognised, and guessing at a
+     * column called `id` would be inventing an identity for a table that has
+     * none.
+     */
+    private rowAddress(row: Record<string, unknown>, pks: PrimaryKeyInfo[] | undefined): string | undefined {
+        if (!pks || pks.length === 0) return undefined;
+        const address = buildCompositeId(row, pks);
+        if (!address || address.split(COMPOSITE_ID_SEPARATOR).every(part => part === "")) return undefined;
+        return address;
+    }
+
+    /**
      * Merge incoming rows with cached data, preserving cached references
      * for rows whose values haven't changed. This avoids unnecessary
      * React re-renders when the server refetches all rows but most
      * haven't actually changed.
      */
-    private mergeRows(cached: Record<string, unknown>[] | undefined, incoming: Record<string, unknown>[]): Record<string, unknown>[] {
+    private mergeRows(
+        cached: Record<string, unknown>[] | undefined,
+        incoming: Record<string, unknown>[],
+        pks?: PrimaryKeyInfo[]
+    ): Record<string, unknown>[] {
         if (!cached || cached.length === 0) return incoming;
 
-        // Build a lookup from cached rows by ID for O(1) access
-        const cachedById = new Map<string | number, Record<string, unknown>>();
+        // Build a lookup from cached rows by address for O(1) access
+        const cachedById = new Map<string, Record<string, unknown>>();
         for (const row of cached) {
-            cachedById.set(row.id as string | number, row);
+            const address = this.rowAddress(row, pks);
+            if (address !== undefined) cachedById.set(address, row);
         }
 
         return incoming.map(incomingRow => {
-            const cachedRow = cachedById.get(incomingRow.id as string | number);
+            const address = this.rowAddress(incomingRow, pks);
+            const cachedRow = address === undefined ? undefined : cachedById.get(address);
             if (!cachedRow) return incomingRow;
 
             // Compare flat rows directly (no more path/values nesting)
@@ -1051,7 +1102,7 @@ options }
 incoming: normIncoming[key] };
                     }
                 }
-                console.debug(`[RebaseWS] Row ${incomingRow.id} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
+                console.debug(`[RebaseWS] Row ${address} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
             }
             return incomingRow;
         });

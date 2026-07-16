@@ -4,6 +4,15 @@ import { RebaseWebSocketClient } from "../src/websocket";
 // so the existing instanceof/code assertions below read unchanged.
 import { RebaseApiError as ApiError } from "@rebasepro/types";
 
+/**
+ * The key columns the server sends alongside a collection's rows. Rows carry no
+ * address, so recognising one — to patch it, or to keep its reference across a
+ * refetch — means deriving the address from these. The fixtures here are all
+ * keyed on `id`, which the server reports like any other key.
+ */
+const ID_PKS = [{ fieldName: "id",
+type: "string" as const }];
+
 // ---------------------------------------------------------------------------
 // Mock WebSocket
 // ---------------------------------------------------------------------------
@@ -840,7 +849,8 @@ path: "users" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [initialEntity]
+                rows: [initialEntity],
+                pks: ID_PKS
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
@@ -865,7 +875,8 @@ name: "Alice" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [refetchedEntity]
+                rows: [refetchedEntity],
+                pks: ID_PKS
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);
@@ -898,7 +909,8 @@ path: "users" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [initialEntity]
+                rows: [initialEntity],
+                pks: ID_PKS
             }) });
 
             const firstUpdate = onUpdate.mock.calls[0][0] as any[];
@@ -917,7 +929,8 @@ path: "users" }
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_update",
                 subscriptionId: subId,
-                rows: [newAuthorEntity]
+                rows: [newAuthorEntity],
+                pks: ID_PKS
             }) });
 
             const secondUpdate = onUpdate.mock.calls[0][0] as any[];
@@ -948,7 +961,8 @@ path: "tags" }
             };
             ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
 subscriptionId: subId,
-rows: [row] }) });
+rows: [row],
+pks: ID_PKS }) });
 
             const firstInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             onUpdate.mockClear();
@@ -968,7 +982,8 @@ data: { id: "11" } }
             };
             ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
 subscriptionId: subId,
-rows: [entityWithData] }) });
+rows: [entityWithData],
+pks: ID_PKS }) });
 
             const secondInstance = (onUpdate.mock.calls[0][0] as any[])[0];
             expect(secondInstance).toBe(firstInstance);
@@ -999,15 +1014,18 @@ rows: [entityWithData] }) });
 title: "Old" },
                     { id: "2",
 title: "Two" }
-                ]
+                ],
+                pks: ID_PKS
             }) });
 
             onUpdate.mockClear();
 
-            // Patch row 1
+            // Patch row 1. The server names the row by its address in the
+            // envelope `id`; the row itself is columns only.
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_patch",
                 subscriptionId: subId,
+                id: "1",
                 row: { id: "1",
 title: "New" }
             }) });
@@ -1044,6 +1062,7 @@ title: "Two" });
             ws.onmessage!({ data: JSON.stringify({
                 type: "collection_patch",
                 subscriptionId: subId,
+                id: "new",
                 row: { id: "new",
 title: "Fresh" }
             }) });
@@ -1071,7 +1090,8 @@ title: "Fresh" }
                 rows: [
                     { id: "1" },
                     { id: "2" }
-                ]
+                ],
+                pks: ID_PKS
             }) });
             onUpdate.mockClear();
 

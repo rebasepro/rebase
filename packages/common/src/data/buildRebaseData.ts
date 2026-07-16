@@ -48,6 +48,9 @@ function createPrimaryKeyResolver(options?: EntityDataOptions) {
 
         const keys = resolvePrimaryKeys(collection);
         if (keys.length > 0) {
+            // Memoized for the session: a collection's key does not change
+            // while the app runs, and this is called once per row. Editing
+            // `isId` in the schema editor needs a reload to take effect here.
             cache.set(slug, keys);
             return keys;
         }
@@ -59,7 +62,8 @@ function createPrimaryKeyResolver(options?: EntityDataOptions) {
             console.warn(
                 `[rebase] Collection '${slug}' declares no primary key, so its rows have no address: ` +
                 `detail links, caching and relations will not work for it. ` +
-                `Mark the key property with \`isId\` in its collection config.`
+                `Mark the key property with \`isId\` in its collection config — the server logs which ` +
+                `column to mark at boot, if its schema knows the key.`
             );
         }
         return keys;

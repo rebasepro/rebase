@@ -162,11 +162,12 @@ export class RelationService {
             const rows: RelatedRow<M>[] = [];
             for (const row of results as Array<Record<string, unknown>>) {
                 const targetRow = (row[targetTableName] as Record<string, unknown>) || row;
-                const id = targetRow[idInfo[0].fieldName as string];
                 const parsedValues = await parseDataFromServer(targetRow, targetCollection, this.db, this.registry);
 
                 rows.push({
-                    id: id?.toString() || "",
+                    // The whole key: the first column of a composite one names
+                    // every row that shares it.
+                    id: buildCompositeId(targetRow, idInfo),
                     path: targetCollection.slug,
                     values: parsedValues as M
                 });
@@ -228,11 +229,10 @@ export class RelationService {
         const rows: RelatedRow<M>[] = [];
         for (const row of results) {
             const targetRow = row[getTableName(targetCollection)] || row;
-            const id = targetRow[idInfo[0].fieldName];
             const parsedValues = await parseDataFromServer(targetRow, targetCollection, this.db, this.registry);
 
             rows.push({
-                id: id?.toString() || "",
+                id: buildCompositeId(targetRow as Record<string, unknown>, idInfo),
                 path: targetCollection.slug,
                 values: parsedValues as M
             });
@@ -371,7 +371,7 @@ export class RelationService {
                 const parsedValues = await parseDataFromServer(targetRow, targetCollection);
 
                 resultMap.set(String(parentId), {
-                    id: String(targetRow[targetIdInfo.fieldName]),
+                    id: buildCompositeId(targetRow, targetPks),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
                 });
@@ -438,7 +438,7 @@ export class RelationService {
                 if (targetRow) {
                     const parsedValues = await parseDataFromServer(targetRow, targetCollection);
                     resultMap.set(parentIdStr, {
-                        id: String(targetRow[targetIdInfo.fieldName]),
+                        id: buildCompositeId(targetRow, targetPks),
                         path: targetCollection.slug,
                         values: parsedValues as Record<string, unknown>
                     });
@@ -490,7 +490,7 @@ export class RelationService {
             if (parentId !== undefined && parentIdSet.has(String(parentId))) {
                 const parsedValues = await parseDataFromServer(targetRow, targetCollection);
                 resultMap.set(String(parentId), {
-                    id: String(targetRow[targetIdInfo.fieldName]),
+                    id: buildCompositeId(targetRow, targetPks),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
                 });
@@ -565,7 +565,7 @@ export class RelationService {
 
                 const arr = resultMap.get(parentId) || [];
                 arr.push({
-                    id: String(targetRow[targetIdInfo.fieldName]),
+                    id: buildCompositeId(targetRow, targetPks),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
                 });
@@ -616,7 +616,7 @@ export class RelationService {
 
                 const arr = resultMap.get(parentId) || [];
                 arr.push({
-                    id: String(targetData[targetIdInfo.fieldName]),
+                    id: buildCompositeId(targetData, targetPks),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
                 });
@@ -672,7 +672,7 @@ export class RelationService {
                 const key = String(parentId);
                 const arr = resultMap.get(key) || [];
                 arr.push({
-                    id: String(targetRow[targetIdInfo.fieldName]),
+                    id: buildCompositeId(targetRow, targetPks),
                     path: targetCollection.slug,
                     values: parsedValues as Record<string, unknown>
                 });
@@ -865,7 +865,6 @@ export class RelationService {
             relationKey: string;
             relation: Relation;
             newValue: unknown;
-            currentId?: string | number;
         }>
     ) {
         for (const update of inverseRelationUpdates) {

@@ -14,7 +14,7 @@ import { applyAuthContext } from "../security/rls-enforcement";
 import { logger } from "@rebasepro/server";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
-import { getPrimaryKeys, buildCompositeId } from "./collection-helpers";
+import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -390,7 +390,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 authContext
             );
 
-            this.sendCollectionUpdate(clientId, subscriptionId, rows);
+            this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path);
 
         } catch (error) {
             const sanitized = sanitizeErrorForClient(error, request.path);
@@ -554,7 +554,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     // Phase 1: Send instant row-level patch (no DB query)
                     // This gives immediate cross-tab feedback
                     if (!row || !(row as Record<string, unknown>)?._rebase_invalidated) {
-                        this.sendCollectionPatch(subscription.clientId, subscriptionId, id, row);
+                        this.sendCollectionPatch(subscription.clientId, subscriptionId, id, row, notifyPath);
                     }
 
                     // Phase 2: Schedule a deferred full refetch for correctness
@@ -609,7 +609,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (!this._subscriptions.has(subscriptionId)) return;
             try {
                 const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
-                this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows);
+                this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath);
             } catch (error) {
                 const sanitized = sanitizeErrorForClient(error, notifyPath);
                 this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
@@ -910,11 +910,12 @@ roles: activeAuth.roles },
         return await this.dataService.fetchOne(notifyPath, id);
     }
 
-    private sendCollectionUpdate(clientId: string, subscriptionId: string, rows: Record<string, unknown>[]) {
+    private sendCollectionUpdate(clientId: string, subscriptionId: string, rows: Record<string, unknown>[], path: string) {
         const message: CollectionUpdateMessage = {
             type: "collection_update",
             subscriptionId,
-            rows: rows
+            rows: rows,
+            pks: this.primaryKeysForPath(path)
         };
         this.sendMessage(clientId, message);
     }
@@ -931,15 +932,41 @@ roles: activeAuth.roles },
     /**
      * Send a lightweight row-level patch to a collection subscriber.
      * The client can merge this into its cached data for instant feedback.
+     *
+     * The key columns ride along: the patch names a row by address, and the
+     * client has to find that row among the ones it cached — which carry
+     * columns and no address. The SDK holds no collection config to derive one
+     * from, so this is the only place the mapping can come from.
      */
-    private sendCollectionPatch(clientId: string, subscriptionId: string, id: string, row: Record<string, unknown> | null) {
+    private sendCollectionPatch(
+        clientId: string,
+        subscriptionId: string,
+        id: string,
+        row: Record<string, unknown> | null,
+        notifyPath: string
+    ) {
         const message: CollectionPatchMessage = {
             type: "collection_patch",
             subscriptionId,
             id,
-            row: row
+            row: row,
+            pks: this.primaryKeysForPath(notifyPath)
         };
         this.sendMessage(clientId, message);
+    }
+
+    /** The key columns of the collection at `path`, if they can be resolved. */
+    private primaryKeysForPath(path: string): PrimaryKeyInfo[] | undefined {
+        try {
+            const collection = this.registry.getCollectionByPath(path);
+            if (!collection) return undefined;
+            const keys = getPrimaryKeys(collection, this.registry);
+            return keys.length > 0 ? keys : undefined;
+        } catch {
+            // Unregistered table, or a relation path with no collection of its
+            // own: the client keeps its pre-existing `id` behaviour.
+            return undefined;
+        }
     }
 
     private sendError(clientId: string, error: string, subscriptionId?: string, code?: string) {
@@ -1294,17 +1321,9 @@ lastSeen: Date.now() });
 
     /** Compute the canonical (possibly composite) id string from a captured row. */
     private extractIdFromCdcRow(collection: CollectionConfig, row: Record<string, unknown>): string {
-        try {
-            const primaryKeys = getPrimaryKeys(collection, this.registry);
-            const composite = buildCompositeId(row, primaryKeys);
-            if (composite && composite !== ":::") return composite;
-        } catch {
-            /* fall through to id-field / wildcard */
-        }
-        // Fallbacks: a plain `id` column (common), else a collection-level
-        // invalidation ("*") — single-row subs won't match but collection subs refetch.
-        if (row.id !== undefined && row.id !== null) return String(row.id);
-        return "*";
+        // Unaddressable falls back to a collection-level invalidation: single-row
+        // subs won't match, but collection subs still refetch.
+        return deriveRowAddress(row, collection, this.registry) || "*";
     }
 
     // ── App/CDC de-duplication ──

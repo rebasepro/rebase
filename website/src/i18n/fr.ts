@@ -1,9 +1,9 @@
 export const fr = {
   "hero.badge": "Open-source · Auto-hébergé · Natif Postgres",
-  "hero.title.part1": "Votre Postgres existant —",
-  "hero.title.part2": "panneau d'administration, APIs et SDK typé, instantanément.",
+  "hero.title.part1": "Le Postgres que vous avez déjà.",
+  "hero.title.part2": "Le backend que vous avez toujours voulu.",
   "hero.subtitle":
-    "Pointez Rebase vers n'importe quelle base Postgres et obtenez un panneau d'administration prêt pour la production, des APIs REST typées et un SDK temps réel — en quelques minutes. Open-source, auto-hébergé et pensé pour les agents.",
+    "Pointez Rebase vers votre base de données et obtenez des APIs REST, l'auth, le stockage, le temps réel — et un panneau d'administration si vous le souhaitez. Sécurisé par la row-level security de Postgres, pas par du middleware. Prêt pour votre équipe et vos agents IA.",
   "hero.cta.demo": "Voir la démo en direct",
   "hero.cta.demo.note": "Sans inscription — un vrai panneau d'administration généré",
   "hero.cli.label": "Vous préférez le terminal ? Opérationnel en local en moins d'une minute :",
@@ -15,7 +15,7 @@ export const fr = {
   "demo.dev":
     "✔ Panel admin, API et serveur WebSocket en cours d'exécution.",
   "social.title":
-    "Des équipes qui lancent déjà des produits avec Rebase",
+    "Des équipes qui livrent avec nos outils — Rebase et FireCMS",
   "howitworks.badge": "Temps récupéré",
   "howitworks.title":
     'Ce que vous ne <span class="text-primary">construirez plus jamais.</span>',
@@ -438,12 +438,10 @@ export const fr = {
   "about.values.v3.title": "Porté par la communauté",
   "about.values.v3.desc": "Nos meilleures features viennent de notre communauté. Nous écoutons, nous itérons, et nous construisons ce dont les développeurs ont réellement besoin — pas ce que nous pensons qu'ils veulent.",
   "about.stats.title": "Rebase en chiffres",
-  "about.stats.s1.value": "1k+",
-  "about.stats.s1.label": "Stars GitHub",
-  "about.stats.s2.value": "1M+",
-  "about.stats.s2.label": "Téléchargements",
-  "about.stats.s3.value": "100+",
-  "about.stats.s3.label": "Contributeurs",
+  "about.stats.s1.value": "100%",
+  "about.stats.s1.label": "Open source — MIT, sans fonctionnalités verrouillées",
+  "about.stats.s3.value": "1.3k+",
+  "about.stats.s3.label": "Stars GitHub sur l'ensemble de nos projets",
   "about.join.title": "Construisons ensemble l'avenir du back-office",
   "about.join.desc": "Nous cherchons toujours des développeurs passionnés pour rejoindre notre communauté et contribuer au projet.",
   "about.join.github": "Contribuer sur GitHub",
