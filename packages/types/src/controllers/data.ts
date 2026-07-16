@@ -302,7 +302,11 @@ export interface SDKCollectionClient<
     /**
      * Create a new record.
      * @param data The record data to create (the collection's `Insert` shape).
-     * @param id Optional specific ID to use for the new record.
+     * @param id Optional specific id, sent as an `id` column. This is for tables
+     *   whose key *is* `id`: the value goes in as that column. For a table keyed
+     *   on anything else (a `sku`, a composite key), there is no `id` column to
+     *   receive it — put the key in `data` instead, where it belongs among the
+     *   columns.
      * @returns The created row
      */
     create(data: I, id?: string | number): Promise<M>;

@@ -11,5 +11,8 @@
     "dist",
     "../ui/src",
     "../forms/src",
+    "test",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
   ]
 }

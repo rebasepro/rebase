@@ -14,10 +14,31 @@ export interface WebSocketMessage {
     error?: string;
 }
 
+/**
+ * The key columns a collection's rows are addressed by.
+ *
+ * A row is exactly its columns and carries no address, so a subscriber that has
+ * to recognise one — to patch it, or to keep its reference across a refetch —
+ * derives the address from these. The SDK is usable with no collections
+ * declared at all, so the server is the only side that knows them.
+ *
+ * Undefined when the server cannot resolve them: a table with no primary key
+ * and no `id` column has no address, and rows of it cannot be recognised by
+ * anyone.
+ */
+export type WirePrimaryKeys = { fieldName: string; type: "string" | "number"; isUUID?: boolean }[];
+
 export interface CollectionUpdateMessage extends WebSocketMessage {
     type: "collection_update";
     subscriptionId: string;
     rows: Record<string, unknown>[];
+    /**
+     * See {@link WirePrimaryKeys}. Sent with the rows themselves — and not only
+     * with a patch — because a CDC-originated change sends no patch at all: it
+     * invalidates and goes straight to a refetch, and the merge that preserves
+     * unchanged rows' references needs an address to match them by.
+     */
+    pks?: WirePrimaryKeys;
 }
 
 export interface SingleUpdateMessage extends WebSocketMessage {
@@ -35,9 +56,12 @@ export interface SingleUpdateMessage extends WebSocketMessage {
 export interface CollectionPatchMessage extends WebSocketMessage {
     type: "collection_patch";
     subscriptionId: string;
+    /** The address of the row this patch refers to — derived, never read off it. */
     id: string;
     /** The updated row, or null if deleted */
     row: Record<string, unknown> | null;
+    /** See {@link WirePrimaryKeys}: how the subscriber finds {@link id} in its cache. */
+    pks?: WirePrimaryKeys;
 }
 
 /**
