@@ -1,6 +1,7 @@
 export * from "./collections";
 export * from "./common";
 export * from "./entities";
+export * from "./identity";
 export * from "./enums";
 export * from "./paths";
 export * from "./resolutions";

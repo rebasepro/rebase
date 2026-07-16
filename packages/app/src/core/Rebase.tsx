@@ -8,7 +8,7 @@ import { CenteredView, Typography } from "@rebasepro/ui";
 import { RebaseContext, User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
-import { AuthControllerContext } from "../contexts";
+import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver } from "../contexts";
 import { useCustomizationController, useRebaseContext, useAuthSubscription } from "../hooks";
 import { ApiConfigProvider, useApiConfig } from "../hooks/ApiConfigContext";
 import { ErrorView } from "../components";
@@ -98,6 +98,18 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         return dataSourcesProp ?? [];
     }, [dataSourcesProp]);
 
+    // Rows arrive as columns only; their address is derived from the
+    // collection's primary keys. The collections live below us (in RebaseAdmin),
+    // so they register a resolver here and we read it lazily, per row. Headless
+    // apps register nothing and are unaffected.
+    const collectionResolverRef = useRef<CollectionResolver | undefined>(undefined);
+    const registerCollectionResolver = React.useCallback((resolver: CollectionResolver | undefined) => {
+        collectionResolverRef.current = resolver;
+    }, []);
+    const entityDataOptions = useMemo(() => ({
+        resolveCollection: (slug: string) => collectionResolverRef.current?.(slug)
+    }), []);
+
     // Build the data-source context: the declared registry plus a RebaseData
     // per direct/custom source (those carrying a client-side driver). Server-
     // mediated sources have no entry — they ride the default client.
@@ -131,12 +143,12 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                 ...definition,
                 transport: ds.transport ?? (driver ? "direct" : "server")
             };
-            if (driver) sources[ds.key] = buildRebaseData(driver);
+            if (driver) sources[ds.key] = buildRebaseData(driver, entityDataOptions);
         }
         const value: DataSourcesContextValue = { registry, sources };
         dataSourcesRef.current = { sig, value };
         return value;
-    }, [normalizedDataSources]);
+    }, [normalizedDataSources, entityDataOptions]);
 
     // Default data source — serves every collection not routed to a
     // registered direct/custom source. Resolution:
@@ -148,7 +160,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         if (registeredDefault) return registeredDefault;
         // CMS boundary: the SDK client returns flat rows; wrap them into the
         // Entity view-model the admin (`useData()`) renders.
-        if (client?.data) return wrapAsEntityData(client.data);
+        if (client?.data) return wrapAsEntityData(client.data, entityDataOptions);
         const built = Object.values(dataSourcesValue.sources);
         if (built.length === 1) return built[0];
         if (built.length > 1) {
@@ -158,7 +170,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
             );
         }
         throw new Error("Rebase requires either `client` or a `dataSources` entry with a driver to be provided");
-    }, [client, dataSourcesValue]);
+    }, [client, dataSourcesValue, entityDataOptions]);
 
     // Storage fallback logic
     const resolvedStorage = storageSourceProp ?? client?.storage;
@@ -349,6 +361,8 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                         value={storageSourcesValue}>
                     <StorageSourceContext.Provider
                         value={resolvedStorage!}>
+                        <CollectionResolverRegistrationContext.Provider
+                            value={registerCollectionResolver}>
                         <DataSourcesContext.Provider
                             value={dataSourcesValue}>
                         <RebaseDataContext.Provider
@@ -373,6 +387,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                             </DatabaseAdminContext.Provider>
                         </RebaseDataContext.Provider>
                         </DataSourcesContext.Provider>
+                        </CollectionResolverRegistrationContext.Provider>
                     </StorageSourceContext.Provider>
                     </StorageSourcesContext.Provider>
                 </UserConfigurationPersistenceContext.Provider>

@@ -154,18 +154,16 @@ export class FetchService {
     /**
      * Convert a db.query result row (with nested relation objects) to a flat row.
      * Handles:
-     * - Placing `id` at the top level as a string
      * - Type normalization (dates, numbers, NaN) via normalizeDbValues
      * - Converting nested relation objects to { id, path, __type: "relation" } for CMS
      * - Flattening junction-table many-to-many results
+     *
+     * The row's own address is not among them: it is derived by the consumer
+     * from the collection's primary keys.
      */
     private drizzleResultToRow<M extends Record<string, unknown>>(
         row: Record<string, unknown>,
-        collection: CollectionConfig,
-        _collectionPath: string,
-        idInfo: { fieldName: string; type: "string" | "number" },
-        _databaseId?: string,
-        idInfoArray?: { fieldName: string; type: "string" | "number" }[]
+        collection: CollectionConfig
     ): Record<string, unknown> {
         const resolvedRelations = resolveCollectionRelations(collection);
 
@@ -226,11 +224,10 @@ export class FetchService {
             }
         }
 
-        return {
-            ...normalizedValues,
-            // Spread the canonical id last so it wins over a raw `id` column
-            id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName])
-        };
+        // A row is exactly its columns. The address is derived by the consumer
+        // from the collection's primary keys — writing it here would rename the
+        // key column (`sku` → `id`) and restringify it (`42` → `"42"`).
+        return normalizedValues;
     }
 
     /**
@@ -405,42 +402,39 @@ export class FetchService {
     }
 
     /**
-     * Convert a db.query result row to a flat REST-style object with populated relations.
+     * Convert a db.query result row to a flat REST-style row with populated relations.
+     *
+     * Every column is copied through under its own name, with the value Postgres
+     * returned. This used to open with a synthesized `id` and then skip the key
+     * column, which renamed it (a `sku` primary key was served as `id`, and `sku`
+     * did not appear at all) and restringified it (`42` → `"42"`). Consumers that
+     * need an address derive it from the collection's primary keys.
      */
     private drizzleResultToRestRow(
         row: Record<string, unknown>,
-        collection: CollectionConfig,
-        idInfo: { fieldName: string; type: "string" | "number" },
-        idInfoArray?: { fieldName: string; type: "string" | "number" }[]
+        collection: CollectionConfig
     ): Record<string, unknown> {
-        const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName]) };
+        const flat: Record<string, unknown> = {};
         const resolvedRelations = resolveCollectionRelations(collection);
 
         for (const [k, v] of Object.entries(row)) {
-            if (k === idInfo.fieldName) continue;
-
             const relation = findRelation(resolvedRelations, k);
             if (Array.isArray(v) && relation) {
-                // Many relation — flatten each nested row, handling junction tables
+                // Many relation — inline each nested row, unwrapping junction rows
                 flat[k] = v.map((item: Record<string, unknown>) => {
                     if (this.isJunctionRelation(relation, collection)) {
                         const nestedKey = Object.keys(item).find(
                             nk => typeof item[nk] === "object" && item[nk] !== null && !Array.isArray(item[nk])
                         );
                         if (nestedKey) {
-                            const nested = item[nestedKey] as Record<string, unknown>;
-                            return { ...nested,
-id: String(nested.id ?? nested[Object.keys(nested)[0]]) };
+                            return { ...(item[nestedKey] as Record<string, unknown>) };
                         }
                     }
-                    return { ...item,
-id: String(item.id ?? item[Object.keys(item)[0]]) };
+                    return { ...item };
                 });
             } else if (typeof v === "object" && v !== null && !Array.isArray(v) && relation) {
-                // One-to-one relation — inline the object
-                const relObj = v as Record<string, unknown>;
-                flat[k] = { ...relObj,
-id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
+                // One-to-one relation — inline the target's columns
+                flat[k] = { ...(v as Record<string, unknown>) };
             } else {
                 flat[k] = v;
             }
@@ -616,7 +610,7 @@ id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
 
                 if (!row) return undefined;
 
-                const flatRow = this.drizzleResultToRow<M>(row, collection, collectionPath, idInfo, databaseId, idInfoArray);
+                const flatRow = this.drizzleResultToRow<M>(row, collection);
 
                 // Post-fetch joinPath relations that Drizzle's `with` can't express
                 await this.resolveJoinPathRelations<M>(flatRow, collection, collectionPath, parsedId, databaseId);
@@ -740,7 +734,7 @@ id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
                 const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const rows = (results as Record<string, unknown>[]).map(row =>
-                    this.drizzleResultToRow<M>(row, collection, collectionPath, idInfo, options.databaseId, idInfoArray)
+                    this.drizzleResultToRow<M>(row, collection)
                 );
 
                 return rows;
@@ -864,11 +858,9 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         // relation type, avoiding the N+1 that plagued the old path.
         const parsedRows = await Promise.all(results.map(async (rawRow: Record<string, unknown>) => {
             const values = await parseDataFromServer(rawRow as M, collection) as Record<string, unknown>;
-            const id = (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(rawRow as Record<string, unknown>, idInfoArray!) : String(rawRow[idInfo.fieldName]);
             return {
                 rawRow,
-                values,
-                id
+                values
             };
         }));
 
@@ -938,10 +930,8 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             }
         }
 
-        return parsedRows.map(item => ({
-            ...item.values,
-            id: item.id
-        }));
+        // Columns only — the address is the consumer's to derive.
+        return parsedRows.map(item => item.values);
     }
 
     /**
@@ -1235,7 +1225,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const restRows = (results as Record<string, unknown>[]).map(row =>
-                    this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray)
+                    this.drizzleResultToRestRow(row, collection)
                 );
 
                 // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
@@ -1255,10 +1245,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         const rows = await this.fetchRowsWithConditionsRaw<M>(collectionPath, options);
 
         if (!include || include.length === 0) {
-            return rows.map(row => ({
-                ...row,
-                id: (idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName])
-            }));
+            return rows;
         }
 
         // Fallback relation loading via batch
@@ -1279,8 +1266,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     const eid = row[idInfo.fieldName] as string | number;
                     const related = batchResults.get(String(eid));
                     if (related) {
-                        (row as Record<string, unknown>)[key] = { ...related.values,
-id: related.id };
+                        (row as Record<string, unknown>)[key] = { ...related.values };
                     }
                 }
             } catch (e) {
@@ -1304,10 +1290,7 @@ id: related.id };
             }
         }
 
-        return rows.map(row => ({
-            ...row,
-            id: (idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName])
-        }));
+        return rows;
     }
 
     /**
@@ -1347,7 +1330,7 @@ id: related.id };
 
                 if (!row) return null;
 
-                const restRow = this.drizzleResultToRestRow(row, collection, idInfo, idInfoArray);
+                const restRow = this.drizzleResultToRestRow(row, collection);
 
                 // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
                 await this.resolveJoinPathRelationsBatchRest([restRow], collection, collectionPath, idInfoArray, include);
@@ -1371,9 +1354,7 @@ id: related.id };
 
         if (result.length === 0) return null;
 
-        const raw = result[0] as Record<string, unknown>;
-        const flatEntity: Record<string, unknown> = { ...raw,
-id: (idInfoArray.length > 1) ? buildCompositeId(raw as Record<string, unknown>, idInfoArray) : String(raw[idInfo.fieldName]) };
+        const flatEntity: Record<string, unknown> = { ...(result[0] as Record<string, unknown>) };
 
         if (!include || include.length === 0) {
             return flatEntity;
@@ -1581,31 +1562,24 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
             const results = await queryTarget.findMany(queryOpts as Parameters<NonNullable<typeof queryTarget>["findMany"]>[0]);
 
-            // Flatten the nested Drizzle results into REST format
+            // Inline the nested Drizzle results, columns only — no synthesized id.
             return results.map((row: Record<string, unknown>) => {
-                const flat: Record<string, unknown> = { id: (idInfoArray && idInfoArray.length > 1) ? buildCompositeId(row as Record<string, unknown>, idInfoArray) : String(row[idInfo.fieldName]) };
+                const flat: Record<string, unknown> = {};
                 for (const [k, v] of Object.entries(row)) {
-                    if (k === idInfo.fieldName) continue;
                     if (Array.isArray(v)) {
-                        // Many relation — flatten each nested row
+                        // Many relation — inline each nested row
                         flat[k] = v.map((item: Record<string, unknown>) => {
-                            // Junction table rows may have the target nested, flatten those
+                            // Junction table rows may have the target nested, unwrap those
                             const keys = Object.keys(item);
-                            // If it looks like a junction row (only FKs + nested objects), extract nested
                             const nestedObj = keys.find(nk => typeof item[nk] === "object" && item[nk] !== null && !Array.isArray(item[nk]));
                             if (nestedObj && keys.length <= 3) {
-                                const nested = item[nestedObj] as Record<string, unknown>;
-                                return { ...nested,
-id: String(nested.id ?? nested[Object.keys(nested)[0]]) };
+                                return { ...(item[nestedObj] as Record<string, unknown>) };
                             }
-                            return { ...item,
-id: String(item.id ?? item[Object.keys(item)[0]]) };
+                            return { ...item };
                         });
                     } else if (typeof v === "object" && v !== null) {
-                        // One-to-one relation — inline the object
-                        const relObj = v as Record<string, unknown>;
-                        flat[k] = { ...relObj,
-id: String(relObj.id ?? relObj[Object.keys(relObj)[0]]) };
+                        // One-to-one relation — inline the target's columns
+                        flat[k] = { ...(v as Record<string, unknown>) };
                     } else {
                         flat[k] = v;
                     }

@@ -3,6 +3,13 @@ import { CollectionConfig, Property } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { getTableName } from "@rebasepro/common";
 
+// Row identity is derived on both sides of the wire — the driver parses an
+// incoming address into key columns, the admin derives one from a served row —
+// so the implementation lives in `common` and both agree by construction.
+export { buildCompositeId, parseIdValues, COMPOSITE_ID_SEPARATOR } from "@rebasepro/common";
+export type { PrimaryKeyInfo } from "@rebasepro/common";
+import type { PrimaryKeyInfo } from "@rebasepro/common";
+
 /**
  * Shared helper functions for row operations.
  * These are used by FetchService, PersistService, and RelationService.
@@ -49,7 +56,7 @@ export function getTableForCollection(collection: CollectionConfig, registry: Po
     return table;
 }
 
-export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): { fieldName: string; type: "string" | "number"; isUUID?: boolean }[] {
+export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): PrimaryKeyInfo[] {
     const table = getTableForCollection(collection, registry);
 
     // Fallback to explicitly defined isId properties
@@ -68,7 +75,7 @@ export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresC
     }
 
     // Otherwise infer from Drizzle schema
-    const keys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[] = [];
+    const keys: PrimaryKeyInfo[] = [];
     for (const [key, colRaw] of Object.entries(table)) {
         const col = colRaw as AnyPgColumn;
         if (col && typeof col === "object" && "primary" in col && col.primary) {
@@ -96,56 +103,3 @@ isUUID });
     return keys;
 }
 
-export function parseIdValues(idValue: string | number, primaryKeys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[]): Record<string, string | number> {
-    const result: Record<string, string | number> = {};
-
-    if (primaryKeys.length === 0) {
-        return result;
-    }
-
-    if (primaryKeys.length === 1) {
-        const pk = primaryKeys[0];
-        if (pk.type === "number" && !pk.isUUID) {
-            const parsed = typeof idValue === "number" ? idValue : parseInt(String(idValue), 10);
-            if (isNaN(parsed)) {
-                throw new Error(`Invalid numeric ID: ${idValue}`);
-            }
-            result[pk.fieldName] = parsed;
-        } else {
-            result[pk.fieldName] = String(idValue);
-        }
-        return result;
-    }
-
-    // Composite key - split by :::
-    const parts = String(idValue).split(":::");
-    if (parts.length !== primaryKeys.length) {
-        throw new Error(`Composite ID parts mismatch. Expected ${primaryKeys.length}, got ${parts.length} for ID: ${idValue}`);
-    }
-
-    for (let i = 0; i < primaryKeys.length; i++) {
-        const pk = primaryKeys[i];
-        const val = parts[i];
-        if (pk.type === "number" && !pk.isUUID) {
-            const parsed = parseInt(val, 10);
-            if (isNaN(parsed)) {
-                throw new Error(`Invalid numeric ID component: ${val}`);
-            }
-            result[pk.fieldName] = parsed;
-        } else {
-            result[pk.fieldName] = val;
-        }
-    }
-
-    return result;
-}
-
-export function buildCompositeId(values: Record<string, unknown>, primaryKeys: { fieldName: string; type: "string" | "number"; isUUID?: boolean }[]): string {
-    if (primaryKeys.length === 0) {
-        return "";
-    }
-    if (primaryKeys.length === 1) {
-        return String(values[primaryKeys[0].fieldName] ?? "");
-    }
-    return primaryKeys.map(pk => String(values[pk.fieldName] ?? "")).join(":::");
-}

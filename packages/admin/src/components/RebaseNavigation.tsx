@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, lazy, Suspense } from "react";
+import React, { useMemo, useRef, useEffect, useCallback, useContext, lazy, Suspense } from "react";
 import {
     useRebaseRegistry,
     useRebaseContext,
@@ -9,6 +9,7 @@ import {
     useRebaseClient,
     useData,
     useDataSources,
+    CollectionResolverRegistrationContext,
     StudioBridgeRegistryProvider,
     useBridgeRegistration,
     CustomizationControllerContext,
@@ -103,6 +104,20 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const defaultData = useData();
     const getCollectionRef = useRef(collectionRegistryController.getCollection);
     getCollectionRef.current = collectionRegistryController.getCollection;
+
+    // Hand the data layer a way to read this registry. It was built by <Rebase>,
+    // above us, and needs a collection's primary keys to give its rows an
+    // address — rows themselves carry only columns.
+    //
+    // Registered during render, not in an effect: the views that fetch rows are
+    // below us, and their effects run before ours, so an effect here would bind
+    // after the first page had already been converted. The call only assigns a
+    // ref, so repeating it per render is free.
+    const registerCollectionResolver = useContext(CollectionResolverRegistrationContext);
+    const resolveCollection = useCallback(
+        (slug: string) => getCollectionRef.current(slug),
+        []);
+    registerCollectionResolver(resolveCollection);
     const routedData = useMemo(() => buildRoutedRebaseData({
         defaultData,
         sources: dataSources.sources,

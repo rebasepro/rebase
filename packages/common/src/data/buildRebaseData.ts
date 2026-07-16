@@ -17,14 +17,75 @@ import {
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { deserializeFilter } from "./filter-dialect";
+import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
+
+export interface EntityDataOptions {
+    /**
+     * Look up a collection's config by slug, to derive row addresses from its
+     * primary keys.
+     *
+     * Called lazily rather than up front: the data layer is created by `Rebase`,
+     * which sits *above* the admin that owns the collections, so a resolver
+     * registered on mount would otherwise arrive too late to be seen.
+     */
+    resolveCollection?: (slug: string) => { properties?: Record<string, unknown> } | undefined;
+}
+
+function createPrimaryKeyResolver(options?: EntityDataOptions) {
+    const cache = new Map<string, PrimaryKeyInfo[]>();
+    const warned = new Set<string>();
+
+    return function primaryKeysFor(slug: string): PrimaryKeyInfo[] {
+        const cached = cache.get(slug);
+        if (cached) return cached;
+
+        const collection = options?.resolveCollection?.(slug);
+        if (!collection) {
+            // The registry may not have been registered yet. Don't memoize a
+            // miss, or the collection would stay address-less for this session.
+            return [];
+        }
+
+        const keys = resolvePrimaryKeys(collection);
+        if (keys.length > 0) {
+            cache.set(slug, keys);
+            return keys;
+        }
+
+        if (!warned.has(slug)) {
+            warned.add(slug);
+            // Silence here surfaces much later as rows that cannot be opened,
+            // linked, or saved, with nothing pointing back at the cause.
+            console.warn(
+                `[rebase] Collection '${slug}' declares no primary key, so its rows have no address: ` +
+                `detail links, caching and relations will not work for it. ` +
+                `Mark the key property with \`isId\` in its collection config.`
+            );
+        }
+        return keys;
+    };
+}
 
 /**
- * Convert a flat REST record (e.g. from RestFetchService) to Entity<M> format.
- * Mirrors the client SDK's rowToEntity conversion.
+ * Give a flat row the Entity view-model the admin renders.
+ *
+ * The address is *derived here* — it is not a column, and the row it came from
+ * does not contain one. Rows carry exactly what the table has, with the types
+ * Postgres returned; the id is this layer's invention, and this is the only
+ * place it is minted.
+ *
+ * `primaryKeys` empty falls back to a literal `id` on the row: drivers other
+ * than postgres still serve rows with one, and this keeps them working.
  */
-function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unknown>, slug: string): Entity<M> {
+function rowToEntity<M extends Record<string, unknown>>(
+    row: Record<string, unknown>,
+    slug: string,
+    primaryKeys: PrimaryKeyInfo[] = []
+): Entity<M> {
     return {
-        id: row.id as string | number,
+        id: primaryKeys.length > 0
+            ? buildCompositeId(row, primaryKeys)
+            : row.id as string | number,
         path: slug,
         values: row as EntityValues<M>
     };
@@ -32,7 +93,8 @@ function rowToEntity<M extends Record<string, unknown>>(row: Record<string, unkn
 
 function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
     driver: DataDriver,
-    slug: string
+    slug: string,
+    getPks: () => PrimaryKeyInfo[] = () => []
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
@@ -75,14 +137,14 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             }
 
             return {
-                data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
+                data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks())),
                 meta: { total, limit, offset, hasMore }
             };
         },
 
         async findById(id: string | number): Promise<Entity<M> | undefined> {
             const row = await driver.fetchOne<M>({ path: slug, id: id });
-            return row ? rowToEntity<M>(row, slug) : undefined;
+            return row ? rowToEntity<M>(row, slug, getPks()) : undefined;
         },
 
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
@@ -92,7 +154,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 id: id,
                 status: "new"
             });
-            return rowToEntity<M>(row, slug);
+            return rowToEntity<M>(row, slug, getPks());
         },
 
         createMany: driver.saveMany
@@ -102,7 +164,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     rows: data,
                     upsert: options?.upsert
                 });
-                return rows.map((row) => rowToEntity<M>(row, slug));
+                return rows.map((row) => rowToEntity<M>(row, slug, getPks()));
             }
             : undefined,
 
@@ -113,7 +175,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 id: id,
                 status: "existing"
             });
-            return rowToEntity<M>(row, slug);
+            return rowToEntity<M>(row, slug, getPks());
         },
 
         async delete(id: string | number): Promise<void> {
@@ -148,7 +210,7 @@ values: {} as Record<string, unknown> }
                     searchString: params?.searchString,
                     onUpdate: (entities) => {
                         onUpdate({
-                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug)),
+                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks())),
                             meta: {
                                 total: entities.length,
                                 limit,
@@ -166,7 +228,7 @@ values: {} as Record<string, unknown> }
                 return driver.listenOne!<M>({
                     path: slug,
                     id: id,
-                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(entity, slug) : undefined),
+                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(entity, slug, getPks()) : undefined),
                     onError
                 });
             } : undefined,
@@ -211,13 +273,14 @@ values: {} as Record<string, unknown> }
  * await data.products.create({ name: "Camera", price: 299 });
  * const { data: items } = await data.products.find({ where: { status: ["==", "published"] } });
  */
-export function buildRebaseData(driver: DataDriver): RebaseData {
+export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
+    const primaryKeysFor = createPrimaryKeyResolver(options);
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = createDriverAccessor(driver, slug);
+            accessor = createDriverAccessor(driver, slug, () => primaryKeysFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;
@@ -247,8 +310,9 @@ export function buildRebaseData(driver: DataDriver): RebaseData {
 // =============================================================================
 
 /**
- * Unwrap a Entity into a flat row. `rowToEntity` stores the whole flat row
- * (id included) under `.values`, so this is just that payload.
+ * Unwrap a Entity back into the flat row it was built from. `rowToEntity` keeps
+ * the row untouched under `.values` and derives `.id` alongside it, so dropping
+ * the wrapper is the whole operation — the address was never part of the row.
  */
 function entityToRow<M extends Record<string, unknown>>(entity: Entity<M>): M {
     return entity.values as unknown as M;
@@ -389,24 +453,25 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
  */
 function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,
-    slug: string
+    slug: string,
+    getPks: () => PrimaryKeyInfo[] = () => []
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams): Promise<FindResponse<M>> {
             const res = await sdk.find(params);
-            return { data: res.data.map((row) => rowToEntity<M>(row, slug)), meta: res.meta };
+            return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta };
         },
         async findById(id: string | number): Promise<Entity<M> | undefined> {
             const row = await sdk.findById(id);
-            return row ? rowToEntity<M>(row, slug) : undefined;
+            return row ? rowToEntity<M>(row, slug, getPks()) : undefined;
         },
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
-            return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug);
+            return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug, getPks());
         },
         async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await sdk.update(id, data as Partial<M>);
             if (!row) throw new Error(`Update returned no data for id ${id}`);
-            return rowToEntity<M>(row, slug);
+            return rowToEntity<M>(row, slug, getPks());
         },
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
@@ -414,11 +479,11 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         count: sdk.count ? (params?: FindParams) => sdk.count!(params) : undefined,
         listen: sdk.listen
             ? (params: FindParams | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
-                sdk.listen!(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug)), meta: res.meta }), onError)
+                sdk.listen!(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta }), onError)
             : undefined,
         listenById: sdk.listenById
             ? (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
-                sdk.listenById!(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug) : undefined), onError)
+                sdk.listenById!(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks()) : undefined), onError)
             : undefined,
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
@@ -445,13 +510,14 @@ function toEntityAccessor<M extends Record<string, unknown>>(
  * CMS `RebaseDataContext` — without it the admin renders rows with only their
  * `id`.
  */
-export function wrapAsEntityData(sdkData: RebaseSdkData): RebaseData {
+export function wrapAsEntityData(sdkData: RebaseSdkData, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
+    const primaryKeysFor = createPrimaryKeyResolver(options);
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toEntityAccessor(sdkData.collection(slug), slug);
+            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;

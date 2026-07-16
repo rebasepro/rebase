@@ -15,3 +15,4 @@ export * from "./RebaseClientInstanceContext";
 export * from "./CustomizationControllerContext";
 export * from "./ComponentOverrideContext";
 export * from "./CollectionScopeContext";
+export * from "./CollectionResolverContext";
