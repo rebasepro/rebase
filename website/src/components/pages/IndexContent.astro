@@ -143,6 +143,89 @@ const translatePath = useTranslatedPath(lang);
 
 
 
+    <!-- The backend underneath: SDK / REST / realtime proof -->
+ <section id="s-backend-engine" class="relative z-0 py-24 sm:py-32 overflow-hidden">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("engine.badge")}</p>
+                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">{t("engine.title")}</h2>
+                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-6xl mx-auto">
+                <!-- TypeScript SDK -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="relative flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">app.ts</div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
+                            <SdkMiniDemo client:load/>
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="text-base font-semibold text-white mb-1">{t("features.sdk.title")}</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.sdk.desc")}</p>
+                    </div>
+                </div>
+
+                <!-- Instant REST API -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
+                    <div class="relative flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.dev</div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
+                            <ApiMiniDemo client:load/>
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="text-base font-semibold text-white mb-1">{t("features.api.title")}</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.api.desc")}</p>
+                    </div>
+                </div>
+
+                <!-- Realtime engine -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
+                    <div class="relative flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">websocket: sync</div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
+                            <RealtimeMiniDemo client:load/>
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="text-base font-semibold text-white mb-1">{t("features.realtime.title")}</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.realtime.desc")}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-10 text-center animate-on-scroll fade-in-up delay-300">
+                <a href={translatePath("/backend")}
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
+                    {t("engine.link")}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         class="group-hover:translate-x-0.5 transition-transform">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
     <!-- Adoption modes: BaaS / CMS / Full -->
  <section id="s-modes" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-12">
