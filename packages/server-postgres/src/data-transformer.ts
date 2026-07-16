@@ -20,12 +20,19 @@ import { logger } from "@rebasepro/server";
 export interface SerializedEntityData {
     /** Scalar column values ready for INSERT/UPDATE. */
     scalarData: Record<string, unknown>;
-    /** Inverse relation updates that must be applied to target tables. */
+    /**
+     * Inverse relation updates that must be applied to target tables.
+     *
+     * No address here: the row being written does not know its own. These are
+     * applied by `PersistService`, which addresses them with the id it holds —
+     * the one it was given for an update, or the one the INSERT returned — and
+     * that is the authority. This item used to carry a `currentId` derived from
+     * the *input* values, which nothing ever read.
+     */
     inverseRelationUpdates: Array<{
         relationKey: string;
         relation: Relation;
         newValue: unknown;
-        currentId?: string | number;
     }>;
     /** JoinPath relation updates that require multi-hop writes. */
     joinPathRelationUpdates: Array<{
@@ -105,7 +112,6 @@ joinPathRelationUpdates: [] };
         relationKey: string;
         relation: Relation;
         newValue: unknown;
-        currentId?: string | number;
     }> = [];
     const joinPathRelationUpdates: Array<{
         relationKey: string;
@@ -146,12 +152,10 @@ joinPathRelationUpdates: [] };
                 } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
                     // Inverse relation: Need to update the target table's FK
                     const serializedValue = serializePropertyToServer(effectiveValue, property);
-                    const pks = getPrimaryKeys(collection, registry!);
                     inverseRelationUpdates.push({
                         relationKey: key,
                         relation,
-                        newValue: serializedValue,
-                        currentId: (row.id as string | number | undefined) || buildCompositeId(row, pks)
+                        newValue: serializedValue
                     });
                     // Don't add the original relation property to the result
                     continue;
@@ -170,12 +174,10 @@ joinPathRelationUpdates: [] };
                         });
                     } else {
                         // Many inverse joinPath: capture as inverse relation update
-                        const pks = getPrimaryKeys(collection, registry!);
                         inverseRelationUpdates.push({
                             relationKey: key,
                             relation,
-                            newValue: serializedValue,
-                            currentId: (row.id as string | number | undefined) || buildCompositeId(row, pks)
+                            newValue: serializedValue
                         });
                     }
                     // Don't add the original relation property to the result
