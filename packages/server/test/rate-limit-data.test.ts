@@ -1,0 +1,186 @@
+import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { Hono } from "hono";
+import { createDataRateLimiter } from "../src/auth/rate-limiter";
+import { MemoryRateLimitStore, RateLimitStore } from "../src/auth/rate-limit-store";
+
+/**
+ * The data API's limiter buckets every request: an API key by its id, a
+ * signed-in user by their uid, anyone else by IP.
+ *
+ * Only the first of those used to be limited at all — the middleware returned
+ * early for any request carrying no API key — so JWT and anonymous traffic to
+ * `/api/data/*` was unbounded, which is most of what a BaaS serves.
+ */
+describe("createDataRateLimiter", () => {
+    let store: MemoryRateLimitStore;
+
+    beforeEach(() => {
+        store = new MemoryRateLimitStore();
+    });
+
+    afterEach(() => {
+        store.dispose();
+    });
+
+    /** An app whose principal is whatever `principal` sets on the context. */
+    const appWith = (
+        principal: (c: Parameters<Parameters<Hono["use"]>[1]>[0]) => void,
+        config: Parameters<typeof createDataRateLimiter>[0] = {}
+    ) => {
+        const app = new Hono();
+        app.use("/*", async (c, next) => {
+            principal(c as never);
+            await next();
+        });
+        app.use("/*", createDataRateLimiter({ store,
+...config }));
+        app.get("/data", (c) => c.json({ ok: true }));
+        return app;
+    };
+
+    const hit = (app: Hono, ip = "1.2.3.4") =>
+        app.fetch(new Request("http://localhost/data", { headers: { "x-real-ip": ip } }));
+
+    it("limits a signed-in user, which nothing did before", async () => {
+        const app = appWith((c) => c.set("user", { userId: "user-1" }), { user: 2 });
+
+        expect((await hit(app)).status).toBe(200);
+        expect((await hit(app)).status).toBe(200);
+        const limited = await hit(app);
+
+        expect(limited.status).toBe(429);
+        expect(await limited.json()).toEqual({ error: { message: expect.any(String),
+code: "RATE_LIMITED" } });
+        expect(limited.headers.get("Retry-After")).toBeTruthy();
+    });
+
+    it("gives each user their own allowance", async () => {
+        const appA = appWith((c) => c.set("user", { userId: "user-a" }), { user: 1 });
+        const appB = appWith((c) => c.set("user", { userId: "user-b" }), { user: 1 });
+
+        expect((await hit(appA)).status).toBe(200);
+        expect((await hit(appA)).status).toBe(429);
+        // A different user is a different bucket, even on a shared store.
+        expect((await hit(appB)).status).toBe(200);
+    });
+
+    it("limits anonymous callers per IP", async () => {
+        const app = appWith(() => undefined, { anonymous: 1 });
+
+        expect((await hit(app, "9.9.9.9")).status).toBe(200);
+        expect((await hit(app, "9.9.9.9")).status).toBe(429);
+        // A different caller is unaffected.
+        expect((await hit(app, "8.8.8.8")).status).toBe(200);
+    });
+
+    it("treats the anon principal as anonymous, not as a user named 'anon'", async () => {
+        // The auth middleware scopes unauthenticated requests as `anon` so RLS
+        // can evaluate them — all of them, so they must not share one bucket
+        // and they must not be counted as a signed-in user.
+        const app = appWith((c) => c.set("user", { userId: "anon" }), { anonymous: 1,
+user: 100 });
+
+        expect((await hit(app, "7.7.7.7")).status).toBe(200);
+        expect((await hit(app, "7.7.7.7")).status).toBe(429);
+        expect((await hit(app, "6.6.6.6")).status).toBe(200);
+    });
+
+    it("honours an API key's own limit over the default", async () => {
+        const app = appWith((c) => c.set("apiKey", { id: "key-1",
+rate_limit: 1 }), { apiKey: 500 });
+
+        expect((await hit(app)).status).toBe(200);
+        expect((await hit(app)).status).toBe(429);
+    });
+
+    it("falls back to the configured API-key limit when the key sets none", async () => {
+        const app = appWith((c) => c.set("apiKey", { id: "key-2",
+rate_limit: null }), { apiKey: 1 });
+
+        expect((await hit(app)).status).toBe(200);
+        expect((await hit(app)).status).toBe(429);
+    });
+
+    it("prefers the API key's bucket over the user's", async () => {
+        const app = appWith((c) => {
+            c.set("apiKey", { id: "key-3",
+rate_limit: 1 });
+            c.set("user", { userId: "user-1" });
+        }, { user: 100 });
+
+        expect((await hit(app)).status).toBe(200);
+        // Limited by the key (1), not the user (100).
+        expect((await hit(app)).status).toBe(429);
+    });
+
+    it("reports what is left", async () => {
+        const app = appWith((c) => c.set("user", { userId: "user-h" }), { user: 5 });
+
+        const res = await hit(app);
+        expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        expect(res.headers.get("X-RateLimit-Remaining")).toBe("4");
+    });
+});
+
+/**
+ * The store contract, run against every implementation. A Postgres-backed store
+ * (so several replicas share one limit) has to satisfy exactly this.
+ */
+describe.each<[string, () => RateLimitStore]>([
+    ["MemoryRateLimitStore", () => new MemoryRateLimitStore()]
+])("%s satisfies the RateLimitStore contract", (_name, create) => {
+    let store: RateLimitStore;
+
+    beforeEach(() => {
+        store = create();
+    });
+
+    afterEach(() => {
+        store.dispose?.();
+    });
+
+    it("allows up to the limit, then refuses", async () => {
+        expect((await store.hit("k", 60_000, 2)).allowed).toBe(true);
+        expect((await store.hit("k", 60_000, 2)).allowed).toBe(true);
+        expect((await store.hit("k", 60_000, 2)).allowed).toBe(false);
+    });
+
+    it("counts down what is remaining", async () => {
+        expect((await store.hit("k", 60_000, 3)).remaining).toBe(2);
+        expect((await store.hit("k", 60_000, 3)).remaining).toBe(1);
+        expect((await store.hit("k", 60_000, 3)).remaining).toBe(0);
+    });
+
+    it("keeps keys apart", async () => {
+        expect((await store.hit("a", 60_000, 1)).allowed).toBe(true);
+        expect((await store.hit("a", 60_000, 1)).allowed).toBe(false);
+        expect((await store.hit("b", 60_000, 1)).allowed).toBe(true);
+    });
+
+    it("says how long to wait when it refuses", async () => {
+        await store.hit("k", 60_000, 1);
+        const refused = await store.hit("k", 60_000, 1);
+
+        expect(refused.allowed).toBe(false);
+        expect(refused.retryAfterMs).toBeGreaterThan(0);
+        expect(refused.retryAfterMs).toBeLessThanOrEqual(60_000);
+        expect(refused.remaining).toBe(0);
+    });
+
+    it("forgets hits that have left the window", async () => {
+        // A one-millisecond window is empty by the next tick.
+        expect((await store.hit("k", 1, 1)).allowed).toBe(true);
+        await new Promise(resolve => setTimeout(resolve, 5));
+        expect((await store.hit("k", 1, 1)).allowed).toBe(true);
+    });
+
+    it("slides rather than resetting on a boundary", async () => {
+        // A fixed window would let a caller spend its whole allowance at the
+        // end of one window and again at the start of the next.
+        await store.hit("k", 50, 2);
+        await store.hit("k", 50, 2);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        // Half a window later the two earlier hits are still in it.
+        expect((await store.hit("k", 50, 2)).allowed).toBe(false);
+    });
+});

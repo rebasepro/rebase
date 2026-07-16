@@ -49,7 +49,7 @@ import {
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
-import { createApiKeyRateLimiter } from "./auth/rate-limiter";
+import { createDataRateLimiter, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { createHistoryRoutes } from "./history";
@@ -215,6 +215,18 @@ export interface RebaseBackendConfig {
     server: Server;
     app: Hono<HonoEnv>;
     basePath?: string;
+
+    /**
+     * Rate limiting for the data API, per caller: an API key by its id, a
+     * signed-in user by their uid, anyone else by IP.
+     *
+     * On by default with loose limits — a floor against a runaway client, not a
+     * quota. Counts live in this process's memory unless you pass a `store`, so
+     * N replicas enforce N times the limit between them; set real quotas at a
+     * proxy or supply a shared store if that matters. `{ enabled: false }` for
+     * a deployment whose edge already does this.
+     */
+    rateLimit?: DataRateLimitConfig;
 
     /**
      * How much of Rebase to run.
@@ -937,9 +949,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     if (schemaEditorEnabled && config.collectionsDir) {
-        {
-            const { createSchemaEditorRoutes } = await import("./api/schema-editor-routes");
-            const schemaEditorRoutes = createSchemaEditorRoutes(config.collectionsDir);
+        // ts-morph is an optional peer dependency, so it can legitimately be
+        // absent — run without the schema editor instead of failing startup.
+        let editorModule: typeof import("./api/schema-editor-routes") | undefined;
+        try {
+            editorModule = await import("./api/schema-editor-routes");
+        } catch (err) {
+            if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
+                logger.warn("Schema Editor disabled: its dependency ts-morph is not installed. Run `npm install ts-morph@28.0.0` to enable it.");
+            } else {
+                throw err;
+            }
+        }
+        if (editorModule) {
+            const schemaEditorRoutes = editorModule.createSchemaEditorRoutes(config.collectionsDir);
 
             if (authAdapter && !isAuthAdapter(config.auth!)) {
                 const safeAuth = config.auth as RebaseAuthConfig;
@@ -1046,9 +1069,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }));
         }
 
-        // Per-API-key rate limiting (no-op for non-API-key requests)
-        if (apiKeyStore) {
-            dataRouter.use("/*", createApiKeyRateLimiter());
+        // Rate limiting, per caller: API key, else signed-in user, else IP.
+        // Not gated on `apiKeyStore` any more — that made the limiter's
+        // presence depend on a feature it does not need, so a deployment
+        // without API keys had no limit at all on its data API.
+        if (config.rateLimit?.enabled !== false) {
+            dataRouter.use("/*", createDataRateLimiter(config.rateLimit));
         }
 
         // Mount history routes BEFORE the REST API subcollection catch-all so

@@ -44,7 +44,10 @@ export { createResetPasswordRoute } from "./reset-password-admin";
 export type { ResetPasswordRouteConfig } from "./reset-password-admin";
 
 
-export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter, createApiKeyRateLimiter, apiKeyKeyGenerator } from "./rate-limiter";
+export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter, createApiKeyRateLimiter, createDataRateLimiter, apiKeyKeyGenerator } from "./rate-limiter";
+export type { DataRateLimitConfig } from "./rate-limiter";
+export { MemoryRateLimitStore } from "./rate-limit-store";
+export type { RateLimitStore, RateLimitDecision } from "./rate-limit-store";
 
 // API Keys
 export { createApiKeyStore, createApiKeyRoutes, isApiKeyToken, validateApiKey, httpMethodToOperation, isOperationAllowed } from "./api-keys";
