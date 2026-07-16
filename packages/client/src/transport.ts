@@ -9,8 +9,29 @@ export { RebaseApiError } from "@rebasepro/types";
 export type { RebaseErrorInit } from "@rebasepro/types";
 
 export interface RebaseClientConfig {
+    /**
+     * Origin of the Rebase server — scheme, host and port **only**.
+     *
+     * {@link apiPath} is appended to this, so do not include it here:
+     * `"http://localhost:3001"` is correct, while `"http://localhost:3001/api"`
+     * silently builds `/api/api/…` and every request 404s. Omit entirely for
+     * same-origin requests from the browser.
+     */
     baseUrl?: string;
+    /**
+     * Bearer token sent as `Authorization` on every request.
+     *
+     * In the browser this is the signed-in user's access token, so row-level
+     * security applies. Server-side callers — scripts, cron jobs, ETL — pass the
+     * service key instead, which resolves to `{ uid: "service", roles: ["admin"] }`
+     * and **bypasses RLS**: there is no user to constrain those queries, so scope
+     * them explicitly.
+     */
     token?: string;
+    /**
+     * Path the API is mounted under, appended to {@link baseUrl}.
+     * Defaults to `"/api"`; override only if the server mounts it elsewhere.
+     */
     apiPath?: string;
     fetch?: typeof globalThis.fetch;
     onUnauthorized?: () => Promise<boolean>;
