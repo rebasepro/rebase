@@ -43,7 +43,9 @@ export async function startPgContainer(): Promise<PgContainer> {
         throw new Error(`Failed to parse host port from docker port output: ${portOutput}`);
     }
     const port = parseInt(portMatch[1], 10);
-    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public`;
+    // sslmode=disable: the container has no TLS and atlas (rebase db push)
+    // defaults to requiring SSL when the URL doesn't say otherwise.
+    const connectionString = `postgresql://rebase:rebase@localhost:${port}/rebase?options=-c%20search_path=public&sslmode=disable`;
 
     console.log(`Container started on port ${port}. Waiting for database readiness...`);
 

@@ -32,6 +32,17 @@ function findParentDir(currentDir: string, targetName: string): string | null {
 
 const cliRoot = findParentDir(__dirname, "cli");
 
+const PROJECT_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
+
+/** Returns an error message, or null when the name is a valid package name. */
+export function validateProjectName(name: string): string | null {
+    if (!name.trim()) return "Project name is required";
+    if (!PROJECT_NAME_RE.test(name)) {
+        return "Project name must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, dots, or underscores";
+    }
+    return null;
+}
+
 export type TemplatePreset = "blog" | "ecommerce" | "blank";
 
 /**
@@ -110,13 +121,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
             name: "projectName",
             message: "Project name:",
             default: "my-rebase-app",
-            validate: (input: string) => {
-                if (!input.trim()) return "Project name is required";
-                if (!/^[a-z0-9][a-z0-9._-]*$/.test(input)) {
-                    return "Project name must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, dots, or underscores";
-                }
-                return true;
-            }
+            validate: (input: string) => validateProjectName(input) ?? true
         });
     }
 
@@ -220,6 +225,19 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     const nameArg = args._[0];
     const isNonInteractive = args["--yes"] || false;
 
+    // The interactive prompt validates typed names; a name passed as an
+    // argument must pass the same check or it becomes an invalid package.json
+    // "name" that only fails later, at install time. Validate the basename so
+    // nested paths ("apps/my-app") and "." still work.
+    if (nameArg) {
+        const resolvedName = path.basename(path.resolve(process.cwd(), nameArg));
+        const nameError = validateProjectName(resolvedName);
+        if (nameError) {
+            console.error(chalk.red(`Invalid project name "${resolvedName}": ${nameError}`));
+            process.exit(1);
+        }
+    }
+
     const templateArg = args["--template"] as TemplatePreset | undefined;
     if (templateArg && !PRESET_CHOICES.some(p => p.value === templateArg)) {
         console.error(chalk.red(`Unknown template "${templateArg}". Available: ${PRESET_CHOICES.map(p => p.value).join(", ")}`));
@@ -320,9 +338,25 @@ async function createProject(options: InitOptions) {
         process.exit(1);
     }
 
+    // npm/pnpm always strip files named .gitignore and .npmrc from published
+    // tarballs, so the template ships them un-dotted and we restore the real
+    // names here.
+    for (const [from, to] of [["gitignore", ".gitignore"], ["npmrc", ".npmrc"]] as const) {
+        const shipped = path.join(options.targetDirectory, from);
+        if (fs.existsSync(shipped)) {
+            fs.renameSync(shipped, path.join(options.targetDirectory, to));
+        }
+    }
+
     // Apply the selected template preset (swap collection files)
     if (options.flavor !== "baas") {
-        await applyPreset(options.targetDirectory, options.preset);
+        // When introspecting, the database is the source of truth: start from
+        // the blank preset so example collections never register on top of
+        // tables the database doesn't have.
+        if (options.introspect && options.preset !== "blank") {
+            console.log(chalk.gray("  Using the blank template: collections will come from your database."));
+        }
+        await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
     }
 
     // Reduce the project to the selected flavor
@@ -347,6 +381,7 @@ async function createProject(options: InitOptions) {
     const { pm, pmCommands } = options;
     const installCmd = pmCommands.install;
     const execCmd = pmCommands.exec("rebase", ["schema", "introspect", "--force"]);
+    const generateCmd = pmCommands.exec("rebase", ["schema", "generate", "--collections", "../config/collections"]);
 
     if (options.installDeps) {
         console.log("");
@@ -373,10 +408,17 @@ async function createProject(options: InitOptions) {
                     cwd: options.targetDirectory,
                     stdio: "inherit"
                 });
+                // The template ships a schema.generated.ts for the example blog
+                // collections; regenerate it from the introspected collections or
+                // the backend serves a schema that doesn't match the database.
+                await execa(generateCmd[0], generateCmd.slice(1), {
+                    cwd: options.targetDirectory,
+                    stdio: "inherit"
+                });
                 console.log(chalk.green("  Database successfully introspected!"));
             } catch {
                 console.warn(chalk.yellow("  Warning: Failed to introspect database automatically."));
-                console.warn(chalk.yellow(`  You can run \`${execCmd.join(" ")}\` manually after setup.`));
+                console.warn(chalk.yellow(`  You can run \`${execCmd.join(" ")}\` then \`${generateCmd.join(" ")}\` manually after setup.`));
             }
         } else {
             console.warn(chalk.yellow("  Skipping introspection because dependencies were not installed."));
@@ -713,7 +755,10 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             const dbPort = await findAvailablePort(5432);
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
-                `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:${dbPort}/rebase?options=-c%20search_path=public\nDATABASE_PASSWORD=${dbPassword}`
+                // sslmode=disable: the paired docker-compose Postgres has no TLS,
+                // and Go-based tooling (atlas, via `rebase db push`) defaults to
+                // requiring SSL when the URL doesn't say otherwise.
+                `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:${dbPort}/rebase?options=-c%20search_path=public&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
             );
 
             // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping

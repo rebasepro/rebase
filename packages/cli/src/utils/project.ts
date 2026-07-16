@@ -100,14 +100,27 @@ export function getActiveBackendPlugin(backendDir: string): string | null {
  * Resolve the active plugin's CLI script.
  */
 export function resolvePluginCliScript(backendDir: string, pluginName: string): string | null {
-    const candidates = [
-        path.join(backendDir, "node_modules", pluginName, "src", "cli.ts"),
-        path.join(backendDir, "node_modules", pluginName, "dist", "cli.js"),
+    const candidates: string[] = [];
+
+    // Walk up from the backend dir: pnpm links the plugin into
+    // backend/node_modules, while npm workspaces hoist it to the project (or an
+    // enclosing monorepo) root.
+    let dir = path.resolve(backendDir);
+    const fsRoot = path.parse(dir).root;
+    while (dir !== fsRoot) {
+        candidates.push(
+            path.join(dir, "node_modules", pluginName, "src", "cli.ts"),
+            path.join(dir, "node_modules", pluginName, "dist", "cli.js")
+        );
+        dir = path.dirname(dir);
+    }
+
+    candidates.push(
         // For monorepo dev mode:
         path.resolve(backendDir, "..", "..", "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts"),
         path.resolve(backendDir, "..", "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts"),
         path.resolve(backendDir, "..", "packages", pluginName.replace("@rebasepro/", ""), "src", "cli.ts")
-    ];
+    );
 
     for (const candidate of candidates) {
         if (fs.existsSync(candidate)) return candidate;

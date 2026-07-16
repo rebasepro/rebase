@@ -10,7 +10,7 @@ import path from "path";
 import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
-import { configureEnvFile, buildInitQuestions } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName } from "./init.js";
 
 
 let tmpDir: string;
@@ -77,6 +77,20 @@ async function simulateInit(projectName: string): Promise<string> {
 // Template structure
 // =============================================================================
 
+describe("validateProjectName", () => {
+    it("accepts valid names", () => {
+        for (const name of ["my-app", "app2", "my.app", "my_app", "0app"]) {
+            expect(validateProjectName(name)).toBeNull();
+        }
+    });
+
+    it("rejects names npm/pnpm would refuse to install", () => {
+        for (const name of ["My App", "MyApp", "-app", ".app", "app!", "", "  "]) {
+            expect(validateProjectName(name)).toBeTypeOf("string");
+        }
+    });
+});
+
 describe("template structure", () => {
     it("contains all required directories", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend"))).toBe(true);
@@ -90,7 +104,9 @@ describe("template structure", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, ".env.example"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "docker-compose.yml"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, ".gitignore"))).toBe(true);
+        // Shipped un-dotted: npm/pnpm strip .gitignore/.npmrc from published
+        // tarballs; init renames them back at scaffold time.
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "gitignore"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "README.md"))).toBe(true);
     });
 
@@ -477,12 +493,12 @@ describe("dual PM compatibility", () => {
     });
 
     describe(".npmrc configuration", () => {
-        it("ships a .npmrc file", () => {
-            expect(fs.existsSync(path.join(TEMPLATE_DIR, ".npmrc"))).toBe(true);
+        it("ships an npmrc file (un-dotted so npm pack keeps it)", () => {
+            expect(fs.existsSync(path.join(TEMPLATE_DIR, "npmrc"))).toBe(true);
         });
 
         it(".npmrc enables link-workspace-packages for pnpm", () => {
-            const npmrc = fs.readFileSync(path.join(TEMPLATE_DIR, ".npmrc"), "utf-8");
+            const npmrc = fs.readFileSync(path.join(TEMPLATE_DIR, "npmrc"), "utf-8");
             expect(npmrc).toContain("link-workspace-packages=true");
         });
     });
@@ -679,7 +695,7 @@ describe("scaffold security defaults", () => {
 
     describe(".gitignore", () => {
         it("ignores both .rebase-dev-url and .rebase-dev-port", () => {
-            const gitignore = fs.readFileSync(path.join(TEMPLATE_DIR, ".gitignore"), "utf-8");
+            const gitignore = fs.readFileSync(path.join(TEMPLATE_DIR, "gitignore"), "utf-8");
             expect(gitignore).toContain(".rebase-dev-url");
             expect(gitignore).toContain(".rebase-dev-port");
         });

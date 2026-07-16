@@ -30,6 +30,7 @@ async function main() {
             "--force": Boolean,
             "--schema": String,
             "--data-inference": Boolean,
+            "--no-data-inference": Boolean,
             "-o": "--output",
             "-c": "--collections",
             "-f": "--force"
@@ -166,8 +167,14 @@ async function main() {
         logger.info(chalk.blue(`Found ${tablesMap.size} tables (including ${joinTables.size} detected join tables).`));
 
         let runDataInference = false;
-        if (args["--data-inference"] !== undefined) {
+        if (args["--no-data-inference"]) {
+            runDataInference = false;
+        } else if (args["--data-inference"] !== undefined) {
             runDataInference = args["--data-inference"];
+        } else if (!process.stdin.isTTY) {
+            // No terminal to answer the question below (scaffolding scripts, CI,
+            // `rebase init --introspect`) — asking would hang forever.
+            logger.info(chalk.gray("Skipping data inference (non-interactive run; pass --data-inference to enable)."));
         } else {
             const rl = readline.createInterface({
                 input: process.stdin,
