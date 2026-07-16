@@ -5,7 +5,7 @@ export const en = {
   "hero.subtitle":
     "Point Rebase at your database and get REST APIs, auth, storage, realtime — and an admin panel when you want one. Secured by Postgres row-level security, not middleware. Ready for your team and your AI agents.",
   "hero.cta.demo": "See the live demo",
-  "hero.cta.demo.note": "No signup — explore a real generated admin panel",
+  "hero.cta.demo.note": "No signup — a real Rebase backend, live, with its generated admin panel",
   "hero.cli.label": "Prefer your terminal? Up and running locally in under a minute:",
   "hero.cta.github": "View on GitHub",
   "demo.badge": "Three commands. Zero boilerplate.",
@@ -17,7 +17,12 @@ export const en = {
   "see.badge": "See it for yourself",
   "see.title": "From connection string to control panel",
   "see.subtitle":
-    "This is what your database becomes: a full back office your whole team can work in — generated, not built.",
+    "APIs, auth and realtime are running the moment you connect. This is the back office that comes with them — generated, not built.",
+  "engine.badge": "The backend underneath",
+  "engine.title": "A full backend. Not just a pretty face.",
+  "engine.subtitle":
+    "The admin panel is the layer you see. Underneath it: a typed SDK, instant REST, and realtime over WebSocket — running against your database from minute one.",
+  "engine.link": "Explore the backend",
   "modes.badge": "Modular by design",
   "modes.title": 'Adopt only <span class="text-primary">what you need.</span>',
   "modes.subtitle":
@@ -511,8 +516,8 @@ export const en = {
   "about.join.desc": "We're always looking for passionate developers to join our community and contribute to the project.",
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
-  "index.meta.title": "Rebase — Admin Panel, APIs & SDK Generated from Your Postgres Schema",
-  "index.meta.description": "Define your schema once in TypeScript. Rebase generates a production-ready admin panel, REST APIs, a typed SDK, and real-time sync — from your existing Postgres. Open-source, self-hosted.",
+  "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & Admin Panel",
+  "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, self-hosted.",
   "backend.meta.title": "Backend & APIs — Rebase App Engine",
   "backend.meta.description": "Get an auto-generated backend powered by Hono and Drizzle ORM. Complete with REST and WebSockets.",
   "ai.meta.title": "AI & Agents Infrastructure — Rebase",
