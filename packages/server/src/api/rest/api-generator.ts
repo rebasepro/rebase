@@ -3,6 +3,7 @@ import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions } from "./query-parser";
+import { assertKnownWriteFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 
@@ -232,6 +233,12 @@ export class RestApiGenerator {
                 );
             }
 
+            // Checked before the transaction opens, and named by row index: a
+            // batch is all-or-nothing, so one bad field in ten thousand rows
+            // should not be found by rolling the other 9,999 back.
+            (body.rows as Record<string, unknown>[]).forEach((row, rowIndex) =>
+                assertKnownWriteFields(row, resolvedCollection, { rowIndex }));
+
             const rows = await driver.saveMany({
                 path,
                 rows: body.rows as Record<string, unknown>[],
@@ -255,10 +262,16 @@ export class RestApiGenerator {
 
                 const body = await parseJsonBody(c);
 
-
-
                 const isAuth = collection.auth;
                 const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+
+                // Auth signups carry credential fields (`password`, provider
+                // bits) that the users collection does not declare as columns —
+                // `prepareUserCreation` turns them into what the table has. So
+                // the shape is only this collection's to judge once that has run.
+                if (!isAuthCollection) {
+                    assertKnownWriteFields(body, resolvedCollection);
+                }
 
                 if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
                     const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
@@ -342,8 +355,7 @@ values: entity.values as Record<string, unknown> },
                 }
 
                 const body = await parseJsonBody(c);
-
-
+                assertKnownWriteFields(body, resolvedCollection);
 
                 const entity = await driver.save({
                     path: getCollectionDataPath(collection),
