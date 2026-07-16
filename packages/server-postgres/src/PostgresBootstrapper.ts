@@ -4,7 +4,7 @@
  * Implements the `BackendBootstrapper` interface for PostgreSQL.
  */
 
-import { getTableName, isTable, Relations, sql } from "drizzle-orm";
+import { Relations, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import type { RebasePgTable } from "./types";
@@ -21,6 +21,7 @@ import {
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService } from "./services/realtimeService";
+import { buildCollectionRegistry } from "./collections/buildRegistry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
@@ -161,30 +162,17 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             const activeCollections = introspectedCollections ?? collections;
-
-            // Create a fresh registry for this driver
-            const registry = new PostgresCollectionRegistry();
-            if (activeCollections) {
-                registry.registerMultiple(activeCollections);
-                logger.info(`📋 [PostgresRegistry] Registered ${registry.getCollections().length} collections: [${registry.getCollections().map(c => c.slug).join(", ")}]`);
-            }
-
             const schemaTables = introspectedTables ?? pgConfig.schema?.tables;
-
-            // Register tables
-            if (schemaTables) {
-                Object.values(schemaTables).forEach((table) => {
-                    if (isTable(table)) {
-                        const tableName = getTableName(table);
-                        registry.registerTable(table as PgTable, tableName);
-                    }
-                });
-            }
-
-            if (pgConfig.schema?.enums) registry.registerEnums(pgConfig.schema.enums as Record<string, PgEnum<[string, ...string[]]>>);
-
             const schemaRelations = introspectedRelations ?? (pgConfig.schema?.relations as Record<string, Relations> | undefined);
-            if (schemaRelations) registry.registerRelations(schemaRelations);
+
+            // Create a fresh registry for this driver. Registration order is
+            // load-bearing, so it lives in one place — see `buildCollectionRegistry`.
+            const registry = buildCollectionRegistry({
+                collections: activeCollections,
+                tables: schemaTables,
+                enums: pgConfig.schema?.enums as Record<string, PgEnum<[string, ...string[]]>> | undefined,
+                relations: schemaRelations
+            });
 
             // Patch Drizzle's PgArray columns to handle NULL values safely.
             // Drizzle's mapFromDriverValue crashes with "value.map is not a function"

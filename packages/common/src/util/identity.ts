@@ -101,12 +101,17 @@ export function parseIdValues(idValue: string | number, primaryKeys: PrimaryKeyI
 /**
  * The primary keys of a collection, as declared by its properties.
  *
- * The driver can also infer keys from the Drizzle schema, which the browser
- * cannot see — so the server normalizes what it resolved onto the config it
- * serves (see `stampPrimaryKeys`), and this reads that back. Returns an empty
- * array when a collection declares none, which callers must treat as "not
- * addressable" rather than defaulting to `id`: guessing a key that is not the
- * real one produces confidently wrong addresses.
+ * This is the only tier both sides can read, because it is the only one written
+ * in the config: the postgres driver can also infer keys from the Drizzle
+ * schema, which the browser never sees and is never sent — the admin compiles
+ * the collection files into its own bundle rather than being served them. A key
+ * that lives only in the Drizzle schema is therefore invisible here, and the
+ * server says so at boot (`warnOnKeysTheAdminCannotResolve`) naming the `isId`
+ * to add.
+ *
+ * Returns an empty array when a collection declares none, which callers must
+ * treat as "not addressable" rather than defaulting to `id`: guessing a key
+ * that is not the real one produces confidently wrong addresses.
  */
 export function getDeclaredPrimaryKeys(collection: {
     properties?: Record<string, unknown>;
@@ -135,9 +140,15 @@ export function getDeclaredPrimaryKeys(collection: {
  * The postgres driver tries, in order: properties marked `isId`; the primary
  * keys of the Drizzle schema; and finally a column literally named `id`. Only
  * the first and last are visible in a `CollectionConfig`, which is what both
- * sides share — so a collection whose key is *only* known to Drizzle, and is
- * not named `id`, resolves to nothing here. That is reported rather than
- * guessed: inventing a key produces addresses that look right and route wrong.
+ * sides share.
+ *
+ * So the two agree except on a collection that declares no `isId` and whose key
+ * is known only to Drizzle. There, the driver reads the real key, and this
+ * either resolves nothing (reported to the console by the caller) or — if the
+ * table happens to have an unrelated `id` property — resolves `id`, which is
+ * the wrong key and cannot be detected from here: the addresses look right and
+ * route wrong. Only the config can settle it, so the server names both cases
+ * at boot (`warnOnKeysTheAdminCannotResolve`) with the `isId` to add.
  */
 export function resolvePrimaryKeys(collection: {
     properties?: Record<string, unknown>;
