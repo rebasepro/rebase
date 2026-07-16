@@ -1119,6 +1119,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
     logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
 
+    // Same treatment for storage: server-side `rebase.storage` must talk to the
+    // controller directly, not loop back through `POST /api/storage/upload`. The
+    // loopback carried the service key but still 403'd (the storage route's auth
+    // is written for real user/session requests, not the internal self-call), so
+    // every backend-initiated write — e.g. the deploy build-context upload —
+    // failed at ~2ms with "Request failed with status 403". The controller
+    // exposes the same StorageSource surface (putObject/getObject/…).
+    if (storageController) {
+        Object.assign(serverClient, { storage: storageController });
+        logger.info("Native storage attached to singleton (bypasses HTTP loop)");
+    }
+
     // Attach email service to the server client when configured.
     // The email service may come from the auth bootstrapper or from the auth config directly.
     let emailService: EmailService | undefined;
