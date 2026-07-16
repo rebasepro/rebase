@@ -15,7 +15,7 @@ export const es = {
   "demo.dev":
     "✔ Panel de administración, API y servidor WebSocket en ejecución.",
   "social.title":
-    "Equipos que ya lanzan productos con Rebase",
+    "Equipos que lanzan productos con nuestras herramientas — Rebase y FireCMS",
   "howitworks.badge": "Recupera tu tiempo",
   "howitworks.title":
     'Lo que <span class="text-primary">nunca volverás a construir.</span>',
@@ -436,12 +436,10 @@ export const es = {
   "about.values.v3.title": "Impulsado por la comunidad",
   "about.values.v3.desc": "Nuestras mejores funcionalidades vienen de la comunidad. Escuchamos, iteramos y construimos lo que los desarrolladores realmente necesitan — no lo que creemos que necesitan.",
   "about.stats.title": "Rebase en Números",
-  "about.stats.s1.value": "1k+",
-  "about.stats.s1.label": "Estrellas de GitHub",
-  "about.stats.s2.value": "1M+",
-  "about.stats.s2.label": "Descargas",
-  "about.stats.s3.value": "100+",
-  "about.stats.s3.label": "Colaboradores",
+  "about.stats.s1.value": "100%",
+  "about.stats.s1.label": "Open source — MIT, sin funciones bloqueadas",
+  "about.stats.s3.value": "1.3k+",
+  "about.stats.s3.label": "Estrellas de GitHub en nuestros proyectos",
   "about.join.title": "Ayúdanos a construir el futuro del back-office",
   "about.join.desc": "Siempre buscamos desarrolladores con ganas de unirse a la comunidad y contribuir al proyecto.",
   "about.join.github": "Contribuir en GitHub",
