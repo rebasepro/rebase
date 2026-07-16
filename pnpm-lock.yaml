@@ -1235,9 +1235,6 @@ importers:
       google-auth-library:
         specifier: ^10.7.0
         version: 10.7.0
-      hono:
-        specifier: ^4.12.25
-        version: 4.12.25
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
@@ -1284,6 +1281,9 @@ importers:
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
+      hono:
+        specifier: ^4.12.25
+        version: 4.12.25
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@25.9.3)
@@ -1381,9 +1381,6 @@ importers:
       execa:
         specifier: ^9.6.1
         version: 9.6.1
-      hono:
-        specifier: ^4.12.25
-        version: 4.12.25
       pg:
         specifier: ^8.21.0
         version: 8.21.0
