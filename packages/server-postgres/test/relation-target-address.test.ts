@@ -1,5 +1,5 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { FetchService } from "../src/services/FetchService";
+import { toCmsRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
@@ -67,15 +67,13 @@ relationName: "seat" }
         });
     });
 
-    const toFlatRow = (fetchService: FetchService, row: Record<string, unknown>, collection: CollectionConfig) =>
-        (fetchService as unknown as {
-            drizzleResultToRow: (r: Record<string, unknown>, c: CollectionConfig) => Record<string, unknown>;
-        }).drizzleResultToRow(row, collection);
+    // The CMS row builder is a plain function now, rather than a private
+    // reached into through a cast.
+    const toFlatRow = (row: Record<string, unknown>, collection: CollectionConfig) =>
+        toCmsRow(row, collection, registry);
 
     it("joins a composite target key into the ref address", () => {
-        const fetchService = new FetchService({} as any, registry);
-
-        const result = toFlatRow(fetchService, {
+        const result = toFlatRow({
             id: 1,
             seat: { seat_row: "A",
 seat_number: 12,
@@ -113,9 +111,7 @@ occupant: "Ada" }
             if (name === "notes") return table("notes", ["body"]) as any;
             return undefined;
         });
-        const fetchService = new FetchService({} as any, registry);
-
-        const result = toFlatRow(fetchService, {
+        const result = toFlatRow({
             id: 1,
             seat: { body: "aisle, please" }
         }, keylessBooking);

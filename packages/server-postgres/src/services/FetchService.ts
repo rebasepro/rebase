@@ -18,6 +18,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { toCmsRow, toRestRow, isJunctionRelation } from "./row-pipeline";
 import { logger } from "@rebasepro/server";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
@@ -111,7 +112,7 @@ export class FetchService {
             // Detect many-to-many junction tables:
             // If the relation goes through a junction table (relation.through exists or
             // the Drizzle schema maps to a junction table), we need two-level with.
-            if (relation.cardinality === "many" && this.isJunctionRelation(relation, collection)) {
+            if (relation.cardinality === "many" && isJunctionRelation(relation)) {
                 // The Drizzle relation points to the junction table.
                 // We need: { [junctionRelName]: { with: { [targetFkName]: true } } }
                 // The target FK name is the relation on the junction table that points to the actual target.
@@ -130,17 +131,6 @@ export class FetchService {
     }
 
     /**
-     * Detect if a many-to-many relation uses a junction table in the Drizzle schema.
-     */
-    private isJunctionRelation(relation: Relation, _collection: CollectionConfig): boolean {
-        // If `through` is defined, it's explicitly a junction relation
-        if (relation.through) return true;
-        // If joinPath has an intermediate table, it's likely junction-based
-        if (relation.joinPath && relation.joinPath.length > 1) return true;
-        return false;
-    }
-
-    /**
      * Get the Drizzle relation name on the junction table that points to the actual target row.
      * For example, for posts_tags junction, this returns "tag_id" (the relation pointing to tags).
      */
@@ -151,98 +141,6 @@ export class FetchService {
             return relation.through.targetColumn.replace(/_id$/, "_id");
         }
         return null;
-    }
-
-    /**
-     * The address a relation ref points at.
-     *
-     * The whole key, not its first column: a composite-keyed target addressed
-     * by `tenant_id` alone points at every row that shares it. And a target
-     * whose key cannot be resolved at all used to throw here — reading
-     * `targetPks[0]` of an empty array — taking down the parent's fetch over a
-     * relation it may not even have asked for; the first column is a guess, but
-     * a ref that resolves to nothing beats no rows at all.
-     */
-    private relationTargetAddress(targetRow: Record<string, unknown>, targetCollection: CollectionConfig): string {
-        const address = deriveRowAddress(targetRow, targetCollection, this.registry);
-        if (address) return address;
-        const firstColumn = targetRow[Object.keys(targetRow)[0]];
-        return String(firstColumn ?? "");
-    }
-
-    /**
-     * Convert a db.query result row (with nested relation objects) to a flat row.
-     * Handles:
-     * - Type normalization (dates, numbers, NaN) via normalizeDbValues
-     * - Converting nested relation objects to { id, path, __type: "relation" } for CMS
-     * - Flattening junction-table many-to-many results
-     *
-     * The row's own address is not among them: it is derived by the consumer
-     * from the collection's primary keys.
-     */
-    private drizzleResultToRow<M extends Record<string, unknown>>(
-        row: Record<string, unknown>,
-        collection: CollectionConfig
-    ): Record<string, unknown> {
-        const resolvedRelations = resolveCollectionRelations(collection);
-
-        // Normalize non-relation values (dates, numbers, etc.)
-        const normalizedValues = normalizeDbValues(row as M, collection) as Record<string, unknown>;
-
-        // Convert nested relation objects to CMS-style { id, path, __type: "relation" }
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
-            const drizzleRelName = relation.relationName || key;
-            const relData = row[drizzleRelName];
-
-            if (relData === undefined || relData === null) continue;
-
-            if (relation.cardinality === "many" && Array.isArray(relData)) {
-                const targetCollection = relation.target();
-                const targetPath = targetCollection.slug;
-
-                normalizedValues[key] = relData.map((item: Record<string, unknown>) => {
-                    // Handle junction table flattening:
-                    // Junction rows look like { post_id: 1, tag_id: { id: 5, name: "ts" } }
-                    let targetRow = item;
-                    if (this.isJunctionRelation(relation, collection)) {
-                        // Find the nested target object in the junction row
-                        const nestedKey = Object.keys(item).find(
-                            nk => typeof item[nk] === "object" && item[nk] !== null && !Array.isArray(item[nk])
-                        );
-                        if (nestedKey) {
-                            targetRow = item[nestedKey] as Record<string, unknown>;
-                        }
-                    }
-
-                    const relId = this.relationTargetAddress(targetRow, targetCollection);
-                    const targetValues = normalizeDbValues(targetRow, targetCollection);
-
-                    return createRelationRefWithData(relId, targetPath, {
-                        id: relId,
-                        path: targetPath,
-                        values: targetValues
-                    });
-                });
-            } else if (relation.cardinality === "one" && typeof relData === "object" && !Array.isArray(relData)) {
-                const targetCollection = relation.target();
-                const targetPath = targetCollection.slug;
-                const relObj = relData as Record<string, unknown>;
-
-                const relId = this.relationTargetAddress(relObj, targetCollection);
-                const targetValues = normalizeDbValues(relObj, targetCollection);
-
-                normalizedValues[key] = createRelationRefWithData(relId, targetPath, {
-                    id: relId,
-                    path: targetPath,
-                    values: targetValues
-                });
-            }
-        }
-
-        // A row is exactly its columns. The address is derived by the consumer
-        // from the collection's primary keys — writing it here would rename the
-        // key column (`sku` → `id`) and restringify it (`42` → `"42"`).
-        return normalizedValues;
     }
 
     /**
@@ -360,47 +258,6 @@ export class FetchService {
                 logger.warn(`Could not batch resolve joinPath relation '${key}' for REST`, { error: e });
             }
         }
-    }
-
-    /**
-     * Convert a db.query result row to a flat REST-style row with populated relations.
-     *
-     * Every column is copied through under its own name, with the value Postgres
-     * returned. This used to open with a synthesized `id` and then skip the key
-     * column, which renamed it (a `sku` primary key was served as `id`, and `sku`
-     * did not appear at all) and restringified it (`42` → `"42"`). Consumers that
-     * need an address derive it from the collection's primary keys.
-     */
-    private drizzleResultToRestRow(
-        row: Record<string, unknown>,
-        collection: CollectionConfig
-    ): Record<string, unknown> {
-        const flat: Record<string, unknown> = {};
-        const resolvedRelations = resolveCollectionRelations(collection);
-
-        for (const [k, v] of Object.entries(row)) {
-            const relation = findRelation(resolvedRelations, k);
-            if (Array.isArray(v) && relation) {
-                // Many relation — inline each nested row, unwrapping junction rows
-                flat[k] = v.map((item: Record<string, unknown>) => {
-                    if (this.isJunctionRelation(relation, collection)) {
-                        const nestedKey = Object.keys(item).find(
-                            nk => typeof item[nk] === "object" && item[nk] !== null && !Array.isArray(item[nk])
-                        );
-                        if (nestedKey) {
-                            return { ...(item[nestedKey] as Record<string, unknown>) };
-                        }
-                    }
-                    return { ...item };
-                });
-            } else if (typeof v === "object" && v !== null && !Array.isArray(v) && relation) {
-                // One-to-one relation — inline the target's columns
-                flat[k] = { ...(v as Record<string, unknown>) };
-            } else {
-                flat[k] = v;
-            }
-        }
-        return flat;
     }
 
     /**
@@ -571,7 +428,7 @@ export class FetchService {
 
                 if (!row) return undefined;
 
-                const flatRow = this.drizzleResultToRow<M>(row, collection);
+                const flatRow = toCmsRow(row, collection, this.registry);
 
                 // Post-fetch joinPath relations that Drizzle's `with` can't express
                 await this.resolveJoinPathRelations<M>(flatRow, collection, collectionPath, parsedId, databaseId);
@@ -695,7 +552,7 @@ export class FetchService {
                 const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const rows = (results as Record<string, unknown>[]).map(row =>
-                    this.drizzleResultToRow<M>(row, collection)
+                    toCmsRow(row, collection, this.registry)
                 );
 
                 return rows;
@@ -795,8 +652,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
     /**
      * Fallback path used when db.query is unavailable.
-     * The primary path uses drizzleResultToRow which handles relation
-     * mapping without N+1 queries.
+     *
+     * The primary path runs the results through `toCmsRow`, which maps
+     * relations from what drizzle already nested — no query per row. This one
+     * has no nesting to read, so it resolves relations itself, in batches.
      *
      * Process raw database results into flat rows with relations.
      */
@@ -1187,7 +1046,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const restRows = (results as Record<string, unknown>[]).map(row =>
-                    this.drizzleResultToRestRow(row, collection)
+                    toRestRow(row, collection, this.registry)
                 );
 
                 // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
@@ -1292,7 +1151,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
                 if (!row) return null;
 
-                const restRow = this.drizzleResultToRestRow(row, collection);
+                const restRow = toRestRow(row, collection, this.registry);
 
                 // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
                 await this.resolveJoinPathRelationsBatchRest([restRow], collection, collectionPath, idInfoArray, include);

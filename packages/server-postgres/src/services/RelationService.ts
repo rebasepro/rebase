@@ -58,6 +58,39 @@ export class RelationService {
     constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) { }
 
     /**
+     * One target row, as the {@link RelatedRow} everything here returns.
+     *
+     * Eight sites built this by hand, which is how the address came to be the
+     * target's first key column in all eight — one edit, eight places to miss.
+     *
+     * `resolveNested` is the one thing they did not agree on, and the
+     * disagreement was invisible: the single-parent fetches pass `db` and
+     * `registry` to `parseDataFromServer`, so the target's *own* relations get
+     * resolved too, while the batch paths deliberately do not — a query per
+     * target row is the N+1 the batching exists to avoid. Naming the parameter
+     * makes that a decision rather than a difference between two call sites
+     * nobody was comparing.
+     */
+    private async toRelatedRow<M extends Record<string, unknown>>(
+        targetRow: Record<string, unknown>,
+        targetCollection: CollectionConfig,
+        targetPks: PrimaryKeyInfo[],
+        options?: { resolveNested?: boolean }
+    ): Promise<RelatedRow<M>> {
+        const values = options?.resolveNested
+            ? await parseDataFromServer(targetRow, targetCollection, this.db, this.registry)
+            : await parseDataFromServer(targetRow, targetCollection);
+
+        return {
+            // The whole key: a composite target addressed by its first column
+            // names every row that shares it.
+            id: buildCompositeId(targetRow, targetPks),
+            path: targetCollection.slug,
+            values: values as M
+        };
+    }
+
+    /**
      * A WHERE matching any of `parentIds`, by the whole key.
      *
      * A single key is an `IN (…)`. A composite one cannot be: matching
@@ -218,15 +251,7 @@ export class RelationService {
             const rows: RelatedRow<M>[] = [];
             for (const row of results as Array<Record<string, unknown>>) {
                 const targetRow = (row[targetTableName] as Record<string, unknown>) || row;
-                const parsedValues = await parseDataFromServer(targetRow, targetCollection, this.db, this.registry);
-
-                rows.push({
-                    // The whole key: the first column of a composite one names
-                    // every row that shares it.
-                    id: buildCompositeId(targetRow, idInfo),
-                    path: targetCollection.slug,
-                    values: parsedValues as M
-                });
+                rows.push(await this.toRelatedRow<M>(targetRow, targetCollection, idInfo, { resolveNested: true }));
             }
 
             return rows;
@@ -285,13 +310,7 @@ export class RelationService {
         const rows: RelatedRow<M>[] = [];
         for (const row of results) {
             const targetRow = row[getTableName(targetCollection)] || row;
-            const parsedValues = await parseDataFromServer(targetRow, targetCollection, this.db, this.registry);
-
-            rows.push({
-                id: buildCompositeId(targetRow as Record<string, unknown>, idInfo),
-                path: targetCollection.slug,
-                values: parsedValues as M
-            });
+            rows.push(await this.toRelatedRow<M>(targetRow as Record<string, unknown>, targetCollection, idInfo, { resolveNested: true }));
         }
 
         return rows;
@@ -423,13 +442,10 @@ export class RelationService {
                 const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
                 const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
 
-                const parsedValues = await parseDataFromServer(targetRow, targetCollection);
-
-                resultMap.set(buildCompositeId(parentRow, parentPks), {
-                    id: buildCompositeId(targetRow, targetPks),
-                    path: targetCollection.slug,
-                    values: parsedValues as Record<string, unknown>
-                });
+                resultMap.set(
+                    buildCompositeId(parentRow, parentPks),
+                    await this.toRelatedRow(targetRow, targetCollection, targetPks)
+                );
             }
 
             return resultMap;
@@ -492,12 +508,7 @@ export class RelationService {
             for (const [parentIdStr, fkValue] of parentToFk) {
                 const targetRow = targetById.get(String(fkValue));
                 if (targetRow) {
-                    const parsedValues = await parseDataFromServer(targetRow, targetCollection);
-                    resultMap.set(parentIdStr, {
-                        id: buildCompositeId(targetRow, targetPks),
-                        path: targetCollection.slug,
-                        values: parsedValues as Record<string, unknown>
-                    });
+                    resultMap.set(parentIdStr, await this.toRelatedRow(targetRow, targetCollection, targetPks));
                 }
             }
 
@@ -551,12 +562,7 @@ export class RelationService {
             }
 
             if (parentId !== undefined && parentIdSet.has(String(parentId))) {
-                const parsedValues = await parseDataFromServer(targetRow, targetCollection);
-                resultMap.set(String(parentId), {
-                    id: buildCompositeId(targetRow, targetPks),
-                    path: targetCollection.slug,
-                    values: parsedValues as Record<string, unknown>
-                });
+                resultMap.set(String(parentId), await this.toRelatedRow(targetRow, targetCollection, targetPks));
             }
         }
 
@@ -623,14 +629,8 @@ export class RelationService {
                 const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
                 const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
                 const parentId = buildCompositeId(parentRow, parentPks);
-                const parsedValues = await parseDataFromServer(targetRow, targetCollection);
-
                 const arr = resultMap.get(parentId) || [];
-                arr.push({
-                    id: buildCompositeId(targetRow, targetPks),
-                    path: targetCollection.slug,
-                    values: parsedValues as Record<string, unknown>
-                });
+                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks));
                 resultMap.set(parentId, arr);
             }
 
@@ -677,14 +677,8 @@ export class RelationService {
                 const targetData = (row[targetTableName] || row) as Record<string, unknown>;
 
                 const parentId = String(junctionData[relation.through.sourceColumn]);
-                const parsedValues = await parseDataFromServer(targetData, targetCollection);
-
                 const arr = resultMap.get(parentId) || [];
-                arr.push({
-                    id: buildCompositeId(targetData, targetPks),
-                    path: targetCollection.slug,
-                    values: parsedValues as Record<string, unknown>
-                });
+                arr.push(await this.toRelatedRow(targetData, targetCollection, targetPks));
                 resultMap.set(parentId, arr);
             }
 
@@ -739,14 +733,9 @@ export class RelationService {
             }
 
             if (parentId !== undefined && parentIdSet.has(String(parentId))) {
-                const parsedValues = await parseDataFromServer(targetRow, targetCollection);
                 const key = String(parentId);
                 const arr = resultMap.get(key) || [];
-                arr.push({
-                    id: buildCompositeId(targetRow, targetPks),
-                    path: targetCollection.slug,
-                    values: parsedValues as Record<string, unknown>
-                });
+                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks));
                 resultMap.set(key, arr);
             }
         }
