@@ -82,6 +82,32 @@ export class UserService implements UserRepository {
         return `"${schema}"."${name}"`;
     }
 
+    /**
+     * Run a privileged auth write with an explicitly cleared RLS context.
+     *
+     * The auth services run on the base/owner connection, which by design
+     * carries a NULL `app.user_id` so the `auth.uid() IS NULL` server-escape
+     * in the default policies applies. That NULL is normally guaranteed by
+     * `set_config(..., is_local = true)` resetting at transaction end — but a
+     * GUC that survives on a pooled connection (or a connection role that
+     * doesn't bypass RLS: FORCE ROW LEVEL SECURITY, or a non-owner role)
+     * turns the trusted write into an RLS-scoped one and denies it with
+     * SQLSTATE 42501. Clearing the GUCs here, transaction-locally at the
+     * single chokepoint, makes the server context deterministic instead of
+     * trusting whatever state the pool hands us. `auth.uid()` reads '' as
+     * NULL via NULLIF, so '' is the server context.
+     */
+    private async withServerContext<T>(fn: (db: NodePgDatabase) => Promise<T>): Promise<T> {
+        return await this.db.transaction(async (tx) => {
+            await tx.execute(sql`
+                SELECT set_config('app.user_id', '', true),
+                       set_config('app.user_roles', '', true),
+                       set_config('app.jwt', '', true)
+            `);
+            return await fn(tx as unknown as NodePgDatabase);
+        });
+    }
+
     private mapRowToUser(row: Record<string, unknown>): UserData {
         if (!row) return row as UserData;
 
@@ -200,7 +226,9 @@ export class UserService implements UserRepository {
 
     async createUser(data: CreateUserData): Promise<UserData> {
         const payload = this.mapPayload(data);
-        const [row] = (await this.db.insert(this.usersTable).values(payload).returning()) as Record<string, unknown>[];
+        const [row] = await this.withServerContext(async (db) =>
+            (await db.insert(this.usersTable).values(payload).returning()) as Record<string, unknown>[]
+        );
         return this.mapRowToUser(row);
     }
 
@@ -255,12 +283,12 @@ export class UserService implements UserRepository {
     }
 
     async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
-        await this.db.insert(this.userIdentitiesTable).values({
+        await this.withServerContext(async (db) => db.insert(this.userIdentitiesTable).values({
             userId,
             provider,
             providerId,
             profileData: profileData || null
-        }).onConflictDoNothing({ target: [this.userIdentitiesTable.provider, this.userIdentitiesTable.providerId] });
+        }).onConflictDoNothing({ target: [this.userIdentitiesTable.provider, this.userIdentitiesTable.providerId] }));
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
@@ -270,18 +298,20 @@ export class UserService implements UserRepository {
         const updatedAtKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
         payload[updatedAtKey] = new Date();
 
-        const [row] = (await this.db
-            .update(this.usersTable)
-            .set(payload)
-            .where(eq(idCol, id))
-            .returning()) as Record<string, unknown>[];
+        const [row] = await this.withServerContext(async (db) =>
+            (await db
+                .update(this.usersTable)
+                .set(payload)
+                .where(eq(idCol, id))
+                .returning()) as Record<string, unknown>[]
+        );
         return row ? this.mapRowToUser(row) : null;
     }
 
     async deleteUser(id: string): Promise<void> {
         const idCol = getColumn(this.usersTable, "id");
         if (!idCol) return;
-        await this.db.delete(this.usersTable).where(eq(idCol, id));
+        await this.withServerContext(async (db) => db.delete(this.usersTable).where(eq(idCol, id)));
     }
 
     async listUsers(): Promise<UserData[]> {
@@ -357,13 +387,13 @@ export class UserService implements UserRepository {
         const passwordHashColKey = getColumnKey(this.usersTable, "passwordHash", "password_hash") || "passwordHash";
         const updatedAtColKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
 
-        await this.db
+        await this.withServerContext(async (db) => db
             .update(this.usersTable)
             .set({
                 [passwordHashColKey]: passwordHash,
                 [updatedAtColKey]: new Date()
             })
-            .where(eq(idCol, id));
+            .where(eq(idCol, id)));
     }
 
     /**
@@ -376,14 +406,14 @@ export class UserService implements UserRepository {
         const emailVerificationTokenColKey = getColumnKey(this.usersTable, "emailVerificationToken", "email_verification_token") || "emailVerificationToken";
         const updatedAtColKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
 
-        await this.db
+        await this.withServerContext(async (db) => db
             .update(this.usersTable)
             .set({
                 [emailVerifiedColKey]: verified,
                 [emailVerificationTokenColKey]: null,
                 [updatedAtColKey]: new Date()
             })
-            .where(eq(idCol, id));
+            .where(eq(idCol, id)));
     }
 
     /**
@@ -396,14 +426,14 @@ export class UserService implements UserRepository {
         const emailVerificationSentAtColKey = getColumnKey(this.usersTable, "emailVerificationSentAt", "email_verification_sent_at") || "emailVerificationSentAt";
         const updatedAtColKey = getColumnKey(this.usersTable, "updatedAt", "updated_at") || "updatedAt";
 
-        await this.db
+        await this.withServerContext(async (db) => db
             .update(this.usersTable)
             .set({
                 [emailVerificationTokenColKey]: token,
                 [emailVerificationSentAtColKey]: token ? new Date() : null,
                 [updatedAtColKey]: new Date()
             })
-            .where(eq(idCol, id));
+            .where(eq(idCol, id)));
     }
 
     /**
@@ -463,11 +493,11 @@ export class UserService implements UserRepository {
     async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
         const usersTableName = this.getQualifiedUsersTableName();
         const rolesArray = `{${roleIds.join(",")}}`;
-        await this.db.execute(sql`
+        await this.withServerContext(async (db) => db.execute(sql`
             UPDATE ${sql.raw(usersTableName)}
             SET roles = ${rolesArray}::text[], updated_at = NOW()
             WHERE id = ${userId}
-        `);
+        `));
     }
 
     /**
@@ -475,11 +505,11 @@ export class UserService implements UserRepository {
      */
     async assignDefaultRole(userId: string, roleId: string): Promise<void> {
         const usersTableName = this.getQualifiedUsersTableName();
-        await this.db.execute(sql`
+        await this.withServerContext(async (db) => db.execute(sql`
             UPDATE ${sql.raw(usersTableName)}
             SET roles = array_append(roles, ${roleId}), updated_at = NOW()
             WHERE id = ${userId} AND NOT (${roleId} = ANY(roles))
-        `);
+        `));
     }
 
     /**

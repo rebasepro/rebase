@@ -118,7 +118,10 @@ describe("Auth Services", () => {
             select: jest.fn().mockReturnValue(mockChain),
             update: jest.fn().mockReturnValue({ set: mockUpdateSet }),
             delete: jest.fn().mockReturnValue({ where: mockDeleteWhere }),
-            execute: mockExecute
+            execute: mockExecute,
+            // Privileged writes run through withServerContext → db.transaction;
+            // hand the callback the same mock so the builder assertions still apply.
+            transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(db))
         } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
 
         // Set default return value for mockSelectFrom to return mockChain (chainable)
@@ -154,6 +157,22 @@ describe("Auth Services", () => {
                     metadata: {}
                 });
                 expect(result).toEqual(mockUserData({ displayName: "Test User" }));
+            });
+
+            it("clears the RLS GUCs inside a transaction before the insert", async () => {
+                mockInsertReturning.mockResolvedValueOnce([{ id: "user-123", email: "test@example.com" }]);
+
+                await userService.createUser({ email: "test@example.com" });
+
+                expect(db.transaction).toHaveBeenCalledTimes(1);
+                // The set_config reset must run before the insert so a leaked
+                // pooled-connection context can never scope the privileged write.
+                const firstExecuteSql = mockExecute.mock.calls[0]?.[0] as { strings?: readonly string[] } | undefined;
+                const sqlText = (firstExecuteSql?.strings ?? []).join("");
+                expect(sqlText).toContain("set_config('app.user_id', '', true)");
+                expect(sqlText).toContain("set_config('app.user_roles', '', true)");
+                expect(sqlText).toContain("set_config('app.jwt', '', true)");
+                expect(db.insert).toHaveBeenCalledWith(users);
             });
         });
 

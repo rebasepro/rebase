@@ -91,7 +91,9 @@ describe("createPostgresDatabaseConnection", () => {
         expect(cfg.max).toBe(20);
         expect(cfg.idleTimeoutMillis).toBe(30_000);
         expect(cfg.connectionTimeoutMillis).toBe(10_000);
-        expect(cfg.query_timeout).toBe(30_000);
+        // query_timeout (client) must stay above statement_timeout (server) so
+        // the server abort always wins — see the DEFAULT_POOL comment.
+        expect(cfg.query_timeout).toBe(60_000);
         expect(cfg.statement_timeout).toBe(30_000);
         expect(cfg.keepAlive).toBe(true);
         expect(cfg.keepAliveInitialDelayMillis).toBe(0);
