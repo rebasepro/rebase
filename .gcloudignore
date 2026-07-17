@@ -38,3 +38,13 @@
 /*.log
 /yarn.lock
 
+# Claude Code worktrees + session data — each worktree is a full repo checkout
+# (1.6 GB+ combined, ~60% of the upload), carrying website videos and assets.
+# Never needed for a build; the single biggest source of upload bloat and the
+# likely cause of stalled source uploads.
+.claude/
+
+# Local tooling caches
+/.fallow/
+**/.astro/
+
