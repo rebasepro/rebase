@@ -251,17 +251,32 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // Seed default roles if none exist
         // (no-op: roles are now stored inline on the users table)
 
-        // ── Migration: Add is_anonymous column (safe for existing tables) ────
-        await db.execute(sql`
-            ALTER TABLE ${sql.raw(usersTableName)}
-            ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE
-        `);
-
-        // ── Migration: Add inline roles column (safe for existing tables) ────
-        await db.execute(sql`
-            ALTER TABLE ${sql.raw(usersTableName)}
-            ADD COLUMN IF NOT EXISTS roles TEXT[] DEFAULT '{}' NOT NULL
-        `);
+        // ── Migration: reconcile the full users column set (safe for existing tables) ──
+        // CREATE TABLE IF NOT EXISTS never revisits an existing table, so a
+        // database provisioned by an older framework era is missing every
+        // column added since. Each column the auth services read or write must
+        // be back-filled here, or upgraded deployments break on the first
+        // statement that references it. `email` is deliberately absent: it has
+        // existed since the first era and cannot be added NOT NULL safely.
+        const userColumnBackfills = [
+            "display_name VARCHAR(255)",
+            "photo_url VARCHAR(500)",
+            "roles TEXT[] DEFAULT '{}' NOT NULL",
+            "password_hash VARCHAR(255)",
+            "email_verified BOOLEAN DEFAULT FALSE NOT NULL",
+            "email_verification_token VARCHAR(255)",
+            "email_verification_sent_at TIMESTAMP WITH TIME ZONE",
+            "is_anonymous BOOLEAN DEFAULT FALSE NOT NULL",
+            "metadata JSONB DEFAULT '{}' NOT NULL",
+            "created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL",
+            "updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL"
+        ];
+        for (const columnDef of userColumnBackfills) {
+            await db.execute(sql`
+                ALTER TABLE ${sql.raw(usersTableName)}
+                ADD COLUMN IF NOT EXISTS ${sql.raw(columnDef)}
+            `);
+        }
 
         // ── Migration: Copy roles from legacy junction table to inline column ──
         // If the old rebase.user_roles and rebase.roles tables exist, migrate
@@ -357,6 +372,53 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             CREATE INDEX IF NOT EXISTS idx_recovery_codes_user
             ON ${sql.raw(recoveryCodesTableName)}(user_id)
         `);
+
+        // ── Migration: clear stale FORCE ROW LEVEL SECURITY (older RLS model) ──
+        // The current model never emits FORCE: privileged auth writes run as
+        // the table owner and rely on the owner bypassing plain ENABLE RLS
+        // (see generate-postgres-ddl-logic). A table still carrying FORCE from
+        // an older framework era binds the owner too, so the first user
+        // registration after an upgrade fails with SQLSTATE 42501. Reconcile
+        // on boot; only tables actually flagged get the ALTER (and its lock).
+        try {
+            const authTablePairs: [string, string][] = [
+                [usersSchema, resolvedTable],
+                [authSchema, "user_identities"],
+                [authSchema, "refresh_tokens"],
+                [authSchema, "password_reset_tokens"],
+                [authSchema, "app_config"],
+                [authSchema, "mfa_factors"],
+                [authSchema, "mfa_challenges"],
+                [authSchema, "recovery_codes"]
+            ];
+            for (const [schemaName, tableName] of authTablePairs) {
+                const forced = await db.execute(sql`
+                    SELECT 1
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = ${schemaName}
+                      AND c.relname = ${tableName}
+                      AND c.relforcerowsecurity
+                `);
+                if (forced.rows.length > 0) {
+                    await db.execute(sql`
+                        ALTER TABLE ${sql.raw(`"${schemaName}"."${tableName}"`)}
+                        NO FORCE ROW LEVEL SECURITY
+                    `);
+                    logger.warn(
+                        `🔧 Cleared stale FORCE ROW LEVEL SECURITY on "${schemaName}"."${tableName}" ` +
+                        "(legacy RLS model — it binds the owner connection and breaks privileged auth writes)"
+                    );
+                }
+            }
+        } catch (rlsReconcileError: unknown) {
+            // Non-fatal: the connection may lack ownership on a pre-provisioned
+            // table; registration will still fail loudly (42501) if FORCE remains.
+            logger.warn(
+                `⚠️  Could not reconcile FORCE ROW LEVEL SECURITY on auth tables: ` +
+                `${rlsReconcileError instanceof Error ? rlsReconcileError.message : String(rlsReconcileError)}`
+            );
+        }
 
         logger.info("✅ Auth tables ready");
     } catch (error) {
