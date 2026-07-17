@@ -101,7 +101,41 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         if (!caller) {
             throw ApiError.notFound("Authenticated user does not exist in the database.", "USER_NOT_FOUND");
         }
+
+        // Even while no admin exists, only the earliest-registered user may claim
+        // the initial admin role. The common paths already auto-promote the first
+        // user, so this endpoint only matters once a system has reached a "users
+        // exist but no admin" state — e.g. concurrent first-registrations, or the
+        // first user being deleted. Without this gate, any authenticated user
+        // could then seize admin: a land-grab. The genuine first user is
+        // deterministic; tie-break by id so identical timestamps still resolve to
+        // a single winner.
+        if (users.length > 0) {
+            const earliest = users.reduce((a, b) => {
+                const at = new Date(a.createdAt).getTime();
+                const bt = new Date(b.createdAt).getTime();
+                if (at !== bt) return at < bt ? a : b;
+                return a.id < b.id ? a : b;
+            });
+            if (earliest.id !== userId) {
+                logger.warn("[Security Audit] Bootstrap denied: caller is not the earliest-registered user", {
+                    eventType: "auth.bootstrap.denied",
+                    callerId: userId,
+                    earliestUserId: earliest.id
+                });
+                throw ApiError.forbidden(
+                    "Only the first registered user may claim the initial admin role. " +
+                    "Ask that user to bootstrap, or assign the admin role using the service key.",
+                    "BOOTSTRAP_NOT_FIRST_USER"
+                );
+            }
+        }
+
         await authRepo.setUserRoles(userId, ["admin"]);
+        logger.info("[Security Audit] Initial admin bootstrapped", {
+            eventType: "auth.bootstrap.success",
+            userId
+        });
 
         if (config.setBootstrapCompleted) {
             await config.setBootstrapCompleted();
