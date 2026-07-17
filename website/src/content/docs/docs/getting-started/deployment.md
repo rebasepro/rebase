@@ -4,6 +4,25 @@ sidebar_label: Deployment
 description: Deploy your Rebase project to production using Docker, cloud platforms, or manual setups.
 ---
 
+## What a Deployment Serves
+
+A Rebase project deploys as **one server at one URL** (on Rebase Cloud: `https://<project>.apps.rebase.pro`). That server handles:
+
+- **`/api/*`** — the data API, authentication, realtime, and storage
+- **everything else** — your built `frontend/` as a static SPA
+
+There is no separate admin URL: the admin panel is part of your frontend, so where it appears depends on what your frontend is.
+
+| Project type | Root URL shows | Admin panel is at |
+|--------------|----------------|-------------------|
+| Default scaffold (`rebase init`) | The admin panel | `/` — the frontend **is** the admin |
+| Custom product frontend | Your app | Wherever you mount it, commonly `/admin` — see [Changing the Base URL](#changing-the-base-url) |
+| Backend-only project | Nothing (API only) | Not deployed |
+
+:::note[First visit]
+On the first visit to a fresh deployment's admin, Rebase shows a bootstrap screen to **create your admin account**. The first registered account receives admin privileges — claim it right after deploying.
+:::
+
 ## Docker Compose (Recommended)
 
 The generated project includes a `Dockerfile` and `docker-compose.yml`. This is the simplest way to deploy:
@@ -131,6 +150,30 @@ spinner with no data fetch:
 Set **either** the router `basename` **or** `RebaseAdmin basePath` — not both, or the
 prefix is applied twice.
 :::
+
+### Product App + Admin in One Deployment
+
+The common reason to move the admin to `/admin` is shipping your **own product app**
+at the root of the same deployment. A single Vite entry can serve both, split by URL,
+so each app is lazy-loaded and product visitors never download the admin bundle:
+
+```tsx title="frontend/src/main.tsx"
+const isAdmin = window.location.pathname.startsWith("/admin");
+
+const ProductApp = lazy(() => import("./App"));
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+
+if (isAdmin) {
+    // The admin uses useBlocker → needs a data router
+    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
+    root.render(<RouterProvider router={router} />);
+} else {
+    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
+}
+```
+
+The backend needs no changes for this pattern — the API stays at `/api` and the SPA
+catch-all serves `index.html` for both `/` and `/admin/*`.
 
 ## Next Steps
 

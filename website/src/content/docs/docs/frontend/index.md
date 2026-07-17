@@ -8,6 +8,8 @@ description: Build and customize the Rebase admin panel with React — controlle
 
 The Rebase frontend is a **React framework** that renders your admin panel. It reads your collection definitions and generates tables, forms, navigation, and routing automatically.
 
+In the default scaffold, the admin panel **is** the frontend: it's served at the root of your deployed URL. If you build your own product app instead, you can mount the admin under a prefix like `/admin` in the same deployment — see [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
+
 The key components that make up a Rebase frontend:
 
 ```tsx

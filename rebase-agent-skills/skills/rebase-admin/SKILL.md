@@ -745,6 +745,36 @@ Views participate in the same navigation group system as collections. Use the `g
 
 ---
 
+## 11. Where the Admin Lives — Mounting Under a URL Prefix
+
+In the default scaffold the frontend **is** the admin panel: `App.tsx` renders `<RebaseAuth>` + `<RebaseAdmin>` + `<RebaseShell>` at the root, so the deployed URL shows the admin directly. There is no separate admin URL — in production one server serves both the API (`/api/*`) and this SPA.
+
+When a project ships its **own product app** as the frontend, the admin is mounted under a prefix (commonly `/admin`) instead. Split the Vite entry by URL so each app is lazy-loaded and product visitors never download the admin bundle:
+
+```tsx
+// frontend/src/main.tsx
+const isAdmin = window.location.pathname.startsWith("/admin");
+const ProductApp = lazy(() => import("./App"));
+const AdminApp = lazy(() => import("./AdminApp"));
+
+if (isAdmin) {
+    // The admin uses useBlocker → needs a DATA router
+    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
+    root.render(<RouterProvider router={router} />);
+} else {
+    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
+}
+```
+
+```tsx
+// frontend/src/AdminApp.tsx — tell the CMS about the prefix
+<RebaseAdmin collections={collections} basePath="/admin" />
+```
+
+> **IMPORTANT FOR AGENTS:** Choose **either** a router `basename="/admin"` **or** `<RebaseAdmin basePath="/admin">` — never both, or the prefix is applied twice. Without either, collection views hang on a spinner because URL⇄collection resolution never matches. `<RebaseAdmin>` requires a **data router** (`createBrowserRouter`) because it uses `useBlocker`.
+
+---
+
 ## Exported Components
 
 The admin package exports the following components (from `@rebasepro/admin`):

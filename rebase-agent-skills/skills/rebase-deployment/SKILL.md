@@ -38,6 +38,36 @@ rebase deploy
 rebase deploy --env dev
 ```
 
+### What a Cloud Deployment Serves
+
+`rebase deploy` ships **one container** per project, served at `https://<project>.apps.rebase.pro`. That container runs your backend, which handles:
+
+- **`/api/*`** — the data API, auth, realtime, storage
+- **everything else** — your built `frontend/` as a static SPA (via `serveSPA()`, see below)
+
+There is **no separate admin URL** — the admin panel is part of your frontend, so where it appears depends on what your frontend is:
+
+| Project type | What the root URL shows | Where the admin is |
+|--------------|------------------------|--------------------|
+| Default scaffold (`rebase init`, cms flavor) | The admin panel itself (login / bootstrap) | `/` — the frontend **is** the admin |
+| Custom product frontend | Your product app | Wherever you mount it — commonly `/admin` (see below) |
+| Backend-only (`--flavor backend`) | Nothing (API only) | Not deployed |
+
+> **IMPORTANT FOR AGENTS:** On the **first visit** to a freshly deployed project's admin, Rebase shows the bootstrap screen ("Create your admin account"). The earliest-registered account receives admin privileges — the project owner should claim it immediately after deploying. Never fill this form on the user's behalf.
+
+**Mounting the admin at `/admin` alongside a product app** — a single Vite entry can serve both, split by URL, so visitors never download the admin bundle:
+
+```tsx
+// frontend/src/main.tsx
+const isAdmin = window.location.pathname.startsWith("/admin");
+const ProductApp = lazy(() => import("./App"));
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" .../>
+
+// route "/admin/*" → AdminApp, everything else → ProductApp
+```
+
+Set **either** a router `basename="/admin"` **or** `<RebaseAdmin basePath="/admin">` — not both, or the prefix is applied twice.
+
 ---
 
 ## Docker (Self-Hosted)
