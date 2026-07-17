@@ -8,7 +8,7 @@ A sample React + Vite app demonstrating the `@rebasepro/client` SDK.
 - **Collection Browsing** — Navigate Authors, Posts, Tags, Profiles
 - **CRUD Operations** — Create, edit, delete records via the SDK
 - **Pagination** — Server-side pagination with page navigation
-- **Dark Theme** — Premium dark UI design
+- **Dark Theme** — follows the Rebase UI design language (blue primary, neutral surfaces)
 
 ## Prerequisites
 

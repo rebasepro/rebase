@@ -1,40 +1,41 @@
 :root {
-  /* Color palette */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-card: #1a1a2e;
-  --bg-card-hover: #22223a;
-  --bg-input: #16162a;
-  --border: #2a2a45;
-  --border-focus: #6c5ce7;
-  
-  --text-primary: #e8e8f0;
-  --text-secondary: #9090b0;
-  --text-muted: #6060a0;
-  
-  --accent: #6c5ce7;
-  --accent-hover: #7d6ff0;
-  --accent-glow: rgba(108, 92, 231, 0.3);
-  --success: #00b894;
-  --success-bg: rgba(0, 184, 148, 0.12);
-  --danger: #e74c3c;
-  --danger-bg: rgba(231, 76, 60, 0.12);
-  --warning: #f39c12;
-  --warning-bg: rgba(243, 156, 18, 0.12);
-  
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-xs: 6px;
+  /* Color palette — mirrors the @rebasepro/ui theme (see packages/ui/src/index.css
+     and the /debug/ui UIReferenceView): blue primary, neutral surface scale. */
+  --bg-primary: #111111;      /* surface-800: dark main content */
+  --bg-secondary: #0a0a0a;    /* surface-900: drawer / paper */
+  --bg-card: #0a0a0a;         /* paperMixin: dark:bg-surface-900 + border */
+  --bg-card-hover: #171717;
+  --bg-input: #171717;
+  --border: #262626;          /* surface-700: defaultBorderMixin */
+  --border-focus: #0070F4;
+
+  --text-primary: #ffffff;    /* text-primary-dark */
+  --text-secondary: #a0a0a9;  /* text-secondary-dark */
+  --text-muted: #757580;      /* text-disabled-dark */
+
+  --accent: #0070F4;          /* primary */
+  --accent-hover: #3d8ef7;    /* primary-light */
+  --accent-glow: rgba(0, 112, 244, 0.25);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.12);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+
+  --radius: 8px;              /* rounded-lg */
+  --radius-sm: 6px;           /* rounded-md */
+  --radius-xs: 4px;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.4);
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  font-family: 'Rubik', 'Roboto', 'Helvetica', 'Arial', sans-serif;
   color: var(--text-primary);
   background: var(--bg-primary);
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 * {
   margin: 0;
@@ -85,12 +86,12 @@ body {
 .sidebar-logo-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  background: var(--accent);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 18px;
   color: white;
 }
@@ -98,10 +99,7 @@ body {
 .sidebar-logo h1 {
   font-size: 18px;
   font-weight: 600;
-  background: linear-gradient(135deg, var(--text-primary), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--text-primary);
 }
 
 .sidebar-logo span {
@@ -142,13 +140,14 @@ body {
   text-align: left;
 }
 
+/* DrawerNavigationItem pattern: hover bg-primary/5, active bg-primary/10 */
 .sidebar-item:hover {
-  background: rgba(108, 92, 231, 0.08);
+  background: rgba(0, 112, 244, 0.05);
   color: var(--text-primary);
 }
 
 .sidebar-item.active {
-  background: rgba(108, 92, 231, 0.15);
+  background: rgba(0, 112, 244, 0.10);
   color: var(--accent);
 }
 
@@ -174,7 +173,7 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -399,7 +398,7 @@ tr:last-child td {
 }
 
 tr:hover td {
-  background: rgba(108, 92, 231, 0.04);
+  background: rgba(0, 112, 244, 0.04);
 }
 
 .table-empty {
@@ -464,7 +463,7 @@ tr:hover td {
 
 .badge-archived,
 .badge-review {
-  background: rgba(108, 92, 231, 0.12);
+  background: rgba(0, 112, 244, 0.12);
   color: var(--accent);
 }
 
@@ -569,7 +568,7 @@ tr:hover td {
   box-shadow:
     0 0 0 1px var(--border),
     0 20px 60px -12px rgba(0, 0, 0, 0.5),
-    0 0 80px -20px rgba(108, 92, 231, 0.15);
+    0 0 80px -20px rgba(0, 112, 244, 0.15);
 }
 
 /* ---- Hero (left panel) ---- */
@@ -578,7 +577,7 @@ tr:hover td {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(160deg, #14142b 0%, #1a1a3e 50%, #0f0f24 100%);
+  background: linear-gradient(160deg, #0f1524 0%, #12203a 50%, #0a101e 100%);
   padding: 48px 40px;
   display: flex;
   flex-direction: column;
@@ -597,7 +596,7 @@ tr:hover td {
 .auth-hero-orb-1 {
   width: 280px;
   height: 280px;
-  background: rgba(108, 92, 231, 0.45);
+  background: rgba(0, 112, 244, 0.35);
   top: -60px;
   left: -40px;
   animation-delay: 0s;
@@ -606,7 +605,7 @@ tr:hover td {
 .auth-hero-orb-2 {
   width: 200px;
   height: 200px;
-  background: rgba(167, 139, 250, 0.35);
+  background: rgba(61, 142, 247, 0.25);
   bottom: 30px;
   right: -30px;
   animation-delay: -4s;
@@ -645,20 +644,20 @@ tr:hover td {
 .auth-hero-logo-icon {
   width: 42px;
   height: 42px;
-  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  background: var(--accent);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 20px;
   color: white;
-  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 112, 244, 0.35);
 }
 
 .auth-hero-logo-text {
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   background: linear-gradient(135deg, #fff, rgba(255,255,255,0.7));
   -webkit-background-clip: text;
   background-clip: text;
@@ -668,10 +667,10 @@ tr:hover td {
 
 .auth-hero-title {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, #fff 30%, rgba(167,139,250,0.9));
+  background: linear-gradient(135deg, #fff 30%, rgba(61, 142, 247, 0.9));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -770,7 +769,7 @@ tr:hover td {
 .auth-mode-tab.active {
   background: var(--accent);
   color: white;
-  box-shadow: 0 2px 8px rgba(108, 92, 231, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 112, 244, 0.35);
 }
 
 .auth-title {
@@ -944,11 +943,8 @@ tr:hover td {
 
 .stat-value {
   font-size: 28px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--text-primary), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 /* ===== Loading ===== */
