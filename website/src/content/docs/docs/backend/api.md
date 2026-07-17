@@ -317,7 +317,9 @@ Storage works the same way, under the `storage` namespace:
 `{"collection": "storage", "operations": ["read", "write"]}` lets the key
 download/list (`read`), upload and create folders (`write`), and delete files
 (`delete`). The global `"*"` wildcard also grants storage. A key without such
-an entry cannot touch storage.
+an entry cannot touch storage. TUS resumable-upload routes count as `write`
+for every step (including the offset check and cancel), so a write-scoped key
+can complete an upload on its own.
 
 ### Admin Access for Agents and MCP
 

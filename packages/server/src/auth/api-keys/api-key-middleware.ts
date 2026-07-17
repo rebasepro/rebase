@@ -138,12 +138,39 @@ code: "INTERNAL_ERROR" }
         }, 500);
     }
 
-    // Touch last_used_at in the background (non-blocking)
-    store.updateLastUsed(apiKey.id).catch(() => {
-        // Swallowed intentionally — logged inside the store
-    });
+    // Touch last_used_at in the background (non-blocking), debounced: every
+    // API-key request on every surface routes through here, and per-request
+    // UPDATEs would serialize on the single api_keys row for a busy key.
+    // Minute-resolution is plenty for a "last used" display.
+    const lastTouch = lastUsedTouchedAt.get(apiKey.id);
+    const now = Date.now();
+    if (!lastTouch || now - lastTouch >= LAST_USED_DEBOUNCE_MS) {
+        lastUsedTouchedAt.set(apiKey.id, now);
+        store.updateLastUsed(apiKey.id).catch(() => {
+            // Swallowed intentionally — logged inside the store
+        });
+    }
 
     return true;
+}
+
+/** Per-process debounce state for last_used_at touches. */
+const lastUsedTouchedAt = new Map<string, number>();
+const LAST_USED_DEBOUNCE_MS = 60_000;
+
+/**
+ * Shared 403 response for API-key permission denials outside the REST
+ * generator (storage and functions guards). One envelope, one code — a
+ * change to the error contract happens in one place.
+ */
+function forbidApiKey(c: Context<HonoEnv>, operation: string, resource: string, grantHint: string): Response {
+    return c.json({
+        error: {
+            message: `API key does not have "${operation}" permission for ${resource}. ` +
+                `Grant it with a permission entry like { "collection": "${grantHint}", "operations": ["${operation}"] }.`,
+            code: "API_KEY_FORBIDDEN"
+        }
+    }, 403);
 }
 
 /**
@@ -155,21 +182,22 @@ code: "INTERNAL_ERROR" }
  * `"storage"` permission entry (or the global `"*"` wildcard) covering the
  * operation derived from the HTTP method. Requests not authenticated via an
  * API key pass through to the storage router's own auth gates.
+ *
+ * TUS resumable-upload routes (`/tus`, `/tus/:id`) are classified as `write`
+ * for EVERY method: the protocol's offset check is a GET and its cancel is a
+ * DELETE, but both are steps of an upload — a write-scoped key must be able
+ * to complete (and abort) its own resumable upload without also holding
+ * `read`/`delete` on stored objects.
  */
 export function createStorageApiKeyGuard(): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
         const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
         if (!apiKey) return next();
 
-        const operation = httpMethodToOperation(c.req.method);
+        const isTus = /\/tus(\/|$)/.test(c.req.path);
+        const operation = isTus ? "write" : httpMethodToOperation(c.req.method);
         if (!isStorageAllowed(apiKey.permissions, operation)) {
-            return c.json({
-                error: {
-                    message: `API key does not have "${operation}" permission for storage. ` +
-                        `Grant it with a permission entry like { "collection": "storage", "operations": ["${operation}"] }.`,
-                    code: "API_KEY_FORBIDDEN"
-                }
-            }, 403);
+            return forbidApiKey(c, operation, "storage", "storage");
         }
 
         return next();
@@ -200,19 +228,21 @@ export function createFunctionApiKeyGuard(mountPrefix: string): MiddlewareHandle
         const path = c.req.path;
         const idx = path.indexOf(mountPrefix);
         const rest = idx < 0 ? "" : path.slice(idx + mountPrefix.length);
-        const functionName = decodeURIComponent(rest.split("/").filter(Boolean)[0] ?? "");
+        const rawName = rest.split("/").filter(Boolean)[0] ?? "";
+        let functionName: string;
+        try {
+            functionName = decodeURIComponent(rawName);
+        } catch {
+            // Malformed percent-encoding (e.g. %ZZ) — fall back to the raw
+            // segment rather than throwing a 500. It won't match any
+            // functions/<name> entry, so only namespace-wide grants pass.
+            functionName = rawName;
+        }
 
         const operation = httpMethodToOperation(c.req.method);
         if (!isFunctionAllowed(apiKey.permissions, functionName, operation)) {
             const resource = functionName ? `function "${functionName}"` : "the functions index";
-            return c.json({
-                error: {
-                    message: `API key does not have "${operation}" permission for ${resource}. ` +
-                        "Grant it with a permission entry like " +
-                        `{ "collection": "functions${functionName ? `/${functionName}` : ""}", "operations": ["${operation}"] }.`,
-                    code: "API_KEY_FORBIDDEN"
-                }
-            }, 403);
+            return forbidApiKey(c, operation, resource, `functions${functionName ? `/${functionName}` : ""}`);
         }
 
         return next();

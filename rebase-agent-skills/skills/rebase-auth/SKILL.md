@@ -468,7 +468,7 @@ By default API keys get the `service` role (data access only). Set `"admin": tru
 
 ```bash
 # CLI — create an admin API key
-rebase api-keys create --name "My Agent" --admin
+rebase api-keys create --name "My Agent" --admin --full-access
 
 # REST
 curl -X POST http://localhost:3000/api/admin/api-keys \
@@ -624,7 +624,7 @@ rebase api-keys list
 rebase api-keys create --name "Read Only" --permissions '[{"collection":"orders","operations":["read"]}]'
 
 # Create an admin key (for agents / MCP / CI)
-rebase api-keys create --name "My Agent" --admin
+rebase api-keys create --name "My Agent" --admin --full-access
 
 # Revoke a key
 rebase api-keys revoke <key-id>

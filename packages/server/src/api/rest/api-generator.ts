@@ -93,6 +93,21 @@ export class RestApiGenerator {
     }
 
     /**
+     * API key permission check for nested paths. The operation targets the
+     * LAST collection in the path (e.g. "posts" for /authors/1/posts), so
+     * that is the slug the key must hold permission for — checking the
+     * parent instead would let a key scoped to "authors" write "posts".
+     * `parseSubPath` always yields a collectionPath ending in a collection
+     * slug, never an id.
+     */
+    private enforceSubcollectionApiKeyPermission(
+        c: { get: (key: string) => unknown; req: { method: string } },
+        collectionPath: string
+    ): void {
+        this.enforceApiKeyPermission(c, collectionPath.split("/").pop()!);
+    }
+
+    /**
      * Get the request-scoped driver. Throws if none is set — never falls
      * back to the unscoped `this.driver` to avoid bypassing RLS/auth.
      */
@@ -488,11 +503,7 @@ id };
 
             const driver = this.getScopedDriver(c);
 
-            // The operation targets the LAST collection in the nested path
-            // (e.g. "posts" for /authors/1/posts), so that is the slug the
-            // API key must hold permission for — checking the parent instead
-            // would let a key scoped to "authors" write "posts".
-            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
+            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
 
 
 
@@ -561,11 +572,7 @@ id };
             const driver = this.getScopedDriver(c);
 
 
-            // The operation targets the LAST collection in the nested path
-            // (e.g. "posts" for /authors/1/posts), so that is the slug the
-            // API key must hold permission for — checking the parent instead
-            // would let a key scoped to "authors" write "posts".
-            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
+            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
             const body = await parseJsonBody(c);
 
 
@@ -594,11 +601,7 @@ id };
             const driver = this.getScopedDriver(c);
 
 
-            // The operation targets the LAST collection in the nested path
-            // (e.g. "posts" for /authors/1/posts), so that is the slug the
-            // API key must hold permission for — checking the parent instead
-            // would let a key scoped to "authors" write "posts".
-            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
+            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
 
             const body = await parseJsonBody(c);
 
@@ -629,11 +632,7 @@ id };
             const driver = this.getScopedDriver(c);
 
 
-            // The operation targets the LAST collection in the nested path
-            // (e.g. "posts" for /authors/1/posts), so that is the slug the
-            // API key must hold permission for — checking the parent instead
-            // would let a key scoped to "authors" write "posts".
-            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
+            this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
 
             const existingEntity = await driver.fetchOne({
                 path: parsed.collectionPath,

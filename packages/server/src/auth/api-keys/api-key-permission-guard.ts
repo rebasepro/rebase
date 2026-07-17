@@ -64,6 +64,25 @@ export function isOperationAllowed(
 }
 
 /**
+ * Check whether the given permissions array allows a storage operation.
+ *
+ * Storage, like functions, lives outside the collection namespace: an entry
+ * with collection `"storage"` grants storage access for the listed
+ * operations (GET routes → `read`, upload/folder/tus → `write`,
+ * DELETE routes → `delete`), and the global `"*"` wildcard also matches.
+ * A collection-scoped key gets no storage access at all.
+ *
+ * Matching is exactly {@link isOperationAllowed} with `"storage"` as the
+ * resource name — delegated so the semantics can never drift.
+ */
+export function isStorageAllowed(
+    permissions: ApiKeyPermission[],
+    operation: ApiKeyOperation
+): boolean {
+    return isOperationAllowed(permissions, "storage", operation);
+}
+
+/**
  * Check whether the given permissions array allows invoking a custom function.
  *
  * Functions live outside the collection namespace, so they have their own
@@ -82,28 +101,6 @@ export function isOperationAllowed(
  * invoke functions — before this guard existed, any valid key could call
  * every function.
  */
-/**
- * Check whether the given permissions array allows a storage operation.
- *
- * Storage, like functions, lives outside the collection namespace: an entry
- * with collection `"storage"` grants storage access for the listed
- * operations (GET routes → `read`, upload/folder/tus → `write`,
- * DELETE routes → `delete`), and the global `"*"` wildcard also matches.
- * A collection-scoped key gets no storage access at all.
- */
-export function isStorageAllowed(
-    permissions: ApiKeyPermission[],
-    operation: ApiKeyOperation
-): boolean {
-    for (const perm of permissions) {
-        const match = perm.collection === "*" || perm.collection === "storage";
-        if (match && perm.operations.includes(operation)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 export function isFunctionAllowed(
     permissions: ApiKeyPermission[],
     functionName: string,

@@ -971,12 +971,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // key and admin API keys while other admin surfaces accepted them. One
     // gate, same acceptance everywhere: `rk_` admin keys (via pre-auth), the
     // service key, and admin JWTs.
+    // Whether admin surfaces get a gate at all — global for this boot, so
+    // computed once rather than per router.
+    const adminSurfacesGated = !!authAdapter && (
+        isAuthAdapter(config.auth!) ||
+        ((config.auth as RebaseAuthConfig).requireAuth !== false && !!(config.auth as RebaseAuthConfig).jwtSecret)
+    );
     const applyAdminGate = (router: Hono<HonoEnv>, surface: string): void => {
-        const gated = !!authAdapter && (
-            isAuthAdapter(config.auth!) ||
-            ((config.auth as RebaseAuthConfig).requireAuth !== false && !!(config.auth as RebaseAuthConfig).jwtSecret)
-        );
-        if (!gated) {
+        if (!adminSurfacesGated) {
             logger.warn(
                 `${surface} routes are mounted WITHOUT an auth gate ` +
                 "(no auth configured, requireAuth: false, or no jwtSecret) — " +
@@ -1325,8 +1327,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // store so one caller has one budget. Previously only /api/data
             // was limited, so a key's rate_limit did not bound its function
             // traffic at all.
+            //
+            // The anonymous bucket is disabled here: functions default to
+            // public access precisely for webhook receivers (Stripe, GitHub),
+            // whose bursts come from a handful of provider IPs — an IP-keyed
+            // 300/window cap would 429 them. Anonymous function traffic was
+            // never limited before; keys and signed-in users now are.
             if (rateLimitConfig) {
-                functionsRouter.use("/*", createDataRateLimiter(rateLimitConfig));
+                functionsRouter.use("/*", createDataRateLimiter({ ...rateLimitConfig, anonymous: null }));
             }
 
             const fnRoutes = createFunctionRoutes(loadedFunctions);

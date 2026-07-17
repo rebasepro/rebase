@@ -175,8 +175,12 @@ export interface DataRateLimitConfig {
     apiKey?: number;
     /** Per signed-in user. Default 1000. */
     user?: number;
-    /** Per IP, for requests with no principal at all. Default 300. */
-    anonymous?: number;
+    /**
+     * Per IP, for requests with no principal at all. Default 300.
+     * `null` disables the anonymous bucket entirely — used for routers whose
+     * anonymous traffic must not be throttled (public webhook functions).
+     */
+    anonymous?: number | null;
     /** Share counts across replicas. Defaults to this process's memory. */
     store?: RateLimitStore;
 }

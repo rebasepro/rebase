@@ -337,6 +337,13 @@ operations: ["read", "write", "delete"] }]);
 operations: ["read", "write", "delete"] }]);
         expect((await app.request("/api/functions/send-email", { method: "POST" })).status).toBe(200);
     });
+
+    it("handles malformed percent-encoding with 403, not a 500", async () => {
+        const app = createApp([{ collection: "functions/send-email",
+operations: ["write"] }]);
+        const res = await app.request("/api/functions/%ZZ", { method: "POST" });
+        expect(res.status).toBe(403);
+    });
 });
 
 // ── 5. Storage permissions for API keys ─────────────────────────────────────
@@ -380,6 +387,17 @@ operations: ["read", "write", "delete"] }]);
         expect(res.status).toBe(403);
         const body = await res.json() as { error: { code: string } };
         expect(body.error.code).toBe("API_KEY_FORBIDDEN");
+    });
+
+    it("classifies every TUS route as write so a write-only key can resume uploads", async () => {
+        const app = createApp([{ collection: "storage",
+operations: ["write"] }]);
+        // The TUS offset check is a GET and cancel is a DELETE, but both are
+        // steps of an upload — write permission must be sufficient.
+        expect((await app.request("/tus/abc123")).status).toBe(200);
+        expect((await app.request("/tus/abc123", { method: "DELETE" })).status).toBe(200);
+        // ...while plain object reads still require "read".
+        expect((await app.request("/file/pic.png")).status).toBe(403);
     });
 
     it("allows a full-access (*) key", async () => {
@@ -431,5 +449,33 @@ body: bigBody });
         const res = await app.request("/upload", { method: "POST",
 body: bigBody });
         expect(res.status).toBe(200);
+    });
+});
+
+// ── 7. Anonymous bucket can be disabled (public webhook functions) ──────────
+
+describe("createDataRateLimiter with anonymous: null", () => {
+    it("does not throttle anonymous requests but still throttles users", async () => {
+        const { createDataRateLimiter } = await import("../src/auth/rate-limiter");
+        const app = new Hono<HonoEnv>();
+        let asUser = false;
+        app.use("/*", async (c, next) => {
+            if (asUser) c.set("user", { userId: "u1",
+roles: [] });
+            await next();
+        });
+        app.use("/*", createDataRateLimiter({ anonymous: null,
+user: 1 }));
+        app.post("/hook", (c) => c.json({ ok: true }));
+
+        // Anonymous: repeated calls all pass — webhooks must not 429.
+        for (let i = 0; i < 5; i++) {
+            expect((await app.request("/hook", { method: "POST" })).status).toBe(200);
+        }
+
+        // Signed-in user: limited (limit 1 → second call 429).
+        asUser = true;
+        expect((await app.request("/hook", { method: "POST" })).status).toBe(200);
+        expect((await app.request("/hook", { method: "POST" })).status).toBe(429);
     });
 });
