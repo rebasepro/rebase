@@ -14,6 +14,12 @@ import { listProjects, createProject, projectInfo, deleteProject } from "./proje
 import { deployCommand, logsCommand } from "./deploy";
 import { orgsCommand } from "./orgs";
 import { dbCommand } from "./databases";
+import { envCommand } from "./env";
+import { domainsCommand } from "./domains";
+import { extensionsCommand } from "./extensions";
+import { settingsCommand } from "./settings";
+import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deployments";
+import { powerCommand } from "./power";
 import {
     statusCommand,
     metricsCommand,
@@ -22,7 +28,7 @@ import {
     clustersCommand,
     billingCommand
 } from "./resources";
-import { requireProjectId } from "./context";
+import { requireProjectId, initOutputMode } from "./context";
 
 /** Positional tokens after `rebase cloud` (group, action, …). */
 function positionals(rawArgs: string[]): string[] {
@@ -31,6 +37,10 @@ permissive: true })._;
 }
 
 export async function cloudCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    // Latch the output mode FIRST — before anything can print or `fail` — so the
+    // whole command family agrees on human vs. machine-readable output.
+    initOutputMode(rawArgs);
+
     const pos = positionals(rawArgs);
     const group = subcommand && subcommand !== "--help" ? subcommand : pos[0];
     const action = pos[1];
@@ -79,11 +89,42 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "logs":
             await logsCommand(rawArgs, requireProjectId(rawArgs));
             break;
+        case "deployments":
+        case "releases":
+            await deploymentsGroup(action, rawArgs);
+            break;
+        case "rollback":
+            await rollbackCommand(rawArgs);
+            break;
+        case "cancel":
+            await cancelCommand(rawArgs);
+            break;
+        case "start":
+        case "stop":
+        case "restart":
+            await powerCommand(group, rawArgs);
+            break;
         case "status":
             await statusCommand(rawArgs);
             break;
         case "metrics":
             await metricsCommand(rawArgs);
+            break;
+
+        /* env / domains / extensions / settings */
+        case "env":
+            await envCommand(action, rawArgs);
+            break;
+        case "domains":
+        case "domain":
+            await domainsCommand(action, rawArgs);
+            break;
+        case "extensions":
+        case "extension":
+            await extensionsCommand(action, rawArgs);
+            break;
+        case "settings":
+            await settingsCommand(action, rawArgs);
             break;
 
         /* orgs */
@@ -148,6 +189,21 @@ async function projectsGroup(action: string | undefined, rawArgs: string[]): Pro
     }
 }
 
+async function deploymentsGroup(action: string | undefined, rawArgs: string[]): Promise<void> {
+    switch (action) {
+        case "list":
+        case undefined:
+            await deploymentsListCommand(rawArgs);
+            break;
+        case "--help":
+            printCloudHelp();
+            break;
+        default:
+            console.error(chalk.red(`Unknown deployments command: ${action}`));
+            process.exit(1);
+    }
+}
+
 function printCloudHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud")} — Manage your apps on Rebase Cloud
@@ -175,15 +231,26 @@ ${chalk.green.bold("Projects")}
 ${chalk.green.bold("Deploy & observe")}
   ${chalk.blue.bold("deploy")} ${chalk.gray("[--source .]")}     Deploy the linked project + stream build logs
   ${chalk.blue.bold("logs")} ${chalk.gray("[--runtime] [-f]")}   Show build (or runtime) logs
+  ${chalk.blue.bold("deployments list")}        Deployment history ${chalk.gray("(status, duration, trigger)")}
+  ${chalk.blue.bold("rollback")} ${chalk.gray("[id] [-y]")}       Roll back to a successful deploy
+  ${chalk.blue.bold("cancel")} ${chalk.gray("[-y]")}             Cancel the in-flight build
+  ${chalk.blue.bold("start|stop|restart")} ${chalk.gray("[-y]")}  Power ops ${chalk.gray("(stop/restart need -y)")}
   ${chalk.blue.bold("status")}                  One-glance project status
   ${chalk.blue.bold("metrics")}                 Live CPU / memory / disk
+
+${chalk.green.bold("Config")}
+  ${chalk.blue.bold("env list|set|unset|reveal|pull")}
+  ${chalk.blue.bold("domains list|add|verify|remove")}
+  ${chalk.blue.bold("extensions list|enable|disable")}
+  ${chalk.blue.bold("settings show|set")}       Name / branch / repo / subdomain
 
 ${chalk.green.bold("Organizations")}
   ${chalk.blue.bold("orgs list|create|members")}
 
 ${chalk.green.bold("Databases")}
-  ${chalk.blue.bold("db list|create|test")}
-  ${chalk.blue.bold("db backup list|create|restore")}
+  ${chalk.blue.bold("db list|create|info|test")}
+  ${chalk.blue.bold("db backup list|create|restore|status|download")}
+  ${chalk.blue.bold("db pitr status|restore|cutover|discard")}
 
 ${chalk.green.bold("Other resources")}
   ${chalk.blue.bold("webhooks list|create|delete")}
@@ -193,6 +260,7 @@ ${chalk.green.bold("Other resources")}
   ${chalk.blue.bold("billing")}                 Show billing account + card on file
 
 ${chalk.green.bold("Global options")}
+  ${chalk.blue("--json")}                  Machine-readable output ${chalk.gray("(also when piped, or REBASE_JSON=1)")}
   ${chalk.blue("--url <origin>")}          Target a specific control plane ${chalk.gray("(or REBASE_CLOUD_URL)")}
   ${chalk.blue("--project, -p <id>")}      Operate on a project without linking
 

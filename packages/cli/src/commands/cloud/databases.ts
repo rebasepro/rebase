@@ -9,7 +9,18 @@
 import arg from "arg";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { requireClient, requireProjectId, colorStatus, keyValues, success, fail, reportError } from "./context";
+import {
+    requireClient,
+    requireProjectId,
+    cloudPositionals,
+    emit,
+    confirmDestructive,
+    colorStatus,
+    keyValues,
+    success,
+    fail,
+    reportError
+} from "./context";
 
 interface DatabaseRow {
     id: string | number;
@@ -35,11 +46,17 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         case "create":
             await createDatabase(rawArgs);
             break;
+        case "info":
+            await dbInfo(rawArgs);
+            break;
         case "test":
             await testDatabase(rawArgs);
             break;
         case "backup":
             await backupCommand(rawArgs);
+            break;
+        case "pitr":
+            await pitrCommand(rawArgs);
             break;
         case "--help":
             printDbHelp();
@@ -154,6 +171,92 @@ async function testDatabase(rawArgs: string[]): Promise<void> {
     }
 }
 
+/* ─── db info ──────────────────────────────────────────────────── */
+
+interface DbInfoResponse {
+    type: "managed" | "byodb";
+    host: string | null;
+    port: string | null;
+    database: string | null;
+    username: string | null;
+    passwordAvailable: boolean;
+    portForward: { namespace: string; service: string; localPort: number; remotePort: number } | null;
+    unavailableReason: string | null;
+}
+
+/**
+ * `rebase cloud db info [--reveal]` — where a project's database actually lives.
+ *
+ * The password is NEVER in the default output; `--reveal` fetches it through the
+ * separate reveal call, and it appears in JSON only when `--reveal` is given.
+ * Any field the server could not resolve comes back `null` and is rendered as
+ * unavailable, never a placeholder.
+ */
+async function dbInfo(rawArgs: string[]): Promise<void> {
+    const args = arg({ "--reveal": Boolean, "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const projectId = requireProjectId(rawArgs);
+    const { client } = await requireClient(rawArgs);
+
+    try {
+        const info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, { method: "GET", path: projectId });
+
+        let password: string | undefined;
+        let connectionString: string | undefined;
+        if (args["--reveal"]) {
+            if (!info.passwordAvailable) {
+                fail("No password is available to reveal for this database.", info.unavailableReason ?? undefined, "password_unavailable");
+            }
+            const revealed = await client.functions.invoke<{ password: string; connectionString: string }>(
+                "db-info",
+                { projectId },
+                { path: "reveal" }
+            );
+            password = revealed.password;
+            connectionString = revealed.connectionString;
+        }
+
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  🗄  Database — project ${projectId}`) + chalk.gray(`  (${info.type})`));
+                console.log("");
+                keyValues([
+                    ["Host", info.host],
+                    ["Port", info.port],
+                    ["Database", info.database],
+                    ["Username", info.username],
+                    ["Password", info.passwordAvailable ? (password ?? chalk.gray("hidden — pass --reveal")) : chalk.gray("unavailable")],
+                    ["Connection", connectionString]
+                ]);
+                if (info.unavailableReason) {
+                    console.log(chalk.gray(`  ${info.unavailableReason}`));
+                }
+                if (info.portForward) {
+                    const pf = info.portForward;
+                    console.log("");
+                    console.log(chalk.gray(`  Port-forward:  kubectl -n ${pf.namespace} port-forward svc/${pf.service} ${pf.localPort}:${pf.remotePort}`));
+                }
+                console.log("");
+            },
+            {
+                projectId,
+                type: info.type,
+                host: info.host,
+                port: info.port,
+                database: info.database,
+                username: info.username,
+                passwordAvailable: info.passwordAvailable,
+                portForward: info.portForward,
+                unavailableReason: info.unavailableReason,
+                // Only present when explicitly revealed.
+                ...(args["--reveal"] ? { password, connectionString } : {})
+            }
+        );
+    } catch (e) {
+        reportError(e, "Failed to load database info");
+    }
+}
+
 /* ─── backups ──────────────────────────────────────────────────── */
 
 async function backupCommand(rawArgs: string[]): Promise<void> {
@@ -162,44 +265,92 @@ async function backupCommand(rawArgs: string[]): Promise<void> {
     const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
 
+    const args = arg({ "--yes": Boolean, "-y": "--yes" }, { argv: rawArgs.slice(2), permissive: true });
+
     try {
         if (action === "create") {
-            console.log("");
-            console.log(`  Creating backup for project ${chalk.bold(projectId)}...`);
             const res = await client.functions.invoke<{ success: boolean; backup?: BackupRow; error?: string }>(
                 "backup",
                 { projectId,
 type: "manual" },
                 { path: "create" }
             );
-            if (res.success) success(`Backup created: ${res.backup?.filename ?? "(unknown)"}`);
-            else fail(res.error || "Backup failed.");
+            if (!res.success) fail(res.error || "Backup failed.");
+            emit(
+                () => success(`Backup created: ${res.backup?.filename ?? "(unknown)"}`),
+                { success: true, backup: res.backup ?? null }
+            );
             return;
         }
 
         if (action === "restore") {
-            const filename = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[3];
-            if (!filename) fail("Usage: rebase cloud db backup restore <filename>");
-            const { confirmed } = await inquirer.prompt([
-                {
-                    type: "confirm",
-                    name: "confirmed",
-                    default: false,
-                    message: `Restore "${filename}" over the current database for project ${projectId}?`
-                }
-            ] as unknown as Parameters<typeof inquirer.prompt>[0]);
-            if (!confirmed) {
-                console.log(chalk.gray("  Aborted."));
-                return;
-            }
+            const filename = cloudPositionals(rawArgs).slice(3)[0];
+            if (!filename) fail("Usage: rebase cloud db backup restore <filename>", undefined, "usage");
+            await confirmDestructive({
+                yes: Boolean(args["--yes"]),
+                prompt: `Restore "${filename}" over the current database for project ${projectId}?`
+            });
             const res = await client.functions.invoke<{ success: boolean; message?: string; error?: string }>(
                 "backup",
                 { projectId,
 filename },
                 { path: "restore" }
             );
-            if (res.success) success(res.message || "Restore complete");
-            else fail(res.error || "Restore failed.");
+            if (!res.success) fail(res.error || "Restore failed.");
+            emit(() => success(res.message || "Restore complete"), { success: true, message: res.message ?? null });
+            return;
+        }
+
+        if (action === "status") {
+            const res = await client.functions.invoke<Record<string, unknown>>("backup", undefined, {
+                method: "GET",
+                path: `backup-status/${projectId}`
+            });
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.bold(`  💾 Automated backups — project ${projectId}`));
+                    console.log("");
+                    keyValues([
+                        ["Enabled", res.enabled ? chalk.green("yes") : chalk.yellow("no")],
+                        ["Reason", String(res.reason ?? "")],
+                        ["Database type", String(res.databaseType ?? "")],
+                        ["Last backup", (res.lastSuccessfulBackup as string) ?? undefined],
+                        [
+                            "Recovery window",
+                            res.recoveryWindow
+                                ? `${(res.recoveryWindow as { from: string }).from} → ${(res.recoveryWindow as { to: string }).to}`
+                                : undefined
+                        ]
+                    ]);
+                    console.log("");
+                },
+                res
+            );
+            return;
+        }
+
+        if (action === "download") {
+            const filename = cloudPositionals(rawArgs).slice(3)[0];
+            if (!filename) fail("Usage: rebase cloud db backup download <filename>", undefined, "usage");
+            const res = await client.functions.invoke<{ url: string; name: string; size: number }>("backup", undefined, {
+                method: "GET",
+                path: `download/${projectId}/${encodeURIComponent(filename)}`
+            });
+            // Print the signed URL rather than downloading the file — downloading
+            // is a user-consented action, and the URL is what the operator/agent
+            // needs to fetch it themselves.
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.bold(`  ${res.name}`) + chalk.gray(`  ${(res.size / 1024 / 1024).toFixed(1)} MB`));
+                    console.log(`  ${chalk.cyan(res.url)}`);
+                    console.log("");
+                    console.log(chalk.gray("  Short-lived signed URL — fetch it with curl/wget."));
+                    console.log("");
+                },
+                { name: res.name, size: res.size, url: res.url }
+            );
             return;
         }
 
@@ -210,21 +361,134 @@ filename },
             { method: "GET",
 path: `list/${projectId}` }
         );
-        console.log("");
-        console.log(chalk.bold(`  💾 Backups — project ${projectId}`));
-        console.log("");
-        if (!res.backups?.length) {
-            console.log(chalk.gray("  No backups yet. Create one with `rebase cloud db backup create`."));
-            console.log("");
-            return;
-        }
-        for (const b of res.backups) {
-            const size = b.size !== undefined ? `${(b.size / 1024 / 1024).toFixed(1)} MB` : "";
-            console.log(`  ${chalk.bold(b.filename)}  ${chalk.gray(`${b.type ?? ""} ${size}`.trim())}`);
-        }
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  💾 Backups — project ${projectId}`));
+                console.log("");
+                if (!res.backups?.length) {
+                    console.log(chalk.gray("  No backups yet. Create one with `rebase cloud db backup create`."));
+                    console.log("");
+                    return;
+                }
+                for (const b of res.backups) {
+                    const size = b.size !== undefined ? `${(b.size / 1024 / 1024).toFixed(1)} MB` : "";
+                    console.log(`  ${chalk.bold(b.filename)}  ${chalk.gray(`${b.type ?? ""} ${size}`.trim())}`);
+                }
+                console.log("");
+            },
+            { projectId, backups: res.backups ?? [] }
+        );
     } catch (e) {
         reportError(e, "Backup operation failed");
+    }
+}
+
+/* ─── PITR (point-in-time recovery) ────────────────────────────── */
+
+/**
+ * `rebase cloud db pitr <status|restore|cutover|discard>`.
+ *
+ * A PITR restore is STAGED, not applied: `restore` creates a recovered copy of
+ * the database beside the live one — the application is NOT repointed and the
+ * original is left running and unchanged. `cutover` is the separate, explicit
+ * step that repoints the app at the recovered copy (and restarts it). `discard`
+ * removes a staged copy; the server refuses to discard a copy that has been cut
+ * over to (it is now the live database). Every mutating step requires `--yes` in
+ * non-interactive use, and the CLI surfaces these staged semantics honestly.
+ */
+async function pitrCommand(rawArgs: string[]): Promise<void> {
+    const args = arg(
+        { "--target": String, "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" },
+        { argv: rawArgs.slice(2), permissive: true }
+    );
+    const action = cloudPositionals(rawArgs).slice(2)[0] || "status";
+    const projectId = requireProjectId(rawArgs);
+    const { client } = await requireClient(rawArgs);
+
+    try {
+        if (action === "status") {
+            const res = await client.functions.invoke<Record<string, unknown>>("backup", undefined, {
+                method: "GET",
+                path: `pitr-status/${projectId}`
+            });
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.bold(`  ⏱  Point-in-time recovery — project ${projectId}`));
+                    console.log("");
+                    keyValues([
+                        ["Available", res.available ? chalk.green("yes") : chalk.yellow("no")],
+                        ["First recoverable", (res.firstRecoverabilityPoint as string) ?? undefined],
+                        ["Last backup", (res.lastSuccessfulBackup as string) ?? undefined],
+                        ["Message", (res.message as string) ?? undefined]
+                    ]);
+                    console.log("");
+                },
+                res
+            );
+            return;
+        }
+
+        if (action === "restore") {
+            const target = args["--target"];
+            if (!target) fail("Usage: rebase cloud db pitr restore --target <ISO timestamp>", undefined, "usage");
+            await confirmDestructive({
+                yes: Boolean(args["--yes"]),
+                prompt: `Stage a point-in-time recovery of project ${projectId} at ${target}? (stages a copy; does not repoint your app)`
+            });
+            const res = await client.functions.invoke<Record<string, unknown>>(
+                "backup",
+                // acknowledgeNoCutover is required by the server: the caller must
+                // affirm this only STAGES a copy. The confirm prompt above says so.
+                { projectId, targetTime: target, acknowledgeNoCutover: true },
+                { path: "pitr-restore" }
+            );
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.yellow(`  ⏳ ${String(res.message ?? "Recovery staged.")}`));
+                    console.log(chalk.gray("  Watch progress with `rebase cloud db pitr status`, then `rebase cloud db pitr cutover --yes`."));
+                    console.log("");
+                },
+                res
+            );
+            return;
+        }
+
+        if (action === "cutover") {
+            await confirmDestructive({
+                yes: Boolean(args["--yes"]),
+                prompt: `Cut project ${projectId} over to the staged recovery? This repoints and restarts your application.`
+            });
+            const res = await client.functions.invoke<Record<string, unknown>>("backup", { projectId }, { path: "pitr-restore-cutover" });
+            emit(
+                () => {
+                    console.log("");
+                    console.log(String(res.message ?? "Cutover requested."));
+                    console.log("");
+                },
+                res
+            );
+            return;
+        }
+
+        if (action === "discard") {
+            await confirmDestructive({
+                yes: Boolean(args["--yes"]),
+                prompt: `Discard the staged recovery for project ${projectId}? This deletes the staged copy and its storage.`
+            });
+            const res = await client.functions.invoke<Record<string, unknown>>("backup", { projectId }, { path: "pitr-restore-discard" });
+            emit(
+                () => success(String(res.message ?? "Staged restore discarded.")),
+                res
+            );
+            return;
+        }
+
+        fail(`Unknown pitr command: ${action}`, "Try status | restore | cutover | discard.", "usage");
+    } catch (e) {
+        reportError(e, "PITR operation failed");
     }
 }
 
@@ -235,14 +499,23 @@ ${chalk.bold("rebase cloud db")} — Database & backups
 ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("list")}                      List databases attached to the project
   ${chalk.blue.bold("create")}                    Attach a managed or bring-your-own database
+  ${chalk.blue.bold("info")} ${chalk.gray("[--reveal]")}           Connection details ${chalk.gray("(password only with --reveal)")}
   ${chalk.blue.bold("test")}                      Test database connectivity
   ${chalk.blue.bold("backup list")}               List backups
   ${chalk.blue.bold("backup create")}             Create a manual backup
   ${chalk.blue.bold("backup restore")} ${chalk.gray("<file>")}     Restore a backup
+  ${chalk.blue.bold("backup status")}             Automated-backup health
+  ${chalk.blue.bold("backup download")} ${chalk.gray("<file>")}    Signed URL for a backup
+  ${chalk.blue.bold("pitr status")}               Point-in-time recovery window
+  ${chalk.blue.bold("pitr restore")} ${chalk.gray("--target <ISO>")} Stage a recovery ${chalk.gray("(does not repoint)")}
+  ${chalk.blue.bold("pitr cutover")} ${chalk.gray("-y")}           Repoint the app at the staged recovery
+  ${chalk.blue.bold("pitr discard")} ${chalk.gray("-y")}           Delete a staged recovery
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--project, -p")}             Target project id ${chalk.gray("(defaults to the linked project)")}
+  ${chalk.blue("--reveal")}                  Include the DB password ${chalk.gray("(info)")}
   ${chalk.blue("--type")}                    managed | byodb ${chalk.gray("(create)")}
   ${chalk.blue("--connection-string")}       External DB URL ${chalk.gray("(byodb)")}
+  ${chalk.blue("--json")}                    Machine-readable output
 `);
 }

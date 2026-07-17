@@ -1,0 +1,348 @@
+/**
+ * Behavioural tests for the agent-facing `rebase cloud` commands.
+ *
+ * The load-bearing guarantees an agent relies on are the ones asserted here:
+ *   1. `--json` mode prints exactly one JSON value and nothing human.
+ *   2. A secret (write-only) variable's VALUE never appears in list/reveal.
+ *   3. Rollback is offered only for a successful deploy that recorded an image —
+ *      never a deploy the server would 409.
+ *   4. Destructive commands refuse to run non-interactively without `--yes`.
+ *
+ * The command handlers call `client.functions.invoke` / `client.data.collection`,
+ * so a fake client stands in for the SDK and we capture stdout.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { setJsonModeForTest } from "./context";
+import { isRollbackable, deploymentDurationMs, deploymentView, triggerInfo, type DeploymentRow } from "./deployments";
+import { parseEnvAssignment } from "./env";
+import { resolveExtensionAlias } from "./extensions";
+import { buildSettingsPatch } from "./settings";
+
+/* ── stdout capture ─────────────────────────────────────────────── */
+
+function captureStdout(): { output: () => string; restore: () => void } {
+    const chunks: string[] = [];
+    const orig = process.stdout.write.bind(process.stdout);
+    // @ts-expect-error test shim
+    process.stdout.write = (s: string) => {
+        chunks.push(typeof s === "string" ? s : String(s));
+        return true;
+    };
+    return { output: () => chunks.join(""), restore: () => { process.stdout.write = orig; } };
+}
+
+/* ── fake SDK client ────────────────────────────────────────────── */
+
+interface FakeClientSpec {
+    invoke?: (name: string, body: unknown, opts?: { method?: string; path?: string }) => Promise<unknown>;
+    find?: (collection: string, query: unknown) => Promise<{ data: unknown[] }>;
+}
+
+function fakeClient(spec: FakeClientSpec) {
+    return {
+        functions: { invoke: vi.fn(spec.invoke ?? (async () => ({}))) },
+        data: {
+            collection: (name: string) => ({
+                find: async (q: unknown) => (spec.find ? spec.find(name, q) : { data: [] }),
+                findById: async () => undefined,
+                update: async () => ({}),
+                create: async () => ({}),
+                delete: async () => ({})
+            })
+        },
+        auth: { getSession: () => ({ accessToken: "t", expiresAt: Date.now() + 1e9 }) }
+    };
+}
+
+// The command modules import `requireClient` from context; mock it to return our
+// fake, and make `requireProjectId` deterministic.
+vi.mock("./context", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./context")>();
+    return {
+        ...actual,
+        requireClient: vi.fn(),
+        requireProjectId: vi.fn(() => "proj_1")
+    };
+});
+
+import * as context from "./context";
+import { envCommand } from "./env";
+import { deploymentsListCommand, rollbackCommand } from "./deployments";
+import { dbCommand } from "./databases";
+
+function useClient(client: unknown): void {
+    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client, url: "https://cp.example" });
+}
+
+beforeEach(() => setJsonModeForTest(true));
+afterEach(() => {
+    setJsonModeForTest(false);
+    vi.clearAllMocks();
+});
+
+/* ── pure helpers ───────────────────────────────────────────────── */
+
+describe("parseEnvAssignment", () => {
+    it("splits KEY=VALUE on the first =", () => {
+        expect(parseEnvAssignment(["DB_URL=postgres://a=b"])).toEqual({ key: "DB_URL", value: "postgres://a=b" });
+    });
+    it("supports KEY VALUE form", () => {
+        expect(parseEnvAssignment(["KEY", "val"])).toEqual({ key: "KEY", value: "val" });
+    });
+    it("returns null when no key", () => {
+        expect(parseEnvAssignment([])).toBeNull();
+    });
+});
+
+describe("resolveExtensionAlias", () => {
+    it("maps pgvector to the real identifier vector", () => {
+        expect(resolveExtensionAlias("pgvector")).toBe("vector");
+        expect(resolveExtensionAlias("PgVector")).toBe("vector");
+    });
+    it("leaves other names alone", () => {
+        expect(resolveExtensionAlias("postgis")).toBe("postgis");
+    });
+});
+
+describe("buildSettingsPatch", () => {
+    it("includes only the flags supplied, lowercasing the subdomain", () => {
+        expect(buildSettingsPatch({ name: "New", subdomain: "ACME" })).toEqual({ name: "New", subdomain: "acme" });
+    });
+    it("is empty when nothing is passed", () => {
+        expect(buildSettingsPatch({})).toEqual({});
+    });
+});
+
+describe("isRollbackable (the safety rule)", () => {
+    it("is true only for a successful deploy with an image", () => {
+        expect(isRollbackable({ id: 1, status: "success", imageUrl: "img:1" })).toBe(true);
+    });
+    it("is false when the image is missing, even if successful", () => {
+        expect(isRollbackable({ id: 1, status: "success" })).toBe(false);
+    });
+    it("is false for a failed deploy that has an image", () => {
+        expect(isRollbackable({ id: 1, status: "failed", imageUrl: "img:1" })).toBe(false);
+    });
+});
+
+describe("deploymentDurationMs", () => {
+    it("is null while a build is still running (no finishedAt)", () => {
+        expect(deploymentDurationMs({ id: 1, createdAt: "2026-01-01T00:00:00Z" })).toBeNull();
+    });
+    it("is finishedAt − createdAt in ms", () => {
+        expect(
+            deploymentDurationMs({ id: 1, createdAt: "2026-01-01T00:00:00Z", finishedAt: "2026-01-01T00:00:08Z" })
+        ).toBe(8000);
+    });
+});
+
+/* ── env list: never leaks a value, JSON is a single object ─────── */
+
+describe("env list --json", () => {
+    it("prints one JSON object with keys but NO values, secret marked", async () => {
+        const client = fakeClient({
+            invoke: async (name, _body, opts) => {
+                expect(name).toBe("env-vars");
+                expect(opts?.method).toBe("GET");
+                return {
+                    vars: [
+                        { id: "1", key: "PUBLIC_URL", secret: false, valueSet: true, createdAt: null, updatedAt: null },
+                        { id: "2", key: "STRIPE_SECRET", secret: true, valueSet: true, createdAt: null, updatedAt: null }
+                    ],
+                    pendingRedeploy: true,
+                    pendingSince: null,
+                    limits: { maxVars: 100, maxValueBytes: 1, maxTotalBytes: 1, keyPattern: "x", reservedKeys: [] }
+                };
+            }
+        });
+        useClient(client);
+        const cap = captureStdout();
+        await envCommand("list", ["node", "rebase", "cloud", "env", "list", "--json"]);
+        cap.restore();
+
+        const text = cap.output().trim();
+        const lines = text.split("\n").filter(Boolean);
+        expect(lines).toHaveLength(1); // exactly one JSON value, nothing human
+        const parsed = JSON.parse(lines[0]);
+        expect(parsed.vars.map((v: { key: string }) => v.key)).toEqual(["PUBLIC_URL", "STRIPE_SECRET"]);
+        expect(parsed.pendingRedeploy).toBe(true);
+        // The secret's shape is present; its VALUE is not — no `value` field at all.
+        for (const v of parsed.vars) expect(v).not.toHaveProperty("value");
+        // And the whole blob must not contain a value string we never fetched.
+        expect(text).not.toContain("sk_live");
+    });
+});
+
+/* ── env reveal: a secret var is refused, never sent to /reveal ──── */
+
+describe("env reveal of a secret var", () => {
+    it("fails without calling /reveal (write-only)", async () => {
+        const invoke = vi.fn(async (name: string, _b: unknown, opts?: { path?: string }) => {
+            if (name === "env-vars" && opts?.path === "proj_1") {
+                return { vars: [{ id: "2", key: "STRIPE_SECRET", secret: true, valueSet: true, createdAt: null, updatedAt: null }], pendingRedeploy: false, pendingSince: null, limits: {} };
+            }
+            throw new Error("reveal should NOT be called for a secret var");
+        });
+        useClient(fakeClient({ invoke }));
+
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        await expect(envCommand("reveal", ["node", "rebase", "cloud", "env", "reveal", "STRIPE_SECRET", "--json"])).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+
+        // /reveal was never invoked (only the list call happened).
+        const revealCalls = invoke.mock.calls.filter((c) => c[2]?.path === "reveal");
+        expect(revealCalls).toHaveLength(0);
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        expect(parsed.error.code).toBe("secret_write_only");
+    });
+});
+
+/* ── rollback: not offered for an ineligible deploy ─────────────── */
+
+describe("rollback --json", () => {
+    const rows: DeploymentRow[] = [
+        { id: "d3", status: "failed", imageUrl: "img:3", createdAt: "2026-01-03T00:00:00Z" },
+        { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+        { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+    ];
+
+    it("refuses an explicitly named ineligible deploy WITHOUT calling deploy/rollback", async () => {
+        const invoke = vi.fn(async () => ({}));
+        useClient(fakeClient({ invoke, find: async () => ({ data: rows }) }));
+
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        await expect(
+            rollbackCommand(["node", "rebase", "cloud", "rollback", "d3", "--yes", "--json"])
+        ).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+
+        expect(invoke).not.toHaveBeenCalled(); // never reached the server
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        expect(parsed.error.code).toBe("deploy_not_rollbackable");
+    });
+
+    it("without an id, targets the most recent successful+image deploy (with --yes)", async () => {
+        const invoke = vi.fn(async (_n: string, body: { deploymentId?: string }) => ({
+            success: true,
+            deployment: { id: "d4" },
+            rolledBackTo: body.deploymentId,
+            imageUrl: "img:2"
+        }));
+        useClient(fakeClient({ invoke, find: async () => ({ data: rows }) }));
+
+        const cap = captureStdout();
+        await rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"]);
+        cap.restore();
+
+        // Called deploy/rollback with the newest ROLLBACKABLE deploy (d2), not the
+        // failed d3 (which is newest overall) and not the old d1.
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect((invoke.mock.calls[0][1] as { deploymentId: string }).deploymentId).toBe("d2");
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        expect(parsed.rolledBackTo).toBe("d2");
+    });
+});
+
+/* ── db info: password hidden unless --reveal ───────────────────── */
+
+describe("db info --json", () => {
+    const infoBody = {
+        type: "managed",
+        host: "h",
+        port: "5432",
+        database: "app",
+        username: "u",
+        passwordAvailable: true,
+        portForward: null,
+        unavailableReason: null
+    };
+
+    it("omits the password without --reveal", async () => {
+        const invoke = vi.fn(async (_n: string, _b: unknown, opts?: { path?: string }) => {
+            if (opts?.path === "reveal") throw new Error("reveal must not be called");
+            return infoBody;
+        });
+        useClient(fakeClient({ invoke }));
+        const cap = captureStdout();
+        await dbCommand("info", ["node", "rebase", "cloud", "db", "info", "--json"]);
+        cap.restore();
+
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        expect(parsed).not.toHaveProperty("password");
+        expect(parsed.passwordAvailable).toBe(true);
+    });
+
+    it("includes the password only when --reveal is passed", async () => {
+        const invoke = vi.fn(async (_n: string, _b: unknown, opts?: { path?: string }) => {
+            if (opts?.path === "reveal") return { password: "s3cr3t", connectionString: "postgres://u:s3cr3t@h/app" };
+            return infoBody;
+        });
+        useClient(fakeClient({ invoke }));
+        const cap = captureStdout();
+        await dbCommand("info", ["node", "rebase", "cloud", "db", "info", "--reveal", "--json"]);
+        cap.restore();
+
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        expect(parsed.password).toBe("s3cr3t");
+    });
+});
+
+/* ── deployment history shaping ─────────────────────────────────── */
+
+describe("deployments list --json", () => {
+    it("shapes rows with rollbackable + duration and a stable trigger object", async () => {
+        const rows: DeploymentRow[] = [
+            { id: "d2", status: "deploying", createdAt: "2026-01-02T00:00:00Z", triggerSource: "cli", triggeredBy: "user" },
+            { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z", finishedAt: "2026-01-01T00:00:10Z" }
+        ];
+        useClient(fakeClient({ find: async () => ({ data: rows }) }));
+        const cap = captureStdout();
+        await deploymentsListCommand(["node", "rebase", "cloud", "deployments", "list", "--json"]);
+        cap.restore();
+
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        expect(parsed.deployments).toHaveLength(2);
+        expect(parsed.deployments[0].durationMs).toBeNull(); // still running
+        expect(parsed.deployments[0].rollbackable).toBe(false);
+        expect(parsed.deployments[1].durationMs).toBe(10000);
+        expect(parsed.deployments[1].rollbackable).toBe(true);
+    });
+});
+
+describe("triggerInfo", () => {
+    it("normalises unknown source/by to 'unknown'", () => {
+        expect(triggerInfo({ id: 1, triggerSource: "bogus", triggeredBy: "??" })).toEqual({ by: "unknown", source: "unknown", userId: "" });
+    });
+});
+
+/* ── destructive confirm gate (non-interactive) ─────────────────── */
+
+describe("confirmDestructive", () => {
+    it("returns immediately when --yes was passed", async () => {
+        await expect(context.confirmDestructive({ yes: true, prompt: "x" })).resolves.toBeUndefined();
+    });
+
+    it("REFUSES (never prompts) in JSON/non-TTY mode without --yes", async () => {
+        setJsonModeForTest(true);
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        await expect(context.confirmDestructive({ yes: false, prompt: "delete?" })).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        expect(parsed.error.code).toBe("confirmation_required");
+    });
+});
+
+/* keep the shaping helper referenced in one place for clarity */
+void deploymentView;

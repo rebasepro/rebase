@@ -19,6 +19,7 @@ import path from "path";
 import { spawn } from "child_process";
 import chalk from "chalk";
 import arg from "arg";
+import inquirer from "inquirer";
 import { createRebaseClient, type AuthStorage } from "@rebasepro/client";
 import { findProjectRoot } from "../../utils/project";
 
@@ -371,16 +372,126 @@ permissive: true });
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Machine-readable output mode
+   ═══════════════════════════════════════════════════════════════
+
+   Rebase is built for agents, and the CLI is their primary interface. An agent
+   must never scrape a colorized table, so every cloud command can emit a single
+   JSON value instead of human output.
+
+   JSON mode is on when ANY of these hold:
+     • `--json` was passed,
+     • `REBASE_JSON=1` is set, or
+     • stdout is not a TTY (piped/redirected — i.e. a program is reading it).
+
+   In JSON mode a command prints exactly one JSON value to stdout and nothing
+   else; errors print `{"error":{...}}` and exit non-zero. The mode is a
+   process-global set once, at dispatch, by `initOutputMode` — every helper here
+   (fail, reportError, emit) reads it so the whole family is consistent.
+*/
+
+let JSON_MODE = false;
+
+/**
+ * Resolve and latch the output mode for this invocation. Call once at the top of
+ * `cloudCommand`, before anything can print or `fail`. Returns the resolved mode
+ * (handy for tests, which otherwise leave it at its `false` default).
+ */
+export function initOutputMode(rawArgs: string[]): boolean {
+    const parsed = arg({ "--json": Boolean }, { argv: rawArgs.slice(2), permissive: true });
+    JSON_MODE =
+        Boolean(parsed["--json"]) ||
+        process.env.REBASE_JSON === "1" ||
+        process.stdout.isTTY !== true;
+    return JSON_MODE;
+}
+
+/** Whether the current invocation is emitting machine-readable JSON. */
+export function isJsonMode(): boolean {
+    return JSON_MODE;
+}
+
+/** Force the mode (tests only — production latches it via `initOutputMode`). */
+export function setJsonModeForTest(value: boolean): void {
+    JSON_MODE = value;
+}
+
+/** Strip ANSI colour codes — JSON output must never carry terminal escapes. */
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\[[0-9;]*m/g;
+function stripAnsi(s: string): string {
+    return s.replace(ANSI_RE, "");
+}
+
+/** Write one JSON value to stdout, followed by a newline. */
+export function printJson(value: unknown): void {
+    process.stdout.write(JSON.stringify(value) + "\n");
+}
+
+/**
+ * The one output primitive every new command uses: in JSON mode emit `json`
+ * (and nothing else); otherwise run `human`. Keeping the two behind a single
+ * call is what guarantees a command can never print a table AND a JSON blob.
+ */
+export function emit(human: () => void, json: unknown): void {
+    if (JSON_MODE) printJson(json);
+    else human();
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Output helpers
    ═══════════════════════════════════════════════════════════════ */
 
 /** Print an error (+ optional hint) and exit non-zero. Never returns. */
-export function fail(message: string, hint?: string): never {
+export function fail(message: string, hint?: string, code?: string): never {
+    if (JSON_MODE) {
+        printJson({ error: { message: stripAnsi(message), code: code ?? null, hint: hint ? stripAnsi(hint) : undefined } });
+        process.exit(1);
+    }
     console.error("");
     console.error(chalk.red(`  ✗ ${message}`));
     if (hint) console.error(chalk.gray(`  ${hint}`));
     console.error("");
     process.exit(1);
+}
+
+/**
+ * Confirm a destructive/irreversible action, respecting non-interactive use.
+ *
+ * With `--yes`/`-y` it proceeds silently. In JSON mode or a non-TTY it REFUSES
+ * to prompt — a prompt that can hang is a known repo landmine — and fails,
+ * telling the caller to pass `--yes`. Only an interactive terminal gets a real
+ * confirm prompt; declining there aborts cleanly (exit 0).
+ */
+export async function confirmDestructive(opts: { yes: boolean; prompt: string }): Promise<void> {
+    if (opts.yes) return;
+    if (JSON_MODE || process.stdin.isTTY !== true) {
+        fail(
+            "This action is destructive and needs confirmation.",
+            `Re-run with ${chalk.bold("--yes")} to proceed.`,
+            "confirmation_required"
+        );
+    }
+    const { confirmed } = (await inquirer.prompt([
+        { type: "confirm", name: "confirmed", default: false, message: opts.prompt }
+    ] as unknown as Parameters<typeof inquirer.prompt>[0])) as { confirmed: boolean };
+    if (!confirmed) {
+        console.log(chalk.gray("  Aborted."));
+        process.exit(0);
+    }
+}
+
+/**
+ * Positional tokens after `rebase cloud` — `[group, action, arg1, …]`.
+ *
+ * Deliberately NOT `arg({}, { permissive: true })._`: in permissive mode `arg`
+ * pushes UNKNOWN FLAGS onto `_` too, so `rollback --yes --json` would report
+ * `--yes` as the deployment id. Operand extraction must see operands only, so
+ * anything starting with `-` is dropped — the same filter the db backup handler
+ * has always used.
+ */
+export function cloudPositionals(rawArgs: string[]): string[] {
+    return rawArgs.slice(3).filter((a) => !a.startsWith("-"));
 }
 
 export function success(message: string): void {
@@ -428,7 +539,18 @@ export function keyValues(rows: Array<[string, string | null | undefined]>): voi
  * a `.status` and `.message`; anything else falls back to its string form.
  */
 export function reportError(e: unknown, context: string): never {
-    const err = e as { status?: number; message?: string };
+    const err = e as { status?: number; message?: string; code?: string };
+    if (JSON_MODE) {
+        printJson({
+            error: {
+                message: err?.message ? stripAnsi(err.message) : String(e),
+                code: err?.code ?? null,
+                status: err?.status ?? null,
+                context
+            }
+        });
+        process.exit(1);
+    }
     const status = err?.status ? ` (${err.status})` : "";
     fail(`${context}${status}: ${err?.message ?? String(e)}`);
 }
