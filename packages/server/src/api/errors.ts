@@ -15,6 +15,26 @@ interface PgLikeError {
     table?: string;
     column?: string;
     schema?: string;
+    detail?: string;
+    hint?: string;
+    constraint?: string;
+}
+
+/** 5-character SQLSTATE, e.g. `42501`, `23505`. */
+const SQLSTATE_RE = /^[0-9A-Z]{5}$/;
+
+/**
+ * Walk the cause chain for the underlying database error, identified by a
+ * 5-char SQLSTATE `code`. Drizzle wraps the pg error in `.cause`, and route
+ * code sometimes wraps drizzle again, so the real error may sit several
+ * levels down.
+ */
+function extractDbError(error: unknown, depth = 0): PgLikeError | null {
+    if (!error || typeof error !== "object" || depth > 8) return null;
+    const e = error as PgLikeError & { cause?: unknown };
+    if (typeof e.code === "string" && SQLSTATE_RE.test(e.code)) return e;
+    if (e.cause && typeof e.cause === "object") return extractDbError(e.cause, depth + 1);
+    return null;
 }
 
 /**
@@ -159,32 +179,45 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         }
     }
 
-    if (resolvedCause) {
+    // The real database error may sit several levels down the cause chain.
+    // Losing it turns a precise failure (e.g. an RLS denial) into an opaque
+    // "Failed query: …" 500 that is undiagnosable without direct DB access.
+    const dbError = extractDbError(error);
+
+    if (resolvedCause && (resolvedCause.code === "ENETUNREACH" || resolvedCause.code === "ECONNREFUSED")) {
         const cause = resolvedCause;
         if (cause.code === "ENETUNREACH") {
             logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
-        } else if (cause.code === "ECONNREFUSED") {
+        } else {
             logMessage = `Connection refused to database at ${cause.address}:${cause.port}. Is PostgreSQL running?`;
-        } else if (cause.code === "42703" || cause.code === "42P01") {
-            code = "SCHEMA_DRIFT";
-            const issue = cause.code === "42703" ? "column" : "table";
-            const identifier = cause.table || cause.column || extractMissingIdentifier(cause.message) || "unknown";
-            logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. Run \`pnpm db:push\` to sync your schema, or \`pnpm db:migrate\` to apply pending migrations.`;
         }
     } else if ("code" in error && error.code === "ENETUNREACH") {
          const netErr = error as PgLikeError;
          logMessage = `Network unreachable. Cannot connect to service at ${netErr.address}:${netErr.port}.`;
-    } else if ("code" in error && (error.code === "42703" || error.code === "42P01")) {
+    } else if (dbError && (dbError.code === "42703" || dbError.code === "42P01")) {
         code = "SCHEMA_DRIFT";
-        const issue = error.code === "42703" ? "column" : "table";
-        const pgErr = error as PgLikeError;
-        const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(error.message) || "unknown";
+        const issue = dbError.code === "42703" ? "column" : "table";
+        const identifier = dbError.table || dbError.column || extractMissingIdentifier(dbError.message) || "unknown";
         logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. Run \`pnpm db:push\` to sync your schema, or \`pnpm db:migrate\` to apply pending migrations.`;
+    } else if (dbError) {
+        const parts = [`[PG ${dbError.code}] ${dbError.message}`];
+        if (dbError.detail) parts.push(`Detail: ${dbError.detail}`);
+        if (dbError.hint) parts.push(`Hint: ${dbError.hint}`);
+        if (dbError.table) parts.push(`Table: ${dbError.table}`);
+        if (dbError.column) parts.push(`Column: ${dbError.column}`);
+        if (dbError.constraint) parts.push(`Constraint: ${dbError.constraint}`);
+        if (dbError.code === "42501") {
+            code = "DB_PERMISSION_DENIED";
+            parts.push(
+                "The database rejected the statement for lack of privilege — usually a row-level " +
+                `security policy${dbError.table ? ` on "${dbError.table}"` : ""} denying this role, ` +
+                "or a stale FORCE ROW LEVEL SECURITY flag binding the owner connection."
+            );
+        }
+        logMessage = parts.join(". ");
     }
 
-    const causePg = (error.cause && typeof error.cause === "object") ? (error.cause as PgLikeError) : undefined;
-    const pgErrorCode = causePg?.code || error.code;
-    const isDbSchemaMismatch = code === "SCHEMA_DRIFT" || pgErrorCode === "42703" || pgErrorCode === "42P01";
+    const isDbSchemaMismatch = code === "SCHEMA_DRIFT";
 
     if (isDbSchemaMismatch) {
         // Database schema mismatch is logged as a warning instead of a fatal error
@@ -216,8 +249,9 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         );
     }
 
-    // Suppress the huge stack trace for known DB errors (it's noisy and leaks SQL)
-    const suppressStack = isDbSchemaMismatch || (statusCode < 500 && code === "BAD_REQUEST");
+    // Suppress the huge stack trace for known DB errors (it's noisy and leaks
+    // SQL and query params — the extracted [PG …] line above carries the signal)
+    const suppressStack = isDbSchemaMismatch || dbError !== null || (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
         logger.error(String(error.stack || error));
     }
@@ -232,19 +266,35 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // We already handled ApiError above, but just in case
         clientMessage = error.message;
     } else if (code === "SCHEMA_DRIFT") {
-        const pgErr = causePg || (error as PgLikeError);
-        const issue = (pgErr.code === "42703" || pgErrorCode === "42703") ? "column" : "table";
+        const pgErr = dbError || (error as PgLikeError);
+        const issue = pgErr.code === "42703" ? "column" : "table";
         const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
         clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. Run \`pnpm db:push\` to sync your schema.`;
+    } else if (code === "DB_PERMISSION_DENIED") {
+        clientMessage = `Permission denied by the database${dbError?.table ? ` on "${dbError.table}"` : ""} (row-level security). Check the RLS policies for this table.`;
     } else if (code === "INTERNAL_ERROR") {
         clientMessage = "Internal Server Error";
     }
+
+    // Database diagnostics for the envelope: the SQLSTATE is always safe to
+    // return; message/detail/hint can reference schema internals, so only
+    // outside production.
+    const dbDetails = dbError ? {
+        dbCode: dbError.code,
+        ...(process.env.NODE_ENV !== "production" && {
+            dbMessage: dbError.message,
+            ...(dbError.detail && { detail: dbError.detail }),
+            ...(dbError.hint && { hint: dbError.hint })
+        })
+    } : undefined;
 
     return c.json({
         error: {
             message: clientMessage,
             code,
-            ...(error.details !== undefined && { details: error.details }),
+            ...(error.details !== undefined
+                ? { details: error.details }
+                : dbDetails !== undefined ? { details: dbDetails } : {}),
             ...(reqId && { requestId: reqId })
         }
     } satisfies ErrorResponse, statusCode as ContentfulStatusCode);
@@ -268,6 +318,7 @@ function codeToStatus(code?: string): number | undefined {
         EMAIL_EXISTS: 409,
         ROLE_EXISTS: 409,
         SCHEMA_DRIFT: 500,
+        DB_PERMISSION_DENIED: 500,
         INTERNAL_ERROR: 500,
         NOT_CONFIGURED: 503,
         SERVICE_UNAVAILABLE: 503

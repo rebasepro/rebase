@@ -118,6 +118,79 @@ describe("Error Handler (Hono)", () => {
         expect(body.error.details).toBeUndefined();
     });
 
+    describe("database error surfacing", () => {
+        /** Build a drizzle-style wrapper: outer error with the pg error nested in the cause chain. */
+        function nestedDbError(pg: Record<string, unknown>, wraps = 2): Error {
+            let inner: Error = Object.assign(new Error(String(pg.message)), pg);
+            for (let i = 0; i < wraps; i++) {
+                inner = new Error(`Failed query: insert into "rebase"."users" (...)`, { cause: inner });
+            }
+            return inner;
+        }
+
+        function createDbApp(err: Error) {
+            const app = new Hono<HonoEnv>();
+            app.onError(errorHandler);
+            app.get("/boom", () => { throw err; });
+            return app;
+        }
+
+        it("surfaces an RLS denial (42501) as DB_PERMISSION_DENIED with the SQLSTATE", async () => {
+            const app = createDbApp(nestedDbError({
+                code: "42501",
+                message: "new row violates row-level security policy for table \"users\"",
+                table: "users"
+            }));
+            const res = await app.request("/boom");
+            expect(res.status).toBe(500);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("DB_PERMISSION_DENIED");
+            expect(body.error.message).toContain("row-level security");
+            expect(body.error.message).toContain("users");
+            expect(body.error.details.dbCode).toBe("42501");
+            // NODE_ENV !== "production" in tests → full diagnostics included
+            expect(body.error.details.dbMessage).toContain("row-level security policy");
+        });
+
+        it("detects schema drift through multiple wrapper levels", async () => {
+            const app = createDbApp(nestedDbError({
+                code: "42703",
+                message: "column \"password_hash\" does not exist"
+            }, 3));
+            const res = await app.request("/boom");
+            expect(res.status).toBe(500);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("SCHEMA_DRIFT");
+            expect(body.error.message).toContain("password_hash");
+        });
+
+        it("exposes the SQLSTATE for other database errors without changing the code", async () => {
+            const app = createDbApp(nestedDbError({
+                code: "23505",
+                message: "duplicate key value violates unique constraint \"users_email_key\"",
+                detail: "Key (email)=(a@b.c) already exists.",
+                constraint: "users_email_key"
+            }));
+            const res = await app.request("/boom");
+            expect(res.status).toBe(500);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("INTERNAL_ERROR");
+            expect(body.error.message).toBe("Internal Server Error");
+            expect(body.error.details.dbCode).toBe("23505");
+            expect(body.error.details.detail).toContain("already exists");
+        });
+
+        it("does not treat non-SQLSTATE codes as database errors", async () => {
+            const err = new Error("boom") as Error & { code: string };
+            err.code = "ERR_SOMETHING";
+            const app = createDbApp(err);
+            const res = await app.request("/boom");
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("ERR_SOMETHING");
+            expect(body.error.details).toBeUndefined();
+        });
+    });
+
     it("returns consistent error shape for all error types", async () => {
         const app = createApp();
         const paths = ["/bad-request", "/unauthorized", "/forbidden", "/not-found", "/internal", "/generic-error"];
