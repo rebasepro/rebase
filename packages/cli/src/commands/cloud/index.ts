@@ -28,7 +28,7 @@ import {
     clustersCommand,
     billingCommand
 } from "./resources";
-import { requireProjectId, initOutputMode } from "./context";
+import { requireProjectRef, initOutputMode } from "./context";
 
 /** Positional tokens after `rebase cloud` (group, action, …). */
 function positionals(rawArgs: string[]): string[] {
@@ -84,10 +84,10 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
 
         /* deploy + logs (operate on linked/--project) */
         case "deploy":
-            await deployCommand(rawArgs, requireProjectId(rawArgs));
+            await deployCommand(rawArgs, requireProjectRef(rawArgs));
             break;
         case "logs":
-            await logsCommand(rawArgs, requireProjectId(rawArgs));
+            await logsCommand(rawArgs, requireProjectRef(rawArgs));
             break;
         case "deployments":
         case "releases":
@@ -171,12 +171,12 @@ async function projectsGroup(action: string | undefined, rawArgs: string[]): Pro
             await createProject(rawArgs);
             break;
         case "info": {
-            const id = positionals(rawArgs)[2] || requireProjectId(rawArgs);
+            const id = positionals(rawArgs)[2] || requireProjectRef(rawArgs);
             await projectInfo(rawArgs, id);
             break;
         }
         case "delete": {
-            const id = positionals(rawArgs)[2] || requireProjectId(rawArgs);
+            const id = positionals(rawArgs)[2] || requireProjectRef(rawArgs);
             await deleteProject(rawArgs, id);
             break;
         }

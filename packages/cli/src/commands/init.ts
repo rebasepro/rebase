@@ -10,6 +10,7 @@ import { cp } from "fs/promises";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
 
 const access = promisify(fs.access);
@@ -95,6 +96,12 @@ export interface InitOptions {
     pm: PackageManager;
     /** Command helpers for the detected PM. */
     pmCommands: PMCommands;
+    /** Cloud project slug (its subdomain) to link the scaffold to. */
+    cloudProject?: string;
+    /** One-time setup key that authenticates the cloud link. */
+    setupKey?: string;
+    /** Control-plane URL the setup key is redeemed against. */
+    cloudUrl?: string;
 }
 
 export interface BuildQuestionsParams {
@@ -208,6 +215,8 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             "--introspect": Boolean,
             "--template": String,
             "--flavor": String,
+            "--project": String,
+            "--setup-key": String,
             "--yes": Boolean,
             "-g": "--git",
             "-i": "--install",
@@ -267,7 +276,10 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             preset: templateArg || "blog",
             flavor: flavorArg || "cms",
             pm,
-            pmCommands
+            pmCommands,
+            cloudProject: args["--project"] || undefined,
+            setupKey: args["--setup-key"] || undefined,
+            cloudUrl: resolveCloudUrl(rawArgs)
         };
     }
 
@@ -299,8 +311,64 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         preset: templateArg || (answers.preset as TemplatePreset) || "blog",
         flavor: flavorArg || (answers.flavor as TemplateFlavor) || "cms",
         pm,
-        pmCommands
+        pmCommands,
+        cloudProject: args["--project"] || undefined,
+        setupKey: args["--setup-key"] || undefined,
+        cloudUrl: resolveCloudUrl(rawArgs)
     };
+}
+
+/**
+ * Redeem the one-time setup key from the console's setup page and write the
+ * `.rebase/cloud.json` link into the scaffold, so `rebase cloud deploy` etc.
+ * work in the new directory with no further flags. `--project` carries the
+ * project's slug (its subdomain, as shown in console URLs); the control plane
+ * also accepts a raw id for old copies of the command.
+ *
+ * Best-effort by design: a failed link must never fail the scaffold, so every
+ * exit path other than success is a warning plus instructions to link later.
+ */
+async function linkScaffoldToCloud(options: InitOptions): Promise<void> {
+    if (!options.cloudProject && !options.setupKey) return;
+
+    const linkLater = `Link it later with ${chalk.bold("rebase cloud login")} then ${chalk.bold("rebase cloud link")}.`;
+    if (!options.cloudProject || !options.setupKey) {
+        console.warn(chalk.yellow("  --project and --setup-key go together; skipping the cloud link."));
+        console.warn(chalk.yellow(`  ${linkLater}`));
+        return;
+    }
+
+    try {
+        const res = await fetch(`${options.cloudUrl}/api/functions/setup-key/validate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ projectId: options.cloudProject,
+setupKey: options.setupKey })
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+            error?: { message?: string };
+            project?: { id?: string | number; subdomain?: string; name?: string };
+        };
+        if (!res.ok || body.project?.id === undefined) {
+            console.warn(chalk.yellow(`  Could not verify the setup key: ${body.error?.message || res.statusText}`));
+            console.warn(chalk.yellow(`  ${linkLater}`));
+            return;
+        }
+        writeLink(
+            {
+                url: String(options.cloudUrl),
+                projectId: String(body.project.id),
+                slug: body.project.subdomain,
+                projectName: body.project.name
+            },
+            options.targetDirectory
+        );
+        console.log("");
+        console.log(`  ${chalk.green("✓")} Linked to cloud project ${chalk.bold(body.project.subdomain ?? options.cloudProject)}`);
+    } catch (e) {
+        console.warn(chalk.yellow(`  Could not reach the control plane: ${e instanceof Error ? e.message : String(e)}`));
+        console.warn(chalk.yellow(`  ${linkLater}`));
+    }
 }
 
 async function createProject(options: InitOptions) {
@@ -425,6 +493,8 @@ async function createProject(options: InitOptions) {
             console.warn(chalk.yellow(`  Run \`${installCmd.join(" ")}\` then \`${execCmd.join(" ")}\` manually.`));
         }
     }
+
+    await linkScaffoldToCloud(options);
 
     // Success message
     console.log("");

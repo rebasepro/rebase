@@ -11,7 +11,8 @@ import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
-    requireProjectId,
+    requireProject,
+    displayProjectRef,
     cloudPositionals,
     emit,
     confirmDestructive,
@@ -134,15 +135,16 @@ async function fetchDeployments(client: CloudClient, projectId: string, limit = 
 }
 
 export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const rows = await fetchDeployments(client, projectId);
         const views = rows.map(deploymentView);
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  🚀 Deployments — project ${projectId}`));
+                console.log(chalk.bold(`  🚀 Deployments — project ${projectRef}`));
                 console.log("");
                 if (!views.length) {
                     console.log(chalk.gray("  No deployments yet. Deploy with `rebase cloud deploy`."));
@@ -168,8 +170,9 @@ export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
 
 export async function rollbackCommand(rawArgs: string[]): Promise<void> {
     const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     // `rollback [deploymentId]` — the id, when given, is the first operand after
     // the `rollback` group token.
@@ -189,7 +192,7 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
     let target: DeploymentRow | undefined;
     if (explicitId) {
         target = rows!.find((d) => String(d.id) === explicitId);
-        if (!target) fail(`Deployment ${explicitId} not found for project ${projectId}.`, undefined, "not_found");
+        if (!target) fail(`Deployment ${explicitId} not found for project ${projectRef}.`, undefined, "not_found");
         // Refuse locally rather than let the server 409 — this is the safety
         // contract, mirrored from the backend's rollback rule.
         if (!isRollbackable(target!)) {
@@ -216,7 +219,7 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
 
     await confirmDestructive({
         yes: Boolean(args["--yes"]),
-        prompt: `Roll project ${projectId} back to deployment ${target!.id}? This starts a new deployment.`
+        prompt: `Roll project ${projectRef} back to deployment ${target!.id}? This starts a new deployment.`
     });
 
     try {
@@ -252,14 +255,15 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
 
 export async function cancelCommand(rawArgs: string[]): Promise<void> {
     const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     const explicitId = cloudPositionals(rawArgs).slice(1)[0];
 
     await confirmDestructive({
         yes: Boolean(args["--yes"]),
-        prompt: `Cancel the in-flight build for project ${projectId}?`
+        prompt: `Cancel the in-flight build for project ${projectRef}?`
     });
 
     try {

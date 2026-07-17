@@ -327,6 +327,8 @@ export function projectHost(
 export interface ProjectLink {
     url: string;
     projectId: string;
+    /** The project's subdomain — the slug users see in console URLs and type into --project. */
+    slug?: string;
     projectName?: string;
     orgId?: string;
 }
@@ -354,11 +356,15 @@ export function removeLink(cwd: string = process.cwd()): boolean {
     return false;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * Resolve the project id to operate on: explicit `--project` flag wins,
+ * The raw project reference to operate on: explicit `--project` flag wins,
  * otherwise the linked project. Exits with guidance when neither is present.
+ * The value is a slug (the project's subdomain, as shown in console URLs) or,
+ * for old scripts and link files, a raw project UUID.
  */
-export function requireProjectId(rawArgs: string[]): string {
+export function requireProjectRef(rawArgs: string[]): string {
     const parsed = arg({ "--project": String,
 "-p": "--project" }, { argv: rawArgs.slice(2),
 permissive: true });
@@ -367,8 +373,55 @@ permissive: true });
     if (link?.projectId) return link.projectId;
     fail(
         "No project specified and this directory is not linked.",
-        `Pass ${chalk.bold("--project <id>")} or run ${chalk.bold("rebase cloud link")}.`
+        `Pass ${chalk.bold("--project <slug>")} or run ${chalk.bold("rebase cloud link")}.`
     );
+}
+
+/**
+ * Resolve a project reference — slug or UUID — to the internal id the API
+ * takes, or undefined when no such project is visible. Slugs cost one lookup;
+ * UUIDs pass through untouched so linked directories and old scripts skip the
+ * round-trip.
+ */
+export async function lookupProjectId(ref: string, client: CloudClient): Promise<string | undefined> {
+    if (UUID_RE.test(ref)) return ref;
+    const res = await client.data.collection("projects").find({
+        where: { subdomain: ["==", ref] },
+        limit: 1
+    });
+    const row = res.data[0] as { id?: string | number } | undefined;
+    return row?.id === undefined ? undefined : String(row.id);
+}
+
+/** Like `lookupProjectId`, but exits with guidance when the ref matches nothing. */
+export async function resolveProjectRef(ref: string, client: CloudClient): Promise<string> {
+    const id = await lookupProjectId(ref, client);
+    if (id === undefined) {
+        fail(
+            `No project with slug ${chalk.bold(ref)}.`,
+            `List yours with ${chalk.bold("rebase cloud projects")}.`
+        );
+    }
+    return id;
+}
+
+/** `requireProjectRef` + `resolveProjectRef` in one step. */
+export async function requireProject(rawArgs: string[], client: CloudClient): Promise<string> {
+    return resolveProjectRef(requireProjectRef(rawArgs), client);
+}
+
+/**
+ * The project reference to SHOW: the slug the user typed or the linked slug.
+ * Never resolves — for human output only. Old link files predate `slug` and
+ * fall back to the stored id.
+ */
+export function displayProjectRef(rawArgs: string[]): string {
+    const parsed = arg({ "--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
+    if (parsed["--project"]) return parsed["--project"];
+    const link = readLink();
+    return link?.slug || link?.projectId || "";
 }
 
 /* ═══════════════════════════════════════════════════════════════

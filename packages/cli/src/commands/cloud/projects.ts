@@ -6,6 +6,7 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     requireClient,
+    resolveProjectRef,
     getContextOrg,
     readLink,
     writeLink,
@@ -67,7 +68,7 @@ export async function listProjects(rawArgs: string[]): Promise<void> {
         const linkedId = readLink()?.projectId;
         for (const p of projects) {
             const marker = String(p.id) === linkedId ? chalk.green(" ●") : "  ";
-            console.log(`${marker}${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.id}]`)} ${colorStatus(p.status)}`);
+            console.log(`${marker}${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.subdomain ?? p.id}]`)} ${colorStatus(p.status)}`);
             console.log(`    ${chalk.gray(projectHost(p, baseDomain) ?? "—")}${p.provider ? chalk.gray(`  ·  ${p.provider}`) : ""}`);
         }
         console.log("");
@@ -184,7 +185,7 @@ message: "Subdomain:" });
 
         success(`Created project ${chalk.bold(name)}`);
         keyValues([
-            ["ID", String(created.id)],
+            ["Slug", String(created.subdomain ?? "")],
             ["URL", projectHost(created, await fetchTenantBaseDomain(client, url))],
             ["Provider", provider],
             ["Branch", gitBranch]
@@ -193,12 +194,13 @@ message: "Subdomain:" });
         if (args["--link"]) {
             writeLink({ url,
 projectId: String(created.id),
+slug: created.subdomain,
 projectName: name,
 orgId: String(org) });
             console.log(chalk.gray("  Linked this directory to the new project."));
         }
         console.log("");
-        console.log(chalk.gray(`  Deploy it with:  ${chalk.bold(`rebase cloud deploy --project ${created.id}`)}`));
+        console.log(chalk.gray(`  Deploy it with:  ${chalk.bold(`rebase cloud deploy --project ${created.subdomain ?? created.id}`)}`));
         console.log("");
     } catch (e) {
         reportError(e, "Failed to create project");
@@ -207,11 +209,12 @@ orgId: String(org) });
 
 /* ─── info ─────────────────────────────────────────────────────── */
 
-export async function projectInfo(rawArgs: string[], projectId: string): Promise<void> {
+export async function projectInfo(rawArgs: string[], projectRef: string): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     try {
+        const projectId = await resolveProjectRef(projectRef, client);
         const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
-        if (!p) fail(`Project ${projectId} not found.`);
+        if (!p) fail(`Project ${projectRef} not found.`);
 
         const [db, lastDeploy, baseDomain] = await Promise.all([
             firstRow(client, "databases", projectId),
@@ -220,7 +223,7 @@ export async function projectInfo(rawArgs: string[], projectId: string): Promise
         ]);
 
         console.log("");
-        console.log(`  ${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.id}]`)} ${colorStatus(p.status)}`);
+        console.log(`  ${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.subdomain ?? p.id}]`)} ${colorStatus(p.status)}`);
         console.log("");
         keyValues([
             ["Subdomain", projectHost(p, baseDomain)],
@@ -241,16 +244,17 @@ export async function projectInfo(rawArgs: string[], projectId: string): Promise
 
 /* ─── delete ───────────────────────────────────────────────────── */
 
-export async function deleteProject(rawArgs: string[], projectId: string): Promise<void> {
+export async function deleteProject(rawArgs: string[], projectRef: string): Promise<void> {
     const args = arg({ "--yes": Boolean,
 "-y": "--yes" }, { argv: rawArgs.slice(2),
 permissive: true });
     const { client } = await requireClient(rawArgs);
+    const projectId = await resolveProjectRef(projectRef, client);
 
     const p = (await client.data.collection("projects").findById(projectId).catch(() => undefined)) as
         | ProjectRow
         | undefined;
-    if (!p) fail(`Project ${projectId} not found.`);
+    if (!p) fail(`Project ${projectRef} not found.`);
 
     if (!args["--yes"]) {
         const { confirmed } = await inquirer.prompt([
@@ -258,7 +262,7 @@ permissive: true });
                 type: "confirm",
                 name: "confirmed",
                 default: false,
-                message: `Permanently delete project "${p.name ?? projectId}" (${projectId})? This tears down its deployment.`
+                message: `Permanently delete project "${p.name ?? projectRef}" (${p.subdomain ?? projectRef})? This tears down its deployment.`
             }
         ] as unknown as Parameters<typeof inquirer.prompt>[0]);
         if (!confirmed) {

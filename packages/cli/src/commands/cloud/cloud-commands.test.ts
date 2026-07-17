@@ -55,13 +55,16 @@ function fakeClient(spec: FakeClientSpec) {
 }
 
 // The command modules import `requireClient` from context; mock it to return our
-// fake, and make `requireProjectId` deterministic.
+// fake, and make project resolution deterministic. `requireProject` yields the
+// resolved id; `displayProjectRef` yields the slug shown in human output.
 vi.mock("./context", async (importOriginal) => {
     const actual = await importOriginal<typeof import("./context")>();
     return {
         ...actual,
         requireClient: vi.fn(),
-        requireProjectId: vi.fn(() => "proj_1")
+        requireProject: vi.fn(async () => "proj_1"),
+        requireProjectRef: vi.fn(() => "proj-one"),
+        displayProjectRef: vi.fn(() => "proj-one")
     };
 });
 

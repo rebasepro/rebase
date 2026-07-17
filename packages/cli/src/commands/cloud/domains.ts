@@ -16,7 +16,8 @@ import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
-    requireProjectId,
+    requireProject,
+    displayProjectRef,
     cloudPositionals,
     emit,
     confirmDestructive,
@@ -99,14 +100,15 @@ export async function domainsCommand(action: string | undefined, rawArgs: string
 }
 
 async function listDomains(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const setup = await fetchDomainSetup(client, projectId);
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  🌐 Custom domain — project ${projectId}`));
+                console.log(chalk.bold(`  🌐 Custom domain — project ${projectRef}`));
                 console.log("");
                 if (!setup.domain) {
                     console.log(chalk.gray("  No custom domain. Add one with `rebase cloud domains add <domain>`."));
@@ -131,8 +133,9 @@ async function listDomains(rawArgs: string[]): Promise<void> {
 }
 
 async function addDomain(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     const domain = cloudPositionals(rawArgs).slice(2)[0];
     if (!domain) fail("Usage: rebase cloud domains add <domain>", undefined, "usage");
 
@@ -156,8 +159,9 @@ async function addDomain(rawArgs: string[]): Promise<void> {
 }
 
 async function verifyDomains(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const res = await client.functions.invoke<VerifyResult>("verify-domain", {}, { path: projectId });
         emit(
@@ -192,18 +196,19 @@ async function verifyDomains(rawArgs: string[]): Promise<void> {
 
 async function removeDomain(rawArgs: string[]): Promise<void> {
     const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     await confirmDestructive({
         yes: Boolean(args["--yes"]),
-        prompt: `Remove the custom domain from project ${projectId}?`
+        prompt: `Remove the custom domain from project ${projectRef}?`
     });
 
     try {
         await client.data.collection("projects").update(projectId, { customDomain: "" });
         emit(
-            () => success(`Removed the custom domain from project ${projectId}`),
+            () => success(`Removed the custom domain from project ${projectRef}`),
             { success: true, projectId }
         );
     } catch (e) {
@@ -223,6 +228,6 @@ ${chalk.green.bold("Commands")}
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Target project id ${chalk.gray("(defaults to the linked project)")}
+  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 `);
 }

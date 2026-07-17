@@ -16,7 +16,8 @@ import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
-    requireProjectId,
+    requireProject,
+    displayProjectRef,
     cloudPositionals,
     emit,
     confirmDestructive,
@@ -102,14 +103,15 @@ export async function extensionsCommand(action: string | undefined, rawArgs: str
 }
 
 async function listExtensions(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const res = await fetchExtensions(client, projectId);
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  🧩 Extensions — project ${projectId}`) + chalk.gray(`  (${res.databaseType}, source: ${res.source})`));
+                console.log(chalk.bold(`  🧩 Extensions — project ${projectRef}`) + chalk.gray(`  (${res.databaseType}, source: ${res.source})`));
                 console.log("");
                 if (res.source === "record") {
                     console.log(chalk.yellow("  ⚠ Database unreachable — showing cached state, not live catalog."));
@@ -133,8 +135,9 @@ async function listExtensions(rawArgs: string[]): Promise<void> {
 
 async function enableExtension(rawArgs: string[]): Promise<void> {
     const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     const raw = cloudPositionals(rawArgs).slice(2)[0];
     if (!raw) fail("Usage: rebase cloud extensions enable <name>", undefined, "usage");
     const name = resolveExtensionAlias(raw!);
@@ -188,8 +191,9 @@ async function enableExtension(rawArgs: string[]): Promise<void> {
 
 async function disableExtension(rawArgs: string[]): Promise<void> {
     const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     const raw = cloudPositionals(rawArgs).slice(2)[0];
     if (!raw) fail("Usage: rebase cloud extensions disable <name>", undefined, "usage");
     const name = resolveExtensionAlias(raw!);
@@ -240,6 +244,6 @@ ${chalk.green.bold("Commands")}
 ${chalk.green.bold("Options")}
   ${chalk.blue("--yes, -y")}                 Confirm a DB-restarting change
   ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Target project id ${chalk.gray("(defaults to the linked project)")}
+  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 `);
 }

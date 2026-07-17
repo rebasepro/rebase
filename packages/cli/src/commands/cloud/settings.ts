@@ -10,7 +10,7 @@
  */
 import arg from "arg";
 import chalk from "chalk";
-import { requireClient, requireProjectId, emit, keyValues, success, fail, reportError } from "./context";
+import { requireClient, requireProject, displayProjectRef, emit, keyValues, success, fail, reportError } from "./context";
 
 interface ProjectSettings {
     id: string | number;
@@ -42,15 +42,16 @@ export async function settingsCommand(action: string | undefined, rawArgs: strin
 }
 
 async function showSettings(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectSettings | undefined;
-        if (!p) fail(`Project ${projectId} not found.`, undefined, "not_found");
+        if (!p) fail(`Project ${projectRef} not found.`, undefined, "not_found");
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  ⚙️  Settings — project ${projectId}`));
+                console.log(chalk.bold(`  ⚙️  Settings — project ${projectRef}`));
                 console.log("");
                 keyValues([
                     ["Name", p!.name],
@@ -106,8 +107,9 @@ async function setSettings(rawArgs: string[]): Promise<void> {
         },
         { argv: rawArgs.slice(2), permissive: true }
     );
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     const patch = buildSettingsPatch({
         name: args["--name"],
@@ -131,7 +133,7 @@ async function setSettings(rawArgs: string[]): Promise<void> {
 
         await client.data.collection("projects").update(projectId, patch);
         emit(
-            () => success(`Updated ${Object.keys(patch).join(", ")} for project ${projectId}`),
+            () => success(`Updated ${Object.keys(patch).join(", ")} for project ${projectRef}`),
             { success: true, projectId, updated: patch }
         );
     } catch (e) {
@@ -155,6 +157,6 @@ ${chalk.green.bold("Set flags")}
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Target project id ${chalk.gray("(defaults to the linked project)")}
+  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 `);
 }

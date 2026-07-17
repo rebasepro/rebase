@@ -11,7 +11,8 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     requireClient,
-    requireProjectId,
+    requireProject,
+    displayProjectRef,
     cloudPositionals,
     emit,
     confirmDestructive,
@@ -67,8 +68,9 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
 }
 
 async function listDatabases(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const dbs = (await client.data.collection("databases").find({
             where: { project: ["==", projectId] },
@@ -76,7 +78,7 @@ async function listDatabases(rawArgs: string[]): Promise<void> {
         })).data as unknown as DatabaseRow[];
 
         console.log("");
-        console.log(chalk.bold(`  🗄  Databases — project ${projectId}`));
+        console.log(chalk.bold(`  🗄  Databases — project ${projectRef}`));
         console.log("");
         if (dbs.length === 0) {
             console.log(chalk.gray("  No database attached. Add one with `rebase cloud db create`."));
@@ -105,8 +107,9 @@ async function createDatabase(rawArgs: string[]): Promise<void> {
         { argv: rawArgs.slice(4),
 permissive: true }
     );
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     let type = args["--type"];
     if (!type) {
@@ -144,7 +147,7 @@ message: "PostgreSQL connection string:" }
             connectionString: type === "byodb" ? connectionString : undefined,
             connectionStatus: "untested"
         })) as unknown as DatabaseRow;
-        success(`Attached ${type} database to project ${projectId}`);
+        success(`Attached ${type} database to project ${projectRef}`);
         keyValues([["ID", String(created.id)]]);
         if (type === "byodb") {
             console.log(chalk.gray("  Verify it with `rebase cloud db test`."));
@@ -156,8 +159,9 @@ message: "PostgreSQL connection string:" }
 }
 
 async function testDatabase(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     console.log("");
     console.log(`  Testing database connectivity for project ${chalk.bold(projectId)}...`);
     try {
@@ -194,8 +198,9 @@ interface DbInfoResponse {
  */
 async function dbInfo(rawArgs: string[]): Promise<void> {
     const args = arg({ "--reveal": Boolean, "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     try {
         const info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, { method: "GET", path: projectId });
@@ -218,7 +223,7 @@ async function dbInfo(rawArgs: string[]): Promise<void> {
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  🗄  Database — project ${projectId}`) + chalk.gray(`  (${info.type})`));
+                console.log(chalk.bold(`  🗄  Database — project ${projectRef}`) + chalk.gray(`  (${info.type})`));
                 console.log("");
                 keyValues([
                     ["Host", info.host],
@@ -262,8 +267,9 @@ async function dbInfo(rawArgs: string[]): Promise<void> {
 async function backupCommand(rawArgs: string[]): Promise<void> {
     // `rebase cloud db backup <action>` — action is the 4th positional token.
     const action = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[2] || "list";
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     const args = arg({ "--yes": Boolean, "-y": "--yes" }, { argv: rawArgs.slice(2), permissive: true });
 
@@ -288,7 +294,7 @@ type: "manual" },
             if (!filename) fail("Usage: rebase cloud db backup restore <filename>", undefined, "usage");
             await confirmDestructive({
                 yes: Boolean(args["--yes"]),
-                prompt: `Restore "${filename}" over the current database for project ${projectId}?`
+                prompt: `Restore "${filename}" over the current database for project ${projectRef}?`
             });
             const res = await client.functions.invoke<{ success: boolean; message?: string; error?: string }>(
                 "backup",
@@ -309,7 +315,7 @@ filename },
             emit(
                 () => {
                     console.log("");
-                    console.log(chalk.bold(`  💾 Automated backups — project ${projectId}`));
+                    console.log(chalk.bold(`  💾 Automated backups — project ${projectRef}`));
                     console.log("");
                     keyValues([
                         ["Enabled", res.enabled ? chalk.green("yes") : chalk.yellow("no")],
@@ -364,7 +370,7 @@ path: `list/${projectId}` }
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  💾 Backups — project ${projectId}`));
+                console.log(chalk.bold(`  💾 Backups — project ${projectRef}`));
                 console.log("");
                 if (!res.backups?.length) {
                     console.log(chalk.gray("  No backups yet. Create one with `rebase cloud db backup create`."));
@@ -403,8 +409,9 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
         { argv: rawArgs.slice(2), permissive: true }
     );
     const action = cloudPositionals(rawArgs).slice(2)[0] || "status";
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     try {
         if (action === "status") {
@@ -415,7 +422,7 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
             emit(
                 () => {
                     console.log("");
-                    console.log(chalk.bold(`  ⏱  Point-in-time recovery — project ${projectId}`));
+                    console.log(chalk.bold(`  ⏱  Point-in-time recovery — project ${projectRef}`));
                     console.log("");
                     keyValues([
                         ["Available", res.available ? chalk.green("yes") : chalk.yellow("no")],
@@ -435,7 +442,7 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
             if (!target) fail("Usage: rebase cloud db pitr restore --target <ISO timestamp>", undefined, "usage");
             await confirmDestructive({
                 yes: Boolean(args["--yes"]),
-                prompt: `Stage a point-in-time recovery of project ${projectId} at ${target}? (stages a copy; does not repoint your app)`
+                prompt: `Stage a point-in-time recovery of project ${projectRef} at ${target}? (stages a copy; does not repoint your app)`
             });
             const res = await client.functions.invoke<Record<string, unknown>>(
                 "backup",
@@ -459,7 +466,7 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
         if (action === "cutover") {
             await confirmDestructive({
                 yes: Boolean(args["--yes"]),
-                prompt: `Cut project ${projectId} over to the staged recovery? This repoints and restarts your application.`
+                prompt: `Cut project ${projectRef} over to the staged recovery? This repoints and restarts your application.`
             });
             const res = await client.functions.invoke<Record<string, unknown>>("backup", { projectId }, { path: "pitr-restore-cutover" });
             emit(
@@ -476,7 +483,7 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
         if (action === "discard") {
             await confirmDestructive({
                 yes: Boolean(args["--yes"]),
-                prompt: `Discard the staged recovery for project ${projectId}? This deletes the staged copy and its storage.`
+                prompt: `Discard the staged recovery for project ${projectRef}? This deletes the staged copy and its storage.`
             });
             const res = await client.functions.invoke<Record<string, unknown>>("backup", { projectId }, { path: "pitr-restore-discard" });
             emit(
@@ -512,7 +519,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("pitr discard")} ${chalk.gray("-y")}           Delete a staged recovery
 
 ${chalk.green.bold("Options")}
-  ${chalk.blue("--project, -p")}             Target project id ${chalk.gray("(defaults to the linked project)")}
+  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
   ${chalk.blue("--reveal")}                  Include the DB password ${chalk.gray("(info)")}
   ${chalk.blue("--type")}                    managed | byodb ${chalk.gray("(create)")}
   ${chalk.blue("--connection-string")}       External DB URL ${chalk.gray("(byodb)")}

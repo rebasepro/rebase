@@ -19,7 +19,8 @@ import fs from "fs";
 import path from "path";
 import {
     requireClient,
-    requireProjectId,
+    requireProject,
+    displayProjectRef,
     cloudPositionals,
     emit,
     isJsonMode,
@@ -96,14 +97,15 @@ function pendingHint(pending: boolean | null): string | undefined {
 }
 
 async function listEnv(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     try {
         const res = await fetchEnvVars(client, projectId);
         emit(
             () => {
                 console.log("");
-                console.log(chalk.bold(`  🔑 Environment — project ${projectId}`));
+                console.log(chalk.bold(`  🔑 Environment — project ${projectRef}`));
                 console.log("");
                 if (!res.vars.length) {
                     console.log(chalk.gray("  No variables. Add one with `rebase cloud env set KEY=VALUE`."));
@@ -161,8 +163,9 @@ export function parseEnvAssignment(operands: string[]): { key: string; value: st
 
 async function setEnv(rawArgs: string[]): Promise<void> {
     const args = arg({ "--secret": Boolean, "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
 
     const operands = cloudPositionals(rawArgs).slice(2); // after `env set`
     const parsed = parseEnvAssignment(operands);
@@ -199,8 +202,9 @@ async function setEnv(rawArgs: string[]): Promise<void> {
 }
 
 async function unsetEnv(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     const key = cloudPositionals(rawArgs).slice(2)[0];
     if (!key) fail("Usage: rebase cloud env unset KEY", undefined, "usage");
 
@@ -223,8 +227,9 @@ async function unsetEnv(rawArgs: string[]): Promise<void> {
 }
 
 async function revealEnv(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     const key = cloudPositionals(rawArgs).slice(2)[0];
     if (!key) fail("Usage: rebase cloud env reveal KEY", undefined, "usage");
 
@@ -238,7 +243,7 @@ async function revealEnv(rawArgs: string[]): Promise<void> {
         reportError(e, "Failed to reveal environment variable");
     }
     const found = list!.vars.find((v) => v.key === key);
-    if (!found) fail(`No variable named ${key} in project ${projectId}.`, undefined, "not_found");
+    if (!found) fail(`No variable named ${key} in project ${projectRef}.`, undefined, "not_found");
     if (found!.secret) {
         fail(
             `${key} is a secret (write-only) variable; its value cannot be revealed.`,
@@ -268,8 +273,9 @@ async function revealEnv(rawArgs: string[]): Promise<void> {
 
 async function pullEnv(rawArgs: string[]): Promise<void> {
     const args = arg({ "--out": String, "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
     const outPath = path.resolve(args["--out"] || ".env");
 
     try {
@@ -341,7 +347,7 @@ ${chalk.green.bold("Commands")}
 ${chalk.green.bold("Options")}
   ${chalk.blue("--secret")}                  Mark a variable write-only ${chalk.gray("(set)")}
   ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Target project id ${chalk.gray("(defaults to the linked project)")}
+  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 `);
 }
 

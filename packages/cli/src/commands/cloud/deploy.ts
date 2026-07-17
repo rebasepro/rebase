@@ -11,7 +11,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawn } from "child_process";
-import { requireClient, colorStatus, fail, reportError, type CloudClient } from "./context";
+import { requireClient, resolveProjectRef, colorStatus, fail, reportError, type CloudClient } from "./context";
 import { latestDeployment } from "./projects";
 
 interface Deployment {
@@ -82,7 +82,7 @@ async function uploadSource(url: string, token: string, projectId: string, tarPa
     return data.source;
 }
 
-export async function deployCommand(rawArgs: string[], projectId: string): Promise<void> {
+export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
     const args = arg(
         { "--no-follow": Boolean,
 "--source": String },
@@ -90,6 +90,7 @@ export async function deployCommand(rawArgs: string[], projectId: string): Promi
 permissive: true }
     );
     const { client, url } = await requireClient(rawArgs);
+    const projectId = await resolveProjectRef(projectRef, client);
 
     // Optional fly-style local source upload: `deploy --source .`
     let source: string | undefined;
@@ -105,7 +106,7 @@ permissive: true }
     }
 
     console.log("");
-    console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectId)}${source ? " from uploaded source" : ""}...`);
+    console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectRef)}${source ? " from uploaded source" : ""}...`);
 
     let deploymentId: string;
     try {
@@ -188,7 +189,7 @@ async function streamBuildLogs(client: CloudClient, deploymentId: string): Promi
     }
 }
 
-export async function logsCommand(rawArgs: string[], projectId: string): Promise<void> {
+export async function logsCommand(rawArgs: string[], projectRef: string): Promise<void> {
     const args = arg(
         { "--runtime": Boolean,
 "--follow": Boolean,
@@ -197,6 +198,7 @@ export async function logsCommand(rawArgs: string[], projectId: string): Promise
 permissive: true }
     );
     const { client } = await requireClient(rawArgs);
+    const projectId = await resolveProjectRef(projectRef, client);
 
     if (args["--runtime"]) {
         try {
@@ -207,7 +209,7 @@ permissive: true }
 path: projectId }
             );
             console.log("");
-            console.log(chalk.bold(`  📄 Runtime logs — project ${projectId}`));
+            console.log(chalk.bold(`  📄 Runtime logs — project ${projectRef}`));
             console.log("");
             console.log(res.logs ?? chalk.gray("  (no logs)"));
             console.log("");

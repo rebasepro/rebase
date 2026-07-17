@@ -9,6 +9,7 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     requireClient,
+    resolveProjectRef,
     resolveCloudUrl,
     writeLink,
     removeLink,
@@ -40,7 +41,8 @@ permissive: true });
         let project: ProjectRow | undefined;
 
         if (args["--project"]) {
-            project = (await client.data.collection("projects").findById(args["--project"])) as unknown as ProjectRow | undefined;
+            const projectId = await resolveProjectRef(args["--project"], client);
+            project = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
             if (!project) fail(`Project ${args["--project"]} not found.`);
         } else {
             const org = getContextOrg(url);
@@ -62,7 +64,7 @@ permissive: true });
                     name: "picked",
                     message: "Select a project to link:",
                     choices: projects.map((p) => ({
-                        name: `${p.name ?? "(unnamed)"}  ${chalk.gray(`${p.subdomain ?? ""} · ${p.id}`)}`,
+                        name: `${p.name ?? "(unnamed)"}  ${chalk.gray(String(p.subdomain ?? ""))}`,
                         value: p
                     }))
                 }
@@ -75,11 +77,12 @@ permissive: true });
         writeLink({
             url,
             projectId: String(project.id),
+            slug: project.subdomain,
             projectName: project.name,
             orgId: project.organization !== undefined ? String(project.organization) : undefined
         });
 
-        success(`Linked to ${chalk.bold(project.name ?? project.id)}`);
+        success(`Linked to ${chalk.bold(project.name ?? project.subdomain ?? "")}`);
         console.log(chalk.gray(`  Wrote ${projectLinkPath()}`));
         console.log("");
     } catch (e) {

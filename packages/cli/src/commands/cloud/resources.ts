@@ -6,7 +6,9 @@ import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
-    requireProjectId,
+    requireProject,
+    lookupProjectId,
+    displayProjectRef,
     getContextOrg,
     readLink,
     colorStatus,
@@ -23,13 +25,13 @@ import { firstRow, latestDeployment, fmtDate } from "./projects";
 /* ─── status: quick project dashboard ──────────────────────────── */
 
 export async function statusCommand(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client, url } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
     try {
         const project = (await client.data.collection("projects").findById(projectId)) as
             | { id: string | number; name?: string; subdomain?: string; host?: string; status?: string; gitBranch?: string }
             | undefined;
-        if (!project) fail(`Project ${projectId} not found.`);
+        if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`);
 
         const [db, storage, deploy, baseDomain] = await Promise.all([
             firstRow(client, "databases", projectId),
@@ -39,7 +41,7 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
         ]);
 
         console.log("");
-        console.log(`  ${chalk.bold(project.name ?? projectId)} ${chalk.gray(`[${projectId}]`)} ${colorStatus(project.status)}`);
+        console.log(`  ${chalk.bold(project.name ?? project.subdomain ?? "")} ${chalk.gray(`[${project.subdomain ?? displayProjectRef(rawArgs)}]`)} ${colorStatus(project.status)}`);
         console.log("");
         keyValues([
             ["URL", projectHost(project, baseDomain)],
@@ -57,8 +59,8 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 /* ─── metrics: live compute metrics ────────────────────────────── */
 
 export async function metricsCommand(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
     try {
         const m = await client.functions.invoke<{
             status?: string;
@@ -70,7 +72,7 @@ export async function metricsCommand(rawArgs: string[]): Promise<void> {
 path: projectId });
 
         console.log("");
-        console.log(chalk.bold(`  📊 Metrics — project ${projectId}`));
+        console.log(chalk.bold(`  📊 Metrics — project ${displayProjectRef(rawArgs)}`));
         console.log("");
         keyValues([
             ["Status", m.status ? colorStatus(m.status === "running" ? "active" : m.status) : undefined],
@@ -87,8 +89,8 @@ path: projectId });
 /* ─── webhooks ─────────────────────────────────────────────────── */
 
 export async function webhooksCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
 
     try {
         if (subcommand === "create") {
@@ -132,7 +134,7 @@ permissive: true }
         })).data as unknown as Array<{ id: string | number; name?: string; table?: string; url?: string; enabled?: boolean; events?: string[] }>;
 
         console.log("");
-        console.log(chalk.bold(`  🔗 Webhooks — project ${projectId}`));
+        console.log(chalk.bold(`  🔗 Webhooks — project ${displayProjectRef(rawArgs)}`));
         console.log("");
         if (hooks.length === 0) {
             console.log(chalk.gray("  No webhooks. Add one with `rebase cloud webhooks create`."));
@@ -153,8 +155,8 @@ permissive: true }
 /* ─── storage ──────────────────────────────────────────────────── */
 
 export async function storageCommand(rawArgs: string[]): Promise<void> {
-    const projectId = requireProjectId(rawArgs);
     const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
     try {
         const stores = (await client.data.collection("storages").find({
             where: { project: ["==", projectId] },
@@ -162,7 +164,7 @@ export async function storageCommand(rawArgs: string[]): Promise<void> {
         })).data as unknown as Array<{ id: string | number; type?: string; provider?: string; bucketName?: string; status?: string }>;
 
         console.log("");
-        console.log(chalk.bold(`  🪣 Storage — project ${projectId}`));
+        console.log(chalk.bold(`  🪣 Storage — project ${displayProjectRef(rawArgs)}`));
         console.log("");
         if (stores.length === 0) {
             console.log(chalk.gray("  No storage buckets attached."));
@@ -243,9 +245,9 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
-    // `rebase cloud billing checkout --project <id>` opens a Stripe session.
+    // `rebase cloud billing checkout --project <slug>` opens a Stripe session.
     if (action === "checkout") {
-        const projectId = requireProjectId(rawArgs);
+        const projectId = await requireProject(rawArgs, client);
         try {
             const res = await client.functions.invoke<{ url?: string }>(
                 "stripe-billing",
@@ -300,7 +302,8 @@ path: `payment-method/${org}` }
             const parsed = arg({ "--project": String,
 "-p": "--project" }, { argv: rawArgs.slice(2),
 permissive: true });
-            const projectId = parsed["--project"] || readLink()?.projectId;
+            const ref = parsed["--project"] || readLink()?.projectId;
+            const projectId = ref ? await lookupProjectId(ref, client) : undefined;
             if (projectId) {
                 const proj = (await client.data.collection("projects").findById(projectId)) as
                     | { cluster_id?: string | number; cluster?: unknown; provider?: string; vmSize?: string }
