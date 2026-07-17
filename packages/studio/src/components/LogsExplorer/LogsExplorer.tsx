@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Select, SelectItem, TextField, Checkbox, Label, Typography, cls, defaultBorderMixin } from "@rebasepro/ui";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, TextField, Typography } from "@rebasepro/ui";
 import { useApiConfig } from "@rebasepro/app";
 
 interface LogEntry {
@@ -26,15 +26,42 @@ const SOURCE_COLORS: Record<string, string> = {
     system: "text-surface-600 dark:text-surface-400"
 };
 
+// Ids are `log_<n>` with a monotonic counter, so numeric comparison tells
+// old entries from new ones across polls.
+const idNum = (entry: LogEntry): number => Number(entry.id.slice("log_".length));
+
+// The window is contiguous and ordered, so identical ends mean identical content.
+const sameLogs = (a: LogEntry[], b: LogEntry[]): boolean =>
+    a.length === b.length &&
+    a[0]?.id === b[0]?.id &&
+    a[a.length - 1]?.id === b[b.length - 1]?.id;
+
+// How close to the bottom edge still counts as "at the bottom".
+const STICK_THRESHOLD = 40;
+
 export function LogsExplorer() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [level, setLevel] = useState<string>("all");
     const [source, setSource] = useState<string>("all");
+    const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
     const [autoScroll, setAutoScroll] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    // Entries that arrived while the user was scrolled away from the bottom.
+    const [newCount, setNewCount] = useState(0);
+    const [atBottom, setAtBottom] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
+    // Whether the view is stuck to the bottom right now. A ref, not state:
+    // the scroll handler and the fetch loop both read it synchronously.
+    const stickRef = useRef(true);
+    const lastMaxIdRef = useRef<number | null>(null);
     const apiConfig = useApiConfig();
+
+    // Debounce the search box so typing doesn't refetch per keystroke.
+    useEffect(() => {
+        const t = setTimeout(() => setSearch(searchInput), 300);
+        return () => clearTimeout(t);
+    }, [searchInput]);
 
     const fetchLogs = useCallback(async () => {
         if (!apiConfig?.apiUrl) {
@@ -63,12 +90,32 @@ export function LogsExplorer() {
                 return;
             }
             const data: { entries?: LogEntry[] } = await resp.json();
-            setLogs(data.entries || []);
+            // The API returns newest-first; the view tails like a terminal, so
+            // flip to chronological order (newest at the bottom).
+            const entries = (data.entries || []).slice().reverse();
+
+            const prevMax = lastMaxIdRef.current;
+            if (prevMax != null && !stickRef.current) {
+                const fresh = entries.filter(e => idNum(e) > prevMax).length;
+                if (fresh > 0) setNewCount(c => c + fresh);
+            }
+            if (entries.length > 0) lastMaxIdRef.current = idNum(entries[entries.length - 1]);
+
+            // Unchanged window → keep the previous array so React leaves the
+            // DOM alone (hover states and text selection survive the poll).
+            setLogs(prev => sameLogs(prev, entries) ? prev : entries);
             setError(null);
         } catch (e) {
             setError(e instanceof Error ? e.message : "Could not load logs.");
         }
     }, [level, source, search, apiConfig]);
+
+    // A filter change replaces the window wholesale — "new entries since last
+    // poll" stops meaning anything, so the counter starts over.
+    useEffect(() => {
+        lastMaxIdRef.current = null;
+        setNewCount(0);
+    }, [level, source, search]);
 
     useEffect(() => {
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -102,9 +149,31 @@ export function LogsExplorer() {
         };
     }, [fetchLogs]);
 
-    useEffect(() => {
-        if (autoScroll && containerRef.current) {
-            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    const scrollToBottom = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        el.scrollTop = el.scrollHeight;
+        stickRef.current = true;
+        setAtBottom(true);
+        setNewCount(0);
+    }, []);
+
+    // Stick to the bottom only while the user is already there. Scrolling up
+    // disengages; scrolling back down re-engages. Our own scrollTop writes
+    // always land at the bottom, so they can never disengage it.
+    const handleScroll = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_THRESHOLD;
+        stickRef.current = nearBottom;
+        setAtBottom(nearBottom);
+        if (nearBottom) setNewCount(0);
+    }, []);
+
+    useLayoutEffect(() => {
+        if (autoScroll && stickRef.current) {
+            const el = containerRef.current;
+            if (el) el.scrollTop = el.scrollHeight;
         }
     }, [logs, autoScroll]);
 
@@ -143,15 +212,18 @@ export function LogsExplorer() {
                 <TextField
                     size="small"
                     placeholder="Search logs..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
                     className="flex-1 min-w-[200px]"
                 />
                 <div className="flex items-center gap-1.5 cursor-pointer ml-2">
                     <Checkbox
                         id="auto-scroll"
                         checked={autoScroll}
-                        onCheckedChange={setAutoScroll}
+                        onCheckedChange={(checked: boolean) => {
+                            setAutoScroll(checked);
+                            if (checked) scrollToBottom();
+                        }}
                         size="small"
                         padding={false}
                     />
@@ -168,44 +240,70 @@ export function LogsExplorer() {
                     </Typography>
                 </div>
             </div>
-            
+
+            {/* A failing poll must stay visible even while stale logs are on
+                screen — otherwise the view quietly freezes. */}
+            {error && logs.length > 0 && (
+                <div className={cls(
+                    "px-4 py-1.5 border-b bg-amber-50 dark:bg-amber-950/20 shrink-0",
+                    defaultBorderMixin
+                )}>
+                    <Typography variant="caption" className="text-amber-700 dark:text-amber-400">
+                        {error}
+                    </Typography>
+                </div>
+            )}
+
             {/* Log entries */}
-            <div
-                ref={containerRef}
-                className="flex-1 overflow-auto py-2"
-            >
-                {logs.map(log => (
-                    <div
-                        key={log.id}
-                        className={cls(
-                            "flex gap-4 px-4 py-[6px] border-b hover:bg-surface-100 dark:hover:bg-surface-900 transition-colors",
-                            defaultBorderMixin
-                        )}
-                    >
-                        <Typography variant="body2" color="secondary" className="w-[72px] shrink-0 font-mono">
-                            {new Date(log.timestamp).toLocaleTimeString()}
-                        </Typography>
-                        <Typography variant="body2" className={cls("w-[48px] shrink-0 uppercase font-semibold font-mono", LEVEL_COLORS[log.level] || "text-surface-500")}>
-                            {log.level}
-                        </Typography>
-                        <Typography variant="body2" className={cls("w-[80px] shrink-0 font-mono", SOURCE_COLORS[log.source] || "text-surface-500")}>
-                            [{log.source}]
-                        </Typography>
-                        <Typography variant="body2" className="flex-1 font-mono break-all whitespace-pre-wrap text-surface-900 dark:text-surface-100">
-                            {log.message}
-                        </Typography>
-                    </div>
-                ))}
-                {logs.length === 0 && (
-                    <div className="p-8 text-center">
-                        <Typography
-                            variant="body2"
-                            className={error ? "text-red-600 dark:text-red-500" : undefined}
-                            color={error ? undefined : "secondary"}
+            <div className="relative flex-1 min-h-0">
+                <div
+                    ref={containerRef}
+                    onScroll={handleScroll}
+                    className="h-full overflow-auto py-2"
+                >
+                    {logs.map(log => (
+                        <div
+                            key={log.id}
+                            className={cls(
+                                "flex gap-4 px-4 py-[6px] border-b hover:bg-surface-100 dark:hover:bg-surface-900 transition-colors",
+                                defaultBorderMixin
+                            )}
                         >
-                            {error ?? "No log entries yet. Logs will appear here as requests come in."}
-                        </Typography>
-                    </div>
+                            <Typography variant="body2" color="secondary" className="w-[72px] shrink-0 font-mono">
+                                {new Date(log.timestamp).toLocaleTimeString()}
+                            </Typography>
+                            <Typography variant="body2" className={cls("w-[48px] shrink-0 uppercase font-semibold font-mono", LEVEL_COLORS[log.level] || "text-surface-500")}>
+                                {log.level}
+                            </Typography>
+                            <Typography variant="body2" className={cls("w-[80px] shrink-0 font-mono", SOURCE_COLORS[log.source] || "text-surface-500")}>
+                                [{log.source}]
+                            </Typography>
+                            <Typography variant="body2" className="flex-1 font-mono break-all whitespace-pre-wrap text-surface-900 dark:text-surface-100">
+                                {log.message}
+                            </Typography>
+                        </div>
+                    ))}
+                    {logs.length === 0 && (
+                        <div className="p-8 text-center">
+                            <Typography
+                                variant="body2"
+                                className={error ? "text-red-600 dark:text-red-500" : undefined}
+                                color={error ? undefined : "secondary"}
+                            >
+                                {error ?? "No log entries yet. Logs will appear here as requests come in."}
+                            </Typography>
+                        </div>
+                    )}
+                </div>
+
+                {autoScroll && !atBottom && newCount > 0 && (
+                    <button
+                        onClick={scrollToBottom}
+                        className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-primary text-white text-xs font-medium pl-2.5 pr-3 py-1.5 shadow-md hover:bg-primary-dark transition-colors"
+                    >
+                        <ArrowDownToLineIcon size={14}/>
+                        {newCount} new {newCount === 1 ? "entry" : "entries"}
+                    </button>
                 )}
             </div>
         </div>
