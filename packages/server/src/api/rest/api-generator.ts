@@ -488,7 +488,11 @@ id };
 
             const driver = this.getScopedDriver(c);
 
-            this.enforceApiKeyPermission(c, c.req.param("parent"));
+            // The operation targets the LAST collection in the nested path
+            // (e.g. "posts" for /authors/1/posts), so that is the slug the
+            // API key must hold permission for — checking the parent instead
+            // would let a key scoped to "authors" write "posts".
+            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
 
 
 
@@ -557,7 +561,11 @@ id };
             const driver = this.getScopedDriver(c);
 
 
-            this.enforceApiKeyPermission(c, c.req.param("parent"));
+            // The operation targets the LAST collection in the nested path
+            // (e.g. "posts" for /authors/1/posts), so that is the slug the
+            // API key must hold permission for — checking the parent instead
+            // would let a key scoped to "authors" write "posts".
+            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
             const body = await parseJsonBody(c);
 
 
@@ -586,7 +594,11 @@ id };
             const driver = this.getScopedDriver(c);
 
 
-            this.enforceApiKeyPermission(c, c.req.param("parent"));
+            // The operation targets the LAST collection in the nested path
+            // (e.g. "posts" for /authors/1/posts), so that is the slug the
+            // API key must hold permission for — checking the parent instead
+            // would let a key scoped to "authors" write "posts".
+            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
 
             const body = await parseJsonBody(c);
 
@@ -617,7 +629,11 @@ id };
             const driver = this.getScopedDriver(c);
 
 
-            this.enforceApiKeyPermission(c, c.req.param("parent"));
+            // The operation targets the LAST collection in the nested path
+            // (e.g. "posts" for /authors/1/posts), so that is the slug the
+            // API key must hold permission for — checking the parent instead
+            // would let a key scoped to "authors" write "posts".
+            this.enforceApiKeyPermission(c, parsed.collectionPath.split("/").pop()!);
 
             const existingEntity = await driver.fetchOne({
                 path: parsed.collectionPath,

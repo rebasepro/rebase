@@ -76,12 +76,14 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
     c,
     next
 ) => {
+    // A prior middleware (queryTokenAuth, API-key pre-auth) may have already
+    // resolved the user — respect it instead of re-parsing the token as a JWT.
+    if (c.get("user")) return next();
+
     const authHeader = c.req.header("authorization");
     const hasBearer = authHeader && authHeader.startsWith("Bearer ");
 
     if (!hasBearer) {
-        // Skip 401 if a prior middleware (e.g. queryTokenAuth) already set the user.
-        if (c.get("user")) return next();
         return c.json({
             error: {
                 message: "Authorization header missing or invalid",
@@ -121,12 +123,13 @@ export function createRequireAuth(options?: { serviceKey?: string }): Middleware
 
     const key = options.serviceKey;
     return async (c, next) => {
+        // Respect a user already resolved upstream (e.g. API-key pre-auth).
+        if (c.get("user")) return next();
+
         const authHeader = c.req.header("authorization");
         const hasBearer = authHeader && authHeader.startsWith("Bearer ");
 
         if (!hasBearer) {
-            // Skip 401 if a prior middleware already set the user.
-            if (c.get("user")) return next();
             return c.json({
                 error: {
                     message: "Authorization header missing or invalid",

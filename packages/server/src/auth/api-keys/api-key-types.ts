@@ -11,10 +11,13 @@
 /**
  * A single permission entry scoping an API key to a collection and set of operations.
  *
- * Use `"*"` as the collection value to grant access to all collections.
+ * Use `"*"` as the collection value to grant access to all collections
+ * (and all custom functions). Custom functions are addressed with the
+ * `functions` namespace: `"functions"` grants every function,
+ * `"functions/<name>"` grants a single one.
  */
 export interface ApiKeyPermission {
-    /** Collection slug, or `"*"` for all collections. */
+    /** Collection slug, `"functions"`/`"functions/<name>"`, or `"*"` for everything. */
     collection: string;
     /** Allowed operations on the collection. */
     operations: ("read" | "write" | "delete")[];
@@ -32,9 +35,19 @@ export interface ApiKey {
     /** SHA-256 hash of the full plaintext key. */
     key_hash: string;
     permissions: ApiKeyPermission[];
-    /** When true, the key is granted the `admin` role (access to admin routes). */
+    /**
+     * When true, the key is granted the `admin` role: it passes the
+     * admin-gated routes (users, roles, cron, backups, logs, API keys) and
+     * the RLS `default_admin` policies. Non-admin keys carry only the
+     * `service` role — RLS grants them nothing unless a collection policy
+     * explicitly names that role.
+     */
     admin: boolean;
-    /** Requests per 15-minute window. `null` means unlimited. */
+    /**
+     * Requests per 15-minute window. `null` means "no per-key override" —
+     * the data rate limiter then applies its default API-key limit
+     * (1000/window unless configured otherwise), not unlimited.
+     */
     rate_limit: number | null;
     created_by: string;
     created_at: string;
@@ -53,7 +66,7 @@ export interface ApiKeyMasked {
     name: string;
     key_prefix: string;
     permissions: ApiKeyPermission[];
-    /** When true, the key is granted the `admin` role (access to admin routes). */
+    /** When true, the key is granted the `admin` role (admin routes + RLS `default_admin` policies). */
     admin: boolean;
     rate_limit: number | null;
     created_by: string;
@@ -70,9 +83,9 @@ export interface ApiKeyMasked {
 export interface CreateApiKeyRequest {
     name: string;
     permissions: ApiKeyPermission[];
-    /** When true, grants the `admin` role — allows access to admin routes. */
+    /** When true, grants the `admin` role (admin routes + RLS `default_admin` policies). */
     admin?: boolean;
-    /** Requests per 15-minute window. Omit or `null` for unlimited. */
+    /** Requests per 15-minute window. Omit or `null` to use the server default (1000/window). */
     rate_limit?: number | null;
     /** ISO-8601 expiration timestamp. Omit for no expiration. */
     expires_at?: string | null;
@@ -85,7 +98,7 @@ export interface CreateApiKeyRequest {
 export interface UpdateApiKeyRequest {
     name?: string;
     permissions?: ApiKeyPermission[];
-    /** When true, grants the `admin` role — allows access to admin routes. */
+    /** When true, grants the `admin` role (admin routes + RLS `default_admin` policies). */
     admin?: boolean;
     rate_limit?: number | null;
     expires_at?: string | null;

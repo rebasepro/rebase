@@ -39,7 +39,7 @@ import { initializeStorage } from "./init/storage";
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
-import { configureJwt, requireAdmin, requireAuth } from "./auth";
+import { configureJwt, requireAdmin } from "./auth";
 import {
     BackendStorageConfig,
     createStorageRoutes,
@@ -49,6 +49,8 @@ import {
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
+import { createApiKeyPreAuth, createFunctionApiKeyGuard } from "./auth/api-keys/api-key-middleware";
+import { createRequireAuth } from "./auth/middleware";
 import { createDataRateLimiter, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
 import { createRebaseClient } from "@rebasepro/client";
@@ -796,6 +798,60 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // ─── Internal per-process credential ───────────────────────────────────
+    // When the user hasn't configured a REBASE_SERVICE_KEY, generate a random
+    // per-boot key so the singleton's control-plane APIs (auth, admin, storage,
+    // functions) can still authenticate against the server's own middleware.
+    // This key never leaves the process and is never logged.
+    //
+    // Resolved BEFORE route mounting so every admin surface — including the
+    // adapter-created admin routes, whose middleware captures the key at
+    // creation time — gates on the same key.
+    const internalServiceKey = serviceKey || randomBytes(48).toString("base64");
+    if (!serviceKey) {
+        logger.info("No REBASE_SERVICE_KEY configured. Generated internal per-boot key for singleton control-plane APIs.");
+    }
+
+    // For user-provided AuthAdapters (the built-in one receives the key at
+    // creation below): expose the internal key so the adapter and the
+    // websocket auth path recognize the singleton's control-plane requests.
+    if (authAdapter && !authAdapter.serviceKey) {
+        authAdapter.serviceKey = internalServiceKey;
+    }
+
+    // ─── API Key Store Bootstrap ──────────────────────────────────────────
+    // Bootstrapped before route mounting so `rk_` pre-auth can be registered
+    // in front of every admin surface (Hono runs middleware in registration
+    // order — a `use()` after `route()` would never fire for that router).
+    let apiKeyStore: ApiKeyStore | undefined;
+    const apiKeyStoreResult = createApiKeyStore(defaultDriver);
+    if (apiKeyStoreResult) {
+        apiKeyStore = apiKeyStoreResult;
+        await apiKeyStore.ensureTable();
+        logger.info("Service API Keys initialized");
+    }
+
+    // Authenticates `rk_` bearer tokens in front of the JWT-based admin gates,
+    // so keys created with `admin: true` genuinely reach the admin surfaces
+    // (users, roles, api-keys, cron, backups, logs, schema editor) — their
+    // documented behavior. Non-admin keys still fail `requireAdmin` with 403.
+    const apiKeyPreAuth = apiKeyStore
+        ? createApiKeyPreAuth({ store: apiKeyStore, driver: defaultDriver })
+        : undefined;
+    if (apiKeyPreAuth) {
+        config.app.use(`${basePath}/admin/*`, apiKeyPreAuth);
+    }
+
+    if (apiKeyStore) {
+        // Mount API key admin routes
+        const apiKeyRoutes = createApiKeyRoutes({
+            store: apiKeyStore,
+            serviceKey: internalServiceKey
+        });
+        config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
+        logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
+    }
+
     // 3. Initialize Storage
     const { storageRegistry, storageController } = await initializeStorage(config.storage, isProduction);
 
@@ -856,7 +912,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,
-                serviceKey,
+                // The internal per-boot fallback is included so the closure the
+                // adapter's routes capture recognizes the singleton's own
+                // control-plane requests even without a configured key.
+                serviceKey: serviceKey || internalServiceKey,
                 authHooks: safeAuthConfig.hooks,
                 collectionAuthConfig,
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
@@ -892,38 +951,28 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    // ─── Internal per-process credential ───────────────────────────────────
-    // When the user hasn't configured a REBASE_SERVICE_KEY, generate a random
-    // per-boot key so the singleton's control-plane APIs (auth, admin, storage,
-    // functions) can still authenticate against the server's own middleware.
-    // This key never leaves the process and is never logged.
-    const internalServiceKey = serviceKey || randomBytes(48).toString("base64");
-    if (!serviceKey) {
-        logger.info("No REBASE_SERVICE_KEY configured. Generated internal per-boot key for singleton control-plane APIs.");
-    }
-
-    // Update the auth adapter's service key to include the internal key
-    // so that the singleton's control-plane requests are recognized.
-    if (authAdapter && !authAdapter.serviceKey) {
-        authAdapter.serviceKey = internalServiceKey;
-    }
-
-    // ─── API Key Store Bootstrap ──────────────────────────────────────────
-    let apiKeyStore: ApiKeyStore | undefined;
-    const apiKeyStoreResult = createApiKeyStore(defaultDriver);
-    if (apiKeyStoreResult) {
-        apiKeyStore = apiKeyStoreResult;
-        await apiKeyStore.ensureTable();
-        logger.info("Service API Keys initialized");
-
-        // Mount API key admin routes
-        const apiKeyRoutes = createApiKeyRoutes({
-            store: apiKeyStore,
-            serviceKey: internalServiceKey
-        });
-        config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
-        logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
-    }
+    // ─── Shared gate for admin-only surfaces ──────────────────────────────
+    // Cron, backups, logs, and the schema editor previously gated on the
+    // plain JWT-only `requireAuth`, which silently rejected both the service
+    // key and admin API keys while other admin surfaces accepted them. One
+    // gate, same acceptance everywhere: `rk_` admin keys (via pre-auth), the
+    // service key, and admin JWTs.
+    const applyAdminGate = (router: Hono<HonoEnv>, surface: string): void => {
+        const gated = !!authAdapter && (
+            isAuthAdapter(config.auth!) ||
+            ((config.auth as RebaseAuthConfig).requireAuth !== false && !!(config.auth as RebaseAuthConfig).jwtSecret)
+        );
+        if (!gated) {
+            logger.warn(
+                `${surface} routes are mounted WITHOUT an auth gate ` +
+                "(no auth configured, requireAuth: false, or no jwtSecret) — " +
+                "anyone who can reach the server can call them."
+            );
+            return;
+        }
+        if (apiKeyPreAuth) router.use("/*", apiKeyPreAuth);
+        router.use("/*", createRequireAuth({ serviceKey: internalServiceKey }), requireAdmin);
+    };
 
     // The schema editor rewrites collection files, so it needs a collectionsDir
     // to write to and is off in baas mode (no files) and in production.
@@ -949,15 +998,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (editorModule) {
             const schemaEditorRoutes = editorModule.createSchemaEditorRoutes(config.collectionsDir);
 
-            if (authAdapter && !isAuthAdapter(config.auth!)) {
-                const safeAuth = config.auth as RebaseAuthConfig;
-                if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
-                    schemaEditorRoutes.use("/*", requireAuth, requireAdmin);
-                }
-            } else if (authAdapter) {
-                // External auth adapter — still protect schema editor
-                schemaEditorRoutes.use("/*", requireAuth, requireAdmin);
-            }
+            applyAdminGate(schemaEditorRoutes, "Schema editor");
 
             config.app.route(`${basePath}/schema-editor`, schemaEditorRoutes);
             logger.info("Schema Editor mounted", { path: `${basePath}/schema-editor` });
@@ -1246,6 +1287,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 }));
             }
 
+            // API-key requests must hold a "functions"/"functions/<name>"
+            // permission (or the "*" wildcard). Without this, any valid key —
+            // however narrowly scoped — could invoke every custom function.
+            functionsRouter.use("/*", createFunctionApiKeyGuard(`${basePath}/functions`));
+
+            // Same per-caller rate limiting as the data API. Previously only
+            // /api/data was limited, so a key's rate_limit did not bound its
+            // function traffic at all.
+            if (config.rateLimit?.enabled !== false) {
+                functionsRouter.use("/*", createDataRateLimiter(config.rateLimit));
+            }
+
             const fnRoutes = createFunctionRoutes(loadedFunctions);
             functionsRouter.route("/", fnRoutes);
             config.app.route(`${basePath}/functions`, functionsRouter);
@@ -1286,14 +1339,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const cronRouter = new Hono<HonoEnv>();
 
             // Cron admin routes require authentication + admin role
-            if (authAdapter && !isAuthAdapter(config.auth!)) {
-                const safeAuth = config.auth as RebaseAuthConfig;
-                if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
-                    cronRouter.use("/*", requireAuth, requireAdmin);
-                }
-            } else if (authAdapter) {
-                cronRouter.use("/*", requireAuth, requireAdmin);
-            }
+            applyAdminGate(cronRouter, "Cron");
 
             cronRouter.route("/", createCronRoutes(cronScheduler));
             config.app.route(`${basePath}/cron`, cronRouter);
@@ -1315,14 +1361,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const { createBackupRoutes, parseBackupDestination } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
 
-        if (authAdapter && !isAuthAdapter(config.auth!)) {
-            const safeAuth = config.auth as RebaseAuthConfig;
-            if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
-                backupRouter.use("/*", requireAuth, requireAdmin);
-            }
-        } else if (authAdapter) {
-            backupRouter.use("/*", requireAuth, requireAdmin);
-        }
+        applyAdminGate(backupRouter, "Backup");
 
         backupRouter.route("/", createBackupRoutes({
             getDestination: () => {
@@ -1342,14 +1381,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const { default: logsRoutes } = await import("./api/logs-routes");
         const logsRouter = new Hono<HonoEnv>();
 
-        if (authAdapter && !isAuthAdapter(config.auth!)) {
-            const safeAuth = config.auth as RebaseAuthConfig;
-            if (safeAuth.requireAuth !== false && !!safeAuth.jwtSecret) {
-                logsRouter.use("/*", requireAuth, requireAdmin);
-            }
-        } else if (authAdapter) {
-            logsRouter.use("/*", requireAuth, requireAdmin);
-        }
+        applyAdminGate(logsRouter, "Logs");
 
         logsRouter.route("/", logsRoutes);
         config.app.route(`${basePath}/logs`, logsRouter);

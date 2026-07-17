@@ -62,3 +62,38 @@ export function isOperationAllowed(
     }
     return false;
 }
+
+/**
+ * Check whether the given permissions array allows invoking a custom function.
+ *
+ * Functions live outside the collection namespace, so they have their own
+ * resource names in the permission list:
+ *
+ * - `{ collection: "functions", ... }` grants every function
+ * - `{ collection: "functions/<name>", ... }` grants a single function
+ * - the global `"*"` wildcard (full-access keys) also matches
+ *
+ * The operation is derived from the HTTP method as usual (GET → read,
+ * POST/PUT/PATCH → write, DELETE → delete). The functions index route is
+ * checked as `functionName === ""`, which only the `"functions"` and `"*"`
+ * entries can grant.
+ *
+ * A collection-scoped key (e.g. read-only on `events`) therefore can NOT
+ * invoke functions — before this guard existed, any valid key could call
+ * every function.
+ */
+export function isFunctionAllowed(
+    permissions: ApiKeyPermission[],
+    functionName: string,
+    operation: ApiKeyOperation
+): boolean {
+    for (const perm of permissions) {
+        const match = perm.collection === "*"
+            || perm.collection === "functions"
+            || (functionName !== "" && perm.collection === `functions/${functionName}`);
+        if (match && perm.operations.includes(operation)) {
+            return true;
+        }
+    }
+    return false;
+}

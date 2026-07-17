@@ -153,6 +153,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
         {
             "--name": String,
             "--permissions": String,
+            "--full-access": Boolean,
             "--admin": Boolean,
             "--rate-limit": Number,
             "--expires": String,
@@ -184,9 +185,19 @@ async function createKey(rawArgs: string[]): Promise<void> {
             process.exit(1);
             return; // unreachable but satisfies TS
         }
-    } else {
-        // Default: full access to all collections
+    } else if (args["--full-access"]) {
         permissions = [{ collection: "*", operations: ["read", "write", "delete"] }];
+    } else {
+        // No silent full-access default: a "scoped keys" feature should not
+        // hand out read/write/delete on every collection when the flag is
+        // simply forgotten. Full access must be asked for by name.
+        console.error(chalk.red("✗ Specify what the key may access: --permissions '<json>' or --full-access."));
+        console.log("");
+        console.log(chalk.gray('  Scoped:      rebase api-keys create -n "Analytics" --permissions \'[{"collection":"events","operations":["read"]}]\''));
+        console.log(chalk.gray('  Functions:   add {"collection":"functions/<name>","operations":["write"]} to invoke a custom function'));
+        console.log(chalk.gray('  Full access: rebase api-keys create -n "CI" --full-access'));
+        process.exit(1);
+        return; // unreachable but satisfies TS
     }
 
     let expires_at: string | null = null;
@@ -334,9 +345,10 @@ ${chalk.green.bold("Commands")}
 
 ${chalk.green.bold("create Options")}
   ${chalk.blue("--name, -n")}        Key name ${chalk.gray("(required)")}
-  ${chalk.blue("--permissions")}     JSON array of permissions
-                    ${chalk.gray('Default: [{"collection":"*","operations":["read","write","delete"]}]')}
-  ${chalk.blue("--admin")}           Grant admin role (access to admin routes)
+  ${chalk.blue("--permissions")}     JSON array of permissions ${chalk.gray("(required unless --full-access)")}
+                    ${chalk.gray('Collections by slug; custom functions as "functions" or "functions/<name>"')}
+  ${chalk.blue("--full-access")}     Grant read/write/delete on every collection and function
+  ${chalk.blue("--admin")}           Grant admin role (admin routes + RLS admin policies)
   ${chalk.blue("--rate-limit")}      Requests per 15-min window ${chalk.gray("(default: 1000)")}
   ${chalk.blue("--expires")}         Expiration: 7d, 30d, 90d, 1y, or ISO date
 
@@ -346,7 +358,7 @@ ${chalk.green.bold("revoke Options")}
 ${chalk.green.bold("Examples")}
   rebase api-keys list
   rebase api-keys create --name "Analytics" --permissions '[{"collection":"events","operations":["read"]}]'
-  rebase api-keys create -n "Full Access" --expires 90d
+  rebase api-keys create -n "Full Access" --full-access --expires 90d
   rebase api-keys revoke abc123-def456
 `);
 }

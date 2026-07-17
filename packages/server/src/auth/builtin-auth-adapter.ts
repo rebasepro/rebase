@@ -102,16 +102,21 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         serviceKey,
 
         async verifyRequest(request: Request): Promise<AuthenticatedUser | null> {
+            // Tokens are accepted ONLY via the Authorization header. A `?token=`
+            // query param must NOT authenticate here: URLs leak into access
+            // logs, proxies, Referer headers, and browser history, and the
+            // non-adapter middleware already refuses query tokens for exactly
+            // that reason. Routes that legitimately need query-string tokens
+            // (storage file serving for `<img src>`) use scoped download
+            // tokens via `fileTokenAuth`, which never reach this adapter.
             const authHeader = request.headers.get("authorization");
-            const url = new URL(request.url, "http://localhost");
-            const queryToken = url.searchParams.get("token");
             const hasBearer = authHeader?.startsWith("Bearer ");
 
-            if (!hasBearer && !queryToken) {
+            if (!hasBearer) {
                 return null;
             }
 
-            const token = hasBearer ? authHeader!.substring(7) : queryToken!;
+            const token = authHeader!.substring(7);
 
             // Check service key first (constant-time)
             if (serviceKey && safeCompare(token, serviceKey)) {

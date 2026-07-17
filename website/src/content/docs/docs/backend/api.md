@@ -288,13 +288,36 @@ curl http://localhost:3000/api/data/orders \
   -H "Authorization: Bearer rk_live_abc123..."
 ```
 
+### Permissions and RLS: two independent gates
+
+An API key's request passes through **two** authorization checks, and both must allow it:
+
+1. **The key's permission list** — collection × operation, checked at the route layer.
+2. **Row-Level Security** — API keys do *not* bypass RLS. A key runs as
+   `uid: "api-key:<id>"` with the `service` role (plus `admin` when
+   `admin: true`). Admin keys pass via the built-in admin policies; a
+   non-admin key only sees rows that a security rule explicitly grants to
+   the `service` role or to the public. Owner-style rules
+   (`owner_id = auth.uid()`) never match an API key.
+
+So a non-admin key with `"*"` permissions can still get empty results — that's
+RLS working, not a bug. Either grant the `service` role in the relevant
+collections' security rules, or use an admin key.
+
+### Custom Functions
+
+Function invocations are scoped like collections, under the `functions`
+namespace: `{"collection": "functions", "operations": ["write"]}` grants every
+function, `"functions/<name>"` grants one, and the global `"*"` wildcard grants
+all. A key without such an entry cannot invoke functions at all.
+
 ### Admin Access for Agents and MCP
 
-By default, API keys get the `service` role (data access only). Add `"admin": true` to grant the key full admin access — including `/api/admin/*` routes for schema management, user management, and more. Use this for agents, MCP servers, and CI:
+By default, API keys get the `service` role (data access only). Add `"admin": true` to grant the key full admin access — including `/api/admin/*` routes for schema management, user management, and more, plus cron, backups, and logs. Use this for agents, MCP servers, and CI:
 
 ```bash
 # CLI
-rebase api-keys create --name "My Agent" --admin
+rebase api-keys create --name "My Agent" --admin --full-access
 
 # REST
 curl -X POST http://localhost:3000/api/admin/api-keys \
@@ -312,10 +335,13 @@ curl -X POST http://localhost:3000/api/admin/api-keys \
 | Field | Type | Description |
 |---|---|---|
 | `name` | `string` | Human-readable label |
-| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = all collections) |
-| `admin` | `boolean` | Grant admin role — access to all admin routes |
-| `rate_limit` | `number \| null` | Requests per 15-min window (`null` = unlimited) |
+| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = all collections and functions, `"functions/<name>"` = one function) |
+| `admin` | `boolean` | Grant admin role — admin routes + RLS admin policies |
+| `rate_limit` | `number \| null` | Requests per 15-min window (`null` = the server default, 1000) |
 | `expires_at` | `string \| null` | ISO-8601 expiration timestamp |
+
+The CLI requires an explicit scope: pass `--permissions '<json>'` or opt into
+`--full-access` — there is no silent full-access default.
 
 Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the `rebase api-keys` CLI commands.
 

@@ -9,7 +9,7 @@ import {
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv } from "dotenv";
 import { resolve, join } from "node:path";
-import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
 
 // ── Package Manager Detection ───────────────────────────────────────────────
@@ -126,7 +126,10 @@ function saveRegistry(): void {
         if (!existsSync(dir)) {
             mkdirSync(dir, { recursive: true });
         }
-        writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2), "utf-8");
+        // Owner-only: this file holds bearer tokens (service keys / API keys).
+        // `mode` only applies on create, so chmod covers pre-existing files.
+        writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2), { encoding: "utf-8", mode: 0o600 });
+        chmodSync(REGISTRY_PATH, 0o600);
     } catch {
         // Non-fatal — registry won't persist across restarts
     }
