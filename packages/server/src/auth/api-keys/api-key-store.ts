@@ -211,7 +211,7 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                     request.rate_limit ?? null,
                     createdBy,
                     request.expires_at ?? null
-                ]}
+                ] }
             );
 
             const apiKey = rowToApiKey(rows[0]);

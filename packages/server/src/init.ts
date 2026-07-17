@@ -49,9 +49,10 @@ import {
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
-import { createApiKeyPreAuth, createFunctionApiKeyGuard } from "./auth/api-keys/api-key-middleware";
+import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./auth/api-keys/api-key-middleware";
 import { createRequireAuth } from "./auth/middleware";
 import { createDataRateLimiter, type DataRateLimitConfig } from "./auth/rate-limiter";
+import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
 import { createRebaseClient } from "@rebasepro/client";
 
@@ -852,6 +853,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
     }
 
+    // One rate-limit store shared by the data and functions limiters: the
+    // budget is per caller, not per router — two private stores would
+    // silently double every caller's allowance. An operator-provided store
+    // is respected as-is.
+    const rateLimitConfig: DataRateLimitConfig | undefined =
+        config.rateLimit?.enabled !== false
+            ? {
+                ...config.rateLimit,
+                store: config.rateLimit?.store
+                    ?? new MemoryRateLimitStore(config.rateLimit?.windowMs ?? 15 * 60 * 1000)
+            }
+            : undefined;
+
     // 3. Initialize Storage
     const { storageRegistry, storageController } = await initializeStorage(config.storage, isProduction);
 
@@ -1022,8 +1036,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             authAdapter
         });
 
+        // Wrapper router: middleware must be registered BEFORE the routes it
+        // guards — Hono composes handlers in registration order, so a `use()`
+        // issued after `createStorageRoutes()` has registered its handlers
+        // sits deeper than them and never runs. The previous
+        // `storageRoutes.use("/upload", bodyLimit)` was exactly that: dead
+        // code, leaving uploads without any size cap.
+        const storageRouter = new Hono<HonoEnv>();
+
+        // API keys on storage: authenticate `rk_` tokens, then require a
+        // "storage" (or "*") permission entry for the derived operation.
+        if (apiKeyPreAuth) {
+            storageRouter.use("/*", apiKeyPreAuth, createStorageApiKeyGuard());
+        }
+
         // Apply a permissive body limit specifically for the upload endpoint
-        storageRoutes.use("/upload", bodyLimit({
+        storageRouter.use("/upload", bodyLimit({
             maxSize: storageMaxSize,
             onError: (c) => {
                 return c.json({
@@ -1035,7 +1063,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         }));
 
-        config.app.route(`${basePath}/storage`, storageRoutes);
+        storageRouter.route("/", storageRoutes);
+        config.app.route(`${basePath}/storage`, storageRouter);
     }
 
     if (activeCollections.length > 0) {
@@ -1099,8 +1128,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Not gated on `apiKeyStore` any more — that made the limiter's
         // presence depend on a feature it does not need, so a deployment
         // without API keys had no limit at all on its data API.
-        if (config.rateLimit?.enabled !== false) {
-            dataRouter.use("/*", createDataRateLimiter(config.rateLimit));
+        if (rateLimitConfig) {
+            dataRouter.use("/*", createDataRateLimiter(rateLimitConfig));
         }
 
         // Mount history routes BEFORE the REST API subcollection catch-all so
@@ -1292,11 +1321,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // however narrowly scoped — could invoke every custom function.
             functionsRouter.use("/*", createFunctionApiKeyGuard(`${basePath}/functions`));
 
-            // Same per-caller rate limiting as the data API. Previously only
-            // /api/data was limited, so a key's rate_limit did not bound its
-            // function traffic at all.
-            if (config.rateLimit?.enabled !== false) {
-                functionsRouter.use("/*", createDataRateLimiter(config.rateLimit));
+            // Same per-caller rate limiting as the data API, sharing its
+            // store so one caller has one budget. Previously only /api/data
+            // was limited, so a key's rate_limit did not bound its function
+            // traffic at all.
+            if (rateLimitConfig) {
+                functionsRouter.use("/*", createDataRateLimiter(rateLimitConfig));
             }
 
             const fnRoutes = createFunctionRoutes(loadedFunctions);

@@ -195,6 +195,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
         console.log("");
         console.log(chalk.gray('  Scoped:      rebase api-keys create -n "Analytics" --permissions \'[{"collection":"events","operations":["read"]}]\''));
         console.log(chalk.gray('  Functions:   add {"collection":"functions/<name>","operations":["write"]} to invoke a custom function'));
+        console.log(chalk.gray('  Storage:     add {"collection":"storage","operations":["read","write"]} for file storage'));
         console.log(chalk.gray('  Full access: rebase api-keys create -n "CI" --full-access'));
         process.exit(1);
         return; // unreachable but satisfies TS

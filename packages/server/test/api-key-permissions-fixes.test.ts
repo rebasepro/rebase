@@ -15,7 +15,7 @@ import { Hono, Context } from "hono";
 import { createHash } from "crypto";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { requireAuth, requireAdmin, createRequireAuth } from "../src/auth/middleware";
-import { createApiKeyPreAuth, createFunctionApiKeyGuard } from "../src/auth/api-keys/api-key-middleware";
+import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "../src/auth/api-keys/api-key-middleware";
 import { isFunctionAllowed } from "../src/auth/api-keys/api-key-permission-guard";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
@@ -336,5 +336,100 @@ operations: ["read", "write", "delete"] }]);
         const app = createApp([{ collection: "*",
 operations: ["read", "write", "delete"] }]);
         expect((await app.request("/api/functions/send-email", { method: "POST" })).status).toBe(200);
+    });
+});
+
+// ── 5. Storage permissions for API keys ─────────────────────────────────────
+
+describe("createStorageApiKeyGuard", () => {
+    function createApp(permissions: ApiKeyPermission[] | null) {
+        const app = new Hono<HonoEnv>();
+        if (permissions) {
+            app.use("/*", async (c, next) => {
+                c.set("apiKey", { id: "k1",
+permissions } as unknown as ApiKeyMasked);
+                await next();
+            });
+        }
+        app.use("/*", createStorageApiKeyGuard());
+        app.all("/*", (c) => c.json({ ok: true }));
+        return app;
+    }
+
+    it("lets non-API-key requests through untouched", async () => {
+        expect((await createApp(null).request("/upload", { method: "POST" })).status).toBe(200);
+    });
+
+    it("allows a storage-scoped key for the matching operation", async () => {
+        const app = createApp([{ collection: "storage",
+operations: ["read", "write"] }]);
+        expect((await app.request("/file/pic.png")).status).toBe(200);
+        expect((await app.request("/upload", { method: "POST" })).status).toBe(200);
+    });
+
+    it("maps HTTP methods to operations (no delete permission → DELETE 403)", async () => {
+        const app = createApp([{ collection: "storage",
+operations: ["read", "write"] }]);
+        expect((await app.request("/file/pic.png", { method: "DELETE" })).status).toBe(403);
+    });
+
+    it("rejects a collection-scoped key with 403", async () => {
+        const app = createApp([{ collection: "events",
+operations: ["read", "write", "delete"] }]);
+        const res = await app.request("/file/pic.png");
+        expect(res.status).toBe(403);
+        const body = await res.json() as { error: { code: string } };
+        expect(body.error.code).toBe("API_KEY_FORBIDDEN");
+    });
+
+    it("allows a full-access (*) key", async () => {
+        const app = createApp([{ collection: "*",
+operations: ["read", "write", "delete"] }]);
+        expect((await app.request("/upload", { method: "POST" })).status).toBe(200);
+    });
+});
+
+// ── 6. Storage upload body limit actually runs ──────────────────────────────
+//
+// Regression: init.ts used to register the upload bodyLimit with `use()`
+// AFTER `createStorageRoutes()` had registered its handlers. Hono composes
+// handlers in registration order, so the limit sat deeper than the route and
+// never executed — uploads had no size cap at all. The wrapper router now
+// registers it first; this test pins the ordering semantics.
+
+describe("storage upload body limit ordering", () => {
+    async function makeApp(limitFirst: boolean) {
+        const { bodyLimit } = await import("hono/body-limit");
+        const routes = new Hono<HonoEnv>();
+        const limit = bodyLimit({
+            maxSize: 10,
+            onError: (c) => c.json({ error: { code: "PAYLOAD_TOO_LARGE" } }, 413)
+        });
+        if (limitFirst) {
+            const wrapper = new Hono<HonoEnv>();
+            wrapper.use("/upload", limit);
+            routes.post("/upload", (c) => c.json({ ok: true }));
+            wrapper.route("/", routes);
+            return wrapper;
+        }
+        routes.post("/upload", (c) => c.json({ ok: true }));
+        routes.use("/upload", limit); // the old, broken order
+        return routes;
+    }
+
+    const bigBody = "x".repeat(100);
+
+    it("enforces the limit when registered before the routes (the fix)", async () => {
+        const app = await makeApp(true);
+        const res = await app.request("/upload", { method: "POST",
+body: bigBody });
+        expect(res.status).toBe(413);
+    });
+
+    it("documents that the old order never ran the limit (the bug)", async () => {
+        const app = await makeApp(false);
+        const res = await app.request("/upload", { method: "POST",
+body: bigBody });
+        expect(res.status).toBe(200);
     });
 });

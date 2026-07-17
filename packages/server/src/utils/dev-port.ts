@@ -197,7 +197,10 @@ function writeStateFile(projectRoot: string, port: number, serviceKey?: string):
         if (serviceKey) {
             state.serviceKey = serviceKey;
         }
-        fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), "utf-8");
+        // Owner-only: the file can carry the dev service key. `mode` only
+        // applies on create, so chmod covers a pre-existing file.
+        fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), { encoding: "utf-8", mode: 0o600 });
+        fs.chmodSync(stateFile, 0o600);
     } catch {
         // Non-fatal
     }

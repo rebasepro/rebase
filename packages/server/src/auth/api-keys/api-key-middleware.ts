@@ -29,7 +29,7 @@ import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
 import { scopeDataDriver } from "../rls-scope";
-import { httpMethodToOperation, isFunctionAllowed } from "./api-key-permission-guard";
+import { httpMethodToOperation, isFunctionAllowed, isStorageAllowed } from "./api-key-permission-guard";
 import { logger } from "../../utils/logger";
 
 /**
@@ -99,7 +99,8 @@ code: "UNAUTHORIZED" }
     // Set user identity — API keys represent service accounts
     const userId = `api-key:${apiKey.id}`;
     const roles: string[] = apiKey.admin ? ["admin", "service"] : ["service"];
-    c.set("user", { userId, roles });
+    c.set("user", { userId,
+roles });
 
     // Expose masked key metadata for downstream permission checks
     const masked: ApiKeyMasked = {
@@ -146,20 +147,35 @@ code: "INTERNAL_ERROR" }
 }
 
 /**
- * Standalone pre-auth middleware for `rk_` bearer tokens.
+ * Permission guard for API-key requests to the storage router.
  *
- * Routers whose auth gate is JWT-based (`requireAuth` / `createRequireAuth` —
- * the admin surfaces: admin users/roles, api-keys management, cron, backups,
- * logs, schema editor) don't know about API keys. Mounting this middleware in
- * front of them authenticates `rk_` tokens and populates the request context;
- * the downstream gates then see the already-resolved user and apply their
- * role checks (`requireAdmin`) as usual — so an `admin: true` key passes and
- * a non-admin key is rejected with 403.
- *
- * Requests without an `rk_` bearer token pass through untouched. An invalid,
- * revoked, or expired `rk_` token is rejected here (401) rather than falling
- * through to be misparsed as a JWT.
+ * Storage previously did not accept API keys at all (`rk_` tokens were
+ * misparsed as JWTs and 401'd). Now that the pre-auth middleware
+ * authenticates them, this guard decides what they may do: the key needs a
+ * `"storage"` permission entry (or the global `"*"` wildcard) covering the
+ * operation derived from the HTTP method. Requests not authenticated via an
+ * API key pass through to the storage router's own auth gates.
  */
+export function createStorageApiKeyGuard(): MiddlewareHandler<HonoEnv> {
+    return async (c, next) => {
+        const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
+        if (!apiKey) return next();
+
+        const operation = httpMethodToOperation(c.req.method);
+        if (!isStorageAllowed(apiKey.permissions, operation)) {
+            return c.json({
+                error: {
+                    message: `API key does not have "${operation}" permission for storage. ` +
+                        `Grant it with a permission entry like { "collection": "storage", "operations": ["${operation}"] }.`,
+                    code: "API_KEY_FORBIDDEN"
+                }
+            }, 403);
+        }
+
+        return next();
+    };
+}
+
 /**
  * Permission guard for API-key requests to the custom-functions router.
  *
@@ -203,6 +219,21 @@ export function createFunctionApiKeyGuard(mountPrefix: string): MiddlewareHandle
     };
 }
 
+/**
+ * Standalone pre-auth middleware for `rk_` bearer tokens.
+ *
+ * Routers whose auth gate is JWT-based (`requireAuth` / `createRequireAuth` —
+ * the admin surfaces: admin users/roles, api-keys management, cron, backups,
+ * logs, schema editor) don't know about API keys. Mounting this middleware in
+ * front of them authenticates `rk_` tokens and populates the request context;
+ * the downstream gates then see the already-resolved user and apply their
+ * role checks (`requireAdmin`) as usual — so an `admin: true` key passes and
+ * a non-admin key is rejected with 403.
+ *
+ * Requests without an `rk_` bearer token pass through untouched. An invalid,
+ * revoked, or expired `rk_` token is rejected here (401) rather than falling
+ * through to be misparsed as a JWT.
+ */
 export function createApiKeyPreAuth(options: ApiKeyAuthOptions): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
         // Already validated by an earlier instance (e.g. the app-level

@@ -337,11 +337,17 @@ Authorization: Bearer rk_live_abc123...
 
 If an API key lacks the required permission for an operation, a `403 API_KEY_FORBIDDEN` error is returned.
 
-**Admin API keys** — set `"admin": true` when creating a key to grant it the `admin` role. This gives access to all `/api/admin/*` routes (schema, users, other API keys, etc.). Use this for agents, MCP servers, and CI pipelines:
+Beyond collections, the permission list also covers custom functions
+(`"functions"` for all, `"functions/<name>"` for one) and file storage
+(`"storage"`); the global `"*"` wildcard grants all three. API keys do NOT
+bypass RLS: admin keys pass via the built-in admin policies, while non-admin
+keys only see rows a security rule grants to the `service` role or the public.
+
+**Admin API keys** — set `"admin": true` when creating a key to grant it the `admin` role. This gives access to all `/api/admin/*` routes (schema, users, other API keys, etc.) plus cron, backups, and logs. Use this for agents, MCP servers, and CI pipelines:
 
 ```bash
-# CLI
-rebase api-keys create --name "My Agent" --admin
+# CLI (an explicit scope is required: --permissions '<json>' or --full-access)
+rebase api-keys create --name "My Agent" --admin --full-access
 
 # REST
 POST /api/admin/api-keys

@@ -311,6 +311,14 @@ namespace: `{"collection": "functions", "operations": ["write"]}` grants every
 function, `"functions/<name>"` grants one, and the global `"*"` wildcard grants
 all. A key without such an entry cannot invoke functions at all.
 
+### Storage
+
+Storage works the same way, under the `storage` namespace:
+`{"collection": "storage", "operations": ["read", "write"]}` lets the key
+download/list (`read`), upload and create folders (`write`), and delete files
+(`delete`). The global `"*"` wildcard also grants storage. A key without such
+an entry cannot touch storage.
+
 ### Admin Access for Agents and MCP
 
 By default, API keys get the `service` role (data access only). Add `"admin": true` to grant the key full admin access — including `/api/admin/*` routes for schema management, user management, and more, plus cron, backups, and logs. Use this for agents, MCP servers, and CI:
@@ -335,7 +343,7 @@ curl -X POST http://localhost:3000/api/admin/api-keys \
 | Field | Type | Description |
 |---|---|---|
 | `name` | `string` | Human-readable label |
-| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = all collections and functions, `"functions/<name>"` = one function) |
+| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = everything; `"functions/<name>"` = one function; `"storage"` = file storage) |
 | `admin` | `boolean` | Grant admin role — admin routes + RLS admin policies |
 | `rate_limit` | `number \| null` | Requests per 15-min window (`null` = the server default, 1000) |
 | `expires_at` | `string \| null` | ISO-8601 expiration timestamp |
