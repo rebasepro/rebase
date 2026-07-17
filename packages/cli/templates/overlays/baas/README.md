@@ -4,8 +4,26 @@ A headless Rebase backend: a REST API, auth, storage, realtime and backups over
 your PostgreSQL database.
 
 There are no collection files. The server reads your database schema at boot and
-serves every table, so the API follows your migrations — change the schema and
+serves your tables, so the API follows your migrations — change the schema and
 the endpoints change with it.
+
+## Serving a table
+
+A table is served once it has an authorization model: row-level security enabled
+plus at least one policy. Until then the server skips it — deliberately, so a new
+table is never exposed just by existing — and logs each table it skipped and why.
+
+```sql
+ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY your_table_owner ON your_table
+    FOR ALL USING (user_id = auth.uid());
+```
+
+`auth.uid()`, `auth.roles()` and `auth.jwt()` are provided by Rebase and read the
+identity of the authenticated request.
+
+To serve unprotected tables anyway (development only), set
+`baas: { unprotectedTables: "serve" }` in `backend/src/index.ts`.
 
 ## Run it
 

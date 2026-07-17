@@ -383,8 +383,15 @@ export class PersistService {
             throw this.toUserFriendlyError(error, collection.slug);
         }
 
-        // Fetch the updated/created row to return with proper relation objects
-        const finalEntity = await this.fetchService.fetchOne<M>(collection.slug, savedId, databaseId);
+        // Fetch the saved row back through the same walk `GET /:id` serves, so a
+        // write's answer is the read that follows it. This used to be `fetchOne`
+        // — the admin view-model walk — whose `__type: "relation"` refs then
+        // leaked into REST responses, afterSave callbacks, history records and
+        // app-level realtime payloads, none of which see that shape from any
+        // read path. The admin does not need them here either: its rows arrive
+        // over the realtime subscription refetch, which still serves the
+        // view-model walk.
+        const finalEntity = await this.fetchService.fetchOneForRest(collection.slug, savedId, undefined, databaseId);
         if (!finalEntity) throw new Error("Could not fetch row after save.");
         return finalEntity;
     }

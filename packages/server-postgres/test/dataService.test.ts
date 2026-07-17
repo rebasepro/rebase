@@ -239,13 +239,31 @@ describe("DataService", () => {
                 author_id: "3" // Should be serialized to FK for database storage
             }));
 
-            // 2. Check that the returned entity has the relation deserialized correctly
-            expect(entity.id).toBe("4");
-            expect(entity.author).toEqual({
-                id: "3",
-                path: "authors",
-                __type: "relation"
-            });
+            // 2. The returned row is the one `GET /:id` serves: raw columns,
+            // the FK under its own name, and no relation ref — the Entity
+            // view-model (refs, canonical id) is built by its consumers.
+            expect(entity.id).toBe(4);
+            expect(entity.author_id).toBe("3");
+            expect(entity.author).toBeUndefined();
+        });
+
+        it("answers a save with the same row shape a REST read serves", async () => {
+            // POST /data/posts used to answer with the admin view-model row
+            // (string-normalized ids, `__type: "relation"` refs) while the GET
+            // that followed served raw columns — the same resource, two shapes.
+            // The save's fetch-back now runs the same walk as `GET /:id`.
+            const dbRow = {
+                id: 7,
+                title: "Same shape",
+                author_id: "3"
+            };
+            db.returning.mockResolvedValue([{ id: 7 }]);
+            db.limit.mockResolvedValue([dbRow]);
+
+            const saved = await dataService.save("posts", { title: "Same shape" });
+            const read = await dataService.getFetchService().fetchOneForRest("posts", 7);
+
+            expect(saved).toEqual(read);
         });
 
         it("should save a entity with composite primary keys in UPSERT/onConflictDoUpdate mode", async () => {
@@ -280,7 +298,11 @@ describe("DataService", () => {
             expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ email: "new@test.com" }));
             expect(mockWhere).toHaveBeenCalled();
 
-            expect(savedEntity.id).toBe("proj1:::user1");
+            // The row's columns, exactly as `GET /:id` serves them. The
+            // composite address ("proj1:::user1") is derived by consumers from
+            // the key columns, not written into the row.
+            expect(savedEntity.id).toBe("user1");
+            expect(savedEntity.project_id).toBe("proj1");
             expect(savedEntity.email).toBe("new@test.com");
         });
     });
@@ -855,7 +877,7 @@ __type: "relation" }
                 title: "New Project",
                 company_id: "1"
             }));
-            expect(entity.id).toBe("5");
+            expect(entity.id).toBe(5);
         });
 
         it("should handle updating entity with relation changes", async () => {

@@ -460,8 +460,12 @@ async function createProject(options: InitOptions) {
         console.log(`  ${chalk.cyan("docker compose up -d db")}`);
         console.log("");
         console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
+        console.log(chalk.gray("  #    A table is served once it has an authorization model, i.e."));
+        console.log(chalk.gray("  #    row-level security enabled plus at least one policy:"));
+        console.log(`  ${chalk.cyan("ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;")}`);
+        console.log(chalk.gray("  #    The API logs any table it skips, and why."));
         console.log("");
-        console.log(chalk.gray("  # 3. Start the API — every table is served automatically:"));
+        console.log(chalk.gray("  # 3. Start the API — every protected table is served automatically:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
     } else {
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
@@ -478,7 +482,7 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(isBaas
         ? chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
-            + chalk.gray("the API is derived from your database schema. Docs at /api/swagger.")
+            + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
         : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
             + chalk.gray(" and the frontend (Vite + React) concurrently."));
     console.log("");
@@ -735,12 +739,21 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
         // Generate secure random strings
         const jwtSecret = crypto.randomBytes(32).toString("hex");
         const dbPassword = crypto.randomBytes(16).toString("hex");
+        const serviceKey = crypto.randomBytes(48).toString("base64");
 
         let envContent = fs.readFileSync(envPath, "utf-8");
 
         envContent = envContent.replace(
             /^JWT_SECRET=.*$/m,
             `JWT_SECRET=${jwtSecret}`
+        );
+
+        // Ships commented out in .env.example. Left unset, the server generates
+        // one on every boot and silently invalidates the previous run's tokens,
+        // so write a stable one now rather than making each restart a logout.
+        envContent = envContent.replace(
+            /^#\s*REBASE_SERVICE_KEY=.*$/m,
+            `REBASE_SERVICE_KEY=${serviceKey}`
         );
 
         if (databaseUrl) {

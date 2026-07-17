@@ -243,7 +243,17 @@ async function main() {
                 const merged = mergeIndexContent(existing, generatedFiles);
                 fs.writeFileSync(indexPath, merged, "utf-8");
             } else {
-                const indexContent = generateIndexContent(generatedFiles);
+                // --force replaces collections derived from the database, but the
+                // directory can also hold hand-written ones with no table in the
+                // introspected schema (the auth users collection lives in
+                // "rebase"). The backend discovers the whole directory, so an
+                // index listing only introspected tables would silently drop them
+                // from the admin UI while the API still served them.
+                const siblings = fs.readdirSync(outDir)
+                    .filter(f => f.endsWith(".ts") && f !== "index.ts")
+                    .map(f => f.replace(/\.ts$/, ""));
+                const allFiles = [...new Set([...generatedFiles, ...siblings])];
+                const indexContent = generateIndexContent(allFiles);
                 fs.writeFileSync(indexPath, indexContent, "utf-8");
             }
             logger.info(chalk.green(`  ✓ ${indexPath}`));

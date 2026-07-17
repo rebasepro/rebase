@@ -65,6 +65,15 @@ export interface PostgresDriverInternals {
     realtimeService: RealtimeService;
     driver: PostgresBackendDriver;
     poolManager?: DatabasePoolManager;
+    /**
+     * Attach CDC triggers to tables that did not exist when the driver
+     * bootstrapped. Only set when database-level capture is actually active.
+     *
+     * Auth owns its own tables and creates them later in boot, so at driver
+     * bootstrap they are legitimately missing and get skipped; without this
+     * they would stay uninstrumented until the next restart.
+     */
+    provisionCdcForTables?: (tables: CdcTableRef[]) => Promise<void>;
 }
 
 // Re-export from shared CLI error utilities
@@ -334,6 +343,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const wantsCdc = cdcMode !== "off";
             const explicitCdc = cdcMode === "trigger" || cdcMode === "wal";
             let cdcEnabled = false;
+            let provisionCdcForTables: PostgresDriverInternals["provisionCdcForTables"];
 
             if (wantsCdc && !directUrl) {
                 const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
@@ -367,6 +377,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     await provisionTriggerCdc(cdcRunSql, cdcTables);
                     await realtimeService.enableCdc(directUrl);
                     cdcEnabled = true;
+                    // Boot steps that create their own tables (auth) run after
+                    // this one and use it to instrument what they just created.
+                    provisionCdcForTables = async (tables) => {
+                        await provisionTriggerCdc(cdcRunSql, tables);
+                    };
                     logger.info(
                         `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
                         `All writes now emit realtime events regardless of origin.`
@@ -417,6 +432,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     );
                     const missing: Array<{ slug: string; table: string }> = [];
                     for (const col of registeredCollections) {
+                        // Auth owns its table and creates it later in this same
+                        // boot (initializeAuth → ensureAuthTablesExist), so it is
+                        // legitimately absent right now. Reporting it as drift
+                        // tells the user to `db:push` a table that is about to
+                        // exist — and on an introspected database, one that the
+                        // database was never supposed to hold.
+                        if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
+
                         const schemaName = "schema" in col && col.schema ? col.schema : "public";
                         const tableName = registry.hasTableForCollection(
                             col.table ?? col.slug
@@ -431,8 +454,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                         const checkName = resolvedTable ?? tableName;
                         const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
                         if (!dbTables.has(fullCheckName)) {
+                            // Report what was actually looked up: an unqualified
+                            // "users" sends people hunting for public.users.
                             missing.push({ slug: col.slug,
-table: checkName });
+table: fullCheckName });
                         }
                     }
                     if (missing.length > 0) {
@@ -466,7 +491,8 @@ table: checkName });
                 registry,
                 realtimeService,
                 driver,
-                poolManager
+                poolManager,
+                provisionCdcForTables
             };
 
             return {
@@ -494,6 +520,29 @@ table: checkName });
 
             // ensureAuthTablesExist works with the collection abstraction — no Drizzle leakage.
             await ensureAuthTablesExist(db, authCollection);
+
+            // The driver bootstrapped before these tables existed, so CDC skipped
+            // them. Instrument them now, or writes to the user table emit no
+            // realtime events until the next restart.
+            if (authCollection && internals.provisionCdcForTables) {
+                const authSchema = "schema" in authCollection && typeof authCollection.schema === "string"
+                    ? authCollection.schema
+                    : "rebase";
+                const authTable = "table" in authCollection && typeof authCollection.table === "string"
+                    ? authCollection.table
+                    : authCollection.slug;
+                if (authTable) {
+                    try {
+                        await internals.provisionCdcForTables([{ schema: authSchema, table: authTable }]);
+                    } catch (err) {
+                        logger.warn(
+                            `⚠️ [CDC] Could not attach change-capture to the auth table "${authSchema}.${authTable}" — ` +
+                            "writes to it won't emit database-level events.",
+                            { detail: err instanceof Error ? err.message : String(err) }
+                        );
+                    }
+                }
+            }
 
             let emailService: EmailService | undefined;
             if (authConfig.email) {

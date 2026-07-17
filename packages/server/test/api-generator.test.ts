@@ -579,5 +579,67 @@ passwordHash: "custom-hash" },
                 })
             );
         });
+
+        it("hands finalizeUserCreation the saved row as values, not undefined", async () => {
+            // `driver.save` returns the flat row — the row IS the values. The
+            // handler used to read `entity.values` (an Entity-era leftover),
+            // handing the adapter `values: undefined`; its invite-email path
+            // then threw on `values.email` inside a try that reports "email
+            // delivery failed" — so no invitation was ever sent, and the flag
+            // blamed SMTP.
+            const mockFinalize = jest.fn().mockResolvedValue({ invitationSent: true });
+            const mockAuthAdapter = {
+                id: "test-adapter",
+                verifyRequest: jest.fn(),
+                getCapabilities: jest.fn(),
+                prepareUserCreation: jest.fn().mockResolvedValue({
+                    values: { email: "invited@example.com",
+passwordHash: "hash" },
+                    clearPassword: "temp-password",
+                    hookHandledEmail: false
+                }),
+                finalizeUserCreation: mockFinalize
+            };
+
+            const app = new Hono();
+            app.onError(errorHandler);
+            app.use("/api/*", async (c, next) => {
+                c.set("driver", mockDriver);
+                await next();
+            });
+
+            const authCollections = [
+                {
+                    slug: "users",
+                    name: "Users",
+                    singularName: "User",
+                    auth: true,
+                    properties: {}
+                } as any
+            ];
+
+            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter as any);
+            app.route("/api", generator.generateRoutes());
+
+            const savedRow = {
+                id: "invited-id",
+                email: "invited@example.com",
+                displayName: "Invited User"
+            };
+            mockDriver.save.mockResolvedValue(savedRow as any);
+
+            const res = await app.request("/api/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: "invited@example.com" })
+            });
+
+            expect(res.status).toBe(201);
+            expect(mockFinalize).toHaveBeenCalledWith(
+                { id: "invited-id",
+values: savedRow },
+                "temp-password"
+            );
+        });
     });
 });

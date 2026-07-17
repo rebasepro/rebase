@@ -11,6 +11,8 @@ import {
     writeLink,
     colorStatus,
     keyValues,
+    fetchTenantBaseDomain,
+    projectHost,
     success,
     fail,
     reportError,
@@ -21,6 +23,12 @@ interface ProjectRow {
     id: string | number;
     name?: string;
     subdomain?: string;
+    /**
+     * Where the project is actually served. Computed by the control plane from
+     * the project's cluster, which the CLI cannot read itself (admin-only RLS).
+     * Absent on control planes older than that hook — `projectHost` falls back.
+     */
+    host?: string;
     customDomain?: string;
     gitRepoUrl?: string;
     gitBranch?: string;
@@ -37,11 +45,14 @@ export async function listProjects(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
     try {
-        const projects = (await client.data.collection("projects").find({
-            where: org ? { organization: ["==", org] } : undefined,
-            orderBy: ["name", "asc"],
-            limit: 100
-        })).data as unknown as ProjectRow[];
+        const [projects, baseDomain] = await Promise.all([
+            client.data.collection("projects").find({
+                where: org ? { organization: ["==", org] } : undefined,
+                orderBy: ["name", "asc"],
+                limit: 100
+            }).then((res) => res.data as unknown as ProjectRow[]),
+            fetchTenantBaseDomain(client, url)
+        ]);
 
         console.log("");
         console.log(chalk.bold("  📦 Projects") + (org ? chalk.gray(`  (org ${org})`) : ""));
@@ -57,7 +68,7 @@ export async function listProjects(rawArgs: string[]): Promise<void> {
         for (const p of projects) {
             const marker = String(p.id) === linkedId ? chalk.green(" ●") : "  ";
             console.log(`${marker}${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.id}]`)} ${colorStatus(p.status)}`);
-            console.log(`    ${chalk.gray(`${p.subdomain ?? "—"}.rebase.pro`)}${p.provider ? chalk.gray(`  ·  ${p.provider}`) : ""}`);
+            console.log(`    ${chalk.gray(projectHost(p, baseDomain) ?? "—")}${p.provider ? chalk.gray(`  ·  ${p.provider}`) : ""}`);
         }
         console.log("");
     } catch (e) {
@@ -174,7 +185,7 @@ message: "Subdomain:" });
         success(`Created project ${chalk.bold(name)}`);
         keyValues([
             ["ID", String(created.id)],
-            ["URL", `${subdomain}.rebase.pro`],
+            ["URL", projectHost(created, await fetchTenantBaseDomain(client, url))],
             ["Provider", provider],
             ["Branch", gitBranch]
         ]);
@@ -197,21 +208,22 @@ orgId: String(org) });
 /* ─── info ─────────────────────────────────────────────────────── */
 
 export async function projectInfo(rawArgs: string[], projectId: string): Promise<void> {
-    const { client } = await requireClient(rawArgs);
+    const { client, url } = await requireClient(rawArgs);
     try {
         const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
         if (!p) fail(`Project ${projectId} not found.`);
 
-        const [db, lastDeploy] = await Promise.all([
+        const [db, lastDeploy, baseDomain] = await Promise.all([
             firstRow(client, "databases", projectId),
-            latestDeployment(client, projectId)
+            latestDeployment(client, projectId),
+            fetchTenantBaseDomain(client, url)
         ]);
 
         console.log("");
         console.log(`  ${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.id}]`)} ${colorStatus(p.status)}`);
         console.log("");
         keyValues([
-            ["Subdomain", p.subdomain ? `${p.subdomain}.rebase.pro` : undefined],
+            ["Subdomain", projectHost(p, baseDomain)],
             ["Custom domain", p.customDomain],
             ["Repository", p.gitRepoUrl],
             ["Branch", p.gitBranch],

@@ -11,6 +11,8 @@ import {
     readLink,
     colorStatus,
     keyValues,
+    fetchTenantBaseDomain,
+    projectHost,
     openUrl,
     success,
     fail,
@@ -22,24 +24,25 @@ import { firstRow, latestDeployment, fmtDate } from "./projects";
 
 export async function statusCommand(rawArgs: string[]): Promise<void> {
     const projectId = requireProjectId(rawArgs);
-    const { client } = await requireClient(rawArgs);
+    const { client, url } = await requireClient(rawArgs);
     try {
         const project = (await client.data.collection("projects").findById(projectId)) as
-            | { id: string | number; name?: string; subdomain?: string; status?: string; gitBranch?: string }
+            | { id: string | number; name?: string; subdomain?: string; host?: string; status?: string; gitBranch?: string }
             | undefined;
         if (!project) fail(`Project ${projectId} not found.`);
 
-        const [db, storage, deploy] = await Promise.all([
+        const [db, storage, deploy, baseDomain] = await Promise.all([
             firstRow(client, "databases", projectId),
             firstRow(client, "storages", projectId),
-            latestDeployment(client, projectId)
+            latestDeployment(client, projectId),
+            fetchTenantBaseDomain(client, url)
         ]);
 
         console.log("");
         console.log(`  ${chalk.bold(project.name ?? projectId)} ${chalk.gray(`[${projectId}]`)} ${colorStatus(project.status)}`);
         console.log("");
         keyValues([
-            ["URL", project.subdomain ? `${project.subdomain}.rebase.pro` : undefined],
+            ["URL", projectHost(project, baseDomain)],
             ["Branch", project.gitBranch],
             ["Last deploy", deploy ? `${colorStatus(deploy.status)} · ${fmtDate(deploy.createdAt)}` : "never"],
             ["Database", db ? `${db.type} (${colorStatus(db.connectionStatus as string)})` : "none"],

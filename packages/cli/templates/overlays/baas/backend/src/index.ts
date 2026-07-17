@@ -165,7 +165,11 @@ pass: env.SMTP_PASS! }
         process.on("exit", cleanup);
 
         logger.info(`API running at http://localhost:${actualPort}`);
-        logger.info(`API docs at http://localhost:${actualPort}/api/swagger`);
+        // Docs are only mounted once there is something to document; with no
+        // servable tables the URL would 404, so don't advertise it.
+        if (backend.collectionRegistry.getCollections().length > 0) {
+            logger.info(`API docs at http://localhost:${actualPort}/api/swagger`);
+        }
     } else {
         server.listen(PORT, () => {
             logger.info(`API running at http://localhost:${PORT}`);

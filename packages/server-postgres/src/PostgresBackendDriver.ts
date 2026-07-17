@@ -548,13 +548,26 @@ export class PostgresBackendDriver implements DataDriver {
         let updatedValues = values;
         const contextForCallback = this.buildCallContext();
 
-        // Fetch previous values for callbacks AND history recording
+        // Fetch previous values for callbacks AND history recording. Same walk
+        // as the saved row the callbacks receive (`fetchOneForRest`), so
+        // `values` and `previousValues` compare like with like — a Date on one
+        // side and its ISO string on the other reads as a change that never
+        // happened.
         let previousValuesForHistory: Partial<M> | undefined;
         if (status === "existing" && id) {
-            const existing = await this.dataService.fetchOne<M>(path, id, resolvedCollection?.databaseId);
-            if (existing) {
-                const { id: _existingId, ...existingValues } = existing;
-                previousValuesForHistory = existingValues as Partial<M>;
+            try {
+                const existing = await this.dataService.getFetchService()
+                    .fetchOneForRest(path, id, undefined, resolvedCollection?.databaseId);
+                if (existing) {
+                    const { id: _existingId, ...existingValues } = existing;
+                    previousValuesForHistory = existingValues as Partial<M>;
+                }
+            } catch (err) {
+                // Best-effort enrichment: callbacks and history run without
+                // previous values rather than the save failing on a read the
+                // write itself does not need (e.g. a collection whose key the
+                // registry cannot resolve).
+                logger.debug(`[save] Could not fetch previous values for "${path}"`, { detail: err instanceof Error ? err.message : String(err) });
             }
         }
 

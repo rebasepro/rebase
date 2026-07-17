@@ -254,11 +254,11 @@ __type: "relation" }
                 total: 150,
                 customer_id: "1"
             }));
-            expect(entity.customer).toEqual({
-                id: "1",
-                path: "customers",
-                __type: "relation"
-            });
+            // Save answers with the row `GET /:id` serves: the FK column,
+            // no relation ref — refs are the admin view-model's, built
+            // client-side.
+            expect(entity.customer_id).toBe(1);
+            expect(entity.customer).toBeUndefined();
         });
 
         it("should deserialize owning relation correctly on fetch", async () => {
@@ -398,7 +398,7 @@ __type: "relation" }
                 total: 150
             }));
             // Verify the entity was returned successfully
-            expect(entity.id).toBe("5");
+            expect(entity.id).toBe(5);
             expect(entity.total).toBe(150);
         });
     });

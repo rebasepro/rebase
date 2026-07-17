@@ -289,8 +289,14 @@ export class RestApiGenerator {
 invitationSent: prepared.invitationSent }
                         : this.authAdapter.finalizeUserCreation
                             ? await this.authAdapter.finalizeUserCreation(
+                                // `driver.save` returns the flat row — the row IS the
+                                // values. Reading `entity.values` here (an Entity-era
+                                // leftover) handed the adapter `undefined`, whose
+                                // `.email` threw inside the invite-email try block —
+                                // reported as "email delivery failed", so no
+                                // invitation was ever sent.
                                 { id: entity.id as string,
-values: entity.values as Record<string, unknown> },
+values: entity as Record<string, unknown> },
                                 prepared.clearPassword
                             )
                             : { invitationSent: false };

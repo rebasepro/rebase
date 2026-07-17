@@ -240,6 +240,86 @@ url };
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Tenant hostnames
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * The base domain tenant projects are served at, as reported by the control
+ * plane (`platform-config`, which derives it from the same TENANT_BASE_DOMAIN
+ * the ingress and the console read — see saas/backend/src/utils/tenant-domain.ts).
+ *
+ * The CLI cannot know this value: it is per-deployment configuration (production
+ * serves tenants at `apps.rebase.pro`, a dev control plane at `localhost`). It
+ * used to be hardcoded to `rebase.pro`, so `cloud projects create` congratulated
+ * the user with a URL that resolves nowhere near their app.
+ *
+ * Cached per host for the process: it is fixed for a control plane's lifetime,
+ * and `projects list` formats one host per row off a single fetch.
+ *
+ * @returns the base domain, or `undefined` if the control plane doesn't serve
+ *   `platform-config` (an older deployment) or the request failed. A failure is
+ *   cached too — the caller renders a subdomain either way, and a short-lived
+ *   CLI should not retry once per row.
+ */
+const tenantBaseDomainCache = new Map<string, Promise<string | undefined>>();
+
+export function fetchTenantBaseDomain(client: CloudClient, url: string): Promise<string | undefined> {
+    let pending = tenantBaseDomainCache.get(url);
+    if (!pending) {
+        pending = client.functions
+            .invoke<{ tenantBaseDomain?: string }>("platform-config", undefined, { method: "GET" })
+            .then((cfg) => cfg?.tenantBaseDomain?.trim() || undefined)
+            .catch(() => undefined);
+        tenantBaseDomainCache.set(url, pending);
+    }
+    return pending;
+}
+
+/**
+ * Public host for a project — `<subdomain>.<base>`, or the bare subdomain when
+ * the base domain is unknown.
+ *
+ * It deliberately never falls back to a guessed domain. The user copies this
+ * string into a browser, so a plausible-but-wrong hostname is worse than an
+ * obviously incomplete one: `acme.rebase.pro` looks reachable and isn't, while
+ * `acme` reads as "the subdomain is acme" and prompts no wasted debugging.
+ */
+export function formatTenantHost(
+    subdomain: string | undefined,
+    baseDomain: string | undefined
+): string | undefined {
+    if (!subdomain) return undefined;
+    return baseDomain ? `${subdomain}.${baseDomain}` : subdomain;
+}
+
+/** The fields of a project row this module needs to render a host. */
+export interface HostableProject {
+    subdomain?: string;
+    /** Resolved server-side; absent on control planes older than the host hook. */
+    host?: string;
+}
+
+/**
+ * The host to display for a project.
+ *
+ * Prefers `host` off the record: the control plane resolves it through the same
+ * `tenantHost()` the ingress uses, so it accounts for the project's *cluster*
+ * base domain. The CLI cannot compute that itself — `clusters` is admin-only
+ * under RLS, so a normal user's token cannot read `baseDomain`, and a project on
+ * a second cluster is served somewhere the platform default does not name.
+ *
+ * `baseDomain` (from `platform-config`) remains the fallback for a control plane
+ * that predates the hook — right for the single-cluster case, which is every
+ * project today.
+ */
+export function projectHost(
+    project: HostableProject,
+    baseDomain: string | undefined
+): string | undefined {
+    return project.host || formatTenantHost(project.subdomain, baseDomain);
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Project link file (.rebase/cloud.json)
    ═══════════════════════════════════════════════════════════════ */
 
@@ -330,11 +410,15 @@ export function colorStatus(status: string | undefined): string {
     }
 }
 
-/** Render a two-column key/value block with aligned keys. */
-export function keyValues(rows: Array<[string, string | undefined]>): void {
+/**
+ * Render a two-column key/value block with aligned keys. Empty rows are skipped
+ * — including `null`, which the API sends for an unset column and which used to
+ * print the literal string "null" (e.g. `Custom domain: null`).
+ */
+export function keyValues(rows: Array<[string, string | null | undefined]>): void {
     const width = Math.max(...rows.map(([k]) => k.length));
     for (const [k, v] of rows) {
-        if (v === undefined || v === "") continue;
+        if (v === undefined || v === null || v === "") continue;
         console.log(`  ${chalk.gray(`${k}:`.padEnd(width + 1))} ${v}`);
     }
 }

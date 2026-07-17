@@ -628,15 +628,20 @@ function LoginForm({
         };
     }, [onClose]);
 
+    // Both controller methods record the failure in `authProviderError` — which
+    // this form renders above — and then rethrow for programmatic callers. This
+    // is not one of those: without a catch here every rejected sign-in becomes an
+    // unhandled rejection, reported as a crash by anything listening for one,
+    // while the user has already been shown the error.
     function handleEnterPassword() {
         if (email && password && authController.emailPasswordLogin) {
-            authController.emailPasswordLogin(email, password);
+            void Promise.resolve(authController.emailPasswordLogin(email, password)).catch(() => undefined);
         }
     }
 
     function handleRegistration() {
         if (email && password && authController.register) {
-            authController.register(email, password, displayName);
+            void Promise.resolve(authController.register(email, password, displayName)).catch(() => undefined);
         }
     }
 

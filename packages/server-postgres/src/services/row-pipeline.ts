@@ -1,4 +1,4 @@
-import { CollectionConfig, Relation } from "@rebasepro/types";
+import { CollectionConfig, Property, Relation } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRefWithData } from "@rebasepro/common";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
@@ -54,6 +54,42 @@ function unwrapJunctionRow(item: Record<string, unknown>): Record<string, unknow
     return nestedKey ? item[nestedKey] as Record<string, unknown> : item;
 }
 
+/**
+ * Give back the number a `number` property was declared to be.
+ *
+ * Postgres returns NUMERIC as a string and drizzle keeps it that way, since a
+ * numeric can hold more precision than a double. But the collection declared
+ * this property `number` and the OpenAPI spec this server publishes says
+ * `type: number`, so serving `"9.99"` breaks its own contract — and breaks it
+ * asymmetrically, because a create answers with the number and the read that
+ * follows answers with the string. Any client that multiplies a price works
+ * until the first refresh.
+ *
+ * Declaring a property `number` already accepts double precision — that is what
+ * the admin has always parsed it to. Columns REST serves that no property
+ * declares are left exactly as the database returned them.
+ */
+function coerceDeclaredNumber(value: unknown, property: Property | undefined): unknown {
+    if (property?.type !== "number" || typeof value !== "string") return value;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? null : parsed;
+}
+
+/** Apply {@link coerceDeclaredNumber} across a row, leaving every other column alone. */
+function coerceDeclaredNumbers(
+    row: Record<string, unknown>,
+    collection: CollectionConfig
+): Record<string, unknown> {
+    const properties = collection.properties;
+    if (!properties) return row;
+
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+        out[key] = coerceDeclaredNumber(value, properties[key] as Property | undefined);
+    }
+    return out;
+}
+
 /** Render one target row in the requested style. */
 function renderTarget(
     targetRow: Record<string, unknown>,
@@ -64,7 +100,7 @@ function renderTarget(
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        return { ...targetRow };
+        return coerceDeclaredNumbers({ ...targetRow }, targetCollection);
     }
 
     const address = relationTargetAddress(targetRow, targetCollection, registry);
@@ -139,8 +175,11 @@ export function toCmsRow(
  * The row REST serves: every column under its own name, with the value Postgres
  * returned, and relations inlined as the target's columns.
  *
- * Deliberately not normalized: REST serves what the database holds, and JSON
- * has its own opinions about dates that the admin's view-model does not share.
+ * Values are the ones the database returned, except where that contradicts the
+ * declared type: a `number` property is served as a number (see
+ * {@link coerceDeclaredNumber}). Dates stay as the database returned them —
+ * JSON has its own opinions about dates that the admin's view-model does not
+ * share.
  *
  * Keyed by the row rather than by the relation list — a REST fetch only loads
  * the relations `include` asked for, so the row is the authority on which are
@@ -168,7 +207,7 @@ export function toRestRow(
         } else if (relation && typeof value === "object" && value !== null) {
             flat[key] = renderTarget(value as Record<string, unknown>, relation.target(), "inline", registry);
         } else {
-            flat[key] = value;
+            flat[key] = coerceDeclaredNumber(value, collection.properties?.[key] as Property | undefined);
         }
     }
 

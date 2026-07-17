@@ -50,6 +50,14 @@ const SEED = `
         PRIMARY KEY (tenant_id, user_id)
     );
 
+    -- A foreign key: the case where a write's response used to grow a
+    -- relation object no read ever served.
+    CREATE TABLE orders (
+        id serial PRIMARY KEY,
+        product_id integer REFERENCES products(id),
+        quantity integer NOT NULL
+    );
+
     -- No RLS: must not be served at all.
     CREATE TABLE secrets (
         id serial PRIMARY KEY,
@@ -59,10 +67,12 @@ const SEED = `
     ALTER TABLE products ENABLE ROW LEVEL SECURITY;
     ALTER TABLE sku_items ENABLE ROW LEVEL SECURITY;
     ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 
     CREATE POLICY products_all ON products FOR ALL TO public USING (true) WITH CHECK (true);
     CREATE POLICY sku_items_all ON sku_items FOR ALL TO public USING (true) WITH CHECK (true);
     CREATE POLICY memberships_all ON memberships FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY orders_all ON orders FOR ALL TO public USING (true) WITH CHECK (true);
 
     INSERT INTO products (name, price) VALUES ('Camera', 299);
     INSERT INTO sku_items (sku, label) VALUES ('ABC-1', 'Widget');
@@ -244,6 +254,28 @@ async function main(): Promise<void> {
             const res = await api(`/memberships/${encodeURIComponent("1:::2")}`);
             expectTrue(res.status === 200, `expected 200, got ${res.status}`);
             expectEqual((await res.json() as { role: string }).role, "admin", "role");
+        });
+
+        await check("a create's response is the read that follows it, FK included", async () => {
+            // The same resource used to have two shapes: POST answered with the
+            // admin view-model row (relation refs, normalized ids) while GET
+            // served raw columns. Client arithmetic and equality both broke on
+            // the first refresh.
+            const created = await api("/orders", {
+                method: "POST",
+                body: JSON.stringify({ product_id: 1, quantity: 2 })
+            });
+            const createdText = await created.text();
+            expectTrue(created.status === 201, `create: expected 201, got ${created.status} ${createdText}`);
+            const createdBody = JSON.parse(createdText) as Record<string, unknown>;
+
+            expectTrue(createdBody.product_id === 1, `product_id was ${JSON.stringify(createdBody.product_id)}, not 1`);
+            expectTrue(!("product" in createdBody) && !JSON.stringify(createdBody).includes("__type"),
+                `a relation object reached the create response: ${JSON.stringify(createdBody)}`);
+
+            const read = await api(`/orders/${createdBody.id}`);
+            expectTrue(read.status === 200, `read: expected 200, got ${read.status}`);
+            expectEqual(createdBody, await read.json(), "create response vs subsequent GET");
         });
 
         await check("rejects a write naming a column the table does not have", async () => {

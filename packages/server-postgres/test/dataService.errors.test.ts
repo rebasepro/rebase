@@ -258,7 +258,7 @@ name: null }]);
             // The service should handle validation at the collection level
             // This test verifies the service doesn't crash with incomplete data
             const entity = await dataService.save("test", incompleteEntity);
-            expect(entity.id).toBe("1");
+            expect(entity.id).toBe(1);
         });
 
         it("should handle NULL values in database correctly", async () => {
@@ -278,7 +278,7 @@ name: null };
 name: null }]);
 
             const entity = await dataService.save("test", entityWithUndefined);
-            expect(entity.id).toBe("1");
+            expect(entity.id).toBe(1);
         });
     });
 

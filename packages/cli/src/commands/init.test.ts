@@ -329,6 +329,42 @@ force: true });
         expect(indexContent).not.toContain("postsCollection");
     });
 
+    it("every relative import resolves after applying each preset", async () => {
+        // Preset files are authored under presets/<name>/ but scaffolded flat
+        // into config/collections/, so an import that resolves in the template
+        // tree can still dangle after init (e.g. "../../users.js").
+        for (const preset of ["blog", "blank", "ecommerce"] as const) {
+            const targetDir = await simulateInit(`imports-${preset}-app`);
+            const collectionsDir = path.join(targetDir, "config", "collections");
+            const presetsDir = path.join(collectionsDir, "presets");
+
+            if (preset !== "blog") {
+                for (const file of ["posts.ts", "authors.ts", "tags.ts", "index.ts"]) {
+                    const filePath = path.join(collectionsDir, file);
+                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                }
+                const presetDir = path.join(presetsDir, preset);
+                for (const file of fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"))) {
+                    fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
+                }
+            }
+            fs.rmSync(presetsDir, { recursive: true,
+force: true });
+
+            for (const file of fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts"))) {
+                const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
+                const specs = [...content.matchAll(/from\s+"(\.[^"]+)"/g)].map(m => m[1]);
+                for (const spec of specs) {
+                    const resolved = path.resolve(collectionsDir, spec.replace(/\.js$/, ".ts"));
+                    expect(
+                        fs.existsSync(resolved),
+                        `${preset} preset: ${file} imports "${spec}", which does not exist after scaffolding`
+                    ).toBe(true);
+                }
+            }
+        }
+    });
+
     it("applying ecommerce preset replaces blog files with ecommerce collections", async () => {
         const targetDir = await simulateInit("ecom-test-app");
         const collectionsDir = path.join(targetDir, "config", "collections");
@@ -590,6 +626,20 @@ describe(".env.example", () => {
         const dbPasswordMatch = envContent.match(/^DATABASE_PASSWORD=(.*)$/m);
         expect(dbPasswordMatch).toBeTruthy();
         expect(dbMatch![1]).toContain(`postgresql://rebase:${dbPasswordMatch![1]}@`);
+    });
+
+    it("configureEnvFile writes a stable REBASE_SERVICE_KEY", async () => {
+        // Left unset, the server auto-generates one per boot and invalidates
+        // the previous run's tokens — every restart becomes a silent logout.
+        const targetDir = await simulateInit("env-service-key-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        const match = envContent.match(/^REBASE_SERVICE_KEY=(.+)$/m);
+        expect(match).toBeTruthy();
+        expect(match![1].length).toBeGreaterThanOrEqual(32);
+        // The commented placeholder must be gone, not merely accompanied.
+        expect(envContent).not.toMatch(/^#\s*REBASE_SERVICE_KEY=/m);
     });
 
     it("configureEnvFile correctly uses provided databaseUrl", async () => {
