@@ -29,6 +29,31 @@ interface RateLimiterOptions {
      * `limit`; returning `null` skips the limiter for this request.
      */
     resolveLimit?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => number | null | undefined;
+    /**
+     * Number of trusted reverse-proxy hops in front of this server. Each hop
+     * appends the address it saw to `X-Forwarded-For`, so the real client IP is
+     * the Nth entry from the right. Anything further left is client-supplied and
+     * ignored — which is what stops a caller spoofing `X-Forwarded-For` to
+     * rotate rate-limit keys. Defaults to `TRUSTED_PROXY_HOPS` (env) or `1`.
+     * Set to `0` when the server is exposed directly (no proxy): `X-Forwarded-For`
+     * is then ignored entirely in favour of `X-Real-IP`.
+     */
+    trustedProxyHops?: number;
+}
+
+/**
+ * Resolve the number of trusted proxy hops from an explicit option, the
+ * `TRUSTED_PROXY_HOPS` env var, or the default of 1.
+ */
+function resolveTrustedProxyHops(optionValue?: number): number {
+    if (typeof optionValue === "number" && Number.isFinite(optionValue) && optionValue >= 0) {
+        return Math.floor(optionValue);
+    }
+    const fromEnv = Number(process.env.TRUSTED_PROXY_HOPS);
+    if (Number.isFinite(fromEnv) && fromEnv >= 0) {
+        return Math.floor(fromEnv);
+    }
+    return 1;
 }
 
 /**
@@ -37,10 +62,11 @@ interface RateLimiterOptions {
  * Uses a sliding window: only hits within the last `windowMs` are counted.
  */
 export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareHandler<HonoEnv> {
+    const trustedProxyHops = resolveTrustedProxyHops(options.trustedProxyHops);
     const {
         windowMs = 15 * 60 * 1000,
         limit = 100,
-        keyGenerator = defaultKeyGenerator,
+        keyGenerator = (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => defaultKeyGenerator(c, trustedProxyHops),
         message = "Too many requests, please try again later.",
         store = new MemoryRateLimitStore(windowMs),
         resolveLimit
@@ -77,15 +103,30 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
 
 /**
  * Default key generator: extract client IP from standard headers.
+ *
+ * `X-Forwarded-For` is a client-writable header; only the entries appended by
+ * trusted reverse proxies can be believed. With `trustedProxyHops` proxies in
+ * front, each appends the address it saw, so the real client IP is the
+ * `trustedProxyHops`-th entry from the right — everything further left is
+ * client-supplied and must be ignored. This is what prevents a caller from
+ * spoofing `X-Forwarded-For` to spread its requests across many rate-limit keys.
+ *
+ * With `trustedProxyHops === 0` (server exposed directly, no proxy),
+ * `X-Forwarded-For` is not trusted at all and `X-Real-IP` is used instead.
  */
-function defaultKeyGenerator(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string {
-    const forwardedFor = c.req.header("x-forwarded-for");
-    if (forwardedFor) {
-        const ips = forwardedFor.split(",");
-        // The leftmost IP can be easily spoofed by the client in the initial request.
-        // Reverse proxies append to the right. We take the rightmost IP as the most
-        // reliable indicator of the true client IP (the one closest to our server).
-        return ips[ips.length - 1].trim();
+function defaultKeyGenerator(
+    c: Parameters<MiddlewareHandler<HonoEnv>>[0],
+    trustedProxyHops: number = resolveTrustedProxyHops()
+): string {
+    if (trustedProxyHops > 0) {
+        const forwardedFor = c.req.header("x-forwarded-for");
+        if (forwardedFor) {
+            const ips = forwardedFor.split(",").map(s => s.trim()).filter(Boolean);
+            if (ips.length > 0) {
+                const idx = Math.max(0, ips.length - trustedProxyHops);
+                return ips[idx];
+            }
+        }
     }
     return c.req.header("x-real-ip") || "unknown";
 }

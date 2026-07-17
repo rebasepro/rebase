@@ -61,12 +61,17 @@ export function configureMiddlewares(
         logger.info("CSRF protection enabled");
     }
 
-    // CORS Warning
-    if (!isProduction && !process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
+    // CORS Warning. The framework does not install a CORS middleware itself —
+    // that belongs to the app (the scaffolded template adds `hono/cors`). A
+    // backend wired up by hand can therefore end up with no origin restriction
+    // at all, which is most dangerous in production, so warn there too rather
+    // than only in development.
+    if (!process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
         logger.warn(
+            (isProduction ? "[PRODUCTION] " : "") +
             "No CORS configuration detected (CORS_ORIGINS / FRONTEND_URL not set). " +
-            "The API will accept requests from any origin. " +
-            "Set CORS_ORIGINS in your .env file to restrict access."
+            "If your app does not install its own CORS middleware, the API may accept " +
+            "requests from any origin. Set CORS_ORIGINS to restrict access."
         );
     }
 

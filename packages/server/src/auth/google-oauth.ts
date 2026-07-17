@@ -18,6 +18,76 @@ async function loadGoogleAuth() {
     return _googleAuth;
 }
 
+/**
+ * Verify a Google **access token** and resolve it to a profile.
+ *
+ * SECURITY: an access token must be checked against Google's `tokeninfo`
+ * endpoint so we can confirm its `aud` (the OAuth client the token was issued
+ * to) matches *our* `clientId`. The `userinfo` endpoint does **not** verify
+ * audience — it returns a profile for any valid Google access token — so
+ * trusting it alone lets an attacker present a token they obtained for a
+ * *different* client (e.g. their own app, via a phished consent) and log in as
+ * whatever account that token belongs to. The `aud` check is what binds the
+ * token to this application.
+ *
+ * Identity (`sub` / `email` / `email_verified`) is taken from the
+ * audience-checked `tokeninfo` response. `userinfo` is used only, best-effort,
+ * to enrich display fields (name, picture).
+ */
+async function verifyGoogleAccessToken(
+    accessToken: string,
+    expectedClientId: string
+): Promise<OAuthProviderProfile> {
+    const tokenInfoRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    );
+    if (!tokenInfoRes.ok) {
+        throw new Error(`Google tokeninfo request failed with status ${tokenInfoRes.status}`);
+    }
+    const tokenInfo = await tokenInfoRes.json() as {
+        aud?: string;
+        sub?: string;
+        email?: string;
+        // The legacy tokeninfo endpoint returns this as the string "true"/"false".
+        email_verified?: string | boolean;
+    };
+
+    if (tokenInfo.aud !== expectedClientId) {
+        throw new Error(
+            "Google access token audience mismatch: the token was not issued for this application"
+        );
+    }
+    if (!tokenInfo.sub || !tokenInfo.email) {
+        throw new Error("Google access token missing sub or email (the email scope is required)");
+    }
+
+    const emailVerified = tokenInfo.email_verified === true || tokenInfo.email_verified === "true";
+
+    let displayName: string | null = null;
+    let photoUrl: string | null = null;
+    try {
+        const res = await fetch(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (res.ok) {
+            const info = await res.json() as { name?: string; picture?: string };
+            displayName = info.name || null;
+            photoUrl = info.picture || null;
+        }
+    } catch {
+        // Non-fatal: identity is already established from tokeninfo.
+    }
+
+    return {
+        providerId: tokenInfo.sub,
+        email: tokenInfo.email,
+        displayName,
+        photoUrl,
+        emailVerified
+    };
+}
+
 export interface GoogleUserInfo {
     googleId: string;
     email: string;
@@ -114,35 +184,15 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         email: content.email || "",
                         displayName: content.name || null,
                         photoUrl: content.picture || null,
-                        emailVerified: true
+                        emailVerified: content.email_verified === true
                     };
                 }
 
-                // Path 2: verify an access token via Google's userinfo endpoint
+                // Path 2: verify a client-supplied access token. This validates
+                // the token's audience against our clientId — see
+                // verifyGoogleAccessToken — before trusting the identity.
                 if (payload.accessToken) {
-                    const res = await fetch(
-                        "https://www.googleapis.com/oauth2/v3/userinfo",
-                        { headers: { Authorization: `Bearer ${payload.accessToken}` } }
-                    );
-                    if (!res.ok) {
-                        throw new Error(`Google userinfo request failed with status ${res.status}`);
-                    }
-                    const info = await res.json() as {
-                        sub: string;
-                        email?: string;
-                        name?: string;
-                        picture?: string;
-                    };
-                    if (!info.sub || !info.email) {
-                        throw new Error("Google userinfo response missing sub or email");
-                    }
-                    return {
-                        providerId: info.sub,
-                        email: info.email,
-                        displayName: info.name || null,
-                        photoUrl: info.picture || null,
-                        emailVerified: true
-                    };
+                    return await verifyGoogleAccessToken(payload.accessToken, clientId);
                 }
 
                 // Path 3: authorization code exchange (most secure)
@@ -204,35 +254,16 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                             email: content.email || "",
                             displayName: content.name || null,
                             photoUrl: content.picture || null,
-                            emailVerified: true
+                            emailVerified: content.email_verified === true
                         };
                     }
 
-                    // Fallback: use the access token to fetch userinfo
+                    // Fallback: use the access token from our own confidential
+                    // exchange. Its audience is necessarily our clientId, so the
+                    // check in verifyGoogleAccessToken passes — we route through
+                    // it anyway for a single trusted identity path.
                     if (tokenData.access_token) {
-                        const userInfoRes = await fetch(
-                            "https://www.googleapis.com/oauth2/v3/userinfo",
-                            { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
-                        );
-                        if (!userInfoRes.ok) {
-                            throw new Error(`Google userinfo request failed after code exchange (${userInfoRes.status})`);
-                        }
-                        const info = await userInfoRes.json() as {
-                            sub: string;
-                            email?: string;
-                            name?: string;
-                            picture?: string;
-                        };
-                        if (!info.sub || !info.email) {
-                            return null;
-                        }
-                        return {
-                            providerId: info.sub,
-                            email: info.email,
-                            displayName: info.name || null,
-                            photoUrl: info.picture || null,
-                            emailVerified: true
-                        };
+                        return await verifyGoogleAccessToken(tokenData.access_token, clientId);
                     }
 
                     throw new Error("Google token exchange returned neither id_token nor access_token");

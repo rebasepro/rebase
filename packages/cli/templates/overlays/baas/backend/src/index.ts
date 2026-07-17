@@ -36,10 +36,26 @@ const allowedOrigins = isProduction
     })()
     : [];
 
+// In dev we still restrict which origins are reflected. Because `credentials`
+// is enabled, reflecting an arbitrary Origin would let any website the
+// developer happens to visit make credentialed cross-origin requests to this
+// dev server (and read the responses) using the developer's session. So dev
+// reflects only localhost origins; requests with no Origin (curl, same-origin)
+// are unaffected.
+const isLocalhostOrigin = (origin: string): boolean => {
+    try {
+        const { hostname } = new URL(origin);
+        return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
+    } catch {
+        return false;
+    }
+};
+
 app.use("/*", cors({
     origin: (origin) => {
-        if (!isProduction) return origin || "*";
-        return allowedOrigins.includes(origin) ? origin : null;
+        if (isProduction) return allowedOrigins.includes(origin) ? origin : null;
+        if (!origin) return "*";
+        return isLocalhostOrigin(origin) ? origin : null;
     },
     credentials: true
 }));

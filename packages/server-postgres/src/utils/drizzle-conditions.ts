@@ -1126,6 +1126,19 @@ export class DrizzleConditionBuilder {
             throw new Error(`Vector column '${vectorSearch.property}' not found in table`);
         }
 
+        // The vector is interpolated as a raw SQL literal below (pgvector has no
+        // bind form for the `::vector` cast), so every element must be a finite
+        // number. The REST query parser already enforces this, but this builder
+        // is a shared entry point — validate here too so no future caller can
+        // turn an unchecked value into SQL injection.
+        if (
+            !Array.isArray(vectorSearch.vector) ||
+            vectorSearch.vector.length === 0 ||
+            !vectorSearch.vector.every((n) => typeof n === "number" && Number.isFinite(n))
+        ) {
+            throw new Error("Vector search requires a non-empty array of finite numbers");
+        }
+
         const vectorLiteral = `'[${vectorSearch.vector.join(",")}]'::vector`;
         const distanceFn = vectorSearch.distance || "cosine";
 

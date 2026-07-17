@@ -72,6 +72,16 @@ export function createMicrosoftProvider(config: {
                     return null;
                 }
 
+                // Microsoft Graph exposes no per-request email-verification flag.
+                // `mail` is a provisioned, provider-verified mailbox address; a
+                // bare `userPrincipalName` (which is what some guest / MSA cases
+                // fall back to) is a sign-in identifier, not a guaranteed
+                // verified email. `emailVerified` gates auto-linking an OAuth
+                // login onto a pre-existing password account (see auth routes),
+                // so only treat a real `mail` address as verified rather than
+                // asserting it unconditionally.
+                const emailVerified = Boolean(profileData.mail);
+
                 // Attempt to fetch profile photo URL (Graph returns binary, not a URL).
                 // We skip this and let the frontend use the Microsoft Graph photo endpoint.
                 return {
@@ -79,7 +89,7 @@ export function createMicrosoftProvider(config: {
                     email,
                     displayName: profileData.displayName || null,
                     photoUrl: null,
-                    emailVerified: true
+                    emailVerified
                 };
             } catch (error) {
                 logger.error("Microsoft OAuth error", { error: error });

@@ -99,4 +99,50 @@ describe("Rate Limiter", () => {
         const body = await res.json() as any;
         expect(body.error.message).toBe("Slow down!");
     });
+
+    describe("X-Forwarded-For trust (default key generator)", () => {
+        function appWith(options: { limit?: number; trustedProxyHops?: number } = {}) {
+            const app = new Hono<HonoEnv>();
+            // No custom keyGenerator: exercise the real defaultKeyGenerator.
+            app.use("/api/*", createRateLimiter({
+                windowMs: 60 * 1000,
+                limit: options.limit ?? 1,
+                trustedProxyHops: options.trustedProxyHops
+            }));
+            app.get("/api/test", (c) => c.json({ ok: true }));
+            return app;
+        }
+
+        it("ignores client-prepended X-Forwarded-For entries (1 trusted hop)", async () => {
+            const app = appWith({ limit: 1, trustedProxyHops: 1 });
+
+            // The proxy appended the real client (9.9.9.9); the leftmost entry is
+            // attacker-controlled. Varying it must NOT create a fresh bucket.
+            const first = await app.request("/api/test", {
+                headers: { "x-forwarded-for": "spoof-1, 9.9.9.9" }
+            });
+            expect(first.status).toBe(200);
+
+            const second = await app.request("/api/test", {
+                headers: { "x-forwarded-for": "spoof-2, 9.9.9.9" }
+            });
+            expect(second.status).toBe(429);
+        });
+
+        it("ignores X-Forwarded-For entirely when trustedProxyHops is 0", async () => {
+            const app = appWith({ limit: 1, trustedProxyHops: 0 });
+
+            // With no trusted proxy, only X-Real-IP is believed. Different XFF
+            // values with the same X-Real-IP share one bucket.
+            const first = await app.request("/api/test", {
+                headers: { "x-forwarded-for": "1.1.1.1", "x-real-ip": "8.8.8.8" }
+            });
+            expect(first.status).toBe(200);
+
+            const second = await app.request("/api/test", {
+                headers: { "x-forwarded-for": "2.2.2.2", "x-real-ip": "8.8.8.8" }
+            });
+            expect(second.status).toBe(429);
+        });
+    });
 });
