@@ -41,14 +41,17 @@ height: 800 }
     // 3. Click Submit
     console.log("Submitting login form...");
     await page.click('button[type="submit"]');
-    // Wait for registration to complete and redirect to the dashboard
-    await page.waitForURL("**/org/*/projects", { timeout: 15000 });
+    // Wait for registration to complete and redirect to the dashboard.
+    // Accepts both the current /o/:orgSlug/p scheme and the pre-slug
+    // /org/:orgSlug/projects one, so the script works on either side of the
+    // saas feat/slug-urls branch.
+    await page.waitForURL(/\/(o|org)\/[^/]+\/(p|projects)$/, { timeout: 15000 });
     await page.screenshot({ path: path.join(screenshotDir, "3-dashboard-projects.png") });
 
     // 4. Navigate to Create Project
     console.log("Clicking 'New Project'...");
     await page.click('button:has-text("Create Project")');
-    await page.waitForURL("**/org/*/projects/new", { timeout: 10000 });
+    await page.waitForURL(/\/(o|org)\/[^/]+\/(p|projects)\/new$/, { timeout: 10000 });
     await page.screenshot({ path: path.join(screenshotDir, "4-create-project-step1.png") });
 
     // 5. Fill Step 1
