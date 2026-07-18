@@ -30,21 +30,17 @@ force: true });
 // =============================================================================
 
 describe("detectPackageManager", () => {
-    describe("user agent detection", () => {
-        it("detects npm from npm_config_user_agent", () => {
+    describe("invocation is not a project signal", () => {
+        it("ignores an npm user agent and prefers pnpm when installed", () => {
+            // Running `npx @rebasepro/cli init` must not pin the project to npm.
             process.env.npm_config_user_agent = "npm/10.2.0 node/v20.11.0 darwin arm64";
-            expect(detectPackageManager(tmpDir)).toBe("npm");
-        });
-
-        it("detects pnpm from npm_config_user_agent", () => {
-            process.env.npm_config_user_agent = "pnpm/8.15.4 npm/? node/v20.11.0 darwin arm64";
             expect(detectPackageManager(tmpDir)).toBe("pnpm");
         });
 
-        it("user agent takes precedence over lock files", () => {
-            process.env.npm_config_user_agent = "npm/10.2.0 node/v20.11.0";
-            // Even with pnpm-lock.yaml present, npm_config_user_agent wins
-            fs.writeFileSync(path.join(tmpDir, "pnpm-lock.yaml"), "lockfileVersion: '6.0'");
+        it("an existing lock file still wins over invocation", () => {
+            process.env.npm_config_user_agent = "pnpm/8.15.4 npm/? node/v20.11.0 darwin arm64";
+            // A committed package-lock.json is an explicit choice we respect.
+            fs.writeFileSync(path.join(tmpDir, "package-lock.json"), "{}");
             expect(detectPackageManager(tmpDir)).toBe("npm");
         });
     });
@@ -62,18 +58,19 @@ describe("detectPackageManager", () => {
             expect(detectPackageManager(tmpDir)).toBe("pnpm");
         });
 
-        it("prefers package-lock.json over pnpm-lock.yaml when both exist", () => {
+        it("prefers pnpm-lock.yaml over package-lock.json when both exist", () => {
             delete process.env.npm_config_user_agent;
             fs.writeFileSync(path.join(tmpDir, "package-lock.json"), "{}");
             fs.writeFileSync(path.join(tmpDir, "pnpm-lock.yaml"), "lockfileVersion: '6.0'");
-            // package-lock.json is checked first
-            expect(detectPackageManager(tmpDir)).toBe("npm");
+            // pnpm is checked first — Rebase's recommended PM wins a tie.
+            expect(detectPackageManager(tmpDir)).toBe("pnpm");
         });
     });
 
     describe("default behavior", () => {
-        it("defaults to pnpm when no signals are present", () => {
+        it("defaults to pnpm when installed and no lock file is present", () => {
             delete process.env.npm_config_user_agent;
+            // Test runs in the pnpm-based Rebase monorepo, so pnpm is available.
             expect(detectPackageManager(tmpDir)).toBe("pnpm");
         });
 

@@ -7,7 +7,7 @@
     "scripts": {
         "dev": "tsx watch --include=\"./functions/**/*\" src/index.ts",
         "build": "tsc",
-        "start": "node dist/backend/src/index.js"
+        "start": "node dist/index.js"
     },
     "dependencies": {
         "@rebasepro/server": "workspace:*",

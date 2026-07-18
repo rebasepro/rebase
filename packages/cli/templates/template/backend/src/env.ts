@@ -1,4 +1,5 @@
 import * as dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { loadEnv } from "@rebasepro/server";
@@ -7,7 +8,35 @@ import { z } from "zod";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+/**
+ * Locate the project's `.env` by walking up the directory tree.
+ *
+ * A fixed relative path can't work in both modes: in dev this file runs from
+ * source at `backend/src/env.ts`, but the compiled output lives at
+ * `backend/dist/backend/src/env.js` — two directories deeper — so
+ * `../../.env` points at a file that doesn't exist in production. Walking up
+ * finds the root `.env` from either location.
+ */
+function findEnvFile(startDir: string): string | undefined {
+    let dir = startDir;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+        const candidate = path.join(dir, ".env");
+        if (fs.existsSync(candidate)) return candidate;
+        const parent = path.dirname(dir);
+        if (parent === dir) return undefined;
+        dir = parent;
+    }
+}
+
+// `rebase start` sets DOTENV_CONFIG_PATH to the project's .env; honor it first,
+// then fall back to searching up from this file. When neither is found (e.g. a
+// production host that injects env vars directly), skip dotenv entirely and let
+// the real process environment flow through.
+const envPath = process.env.DOTENV_CONFIG_PATH || findEnvFile(__dirname);
+if (envPath && fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+}
 
 export const env = loadEnv({
     extend: z.object({

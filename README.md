@@ -56,7 +56,7 @@ Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](
 
 - 🔓 **No Vendor Lock-in** — Self-host anywhere. Full control over your infrastructure, code, and database.
 - 🧱 **Modular** — Start as a pure API and add the admin panel later, or never. Nothing is bundled that you didn't ask for.
-- ⚡ **Instant Setup** — `npx @rebasepro/cli init` scaffolds a production-ready project in seconds.
+- ⚡ **Instant Setup** — `pnpm dlx @rebasepro/cli init` scaffolds a production-ready project in seconds.
 - 🗄️ **PostgreSQL First** — First-class Postgres support with Drizzle ORM, schema introspection, and automatic migrations.
 - 🔒 **Secure by Default** — Authorization is Postgres RLS, not application code. Tables without row-level security aren't served.
 - 🧩 **Radical Extensibility** — Not constrained to pre-built widgets. If you can build it in React, you can build it in Rebase.
@@ -70,7 +70,7 @@ Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](
 Scaffold a complete, self-hosted Rebase application connected to your database:
 
 ```bash
-npx @rebasepro/cli init my-rebase-app
+pnpm dlx @rebasepro/cli init my-rebase-app
 cd my-rebase-app
 ```
 
@@ -89,7 +89,7 @@ Your admin panel is running at `http://localhost:5173` and the API at `http://lo
 Rebase is modular — take only the parts you want:
 
 ```bash
-npx @rebasepro/cli init my-api --flavor baas
+pnpm dlx @rebasepro/cli init my-api --flavor baas
 ```
 
 That scaffolds a headless backend: REST, auth, storage, realtime and backups over
@@ -179,7 +179,7 @@ Drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` di
 Auto-generate fully typed **TypeScript SDKs** from your collection definitions. Use them in any frontend, script, or service to interact with your Rebase backend with complete type safety.
 
 ```bash
-npx @rebasepro/cli generate-sdk
+pnpm dlx @rebasepro/cli generate-sdk
 ```
 
 ### 🤖 MCP Server
@@ -268,7 +268,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 Rebase exposes its design system as a completely independent library. Fully typed, accessible, and customizable via Tailwind CSS v4:
 
 ```bash
-npm install @rebasepro/ui
+pnpm add @rebasepro/ui
 ```
 
 ---

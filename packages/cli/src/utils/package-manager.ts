@@ -7,6 +7,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { spawnSync } from "child_process";
 
 export type PackageManager = "pnpm" | "npm";
 
@@ -32,35 +33,49 @@ export interface PMCommands {
 }
 
 /**
- * Detect the package manager from the environment or the target directory.
+ * Whether pnpm is runnable on this machine.
+ *
+ * Used to decide whether a fresh project can be scaffolded with pnpm. Kept
+ * cheap and non-interactive (short timeout, output discarded) so it never
+ * hangs detection if a corepack shim misbehaves.
+ */
+export function isPnpmAvailable(): boolean {
+    try {
+        const res = spawnSync("pnpm", ["--version"], { stdio: "ignore", timeout: 3000 });
+        return res.status === 0;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Detect the package manager for a Rebase project.
+ *
+ * Rebase recommends pnpm, so detection prefers it. Crucially, *how the CLI was
+ * invoked* (`npx` vs `pnpm dlx`, i.e. `npm_config_user_agent`) is deliberately
+ * ignored: running `npx @rebasepro/cli init` says nothing about how the user
+ * wants to manage the project they're creating, and letting it pin the scaffold
+ * to npm is what made every `npx`-invoked project an npm project.
  *
  * Detection order:
- * 1. Explicit override (if provided)
- * 2. `npm_config_user_agent` env var (set by npm/pnpm when running via `npx`/`pnpm dlx`)
- * 3. Lock-file presence in the target directory
- * 4. Default to pnpm (Rebase's recommended PM)
+ * 1. An existing lock file — an explicit choice we always respect
+ *    (`pnpm-lock.yaml` wins over `package-lock.json` when both are present).
+ * 2. pnpm, whenever it is installed.
+ * 3. npm, only as a fallback when pnpm is genuinely unavailable.
  */
 export function detectPackageManager(targetDir?: string): PackageManager {
-    // 1. Check user agent (set when invoked via npx / pnpm dlx)
-    const userAgent = process.env.npm_config_user_agent ?? "";
-    if (userAgent.startsWith("npm/")) return "npm";
-    if (userAgent.startsWith("pnpm/")) return "pnpm";
-
-    // 2. Check for lock files in the target directory
-    if (targetDir) {
-        if (fs.existsSync(path.join(targetDir, "package-lock.json"))) return "npm";
-        if (fs.existsSync(path.join(targetDir, "pnpm-lock.yaml"))) return "pnpm";
+    // 1. Respect an existing project's lock file.
+    const dirs = [targetDir, process.cwd()].filter((d): d is string => !!d);
+    for (const dir of dirs) {
+        if (fs.existsSync(path.join(dir, "pnpm-lock.yaml"))) return "pnpm";
+        if (fs.existsSync(path.join(dir, "package-lock.json"))) return "npm";
     }
 
-    // 3. Check for lock files in cwd
-    const cwd = process.cwd();
-    if (cwd !== targetDir) {
-        if (fs.existsSync(path.join(cwd, "package-lock.json"))) return "npm";
-        if (fs.existsSync(path.join(cwd, "pnpm-lock.yaml"))) return "pnpm";
-    }
+    // 2. Prefer pnpm whenever it's installed.
+    if (isPnpmAvailable()) return "pnpm";
 
-    // 4. Default to pnpm
-    return "pnpm";
+    // 3. Fall back to npm only when pnpm is genuinely unavailable.
+    return "npm";
 }
 
 /** Build the command helpers for a given package manager. */
