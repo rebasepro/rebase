@@ -30,7 +30,14 @@ function extractMessageError(message: WebSocketMessage): { errorMessage: string;
     const errorCode = typeof errPayload === "object"
         ? errPayload.code
         : payload?.code;
-    return { errorMessage,
+    // Callers treat this as a string (`.toLowerCase()` in isAuthError). A frame
+    // carrying a non-string here would throw inside the message handler, where
+    // the surrounding try/catch would swallow it — and a subscription error that
+    // never reaches its listener is a view stuck loading forever.
+    const safeMessage = typeof errorMessage === "string"
+        ? errorMessage
+        : (errorMessage == null ? "Unknown error" : JSON.stringify(errorMessage));
+    return { errorMessage: safeMessage,
 errorCode };
 }
 
@@ -91,6 +98,19 @@ export class RebaseWebSocketClient {
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
         /**
+         * A `subscribe_collection` frame is on the wire and its initial payload
+         * has not arrived yet. Without this, a subscription whose subscribe
+         * failed is indistinguishable from one still loading, and every later
+         * listener attaches to it and waits forever.
+         */
+        subscribeInFlight?: boolean;
+        /**
+         * Watchdog for the above. `subscribe_collection` expects no response
+         * envelope, so it is not covered by `pendingRequests`' timeout — a lost
+         * initial payload would otherwise hang the subscription indefinitely.
+         */
+        subscribeTimeout?: ReturnType<typeof setTimeout>;
+        /**
          * The key columns of this collection, as told by the server on a patch.
          * Rows are columns only, and the SDK holds no collection config, so
          * without this there is nothing to derive an address from.
@@ -108,6 +128,9 @@ export class RebaseWebSocketClient {
         latestData?: Record<string, unknown> | null; // Cache the latest flat row
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
+        /** See the collection subscription counterparts. */
+        subscribeInFlight?: boolean;
+        subscribeTimeout?: ReturnType<typeof setTimeout>;
     }>();
 
     // Maps to quickly find subscription by backend subscription ID
@@ -125,6 +148,7 @@ export class RebaseWebSocketClient {
     private isConnected = false;
     private messageQueue: Record<string, unknown>[] = [];
     private requestTimeoutMs = 30000;
+    private subscriptionTimeoutMs = 30000;
     private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
     private isAuthenticated = false;
@@ -270,6 +294,10 @@ export class RebaseWebSocketClient {
                 if (wasReconnect) {
                     this.resubscribeAll();
                 }
+
+                // Subscribes requested while offline have just gone out; they
+                // could not be watchdogged at request time.
+                this.armPendingSubscribeWatchdogs();
             };
 
             this.ws!.onmessage = (event) => {
@@ -286,6 +314,9 @@ export class RebaseWebSocketClient {
                 this.isConnected = false;
                 this.isAuthenticated = false;
                 this.authPromise = null;
+                // The reconnect path re-subscribes everything; a watchdog firing
+                // in the meantime would tear down healthy subscriptions.
+                this.suspendSubscribeWatchdogs();
                 this.emit("disconnect");
 
                 // Re-queue pending requests so the UI doesn't hang indefinitely or crash
@@ -326,6 +357,11 @@ export class RebaseWebSocketClient {
     private attemptReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.error("Max reconnection attempts reached");
+            // Nothing will re-subscribe now, so stop every subscription that
+            // never loaded from spinning forever.
+            this.failAllPendingSubscriptions(
+                new RebaseApiError("Connection lost", { code: "CONNECTION_LOST" })
+            );
             return;
         }
 
@@ -406,29 +442,32 @@ export class RebaseWebSocketClient {
                 backendKeyMap.delete(oldBackendId);
                 backendKeyMap.set(newBackendId, subscriptionKey);
 
-                this.sendMessage({
-                    type: messageType,
-                    payload: {
-                        ...subscription.props,
-                        subscriptionId: newBackendId
-                    }
-                }).catch(error => {
-                    console.error(`[WS] Failed to re-subscribe ${idPrefix} after auth refresh:`, subscriptionKey, error);
-                    subscription.callbacks.forEach(callback => {
-                        if (callback.onError) callback.onError(error);
-                    });
-                });
+                // Route through the helpers so the retry is watchdogged too.
+                if (messageType === "subscribe_collection") {
+                    this.sendCollectionSubscribe(subscriptionKey);
+                } else {
+                    this.sendEntitySubscribe(subscriptionKey);
+                }
+                return;
+            }
+
+            // The refresh did not produce usable credentials. Report the original
+            // error and drop the registration, so a later mount can try again
+            // rather than attaching to a subscription that will never load.
+            const { errorMessage, errorCode } = extractMessageError(message);
+            const error = new RebaseApiError(errorMessage, { code: errorCode });
+            if (messageType === "subscribe_collection") {
+                this.failCollectionSubscription(subscriptionKey, error);
             } else {
-                const { errorMessage, errorCode } = extractMessageError(message);
-                const error = new RebaseApiError(errorMessage, { code: errorCode });
-                subscription.callbacks.forEach(callback => {
-                    if (callback.onError) callback.onError(error);
-                });
+                this.failEntitySubscription(subscriptionKey, error);
             }
         }).catch(err => {
-            subscription.callbacks.forEach(callback => {
-                if (callback.onError) callback.onError(err);
-            });
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (messageType === "subscribe_collection") {
+                this.failCollectionSubscription(subscriptionKey, error);
+            } else {
+                this.failEntitySubscription(subscriptionKey, error);
+            }
         });
     }
 
@@ -493,6 +532,10 @@ export class RebaseWebSocketClient {
                     collectionSub.latestData = rows;
                     collectionSub.lastUpdated = Date.now();
                     collectionSub.isInitialDataReceived = true;
+                    // The subscribe landed — stand the watchdog down.
+                    if (collectionSub.subscribeTimeout) clearTimeout(collectionSub.subscribeTimeout);
+                    collectionSub.subscribeTimeout = undefined;
+                    collectionSub.subscribeInFlight = false;
 
                     // Notify all callbacks for this subscription
                     collectionSub.callbacks.forEach(callback => {
@@ -581,6 +624,9 @@ export class RebaseWebSocketClient {
                     entitySub.latestData = row;
                     entitySub.lastUpdated = Date.now();
                     entitySub.isInitialDataReceived = true;
+                    if (entitySub.subscribeTimeout) clearTimeout(entitySub.subscribeTimeout);
+                    entitySub.subscribeTimeout = undefined;
+                    entitySub.subscribeInFlight = false;
 
                     // Notify all callbacks for this subscription
                     entitySub.callbacks.forEach(callback => {
@@ -616,6 +662,14 @@ export class RebaseWebSocketClient {
                         return;
                     }
 
+                    // The server answered, so nothing is in flight any more. Leave
+                    // the registration in place (its listeners are still mounted
+                    // and have been told), but marked idle so the next listener
+                    // re-subscribes instead of attaching to a dead entry.
+                    if (collectionSub.subscribeTimeout) clearTimeout(collectionSub.subscribeTimeout);
+                    collectionSub.subscribeTimeout = undefined;
+                    collectionSub.subscribeInFlight = false;
+
                     const { errorMessage, errorCode } = extractMessageError(message);
                     const error = new RebaseApiError(errorMessage, { code: errorCode });
                     collectionSub.callbacks.forEach(callback => {
@@ -642,6 +696,10 @@ export class RebaseWebSocketClient {
                         );
                         return;
                     }
+
+                    if (entitySub.subscribeTimeout) clearTimeout(entitySub.subscribeTimeout);
+                    entitySub.subscribeTimeout = undefined;
+                    entitySub.subscribeInFlight = false;
 
                     const { errorMessage, errorCode } = extractMessageError(message);
                     const error = new RebaseApiError(errorMessage, { code: errorCode });
@@ -1139,13 +1197,21 @@ onError });
                         onError(error instanceof Error ? error : new Error(String(error)));
                     }
                 }
+            } else if (!existingSubscription.subscribeInFlight) {
+                // Registered but idle: its subscribe never landed (the send failed,
+                // or the server answered with an error). Nothing is coming, so
+                // re-issue it — otherwise this listener waits forever.
+                this.sendCollectionSubscribe(subscriptionKey);
             }
 
             // Return unsubscribe function
             return () => {
                 callbackMap.delete(callbackId);
                 if (callbackMap.size === 0) {
-                    // No more callbacks, unsubscribe from backend
+                    // Only tear down if this is still the same registration — a
+                    // failed subscribe may have replaced it in the meantime.
+                    if (this.collectionSubscriptions.get(subscriptionKey) !== existingSubscription) return;
+                    if (existingSubscription.subscribeTimeout) clearTimeout(existingSubscription.subscribeTimeout);
                     this.collectionSubscriptions.delete(subscriptionKey);
                     this.backendToCollectionKey.delete(existingSubscription.backendSubscriptionId);
                     if (this.isConnected && this.ws) {
@@ -1176,16 +1242,9 @@ onError });
         // Add reverse lookup
         this.backendToCollectionKey.set(backendSubscriptionId, subscriptionKey);
 
-        // Send subscription request to backend
-        this.sendMessage({
-            type: "subscribe_collection",
-            payload: {
-                ...props,
-                subscriptionId: backendSubscriptionId
-            }
-        }).catch(error => {
-            if (onError) onError(error);
-        });
+        // Send subscription request to backend. A failure here drops the
+        // registration and notifies every listener, so the next mount retries.
+        this.sendCollectionSubscribe(subscriptionKey);
 
         // Return unsubscribe function
         return () => {
@@ -1194,6 +1253,7 @@ onError });
                 const callbacks = subscription.callbacks;
                 callbacks.delete(callbackId);
                 if (callbacks.size === 0) {
+                    if (subscription.subscribeTimeout) clearTimeout(subscription.subscribeTimeout);
                     this.collectionSubscriptions.delete(subscriptionKey);
                     this.backendToCollectionKey.delete(subscription.backendSubscriptionId);
                     if (this.isConnected && this.ws) {
@@ -1237,12 +1297,18 @@ onError });
                         onError(error instanceof Error ? error : new Error(String(error)));
                     }
                 }
+            } else if (!existingSubscription.subscribeInFlight) {
+                // See listenCollection: a registration with nothing in flight is
+                // dead, and attaching to it silently would hang this listener.
+                this.sendEntitySubscribe(subscriptionKey);
             }
 
             // Return unsubscribe function
             return () => {
                 callbackMap.delete(callbackId);
                 if (callbackMap.size === 0) {
+                    if (this.singleSubscriptions.get(subscriptionKey) !== existingSubscription) return;
+                    if (existingSubscription.subscribeTimeout) clearTimeout(existingSubscription.subscribeTimeout);
                     // No more callbacks, unsubscribe from backend
                     this.singleSubscriptions.delete(subscriptionKey);
                     this.backendToEntityKey.delete(existingSubscription.backendSubscriptionId);
@@ -1275,15 +1341,7 @@ onError });
         this.backendToEntityKey.set(backendSubscriptionId, subscriptionKey);
 
         // Send subscription request to backend
-        this.sendMessage({
-            type: "subscribe_one",
-            payload: {
-                ...props,
-                subscriptionId: backendSubscriptionId
-            }
-        }).catch(error => {
-            if (onError) onError(error);
-        });
+        this.sendEntitySubscribe(subscriptionKey);
 
         // Return unsubscribe function
         return () => {
@@ -1306,6 +1364,201 @@ onError });
     }
 
     /**
+     * Send a `subscribe_collection` for an already-registered subscription and
+     * arm its watchdog.
+     *
+     * Every path that registers a collection subscription goes through here, so
+     * that a subscribe which never lands — a rejected send, or a server that
+     * never answers — always ends up in `failCollectionSubscription` rather than
+     * leaving the entry parked with `isInitialDataReceived === false` forever.
+     */
+    private sendCollectionSubscribe(subscriptionKey: string): void {
+        const subscription = this.collectionSubscriptions.get(subscriptionKey);
+        if (!subscription) return;
+
+        const backendSubscriptionId = subscription.backendSubscriptionId;
+        subscription.subscribeInFlight = true;
+
+        if (subscription.subscribeTimeout) clearTimeout(subscription.subscribeTimeout);
+        subscription.subscribeTimeout = undefined;
+        // Only time out a frame that is actually on the wire. While offline the
+        // message just sits in the queue, and reconnect backoff can exceed the
+        // timeout — `armPendingSubscribeWatchdogs` picks these up on connect.
+        if (this.isConnected) this.sendCollectionSubscribeWatchdog(subscriptionKey);
+
+        this.sendMessage({
+            type: "subscribe_collection",
+            payload: {
+                ...subscription.props,
+                subscriptionId: backendSubscriptionId
+            }
+        }).catch(error => {
+            const current = this.collectionSubscriptions.get(subscriptionKey);
+            if (!current || current.backendSubscriptionId !== backendSubscriptionId) return;
+            this.failCollectionSubscription(
+                subscriptionKey,
+                error instanceof Error ? error : new Error(String(error))
+            );
+        });
+    }
+
+    /** The `listenOne` counterpart of {@link sendCollectionSubscribe}. */
+    private sendEntitySubscribe(subscriptionKey: string): void {
+        const subscription = this.singleSubscriptions.get(subscriptionKey);
+        if (!subscription) return;
+
+        const backendSubscriptionId = subscription.backendSubscriptionId;
+        subscription.subscribeInFlight = true;
+
+        if (subscription.subscribeTimeout) clearTimeout(subscription.subscribeTimeout);
+        subscription.subscribeTimeout = undefined;
+        if (this.isConnected) this.sendEntitySubscribeWatchdog(subscriptionKey);
+
+        this.sendMessage({
+            type: "subscribe_one",
+            payload: {
+                ...subscription.props,
+                subscriptionId: backendSubscriptionId
+            }
+        }).catch(error => {
+            const current = this.singleSubscriptions.get(subscriptionKey);
+            if (!current || current.backendSubscriptionId !== backendSubscriptionId) return;
+            this.failEntitySubscription(
+                subscriptionKey,
+                error instanceof Error ? error : new Error(String(error))
+            );
+        });
+    }
+
+    /**
+     * Report a subscribe failure to every listener and drop the registration.
+     *
+     * Dropping it is the point: the callbacks stay live (their components are
+     * still mounted and have been told), but the next `listenCollection` for
+     * these params finds no entry and issues a fresh subscribe instead of
+     * silently attaching to a dead one.
+     */
+    private failCollectionSubscription(subscriptionKey: string, error: Error): void {
+        const subscription = this.collectionSubscriptions.get(subscriptionKey);
+        if (!subscription) return;
+
+        if (subscription.subscribeTimeout) clearTimeout(subscription.subscribeTimeout);
+        subscription.subscribeInFlight = false;
+
+        this.collectionSubscriptions.delete(subscriptionKey);
+        this.backendToCollectionKey.delete(subscription.backendSubscriptionId);
+
+        subscription.callbacks.forEach(callback => {
+            if (callback.onError) {
+                try {
+                    callback.onError(error);
+                } catch (callbackError) {
+                    console.error("Error in collection subscription error callback:", callbackError);
+                }
+            }
+        });
+    }
+
+    /** The `listenOne` counterpart of {@link failCollectionSubscription}. */
+    private failEntitySubscription(subscriptionKey: string, error: Error): void {
+        const subscription = this.singleSubscriptions.get(subscriptionKey);
+        if (!subscription) return;
+
+        if (subscription.subscribeTimeout) clearTimeout(subscription.subscribeTimeout);
+        subscription.subscribeInFlight = false;
+
+        this.singleSubscriptions.delete(subscriptionKey);
+        this.backendToEntityKey.delete(subscription.backendSubscriptionId);
+
+        subscription.callbacks.forEach(callback => {
+            if (callback.onError) {
+                try {
+                    callback.onError(error);
+                } catch (callbackError) {
+                    console.error("Error in row subscription error callback:", callbackError);
+                }
+            }
+        });
+    }
+
+    /**
+     * Stop the watchdogs without failing anything — used when the socket drops,
+     * since the reconnect path re-subscribes everything anyway and a watchdog
+     * firing mid-reconnect would tear down healthy subscriptions.
+     */
+    private suspendSubscribeWatchdogs(): void {
+        for (const sub of this.collectionSubscriptions.values()) {
+            if (sub.subscribeTimeout) clearTimeout(sub.subscribeTimeout);
+            sub.subscribeTimeout = undefined;
+            sub.subscribeInFlight = false;
+        }
+        for (const sub of this.singleSubscriptions.values()) {
+            if (sub.subscribeTimeout) clearTimeout(sub.subscribeTimeout);
+            sub.subscribeTimeout = undefined;
+            sub.subscribeInFlight = false;
+        }
+    }
+
+    /**
+     * Arm watchdogs for subscribes that were requested while offline and have
+     * just been flushed to the socket. Their timers were deliberately not set at
+     * request time, so without this they would have no timeout at all.
+     */
+    private armPendingSubscribeWatchdogs(): void {
+        for (const [key, sub] of this.collectionSubscriptions.entries()) {
+            if (sub.subscribeInFlight && !sub.subscribeTimeout) this.sendCollectionSubscribeWatchdog(key);
+        }
+        for (const [key, sub] of this.singleSubscriptions.entries()) {
+            if (sub.subscribeInFlight && !sub.subscribeTimeout) this.sendEntitySubscribeWatchdog(key);
+        }
+    }
+
+    private sendCollectionSubscribeWatchdog(subscriptionKey: string): void {
+        const subscription = this.collectionSubscriptions.get(subscriptionKey);
+        if (!subscription) return;
+        const backendSubscriptionId = subscription.backendSubscriptionId;
+        subscription.subscribeTimeout = setTimeout(() => {
+            const current = this.collectionSubscriptions.get(subscriptionKey);
+            if (!current || current.backendSubscriptionId !== backendSubscriptionId) return;
+            if (!current.subscribeInFlight) return;
+            this.failCollectionSubscription(
+                subscriptionKey,
+                new RebaseApiError("Subscription timed out", { code: "SUBSCRIPTION_TIMEOUT" })
+            );
+        }, this.subscriptionTimeoutMs);
+    }
+
+    private sendEntitySubscribeWatchdog(subscriptionKey: string): void {
+        const subscription = this.singleSubscriptions.get(subscriptionKey);
+        if (!subscription) return;
+        const backendSubscriptionId = subscription.backendSubscriptionId;
+        subscription.subscribeTimeout = setTimeout(() => {
+            const current = this.singleSubscriptions.get(subscriptionKey);
+            if (!current || current.backendSubscriptionId !== backendSubscriptionId) return;
+            if (!current.subscribeInFlight) return;
+            this.failEntitySubscription(
+                subscriptionKey,
+                new RebaseApiError("Subscription timed out", { code: "SUBSCRIPTION_TIMEOUT" })
+            );
+        }, this.subscriptionTimeoutMs);
+    }
+
+    /**
+     * Fail every subscription that never received data. Called when reconnection
+     * is given up on, so views surface an error instead of spinning forever.
+     */
+    private failAllPendingSubscriptions(error: Error): void {
+        for (const key of [...this.collectionSubscriptions.keys()]) {
+            const sub = this.collectionSubscriptions.get(key);
+            if (sub && !sub.isInitialDataReceived) this.failCollectionSubscription(key, error);
+        }
+        for (const key of [...this.singleSubscriptions.keys()]) {
+            const sub = this.singleSubscriptions.get(key);
+            if (sub && !sub.isInitialDataReceived) this.failEntitySubscription(key, error);
+        }
+    }
+
+    /**
      * Re-send all active subscriptions to the backend after a reconnect.
      * The server wipes subscription state when a client disconnects, so
      * we need to re-register everything to resume receiving updates.
@@ -1324,15 +1577,7 @@ onError });
             this.backendToCollectionKey.delete(oldBackendId);
             this.backendToCollectionKey.set(newBackendId, key);
 
-            this.sendMessage({
-                type: "subscribe_collection",
-                payload: {
-                    ...sub.props,
-                    subscriptionId: newBackendId
-                }
-            }).catch(error => {
-                console.error("[WS] Failed to re-subscribe collection:", key, error);
-            });
+            this.sendCollectionSubscribe(key);
         }
 
         // Re-subscribe row subscriptions
@@ -1344,15 +1589,7 @@ onError });
             this.backendToEntityKey.delete(oldBackendId);
             this.backendToEntityKey.set(newBackendId, key);
 
-            this.sendMessage({
-                type: "subscribe_one",
-                payload: {
-                    ...sub.props,
-                    subscriptionId: newBackendId
-                }
-            }).catch(error => {
-                console.error("[WS] Failed to re-subscribe row:", key, error);
-            });
+            this.sendEntitySubscribe(key);
         }
     }
 
