@@ -348,6 +348,8 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--secret")}                  Mark a variable write-only ${chalk.gray("(set)")}
   ${chalk.blue("--json")}                    Machine-readable output
   ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
+
+${chalk.gray("Values are encrypted at rest (AES-256-GCM) and only decrypted at deploy time.")}
 `);
 }
 
