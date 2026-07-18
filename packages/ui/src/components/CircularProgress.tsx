@@ -24,13 +24,13 @@ export function CircularProgress({
 
     let borderClasses = "";
     if (size === "smallest") {
-        borderClasses = "border-[3px]";
+        borderClasses = "border-2";
     } else if (size === "small") {
-        borderClasses = "border-[4px]";
+        borderClasses = "border-2";
     } else if (size === "medium") {
-        borderClasses = "border-4";
+        borderClasses = "border-[3px]";
     } else {
-        borderClasses = "border-[6px]";
+        borderClasses = "border-4";
     }
 
     return (
@@ -38,8 +38,9 @@ export function CircularProgress({
             className={cls(
                 sizeClasses,
                 borderClasses,
-                "inline-block animate-spin rounded-full border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]",
-                "text-primary dark:text-primary",
+                "inline-block shrink-0 rounded-full border-solid align-[-0.125em]",
+                "animate-[spin_0.7s_linear_infinite] motion-reduce:animate-[spin_1.5s_linear_infinite]",
+                "border-surface-200 dark:border-surface-700 border-t-primary dark:border-t-primary",
                 className)}
             role="status">
               <span
