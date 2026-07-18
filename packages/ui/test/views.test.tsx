@@ -109,9 +109,15 @@ describe("Decoupled UI Views", () => {
                 />
             );
 
-            // CircularProgress displays standard spinner/animation elements
-            const spinners = document.getElementsByClassName("animate-spin");
-            expect(spinners.length).toBeGreaterThan(0);
+            // Assert on the loading CONTRACT, not on a CSS class. This used to
+            // look for `animate-spin`, which broke the moment CircularProgress
+            // was restyled to an arbitrary-value variant
+            // (`animate-[spin_0.7s_linear_infinite]`) — the component still
+            // spun, the test just knew too much about how. `role="status"` and
+            // the visually-hidden label are what a screen reader announces, and
+            // they are what "shows a loading indicator" actually means.
+            expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
+            expect(screen.getAllByText("Loading...").length).toBeGreaterThan(0);
         });
 
         it("handles onItemClick successfully", () => {
@@ -322,9 +328,9 @@ describe("Decoupled UI Views", () => {
                 />
             );
 
-            // The todo column should show circular progress
-            const spinners = document.getElementsByClassName("animate-spin");
-            expect(spinners.length).toBeGreaterThan(0);
+            // The todo column should show circular progress. Asserted via the
+            // accessible role rather than a CSS class — see the note above.
+            expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
         });
     });
 });
