@@ -126,23 +126,48 @@ function installForAgent(
     return count;
 }
 
-export async function skillsCommand(subcommand: string | undefined, _args: string[]) {
+export async function skillsCommand(subcommand: string | undefined, rawArgs: string[]) {
     switch (subcommand) {
         case "install":
-            await skillsInstall();
+            await skillsInstall(rawArgs);
             break;
         case "--help":
         case undefined:
             printSkillsHelp();
             break;
         default:
-            console.log(chalk.red(`Unknown skills subcommand: ${subcommand}`));
+            console.error(chalk.red(`Unknown skills subcommand: ${subcommand}`));
             console.log("");
             printSkillsHelp();
+            process.exit(1);
     }
 }
 
-async function skillsInstall() {
+/**
+ * Agents named explicitly on the command line, e.g. `--agent claude --agent cursor`
+ * (also accepts a comma-separated list). Returns null when none were given.
+ */
+function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
+    const requested: string[] = [];
+    for (let i = 0; i < rawArgs.length; i++) {
+        if (rawArgs[i] !== "--agent" && rawArgs[i] !== "-a") continue;
+        const value = rawArgs[i + 1];
+        if (value && !value.startsWith("-")) {
+            requested.push(...value.split(",").map(v => v.trim()).filter(Boolean));
+        }
+    }
+    if (requested.length === 0) return null;
+
+    const valid = Object.keys(AGENTS);
+    const unknown = requested.filter(a => !valid.includes(a));
+    if (unknown.length > 0) {
+        console.error(chalk.red(`Unknown agent(s): ${unknown.join(", ")}. Available: ${valid.join(", ")}`));
+        process.exit(1);
+    }
+    return requested as AgentKey[];
+}
+
+async function skillsInstall(rawArgs: string[] = []) {
     const projectDir = process.cwd();
 
     // 1. Load skills from @rebasepro/agent-skills
@@ -160,11 +185,21 @@ async function skillsInstall() {
         process.exit(1);
     }
 
-    // 2. Detect existing agent environments
-    let agents = detectAgents(projectDir);
+    // 2. Explicit --agent wins; otherwise detect existing agent environments
+    let agents = parseAgentFlags(rawArgs) ?? detectAgents(projectDir);
 
     // 3. If none detected, ask the user
     if (agents.length === 0) {
+        // A scaffolded project ships `.cursorrules` / `CLAUDE.md` files but none
+        // of the *directories* detectAgents looks for, so a fresh project always
+        // lands here. On a non-TTY that used to abort with a raw ExitPromptError.
+        if (!process.stdin.isTTY) {
+            console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
+            console.error(chalk.yellow(`  Name the agents explicitly, e.g. rebase skills install --agent ${Object.keys(AGENTS)[0]}`));
+            console.error(chalk.gray(`  Available: ${Object.keys(AGENTS).join(", ")}`));
+            process.exit(1);
+        }
+
         const choices = Object.entries(AGENTS).map(([key, agent]) => ({
             name: agent.label,
             value: key,
@@ -213,7 +248,14 @@ ${chalk.green.bold("Subcommands")}
   ${chalk.blue.bold("install")}    Install Rebase agent skills for your AI coding assistant
                Supports: Cursor, Claude Code, Windsurf, Gemini CLI, Antigravity
 
+${chalk.green.bold("Options")}
+  ${chalk.blue("--agent, -a")}   Agent(s) to install for, skipping detection and the prompt.
+                Repeat the flag or pass a comma-separated list.
+                Available: ${Object.keys(AGENTS).join(", ")}
+
 ${chalk.green.bold("Examples")}
   ${chalk.cyan("rebase skills install")}
+  ${chalk.cyan("rebase skills install --agent claude")}
+  ${chalk.cyan("rebase skills install --agent claude,cursor")}
 `);
 }

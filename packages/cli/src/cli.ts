@@ -131,9 +131,11 @@ export async function entry(args: string[]) {
             break;
 
         default:
-            console.log(chalk.red(`Unknown command: ${command}`));
+            console.error(chalk.red(`Unknown command: ${command}`));
             console.log("");
             printHelp();
+            // A mistyped command must not look like success to a shell or CI.
+            process.exit(1);
     }
 }
 

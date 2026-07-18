@@ -141,9 +141,17 @@ describe("CLI routing", () => {
         expect(output).toContain("Commands");
     });
 
-    it("shows an error for unknown commands", async () => {
+    it("shows an error for unknown commands and exits non-zero", async () => {
         await entry(["node", "rebase", "foobar"]);
+
+        // The message goes to stderr, and the exit code must not read as success
+        // to a shell or CI script.
+        const errOutput = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+        expect(errOutput).toContain("Unknown command");
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+
+        // Help is still printed to stdout so the user sees the valid commands.
         const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
-        expect(output).toContain("Unknown command");
+        expect(output).toContain("Commands");
     });
 });

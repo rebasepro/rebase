@@ -91,6 +91,30 @@ function coerceDeclaredNumbers(
 }
 
 /** Render one target row in the requested style. */
+/**
+ * Drop every column the collection marked `excludeFromApi`.
+ *
+ * Password hashes and verification tokens have to be readable server-side but
+ * must never reach a client — and "never" has to mean every exit from this
+ * pipeline, including relation targets, or a secret leaks through whichever
+ * path was overlooked. Keyed by both the property name and its column name,
+ * since a row can arrive keyed either way depending on the caller.
+ */
+function stripExcluded(
+    row: Record<string, unknown>,
+    collection: CollectionConfig
+): Record<string, unknown> {
+    const properties = collection.properties as Record<string, Property> | undefined;
+    if (!properties) return row;
+
+    for (const [key, property] of Object.entries(properties)) {
+        if (!property?.excludeFromApi) continue;
+        delete row[key];
+        if (property.columnName) delete row[property.columnName];
+    }
+    return row;
+}
+
 function renderTarget(
     targetRow: Record<string, unknown>,
     targetCollection: CollectionConfig,
@@ -100,7 +124,7 @@ function renderTarget(
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        return coerceDeclaredNumbers({ ...targetRow }, targetCollection);
+        return stripExcluded(coerceDeclaredNumbers({ ...targetRow }, targetCollection), targetCollection);
     }
 
     const address = relationTargetAddress(targetRow, targetCollection, registry);
@@ -168,7 +192,7 @@ export function toCmsRow(
         }
     }
 
-    return normalized;
+    return stripExcluded(normalized, collection);
 }
 
 /**
@@ -211,5 +235,5 @@ export function toRestRow(
         }
     }
 
-    return flat;
+    return stripExcluded(flat, collection);
 }

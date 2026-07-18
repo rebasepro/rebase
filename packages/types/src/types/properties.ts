@@ -231,6 +231,20 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     validation?: PropertyValidationSchema;
 
+    /**
+     * Never include this column in an API response.
+     *
+     * For secrets the server must store and read but no client should ever
+     * receive — password hashes, verification tokens. The value is still
+     * written and queryable server-side; it is stripped from every row the API
+     * serves, for every caller, including admins and service keys.
+     *
+     * This is a server-side guarantee, unlike `ui.hideFromCollection`, which
+     * only stops the admin panel from *rendering* a field and leaves it in the
+     * JSON payload.
+     */
+    excludeFromApi?: boolean;
+
     // NOTE: `defaultValue` is intentionally NOT on BaseProperty.
     // Each concrete property type (StringProperty, NumberProperty, etc.)
     // defines its own typed `defaultValue` for compile-time safety.

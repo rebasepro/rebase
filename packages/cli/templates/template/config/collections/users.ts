@@ -66,6 +66,7 @@ roles: ["admin"] }
             name: "Password Hash",
             type: "string",
             columnName: "password_hash",
+            excludeFromApi: true,
             ui: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
@@ -85,6 +86,7 @@ roles: ["admin"] }
             name: "Email Verification Token",
             type: "string",
             columnName: "email_verification_token",
+            excludeFromApi: true,
             ui: {
                 hideFromCollection: true,
                 disabled: { hidden: true }

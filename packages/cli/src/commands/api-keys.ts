@@ -43,9 +43,25 @@ function loadEnv(projectRoot: string): Record<string, string> {
     return env;
 }
 
-function resolveBaseUrl(env: Record<string, string>): string {
+function resolveBaseUrl(env: Record<string, string>, projectRoot?: string): string {
+    // An explicit override always wins.
+    if (env.REBASE_BASE_URL) return env.REBASE_BASE_URL;
+
+    // `rebase dev` runs on a derived per-project port, not the .env PORT, and
+    // records the URL it actually bound. Without this, these commands default to
+    // :3001 and report "Is the Rebase server running?" while it is running.
+    if (projectRoot) {
+        try {
+            const urlFile = path.join(projectRoot, ".rebase-dev-url");
+            if (fs.existsSync(urlFile)) {
+                const devUrl = fs.readFileSync(urlFile, "utf-8").trim();
+                if (devUrl) return devUrl;
+            }
+        } catch { /* fall through to the configured port */ }
+    }
+
     const port = env.PORT || env.REBASE_PORT || "3001";
-    return env.REBASE_BASE_URL || `http://localhost:${port}`;
+    return `http://localhost:${port}`;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -83,7 +99,7 @@ export async function apiKeysCommand(subcommand: string | undefined, rawArgs: st
 async function listKeys(_rawArgs: string[]): Promise<void> {
     const projectRoot = requireProjectRoot();
     const env = loadEnv(projectRoot);
-    const baseUrl = resolveBaseUrl(env);
+    const baseUrl = resolveBaseUrl(env, projectRoot);
     const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
 
     if (!serviceKey) {
@@ -219,7 +235,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
     const env = loadEnv(projectRoot);
-    const baseUrl = resolveBaseUrl(env);
+    const baseUrl = resolveBaseUrl(env, projectRoot);
     const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
 
     if (!serviceKey) {
@@ -297,7 +313,7 @@ async function revokeKey(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
     const env = loadEnv(projectRoot);
-    const baseUrl = resolveBaseUrl(env);
+    const baseUrl = resolveBaseUrl(env, projectRoot);
     const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
 
     if (!serviceKey) {
