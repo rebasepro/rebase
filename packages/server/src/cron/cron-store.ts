@@ -30,11 +30,55 @@ export interface CronStore {
      * Used to seed in-memory counters on startup.
      */
     fetchJobStats(): Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>;
+
+    /**
+     * Atomically claim a scheduled run slot for a job.
+     *
+     * `slot` is the *scheduled* fire time (ISO string) derived from the cron
+     * expression — deterministic across instances regardless of timer drift,
+     * so all instances contend on the same (jobId, slot) key. Exactly one
+     * caller wins the insert against the unique constraint and executes;
+     * the rest skip.
+     *
+     * Fails open (returns true) on unexpected store errors, so a broken
+     * claims table degrades to uncoordinated execution rather than silently
+     * never running jobs.
+     *
+     * Optional so custom stores written against the pre-claims interface
+     * keep working — the scheduler treats a missing implementation as
+     * uncoordinated (always run).
+     */
+    tryClaimRun?(jobId: string, slot: string): Promise<boolean>;
 }
 
 // ─── SQL-based implementation ────────────────────────────────────────
 
 const TABLE = "rebase.cron_logs";
+const CLAIMS_TABLE = "rebase.cron_claims";
+
+/** Claims older than this are garbage-collected on startup. */
+const CLAIM_RETENTION_DAYS = 7;
+
+/**
+ * Detect a unique-constraint violation anywhere in an error's cause chain.
+ * Drizzle wraps the PG error — match the SQLSTATE code, never message text.
+ * Also covers SQLite ("UNIQUE constraint failed") and MySQL (ER_DUP_ENTRY 1062)
+ * for future SQL drivers.
+ */
+function isUniqueViolation(err: unknown): boolean {
+    let current: unknown = err;
+    for (let depth = 0; depth < 10 && current; depth++) {
+        if (typeof current === "object") {
+            const e = current as { code?: unknown; errno?: unknown; message?: unknown; cause?: unknown };
+            if (e.code === "23505" || e.errno === 1062) return true;
+            if (typeof e.message === "string" && e.message.includes("UNIQUE constraint failed")) return true;
+            current = e.cause;
+        } else {
+            break;
+        }
+    }
+    return false;
+}
 
 export function createCronStore(driver: DataDriver): CronStore | undefined {
     const admin = driver.admin;
@@ -69,6 +113,22 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                     CREATE INDEX IF NOT EXISTS idx_cron_logs_job
                     ON ${TABLE}(job_id, started_at DESC)
                 `);
+
+                await exec(`
+                    CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
+                        job_id TEXT NOT NULL,
+                        slot TIMESTAMPTZ NOT NULL,
+                        claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        PRIMARY KEY (job_id, slot)
+                    )
+                `);
+
+                // Garbage-collect old claims — they are only needed while
+                // instances could still contend on the same slot.
+                await exec(
+                    `DELETE FROM ${CLAIMS_TABLE} WHERE claimed_at < now() - make_interval(days => $1)`,
+                    { params: [CLAIM_RETENTION_DAYS] }
+                );
 
                 logger.info("✅ Cron logs table ready");
             } catch (err) {
@@ -145,6 +205,28 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                 logger.error("[cron-store] Failed to fetch job stats", { error: err });
             }
             return stats;
+        },
+
+        async tryClaimRun(jobId: string, slot: string): Promise<boolean> {
+            try {
+                const rows = await exec(
+                    `INSERT INTO ${CLAIMS_TABLE} (job_id, slot)
+                     VALUES ($1, $2)
+                     ON CONFLICT (job_id, slot) DO NOTHING
+                     RETURNING job_id`,
+                    { params: [jobId, slot] }
+                );
+                return rows.length > 0;
+            } catch (err) {
+                if (isUniqueViolation(err)) {
+                    // Another instance won the race for this slot
+                    return false;
+                }
+                // Fail open: better to risk a duplicate run than to have a
+                // broken claims table silently stop all cron execution.
+                logger.warn(`[cron-store] Claim check failed for "${jobId}" — running uncoordinated`, { error: err });
+                return true;
+            }
         }
     };
 }

@@ -483,7 +483,8 @@ reason: "already_executing" });
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog,
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map())
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
+                tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(true)
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("persisted")]);
@@ -497,7 +498,8 @@ reason: "already_executing" });
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockRejectedValue(new Error("DB down")),
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map())
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(new Map()),
+                tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(true)
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("resilient")]);
@@ -515,7 +517,8 @@ lastRunAt: "2026-01-01T00:00:00Z" });
                 ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 insertLog: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
                 fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
-                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(stats)
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string | Date | null }>>>().mockResolvedValue(stats),
+                tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(true)
             };
             scheduler.setStore(mockStore);
             scheduler.registerJobs([makeJob("seeded")]);
@@ -525,6 +528,109 @@ lastRunAt: "2026-01-01T00:00:00Z" });
             const job = scheduler.getJob("seeded")!;
             expect(job.totalRuns).toBe(42);
             expect(job.totalFailures).toBe(3);
+        });
+    });
+
+    // ── Slot claiming (multi-instance coordination) ─────────────────
+
+    describe("slot claiming", () => {
+        function makeMockStore(claimResult: boolean) {
+            return {
+                ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+                insertLog: jest.fn<(entry: CronJobLogEntry) => Promise<void>>().mockResolvedValue(undefined),
+                fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>>().mockResolvedValue(new Map()),
+                tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(claimResult)
+            };
+        }
+
+        it("executes the scheduled run when the claim is won", async () => {
+            const store = makeMockStore(true);
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("winner", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(executed).toBe(true);
+            expect(store.tryClaimRun).toHaveBeenCalledWith("winner", expect.any(String));
+            // The claimed slot is the scheduled fire time (a valid ISO string)
+            const slot = store.tryClaimRun.mock.calls[0]![1];
+            expect(new Date(slot).getTime()).not.toBeNaN();
+        });
+
+        it("skips the scheduled run when another instance claimed the slot", async () => {
+            const store = makeMockStore(false);
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("loser", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(executed).toBe(false);
+            expect(store.tryClaimRun).toHaveBeenCalled();
+            expect(scheduler.getJob("loser")?.totalRuns).toBe(0);
+            // Still schedules the next slot after skipping
+            expect(scheduler.getJob("loser")?.nextRunAt).toBeDefined();
+        });
+
+        it("passes the scheduled slot, not wall-clock fire time", async () => {
+            const store = makeMockStore(true);
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("slot-check", { schedule: "0 * * * *" })]);
+            scheduler.start();
+            const scheduledSlot = scheduler.getJob("slot-check")!.nextRunAt!;
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(store.tryClaimRun.mock.calls[0]![1]).toBe(scheduledSlot);
+        });
+
+        it("manual triggers bypass the claim", async () => {
+            jest.useRealTimers();
+            const store = makeMockStore(false); // would lose any claim race
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("manual-run")]);
+            const log = await scheduler.triggerJob("manual-run");
+            expect(log!.success).toBe(true);
+            expect(store.tryClaimRun).not.toHaveBeenCalled();
+        });
+
+        it("runs when the store predates claims (no tryClaimRun method)", async () => {
+            const store = makeMockStore(true);
+            const legacyStore = { ...store, tryClaimRun: undefined };
+            let executed = false;
+            scheduler.setStore(legacyStore);
+            scheduler.registerJobs([makeJob("legacy-store", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(executed).toBe(true);
+        });
+
+        it("fails open and keeps rescheduling when the claim throws", async () => {
+            const store = makeMockStore(true);
+            store.tryClaimRun.mockRejectedValue(new Error("store exploded"));
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("throwing-claim", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(executed).toBe(true);
+            expect(scheduler.getJob("throwing-claim")?.nextRunAt).toBeDefined();
+        });
+
+        it("runs without a store (uncoordinated fallback)", async () => {
+            let executed = false;
+            scheduler.registerJobs([makeJob("storeless", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+            expect(executed).toBe(true);
         });
     });
 

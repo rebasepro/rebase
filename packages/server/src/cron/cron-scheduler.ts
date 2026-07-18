@@ -273,6 +273,9 @@ export class CronScheduler {
                 this.scheduleNext(id);
             }
         }
+        if (!this.store) {
+            logger.warn("[cron] No cron store attached — runs are uncoordinated; with multiple app instances every instance will execute every job");
+        }
         logger.info(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
     }
 
@@ -420,6 +423,29 @@ reason: "already_executing" },
                     // Re-schedule to try again later
                     this.scheduleNext(id);
                     return;
+                }
+
+                // Cross-instance guard: claim the scheduled slot in the store.
+                // The slot is the scheduled fire time — deterministic across
+                // instances — so exactly one instance wins each (job, slot) pair.
+                // A store without tryClaimRun (pre-claims custom implementation)
+                // runs uncoordinated; a throwing store fails open — either way
+                // this callback must never reject, or the job would silently
+                // stop rescheduling.
+                if (this.store?.tryClaimRun) {
+                    let claimed = true;
+                    try {
+                        claimed = await this.store.tryClaimRun(id, nextRun.toISOString());
+                    } catch (err) {
+                        logger.warn(`[cron] Claim check threw for "${id}" — running uncoordinated`, { error: err });
+                    }
+                    if (!claimed) {
+                        logger.info(`[cron] Slot ${nextRun.toISOString()} for "${id}" claimed by another instance — skipping`);
+                        if (this.started && job.enabled) {
+                            this.scheduleNext(id);
+                        }
+                        return;
+                    }
                 }
 
                 await this.executeJob(job, false);
