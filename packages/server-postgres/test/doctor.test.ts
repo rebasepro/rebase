@@ -106,6 +106,21 @@ describe("Rebase Schema Doctor", () => {
 columnType: "text" } as StringProperty)).toBe("text");
             expect(getExpectedColumnType({ type: "string",
 columnType: "char" } as StringProperty)).toBe("character");
+            expect(getExpectedColumnType({ type: "string",
+columnType: "uuid" } as StringProperty)).toBe("uuid");
+        });
+
+        // The generator compiles markdown/multiline strings to `text`. When this
+        // expectation said "character varying", every scaffolded project reported
+        // phantom drift on its markdown columns the first time doctor ran.
+        it("should expect text for markdown/multiline strings", () => {
+            expect(getExpectedColumnType({ type: "string",
+ui: { markdown: true } } as unknown as StringProperty)).toBe("text");
+            expect(getExpectedColumnType({ type: "string",
+ui: { multiline: true } } as unknown as StringProperty)).toBe("text");
+            // A plain string with unrelated ui config stays varchar.
+            expect(getExpectedColumnType({ type: "string",
+ui: { hideFromCollection: true } } as unknown as StringProperty)).toBe("character varying");
         });
 
         it("should map number types correctly", () => {
@@ -118,6 +133,18 @@ columnType: "real" } as NumberProperty)).toBe("real");
 columnType: "double precision" } as NumberProperty)).toBe("double precision");
             expect(getExpectedColumnType({ type: "number",
 columnType: "bigint" } as NumberProperty)).toBe("bigint");
+            // Serial types are integers with a sequence default; the catalog
+            // reports the underlying width.
+            expect(getExpectedColumnType({ type: "number",
+columnType: "serial" } as NumberProperty)).toBe("integer");
+            expect(getExpectedColumnType({ type: "number",
+columnType: "bigserial" } as NumberProperty)).toBe("bigint");
+            expect(getExpectedColumnType({ type: "number",
+columnType: "smallserial" } as NumberProperty)).toBe("smallint");
+            // Any other columnType passes through, matching the generator, rather
+            // than falling back to numeric and reporting drift.
+            expect(getExpectedColumnType({ type: "number",
+columnType: "smallint" } as unknown as NumberProperty)).toBe("smallint");
         });
 
         it("should map boolean type correctly", () => {

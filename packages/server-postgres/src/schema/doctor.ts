@@ -37,7 +37,7 @@ export type IssueSeverity = "error" | "warning" | "info";
 
 export interface DoctorIssue {
     severity: IssueSeverity;
-    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "sdk_stale";
+    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "sdk_stale" | "sdk_not_generated";
     table?: string;
     column?: string;
     expected?: string;
@@ -61,19 +61,29 @@ export function getExpectedColumnType(prop: Property): string | null {
             const sp = prop as StringProperty;
             if (sp.enum) return "USER-DEFINED"; // pgEnum → USER-DEFINED in information_schema
             if ("isId" in sp && sp.isId === "uuid") return "uuid";
-            if (sp.columnType === "text") return "text";
+            if (sp.columnType === "uuid") return "uuid";
+            // A markdown/multiline string compiles to `text`, not varchar — the
+            // generator treats those UI hints as column-type signals, so the
+            // expectation here must too or every such column reads as drift.
+            if (sp.columnType === "text" || sp.ui?.markdown || sp.ui?.multiline) return "text";
             if (sp.columnType === "char") return "character";
             return "character varying";
         }
         case "number": {
             const np = prop as NumberProperty;
-            if (np.columnType === "double precision") return "double precision";
-            if (np.columnType === "real") return "real";
-            if (np.columnType === "bigint") return "bigint";
-            if (np.columnType === "serial") return "integer"; // serial is integer under the hood
-            if (np.columnType === "bigserial") return "bigint";
-            if (np.columnType === "integer") return "integer";
-            if (np.columnType === "numeric") return "numeric";
+            if (np.columnType) {
+                // The generator passes any columnType straight through to drizzle,
+                // so mirror that rather than enumerating a subset (which reported
+                // drift for anything unlisted, e.g. smallint). Serial types are
+                // integers with a sequence default; information_schema reports the
+                // underlying width.
+                const serialWidths: Record<string, string> = {
+                    serial: "integer",
+                    bigserial: "bigint",
+                    smallserial: "smallint"
+                };
+                return serialWidths[np.columnType] ?? np.columnType;
+            }
             if (np.validation?.integer || ("isId" in np && np.isId)) return "integer";
             return "numeric";
         }
@@ -201,15 +211,18 @@ export async function checkCollectionsVsSdk(
 ): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
     const issues: DoctorIssue[] = [];
 
-    // Check if SDK file exists
+    // The typed SDK is opt-in — nothing in a scaffolded project imports it until
+    // you choose to. A project that never generated one isn't drifting, so report
+    // it as information rather than a warning; otherwise `doctor` can never come
+    // back clean on a fresh project and users learn to ignore its output.
     if (!fs.existsSync(sdkFilePath)) {
         issues.push({
-            severity: "warning",
-            category: "sdk_stale",
-            message: `Generated SDK typedefs file does not exist at "${sdkFilePath}".`,
-            fix: "Run `rebase generate-sdk`"
+            severity: "info",
+            category: "sdk_not_generated",
+            message: "Typed SDK not generated (optional).",
+            fix: "Run `rebase generate-sdk` if you want typed collection access"
         });
-        return { passed: false,
+        return { passed: true,
 issues };
     }
 
@@ -631,11 +644,15 @@ export function renderReport(report: DoctorReport): void {
 }
 
 function renderPhase(label: string, passed: boolean, issues: DoctorIssue[]): void {
-    if (passed) {
+    const errorCount = issues.filter((i) => i.severity === "error").length;
+    const warnCount = issues.filter((i) => i.severity === "warning").length;
+    const infoIssues = issues.filter((i) => i.severity === "info");
+
+    // Informational notes don't make a phase unhealthy, so key the header off
+    // real problems rather than `passed` alone.
+    if (errorCount === 0 && warnCount === 0) {
         logger.info(`  ${chalk.green("✅")} ${label}: ${chalk.green("In sync")}`);
     } else {
-        const errorCount = issues.filter((i) => i.severity === "error").length;
-        const warnCount = issues.filter((i) => i.severity === "warning").length;
         const parts: string[] = [];
         if (errorCount > 0) parts.push(`${errorCount} error${errorCount > 1 ? "s" : ""}`);
         if (warnCount > 0) parts.push(`${warnCount} warning${warnCount > 1 ? "s" : ""}`);
@@ -643,7 +660,14 @@ function renderPhase(label: string, passed: boolean, issues: DoctorIssue[]): voi
     }
     logger.info("");
 
-    for (const issue of issues) {
+    // Notes render as a quiet one-liner, not a full drift box.
+    for (const issue of infoIssues) {
+        const fixPart = issue.fix ? chalk.gray(` — ${issue.fix}`) : "";
+        logger.info(`  ${chalk.gray("ℹ")} ${chalk.gray(issue.message)}${fixPart}`);
+        logger.info("");
+    }
+
+    for (const issue of issues.filter((i) => i.severity !== "info")) {
         const severityIcon = issue.severity === "error" ? chalk.red("✗") : chalk.yellow("⚠");
         const categoryLabel = formatCategory(issue.category);
         logger.info(`  ${chalk.gray("┌─")} ${severityIcon} ${chalk.bold(categoryLabel)} ${chalk.gray("─".repeat(Math.max(0, 42 - categoryLabel.length)))}`);
@@ -674,7 +698,8 @@ function formatCategory(cat: DoctorIssue["category"]): string {
         missing_enum: "Missing Enum",
         enum_value_mismatch: "Enum Value Mismatch",
         missing_foreign_key: "Missing Foreign Key",
-        sdk_stale: "Stale SDK Types"
+        sdk_stale: "Stale SDK Types",
+        sdk_not_generated: "SDK Types Not Generated"
     };
     return labels[cat];
 }

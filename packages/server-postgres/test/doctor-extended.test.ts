@@ -49,12 +49,11 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
                 type: "string",
                 columnType: "uuid",
             };
-            // Current implementation does NOT check columnType === 'uuid' (only checks isId === 'uuid')
-            // So this documents the current behavior:
-            // columnType 'uuid' falls through to the default 'character varying'
+            // The generator emits a uuid column for this, so doctor must expect
+            // one too. This previously asserted "character varying", pinning a
+            // known gap as if it were intended behaviour.
             const result = getExpectedColumnType(prop);
-            // This is the actual behavior — columnType 'uuid' is not handled by doctor
-            expect(result).toBe("character varying");
+            expect(result).toBe("uuid");
         });
 
         it("should return 'USER-DEFINED' for enum string", () => {
