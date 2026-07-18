@@ -271,6 +271,7 @@ export const en = {
   "footer.vsHasura": "vs Hasura",
   "footer.vsDjango": "vs Django",
   "footer.about": "About",
+  "footer.blog": "Blog",
   "footer.contact": "Contact",
   "footer.kitDigital": "Kit Digital",
   "footer.bookCall": "Book a Call",

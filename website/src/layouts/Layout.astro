@@ -23,6 +23,8 @@ export interface Props {
     breadcrumbs?: BreadcrumbItem[];
     lang?: string;
     showBanner?: boolean;
+    ogImage?: string;
+    ogType?: string;
 }
 
 
@@ -32,7 +34,9 @@ const {
     description = "Build powerful back-office applications in minutes with Rebase. An open-source, React-based admin framework for PostgreSQL featuring an AI-powered UI, visual schema builder, and beautiful data management.",
     breadcrumbs,
     lang = getLangFromUrl(Astro.url),
-    showBanner = false
+    showBanner = false,
+    ogImage = "https://rebase.pro/img/teaser.png",
+    ogType = "website"
 } = Astro.props;
 
 const canonicalBase = "https://rebase.pro";
@@ -149,9 +153,9 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content={title}>
     <meta property="og:description" content={description}>
-    <meta property="og:type" content="website">
+    <meta property="og:type" content={ogType}>
     <meta property="og:url" content={canonical}>
-    <meta property="og:image" content="https://rebase.pro/img/teaser.png">
+    <meta property="og:image" content={ogImage}>
 
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">

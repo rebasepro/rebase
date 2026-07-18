@@ -253,6 +253,7 @@ export const es = {
   "footer.vsHasura": "vs Hasura",
   "footer.vsDjango": "vs Django",
   "footer.about": "Acerca de",
+  "footer.blog": "Blog",
   "footer.contact": "Contacto",
   "footer.kitDigital": "Kit Digital",
   "footer.bookCall": "Agendar una Llamada",

@@ -53,6 +53,7 @@ const footerNavs = [
         title: t("footer.company"),
         links: [
             { label: t("footer.about"), url: "/about" },
+            { label: t("footer.blog"), url: "/blog", plain: true },
             { label: t("footer.contact"), url: "/contact" },
             { label: t("footer.kitDigital"), url: "/kit-digital" },
             { label: t("footer.bookCall"), url: "https://calendar.app.google/UDSmMagx6AEwar8P8", external: true },
@@ -97,7 +98,7 @@ const footerNavs = [
                             {nav.links.map((link) => (
                                 <li>
                                     <a
-                                        href={link.external ? link.url : translatePath(link.url)}
+                                        href={link.external || link.plain ? link.url : translatePath(link.url)}
                                         target={link.external ? "_blank" : "_self"}
                                         rel={link.external ? "noopener noreferrer" : ""}
                                         class="hover:underline hover:text-primary-light transition-colors duration-200"

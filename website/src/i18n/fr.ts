@@ -251,6 +251,7 @@ export const fr = {
   "footer.vsHasura": "vs Hasura",
   "footer.vsDjango": "vs Django",
   "footer.about": "À propos",
+  "footer.blog": "Blog",
   "footer.contact": "Contact",
   "footer.kitDigital": "Kit Digital",
   "footer.bookCall": "Réserver un appel",
