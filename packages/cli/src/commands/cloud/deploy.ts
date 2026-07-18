@@ -24,13 +24,20 @@ interface Deployment {
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 15 * 60 * 1000; // 15 min hard stop
 
+// Keep in sync with the control plane's build-context cap (deploy/upload
+// MAX_BYTES and the backend's maxBodySize). Checked before uploading so an
+// oversized context fails in milliseconds with a hint, not after the upload
+// with a bare 413.
+const MAX_SOURCE_UPLOAD_BYTES = 100 * 1024 * 1024;
+
 function sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
 }
 
-function run(cmd: string, cmdArgs: string[], cwd?: string): Promise<void> {
+function run(cmd: string, cmdArgs: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<void> {
     return new Promise((resolve, reject) => {
         const child = spawn(cmd, cmdArgs, { cwd,
+env: env ? { ...process.env, ...env } : undefined,
 stdio: ["ignore", "ignore", "pipe"] });
         let stderr = "";
         child.stderr.on("data", (d) => (stderr += d.toString()));
@@ -55,7 +62,12 @@ async function createSourceTarball(sourceDir: string): Promise<string> {
     tarArgs.push(".");
 
     try {
-        await run("tar", tarArgs, dir);
+        // COPYFILE_DISABLE: macOS bsdtar otherwise emits an AppleDouble sidecar
+        // (`._foo.ts`) for every file carrying an xattr — and macOS stamps the
+        // SIP-protected `com.apple.provenance` xattr routinely, so a stock
+        // checkout ships `._*` binary junk that crashes schema generation in
+        // the builder. GNU tar ignores the variable, so this is safe everywhere.
+        await run("tar", tarArgs, dir, { COPYFILE_DISABLE: "1" });
     } catch (e) {
         fail(`Failed to package source: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -66,6 +78,12 @@ async function createSourceTarball(sourceDir: string): Promise<string> {
 async function uploadSource(url: string, token: string, projectId: string, tarPath: string): Promise<string> {
     const bytes = fs.readFileSync(tarPath);
     const sizeMb = (bytes.length / 1024 / 1024).toFixed(1);
+    if (bytes.length > MAX_SOURCE_UPLOAD_BYTES) {
+        fail(
+            `Source context is ${sizeMb} MB — the upload cap is ${Math.round(MAX_SOURCE_UPLOAD_BYTES / 1024 / 1024)} MB.`,
+            "Trim the build context: exclude sourcemaps (*.map), build output and large assets via .rebaseignore or .gitignore."
+        );
+    }
     console.log(chalk.gray(`  Uploading source (${sizeMb} MB)...`));
     const res = await fetch(`${url}/api/functions/deploy/upload?projectId=${encodeURIComponent(projectId)}`, {
         method: "POST",

@@ -30,6 +30,11 @@ export interface CollectionDefaults {
 
 function isCollectionFile(file: string): boolean {
     return (file.endsWith(".ts") || file.endsWith(".js")) &&
+        // Dotfiles are never collections. In particular macOS bsdtar puts
+        // AppleDouble sidecars (`._foo.ts`) into build contexts — binary blobs
+        // whose names end in .ts and whose first byte is \x00, so importing
+        // them kills the whole load.
+        !file.startsWith(".") &&
         !file.includes(".test.") &&
         !file.endsWith(".d.ts") &&
         // index is the directory's own module: defaults live there, not a collection.

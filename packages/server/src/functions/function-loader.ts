@@ -39,6 +39,9 @@ export async function loadFunctionsFromDirectory(
     for (const file of files) {
         if (
             (file.endsWith(".ts") || file.endsWith(".js")) &&
+            // Dotfiles: notably macOS bsdtar AppleDouble sidecars (`._foo.ts`),
+            // binary blobs that cannot be imported.
+            !file.startsWith(".") &&
             !file.includes(".test.") &&
             !file.endsWith(".d.ts") &&
             file !== "index.ts" &&
