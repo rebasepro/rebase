@@ -101,7 +101,10 @@ export function getPMCommands(pm: PackageManager): PMCommands {
         exec: (bin, args) => ["pnpm", "exec", bin, ...args],
         view: (pkg, field) => ["pnpm", "view", pkg, field],
         runAll: (script) => ["pnpm", "-r", "run", script],
-        runWorkspace: (workspace, script) => ["pnpm", "--filter", workspace, script],
+        // Filter by directory (`./backend`), not name: pnpm's `--filter` matches
+        // the package *name* (e.g. `my-app-backend`), so a bare `backend` matches
+        // nothing. npm's `-w` is path-based, which is why this only bites pnpm.
+        runWorkspace: (workspace, script) => ["pnpm", "--filter", `./${workspace}`, "run", script],
         dlx: (pkg, args) => ["pnpm", "dlx", pkg, ...args],
         workspaceProtocol: "workspace:*"
     };

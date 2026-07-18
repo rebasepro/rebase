@@ -123,8 +123,9 @@ describe("getPMCommands", () => {
         });
 
         it("produces correct runWorkspace command", () => {
+            // Path-based filter — pnpm's --filter matches package name, not dir.
             expect(cmds.runWorkspace("backend", "start")).toEqual([
-                "pnpm", "--filter", "backend", "start"
+                "pnpm", "--filter", "./backend", "run", "start"
             ]);
         });
 
