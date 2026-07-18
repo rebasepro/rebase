@@ -283,6 +283,17 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         };
     }
 
+    // A non-interactive stdin (CI, a pipe, no TTY) can't answer prompts:
+    // inquirer either blocks forever waiting for input or aborts with a raw
+    // ExitPromptError stack trace. Fail fast with actionable guidance instead.
+    if (!process.stdin.isTTY) {
+        console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
+        console.error(chalk.yellow("  Re-run with --yes to accept defaults, passing any choices as flags, e.g.:"));
+        console.error(chalk.yellow(`    rebase init ${nameArg || "my-app"} --yes --template blog --flavor cms`));
+        console.error(chalk.gray("  Options: --template <blog|ecommerce|blank>  --flavor <cms|baas>  --database-url <url>  --install  --git"));
+        process.exit(1);
+    }
+
     const questions = buildInitQuestions({
         nameArg,
         templateArg,
