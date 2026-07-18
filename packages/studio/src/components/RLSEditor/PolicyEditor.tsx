@@ -187,7 +187,9 @@ export const PolicyEditor = ({
 
     return (
         <>
-            <DialogTitle className="flex justify-between items-center w-full" variant="h6">
+            {/* Inline header: this editor renders as a full pane, not inside a Dialog,
+                so DialogTitle (Radix-bound) cannot be used here. */}
+            <Typography variant="h6" gutterBottom className="mt-8 mx-8 flex justify-between items-center w-full">
                 <div>
                     <div>{policy ? t("studio_policy_edit") : t("studio_policy_create")}</div>
                     <div className="text-sm font-normal text-text-secondary dark:text-text-secondary-dark tracking-wide mt-1">
@@ -197,7 +199,7 @@ export const PolicyEditor = ({
                 <IconButton size="small" onClick={() => setHelpOpen(true)}>
                     <HelpCircleIcon size={iconSize.smallest}/>
                 </IconButton>
-            </DialogTitle>
+            </Typography>
 
             <DialogContent className="p-4 md:p-6 border-t dark:border-surface-950 bg-surface-50 dark:bg-surface-950" includeMargin={false}>
                 <div className="max-w-4xl mx-auto">

@@ -543,7 +543,8 @@ duration: 400 }
                             />
                             <Controls
                                 showInteractive={false}
-                                className="!bg-white dark:!bg-surface-900 !border !border-surface-200/40 dark:!border-surface-700/40 !shadow-sm !rounded-lg"
+                                // mb clears the legend overlay pinned at bottom-left
+                                className="!mb-16 !bg-white dark:!bg-surface-900 !border !border-surface-200/40 dark:!border-surface-700/40 !shadow-sm !rounded-lg dark:[--xy-controls-button-background-color:var(--color-surface-900)] dark:[--xy-controls-button-background-color-hover:var(--color-surface-800)] dark:[--xy-controls-button-color:var(--color-surface-300)] dark:[--xy-controls-button-color-hover:var(--color-surface-50)] dark:[--xy-controls-button-border-color:var(--color-surface-700)]"
                             />
                             <MiniMap
                                 nodeStrokeColor={(n) => {

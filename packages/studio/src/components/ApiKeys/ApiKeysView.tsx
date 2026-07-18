@@ -108,6 +108,7 @@ export function ApiKeysView() {
     const [showCreate, setShowCreate] = useState(false);
     const [showSecret, setShowSecret] = useState<ApiKeyWithSecret | null>(null);
     const [revoking, setRevoking] = useState<string | null>(null);
+    const [confirmRevoke, setConfirmRevoke] = useState<ApiKeyMasked | null>(null);
 
     const clientRef = useRef(client);
     clientRef.current = client;
@@ -223,7 +224,7 @@ export function ApiKeysView() {
                                             size="small"
                                             color="error"
                                             variant="outlined"
-                                            onClick={() => handleRevoke(selectedKey.id)}
+                                            onClick={() => setConfirmRevoke(selectedKey)}
                                             disabled={revoking === selectedKey.id}
                                             startIcon={revoking === selectedKey.id ? <CircularProgress size="smallest"/> : <DeleteIcon size={iconSize.smallest}/>}
                                         >
@@ -282,6 +283,45 @@ export function ApiKeysView() {
                     )}
                 </div>
             </div>
+
+            {/* Revoke Confirmation Dialog */}
+            <Dialog
+                open={confirmRevoke !== null}
+                onOpenChange={(open) => {
+                    if (!open && !revoking) setConfirmRevoke(null);
+                }}
+            >
+                <DialogTitle hidden>Revoke Confirmation</DialogTitle>
+                <DialogContent>
+                    <Typography variant="subtitle1" className="font-semibold mb-2">
+                        Revoke &quot;{confirmRevoke?.name}&quot;?
+                    </Typography>
+                    <Typography variant="body2" color="secondary">
+                        Requests authenticated with this key will stop working immediately. This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        variant="text"
+                        onClick={() => setConfirmRevoke(null)}
+                        disabled={revoking !== null}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        color="error"
+                        disabled={revoking !== null}
+                        startIcon={revoking !== null ? <CircularProgress size="smallest"/> : <DeleteIcon size={iconSize.smallest}/>}
+                        onClick={async () => {
+                            if (!confirmRevoke) return;
+                            await handleRevoke(confirmRevoke.id);
+                            setConfirmRevoke(null);
+                        }}
+                    >
+                        Revoke
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Create Dialog */}
             {showCreate && (

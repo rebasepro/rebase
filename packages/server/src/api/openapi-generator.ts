@@ -335,7 +335,7 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                 paths[subPath] = {
                     get: {
                         tags: [collection.name],
-                        summary: `List ${relationName} for a ${collection.singularName || collection.name}`,
+                        summary: `List ${relationName} for ${withIndefiniteArticle(collection.singularName || collection.name)}`,
                         operationId: `list${schemaName}${toPascalCase(relationName)}`,
                         parameters: [
                             { name: "parentId",
@@ -712,6 +712,13 @@ function errorResponses(requireAuth: boolean): Record<string, unknown> {
     }
 
     return responses;
+}
+
+/**
+ * Prefix a noun with "a" or "an" based on its leading sound.
+ */
+function withIndefiniteArticle(noun: string): string {
+    return `${/^[aeiou]/i.test(noun) ? "an" : "a"} ${noun}`;
 }
 
 /**
