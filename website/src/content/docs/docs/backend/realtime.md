@@ -346,6 +346,6 @@ One-way messages that do not expect a response (like `subscribe_collection`, `su
 
 ## Next Steps
 
-- [Client SDK](/docs/client-sdk) — Full SDK reference including typed collection accessors.
+- [Client SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
 - [Authentication](/docs/backend/authentication) — Set up JWT auth and RLS policies.
-- [Backend Architecture](/docs/backend/backend) — Overview of the Rebase server architecture.
+- [Backend Architecture](/docs/backend) — Overview of the Rebase server architecture.

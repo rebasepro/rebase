@@ -1,0 +1,245 @@
+---
+title: Sottoscrizioni in tempo reale
+sidebar_label: Tempo reale
+description: Sottoscrivi le modifiche ai dati in diretta con l'SDK Client di Rebase usando listener in tempo reale basati su WebSocket.
+---
+
+## Panoramica
+
+L'SDK Client di Rebase fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback sottoscritti si attivano immediatamente con i dati aggiornati.
+
+La connessione WebSocket viene stabilita automaticamente quando è disponibile una `websocketUrl` (derivata da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento dei token sono gestiti in modo trasparente.
+
+## Sottoscrivere una collezione
+
+Usa `listen()` per sottoscrivere una query su una collezione. Il callback si attiva ogni volta che il set di dati corrispondente cambia:
+
+```typescript
+const unsubscribe = client.data.products.listen(
+    { where: { active: ["==", true] }, limit: 50 },
+    (response) => {
+        console.log("Products updated:", response.data);
+        console.log("Total:", response.meta.total);
+    }
+);
+
+// Stop listening when done
+unsubscribe();
+```
+
+Il metodo `listen()` accetta gli stessi `FindParams` di `find()` — puoi filtrare, ordinare e paginare la tua sottoscrizione:
+
+```typescript
+const unsubscribe = client.data.orders.listen(
+    {
+        where: { status: "pending" },
+        orderBy: ["created_at", "desc"],
+        limit: 20
+    },
+    (response) => {
+        renderOrders(response.data);
+    },
+    (error) => {
+        console.error("Subscription error:", error);
+    }
+);
+```
+
+### Firma
+
+```typescript
+listen(
+    params: FindParams | undefined,
+    onUpdate: (response: FindResponse<M>) => void,
+    onError?: (error: Error) => void
+): () => void   // returns unsubscribe function
+```
+
+### Metadati in due fasi
+
+Quando `listen()` si attiva, emette gli aggiornamenti in un massimo di due fasi:
+
+1. **Immediata (stimata):** Il primo callback si attiva istantaneamente con le entità e metadati di paginazione euristici (`total` = numero di entità restituite, `hasMore` = se il conteggio è uguale al limite richiesto). Questa emissione porta `meta.estimated: true`.
+
+2. **Autorevole (facoltativa):** Una query di conteggio asincrona viene eseguita in background. Se il `total` o `hasMore` autorevole differisce dalla stima, si attiva un secondo callback con metadati corretti e **senza** il flag `estimated`. Se i valori corrispondono, la seconda emissione viene completamente saltata — il tuo callback si attiva una sola volta.
+
+Se la query di conteggio **fallisce**, non si verifica una seconda emissione. Il flag `estimated: true` della prima emissione rimane come segnale che i metadati sono euristici. Questo non viene trattato come un errore di sottoscrizione.
+
+```typescript
+client.data.products.listen(
+    { where: { active: ["==", true] }, limit: 50 },
+    (response) => {
+        if (response.meta.estimated) {
+            // First-paint: render immediately, total/hasMore may change
+            renderProducts(response.data, { loading: true });
+        } else {
+            // Authoritative: safe to render final pagination controls
+            renderProducts(response.data, { loading: false });
+        }
+    }
+);
+```
+
+> **Suggerimento:** Se non hai bisogno di distinguere tra metadati stimati e autorevoli, puoi ignorare il flag `estimated` — entrambe le emissioni portano lo stesso array `data`.
+
+## Sottoscrivere una singola entità
+
+Usa `listenById()` per osservare un record specifico tramite il suo ID:
+
+```typescript
+const unsubscribe = client.data.products.listenById(
+    42,
+    (entity) => {
+        if (entity) {
+            console.log("Product changed:", entity.values.name);
+        } else {
+            console.log("Product was deleted");
+        }
+    },
+    (error) => {
+        console.error("Subscription error:", error);
+    }
+);
+```
+
+### Firma
+
+```typescript
+listenById(
+    id: string | number,
+    onUpdate: (entity: Entity<M> | undefined) => void,
+    onError?: (error: Error) => void
+): () => void   // returns unsubscribe function
+```
+
+Il callback riceve `undefined` quando l'entità viene eliminata.
+
+## Query Builder fluido
+
+Puoi anche sottoscrivere tramite il query builder fluido. È equivalente a chiamare `listen()` con parametri, ma consente di concatenare `.where()`, `.orderBy()`, ecc.:
+
+```typescript
+const unsubscribe = client.data.products
+    .where("active", "==", true)
+    .orderBy("created_at", "desc")
+    .limit(20)
+    .listen(
+        (response) => console.log("Updated:", response.data),
+        (error) => console.error("Error:", error)
+    );
+```
+
+## Annullare la sottoscrizione
+
+Ogni sottoscrizione restituisce una funzione `unsubscribe`. Chiamala per smettere di ricevere aggiornamenti e ripulire il listener WebSocket:
+
+```typescript
+const unsubscribe = client.data.products.listen(
+    undefined,
+    (response) => { /* ... */ }
+);
+
+// Later, when the component unmounts or you no longer need updates:
+unsubscribe();
+```
+
+In React, usa la pulizia di `useEffect`:
+
+```tsx
+useEffect(() => {
+    const unsubscribe = client.data.products.listen(
+        { where: { active: ["==", true] } },
+        (response) => setProducts(response.data)
+    );
+    return () => unsubscribe();
+}, []);
+```
+
+## Autenticazione e riconnessione
+
+Il client WebSocket gestisce l'autenticazione automaticamente:
+
+- All'**accesso** o all'**aggiornamento del token**, il nuovo token viene inviato al server WebSocket tramite un messaggio `authenticate`.
+- Alla **disconnessione**, la connessione WebSocket viene chiusa.
+- Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive.
+
+Non è necessaria alcuna gestione manuale dei token — l'integrazione tra `client.auth` e il livello WebSocket è gestita internamente.
+
+## Canali di Broadcast
+
+I canali di broadcast ti permettono di inviare messaggi arbitrari tra client connessi — ideali per chat, notifiche o funzionalità collaborative:
+
+```typescript
+// Join a channel
+const channel = client.realtime.channel("chat-room");
+
+// Listen for messages
+channel.on("message", (payload) => {
+    console.log("New message:", payload);
+});
+
+// Send a message to all subscribers
+channel.send("message", {
+    text: "Hello, world!",
+    userId: currentUser.id
+});
+
+// Leave the channel
+channel.unsubscribe();
+```
+
+I canali sono leggeri ed effimeri — esistono finché almeno un client è sottoscritto.
+
+## Tracciamento della Presenza
+
+La presenza ti permette di tracciare quali utenti sono online e di sincronizzare lo stato condiviso tra tutti i partecipanti:
+
+```typescript
+const channel = client.realtime.channel("editors");
+
+// Track your presence
+channel.presence.track({
+    userId: currentUser.id,
+    status: "editing",
+    cursor: { x: 100, y: 200 }
+});
+
+// Listen for presence changes
+channel.presence.on("sync", (state) => {
+    console.log("Online users:", Object.keys(state));
+});
+
+channel.presence.on("join", (key, newPresence) => {
+    console.log(`${key} came online:`, newPresence);
+});
+
+channel.presence.on("leave", (key) => {
+    console.log(`${key} went offline`);
+});
+
+// Update your state
+channel.presence.track({
+    userId: currentUser.id,
+    status: "idle"
+});
+```
+
+La presenza è costruita sui canali di broadcast con un diff automatico dello stato — vengono trasmessi solo i cambiamenti.
+
+## Quando usare il tempo reale
+
+| Caso d'uso | Metodo |
+|----------|--------|
+| Dashboard con dati in diretta | `listen()` con filtri |
+| Chat o messaggistica | `channel.send()` tramite broadcast |
+| Indicatori di digitazione / stato online | `channel.presence.track()` |
+| Pagina di dettaglio con aggiornamenti in diretta | `listenById()` |
+| Monitoraggio del pannello di amministrazione | `listen()` con `orderBy` e `limit` |
+
+> **Suggerimento:** Per recuperi di dati una tantum, usa invece `find()` o `findById()`. Le sottoscrizioni sono ideali per dati che cambiano di frequente e devono essere riflessi immediatamente nell'interfaccia.
+
+## Prossimi passi
+
+- **[Interrogare i dati](/docs/sdk/querying)** — Operazioni CRUD e query builder
+- **[Autenticazione](/docs/sdk/authentication)** — Accesso e gestione delle sessioni
+- **[Tempo reale nel Backend](/docs/backend/realtime)** — Configurazione WebSocket lato server

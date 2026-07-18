@@ -178,4 +178,4 @@ catch-all serves `index.html` for both `/` and `/admin/*`.
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration
-- **[Storage Configuration](/docs/storage)** — S3 setup for production
+- **[Storage Configuration](/docs/backend/storage)** — S3 setup for production

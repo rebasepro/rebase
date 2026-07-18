@@ -92,7 +92,7 @@ async function startServer() {
     // 4. Initialize the Driver and Services
     // Connects to Postgres, verifies connection, starts cross-instance listeners
     const { driver, realtimeProvider, internals } = await bootstrapper.initializeDriver({
-        collections: [] // Pass Rebase EntityCollections if using schema-as-code
+        collections: [] // Pass Rebase CollectionConfigs if using schema-as-code
     });
 
     // Access the underlying schema-aware Drizzle client if needed

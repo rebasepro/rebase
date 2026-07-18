@@ -8,6 +8,8 @@ description: Costruisci e personalizza il pannello di amministrazione Rebase con
 
 Il frontend Rebase è un **framework React** che renderizza il tuo pannello di amministrazione. Legge le definizioni delle tue collezioni e genera automaticamente tabelle, moduli, navigazione e routing.
 
+Nello scaffold predefinito, il pannello di amministrazione **è** il frontend: viene servito alla radice del tuo URL distribuito. Se invece costruisci la tua app di prodotto, puoi montare l'amministrazione sotto un prefisso come `/admin` nella stessa distribuzione — vedi [Cambiare l'URL di Base](/docs/getting-started/deployment#changing-the-base-url).
+
 I componenti chiave che costituiscono un frontend Rebase:
 
 ```tsx

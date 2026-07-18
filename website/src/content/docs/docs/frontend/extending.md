@@ -53,7 +53,7 @@ Slots are named UI extension points scattered throughout the CMS chrome. You reg
 
 Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 
-18 overridable component names in two tiers:
+19 overridable component names in two tiers:
 
 **App-only (7):**
 - `Shell.AppBar`
@@ -64,17 +64,18 @@ Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 - `HomePage.CollectionCard`
 - `Auth.LoginView`
 
-**Collection-scoped (11):**
+**Collection-scoped (12):**
 - `Collection.View`
 - `Collection.Table`
 - `Collection.Card`
 - `Collection.EmptyState`
 - `Collection.Actions`
+- `Collection.FilterField`
 - `Entity.Form`
-- `Entity.FormActions`
-- `Entity.DetailView`
+- `EditView.FormActions`
+- `DetailView`
 - `Entity.SidePanel`
-- `Entity.Preview`
+- `EntityPreview`
 - `Entity.MissingReference`
 
 **Precedence:** Collection-level `components` override app-level defaults for the same component name (simple object spread — collection values overwrite global values). App-only component names (`Shell.*`, `HomePage`, `Auth.*`) can only be overridden at the `<Rebase>` level.

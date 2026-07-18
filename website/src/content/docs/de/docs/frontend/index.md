@@ -8,6 +8,8 @@ description: Erstellen und anpassen Sie das Rebase-Admin-Panel mit React — Con
 
 Das Rebase-Frontend ist ein **React-Framework**, das Ihr Admin-Panel rendert. Es liest Ihre Sammlungsdefinitionen und generiert automatisch Tabellen, Formulare, Navigation und Routing.
 
+Im Standard-Scaffold **ist** das Admin-Panel das Frontend: Es wird im Root Ihrer bereitgestellten URL ausgeliefert. Wenn Sie stattdessen Ihre eigene Produkt-App bauen, können Sie den Admin unter einem Präfix wie `/admin` in derselben Bereitstellung einbinden — siehe [Basis-URL ändern](/docs/getting-started/deployment#changing-the-base-url).
+
 Die Schlüsselkomponenten, aus denen ein Rebase-Frontend besteht:
 
 ```tsx

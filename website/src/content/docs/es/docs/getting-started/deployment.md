@@ -4,6 +4,25 @@ sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
 ---
 
+## Qué Sirve un Despliegue
+
+Un proyecto Rebase se despliega como **un servidor en una URL** (en Rebase Cloud: `https://<project>.apps.rebase.pro`). Ese servidor gestiona:
+
+- **`/api/*`** — la API de datos, la autenticación, el tiempo real y el almacenamiento
+- **todo lo demás** — tu `frontend/` compilado como una SPA estática
+
+No hay una URL de administración separada: el panel de administración forma parte de tu frontend, por lo que dónde aparece depende de qué sea tu frontend.
+
+| Tipo de proyecto | La URL raíz muestra | El panel de administración está en |
+|--------------|----------------|-------------------|
+| Scaffold predeterminado (`rebase init`) | El panel de administración | `/` — el frontend **es** el administrador |
+| Frontend de producto personalizado | Tu app | Donde lo montes, comúnmente `/admin` — consulta [Cambiar la URL Base](#changing-the-base-url) |
+| Proyecto solo backend | Nada (solo API) | No desplegado |
+
+:::note[Primera visita]
+En la primera visita al administrador de un despliegue nuevo, Rebase muestra una pantalla de bootstrap para **crear tu cuenta de administrador**. La primera cuenta registrada recibe privilegios de administrador — reclámala justo después de desplegar.
+:::
+
 ## Docker Compose (Recomendado)
 
 El proyecto generado incluye un `Dockerfile` y un `docker-compose.yml`. Esta es la forma más sencilla de desplegar:
@@ -43,16 +62,16 @@ volumes:
 docker compose up -d
 ```
 
-## Lista de verificación para producción
+## Lista de Verificación para Producción
 
-Antes de desplegar a producción, asegúrate de:
+Antes de desplegar en producción, asegúrate de:
 
 | Elemento | Detalles |
 |------|---------|
-| **JWT_SECRET** | Usa una cadena aleatoria criptográficamente fuerte (≥ 32 caracteres). Nunca la reutilices en diferentes entornos. |
+| **JWT_SECRET** | Usa una cadena aleatoria criptográficamente fuerte (≥ 32 caracteres). Nunca la reutilices entre entornos. |
 | **DATABASE_URL** | Usa una instancia de Postgres gestionada (Neon, Supabase, RDS) con TLS habilitado |
 | **CORS** | Configura los orígenes permitidos en tu backend si el frontend y el backend están en dominios diferentes |
-| **Volúmenes de almacenamiento** | Monta volúmenes persistentes para la carga de archivos. O cambia a S3 para producción. |
+| **Volúmenes de almacenamiento** | Monta volúmenes persistentes para las subidas de archivos. O cambia a S3 para producción. |
 | **HTTPS** | Termina TLS en tu proxy inverso (nginx, Cloudflare, balanceador de carga) |
 | **Registro** | Establece `ALLOW_REGISTRATION=false` después de crear tu cuenta de administrador |
 
@@ -62,54 +81,42 @@ En producción, el backend puede servir el frontend como una SPA estática:
 
 ```typescript
 import { serveSPA } from "@rebasepro/server";
-
-// After initializeRebaseBackend()
 import path from "path";
 
 // After initializeRebaseBackend()
 serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
 ```
 
-Primero, construye el frontend:
+Compila primero el frontend:
 
 ```bash
 cd frontend && pnpm build
 ```
 
-De esta manera, solo necesitas desplegar un servidor que maneje tanto la SPA como la API.
+De esta forma solo necesitas desplegar un servidor que gestione tanto la SPA como la API.
 
-## Plataformas en la Nube
+## Guías de Despliegue por Plataforma
 
-### Railway / Render / Fly.io
+Guías detalladas paso a paso para cada plataforma:
 
-1. Sube tu código a un repositorio Git
-2. Conecta el repositorio a tu plataforma en la nube
-3. Configura las variables de entorno (`DATABASE_URL`, `JWT_SECRET`, etc.)
-4. El `Dockerfile` incluido será detectado automáticamente
-
-### Google Cloud Run
-
-```bash
-# Build the container
-docker build -t gcr.io/YOUR_PROJECT/rebase-backend ./backend
-
-# Push to Container Registry
-docker push gcr.io/YOUR_PROJECT/rebase-backend
-
-# Deploy
-gcloud run deploy rebase-backend \
-  --image gcr.io/YOUR_PROJECT/rebase-backend \
-  --set-env-vars DATABASE_URL=...,JWT_SECRET=... \
-  --allow-unauthenticated
-```
+| Plataforma | Tipo | Guía |
+|----------|------|-------|
+| **AWS** | App Runner / ECS + RDS | [Desplegar en AWS →](/docs/deployment/aws) |
+| **Google Cloud** | Cloud Run + Cloud SQL | [Desplegar en GCP →](/docs/deployment/gcp) |
+| **Azure** | Container Apps + PostgreSQL | [Desplegar en Azure →](/docs/deployment/azure) |
+| **Hetzner Cloud** | VPS + Docker Compose | [Desplegar en Hetzner →](/docs/deployment/hetzner) |
+| **Scaleway** | Contenedores Serverless | [Desplegar en Scaleway →](/docs/deployment/scaleway) |
+| **Railway** | PaaS (autodetecta el Dockerfile) | [Desplegar en Railway →](/docs/deployment/railway) |
+| **Fly.io** | Runtime de contenedores | [Desplegar en Fly.io →](/docs/deployment/flyio) |
 
 :::caution
-Las instancias de Cloud Run son sin estado. Usa **almacenamiento S3** en lugar del sistema de archivos local para las cargas de archivos, y habilita **tiempo real entre instancias** proporcionando una `connectionString` en tu `PostgresBootstrapper` para que las actualizaciones de WebSocket se propaguen entre réplicas.
+Cloud Run y otras plataformas serverless son sin estado. Usa **almacenamiento S3** en lugar del sistema de archivos local para las subidas de archivos, y establece `--min-instances 1` si usas las funciones de tiempo real de Rebase (las conexiones WebSocket se terminan cuando las instancias se reducen).
 :::
+
 
 ## Cambiar la URL Base
 
-Si quieres que Rebase se ejecute en una subruta (por ejemplo, `/admin`):
+Si quieres que Rebase se ejecute en una subruta (p. ej., `/admin`):
 
 **Frontend** — Actualiza el `basename` de `BrowserRouter`:
 
@@ -128,9 +135,47 @@ await initializeRebaseBackend({
 });
 ```
 
+:::note[Montar sin un `basename` de router]
+El enfoque de `basename` anterior es el recomendado — react-router elimina el
+prefijo de la ubicación, por lo que el administrador funciona sin cambios. Si en su lugar incrustas el
+administrador dentro de una **ruta con prefijo de path** de una app más grande (p. ej. `<Route path="/admin/*">`)
+sin `basename`, la ruta actual conserva su prefijo `/admin`. Informa al CMS al
+respecto para que la resolución URL⇄colección tenga en cuenta el prefijo — de lo contrario las vistas se quedan en un
+spinner sin obtener datos:
+
+```tsx
+<RebaseAdmin collections={collections} basePath="/admin" />
+```
+
+Establece **o bien** el `basename` del router **o bien** `RebaseAdmin basePath` — no ambos, o el
+prefijo se aplica dos veces.
+:::
+
+### App de Producto + Administrador en un Solo Despliegue
+
+La razón habitual para mover el administrador a `/admin` es distribuir tu **propia app de producto**
+en la raíz del mismo despliegue. Un único punto de entrada de Vite puede servir ambos, dividido por URL,
+de modo que cada app se carga de forma diferida y los visitantes del producto nunca descargan el bundle del administrador:
+
+```tsx title="frontend/src/main.tsx"
+const isAdmin = window.location.pathname.startsWith("/admin");
+
+const ProductApp = lazy(() => import("./App"));
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+
+if (isAdmin) {
+    // The admin uses useBlocker → needs a data router
+    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
+    root.render(<RouterProvider router={router} />);
+} else {
+    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
+}
+```
+
+El backend no necesita cambios para este patrón — la API permanece en `/api` y el catch-all de la SPA
+sirve `index.html` tanto para `/` como para `/admin/*`.
+
 ## Próximos Pasos
 
-- **[Descripción general del Backend](/docs/backend)** — Configuración completa del backend
-- **[Configuración de Almacenamiento](/docs/storage)** — Configuración de S3 para producción
-
----
+- **[Resumen del Backend](/docs/backend)** — Configuración completa del backend
+- **[Configuración de Almacenamiento](/docs/backend/storage)** — Configuración de S3 para producción

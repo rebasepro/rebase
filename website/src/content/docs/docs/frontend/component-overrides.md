@@ -112,9 +112,10 @@ These components can be overridden globally (acting as defaults for all collecti
 | `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
 | `"Collection.EmptyState"` | `CollectionEmptyStateProps` | View shown when a collection is empty |
 | `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
+| `"Collection.FilterField"` | `FilterFieldBindingProps` | Custom filter input for a column |
 | `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
-| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
-| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
+| `"EditView.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
+| `"DetailView"` | `EntityDetailViewProps` | Read-only detail view |
 | `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
-| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
+| `"EntityPreview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
 | `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is missing |

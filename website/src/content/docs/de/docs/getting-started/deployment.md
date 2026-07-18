@@ -4,9 +4,28 @@ sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
 ---
 
+## Was eine Bereitstellung ausliefert
+
+Ein Rebase-Projekt wird als **ein Server unter einer URL** bereitgestellt (auf Rebase Cloud: `https://<project>.apps.rebase.pro`). Dieser Server übernimmt:
+
+- **`/api/*`** — die Daten-API, Authentifizierung, Echtzeit und Speicher
+- **alles andere** — Ihr gebautes `frontend/` als statische SPA
+
+Es gibt keine separate Admin-URL: Das Admin-Panel ist Teil Ihres Frontends, daher hängt es davon ab, was Ihr Frontend ist, wo es erscheint.
+
+| Projekttyp | Root-URL zeigt | Admin-Panel befindet sich unter |
+|--------------|----------------|-------------------|
+| Standard-Scaffold (`rebase init`) | Das Admin-Panel | `/` — das Frontend **ist** der Admin |
+| Benutzerdefiniertes Produkt-Frontend | Ihre App | Wo Sie es einbinden, üblicherweise `/admin` — siehe [Basis-URL ändern](#changing-the-base-url) |
+| Reines Backend-Projekt | Nichts (nur API) | Nicht bereitgestellt |
+
+:::note[Erster Besuch]
+Beim ersten Besuch des Admins einer neuen Bereitstellung zeigt Rebase einen Bootstrap-Bildschirm zum **Erstellen Ihres Admin-Kontos**. Das erste registrierte Konto erhält Admin-Rechte — beanspruchen Sie es direkt nach der Bereitstellung.
+:::
+
 ## Docker Compose (Empfohlen)
 
-Das generierte Projekt enthält eine `Dockerfile` und eine `docker-compose.yml`. Dies ist der einfachste Weg zur Bereitstellung:
+Das generierte Projekt enthält ein `Dockerfile` und eine `docker-compose.yml`. Dies ist der einfachste Weg zur Bereitstellung:
 
 ```yaml title="docker-compose.yml"
 services:
@@ -45,71 +64,59 @@ docker compose up -d
 
 ## Produktions-Checkliste
 
-Stellen Sie vor der Bereitstellung in der Produktion sicher:
+Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
 
 | Punkt | Details |
 |------|---------|
-| **JWT_SECRET** | Verwenden Sie einen kryptografisch starken Zufallsstring (≥ 32 Zeichen). Niemals über Umgebungen hinweg wiederverwenden. |
+| **JWT_SECRET** | Verwenden Sie eine kryptografisch starke Zufallszeichenkette (≥ 32 Zeichen). Niemals über Umgebungen hinweg wiederverwenden. |
 | **DATABASE_URL** | Verwenden Sie eine verwaltete Postgres-Instanz (Neon, Supabase, RDS) mit aktiviertem TLS |
-| **CORS** | Konfigurieren Sie erlaubte Ursprünge in Ihrem Backend, wenn Frontend und Backend auf unterschiedlichen Domains liegen |
-| **Speichervolumes** | Hängen Sie persistente Volumes für Dateiuploads ein. Oder wechseln Sie für die Produktion zu S3. |
-| **HTTPS** | Beenden Sie TLS an Ihrem Reverse-Proxy (nginx, Cloudflare, Load Balancer) |
+| **CORS** | Konfigurieren Sie erlaubte Origins auf Ihrem Backend, wenn Frontend und Backend auf verschiedenen Domains liegen |
+| **Speicher-Volumes** | Binden Sie persistente Volumes für Datei-Uploads ein. Oder wechseln Sie für die Produktion zu S3. |
+| **HTTPS** | Terminieren Sie TLS an Ihrem Reverse-Proxy (nginx, Cloudflare, Load Balancer) |
 | **Registrierung** | Setzen Sie `ALLOW_REGISTRATION=false`, nachdem Sie Ihr Admin-Konto erstellt haben |
 
-## Bereitstellung des Frontends
+## Das Frontend ausliefern
 
-In der Produktion kann das Backend das Frontend als statische SPA bereitstellen:
+In der Produktion kann das Backend das Frontend als statische SPA ausliefern:
 
 ```typescript
 import { serveSPA } from "@rebasepro/server";
-
-// After initializeRebaseBackend()
 import path from "path";
 
 // After initializeRebaseBackend()
 serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
 ```
 
-Erstellen Sie zuerst das Frontend:
+Bauen Sie zuerst das Frontend:
 
 ```bash
 cd frontend && pnpm build
 ```
 
-Auf diese Weise müssen Sie nur einen Server bereitstellen, der sowohl SPA als auch API verwaltet.
+Auf diese Weise müssen Sie nur einen Server bereitstellen, der sowohl SPA als auch API übernimmt.
 
-## Cloud-Plattformen
+## Plattform-Bereitstellungsanleitungen
 
-### Railway / Render / Fly.io
+Detaillierte Schritt-für-Schritt-Anleitungen für jede Plattform:
 
-1. Pushen Sie Ihren Code in ein Git-Repository
-2. Verbinden Sie das Repository mit Ihrer Cloud-Plattform
-3. Legen Sie Umgebungsvariablen fest (`DATABASE_URL`, `JWT_SECRET`, etc.)
-4. Die enthaltene `Dockerfile` wird automatisch erkannt
-
-### Google Cloud Run
-
-```bash
-# Build the container
-docker build -t gcr.io/YOUR_PROJECT/rebase-backend ./backend
-
-# Push to Container Registry
-docker push gcr.io/YOUR_PROJECT/rebase-backend
-
-# Deploy
-gcloud run deploy rebase-backend \
-  --image gcr.io/YOUR_PROJECT/rebase-backend \
-  --set-env-vars DATABASE_URL=...,JWT_SECRET=... \
-  --allow-unauthenticated
-```
+| Plattform | Typ | Anleitung |
+|----------|------|-------|
+| **AWS** | App Runner / ECS + RDS | [Auf AWS bereitstellen →](/docs/deployment/aws) |
+| **Google Cloud** | Cloud Run + Cloud SQL | [Auf GCP bereitstellen →](/docs/deployment/gcp) |
+| **Azure** | Container Apps + PostgreSQL | [Auf Azure bereitstellen →](/docs/deployment/azure) |
+| **Hetzner Cloud** | VPS + Docker Compose | [Auf Hetzner bereitstellen →](/docs/deployment/hetzner) |
+| **Scaleway** | Serverless-Container | [Auf Scaleway bereitstellen →](/docs/deployment/scaleway) |
+| **Railway** | PaaS (Dockerfile automatisch erkannt) | [Auf Railway bereitstellen →](/docs/deployment/railway) |
+| **Fly.io** | Container-Runtime | [Auf Fly.io bereitstellen →](/docs/deployment/flyio) |
 
 :::caution
-Cloud Run-Instanzen sind zustandslos. Verwenden Sie **S3-Speicher** anstelle des lokalen Dateisystems für Dateiuploads, und aktivieren Sie **Echtzeit über Instanzen hinweg**, indem Sie einen `connectionString` in Ihrem `PostgresBootstrapper` bereitstellen, damit WebSocket-Updates über Replikate hinweg verbreitet werden.
+Cloud Run und andere serverlose Plattformen sind zustandslos. Verwenden Sie **S3-Speicher** anstelle des lokalen Dateisystems für Datei-Uploads und setzen Sie `--min-instances 1`, wenn Sie die Echtzeit-Funktionen von Rebase verwenden (WebSocket-Verbindungen werden beendet, wenn Instanzen herunterskaliert werden).
 :::
 
-## Ändern der Basis-URL
 
-Wenn Sie Rebase unter einem Unterpfad (z. B. `/admin`) ausführen möchten:
+## Basis-URL ändern
+
+Wenn Sie möchten, dass Rebase unter einem Unterpfad läuft (z. B. `/admin`):
 
 **Frontend** — Aktualisieren Sie den `basename` des `BrowserRouter`:
 
@@ -128,9 +135,47 @@ await initializeRebaseBackend({
 });
 ```
 
+:::note[Einbinden ohne einen Router-`basename`]
+Der obige `basename`-Ansatz ist der empfohlene — react-router entfernt das
+Präfix aus der Location, sodass der Admin unverändert funktioniert. Wenn Sie den
+Admin stattdessen in eine **pfadpräfixierte Route** einer größeren App einbetten (z. B. `<Route path="/admin/*">`)
+ohne `basename`, behält der aktuelle Pfad sein `/admin`-Präfix. Teilen Sie dem CMS davon
+mit, damit die URL⇄Collection-Auflösung das Präfix berücksichtigt — andernfalls hängen Views an einem
+Spinner ohne Datenabruf:
+
+```tsx
+<RebaseAdmin collections={collections} basePath="/admin" />
+```
+
+Setzen Sie **entweder** den Router-`basename` **oder** `RebaseAdmin basePath` — nicht beides, sonst wird das
+Präfix zweimal angewendet.
+:::
+
+### Produkt-App + Admin in einer Bereitstellung
+
+Der häufige Grund, den Admin nach `/admin` zu verschieben, ist die Auslieferung Ihrer **eigenen Produkt-App**
+im Root derselben Bereitstellung. Ein einziger Vite-Einstiegspunkt kann beide ausliefern, nach URL aufgeteilt,
+sodass jede App lazy geladen wird und Produktbesucher niemals das Admin-Bundle herunterladen:
+
+```tsx title="frontend/src/main.tsx"
+const isAdmin = window.location.pathname.startsWith("/admin");
+
+const ProductApp = lazy(() => import("./App"));
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+
+if (isAdmin) {
+    // The admin uses useBlocker → needs a data router
+    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
+    root.render(<RouterProvider router={router} />);
+} else {
+    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
+}
+```
+
+Das Backend benötigt für dieses Muster keine Änderungen — die API bleibt unter `/api` und der SPA-
+Catch-all liefert `index.html` sowohl für `/` als auch für `/admin/*`.
+
 ## Nächste Schritte
 
-- **[Backend-Übersicht](/docs/backend)** — Vollständige Backend-Konfiguration
-- **[Speicherkonfiguration](/docs/storage)** — S3-Setup für die Produktion
-
----
+- **[Backend-Überblick](/docs/backend)** — Vollständige Backend-Konfiguration
+- **[Speicherkonfiguration](/docs/backend/storage)** — S3-Einrichtung für die Produktion
