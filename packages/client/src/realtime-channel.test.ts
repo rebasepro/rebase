@@ -51,6 +51,57 @@ describe("RebaseRealtimeChannel", () => {
         jest.useRealTimers();
     });
 
+    // The server reads every channel message out of a `payload` envelope
+    // (`payload?.channel`, `payload?.state`, `payload?.event` — see
+    // server-postgres realtimeService). Sending those fields flat does not
+    // error: `payload?.channel` reads as undefined, so the client is
+    // registered into channel `undefined` with empty state and the echo comes
+    // back with no `channel` for `onChannelMessage` to match. Presence and
+    // broadcast then go silent with nothing logged anywhere.
+    //
+    // This shipped once. The tests below asserted only `m.type`, which is
+    // identical under both shapes — so they passed while the feature did
+    // nothing. These assert the envelope itself.
+    describe("wire contract", () => {
+        it("wraps every channel message in a payload envelope", async () => {
+            await channel.join();
+            await channel.track({ cursor: 1 });
+            await channel.broadcast("ping", { n: 2 });
+            await channel.untrack();
+            await channel.leave();
+
+            expect(fake.sent.length).toBeGreaterThan(0);
+            for (const message of fake.sent) {
+                expect(message).toHaveProperty("payload");
+                // The channel name must travel inside the envelope, never beside it.
+                expect((message.payload as Record<string, unknown>).channel).toBe("doc:42");
+                expect(message).not.toHaveProperty("channel");
+            }
+        });
+
+        it("carries presence state inside the envelope, not beside it", async () => {
+            await channel.track({ name: "Ada" });
+
+            const track = fake.sent.find((m) => m.type === "presence_track");
+            expect(track).toMatchObject({
+                type: "presence_track",
+                payload: { channel: "doc:42", state: { name: "Ada" } }
+            });
+            // Losing state is the quiet half of the bug: presence still
+            // "works", every peer just shows up empty.
+            expect(track).not.toHaveProperty("state");
+        });
+
+        it("carries broadcast event and payload inside the envelope", async () => {
+            await channel.broadcast("saved", { version: 3 });
+
+            expect(fake.sent.find((m) => m.type === "broadcast")).toMatchObject({
+                type: "broadcast",
+                payload: { channel: "doc:42", event: "saved", payload: { version: 3 } }
+            });
+        });
+    });
+
     describe("joining", () => {
         it("asks for the roster, because joining does not push it", async () => {
             // A joining client's presence_diff contains only itself, so
@@ -138,7 +189,7 @@ describe("RebaseRealtimeChannel", () => {
             await jest.advanceTimersByTimeAsync(21_000);
 
             const beats = fake.sent.filter((m) => m.type === "presence_track");
-            expect(beats.at(-1)).toMatchObject({ state: { cursor: 99 } });
+            expect(beats.at(-1)).toMatchObject({ payload: { channel: "doc:42", state: { cursor: 99 } } });
         });
 
         it("stops the heartbeat on untrack", async () => {
@@ -198,7 +249,7 @@ describe("RebaseRealtimeChannel", () => {
             await jest.advanceTimersByTimeAsync(0);
 
             expect(fake.types()).toEqual(["join_channel", "presence_state", "presence_track"]);
-            expect(fake.sent.at(-1)).toMatchObject({ state: { cursor: 7 } });
+            expect(fake.sent.at(-1)).toMatchObject({ payload: { channel: "doc:42", state: { cursor: 7 } } });
         });
 
         it("does not re-track when the client never tracked", async () => {

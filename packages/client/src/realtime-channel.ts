@@ -76,6 +76,22 @@ export class RebaseRealtimeChannel {
      * `onBroadcast`; calling it directly is only needed to start receiving
      * before there is anything to send.
      */
+    /**
+     * Send a channel message.
+     *
+     * Every channel message is read by the server out of a `payload` envelope
+     * (`payload?.channel`, `payload?.state`, `payload?.event`). Sending those
+     * fields flat does not error: `payload?.channel` simply reads as
+     * `undefined`, so the client is registered into channel `undefined` with
+     * empty state, and the echo comes back with no `channel` for
+     * `onChannelMessage` to match — presence and broadcast both go quiet with
+     * nothing logged. Funnelled through one place so a new message type cannot
+     * reintroduce that.
+     */
+    private send(type: string, fields: Record<string, unknown> = {}): Promise<unknown> {
+        return this.transport.sendMessage({ type, payload: { channel: this.name, ...fields } });
+    }
+
     async join(): Promise<void> {
         if (this.joined) return;
         this.joined = true;
@@ -93,22 +109,18 @@ export class RebaseRealtimeChannel {
             })
         );
 
-        await this.transport.sendMessage({ type: "join_channel", channel: this.name });
+        await this.send("join_channel");
         // Not optional. Joining does not push the roster — without this the
         // channel believes it is alone until somebody else happens to move.
-        await this.transport.sendMessage({ type: "presence_state", channel: this.name });
+        await this.send("presence_state");
     }
 
     private async rejoin(): Promise<void> {
         try {
-            await this.transport.sendMessage({ type: "join_channel", channel: this.name });
-            await this.transport.sendMessage({ type: "presence_state", channel: this.name });
+            await this.send("join_channel");
+            await this.send("presence_state");
             if (this.trackedState) {
-                await this.transport.sendMessage({
-                    type: "presence_track",
-                    channel: this.name,
-                    state: this.trackedState
-                });
+                await this.send("presence_track", { state: this.trackedState });
             }
         } catch {
             // The socket is down again; the next reconnect will retry.
@@ -125,13 +137,12 @@ export class RebaseRealtimeChannel {
         await this.join();
         this.trackedState = state;
 
-        await this.transport.sendMessage({ type: "presence_track", channel: this.name, state });
+        await this.send("presence_track", { state });
 
         if (!this.heartbeat) {
             this.heartbeat = setInterval(() => {
                 if (!this.trackedState) return;
-                void this.transport
-                    .sendMessage({ type: "presence_track", channel: this.name, state: this.trackedState })
+                void this.send("presence_track", { state: this.trackedState })
                     .catch(() => { /* a dropped beat is recoverable; the next one carries the same state */ });
             }, PRESENCE_HEARTBEAT_MS);
             // Do not hold a Node process open just to say "still here".
@@ -144,7 +155,7 @@ export class RebaseRealtimeChannel {
         this.stopHeartbeat();
         this.trackedState = null;
         if (this.joined) {
-            await this.transport.sendMessage({ type: "presence_untrack", channel: this.name });
+            await this.send("presence_untrack");
         }
     }
 
@@ -162,7 +173,7 @@ export class RebaseRealtimeChannel {
     /** Send a broadcast. The sender does not receive its own message. */
     async broadcast(event: string, payload: unknown): Promise<void> {
         await this.join();
-        await this.transport.sendMessage({ type: "broadcast", channel: this.name, event, payload });
+        await this.send("broadcast", { event, payload });
     }
 
     /** Observe broadcasts. Pass an event name to filter. */
@@ -194,7 +205,7 @@ export class RebaseRealtimeChannel {
 
         if (this.joined) {
             this.joined = false;
-            await this.transport.sendMessage({ type: "leave_channel", channel: this.name });
+            await this.send("leave_channel");
         }
     }
 

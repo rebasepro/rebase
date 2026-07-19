@@ -146,6 +146,21 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
     /**
+     * Broadcast and presence channels.
+     *
+     * Was missing from this type while present on the returned object, which
+     * made `client.realtime.channel(...)` a type error and forced every adopter
+     * to cast around the feature before they could reach it.
+     */
+    realtime: {
+        /**
+         * Join a broadcast/presence channel. Repeated calls with the same name
+         * return the same channel object. Throws only when the client was
+         * created with `realtime: false`.
+         */
+        channel: (name: string) => RebaseRealtimeChannel;
+    };
+    /**
      * Release the realtime socket and its reconnect timer.
      *
      * An open socket keeps the Node event loop alive, so a script that does not
