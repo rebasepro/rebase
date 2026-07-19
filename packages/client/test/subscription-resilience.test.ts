@@ -48,12 +48,15 @@ class MockWebSocket {
 
 let createdClients: RebaseWebSocketClient[] = [];
 
+/** See the note on the same helper in websocket.test.ts: the constructor no
+ *  longer dials, so a test that wants a socket asks for one. */
 function createClient(opts?: Partial<ConstructorParameters<typeof RebaseWebSocketClient>[0]>) {
     const client = new RebaseWebSocketClient({
         websocketUrl: "ws://localhost:1234",
         WebSocket: MockWebSocket as any,
         ...opts
     });
+    client.ensureConnected();
     createdClients.push(client);
     return client;
 }

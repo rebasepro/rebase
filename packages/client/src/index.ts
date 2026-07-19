@@ -288,9 +288,15 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         auth.onAuthStateChange((event, session) => {
             if (!ws) return;
             if (event === "SIGNED_OUT") {
+                // Not permanent: the client stays usable, and a later subscribe
+                // should reconnect anonymously.
                 ws.disconnect();
             } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-                if (session?.accessToken) {
+                // Only re-authenticate a socket that already exists. Signing in
+                // is not a request for realtime, and dialling here would undo
+                // lazy connect for every app with a login. A socket opened
+                // later authenticates itself from `getAuthToken` on open.
+                if (session?.accessToken && ws.hasSocket) {
                     ws.authenticate(session.accessToken).catch(console.warn);
                 }
             }
@@ -438,6 +444,10 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
              * cut off the others.
              */
             channel: (name: string): RebaseRealtimeChannel => {
+                // Only `realtime: false` gets here — a hard opt-out, so this
+                // stays an error. Being merely *unconnected* does not: the
+                // socket opens on the first channel operation, which is the
+                // whole point of asking for a channel before you use one.
                 if (!ws) {
                     throw new RebaseClientError(
                         "Realtime is disabled on this client (realtime: false), so channels are unavailable."
@@ -464,7 +474,9 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // they publish over is gone.
             for (const channel of realtimeChannels.values()) void channel.leave();
             realtimeChannels.clear();
-            ws?.disconnect();
+            // Permanent: nothing queued afterwards may redial and keep the
+            // event loop alive, which is the reason this method exists.
+            ws?.disconnect(true);
         },
         setToken: transport.setToken,
         setAuthTokenGetter: transport.setAuthTokenGetter,

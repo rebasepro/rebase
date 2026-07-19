@@ -667,7 +667,27 @@ const client = createRebaseClient({
 });
 ```
 
-> **IMPORTANT FOR AGENTS:** If WebSocket is not available and no `WebSocket` constructor is provided, the client logs a warning and realtime subscriptions will NOT work. Always provide a WebSocket constructor in Node.js environments.
+> **IMPORTANT FOR AGENTS:** If WebSocket is not available and no `WebSocket` constructor is provided, the client logs a warning and realtime subscriptions will NOT work. Always provide a WebSocket constructor in Node.js environments. The warning is emitted on first *use*, not on construction, so a client that never subscribes stays silent.
+
+### The socket connects lazily
+
+Creating a client opens **no** WebSocket. The socket is dialled on the first operation that needs it — `collection().listen(...)`, or any channel operation (`join`, `track`, `broadcast`, `onPresence`, `onBroadcast`).
+
+This matters for apps with meaningful signed-out traffic — marketing pages, docs, public read-only views, anonymous-first tools. Previously `realtime` was effectively all-or-nothing per client: enabling it to reach `channel()` dialled a socket on every page load, including the anonymous ones with no token to authenticate with. Realtime is a per-feature capability, so the socket is now per-use.
+
+```typescript
+const client = createRebaseClient({ baseUrl });   // no socket
+const channel = client.realtime.channel("doc:1"); // still no socket
+await channel.join();                             // socket opens here
+```
+
+Notes:
+
+- `realtime: false` is unchanged — a hard opt-out. No socket ever, and `channel()` throws.
+- Signing in does not open a socket. A socket opened later authenticates itself; one already open is re-authenticated on `SIGNED_IN` / `TOKEN_REFRESHED`.
+- **Channel and presence frames do not require an account.** They are exempt from the client-side auth gate, so anonymous visitors can join public channels; the server still authorizes them.
+- `client.close()` is final: nothing queued afterwards redials.
+- Apps that subscribe on boot are unaffected — they connect at the same moment, just triggered by the subscribe rather than the constructor.
 
 ## Server Configuration
 

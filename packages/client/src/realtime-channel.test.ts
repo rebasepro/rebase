@@ -212,6 +212,50 @@ describe("RebaseRealtimeChannel", () => {
         });
     });
 
+    describe("anonymous callers", () => {
+        it("sends channel frames without an account", async () => {
+            // The motivating case, and one unit tests over a fake transport
+            // cannot see: `doSendMessage` gated every non-AUTHENTICATE frame on
+            // `ensureAuthenticated`, which throws "user not logged in" when
+            // there is no token — so on an anonymous-first app every channel
+            // operation failed client-side and the server never decided.
+            // Presence in a public room needs no account.
+            const { RebaseWebSocketClient } = await import("./websocket");
+
+            const sent: Record<string, unknown>[] = [];
+            class FakeWS {
+                static readonly OPEN = 1;
+                readyState = 1;
+                onopen: (() => void) | null = null;
+                onclose: (() => void) | null = null;
+                onerror: (() => void) | null = null;
+                onmessage: (() => void) | null = null;
+                constructor(public url: string) {
+                    setTimeout(() => this.onopen?.(), 0);
+                }
+                send(raw: string) { sent.push(JSON.parse(raw)); }
+                close() { /* noop */ }
+            }
+
+            const ws = new RebaseWebSocketClient({
+                websocketUrl: "ws://localhost:1234",
+                WebSocket: FakeWS as unknown as typeof WebSocket,
+                // Signed out: exactly what an anonymous visitor has.
+                getAuthToken: async () => ""
+            });
+
+            const anonChannel = new RebaseRealtimeChannel("public:lobby", ws);
+            // The frames queue until the socket opens, and under fake timers
+            // the socket only opens when the clock is advanced — so awaiting
+            // join() first would deadlock against the open it is waiting for.
+            const joined = anonChannel.join();
+            await jest.advanceTimersByTimeAsync(10);
+            await joined;
+
+            expect(sent.map((m) => m.type)).toEqual(["join_channel", "presence_state"]);
+        });
+    });
+
     describe("leave", () => {
         it("releases the socket handler, the timer and the listeners", async () => {
             const received: unknown[] = [];

@@ -53,12 +53,22 @@ class MockWebSocket {
 
 let createdClients: RebaseWebSocketClient[] = [];
 
+/**
+ * Construct a client and connect it.
+ *
+ * The constructor deliberately no longer dials — a client is built whenever
+ * realtime is not disabled, so connecting there opened a socket on every page
+ * load of every app that merely might subscribe later. These are tests *of the
+ * socket*, so they want one; `ensureConnected()` is what a subscribe or a
+ * channel operation calls for them in real use.
+ */
 function createClient(opts?: Partial<ConstructorParameters<typeof RebaseWebSocketClient>[0]>) {
     const client = new RebaseWebSocketClient({
         websocketUrl: "ws://localhost:1234",
         WebSocket: MockWebSocket as any,
         ...opts
     });
+    client.ensureConnected();
     createdClients.push(client);
     return client;
 }
@@ -106,6 +116,44 @@ describe("RebaseWebSocketClient", () => {
             createClient();
             expect(MockWebSocket.instances).toHaveLength(1);
             expect(getWs().url).toBe("ws://localhost:1234");
+        });
+
+        it("does NOT connect until asked", () => {
+            new RebaseWebSocketClient({
+                websocketUrl: "ws://localhost:1234",
+                WebSocket: MockWebSocket as any
+            });
+
+            expect(MockWebSocket.instances).toHaveLength(0);
+        });
+
+        it("ensureConnected is idempotent — repeated calls reuse one socket", () => {
+            // Every operation that needs a socket calls it, so it runs far more
+            // often than it connects.
+            const client = createClient();
+            client.ensureConnected();
+            client.ensureConnected();
+
+            expect(MockWebSocket.instances).toHaveLength(1);
+        });
+
+        it("reconnects on demand after a non-permanent disconnect", () => {
+            // Signing out drops the socket but leaves the client usable.
+            const client = createClient();
+            client.disconnect();
+
+            client.ensureConnected();
+
+            expect(MockWebSocket.instances).toHaveLength(2);
+        });
+
+        it("never redials after a permanent disconnect", () => {
+            const client = createClient();
+            client.disconnect(true);
+
+            client.ensureConnected();
+
+            expect(MockWebSocket.instances).toHaveLength(1);
         });
 
         it("does not create connection if WebSocket is undefined", () => {

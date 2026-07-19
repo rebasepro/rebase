@@ -40,13 +40,93 @@ describe("realtime opt-out", () => {
         jest.restoreAllMocks();
     });
 
-    it("opens the socket by default", () => {
+    it("opens NO socket on construction, even with realtime enabled", () => {
+        // Changed deliberately. Constructing a client is not a statement that
+        // the app wants a socket — `createRebaseClient` builds one whenever
+        // realtime is not explicitly disabled, so dialling here cost a
+        // connection on every page load of every app that merely *might*
+        // subscribe later. Anonymous-first apps paid it on every visit to
+        // authenticate with nothing.
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
         createRebaseClient({ baseUrl: "http://localhost:3000/api" });
 
+        expect(opened).toHaveLength(0);
+    });
+
+    it("opens the socket on the first channel operation", () => {
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+
+        // Asking for the channel is not using it.
+        const channel = client.realtime.channel("doc:1");
+        expect(opened).toHaveLength(0);
+
+        void channel.join();
         expect(opened).toHaveLength(1);
+    });
+
+    it("opens the socket on the first collection subscription", () => {
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        expect(opened).toHaveLength(0);
+
+        client.collection("posts").listen!(undefined, () => { /* noop */ });
+
+        expect(opened).toHaveLength(1);
+    });
+
+    it("opens exactly one socket however many things subscribe", () => {
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+
+        client.collection("posts").listen!(undefined, () => { /* noop */ });
+        client.collection("authors").listen!(undefined, () => { /* noop */ });
+        void client.realtime.channel("doc:1").join();
+
+        expect(opened).toHaveLength(1);
+    });
+
+    it("stays silent for an anonymous client that never subscribes", () => {
+        // The motivating case: most page loads of an anonymous-first app.
+        // No socket, and no console noise either.
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
+        const debug = jest.spyOn(console, "debug").mockImplementation(() => { /* capture */ });
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        void client.realtime.channel("doc:1"); // obtained, never used
+
+        expect(opened).toHaveLength(0);
+        expect(warn).not.toHaveBeenCalled();
+        expect(debug).not.toHaveBeenCalled();
+    });
+
+    it("says nothing about a missing WebSocket until something needs one", () => {
+        // The environment warning used to fire on construction, so a Node
+        // process that never subscribed was told off for a socket it did not
+        // want.
+        // @ts-expect-error deliberately removing the global
+        delete globalThis.WebSocket;
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        expect(warn).not.toHaveBeenCalled();
+
+        void client.realtime.channel("doc:1").join();
+        expect(warn).toHaveBeenCalledWith(expect.stringMatching(/WebSocket is not defined/));
+
+        // ...and only once, however many times it is asked.
+        void client.realtime.channel("doc:2").join();
+        expect(warn).toHaveBeenCalledTimes(1);
     });
 
     it("opens no socket when realtime is disabled", () => {
@@ -76,16 +156,34 @@ describe("realtime opt-out", () => {
         expect(opened).toHaveLength(0);
     });
 
-    it("close() releases the socket", () => {
+    it("close() releases a socket that was opened", () => {
         const { FakeWebSocket, opened, closed } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        client.collection("posts").listen!(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
         client.close();
 
         expect(closed).toHaveLength(1);
+    });
+
+    it("close() is final — a later subscribe does not redial", () => {
+        // Otherwise one queued frame could reopen the socket that close() just
+        // released, and the Node process this method exists to let exit would
+        // stay alive anyway.
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        client.collection("posts").listen!(undefined, () => { /* noop */ });
+        expect(opened).toHaveLength(1);
+
+        client.close();
+        client.collection("authors").listen!(undefined, () => { /* noop */ });
+
+        expect(opened).toHaveLength(1);
     });
 
     it("close() is safe when realtime was never started, and when called twice", () => {
@@ -98,6 +196,34 @@ describe("realtime opt-out", () => {
         const live = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
         live.close();
         expect(() => live.close()).not.toThrow();
+    });
+
+    it("still refuses channels when realtime is disabled", () => {
+        // `realtime: false` remains a hard opt-out. Only the *default* changed
+        // — from "connected eagerly" to "connected on use".
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({
+            baseUrl: "http://localhost:3000/api",
+            realtime: false
+        });
+
+        expect(() => client.realtime.channel("doc:1")).toThrow(/realtime: false/);
+        expect(opened).toHaveLength(0);
+    });
+
+    it("signing in does not by itself open a socket", () => {
+        // Authenticating is not a request for realtime. If it dialled, every
+        // app with a login would lose lazy connect at the moment of login.
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        // Drive the auth-state path the way a sign-in would.
+        client.auth.onAuthStateChange(() => { /* noop */ });
+
+        expect(opened).toHaveLength(0);
     });
 
     it("leaves listen() absent so callers can feature-detect, and says why via the query builder", () => {

@@ -53,6 +53,21 @@ export interface RebaseWebSocketConfig {
 
 
 /**
+ * Broadcast and presence frames.
+ *
+ * Fire-and-forget (the server sends no response envelope), and exempt from the
+ * client-side auth gate — a public channel is usable without an account.
+ */
+const CHANNEL_MESSAGE_TYPES = new Set([
+    "join_channel",
+    "leave_channel",
+    "broadcast",
+    "presence_track",
+    "presence_untrack",
+    "presence_state"
+]);
+
+/**
  * Low-level realtime WebSocket client.
  *
  * @internal Not a stable app-facing API. `createRebaseClient()` constructs and
@@ -74,6 +89,22 @@ export class RebaseWebSocketClient {
 
     /** Channel-name → handlers, for broadcast and presence frames. */
     private channelHandlers = new Map<string, Set<(message: Record<string, unknown>) => void>>();
+
+    /** Set by `close()`. Blocks any later operation from silently redialling. */
+    private closedByCaller = false;
+
+    /**
+     * Whether a socket exists at all (open or still opening).
+     *
+     * Lets callers distinguish "authenticate the live socket" from "there is
+     * nothing to authenticate yet", without that question forcing a dial.
+     */
+    public get hasSocket(): boolean {
+        return this.ws !== null;
+    }
+
+    /** So the "no WebSocket in this environment" warning is said once, not per call. */
+    private warnedNoWebSocket = false;
 
     /** Subscribe to broadcast/presence frames for one channel. */
     public onChannelMessage(channel: string, handler: (message: Record<string, unknown>) => void): () => void {
@@ -183,11 +214,39 @@ export class RebaseWebSocketClient {
         this.onUnauthorized = config.onUnauthorized;
         this.WebSocketConstructor = config.WebSocket || (typeof WebSocket !== "undefined" ? WebSocket : undefined);
 
+        // Deliberately does NOT dial here. Constructing the client is not a
+        // statement that the app wants a socket — `createRebaseClient` builds
+        // one whenever realtime is not explicitly disabled, so connecting here
+        // opened a socket on every page load of every app that merely *might*
+        // subscribe later. Anonymous-first apps paid that on every visit, to
+        // authenticate with nothing, which left them choosing between "socket
+        // on every page load" and "no channels at all".
+        //
+        // The environment warning is also deferred: an app that never
+        // subscribes should say nothing at all. See `ensureConnected`.
+    }
+
+    /**
+     * Open the socket if it is not open (or opening) already.
+     *
+     * Idempotent, synchronous, and safe to call on every operation that needs a
+     * live socket — `initWebSocket` already no-ops on an open socket and is
+     * re-entrant, since the reconnect path has always called it.
+     */
+    public ensureConnected(): void {
+        // An explicit `close()` is final. Without this, one queued frame could
+        // redial a socket the caller just released and keep a Node process
+        // alive forever.
+        if (this.closedByCaller) return;
         if (!this.WebSocketConstructor) {
-            console.warn("WebSocket is not defined in this environment. Realtime subscriptions will not work unless you provide a WebSocket implementation in the config.");
-        } else {
-            this.initWebSocket();
+            if (!this.warnedNoWebSocket) {
+                this.warnedNoWebSocket = true;
+                console.warn("WebSocket is not defined in this environment. Realtime subscriptions will not work unless you provide a WebSocket implementation in the config.");
+            }
+            return;
         }
+        if (this.ws || this.reconnectTimeout) return;
+        this.initWebSocket();
     }
 
     /**
@@ -252,7 +311,16 @@ export class RebaseWebSocketClient {
         }
     }
 
-    public disconnect(): void {
+    /**
+     * Drop the socket.
+     *
+     * `permanent` distinguishes the two callers. Signing out drops the socket
+     * but the client stays usable — a later subscribe should reconnect
+     * anonymously. `client.close()` is the caller saying they are done, and
+     * must not be undone by a stray queued frame.
+     */
+    public disconnect(permanent = false): void {
+        if (permanent) this.closedByCaller = true;
         this.isAuthenticated = false;
         this.authPromise = null;
         if (this.reconnectTimeout) {
@@ -852,6 +920,10 @@ export class RebaseWebSocketClient {
         }
 
         if (!this.isConnected || !this.ws) {
+            // The queue is only ever drained by a socket opening, so something
+            // has to open one. Before lazy connect this was guaranteed by the
+            // constructor; now the first frame is what asks for it.
+            this.ensureConnected();
             // Queue the message and return a promise that will be resolved when actually sent
             return new Promise<unknown>((resolve, reject) => {
                 const queueable = message as Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void };
@@ -867,8 +939,19 @@ export class RebaseWebSocketClient {
     }
 
     private async doSendMessage(message: Record<string, unknown>, resolve: (value: unknown) => void, reject: (error: Error) => void): Promise<void> {
-        // Ensure authenticated before sending non-auth messages
-        if (message.type !== "AUTHENTICATE" && this.getAuthToken && !this.isAuthenticated) {
+        // Ensure authenticated before sending non-auth messages.
+        //
+        // Channel traffic is exempt. `ensureAuthenticated` throws "user not
+        // logged in" when there is no token, which rejects the frame before it
+        // is ever sent — so on an anonymous-first app (the kind this API was
+        // added for) *every* channel operation failed client-side, and the
+        // server never got to decide. Presence in a public room does not
+        // require an account. A signed-in caller still authenticates: the
+        // socket does it from `getAuthToken` on open, and the server authorizes
+        // these frames either way.
+        if (message.type !== "AUTHENTICATE"
+            && !CHANNEL_MESSAGE_TYPES.has(message.type as string)
+            && this.getAuthToken && !this.isAuthenticated) {
             try {
                 await this.ensureAuthenticated();
             } catch (error: unknown) {
@@ -881,17 +964,12 @@ export class RebaseWebSocketClient {
         const requestId = (message.requestId as string) || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         message.requestId = requestId;
 
-        const expectsResponse = ![
-            "subscribe_collection",
-            "subscribe_one",
-            "unsubscribe",
-            "join_channel",
-            "leave_channel",
-            "broadcast",
-            "presence_track",
-            "presence_untrack",
-            "presence_state"
-        ].includes(message.type as string);
+        const expectsResponse = !(
+            message.type === "subscribe_collection"
+            || message.type === "subscribe_one"
+            || message.type === "unsubscribe"
+            || CHANNEL_MESSAGE_TYPES.has(message.type as string)
+        );
 
         if (expectsResponse && !this.pendingRequests.has(requestId)) {
             const timeoutHandle = setTimeout(() => {
@@ -1215,6 +1293,11 @@ incoming: normIncoming[key] };
         onUpdate: (rows: Record<string, unknown>[]) => void,
         onError?: (error: Error) => void
     ): () => void {
+        // A subscription is the app asking for live data, so this is where the
+        // socket is wanted. Called before the dedup check below: joining an
+        // existing subscription must still work if the socket has since gone.
+        this.ensureConnected();
+
         const subscriptionKey = this.createCollectionSubscriptionKey(props);
         const callbackId = `callback_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -1315,6 +1398,8 @@ onError });
         onUpdate: (row: Record<string, unknown> | null) => void,
         onError?: (error: Error) => void
     ): () => void {
+        this.ensureConnected();
+
         const subscriptionKey = this.createSingleSubscriptionKey(props);
         const callbackId = `callback_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
