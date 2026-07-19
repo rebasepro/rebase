@@ -57,7 +57,7 @@ function isoOf(dep: DeploymentRow, camel: keyof DeploymentRow, snake: keyof Depl
     return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
 }
 
-export function deploymentImage(dep: DeploymentRow): string | null {
+function deploymentImage(dep: DeploymentRow): string | null {
     return str(dep, "imageUrl", "image_url");
 }
 

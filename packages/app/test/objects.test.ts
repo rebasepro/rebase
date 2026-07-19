@@ -1,4 +1,4 @@
-import { mergeDeep } from "../src/util/objects";
+import { mergeDeep } from "@rebasepro/utils";
 
 describe("mergeDeep", () => {
 

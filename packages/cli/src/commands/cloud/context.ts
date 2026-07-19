@@ -28,7 +28,7 @@ import { findProjectRoot } from "../../utils/project";
    ═══════════════════════════════════════════════════════════════ */
 
 /** Default hosted control plane (the Rebase Cloud console origin). */
-export const DEFAULT_CLOUD_URL = "https://app.rebase.pro";
+const DEFAULT_CLOUD_URL = "https://app.rebase.pro";
 
 /** The storage key the SDK's auth module reads/writes the session under. */
 const SDK_SESSION_KEY = "rebase_auth";
@@ -92,7 +92,7 @@ function writeCredentials(data: CredentialsFile): void {
 }
 
 /** Host that a bare `rebase cloud` command should target, if any. */
-export function currentContextUrl(): string | undefined {
+function currentContextUrl(): string | undefined {
     return readCredentials().current;
 }
 
@@ -477,7 +477,7 @@ function stripAnsi(s: string): string {
 }
 
 /** Write one JSON value to stdout, followed by a newline. */
-export function printJson(value: unknown): void {
+function printJson(value: unknown): void {
     process.stdout.write(JSON.stringify(value) + "\n");
 }
 

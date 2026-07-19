@@ -46,7 +46,3 @@ export async function powerCommand(action: PowerAction, rawArgs: string[]): Prom
         reportError(e, `Failed to ${action} project`);
     }
 }
-
-export function isPowerAction(v: string | undefined): v is PowerAction {
-    return v === "start" || v === "stop" || v === "restart";
-}
