@@ -45,12 +45,14 @@
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
+    "@types/ws": "^8.18.1",
     "cross-env": "^10.1.0",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",
     "tsd": "^0.33.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "ws": "^8.21.0"
   },
   "files": [
     "dist",

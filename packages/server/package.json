@@ -58,7 +58,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "hono": "^4.12.25",
+    "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.9.3",
@@ -68,6 +68,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.2",
     "cross-env": "^10.1.0",
+    "hono": "^4.12.25",
     "jest": "^30.4.2",
     "ts-jest": "29.4.11",
     "typescript": "^6.0.3",

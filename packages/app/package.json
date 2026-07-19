@@ -76,6 +76,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
@@ -125,10 +126,7 @@
     "testEnvironment": "jsdom",
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/src/components/",
-      "objects.test.ts",
-      "navigation.test.ts",
-      "resolutions.test.ts"
+      "/src/components/"
     ],
     "setupFilesAfterEnv": [
       "<rootDir>/test/setupTests.ts"

@@ -89,6 +89,7 @@
   },
   "devDependencies": {
     "@hono/node-server": "^2.0.9",
+    "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
