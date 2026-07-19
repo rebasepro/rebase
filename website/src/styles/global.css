@@ -61,14 +61,13 @@
 
 /* Rubik — variable font (single file covers all weights 300-900) */
 
-/* clip (not hidden) so the root never becomes a horizontal scroll container
-   and position:sticky descendants keep working */
-html {
-    overflow-x: clip;
-}
-
+/* clip (not hidden) on BOTH elements: `hidden` makes the element a scroll
+   container, and once html stops propagating body's overflow to the viewport,
+   a hidden body captures position:sticky descendants (they stick to body,
+   which never scrolls). `clip` clips without creating a scroll container. */
+html,
 body {
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 h1 {
