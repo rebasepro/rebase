@@ -408,7 +408,7 @@ When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) wit
 | `DB_POOL_CONNECT_TIMEOUT` | `string` → `number` | `"10000"` | No | Pool connect timeout (ms) |
 | `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | No | File storage backend type |
 | `STORAGE_PATH` | `string` | — | No | Local storage directory path |
-| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | — | No | Force local storage even in production |
+| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | — | No | Allow local storage in production — **the backend refuses to boot without it**, since the container filesystem loses uploads on restart |
 | `S3_BUCKET` | `string` | — | When S3 | S3 bucket name |
 | `S3_REGION` | `string` | — | When S3 | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | — | When S3 | S3 access key |

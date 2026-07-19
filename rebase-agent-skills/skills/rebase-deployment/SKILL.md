@@ -399,11 +399,16 @@ All variables recognized by the base `rebaseEnvSchema`:
 | `DATABASE_READ_URL` | `string` (URL) | No | — | Read replica database URL |
 | `STORAGE_TYPE` | `enum` | No | `"local"` | `"local"`, `"s3"`, or `"gcs"` |
 | `STORAGE_PATH` | `string` | No | — | Local file storage directory |
-| `FORCE_LOCAL_STORAGE` | `optionalBoolString` | No | `undefined` → `false` | Suppress local-storage-in-production warning |
+| `FORCE_LOCAL_STORAGE` | `optionalBoolString` | No | `undefined` → `false` | Allow `STORAGE_TYPE=local` in production — **the backend refuses to boot without it** |
 | `S3_BUCKET` | `string` | If S3 | — | S3 bucket name |
 | `S3_REGION` | `string` | No | — | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | If S3 | — | S3 access key |
 | `S3_SECRET_ACCESS_KEY` | `string` | If S3 | — | S3 secret key |
+| `GCS_BUCKET` | `string` | If GCS | — | GCS bucket name |
+| `GCS_PROJECT_ID` | `string` | No | — | GCP project (auto-detected from credentials) |
+| `GCS_KEY_FILENAME` | `string` | No | — | Service-account key file; omit on GKE (Workload Identity/ADC) |
+
+> **Deploying with `STORAGE_TYPE=local` fails to boot in production.** Local storage is the container filesystem, so uploads are destroyed on the next restart — silently, with no error at write or read time. Set `STORAGE_TYPE=s3`/`gcs`, or `FORCE_LOCAL_STORAGE=true` if a durable volume really is mounted at `STORAGE_PATH`. A crashed rollout is recoverable; lost user files are not.
 | `S3_ENDPOINT` | `string` (URL) | No | — | Custom S3 endpoint (MinIO, R2) |
 | `S3_FORCE_PATH_STYLE` | `optionalBoolString` | No | `undefined` → `false` | Use path-style S3 URLs (required for MinIO) |
 | `GCS_BUCKET` | `string` | If GCS | — | Google Cloud Storage bucket name |

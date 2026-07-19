@@ -88,7 +88,18 @@ rebase db push
 **What it does:**
 - Reads the generated Drizzle schema
 - Applies changes directly to the database (CREATE, ALTER, DROP)
+- Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
+
+:::note[Editing a security rule renames its policy]
+A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
+
+That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, so a superseded `USING (auth.uid() IS NOT NULL)` kept granting everything no matter how tight its replacement was. Tightening a rule had no effect, and push reported success.
+
+`db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
+
+To audit a database that was pushed before this landed, run `rebase doctor --policies`. It exits non-zero on drift, so it works as a CI gate.
+:::
 
 :::caution
 `db push` modifies the database directly. Use it only in development. For production, use `db generate` + `db migrate` to create reviewable migration files.

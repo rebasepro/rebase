@@ -170,25 +170,29 @@ No se necesita gestión manual de tokens — la integración entre `client.auth`
 Los canales de difusión le permiten enviar mensajes arbitrarios entre clientes conectados — ideal para chat, notificaciones o funciones colaborativas:
 
 ```typescript
-// Join a channel
+// Obtain a channel. This alone opens no connection.
 const channel = client.realtime.channel("chat-room");
 
-// Listen for messages
-channel.on("message", (payload) => {
+// Listen for broadcasts. Pass an event name to filter, or omit it for all.
+channel.onBroadcast("message", (payload) => {
     console.log("New message:", payload);
 });
 
-// Send a message to all subscribers
-channel.send("message", {
+// Send to every other member — the sender never receives its own message.
+await channel.broadcast("message", {
     text: "Hello, world!",
     userId: currentUser.id
 });
 
-// Leave the channel
-channel.unsubscribe();
+// Leave, releasing handlers and timers.
+await channel.leave();
 ```
 
-Los canales son ligeros y efímeros — existen mientras al menos un cliente esté suscrito.
+Los canales son ligeros y efímeros — existen mientras al menos un cliente esté suscrito. Las llamadas repetidas a `channel()` con el mismo nombre devuelven el **mismo** objeto, por lo que dos componentes pueden adjuntar manejadores de forma independiente sin que uno corte al otro al salir.
+
+Las tramas de canal y presencia no requieren una cuenta: los visitantes anónimos pueden unirse a canales públicos, y el servidor sigue autorizando cada trama.
+
+> **Las difusiones no se reproducen.** Solo llegan a los miembros conectados en ese momento; no hay historial. Un cliente que se reconecta no tiene forma de saber que se perdió una. Esto es aceptable para notificaciones que se autocorrigen, pero significa que los canales no son un transporte para un flujo de operaciones donde un hueco silencioso causaría divergencia.
 
 ## Seguimiento de Presencia
 
@@ -197,31 +201,29 @@ La presencia le permite rastrear qué usuarios están en línea y sincronizar el
 ```typescript
 const channel = client.realtime.channel("editors");
 
-// Track your presence
-channel.presence.track({
+// Publish your presence. This is also what opens the connection.
+await channel.track({
     userId: currentUser.id,
     status: "editing",
     cursor: { x: 100, y: 200 }
 });
 
-// Listen for presence changes
-channel.presence.on("sync", (state) => {
-    console.log("Online users:", Object.keys(state));
+// One handler for every change. `presences` is always the full roster;
+// `diff` is what changed, when you only care about the delta.
+channel.onPresence((presences, diff) => {
+    console.log("Online users:", Object.keys(presences));
+    if (diff) {
+        console.log("joined:", Object.keys(diff.joins));
+        console.log("left:", Object.keys(diff.leaves));
+    }
 });
 
-channel.presence.on("join", (key, newPresence) => {
-    console.log(`${key} came online:`, newPresence);
-});
+// Calling track() again replaces your state — this is how you publish a
+// moving cursor.
+await channel.track({ userId: currentUser.id, status: "idle" });
 
-channel.presence.on("leave", (key) => {
-    console.log(`${key} went offline`);
-});
-
-// Update your state
-channel.presence.track({
-    userId: currentUser.id,
-    status: "idle"
-});
+// Stop publishing without leaving the channel.
+await channel.untrack();
 ```
 
 La presencia se construye sobre los canales de difusión con diferenciación automática del estado — solo se transmiten los cambios.
@@ -231,8 +233,8 @@ La presencia se construye sobre los canales de difusión con diferenciación aut
 | Caso de Uso | Método |
 |----------|--------|
 | Panel con datos en vivo | `listen()` con filtros |
-| Chat o mensajería | `channel.send()` vía difusión |
-| Indicadores de escritura / estado en línea | `channel.presence.track()` |
+| Chat o mensajería | `channel.broadcast()` |
+| Indicadores de escritura / estado en línea | `channel.track()` + `channel.onPresence()` |
 | Página de detalle con actualizaciones en vivo | `listenById()` |
 | Monitorización del panel de administración | `listen()` con `orderBy` y `limit` |
 

@@ -170,22 +170,22 @@ Non è necessaria alcuna gestione manuale dei token — l'integrazione tra `clie
 I canali di broadcast ti permettono di inviare messaggi arbitrari tra client connessi — ideali per chat, notifiche o funzionalità collaborative:
 
 ```typescript
-// Join a channel
+// Obtain a channel. This alone opens no connection.
 const channel = client.realtime.channel("chat-room");
 
-// Listen for messages
-channel.on("message", (payload) => {
+// Listen for broadcasts. Pass an event name to filter, or omit it for all.
+channel.onBroadcast("message", (payload) => {
     console.log("New message:", payload);
 });
 
-// Send a message to all subscribers
-channel.send("message", {
+// Send to every other member — the sender never receives its own message.
+await channel.broadcast("message", {
     text: "Hello, world!",
     userId: currentUser.id
 });
 
-// Leave the channel
-channel.unsubscribe();
+// Leave, releasing handlers and timers.
+await channel.leave();
 ```
 
 I canali sono leggeri ed effimeri — esistono finché almeno un client è sottoscritto.
@@ -197,31 +197,29 @@ La presenza ti permette di tracciare quali utenti sono online e di sincronizzare
 ```typescript
 const channel = client.realtime.channel("editors");
 
-// Track your presence
-channel.presence.track({
+// Publish your presence. This is also what opens the connection.
+await channel.track({
     userId: currentUser.id,
     status: "editing",
     cursor: { x: 100, y: 200 }
 });
 
-// Listen for presence changes
-channel.presence.on("sync", (state) => {
-    console.log("Online users:", Object.keys(state));
+// One handler for every change. `presences` is always the full roster;
+// `diff` is what changed, when you only care about the delta.
+channel.onPresence((presences, diff) => {
+    console.log("Online users:", Object.keys(presences));
+    if (diff) {
+        console.log("joined:", Object.keys(diff.joins));
+        console.log("left:", Object.keys(diff.leaves));
+    }
 });
 
-channel.presence.on("join", (key, newPresence) => {
-    console.log(`${key} came online:`, newPresence);
-});
+// Calling track() again replaces your state — this is how you publish a
+// moving cursor.
+await channel.track({ userId: currentUser.id, status: "idle" });
 
-channel.presence.on("leave", (key) => {
-    console.log(`${key} went offline`);
-});
-
-// Update your state
-channel.presence.track({
-    userId: currentUser.id,
-    status: "idle"
-});
+// Stop publishing without leaving the channel.
+await channel.untrack();
 ```
 
 La presenza è costruita sui canali di broadcast con un diff automatico dello stato — vengono trasmessi solo i cambiamenti.
@@ -231,8 +229,8 @@ La presenza è costruita sui canali di broadcast con un diff automatico dello st
 | Caso d'uso | Metodo |
 |----------|--------|
 | Dashboard con dati in diretta | `listen()` con filtri |
-| Chat o messaggistica | `channel.send()` tramite broadcast |
-| Indicatori di digitazione / stato online | `channel.presence.track()` |
+| Chat o messaggistica | `channel.broadcast()` |
+| Indicatori di digitazione / stato online | `channel.track()` + `channel.onPresence()` |
 | Pagina di dettaglio con aggiornamenti in diretta | `listenById()` |
 | Monitoraggio del pannello di amministrazione | `listen()` con `orderBy` e `limit` |
 

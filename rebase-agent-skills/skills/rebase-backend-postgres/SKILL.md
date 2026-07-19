@@ -437,9 +437,9 @@ In non-production mode, `loadEnv()` **auto-generates** ephemeral `JWT_SECRET` an
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | No | `false` | Allow localhost URLs in production env vars |
 | `CORS_ORIGINS` | No (⚠ required in prod) | — | Comma-separated allowed origins |
 | `FRONTEND_URL` | No | — | Frontend URL (used for CORS) |
-| `STORAGE_TYPE` | No | `local` | `local` or `s3` |
+| `STORAGE_TYPE` | No | `local` | `local`, `s3`, or `gcs` |
 | `STORAGE_PATH` | No | — | Path for local file storage |
-| `FORCE_LOCAL_STORAGE` | No | `false` | Suppress local storage warning in production |
+| `FORCE_LOCAL_STORAGE` | No | `false` | Allow local storage in production — **the backend refuses to boot without it** |
 | `S3_BUCKET` | No (if s3) | — | S3 bucket name |
 | `S3_REGION` | No | — | S3 region |
 | `S3_ACCESS_KEY_ID` | No (if s3) | — | S3 access key |

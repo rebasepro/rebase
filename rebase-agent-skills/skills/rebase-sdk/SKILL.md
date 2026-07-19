@@ -409,6 +409,40 @@ rebase.ws?.disconnect();
 - Instant entity patches across subscriptions
 - Auto-authentication and re-authentication on token refresh
 
+### The socket connects lazily
+
+Creating a client opens **no** WebSocket. It is dialled on the first operation that needs one — a `.listen(...)` or any channel operation. Creating a client, obtaining a channel, and reading data over HTTP all stay socket-free.
+
+This matters for apps with signed-out traffic (marketing pages, docs, public views, anonymous-first tools): they no longer pay a connection per page load just to have realtime available. `realtime: false` remains a hard opt-out — no socket ever, and `client.realtime.channel()` throws.
+
+Signing in does not by itself open a socket; a socket opened later authenticates itself, and one already open is re-authenticated on `SIGNED_IN` / `TOKEN_REFRESHED`. `client.close()` is final — nothing queued afterwards redials.
+
+### Broadcast channels & presence
+
+For client-to-client messaging and online status, use `client.realtime.channel(name)` rather than reaching for `client.ws`:
+
+```typescript
+const channel = rebase.realtime.channel("document-42");
+
+// Publish your own presence — call again to update it (e.g. a moving cursor).
+await channel.track({ name: "Alice", cursor: { line: 10, col: 5 } });
+
+// The full roster, plus the diff that caused the change.
+channel.onPresence((presences, diff) => {
+    console.log(Object.keys(presences).length, "people here");
+});
+
+// Broadcasts — the sender never receives its own message.
+await channel.broadcast("typing", { userId: "u1" });
+channel.onBroadcast("typing", (payload) => { /* ... */ });
+
+await channel.leave(); // releases handlers and the presence heartbeat
+```
+
+Channels are per-name singletons, so two components asking for `"document-42"` share one object and neither can cut the other off by leaving.
+
+The SDK handles two protocol details that are easy to get wrong by hand: **the roster is not pushed on join** (a joining client's `presence_diff` contains only itself, so the full state must be requested), and **presence expires after 30 seconds** unless re-sent — the SDK heartbeats at 20s. Channel and presence frames do not require an account, so anonymous visitors can join public channels; the server still authorizes them. See the **rebase-realtime** skill for the raw protocol.
+
 ## File Storage
 
 ```typescript

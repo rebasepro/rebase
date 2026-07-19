@@ -159,36 +159,57 @@ useEffect(() => {
 
 The WebSocket client handles authentication automatically:
 
-- On **sign-in** or **token refresh**, the new token is sent to the WebSocket server via an `authenticate` message.
-- On **sign-out**, the WebSocket connection is disconnected.
+- On **sign-in** or **token refresh**, the new token is sent to an already-open socket via an `authenticate` message. If none is open, nothing happens — signing in is not a request for realtime, and a socket opened later authenticates itself.
+- On **sign-out**, the WebSocket connection is disconnected. The client stays usable; a later subscription reconnects anonymously.
 - If the connection drops, the client **reconnects automatically** and re-establishes all active subscriptions.
 
 No manual token management is needed — the integration between `client.auth` and the WebSocket layer is handled internally.
+
+### The connection is lazy
+
+Creating a client opens **no** WebSocket. It is dialled on the first operation that actually needs one — a `listen()` / `listenById()` subscription, or a channel operation such as `join()`, `track()` or `broadcast()`. Obtaining a channel is not using it.
+
+```typescript
+const client = createRebaseClient({ baseUrl });   // no socket
+const channel = client.realtime.channel("doc:1"); // still no socket
+await channel.join();                             // socket opens here
+```
+
+This matters for apps with meaningful signed-out traffic — marketing pages, public read-only views, anonymous-first tools — which previously paid a connection on every page load simply to have realtime available.
+
+Two related behaviours:
+
+- `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws.
+- `client.close()` is final. It releases the socket and its reconnect timer, and nothing queued afterwards will redial. In Node, an open socket keeps the event loop alive, so a script that never calls it will not exit on its own.
 
 ## Broadcast Channels
 
 Broadcast channels let you send arbitrary messages between connected clients — ideal for chat, notifications, or collaborative features:
 
 ```typescript
-// Join a channel
+// Obtain a channel. This alone opens no connection.
 const channel = client.realtime.channel("chat-room");
 
-// Listen for messages
-channel.on("message", (payload) => {
+// Listen for broadcasts. Pass an event name to filter, or omit it for all.
+channel.onBroadcast("message", (payload) => {
     console.log("New message:", payload);
 });
 
-// Send a message to all subscribers
-channel.send("message", {
+// Send to every other member — the sender never receives its own message.
+await channel.broadcast("message", {
     text: "Hello, world!",
     userId: currentUser.id
 });
 
-// Leave the channel
-channel.unsubscribe();
+// Leave, releasing handlers and timers.
+await channel.leave();
 ```
 
-Channels are lightweight and ephemeral — they exist as long as at least one client is subscribed.
+Channels are lightweight and ephemeral — they exist as long as at least one client is subscribed. Repeated `channel()` calls with the same name return the **same** object, so two components can attach handlers independently without either cutting the other off by leaving.
+
+Channel and presence frames do not require an account: anonymous visitors can join public channels, and the server still authorizes every frame.
+
+> **Broadcasts are not replayed.** They reach currently-connected members only; there is no history. A client that reconnects has no way to know it missed one. That is fine for notifications that self-correct (a "someone saved" nudge is superseded by the next save), but it means channels are not a transport for an operation stream where a silent gap would cause divergence.
 
 ## Presence Tracking
 
@@ -197,42 +218,47 @@ Presence lets you track which users are online and sync shared state across all 
 ```typescript
 const channel = client.realtime.channel("editors");
 
-// Track your presence
-channel.presence.track({
+// Publish your presence. This is also what opens the connection.
+await channel.track({
     userId: currentUser.id,
     status: "editing",
     cursor: { x: 100, y: 200 }
 });
 
-// Listen for presence changes
-channel.presence.on("sync", (state) => {
-    console.log("Online users:", Object.keys(state));
+// One handler for every change. `presences` is always the full roster;
+// `diff` is what changed, when you only care about the delta.
+channel.onPresence((presences, diff) => {
+    console.log("Online users:", Object.keys(presences));
+    if (diff) {
+        console.log("joined:", Object.keys(diff.joins));
+        console.log("left:", Object.keys(diff.leaves));
+    }
 });
 
-channel.presence.on("join", (key, newPresence) => {
-    console.log(`${key} came online:`, newPresence);
-});
+// Calling track() again replaces your state — this is how you publish a
+// moving cursor.
+await channel.track({ userId: currentUser.id, status: "idle" });
 
-channel.presence.on("leave", (key) => {
-    console.log(`${key} went offline`);
-});
-
-// Update your state
-channel.presence.track({
-    userId: currentUser.id,
-    status: "idle"
-});
+// Stop publishing without leaving the channel.
+await channel.untrack();
 ```
 
-Presence is built on top of broadcast channels with automatic state diffing — only changes are transmitted.
+The SDK keeps the roster for you, so `presences` is always complete and you never reassemble it from diffs.
+
+It also handles two protocol details that are easy to get wrong when working against the raw WebSocket:
+
+- **The roster is not pushed on join.** A joining client's first `presence_diff` contains only itself; the existing roster must be requested explicitly. `join()` does that for you.
+- **Presence expires after 30 seconds.** `track()` is not a durable registration — without a periodic re-send you silently disappear from everyone else's roster while still connected and still on the page. The SDK heartbeats at 20s, and stops on `untrack()` / `leave()`.
+
+A reconnect also drops server-side channel membership and presence; the SDK re-joins, re-requests the roster and re-tracks automatically.
 
 ## When to Use Realtime
 
 | Use Case | Method |
 |----------|--------|
 | Dashboard with live data | `listen()` with filters |
-| Chat or messaging | `channel.send()` via broadcast |
-| Typing indicators / online status | `channel.presence.track()` |
+| Chat or messaging | `channel.broadcast()` |
+| Typing indicators / online status | `channel.track()` + `channel.onPresence()` |
 | Detail page with live updates | `listenById()` |
 | Admin panel monitoring | `listen()` with `orderBy` and `limit` |
 
