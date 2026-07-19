@@ -8,6 +8,11 @@ import { BodyPartsDemo } from "../../components/demos/BodyPartsDemo";
 import { ApiMiniDemo } from "../../components/demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../../components/demos/SdkMiniDemo";
 import { RealtimeMiniDemo } from "../../components/demos/RealtimeMiniDemo";
+import AiAppDevelopmentDemo from "../../components/demos/AiAppDevelopmentDemo";
+import RebaseMosaicDemo from "../../components/demos/RebaseMosaicDemo";
+import ScrollSyncShowcase from "../../components/ScrollSyncShowcase.astro";
+import CollectionPowerSection from "../../components/CollectionPowerSection.astro";
+import RoadmapSection from "../../components/RoadmapSection.astro";
 import { NeatBackground } from '../../components/NeatBackground';
 
 
@@ -115,6 +120,151 @@ const translatePath = useTranslatedPath(lang);
         </div>
     </section>
 
+    <!-- Product demo -->
+ <section id="s-demo-terminal" class="relative z-0 pt-32 pb-40 sm:pt-48 sm:pb-56">
+
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("demo.badge")}</p>
+                <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                    {t("demo.title")}
+                </h2>
+                <div class="mt-8 max-w-2xl mx-auto">
+                    <div class="rounded-2xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] text-left relative overflow-hidden group hover:border-primary/40 transition-colors duration-300">
+                        <!-- Glow effect behind terminal -->
+                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500"
+                             aria-hidden="true"
+                             style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 0;"></div>
+
+                        <div class="relative z-10 flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            </div>
+                            <div class="text-[11px] font-mono font-medium text-surface-400 flex items-center gap-2">
+
+                                <svg
+                                        class="lucide lucide-terminal"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M12 19h8"/>
+                                    <path d="m4 17 6-6-6-6"/>
+                                </svg>
+
+                                bash
+                            </div>
+                            <div class="w-12"></div> <!-- spacer -->
+                        </div>
+
+                        <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+                                    </div>
+                                    <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init"
+                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.init")}</div>
+                            </div>
+
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm rebase db push</span>
+                                    </div>
+                                    <button data-track-copy="demo-db-push" data-command="pnpm rebase db push"
+                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-surface-400 text-xs mt-1 ml-6">{t("demo.pull")}</div>
+                            </div>
+
+                            <div>
+                                <div class="flex gap-3 items-center justify-between">
+                                    <div class="flex gap-3 items-center">
+                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-white">pnpm dev</span>
+                                    </div>
+                                    <button data-track-copy="demo-dev" data-command="pnpm dev"
+                                            class="copy-btn text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+
+                                        <svg
+                                                class="lucide lucide-copy"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                        >
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+
+                                    </button>
+                                </div>
+                                <div class="text-emerald-400/90 text-xs mt-1 ml-6">{t("demo.dev")}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
 
 
     <!-- Neat gradient divider -->
@@ -152,11 +302,15 @@ const translatePath = useTranslatedPath(lang);
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-6xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
                 <!-- TypeScript SDK -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
-                    <div class="relative flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
@@ -166,16 +320,146 @@ const translatePath = useTranslatedPath(lang);
                             <SdkMiniDemo client:load/>
                         </div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="text-base font-semibold text-white mb-1">{t("features.sdk.title")}</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.sdk.desc")}</p>
+                    <div class="relative z-10 p-5 flex flex-col justify-between h-full min-h-[160px]">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+                                    <svg class="lucide lucide-code" xmlns="http://www.w3.org/2000/svg" width="20"
+                                         height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="m16 18 6-6-6-6"/>
+                                        <path d="m8 6-6 6 6 6"/>
+                                    </svg>
+                                </div>
+                                <h3 class="text-base font-semibold text-white">{t("features.sdk.title")}</h3>
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                        {t("features.sdk.badge")}
+                                    </span>
+                            </div>
+                            <p class="text-surface-400 text-sm leading-relaxed">{t("features.sdk.desc")}</p>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Data history & audit -->
+                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden">
+                            <img
+                                    src="/img/history.webp"
+                                    alt="Data history and audit view"
+                                    width="800"
+                                    height="600"
+                                    loading="lazy"
+                                    class="w-full h-full object-cover object-top"/>
+                        </div>
+                    </div>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+
+                                <svg
+                                        class="lucide lucide-history"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                    <path d="M12 7v5l4 2"/>
+                                </svg>
+
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.history.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.history.badge")}
+                                </span>
+                        </div>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.history.desc")}</p>
+                    </div>
+                </div>
+
+                <!-- Import & export -->
+                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden">
+                            <video
+                                    class="w-full h-full object-cover object-top"
+                                    style="pointer-events: none;"
+                                    width="800"
+                                    height="600"
+                                    loop
+                                    autoplay
+                                    muted
+                                    playsinline>
+                                <source src="/img/import.webm" type="video/webm"/>
+                            </video>
+                        </div>
+                    </div>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+
+                                <svg
+                                        class="lucide lucide-upload"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M12 3v12"/>
+                                    <path d="m17 8-5-5-5 5"/>
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                </svg>
+
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.import.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.import.badge")}
+                                </span>
+                        </div>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.import.desc")}</p>
                     </div>
                 </div>
 
                 <!-- Instant REST API -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
-                    <div class="relative flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
@@ -185,16 +469,87 @@ const translatePath = useTranslatedPath(lang);
                             <ApiMiniDemo client:load/>
                         </div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="text-base font-semibold text-white mb-1">{t("features.api.title")}</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.api.desc")}</p>
+                    <div class="relative z-10 p-5 flex flex-col justify-between h-full min-h-[160px]">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+
+                                    <svg
+                                            class="lucide lucide-webhook"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="20"
+                                            height="20"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                    >
+                                        <path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/>
+                                        <path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/>
+                                        <path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>
+                                    </svg>
+
+                                </div>
+                                <h3 class="text-base font-semibold text-white">{t("features.api.title")}</h3>
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                        {t("features.api.badge")}
+                                    </span>
+                            </div>
+                            <p class="text-surface-400 text-sm leading-relaxed">{t("features.api.desc")}</p>
+                        </div>
+
                     </div>
                 </div>
 
-                <!-- Realtime engine -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
-                    <div class="relative flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                <!-- Extreme Customization -->
+                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden" inert aria-hidden="true">
+                            <BodyPartsDemo client:load/>
+                        </div>
+                    </div>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+                                <svg class="lucide lucide-palette" xmlns="http://www.w3.org/2000/svg" width="20"
+                                     height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="13.5" cy="6.5" r=".5"/>
+                                    <circle cx="17.5" cy="10.5" r=".5"/>
+                                    <circle cx="8.5" cy="7.5" r=".5"/>
+                                    <circle cx="6.5" cy="12.5" r=".5"/>
+                                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.customization.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.customization.badge")}
+                                </span>
+                        </div>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.customization.desc")}</p>
+
+                    </div>
+                </div>
+
+                <!-- Real-time everywhere -->
+                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-300">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
@@ -204,9 +559,36 @@ const translatePath = useTranslatedPath(lang);
                             <RealtimeMiniDemo client:load/>
                         </div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="text-base font-semibold text-white mb-1">{t("features.realtime.title")}</h3>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+
+                                <svg
+                                        class="lucide lucide-refresh-cw"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                    <path d="M21 3v5h-5"/>
+                                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                    <path d="M8 16H3v5"/>
+                                </svg>
+
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.realtime.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.realtime.badge")}
+                                </span>
+                        </div>
                         <p class="text-surface-400 text-sm leading-relaxed">{t("features.realtime.desc")}</p>
+
                     </div>
                 </div>
             </div>
@@ -225,6 +607,16 @@ const translatePath = useTranslatedPath(lang);
             </div>
         </div>
     </section>
+
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="b" client:visible/>
+    </div>
+
+    <div id="s-collection-power" class="relative z-0">
+        <!-- One Collection. Everything. -->
+        <CollectionPowerSection/>
+    </div>
 
     <!-- Adoption modes: BaaS / CMS / Full -->
  <section id="s-modes" class="relative z-0 py-28 sm:py-36 overflow-hidden">
@@ -487,9 +879,15 @@ const translatePath = useTranslatedPath(lang);
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100">
+            <!-- Interactive: the decoupled AI engine, live -->
+            <div class="max-w-6xl mx-auto mb-12 animate-on-scroll fade-in-up" style="min-height: 600px;">
+                <AiAppDevelopmentDemo client:visible/>
+            </div>
 
-                <!-- Fail-closed by construction -->
+            <!-- Agent Infrastructure Feature Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100">
+
+                <!-- Vector Similarity Search -->
                 <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
@@ -500,25 +898,32 @@ const translatePath = useTranslatedPath(lang);
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                      stroke-linejoin="round" class="text-primary">
-                                    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
-                                    <path d="m9 12 2 2 4-4"/>
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <path d="m21 21-4.3-4.3"/>
+                                    <path d="M11 8v6"/>
+                                    <path d="M8 11h6"/>
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Fail-closed by construction</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">
-                            Authorization in Rebase is Postgres row-level security, enforced by the database itself —
-                            not by hoping the agent wrote good middleware. A table without RLS is never served.
-                            There is no auth check to forget, so there is nothing your agent can forget to write.
-                        </p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Enforced by Postgres</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Unprotected tables refused</span>
+                        <h3 class="text-lg font-semibold text-white mb-2">Vector Similarity Search</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Native pgvector integration with
+                            cosine, L2, and inner product distance. Query embeddings via REST API — no external vector
+                            DB needed.</p>
+                        <div class="rounded-lg bg-surface-950/80 p-3 ring-1 ring-surface-800/50">
+                            <code class="text-xs font-mono text-surface-300">
+                                <span class="text-surface-400">GET</span> <span
+                                    class="text-emerald-400">/api/docs</span><br/>
+                                <span class="text-surface-400">&nbsp;&nbsp;?vector_search=</span><span
+                                    class="text-amber-400">embedding</span><br/>
+                                <span class="text-surface-400">&nbsp;&nbsp;&vector=</span><span class="text-primary">[0.1,0.2,...]</span><br/>
+                                <span class="text-surface-400">&nbsp;&nbsp;&vector_distance=</span><span
+                                    class="text-cyan-400">cosine</span>
+                            </code>
                         </div>
                     </div>
                 </div>
 
-                <!-- Agent-native, not agent-washed -->
+                <!-- Service API Keys -->
                 <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
@@ -529,29 +934,24 @@ const translatePath = useTranslatedPath(lang);
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                      stroke-linejoin="round" class="text-primary">
-                                    <path d="M12 8V4H8"/>
-                                    <rect width="16" height="12" x="4" y="8" rx="2"/>
-                                    <path d="M2 14h2"/>
-                                    <path d="M20 14h2"/>
-                                    <path d="M15 13v2"/>
-                                    <path d="M9 13v2"/>
+                                    <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/>
+                                    <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Agent-native, not agent-washed</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">
-                            A built-in MCP server with real tools — data CRUD, users, migrations, cron, schema
-                            introspection — plus twenty packaged agent skills for Claude, Gemini, Kiro and anything
-                            else that speaks the protocol. Your agent doesn't scrape the docs; it operates the platform.
-                        </p>
+                        <h3 class="text-lg font-semibold text-white mb-2">Scoped Service API Keys</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Issue keys with granular
+                            per-collection, per-operation permissions. Built-in rate limiting, automatic expiry, and
+                            Studio management.</p>
                         <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">MCP server</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">20 agent skills</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">SHA-256 hashed</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Per-key rate limits</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Soft revocation</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Humans keep the back office -->
+                <!-- Custom Functions & Streaming -->
                 <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
@@ -562,20 +962,114 @@ const translatePath = useTranslatedPath(lang);
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                      stroke-linejoin="round" class="text-primary">
-                                    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
-                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="m5 8 6 6"/>
+                                    <path d="m4 14 6-6 2-3"/>
+                                    <path d="M2 5h12"/>
+                                    <path d="M7 2h1"/>
+                                    <path d="m22 22-5-10-5 10"/>
+                                    <path d="M14 18h6"/>
                                 </svg>
                             </div>
                         </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Humans keep the back office</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">
-                            Agents write data faster than anyone can read it. The admin panel is the piece they don't
-                            replace: a place for people to inspect, correct and approve what their agents are doing —
-                            generated from your schema, extensible in React.
-                        </p>
+                        <h3 class="text-lg font-semibold text-white mb-2">Custom Functions & Streaming</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Define server-side endpoints with full
+                            access to your typed data layer. Stream LLM responses, chain agent actions, or build
+                            webhooks — all in TypeScript.</p>
+                        <div class="rounded-lg bg-surface-950/80 p-3 ring-1 ring-surface-800/50">
+                            <code class="text-xs font-mono text-surface-300">
+                                <span class="text-blue-400">export default</span> <span
+                                    class="text-amber-400">async</span> (req, res) => {"{"}
+                                <br/>&nbsp;&nbsp;<span class="text-surface-400">// Full typed access to driver</span>
+                                <br/>&nbsp;&nbsp;<span class="text-blue-400">const</span> docs = <span
+                                    class="text-blue-400">await</span> <span class="text-amber-400">data</span>.docs.find();
+                                <br/>{"}"}
+                            </code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MCP Server -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                     stroke-linejoin="round" class="text-primary">
+                                    <rect x="2" y="6" width="20" height="12" rx="2"/>
+                                    <path d="M12 12h.01"/>
+                                    <path d="M17 12h.01"/>
+                                    <path d="M7 12h.01"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-white mb-2">MCP Server</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Expose your entire project to Cursor,
+                            Claude, and Windsurf via the Model Context Protocol. Agents can CRUD data, run migrations,
+                            and manage schemas.</p>
                         <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Schema-driven UI</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Human in the loop</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data tools</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Schema tools</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Admin tools</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Subscriptions -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                     stroke-linejoin="round" class="text-primary">
+                                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-white mb-2">Realtime Engine</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Full WebSocket engine with live data subscriptions, broadcast channels for messaging, and presence tracking for online status — agents and clients stay in sync instantly.</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">WebSocket</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data subscriptions</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Broadcast channels</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Presence tracking</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Auto-reconnect</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cron Jobs & Background Tasks -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                     stroke-linejoin="round" class="text-primary">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-semibold text-white mb-2">Cron Jobs & Background Tasks</h3>
+                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Schedule recurring agent tasks with
+                            cron expressions. Sync external APIs, process embedding batches, clean stale data, or
+                            trigger LLM pipelines on a timer.</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Cron expressions</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Typed handlers</span>
+                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Execution logs</span>
                         </div>
                     </div>
                 </div>
@@ -613,6 +1107,26 @@ const translatePath = useTranslatedPath(lang);
                         <path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Visual Mosaic Showcase -->
+ <section id="s-mosaic-showcase" 
+             class="relative z-0 py-28 sm:py-36 overflow-hidden">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("mosaic.badge")}</p>
+                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                    {t("mosaic.title")}
+                </h2>
+                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
+                    {t("mosaic.subtitle")}
+                </p>
+            </div>
+
+            <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;" inert aria-hidden="true">
+                <RebaseMosaicDemo client:visible/>
             </div>
         </div>
     </section>
@@ -1021,6 +1535,11 @@ const translatePath = useTranslatedPath(lang);
         </script>
     </section>
 
+    <div id="s-scroll-sync">
+        <!-- Scroll-sync feature showcase -->
+        <ScrollSyncShowcase/>
+    </div>
+
 
 
     <!-- FAQ -->
@@ -1068,6 +1587,11 @@ const translatePath = useTranslatedPath(lang);
             </div>
         </div>
     </section>
+
+    <div id="s-roadmap" class="relative z-0">
+        <!-- Roadmap -->
+        <RoadmapSection/>
+    </div>
 
 
 
