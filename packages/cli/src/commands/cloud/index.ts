@@ -144,7 +144,7 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             await webhooksCommand(action, rawArgs);
             break;
         case "storage":
-            await storageCommand(rawArgs);
+            await storageCommand(action, rawArgs);
             break;
         case "clusters":
             await clustersCommand(rawArgs);

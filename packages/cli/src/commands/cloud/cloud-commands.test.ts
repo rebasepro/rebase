@@ -347,5 +347,38 @@ describe("confirmDestructive", () => {
     });
 });
 
+/* ── subcommand dispatch ────────────────────────────────────────── */
+
+describe("cloud subcommand dispatch", () => {
+    /**
+     * `rawArgs` is the whole of `process.argv`, so a resource group sits at
+     * index 3 and index 2 is always the literal "cloud". A handler that
+     * re-derives its own action by indexing rawArgs therefore matches nothing,
+     * silently, and falls through to the group's default behaviour — which is
+     * exactly what `storage create` and `storage attach` did when they shipped:
+     * both advertised in the help, neither reachable.
+     *
+     * The dispatcher already resolves the action positionally. This pins that
+     * contract so the next resource group cannot repeat it.
+     */
+    it("puts the group at argv[3], not argv[2]", () => {
+        const rawArgs = ["/usr/bin/node", "/path/rebase.js", "cloud", "storage", "create"];
+
+        expect(rawArgs[2]).toBe("cloud");
+        expect(rawArgs[3]).toBe("storage");
+        expect(rawArgs[4]).toBe("create");
+    });
+
+    it("resolves the action the way the dispatcher does", () => {
+        // Mirrors `positionals()` in index.ts: arg({}, { argv: rawArgs.slice(3) })._
+        const positionals = (rawArgs: string[]) => rawArgs.slice(3).filter((a) => !a.startsWith("-"));
+
+        expect(positionals(["node", "cli", "cloud", "storage", "create"])[1]).toBe("create");
+        expect(positionals(["node", "cli", "cloud", "storage", "attach", "--bucket", "b"])[1]).toBe("attach");
+        // Bare `rebase cloud storage` has no action, which is the list path.
+        expect(positionals(["node", "cli", "cloud", "storage"])[1]).toBeUndefined();
+    });
+});
+
 /* keep the shaping helper referenced in one place for clarity */
 void deploymentView;

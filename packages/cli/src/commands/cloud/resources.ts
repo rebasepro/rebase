@@ -154,16 +154,20 @@ permissive: true }
 
 /* ─── storage ──────────────────────────────────────────────────── */
 
-export async function storageCommand(rawArgs: string[]): Promise<void> {
+export async function storageCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     // `rebase cloud storage` used to only ever list. A tenant could therefore
     // reach durable storage only by creating a bucket by hand in a cloud
     // console, minting credentials, and pasting them into the web UI — and the
     // fallback for not doing so is an ephemeral pod filesystem that loses
     // uploads silently. These make it a thing the platform can do for you.
-    const action = rawArgs[2];
+    //
+    // `action` is the positional the dispatcher already resolved, as for every
+    // other resource group. Re-deriving it here by index was wrong — the group
+    // sits at rawArgs[3], so rawArgs[2] is always the literal "cloud" and no
+    // subcommand ever matched.
     if (action === "create") return storageCreateCommand(rawArgs);
     if (action === "attach") return storageAttachCommand(rawArgs);
-    if (action === "--help" || action === "help") return printStorageHelp();
+    if (action === "help") return printStorageHelp();
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
