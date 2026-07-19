@@ -9,6 +9,10 @@ export default [
         ignores: [
             "**/node_modules/**",
             "**/node_modules_backup/**",
+            // Sibling git worktrees are separate checkouts of this same repo.
+            // Linting them double-reports every finding and makes them look
+            // like competing TSConfig roots to typescript-eslint.
+            ".claude/worktrees/**",
             "**/dist/**",
             "**/build/**",
             "**/.next/**",
@@ -47,6 +51,11 @@ export default [
 
         languageOptions: {
             parserOptions: {
+                // Pin the root explicitly: a checked-out worktree (or any
+                // nested copy of the repo) otherwise presents several
+                // candidate roots and the parser refuses to guess, failing
+                // every file with a parsing error.
+                tsconfigRootDir: import.meta.dirname,
                 ecmaFeatures: {
                     jsx: true
                 }
