@@ -28,6 +28,14 @@ const stat = promisify(fs.stat);
 const access = promisify(fs.access);
 
 /**
+ * Bucket used when a call names none.
+ *
+ * Every method resolves through this, so put/get/delete/list agree on where a
+ * bare key lives.
+ */
+export const DEFAULT_BUCKET = "default";
+
+/**
  * Remove initial and trailing slashes from a path.
  * Handles paths like "/images/", "images/", "/images" → "images"
  */
@@ -73,11 +81,21 @@ export class LocalStorageController implements StorageController {
     }
 
     /**
-     * Get the full filesystem path for a storage path.
-     * Includes a path traversal guard to prevent escaping the base directory.
+     * Get the full filesystem path for a storage path, with a traversal guard
+     * that keeps the result inside the bucket directory.
+     *
+     * Defaults the bucket the way `putObject` does.
+     *
+     * `putObject` has always written into `default` when given no bucket, while
+     * the read side resolved a bare key against the storage root — where
+     * nothing is. The two disagreed silently: `getObject` returned null (reads
+     * as "file missing"), `deleteObject` deleted nothing (404s are swallowed by
+     * design), and `listObjects` returned an empty page. So the obvious
+     * `putObject({ key })` → `getObject(key)` did not round-trip and nothing
+     * said why. One default, applied everywhere, removes the whole class.
      */
     private getFullPath(storagePath: string, bucket?: string): string {
-        const bucketPath = bucket ? path.join(this.basePath, bucket) : this.basePath;
+        const bucketPath = path.join(this.basePath, bucket ?? DEFAULT_BUCKET);
         const resolved = path.resolve(path.join(bucketPath, storagePath));
         if (!resolved.startsWith(bucketPath + path.sep) && resolved !== bucketPath) {
             throw new Error("Path traversal detected: resolved storage path is outside the bucket directory.");
@@ -110,7 +128,7 @@ export class LocalStorageController implements StorageController {
         this.validateFile(file);
 
         // Always use a bucket (default to 'default')
-        const usedBucket = bucket ?? "default";
+        const usedBucket = bucket ?? DEFAULT_BUCKET;
         const fullStoragePath = key;
         const fullPath = this.getFullPath(fullStoragePath, usedBucket);
 
@@ -174,7 +192,7 @@ export class LocalStorageController implements StorageController {
             const fileStat = await stat(fullPath);
 
             metadata = {
-                bucket: resolvedBucket ?? "default",
+                bucket: resolvedBucket ?? DEFAULT_BUCKET,
                 fullPath: resolvedPath,
                 name: path.basename(resolvedPath),
                 size: fileStat.size,
@@ -186,7 +204,7 @@ export class LocalStorageController implements StorageController {
             try {
                 const fileStat = await stat(fullPath);
                 metadata = {
-                    bucket: resolvedBucket ?? "default",
+                    bucket: resolvedBucket ?? DEFAULT_BUCKET,
                     fullPath: resolvedPath,
                     name: path.basename(resolvedPath),
                     size: fileStat.size,
@@ -324,9 +342,16 @@ export class LocalStorageController implements StorageController {
             let count = 0;
             const maxResults = options?.maxResults ?? 1000;
             const startIndex = options?.pageToken ? parseInt(options.pageToken, 10) : 0;
+            // Cursor over `entries`, not over emitted results. Every stored
+            // object has a `.metadata.json` sidecar that is skipped without
+            // emitting anything, so a token derived from `count` could fail to
+            // advance — a page of nothing but sidecars handed back the token it
+            // was called with, and `while (pageToken)` never terminated.
+            let scanned = startIndex;
 
             for (let i = startIndex; i < entries.length && count < maxResults; i++) {
                 const entry = entries[i];
+                scanned = i + 1;
 
                 // Skip metadata files
                 if (entry.name.endsWith(".metadata.json")) {
@@ -334,7 +359,7 @@ export class LocalStorageController implements StorageController {
                 }
 
                 const entryPath = prefix ? `${prefix}/${entry.name}` : entry.name;
-                const bucket = options?.bucket ?? "default";
+                const bucket = options?.bucket ?? DEFAULT_BUCKET;
 
                 const ref: StorageReference = {
                     bucket,
@@ -353,9 +378,7 @@ export class LocalStorageController implements StorageController {
                 count++;
             }
 
-            const nextPageToken = startIndex + count < entries.length
-                ? String(startIndex + count)
-                : undefined;
+            const nextPageToken = scanned < entries.length ? String(scanned) : undefined;
 
             return {
                 items,

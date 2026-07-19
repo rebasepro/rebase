@@ -216,11 +216,13 @@ force: true });
     });
 
     describe("getAbsolutePath", () => {
-        it("should return absolute filesystem path without bucket", () => {
+        it("should resolve an unqualified path into the default bucket", () => {
             const absPath = controller.getAbsolutePath("uploads/test.txt");
 
-            // getAbsolutePath uses getFullPath which doesn't include bucket unless specified
-            expect(absPath).toBe(path.join(tempDir, "uploads", "test.txt"));
+            // Where putObject writes it. This used to resolve to the storage
+            // root instead, so a bare key never found the file that a bare key
+            // had just stored.
+            expect(absPath).toBe(path.join(tempDir, "default", "uploads", "test.txt"));
         });
 
         it("should handle custom bucket", () => {
@@ -266,6 +268,108 @@ force: true });
             expect(() => {
                 (controllerWithTypes as {validateFile: (f: File) => void}).validateFile(file);
             }).toThrow(/not allowed/i);
+        });
+    });
+
+    describe("bucket defaulting", () => {
+        /** Store a file the obvious way: no bucket named anywhere. */
+        async function putBare(key: string, body = "payload") {
+            return controller.putObject({
+                file: new File([Buffer.from(body)], path.basename(key), { type: "text/plain" }),
+                key
+            });
+        }
+
+        it("round-trips a bare key through put → get", async () => {
+            // putObject wrote into `default`; the read side used to resolve a
+            // bare key against the storage root and return null, which reads
+            // as "file missing" rather than "you and I disagree on the bucket".
+            await putBare("docs/a.txt", "round trip");
+
+            const got = await controller.getObject("docs/a.txt");
+
+            expect(got).not.toBeNull();
+            expect(await got!.text()).toBe("round trip");
+        });
+
+        it("deletes a bare key instead of silently deleting nothing", async () => {
+            await putBare("docs/b.txt");
+
+            await controller.deleteObject("docs/b.txt");
+
+            expect(await controller.getObject("docs/b.txt")).toBeNull();
+        });
+
+        it("lists a bare prefix instead of returning an empty page", async () => {
+            await putBare("docs/c.txt");
+
+            const listed = await controller.listObjects("docs");
+
+            expect(listed.items.map((i) => i.name)).toEqual(["c.txt"]);
+        });
+
+        it("still honours an explicit bucket", async () => {
+            await controller.putObject({
+                file: new File(["scoped"], "d.txt", { type: "text/plain" }),
+                key: "docs/d.txt",
+                bucket: "other"
+            });
+
+            expect(await controller.getObject("docs/d.txt", "other")).not.toBeNull();
+            // The default bucket is a different namespace, not an alias.
+            expect(await controller.getObject("docs/d.txt")).toBeNull();
+        });
+    });
+
+    describe("listObjects pagination", () => {
+        it("terminates when every entry has a metadata sidecar", async () => {
+            // Each stored object writes a `.metadata.json` beside it, which the
+            // scan skips without emitting. The cursor used to be derived from
+            // the emitted count, so a page made entirely of sidecars handed
+            // back the very token it was called with and `while (pageToken)`
+            // spun forever.
+            for (let i = 0; i < 6; i++) {
+                await controller.putObject({
+                    file: new File([`file ${i}`], `f${i}.txt`, { type: "text/plain" }),
+                    key: `sweep/f${i}.txt`
+                });
+            }
+
+            const seen: string[] = [];
+            let pageToken: string | undefined;
+            let pages = 0;
+
+            do {
+                const page = await controller.listObjects("sweep", { maxResults: 2, pageToken });
+                seen.push(...page.items.map((i) => i.name));
+                pageToken = page.nextPageToken;
+                if (++pages > 50) throw new Error("listObjects did not terminate");
+            } while (pageToken);
+
+            expect(seen.sort()).toEqual(["f0.txt", "f1.txt", "f2.txt", "f3.txt", "f4.txt", "f5.txt"]);
+        });
+
+        it("never repeats a page token", async () => {
+            for (let i = 0; i < 5; i++) {
+                await controller.putObject({
+                    file: new File([`file ${i}`], `g${i}.txt`, { type: "text/plain" }),
+                    key: `pages/g${i}.txt`
+                });
+            }
+
+            const tokens = new Set<string>();
+            let pageToken: string | undefined;
+            let guard = 0;
+
+            do {
+                const page = await controller.listObjects("pages", { maxResults: 1, pageToken });
+                pageToken = page.nextPageToken;
+                if (pageToken) {
+                    expect(tokens.has(pageToken)).toBe(false);
+                    tokens.add(pageToken);
+                }
+                if (++guard > 50) throw new Error("listObjects did not terminate");
+            } while (pageToken);
         });
     });
 });
