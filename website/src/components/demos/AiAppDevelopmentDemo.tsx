@@ -268,8 +268,8 @@ export default function AiAppDevelopmentDemo() {
                     <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/30 bg-[#101b2e] text-primary shadow-[0_0_20px_rgba(0,112,244,0.1)]">
                       <Settings className="w-6 h-6 animate-[spin_8s_linear_infinite]" />
                     </div>
-                    <span className="text-xs font-semibold text-white mt-2.5">UI Trigger</span>
-                    <span className="text-[9px] font-mono text-slate-500">On Row Insert</span>
+                    <span className="text-xs font-semibold text-white mt-2.5">Webhook Trigger</span>
+                    <span className="text-[9px] font-mono text-slate-500">on row insert · no code</span>
                   </div>
 
                   {/* Node 3: AI Logic */}
