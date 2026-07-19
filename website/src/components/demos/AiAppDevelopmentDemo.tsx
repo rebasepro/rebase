@@ -115,7 +115,7 @@ export default function AiAppDevelopmentDemo() {
         <div className="lg:col-span-8">
           
           {/* Main Visual Frame */}
-          <div className="rounded-2xl border border-surface-800 bg-[#0d0d0f] shadow-2xl flex flex-col h-[400px] overflow-hidden relative">
+          <div className="rounded-2xl border border-surface-800 bg-[#0d0d0f] shadow-2xl flex flex-col h-[510px] overflow-hidden relative">
             
             {/* Window Topbar */}
             <div className="px-4 py-3 bg-[#121215] border-b border-surface-900 flex items-center justify-between">
@@ -162,12 +162,12 @@ export default function AiAppDevelopmentDemo() {
                 </div>
 
                 {/* Styled Editor Pane */}
-                <div className="flex-1 p-5 font-mono text-[11px] sm:text-xs text-slate-300 overflow-y-auto leading-relaxed select-text bg-[#0d0d0f] scrollbar-thin scrollbar-thumb-surface-800 scrollbar-track-transparent">
+                <div className="flex-1 p-5 font-mono text-[11px] sm:text-xs text-slate-300 overflow-hidden leading-relaxed select-text bg-[#0d0d0f]">
                   {recipeTab === "schema" ? (
                     <div className="space-y-1">
-                      <div><span className="text-slate-500">// collections/feedbacks.ts</span></div>
+                      <div><span className="text-slate-500">{"// collections/feedbacks.ts"}</span></div>
                       <div>
-                        <span className="text-sky-400">import</span> {"{"} PostgresCollection, EntityBeforeSaveProps {"}"} <span className="text-sky-400">from</span> <span className="text-emerald-400">"@rebasepro/types"</span>;
+                        <span className="text-sky-400">import</span> {"{"} buildCollection {"}"} <span className="text-sky-400">from</span> <span className="text-emerald-400">"@rebasepro/common"</span>;
                       </div>
                       <div>
                         <span className="text-sky-400">import</span> OpenAI <span className="text-sky-400">from</span> <span className="text-emerald-400">"openai"</span>;
@@ -178,97 +178,28 @@ export default function AiAppDevelopmentDemo() {
                       </div>
                       <div className="h-2"></div>
                       <div>
-                        <span className="text-sky-400">export const</span> feedbacksCollection: <span className="text-teal-400">PostgresCollection</span> = {"{"}
-                      </div>
-                      <div className="pl-4">
-                        name: <span className="text-emerald-400">"Feedbacks"</span>,
+                        <span className="text-sky-400">export const</span> feedbacks = <span className="text-blue-400">buildCollection</span>({"{"}
                       </div>
                       <div className="pl-4">
                         slug: <span className="text-emerald-400">"feedbacks"</span>,
                       </div>
                       <div className="pl-4">
-                        table: <span className="text-emerald-400">"feedbacks"</span>,
-                      </div>
-                      <div className="pl-4">
-                        properties: {"{"}
-                      </div>
-                      <div className="pl-8">
-                        content: {"{"} name: <span className="text-emerald-400">"Content"</span>, type: <span className="text-emerald-400">"string"</span> {"},"}
-                      </div>
-                      <div className="pl-8">
-                        aiSentiment: {"{"} name: <span className="text-emerald-400">"AI Sentiment"</span>, type: <span className="text-emerald-400">"string"</span> {"},"}
-                      </div>
-                      <div className="pl-8">
-                        aiTags: {"{"} name: <span className="text-emerald-400">"AI Tags"</span>, type: <span className="text-emerald-400">"string"</span> {"}"}
-                      </div>
-                      <div className="pl-4">
-                        {"},"}
-                      </div>
-                      <div className="pl-4">
-                        <span className="text-slate-500">// Native Rebase collection lifecycle listener</span>
+                        properties: {"{"} content, aiSentiment, aiTags {"},"}
                       </div>
                       <div className="pl-4">
                         callbacks: {"{"}
                       </div>
                       <div className="pl-8">
-                        beforeSave: <span className="text-sky-400">async</span> (props: <span className="text-teal-400">EntityBeforeSaveProps</span>) =&gt; {"{"}
+                        <span className="text-slate-500">{"// Runs on every write — enrich the row before it hits Postgres"}</span>
+                      </div>
+                      <div className="pl-8">
+                        beforeSave: <span className="text-sky-400">async</span> ({"{"} values {"}"}) =&gt; {"{"}
                       </div>
                       <div className="pl-12">
-                        <span className="text-sky-400">const</span> feedback = props.values.content;
+                        <span className="text-sky-400">const</span> ai = <span className="text-sky-400">await</span> <span className="text-blue-400">analyzeFeedback</span>(openai, values.content);
                       </div>
                       <div className="pl-12">
-                        <span className="text-sky-400">if</span> (!feedback) <span className="text-sky-400">return</span> props.values;
-                      </div>
-                      <div className="h-2"></div>
-                      <div className="pl-12">
-                        <span className="text-slate-500">// 1. Process feedback using LLM</span>
-                      </div>
-                      <div className="pl-12">
-                        <span className="text-sky-400">const</span> response = <span className="text-sky-400">await</span> openai.chat.completions.create({"{"}
-                      </div>
-                      <div className="pl-16">
-                        model: <span className="text-emerald-400">"gpt-4o-mini"</span>,
-                      </div>
-                      <div className="pl-16">
-                        messages: [
-                      </div>
-                      <div className="pl-20">
-                        {"{"} role: <span className="text-emerald-400">"system"</span>, content: <span className="text-emerald-400">"Extract: &#123; sentiment, tags &#125;"</span> {"},"}
-                      </div>
-                      <div className="pl-20">
-                        {"{"} role: <span className="text-emerald-400">"user"</span>, content: String(feedback) {"}"}
-                      </div>
-                      <div className="pl-16">
-                        ],
-                      </div>
-                      <div className="pl-16">
-                        response_format: {"{"} type: <span className="text-emerald-400">"json_object"</span> {"}"}
-                      </div>
-                      <div className="pl-12">
-                        {"});"}
-                      </div>
-                      <div className="h-2"></div>
-                      <div className="pl-12">
-                        <span className="text-sky-400">const</span> result = <span className="text-teal-400">JSON</span>.parse(response.choices[0].message.content || <span className="text-emerald-400">"&#123;&#125;"</span>);
-                      </div>
-                      <div className="h-2"></div>
-                      <div className="pl-12">
-                        <span className="text-slate-500">// 2. Return values to be persisted in PostgreSQL</span>
-                      </div>
-                      <div className="pl-12">
-                        <span className="text-sky-400">return</span> {"{"}
-                      </div>
-                      <div className="pl-16">
-                        ...props.values,
-                      </div>
-                      <div className="pl-16">
-                        aiSentiment: result.sentiment,
-                      </div>
-                      <div className="pl-16">
-                        aiTags: result.tags.join(<span className="text-emerald-400">", "</span>)
-                      </div>
-                      <div className="pl-12">
-                        {"};"}
+                        <span className="text-sky-400">return</span> {"{"} ...values, aiSentiment: ai.sentiment, aiTags: ai.tags {"};"}
                       </div>
                       <div className="pl-8">
                         {"}"}
@@ -276,7 +207,7 @@ export default function AiAppDevelopmentDemo() {
                       <div className="pl-4">
                         {"}"}
                       </div>
-                      <div>{"};"}</div>
+                      <div>{"});"}</div>
                     </div>
                   ) : (
                     <div className="space-y-1">

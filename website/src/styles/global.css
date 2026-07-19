@@ -61,6 +61,12 @@
 
 /* Rubik — variable font (single file covers all weights 300-900) */
 
+/* clip (not hidden) so the root never becomes a horizontal scroll container
+   and position:sticky descendants keep working */
+html {
+    overflow-x: clip;
+}
+
 body {
     overflow-x: hidden;
 }
