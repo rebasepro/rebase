@@ -12,6 +12,13 @@ export interface WebSocketMessage {
     rows?: Record<string, unknown>[];
     row?: Record<string, unknown> | null;
     error?: string;
+    /**
+     * Channel name, on broadcast and presence frames.
+     *
+     * These are addressed by channel rather than by `requestId` or
+     * `subscriptionId`, so this is the only field that routes them.
+     */
+    channel?: string;
 }
 
 /**
