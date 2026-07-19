@@ -192,6 +192,62 @@ export async function checkPolicyDrift(
     return drift;
 }
 
+/**
+ * Does this name look like one the generator produced for this table?
+ *
+ * Unnamed rules compile to `<table>_<op>_<sha1[0:7]>` (plus `_<idx>` when one
+ * rule spans several operations), and the hash covers the rule's semantics — so
+ * *editing* a rule renames its policy. The policy under the old name is left
+ * behind by `db push`, which only DROPs the names it is about to CREATE, and
+ * Postgres ORs PERMISSIVE policies together: a superseded `USING (true)` keeps
+ * granting everything no matter how tight its replacement is.
+ *
+ * Matching the shape is what makes dropping them safe. A hand-written policy
+ * would have to collide with a 7-hex digest to be mistaken for generated one;
+ * a policy named anything else is left alone and merely reported, because a
+ * custom name is indistinguishable from one someone wrote in SQL on purpose.
+ */
+export function isGeneratedPolicyName(name: string, table: string): boolean {
+    return new RegExp(`^${table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_(select|insert|update|delete|all)_[0-9a-f]{7}(_\\d+)?$`)
+        .test(name);
+}
+
+export interface OrphanCleanup {
+    /** Superseded generated policies that were dropped. */
+    dropped: PolicyRef[];
+    /** Orphans left in place because their names are not generator-shaped. */
+    kept: PolicyRef[];
+}
+
+/**
+ * Drop the policies an earlier push superseded but never removed.
+ *
+ * Only touches tables the collections describe — a table with no expected
+ * policy is not ours to reconcile, and scanning by schema alone would sweep up
+ * policies belonging to something else sharing the database.
+ */
+export async function dropOrphanedPolicies(
+    client: Queryable,
+    drift: PolicyDrift,
+    collections: CollectionConfig[]
+): Promise<OrphanCleanup> {
+    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(collections));
+    const managed = new Set(expected.map((p) => `${p.schema}.${p.table}`));
+
+    const cleanup: OrphanCleanup = { dropped: [], kept: [] };
+    for (const p of drift.orphaned) {
+        if (!managed.has(`${p.schema}.${p.table}`) || !isGeneratedPolicyName(p.name, p.table)) {
+            cleanup.kept.push(p);
+            continue;
+        }
+        // Identifiers are quoted, and the name came from pg_policies rather than
+        // from user input, so it is already a valid identifier.
+        await client.query(`DROP POLICY IF EXISTS "${p.name}" ON "${p.schema}"."${p.table}"`);
+        cleanup.dropped.push(p);
+    }
+    return cleanup;
+}
+
 export const hasDrift = (d: PolicyDrift): boolean =>
     d.missing.length > 0 || d.orphaned.length > 0 || d.diverged.length > 0;
 

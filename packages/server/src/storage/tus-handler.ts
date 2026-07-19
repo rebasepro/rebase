@@ -60,7 +60,17 @@ export class TusHandler {
     constructor(
         storageBaseDir: string,
         private storageController?: StorageController,
-        private storageRegistry?: StorageRegistry
+        private storageRegistry?: StorageRegistry,
+        /**
+         * Per-object authorization, applied to the resumable path too.
+         *
+         * TUS is a second way to write an object, so a hook enforced only on
+         * `POST /upload` would leave the door it was added to close standing
+         * open. The target key lives in the `Upload-Metadata` header, which
+         * only this class parses — hence the injection rather than a check in
+         * the route. Rejects by throwing.
+         */
+        private authorizeUpload?: (c: Context, key: string, bucket: string) => Promise<void>
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -152,6 +162,14 @@ export class TusHandler {
         }
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
+
+        // Gate before any temp file exists, so a denied upload leaves nothing
+        // behind to resume.
+        if (this.authorizeUpload) {
+            const key = metadata.key || metadata.filename || "";
+            await this.authorizeUpload(c, key, metadata.bucket || "default");
+        }
+
         const id = randomUUID();
         const filePath = join(this.tusDir, id);
 

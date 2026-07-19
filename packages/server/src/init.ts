@@ -324,6 +324,28 @@ export interface RebaseBackendConfig {
     storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
 
     /**
+     * Per-object access control for storage — the analogue of a collection's
+     * security rules, and the thing `requireAuth` / `publicRead` cannot
+     * express because they are global switches.
+     *
+     * Called after authentication on every storage route with the key, bucket,
+     * operation (`read` / `write` / `delete` / `list`) and resolved user.
+     * Return false to deny with a 403; throwing denies too.
+     *
+     * ```ts
+     * storageAuthorize: async ({ key, user, operation }) => {
+     *     if (!user) return false;
+     *     const [ownerId] = key.split("/");
+     *     return ownerId === user.userId || operation === "read";
+     * }
+     * ```
+     *
+     * Without it, any authenticated caller may read any key they can name, so
+     * multi-tenant apps should treat this as required rather than optional.
+     */
+    storageAuthorize?: import("./storage/types").StorageAuthorize;
+
+    /**
      * Entity history / audit-log configuration.
      *
      * - `true` — enable history with default settings
@@ -1035,7 +1057,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             registry: storageRegistry,
             sources: config.storageSources,
             requireAuth: resolveRequireAuth(config.auth),
-            authAdapter
+            authAdapter,
+            authorize: config.storageAuthorize
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it

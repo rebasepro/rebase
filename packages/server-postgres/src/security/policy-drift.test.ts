@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 
-import { checkPolicyDrift, parseExpectedPolicies, formatPolicyDrift, hasDrift, type PolicyRef, type Queryable } from "./policy-drift";
+import { checkPolicyDrift, parseExpectedPolicies, formatPolicyDrift, hasDrift, dropOrphanedPolicies, isGeneratedPolicyName, type PolicyRef, type Queryable } from "./policy-drift";
 import { generatePostgresPoliciesDdl } from "../schema/generate-postgres-ddl-logic";
 
 function collection(slug: string): CollectionConfig {
@@ -152,5 +152,110 @@ describe("checkPolicyDrift", () => {
 
         // Locked-by-default: absence of rules means admin-only policies, not none.
         expect(drift.missing.length).toBeGreaterThan(0);
+    });
+});
+
+describe("isGeneratedPolicyName", () => {
+    it("recognises the generator's own shape", () => {
+        expect(isGeneratedPolicyName("documents_insert_a1b2c3d", "documents")).toBe(true);
+        // One rule spanning several operations appends the operation index.
+        expect(isGeneratedPolicyName("documents_update_a1b2c3d_1", "documents")).toBe(true);
+    });
+
+    it("does not claim names a human could have written", () => {
+        expect(isGeneratedPolicyName("owner_access", "documents")).toBe(false);
+        expect(isGeneratedPolicyName("documents_default_admin_read", "documents")).toBe(false);
+        // Right shape, wrong table — belongs to something else.
+        expect(isGeneratedPolicyName("teams_insert_a1b2c3d", "documents")).toBe(false);
+        // A digest is 7 lowercase hex characters, nothing else.
+        expect(isGeneratedPolicyName("documents_insert_notahex", "documents")).toBe(false);
+        expect(isGeneratedPolicyName("documents_grant_a1b2c3d", "documents")).toBe(false);
+    });
+});
+
+describe("dropOrphanedPolicies", () => {
+    /** Records the DDL issued so the test can assert on what was dropped. */
+    function recordingDb(rows: Record<string, unknown>[]) {
+        const executed: string[] = [];
+        const db: Queryable = {
+            query: async (text: string) => {
+                if (!/^SELECT/i.test(text)) executed.push(text);
+                return { rows: rows as never[] };
+            }
+        };
+        return { db, executed };
+    }
+
+    it("drops the policy a rule edit superseded", async () => {
+        // The reported failure: tightening a rule renames its policy, and the
+        // permissive original stays live and keeps ORing itself back in.
+        const cols = [collection("documents")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const stale = {
+            schemaname: "public", tablename: "documents", policyname: "documents_insert_dead1ee",
+            roles: ["public"], cmd: "INSERT", qual: null, with_check: "true"
+        };
+        const live = [...expected.map((p) => liveRow(p)), stale];
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const { db, executed } = recordingDb(live);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+
+        expect(dropped).toHaveLength(1);
+        expect(dropped[0].name).toBe("documents_insert_dead1ee");
+        expect(kept).toHaveLength(0);
+        expect(executed).toEqual([
+            'DROP POLICY IF EXISTS "documents_insert_dead1ee" ON "public"."documents"'
+        ]);
+    });
+
+    it("leaves a hand-written policy alone and reports it instead", async () => {
+        const cols = [collection("documents")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const live = [
+            ...expected.map((p) => liveRow(p)),
+            { schemaname: "public", tablename: "documents", policyname: "ops_break_glass", roles: ["public"], cmd: "ALL", qual: "true", with_check: null }
+        ];
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const { db, executed } = recordingDb(live);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+
+        expect(dropped).toHaveLength(0);
+        expect(kept.map((p) => p.name)).toEqual(["ops_break_glass"]);
+        expect(executed).toEqual([]);
+    });
+
+    it("never touches a table the collections do not describe", async () => {
+        // Another application sharing the schema owns this table; a
+        // generator-shaped name there is coincidence, not our leftover.
+        const cols = [collection("documents")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const live = [
+            ...expected.map((p) => liveRow(p)),
+            { schemaname: "public", tablename: "legacy", policyname: "legacy_select_a1b2c3d", roles: ["public"], cmd: "SELECT", qual: "true", with_check: null }
+        ];
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const { db, executed } = recordingDb(live);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+
+        expect(dropped).toHaveLength(0);
+        expect(kept.map((p) => p.name)).toEqual(["legacy_select_a1b2c3d"]);
+        expect(executed).toEqual([]);
+    });
+
+    it("does nothing when the database already matches", async () => {
+        const cols = [collection("documents")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const live = expected.map((p) => liveRow(p));
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const { db, executed } = recordingDb(live);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+
+        expect(dropped).toHaveLength(0);
+        expect(kept).toHaveLength(0);
+        expect(executed).toEqual([]);
     });
 });

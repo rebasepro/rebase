@@ -453,6 +453,38 @@ When a client disconnects, they are automatically removed from all channels.
 
 Presence tracks which users are currently online in a channel, with custom state per user.
 
+### Use the SDK, not the raw protocol
+
+`client.realtime.channel(name)` wraps channels and presence, and handles the join roster and the heartbeat below for you. Reach for the raw messages only when you need something it doesn't expose.
+
+```typescript
+const channel = client.realtime.channel("document-42");
+
+// Publish your own state — repeat calls update it (e.g. a moving cursor).
+await channel.track({ name: "Alice", cursor: { line: 10, col: 5 } });
+
+// Observe the roster. Fires with the full state, plus the diff that caused it.
+const off = channel.onPresence((presences, diff) => {
+    console.log(Object.keys(presences).length, "people here");
+});
+
+// Broadcasts — the sender never receives its own message.
+await channel.broadcast("typing", { userId: "u1" });
+channel.onBroadcast("typing", (payload) => { /* ... */ });
+
+await channel.leave(); // releases the handlers and the heartbeat timer
+```
+
+Channels are per-name singletons: two components asking for `"document-42"` get the same object, so neither can cut the other off by leaving.
+
+### Two behaviours that will bite you on the raw protocol
+
+**1. A joining client is told only about its own join.** The `presence_diff` you receive after `presence_track` contains *just you* — the existing roster is not pushed. To learn who is already in the channel you must explicitly send `presence_state`. (The SDK's `join()` does this for you.)
+
+**2. Presence expires after 30 seconds.** `presence_track` is not a durable registration. Unless you re-send it on a timer you silently disappear from everyone else's roster while still sitting in the document — no disconnect, no event, you just stop being listed. Beat well inside the window (the SDK uses 20s) so a single dropped frame isn't a disappearance. See [Presence Timeout](#presence-timeout).
+
+A reconnect also drops server-side channel membership and presence, so both must be re-established; the SDK re-joins, re-requests the roster and re-tracks automatically.
+
 ### Tracking Presence
 
 Sending `presence_track` **automatically joins the channel** — no separate `join_channel` needed:
@@ -469,7 +501,9 @@ ws.send(JSON.stringify({
 
 ### Receiving Presence Diffs
 
-All channel members receive incremental `presence_diff` messages when users join or leave:
+All channel members receive incremental `presence_diff` messages when users join or leave.
+
+> The diff you receive on *your own* join contains only you. It is not the roster — request `presence_state` for that.
 
 ```typescript
 {
@@ -514,6 +548,8 @@ ws.send(JSON.stringify({
 ### Presence Timeout
 
 Stale presences are automatically cleaned up after **30 seconds** of inactivity (`PRESENCE_TIMEOUT_MS = 30000`). The server checks for stale entries every 10 seconds. When a stale presence is removed, a `presence_diff` with a `leaves` entry is broadcast to the channel.
+
+**This means `presence_track` must be re-sent on a timer.** A client that tracks once and then goes quiet is reaped at the 30s mark and vanishes from every other member's roster — while still connected and still sitting in the document. Re-send comfortably inside the window (20s is a good default: one lost beat still leaves time for the next). `client.realtime.channel().track()` starts this heartbeat for you and stops it on `untrack()` / `leave()`.
 
 ## Rate Limiting
 

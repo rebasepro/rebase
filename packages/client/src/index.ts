@@ -10,6 +10,7 @@ import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
+import { RebaseRealtimeChannel } from "./realtime-channel";
 import {
     DEFAULT_STORAGE_SOURCE_KEY,
     InsertOf,
@@ -76,6 +77,8 @@ export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
 // but re-exported (see @internal on the class) because the `client-postgres`
 // driver constructs it directly. Not a stable app-facing API.
 export { RebaseWebSocketClient } from "./websocket";
+export { RebaseRealtimeChannel } from "./realtime-channel";
+export type { PresenceState, PresenceDiff, BroadcastEvent, ChannelTransport } from "./realtime-channel";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
@@ -256,6 +259,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         : undefined;
 
     let ws: RebaseWebSocketClient | undefined;
+    /** One channel object per name — see `realtime.channel`. */
+    const realtimeChannels = new Map<string, RebaseRealtimeChannel>();
     if (resolvedWsUrl) {
         const wsOnUnauthorized = options.onUnauthorized || (async () => {
             try {
@@ -423,6 +428,29 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         createStorageSource,
         fetchStorageSources,
         ws,
+        realtime: {
+            /**
+             * Join a broadcast/presence channel.
+             *
+             * Repeated calls with the same name return the same channel, so
+             * separate components can attach handlers without each opening its
+             * own membership — and `leave()` from one would otherwise silently
+             * cut off the others.
+             */
+            channel: (name: string): RebaseRealtimeChannel => {
+                if (!ws) {
+                    throw new RebaseClientError(
+                        "Realtime is disabled on this client (realtime: false), so channels are unavailable."
+                    );
+                }
+                let existing = realtimeChannels.get(name);
+                if (!existing) {
+                    existing = new RebaseRealtimeChannel(name, ws);
+                    realtimeChannels.set(name, existing);
+                }
+                return existing;
+            }
+        },
         /**
          * Release the realtime socket and its reconnect timer.
          *
@@ -431,6 +459,11 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
          * was never started, and safe to call twice.
          */
         close: () => {
+            // Channels hold presence heartbeat timers, which would otherwise
+            // keep firing (and keep a Node process alive) after the socket
+            // they publish over is gone.
+            for (const channel of realtimeChannels.values()) void channel.leave();
+            realtimeChannels.clear();
             ws?.disconnect();
         },
         setToken: transport.setToken,

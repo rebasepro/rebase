@@ -72,6 +72,26 @@ export class RebaseWebSocketClient {
 
     private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
+    /** Channel-name → handlers, for broadcast and presence frames. */
+    private channelHandlers = new Map<string, Set<(message: Record<string, unknown>) => void>>();
+
+    /** Subscribe to broadcast/presence frames for one channel. */
+    public onChannelMessage(channel: string, handler: (message: Record<string, unknown>) => void): () => void {
+        if (!this.channelHandlers.has(channel)) this.channelHandlers.set(channel, new Set());
+        this.channelHandlers.get(channel)!.add(handler);
+        return () => {
+            const handlers = this.channelHandlers.get(channel);
+            if (!handlers) return;
+            handlers.delete(handler);
+            if (handlers.size === 0) this.channelHandlers.delete(channel);
+        };
+    }
+
+    /** Notified after the socket comes back, so channels can re-join. */
+    public onReconnect(handler: () => void): () => void {
+        return this.on("reconnect", handler);
+    }
+
     public on(event: "connect" | "disconnect" | "reconnect" | "error", cb: (...args: unknown[]) => void) {
         if (!this.listeners.has(event)) {
             this.listeners.set(event, new Set());
@@ -506,6 +526,25 @@ export class RebaseWebSocketClient {
             return;
         }
 
+        // Channel traffic (broadcast / presence) is addressed by channel name
+        // rather than by requestId or subscriptionId, so it is dispatched
+        // before the subscription paths — none of which would match it, and
+        // the message would otherwise fall through and be dropped silently.
+        if (typeof message.channel === "string" &&
+            (type === "broadcast" || type === "presence_state" || type === "presence_diff")) {
+            const handlers = this.channelHandlers.get(message.channel);
+            if (handlers) {
+                for (const handler of [...handlers]) {
+                    try {
+                        handler(message as unknown as Record<string, unknown>);
+                    } catch (error) {
+                        console.error("Error in channel handler:", error);
+                    }
+                }
+            }
+            return;
+        }
+
         // Handle subscription updates for collection subscriptions
         if (subscriptionId && type === "collection_update") {
             const subscriptionKey = this.backendToCollectionKey.get(subscriptionId);
@@ -801,7 +840,11 @@ export class RebaseWebSocketClient {
         }
     }
 
-    private sendMessage(message: Record<string, unknown>): Promise<unknown> {
+    /**
+     * Public because `RebaseRealtimeChannel` sends channel frames through it.
+     * Not part of the stable surface — prefer `client.realtime.channel(name)`.
+     */
+    public sendMessage(message: Record<string, unknown>): Promise<unknown> {
         // If already has a requestId (re-sending from queue), use the stored promise handlers
         const queuedMsg = message as Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void };
         if (queuedMsg._queuedResolve && queuedMsg._queuedReject) {

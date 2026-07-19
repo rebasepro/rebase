@@ -300,43 +300,32 @@ export default function AiAppDevelopmentDemo() {
             {/* Mode 2 Layout: Visual Event Pipeline Diagram */}
             {activeMode === "pipelines" && (
               <div className="flex-1 flex flex-col justify-between p-6 bg-[#0d0d0f] select-none">
-                
-                {/* SVG Connections & Particle flow */}
-                <div className="absolute inset-0 pointer-events-none z-0">
-                  <svg className="w-full h-full" viewBox="0 0 600 240" preserveAspectRatio="none">
-                    {/* SVG Connection line */}
-                    <path
-                      d="M 120 120 H 480"
-                      fill="none"
-                      stroke="#1a1a24"
-                      strokeWidth="4"
-                    />
-                    {/* Glowing active path */}
-                    <path
-                      d="M 120 120 H 480"
-                      fill="none"
-                      stroke="#0070f4"
-                      strokeWidth="3"
-                      strokeDasharray="15 45"
-                      className="animate-[dash_2s_linear_infinite]"
-                      style={{ strokeDashoffset: -100 }}
-                    />
-                  </svg>
-                </div>
 
                 {/* Active flow labels */}
-                <div className="w-full flex justify-between px-6 text-[10px] font-mono text-slate-500 z-10">
+                <div className="w-full flex justify-between px-6 text-[10px] font-mono text-slate-500">
                   <span>Source Event</span>
                   <span>Webhook Router</span>
                   <span>Local Worker</span>
                 </div>
 
-                {/* Pipeline Flow Visualization */}
-                <div className="flex-1 flex items-center justify-between px-6 md:px-12 relative z-10">
-                  
+                {/* Pipeline Flow Visualization. The 1.25rem connector offset compensates for the
+                    ~40px of caption under each 64px icon tile, so the line crosses the icon centers. */}
+                <div className="flex-1 flex items-center justify-between px-6 md:px-12 relative">
+
+                  {/* Connector track + animated flow, behind the node tiles */}
+                  <div
+                    className="absolute left-14 right-14 md:left-20 md:right-20 top-[calc(50%-1.25rem)] -translate-y-1/2 h-1 rounded-full bg-[#232332] overflow-hidden"
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="absolute inset-y-0 -left-8 w-[calc(100%+2rem)] animate-[flow_1.4s_linear_infinite]"
+                      style={{ backgroundImage: "repeating-linear-gradient(90deg, rgba(0,112,244,0.9) 0px, rgba(0,112,244,0.9) 10px, transparent 10px, transparent 32px)" }}
+                    />
+                  </div>
+
                   {/* Node 1: Postgres Row (feedbacks) */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-primary/5 text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-[#0e1520] text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
                       <Database className="w-6 h-6" />
                     </div>
                     <span className="text-xs font-semibold text-white mt-2.5">Postgres Row</span>
@@ -344,8 +333,8 @@ export default function AiAppDevelopmentDemo() {
                   </div>
 
                   {/* Node 2: Webhook Trigger */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/30 bg-primary/10 text-primary shadow-[0_0_20px_rgba(0,112,244,0.1)]">
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/30 bg-[#101b2e] text-primary shadow-[0_0_20px_rgba(0,112,244,0.1)]">
                       <Settings className="w-6 h-6 animate-[spin_8s_linear_infinite]" />
                     </div>
                     <span className="text-xs font-semibold text-white mt-2.5">UI Trigger</span>
@@ -353,8 +342,8 @@ export default function AiAppDevelopmentDemo() {
                   </div>
 
                   {/* Node 3: AI Logic */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-primary/5 text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center border border-primary/20 bg-[#0e1520] text-primary shadow-[0_0_15px_rgba(0,112,244,0.05)]">
                       <Brain className="w-6 h-6 animate-pulse" />
                     </div>
                     <span className="text-xs font-semibold text-white mt-2.5">AI Worker</span>
@@ -380,11 +369,11 @@ export default function AiAppDevelopmentDemo() {
 
       </div>
 
-      {/* SVG Dash CSS Animation */}
+      {/* Connector flow animation: one 32px pattern period per loop, so it tiles seamlessly */}
       <style dangerouslySetInnerHTML={{__html: `
-        @keyframes dash {
+        @keyframes flow {
           to {
-            stroke-dashoffset: 0;
+            transform: translateX(32px);
           }
         }
       `}} />

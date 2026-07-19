@@ -10,7 +10,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { StorageController } from "./types";
+import { StorageController, type StorageAuthorize, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import type { StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
@@ -58,6 +58,13 @@ export interface StorageRoutesConfig {
      * configured" crash when `configureJwt()` was never called.
      */
     authAdapter?: AuthAdapter;
+    /**
+     * Per-object access control, consulted after authentication on every
+     * storage route. See `StorageAuthorize`.
+     *
+     * Omitted, storage behaves as before: authenticated means allowed.
+     */
+    authorize?: StorageAuthorize;
 }
 
 /**
@@ -161,7 +168,47 @@ function buildAdapterAuthMiddleware(
 export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
-    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter } = config;
+    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter, authorize } = config;
+
+    /**
+     * Run the per-object authorization hook, if one is configured.
+     *
+     * Denials are 403 rather than 404: the route already established that the
+     * caller is authenticated, so hiding existence buys nothing, and a
+     * distinguishable status is what makes a misconfigured policy debuggable.
+     * A hook that throws denies too — an ownership lookup that fails must not
+     * fall open.
+     */
+    const checkAuthorized = async (
+        c: { get: (k: "user") => { userId: string; email?: string; roles?: string[] } | undefined },
+        operation: StorageOperation,
+        key: string,
+        bucket: string,
+        storageId?: string | null
+    ): Promise<void> => {
+        if (!authorize) return;
+
+        const user = c.get("user") ?? null;
+
+        // A scoped download token *is* the authorization: it was minted by
+        // `/metadata`, which ran this same hook, and it is valid only for the
+        // path it was minted for. Re-running the hook here would ask the
+        // synthetic token principal a question about ownership it cannot
+        // answer, and would break every <img> the client already renders.
+        // Public paths are declared public, so they are equally not the hook's
+        // business.
+        if (user?.userId === "download-token" || user?.userId === "public") return;
+
+        let allowed: boolean;
+        try {
+            allowed = await authorize({ key, bucket, operation, user, storageId: storageId ?? undefined });
+        } catch {
+            allowed = false;
+        }
+        if (!allowed) {
+            throw ApiError.forbidden("Not authorized for this object");
+        }
+    };
 
     /**
      * Resolve the storage controller for a request.
@@ -245,6 +292,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             }
         }
 
+        await checkAuthorized(c, "write", finalKey, bucket ?? "default", storageId);
+
         const resolved = resolveController(storageId);
         const result = await resolved.putObject({
             file: uploadedFile,
@@ -276,6 +325,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const filePath = decodeURIComponent(rawPath);
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
+
+        {
+            const { bucket, resolvedPath } = parseBucketAndPath(filePath);
+            await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
+        }
 
         // Parse image transform query params (e.g. ?width=300&format=webp)
         const transformOpts = parseTransformOptions(c.req.query() as Record<string, string>);
@@ -374,6 +428,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
+        // The load-bearing check. This route mints the short-lived path-scoped
+        // download token that `/file/*` then trusts, and it used to mint one
+        // for any authenticated caller for any path — which is exactly why
+        // "reject full-access JWTs on file routes" did not close the gap.
+        await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
+
         const downloadConfig = await resolved.getSignedUrl(resolvedPath, bucket);
 
         if (downloadConfig.fileNotFound) {
@@ -413,6 +473,8 @@ message: "No file to delete" });
         const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
+        await checkAuthorized(c, "delete", resolvedPath, bucket, storageId);
+
         await resolved.deleteObject(resolvedPath, bucket);
 
         return c.json({
@@ -432,6 +494,11 @@ message: "No file to delete" });
         const pageToken = c.req.query("pageToken");
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
+
+        // The prefix is the "object" being asked about — a listing is how you
+        // discover keys you were never told, so leaving it ungated would hand
+        // back exactly what per-object read control is meant to withhold.
+        await checkAuthorized(c, "list", storagePrefix, bucket ?? "default", storageId);
 
         const result = await resolved.listObjects(
             storagePrefix,
@@ -468,6 +535,8 @@ message: "No file to delete" });
             throw ApiError.badRequest("Invalid folder path");
         }
 
+        await checkAuthorized(c, "write", resolvedPath, bucket, storageId);
+
         if (resolved.getType() === "local") {
             // For local storage, create the directory
             const localController = resolved as LocalStorageController;
@@ -497,7 +566,16 @@ message: "No file to delete" });
     const tusBaseDir = defaultCtrl.getType() === "local"
         ? (defaultCtrl as LocalStorageController).getBasePath()
         : (process.env.STORAGE_PATH || "./uploads");
-    const tusHandler = new TusHandler(tusBaseDir, defaultCtrl, registry);
+    const tusHandler = new TusHandler(
+        tusBaseDir,
+        defaultCtrl,
+        registry,
+        authorize
+            ? async (c, key, bucket) => {
+                await checkAuthorized(c as never, "write", sanitizeStorageKey(key), bucket, c.req.query("storageId"));
+            }
+            : undefined
+    );
     tusHandler.startCleanup();
 
     router.options("/tus", (_c) => tusHandler.options());
