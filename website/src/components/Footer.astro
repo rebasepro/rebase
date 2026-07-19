@@ -89,6 +89,44 @@ const footerNavs = [
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                     </svg>
                 </a>
+
+                <!-- Rebase Cloud waitlist. Posts cross-origin to the control
+                     plane, which already allows this origin (CORS accepts any
+                     *.rebase.pro plus the bare apex; the apex is on the CSRF
+                     allow-list). `source` distinguishes these signups from the
+                     ones landing on apps.rebase.pro. -->
+                <form
+                    id="footer-waitlist"
+                    class="mt-8 max-w-xs"
+                    novalidate
+                    data-sending={t("footer.waitlistSending")}
+                    data-success={t("footer.waitlistSuccess")}
+                    data-invalid={t("footer.waitlistInvalid")}
+                    data-error={t("footer.waitlistError")}
+                >
+                    <p class="text-sm font-semibold text-white">{t("footer.waitlistTitle")}</p>
+                    <p class="mt-1 text-sm text-surface-400">{t("footer.waitlistBlurb")}</p>
+                    <div class="mt-3 flex gap-2">
+                        <label for="footer-waitlist-email" class="sr-only">{t("footer.waitlistPlaceholder")}</label>
+                        <input
+                            id="footer-waitlist-email"
+                            type="email"
+                            name="email"
+                            autocomplete="email"
+                            placeholder={t("footer.waitlistPlaceholder")}
+                            class="min-w-0 flex-1 rounded-lg border border-surface-800 bg-surface-900 px-3 py-2 text-sm text-white placeholder:text-surface-500 focus:border-primary focus:outline-none"
+                        />
+                        <button
+                            type="submit"
+                            id="footer-waitlist-submit"
+                            data-track
+                            class="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-light disabled:opacity-60"
+                        >
+                            {t("footer.waitlistCta")}
+                        </button>
+                    </div>
+                    <p id="footer-waitlist-status" class="mt-2 text-sm text-surface-400" role="status" aria-live="polite"></p>
+                </form>
             </div>
             <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3 lg:grid-cols-6 xl:gap-8">
                 {footerNavs.map((nav) => (
@@ -141,3 +179,54 @@ const footerNavs = [
         </div>
     </div>
 </footer>
+
+<script>
+    // Astro hoists this into its own module, so it cannot see the component's
+    // `t()` — the localized copy travels on the form's data-* attributes.
+    const form = document.getElementById("footer-waitlist") as HTMLFormElement | null;
+
+    if (form) {
+        const emailEl = document.getElementById("footer-waitlist-email") as HTMLInputElement;
+        const submitEl = document.getElementById("footer-waitlist-submit") as HTMLButtonElement;
+        const statusEl = document.getElementById("footer-waitlist-status") as HTMLElement;
+        const msg = form.dataset as Record<string, string>;
+
+        const setStatus = (text: string, isError: boolean) => {
+            statusEl.textContent = text;
+            statusEl.className = `mt-2 text-sm ${isError ? "text-red-400" : "text-surface-400"}`;
+        };
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const email = emailEl.value.trim();
+
+            // Loose on purpose, and matched to the server's own check: a false
+            // rejection here costs a signup, which is worse than a bounce.
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                setStatus(msg.invalid, true);
+                return;
+            }
+
+            submitEl.disabled = true;
+            setStatus(msg.sending, false);
+
+            try {
+                const res = await fetch("https://app.rebase.pro/api/functions/waitlist", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, source: "website-footer" }),
+                });
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(body?.error?.message || msg.error);
+
+                // The endpoint is idempotent, so a repeat signup reports success
+                // rather than an error the visitor cannot act on.
+                form.querySelector(".flex")?.remove();
+                setStatus(msg.success, false);
+            } catch (err) {
+                submitEl.disabled = false;
+                setStatus(err instanceof Error ? err.message : msg.error, true);
+            }
+        });
+    }
+</script>
