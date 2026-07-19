@@ -155,6 +155,7 @@ export const en = {
     "MIT-licensed. Self-host on Docker, Railway, Fly, or bare metal. Your data stays in your Postgres — no vendor dependency, no surprises, no per-seat pricing.",
   "opensource.link1": "For developers",
   "opensource.link2": "Why Rebase?",
+  "showcase.sync.badge": "Your workflow",
   "showcase.sync.title": "Built for the way<br/>you actually work",
   "showcase.sync.subtitle":
     "Not another tool to learn — Rebase works with your existing database and your existing workflow.",

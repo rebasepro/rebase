@@ -125,7 +125,7 @@ const translatePath = useTranslatedPath(lang);
 
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("demo.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">01</span><span class="mx-2 text-surface-600">·</span>{t("demo.badge")}</p>
                 <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
                     {t("demo.title")}
                 </h2>
@@ -269,35 +269,19 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatBackground variant="a" client:visible/>
+        <NeatBackground variant="b" client:visible/>
     </div>
 
-
- <section id="s-demo-carousel" class="relative z-0 py-24 sm:py-32">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="max-w-3xl mx-auto text-center mb-12 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("see.badge")}</p>
-                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">{t("see.title")}</h2>
-                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("see.subtitle")}</p>
-            </div>
-
-            <div style="min-height: 700px;">
-                <AdminDemoCarousel client:load/>
-            </div>
-            <p class="mt-2 text-center text-xs sm:text-sm text-surface-400">
-                A quick tour of the generated Rebase admin panel.
-            </p>
-        </div>
-    </section>
-
-
-
+    <div id="s-collection-power" class="relative z-0">
+        <!-- One Collection. Everything. -->
+        <CollectionPowerSection/>
+    </div>
 
     <!-- The backend underneath: SDK / REST / realtime proof -->
  <section id="s-backend-engine" class="relative z-0 py-24 sm:py-32 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("engine.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">03</span><span class="mx-2 text-surface-600">·</span>{t("engine.badge")}</p>
                 <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">{t("engine.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
             </div>
@@ -610,19 +594,43 @@ const translatePath = useTranslatedPath(lang);
 
     <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatBackground variant="b" client:visible/>
+        <NeatBackground variant="a" client:visible/>
     </div>
 
-    <div id="s-collection-power" class="relative z-0">
-        <!-- One Collection. Everything. -->
-        <CollectionPowerSection/>
+
+ <section id="s-demo-carousel" class="relative z-0 py-24 sm:py-32">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="max-w-3xl mx-auto text-center mb-12 animate-on-scroll fade-in-up">
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("see.badge")}</p>
+                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">{t("see.title")}</h2>
+                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("see.subtitle")}</p>
+            </div>
+
+            <div style="min-height: 700px;">
+                <AdminDemoCarousel client:load/>
+            </div>
+            <p class="mt-2 text-center text-xs sm:text-sm text-surface-400">
+                A quick tour of the generated Rebase admin panel.
+            </p>
+        </div>
+    </section>
+
+
+
+
+
+    <div id="s-scroll-sync">
+        <!-- Scroll-sync feature showcase -->
+        <ScrollSyncShowcase/>
     </div>
+
+
 
     <!-- Adoption modes: BaaS / CMS / Full -->
  <section id="s-modes" class="relative z-0 py-28 sm:py-36 overflow-hidden">
         <div class="mx-auto max-w-7xl px-6 lg:px-12">
             <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">{t("modes.badge")}</h2>
+                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">06</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</h2>
                 <p class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white"
                    set:html={t("modes.title")}></p>
                 <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
@@ -1534,14 +1542,6 @@ const translatePath = useTranslatedPath(lang);
             });
         </script>
     </section>
-
-    <div id="s-scroll-sync">
-        <!-- Scroll-sync feature showcase -->
-        <ScrollSyncShowcase/>
-    </div>
-
-
-
     <!-- FAQ -->
  <section id="s-faq" class="py-28 sm:py-36">
         <div class="mx-auto max-w-7xl px-6">
