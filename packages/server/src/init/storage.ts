@@ -22,10 +22,21 @@ export async function initializeStorage(
             return entry as StorageController;
         }
         const conf = entry as BackendStorageConfig;
-        if (isProduction && conf.type === "local") {
-            logger.warn(`Storage backend "${label}" uses local filesystem in production. ` +
-                "Files will be lost on container restart. " +
-                "Configure S3-compatible storage or a custom StorageController.");
+        // A warning was not enough. On a managed platform the local backend is a
+        // pod's ephemeral filesystem, so every uploaded file disappears at the
+        // next restart — with no error at write time, no error at read time, and
+        // a log line nobody reads until the data is already gone. Refusing to
+        // boot trades that for a failure the deploy actually surfaces: a crashed
+        // rollout is recoverable, deleted user files are not.
+        if (isProduction && conf.type === "local" && !process.env.FORCE_LOCAL_STORAGE) {
+            throw new Error(
+                `Storage backend "${label}" is set to "local" in production. Local storage is the ` +
+                "container filesystem, so uploaded files are destroyed on the next restart or " +
+                "redeploy. Configure S3-compatible storage (STORAGE_TYPE=s3) or GCS " +
+                "(STORAGE_TYPE=gcs), or pass a custom StorageController. If this deployment " +
+                "really does have a durable volume mounted at the storage path, set " +
+                "FORCE_LOCAL_STORAGE=true to proceed."
+            );
         }
         return await createStorageController(conf);
     };

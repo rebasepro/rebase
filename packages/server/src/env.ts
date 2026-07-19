@@ -117,7 +117,16 @@ const rebaseEnvSchema = z.object({
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_ENDPOINT: z.string().url().optional(),
-    S3_FORCE_PATH_STYLE: optionalBoolString
+    S3_FORCE_PATH_STYLE: optionalBoolString,
+    // The GCS counterparts of the S3 set above. Without them `STORAGE_TYPE=gcs`
+    // validated but there was no way to say *which* bucket, so an app whose
+    // config only branched on "s3" fell through to local disk — i.e. straight
+    // into the ephemeral-storage trap. Credentials stay optional: on GKE
+    // Workload Identity supplies them through ADC and a key file is the
+    // exception, not the rule.
+    GCS_BUCKET: z.string().optional(),
+    GCS_PROJECT_ID: z.string().optional(),
+    GCS_KEY_FILENAME: z.string().optional()
 });
 
 /** Inferred type of the validated environment. */
