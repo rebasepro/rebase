@@ -159,18 +159,15 @@ export const en = {
   "showcase.sync.title": "Built for the way<br/>you actually work",
   "showcase.sync.subtitle":
     "Not another tool to learn — Rebase works with your existing database and your existing workflow.",
-  "showcase.sync.tab1.title": "Edit like a spreadsheet",
+  "showcase.sync.tab1.title": "Every view. Zero code.",
   "showcase.sync.tab1.desc":
-    "Save like it's a database. Inline editing, real-time filters, relational links, and a Notion-style rich text editor — all powered by your existing Postgres tables.",
-  "showcase.sync.tab2.title": "Your schema, understood",
+    "The same Postgres rows as a data grid, cards, a list or a Kanban board. Switch layouts on the fly, filter live, edit inline — without building a single admin screen.",
+  "showcase.sync.tab2.title": "SQL stays first-class",
   "showcase.sync.tab2.desc":
-    "Connect your Postgres and Rebase reads your schema — tables, types, constraints, relations. You get a fully structured admin panel without writing a single line of config.",
+    "You never outgrow the UI. Drop into the built-in SQL editor for raw queries — multiple tabs, autocomplete, EXPLAIN — running directly against your database, with results you can edit in place.",
   "showcase.sync.tab3.title": "Visual editor, real TypeScript",
   "showcase.sync.tab3.desc":
     "Design your data model visually in Rebase Studio. Every change writes back to your local TypeScript files via AST — your code stays clean, your team stays in sync.",
-  "showcase.sync.tab4.title": "Notion-style rich text",
-  "showcase.sync.tab4.desc":
-    "A full block editor with slash commands, markdown shortcuts, drag-and-drop reordering, inline images, code blocks, and task lists — powered by ProseMirror.",
   "power.title":
     'One collection.<br/><span class="text-primary subtle-shimmer">Everything generated.</span>',
   "power.subtitle":

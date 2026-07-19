@@ -133,18 +133,15 @@ export const de = {
     "Gebaut für die Art,<br/>wie du wirklich arbeitest",
   "showcase.sync.subtitle":
     "Kein neues Tool, das du erst lernen musst — Rebase arbeitet mit deiner bestehenden Datenbank und deinem bestehenden Workflow.",
-  "showcase.sync.tab1.title": "Editieren wie ein Spreadsheet",
+  "showcase.sync.tab1.title": "Jede Ansicht. Null Code.",
   "showcase.sync.tab1.desc":
-    "Speichern wie eine Datenbank. Inline Editing, Echtzeit-Filter, relationale Verknüpfungen und ein Rich-Text-Editor im Notion-Stil — alles auf deinen bestehenden Postgres-Tabellen.",
-  "showcase.sync.tab2.title": "Dein Schema, verstanden",
+    "Dieselben Postgres-Zeilen als Tabelle, Karten, Liste oder Kanban-Board. Wechsle die Ansicht on the fly, filtere live, editiere inline — ohne eine einzige Admin-Oberfläche zu bauen.",
+  "showcase.sync.tab2.title": "SQL bleibt erstklassig",
   "showcase.sync.tab2.desc":
-    "Verbinde dein Postgres und Rebase liest dein Schema — Tabellen, Typen, Constraints, Relationen. Du bekommst ein voll strukturiertes Admin-Panel, ohne eine einzige Zeile Config zu schreiben.",
+    "Du wächst nie aus der UI heraus. Öffne den eingebauten SQL-Editor für rohe Queries — mehrere Tabs, Autocomplete, EXPLAIN — direkt auf deiner Datenbank, mit Ergebnissen, die du an Ort und Stelle editierst.",
   "showcase.sync.tab3.title": "Visueller Editor, echtes TypeScript",
   "showcase.sync.tab3.desc":
     "Designe dein Datenmodell visuell in Rebase Studio. Jede Änderung wird per AST in deine lokalen TypeScript-Dateien zurückgeschrieben — dein Code bleibt clean, dein Team bleibt synchron.",
-  "showcase.sync.tab4.title": "Rich Text im Notion-Stil",
-  "showcase.sync.tab4.desc":
-    "Ein vollwertiger Block-Editor mit Slash Commands, Markdown-Shortcuts, Drag-and-Drop, Inline-Bildern, Code-Blöcken und Task-Listen — powered by ProseMirror.",
   "power.title":
     'Eine Collection.<br/><span class="text-primary subtle-shimmer">Alles generiert.</span>',
   "power.subtitle":
