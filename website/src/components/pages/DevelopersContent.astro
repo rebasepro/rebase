@@ -12,6 +12,7 @@ import { SdkMiniDemo } from '../../components/demos/SdkMiniDemo.tsx';
 import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo.tsx';
 import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo.tsx';
 import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo.tsx';
+import ClientUIComponentsTeaser from '../../components/ClientUIComponentsTeaser.tsx';
 import { RealtimeMiniDemo } from '../../components/demos/RealtimeMiniDemo.tsx';
 import { TerminalInit } from '../../components/demos/TerminalInit.tsx';
 import { ArchitectureDiagram } from '../../components/demos/ArchitectureDiagram.tsx';
@@ -513,6 +514,23 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- The UI kit behind it all -->
+            <div class="mt-20">
+                <div class="mx-auto max-w-3xl text-center mb-10">
+                    <h3 class="text-2xl font-bold tracking-tight text-white">Built on <code class="text-primary">@rebasepro/ui</code></h3>
+                    <p class="mt-3 text-base text-surface-400">
+                        Every widget above is composed from the same open React component library the admin panel uses — buttons, dialogs, selects, date pickers and more, yours to reuse in custom views.
+                    </p>
+                </div>
+                <ClientUIComponentsTeaser client:only="react" />
+                <div class="mt-8 text-center">
+                    <a href="/ui" class="inline-flex items-center gap-1.5 text-xs font-bold text-white hover:text-primary transition-colors uppercase tracking-wider">
+                        Explore the full UI kit
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                    </a>
                 </div>
             </div>
         </div>

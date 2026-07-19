@@ -7,6 +7,7 @@ import { NeatBackground } from '../../components/NeatBackground';
 import ClientLogos from '../../components/ClientLogos.astro';
 import SpotlightCard from '../../components/SpotlightCard.astro';
 import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
+import { DeveloperPlayground } from '../../components/demos/DeveloperPlayground';
 ---
 
 <div class="flex flex-col isolate">
@@ -229,6 +230,15 @@ import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
                     </div>
                 </div>
 
+            </div>
+
+            <!-- Interactive developer playground -->
+            <div class="mt-16 max-w-6xl mx-auto animate-on-scroll fade-in-up">
+                <div class="text-center mb-8">
+                    <h3 class="text-2xl font-semibold tracking-tight text-white">Don't take our word for it — poke at it.</h3>
+                    <p class="mt-2 text-surface-400">Schema-as-code, the typed SDK, custom fields and visual RLS, in one interactive tour.</p>
+                </div>
+                <DeveloperPlayground client:visible />
             </div>
         </div>
     </section>
