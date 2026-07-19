@@ -255,6 +255,8 @@ ${chalk.green.bold("Databases")}
 ${chalk.green.bold("Other resources")}
   ${chalk.blue.bold("webhooks list|create|delete")}
   ${chalk.blue.bold("storage")}                 List storage buckets
+  ${chalk.blue.bold("storage create")}          Provision platform-managed storage
+  ${chalk.blue.bold("storage attach")}          Attach your own S3-compatible bucket
   ${chalk.blue.bold("clusters")}                List compute clusters
   ${chalk.blue.bold("billing setup")}           Attach a card to the org ${chalk.gray("(one-time, opens browser)")}
   ${chalk.blue.bold("billing")}                 Show billing account + card on file

@@ -155,6 +155,16 @@ permissive: true }
 /* ─── storage ──────────────────────────────────────────────────── */
 
 export async function storageCommand(rawArgs: string[]): Promise<void> {
+    // `rebase cloud storage` used to only ever list. A tenant could therefore
+    // reach durable storage only by creating a bucket by hand in a cloud
+    // console, minting credentials, and pasting them into the web UI — and the
+    // fallback for not doing so is an ephemeral pod filesystem that loses
+    // uploads silently. These make it a thing the platform can do for you.
+    const action = rawArgs[2];
+    if (action === "create") return storageCreateCommand(rawArgs);
+    if (action === "attach") return storageAttachCommand(rawArgs);
+    if (action === "--help" || action === "help") return printStorageHelp();
+
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
@@ -178,6 +188,142 @@ export async function storageCommand(rawArgs: string[]): Promise<void> {
         console.log("");
     } catch (e) {
         reportError(e, "Failed to list storage");
+    }
+}
+
+function printStorageHelp(): void {
+    console.log("");
+    console.log(chalk.bold("  rebase cloud storage"));
+    console.log("");
+    console.log("  " + chalk.blue.bold("storage") + "                   List this project's storage");
+    console.log("  " + chalk.blue.bold("storage create") + "            Provision platform-managed storage");
+    console.log("  " + chalk.blue.bold("storage attach") + "            Attach your own S3-compatible bucket");
+    console.log("");
+    console.log(chalk.gray("  attach options:"));
+    console.log(chalk.gray("    --bucket <name>          Bucket name (required)"));
+    console.log(chalk.gray("    --access-key-id <id>     Access key ID (required)"));
+    console.log(chalk.gray("    --secret-access-key <s>  Secret access key (required)"));
+    console.log(chalk.gray("    --endpoint <url>         S3 endpoint; omit for AWS"));
+    console.log(chalk.gray("    --region <region>        Region"));
+    console.log(chalk.gray("    --force-path-style       Required by MinIO and some gateways"));
+    console.log("");
+    console.log(chalk.gray("  Without either, a tenant falls back to the container filesystem and"));
+    console.log(chalk.gray("  loses uploaded files on its next restart."));
+    console.log("");
+}
+
+/* ─── storage create: platform-managed ─────────────────────────── */
+
+async function storageCreateCommand(rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+
+    try {
+        console.log("");
+        console.log(chalk.gray("  Provisioning managed storage — this creates a bucket and its credentials..."));
+
+        const res = await client.functions.invoke<{
+            data: { bucketName: string; region: string; endpoint: string; accessKeyId: string };
+        }>(`storage-provision/${encodeURIComponent(projectId)}`, undefined, { method: "POST" });
+
+        const info = (res as unknown as { data?: typeof res.data }).data ?? res.data;
+
+        success(`Managed storage provisioned for ${displayProjectRef(rawArgs)}.`);
+        keyValues([
+            ["Bucket", info.bucketName],
+            ["Region", info.region],
+            ["Endpoint", info.endpoint],
+            ["Access key", info.accessKeyId]
+        ]);
+        console.log("");
+        // The secret is never returned by the endpoint — it goes to the row and
+        // to the tenant's environment. Say so, or the absence reads as a bug.
+        console.log(chalk.gray("  The secret key is stored encrypted and injected at deploy time; it is not displayed."));
+        console.log(chalk.gray("  Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
+        console.log("");
+    } catch (e) {
+        reportError(e, "Failed to provision managed storage");
+    }
+}
+
+/* ─── storage attach: bring your own ───────────────────────────── */
+
+async function storageAttachCommand(rawArgs: string[]): Promise<void> {
+    const parsed = arg(
+        {
+            "--bucket": String,
+            "--access-key-id": String,
+            "--secret-access-key": String,
+            "--endpoint": String,
+            "--region": String,
+            "--force-path-style": Boolean
+        },
+        { argv: rawArgs.slice(3), permissive: true }
+    );
+
+    const bucket = parsed["--bucket"];
+    const accessKeyId = parsed["--access-key-id"];
+    const secretAccessKey = parsed["--secret-access-key"];
+
+    // All three or none. A bucket carrying no credentials is the state that
+    // reads as configured in the console and fails on the first upload.
+    const missing = [
+        !bucket && "--bucket",
+        !accessKeyId && "--access-key-id",
+        !secretAccessKey && "--secret-access-key"
+    ].filter(Boolean) as string[];
+    if (missing.length > 0) {
+        fail(
+            `Missing ${missing.join(", ")}.`,
+            "A bucket without credentials cannot be used, and would be stored as though it could. " +
+            "Run `rebase cloud storage --help` for the full list."
+        );
+    }
+
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+
+    try {
+        const existing = (await client.data.collection("storages").find({
+            where: { project: ["==", projectId] },
+            limit: 1
+        })).data[0] as { id?: string | number } | undefined;
+
+        const row: Record<string, unknown> = {
+            project: projectId,
+            type: "byos",
+            status: "active",
+            s3Bucket: bucket,
+            s3AccessKeyId: accessKeyId,
+            s3SecretAccessKey: secretAccessKey,
+            bucketName: bucket
+        };
+        if (parsed["--endpoint"]) row.s3Endpoint = parsed["--endpoint"];
+        if (parsed["--region"]) {
+            row.s3Region = parsed["--region"];
+            row.region = parsed["--region"];
+        }
+        // Only when set: AWS rejects path style, so an unconditional false
+        // would be noise in every project that does not need it.
+        if (parsed["--force-path-style"]) row.s3ForcePathStyle = true;
+
+        if (existing?.id) {
+            await client.data.collection("storages").update(String(existing.id), row);
+        } else {
+            await client.data.collection("storages").create(row);
+        }
+
+        success(`Storage attached to ${displayProjectRef(rawArgs)}.`);
+        keyValues([
+            ["Bucket", bucket],
+            ["Endpoint", parsed["--endpoint"] ?? "AWS S3"],
+            ["Region", parsed["--region"] ?? "(default)"]
+        ]);
+        console.log("");
+        console.log(chalk.gray("  Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
+        console.log("");
+    } catch (e) {
+        reportError(e, "Failed to attach storage");
     }
 }
 
