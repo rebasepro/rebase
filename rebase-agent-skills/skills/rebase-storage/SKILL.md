@@ -67,6 +67,43 @@ These options are set internally when mounting routes but are derived from the b
 | `basePath` | `string` | `"/api/storage"` | Base path for storage routes |
 | `requireAuth` | `boolean` | `true` | Require authentication for write operations |
 | `publicRead` | `boolean` | `false` | Allow unauthenticated read access to stored files |
+| `authorize` | `StorageAuthorize` | — | Per-object access control (see below) |
+
+## Per-Object Authorization
+
+> **REQUIRED FOR MULTI-TENANT APPS.** `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an `authorize` hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model.
+
+Set `storageAuthorize` on `initializeRebaseBackend`. It is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
+
+```typescript
+await initializeRebaseBackend({
+    storage: { type: "s3", bucket: "app-files", /* ... */ },
+    storageAuthorize: async ({ key, bucket, operation, user }) => {
+        if (!user) return false;
+        // Keys are laid out as `{teamId}/{docId}/...`
+        const [teamId] = key.split("/");
+        return isTeamMember(user.userId, teamId);
+    }
+});
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | `string` | Object key, bucket prefix stripped and traversal sanitized |
+| `bucket` | `string` | Resolved bucket (`"default"` when unspecified) |
+| `operation` | `"read" \| "write" \| "delete" \| "list"` | What the request is attempting |
+| `user` | `{ userId, email?, roles? } \| null` | Resolved caller; `null` when the route allows anonymous access |
+| `storageId` | `string \| undefined` | Named backend, when the request targeted one |
+
+Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
+
+Notes:
+
+- **`GET /metadata/*` is the important one.** It mints the short-lived path-scoped download token that `GET /file/*` trusts, so it is where read access is really decided. The hook gates it.
+- Requests already carrying a valid scoped download token, or hitting a declared public path, **skip** the hook — the token was minted under it and is valid only for its own path.
+- `list` is gated on the *prefix*. Listing is how you discover keys nobody told you about.
+- TUS resumable uploads are gated at create time, so a denied upload leaves no temp file behind.
+- Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
 
 ## Storage Providers
 
@@ -90,9 +127,9 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-> **WARNING FOR AGENTS:** In production, the backend logs a warning if local storage is used. Local files are lost on container restart. Set `FORCE_LOCAL_STORAGE=true` to suppress the warning, or use S3 for production.
+> **WARNING FOR AGENTS:** In production the backend **refuses to boot** on `type: "local"`. Local storage is the container filesystem, so every uploaded file is destroyed on the next restart or redeploy — silently, with no error at write or read time. Use S3/GCS in production. `FORCE_LOCAL_STORAGE=true` overrides the refusal, and is only correct when a durable volume is actually mounted at the storage path.
 
-Local storage uses a `{basePath}/{bucket}/{path}` directory structure. The default bucket is `"default"`. Every uploaded file gets a sidecar `.metadata.json` file containing:
+Local storage uses a `{basePath}/{bucket}/{path}` directory structure. The default bucket is `"default"`, and it is applied consistently across `putObject`, `getObject`, `deleteObject` and `listObjects` — a bare key round-trips. Every uploaded file gets a sidecar `.metadata.json` file containing:
 
 ```json
 {
@@ -222,7 +259,7 @@ The backend validates storage-related environment variables via a Zod schema:
 |----------|------|---------|-------------|
 | `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | Storage provider type |
 | `STORAGE_PATH` | `string` | `"./uploads"` | Base path for local storage / TUS temp directory |
-| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Suppress the production warning for local storage |
+| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Allow local storage in production (refuses to boot otherwise) |
 | `S3_BUCKET` | `string` | — | S3 bucket name |
 | `S3_REGION` | `string` | — | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | — | S3 access key ID |
@@ -431,6 +468,8 @@ List files and folders in a given prefix.
 | `bucket` | `string` | `"default"` (local) | Bucket name |
 | `maxResults` | `number` | `1000` | Maximum number of results |
 | `pageToken` | `string` | — | Pagination token from previous response |
+
+> Listing is **one level deep**: files land in `items`, immediate subfolders in `prefixes`. "Everything under this prefix" needs an explicit recursive walk over `prefixes`.
 
 **Response** (200):
 

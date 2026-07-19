@@ -1,0 +1,186 @@
+import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+/**
+ * Per-object authorization on storage routes.
+ *
+ * Storage authenticated but did not authorize: `requireAuth` and `publicRead`
+ * are global switches, so any signed-in user could read any key they could
+ * name. These tests pin the hook that closes that — including on `/metadata`,
+ * which mints the path-scoped download token `/file/*` trusts, and was
+ * therefore the actual hole rather than the file route itself.
+ */
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import { Hono } from "hono";
+import { HonoEnv } from "../src/api/types";
+import { errorHandler } from "../src/api/errors";
+import { LocalStorageController } from "../src/storage/LocalStorageController";
+import { createStorageRoutes } from "../src/storage/routes";
+import { configureJwt } from "../src/auth/jwt";
+import type { StorageAuthorizeContext } from "../src/storage/types";
+
+describe("storage per-object authorization", () => {
+    let app: Hono<HonoEnv>;
+    let tempDir: string;
+    let controller: LocalStorageController;
+    let calls: StorageAuthorizeContext[];
+
+    /** Only the owner named in the key's first segment may touch it. */
+    const ownerOnly = async (ctx: StorageAuthorizeContext) => {
+        calls.push(ctx);
+        return ctx.key.split("/")[0] === "alice";
+    };
+
+    async function mount(authorize?: (ctx: StorageAuthorizeContext) => Promise<boolean>) {
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/api/storage", createStorageRoutes({
+            controller,
+            requireAuth: false,
+            authorize
+        }));
+    }
+
+    beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
+        calls = [];
+        tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-authz-"));
+        controller = new LocalStorageController({ basePath: tempDir });
+
+        for (const owner of ["alice", "bob"]) {
+            await controller.putObject({
+                file: new File([Buffer.from(`${owner} secret`)], "notes.txt", { type: "text/plain" }),
+                key: `${owner}/notes.txt`
+            });
+        }
+
+        await mount(ownerOnly);
+    });
+
+    afterEach(async () => {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+    });
+
+    describe("reads", () => {
+        it("serves an object the hook allows", async () => {
+            const res = await app.fetch(new Request("http://localhost/api/storage/file/alice/notes.txt"));
+
+            expect(res.status).toBe(200);
+            expect(await res.text()).toBe("alice secret");
+        });
+
+        it("refuses an object the hook denies", async () => {
+            const res = await app.fetch(new Request("http://localhost/api/storage/file/bob/notes.txt"));
+
+            expect(res.status).toBe(403);
+        });
+
+        it("refuses to mint a download token for someone else's object", async () => {
+            // The reported gap: getSignedUrl would mint a scoped token for any
+            // authenticated caller for any path, so rejecting full-access JWTs
+            // on the file route bought nothing.
+            const res = await app.fetch(new Request("http://localhost/api/storage/metadata/default/bob/notes.txt"));
+
+            expect(res.status).toBe(403);
+        });
+
+        it("still mints a token for an object the caller owns", async () => {
+            const res = await app.fetch(new Request("http://localhost/api/storage/metadata/default/alice/notes.txt"));
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as { data: { token?: string } };
+            expect(body.data.token).toBeDefined();
+        });
+
+        it("passes the key with the bucket prefix stripped", async () => {
+            await app.fetch(new Request("http://localhost/api/storage/metadata/default/alice/notes.txt"));
+
+            expect(calls.at(-1)).toMatchObject({
+                key: "alice/notes.txt",
+                bucket: "default",
+                operation: "read"
+            });
+        });
+    });
+
+    describe("writes", () => {
+        it("refuses an upload into someone else's prefix", async () => {
+            const form = new FormData();
+            form.append("file", new File(["intruder"], "x.txt", { type: "text/plain" }));
+            form.append("key", "bob/x.txt");
+
+            const res = await app.fetch(new Request("http://localhost/api/storage/upload", {
+                method: "POST",
+                body: form
+            }));
+
+            expect(res.status).toBe(403);
+            // And nothing was written.
+            expect(await controller.getObject("bob/x.txt")).toBeNull();
+        });
+
+        it("allows an upload into the caller's own prefix", async () => {
+            const form = new FormData();
+            form.append("file", new File(["mine"], "y.txt", { type: "text/plain" }));
+            form.append("key", "alice/y.txt");
+
+            const res = await app.fetch(new Request("http://localhost/api/storage/upload", {
+                method: "POST",
+                body: form
+            }));
+
+            expect(res.status).toBe(201);
+            expect(await controller.getObject("alice/y.txt")).not.toBeNull();
+        });
+
+        it("refuses a delete the hook denies, and does not delete", async () => {
+            const res = await app.fetch(new Request("http://localhost/api/storage/file/bob/notes.txt", {
+                method: "DELETE"
+            }));
+
+            expect(res.status).toBe(403);
+            expect(await controller.getObject("bob/notes.txt")).not.toBeNull();
+            expect(calls.at(-1)).toMatchObject({ operation: "delete", key: "bob/notes.txt" });
+        });
+    });
+
+    describe("listing", () => {
+        it("refuses to list a prefix the hook denies", async () => {
+            // Listing is how you discover keys nobody told you about, so an
+            // ungated list would hand back what read control is withholding.
+            const res = await app.fetch(new Request("http://localhost/api/storage/list?prefix=bob"));
+
+            expect(res.status).toBe(403);
+            expect(calls.at(-1)).toMatchObject({ operation: "list", key: "bob" });
+        });
+
+        it("allows a prefix the hook permits", async () => {
+            const res = await app.fetch(new Request("http://localhost/api/storage/list?prefix=alice"));
+
+            expect(res.status).toBe(200);
+        });
+    });
+
+    describe("fail-closed behaviour", () => {
+        it("denies when the hook throws", async () => {
+            // An ownership lookup that fails (DB down, row missing) must not
+            // fall open.
+            await mount(async () => { throw new Error("lookup failed"); });
+
+            const res = await app.fetch(new Request("http://localhost/api/storage/file/alice/notes.txt"));
+
+            expect(res.status).toBe(403);
+        });
+    });
+
+    describe("without a hook", () => {
+        it("keeps the previous behaviour", async () => {
+            // Opt-in: existing single-tenant apps are unaffected.
+            await mount(undefined);
+
+            const res = await app.fetch(new Request("http://localhost/api/storage/file/bob/notes.txt"));
+
+            expect(res.status).toBe(200);
+        });
+    });
+});
