@@ -511,6 +511,22 @@ const callbacks: CollectionCallbacks = {
 
 Run `rebase db push` after adding the policy — the config is only its source.
 
+#### Editing a rule renames its policy
+
+A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's *semantics*. So **editing** a rule (as opposed to adding one) produces a policy under a new name, and the policy under the old name is a leftover.
+
+This used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, so a superseded `USING (auth.uid() IS NOT NULL)` kept granting everything no matter how tight its replacement was. Tightening a rule had no effect, and push reported success.
+
+`db push` now reconciles this automatically — it drops generated policies that no longer correspond to any rule, and reports (without dropping) any custom-named policy it finds that your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
+
+To audit an existing database — including one that was pushed before this landed — run:
+
+```bash
+rebase doctor --policies
+```
+
+It exits non-zero on drift, so it works as a CI gate.
+
 ### Membership-Scoped Access (RLS, no N+1)
 
 When membership lives in a **join collection** (e.g. `team_members`), prefer the

@@ -176,6 +176,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             
             if (databaseUrl) {
                 await applyPolicies(databaseUrl);
+                await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
             } else {
                 logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
@@ -266,6 +267,65 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
             logger.error(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
         }
         process.exit(1);
+    }
+}
+
+/**
+ * Remove the policies an earlier push superseded but never dropped.
+ *
+ * `policies.sql` only DROPs the names it is about to CREATE, and a rule's
+ * generated name contains a hash of its own semantics — so editing a rule
+ * writes a *new* policy and abandons the old one. Postgres ORs PERMISSIVE
+ * policies together, which makes an abandoned grant outrank every tightening
+ * that replaced it, and push reported success the whole time.
+ *
+ * Runs after `applyPolicies` so the current policies are already in place: the
+ * drift check then sees exactly the set that should survive, and anything else
+ * on a managed table is by definition left over.
+ */
+async function reconcilePolicies(databaseUrl: string, collectionsPath: string): Promise<void> {
+    try {
+        const { checkPolicyDrift, dropOrphanedPolicies, formatPolicyDrift, hasDrift } =
+            await import("./security/policy-drift");
+        const { loadCollections } = await import("./schema/doctor");
+
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            const drift = await checkPolicyDrift(client as never, collections);
+            const { dropped, kept } = await dropOrphanedPolicies(client as never, drift, collections);
+
+            for (const p of dropped) {
+                logger.info(chalk.gray(`  ✓ Dropped superseded policy "${p.name}" on ${p.schema}.${p.table}`));
+            }
+            if (dropped.length > 0) {
+                logger.info(chalk.green(`  ✓ Removed ${dropped.length} superseded RLS ${dropped.length === 1 ? "policy" : "policies"}.`));
+            }
+
+            // Custom-named orphans are indistinguishable from policies someone
+            // wrote in SQL deliberately, so they are reported, never dropped.
+            if (kept.length > 0) {
+                logger.warn(chalk.yellow("  ⚠️  Policies in the database that no collection describes:"));
+                for (const p of kept) {
+                    logger.warn(chalk.yellow(`       • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`));
+                }
+                logger.warn(chalk.yellow("       These still grant access. Drop them by hand if they are stale."));
+            }
+
+            // Missing/diverged are not push's to fix, but staying silent about
+            // them is how a database ends up not matching its config.
+            const remaining = { ...drift, orphaned: kept };
+            if (hasDrift(remaining) && (remaining.missing.length > 0 || remaining.diverged.length > 0)) {
+                logger.warn(chalk.yellow("  ⚠️  RLS policies do not match your collections:"));
+                logger.warn(formatPolicyDrift({ ...remaining, orphaned: [] }));
+            }
+        } finally {
+            await client.end();
+        }
+    } catch (err) {
+        logger.warn(chalk.yellow(`  ⚠️  Could not reconcile RLS policies: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
