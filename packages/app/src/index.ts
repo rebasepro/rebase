@@ -12,6 +12,7 @@ export * from "./contexts";
 export { CONTAINER_FULL_WIDTH, ADDITIONAL_TAB_WIDTH, FORM_CONTAINER_WIDTH } from "./internal/common";
 export { useRestoreScroll } from "./internal/useRestoreScroll";
 export { useUnsavedChangesDialog } from "./hooks/useUnsavedChangesDialog";
+export { NavigationBlockerProvider, useNavigationBlocker } from "./hooks/useNavigationBlocker";
 export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialog";
 export { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 export * from "./i18n/RebaseI18nProvider";

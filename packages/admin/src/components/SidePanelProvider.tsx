@@ -8,7 +8,7 @@ import { BreadcrumbsProvider } from "../contexts/BreacrumbsContext";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 import { useCollectionRegistryController, useUrlController } from "../index";
 import { useNavigationStateController } from "../index";
-import { useAuthController, useBridgeRegistration } from "@rebasepro/app";
+import { useAuthController, useBridgeRegistration, NavigationBlockerProvider } from "@rebasepro/app";
 
 /**
  * Provider that builds the SidePanelController and makes it available
@@ -54,14 +54,16 @@ export function SidePanelProvider({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <BreadcrumbsProvider>
-            <SideDialogsControllerContext.Provider value={sideDialogsController}>
-                <SidePanelControllerContext.Provider value={sidePanelController}>
-                    <BridgeAutoRegistrar sidePanelController={sidePanelController}/>
-                    {children}
-                </SidePanelControllerContext.Provider>
-            </SideDialogsControllerContext.Provider>
-        </BreadcrumbsProvider>
+        <NavigationBlockerProvider>
+            <BreadcrumbsProvider>
+                <SideDialogsControllerContext.Provider value={sideDialogsController}>
+                    <SidePanelControllerContext.Provider value={sidePanelController}>
+                        <BridgeAutoRegistrar sidePanelController={sidePanelController}/>
+                        {children}
+                    </SidePanelControllerContext.Provider>
+                </SideDialogsControllerContext.Provider>
+            </BreadcrumbsProvider>
+        </NavigationBlockerProvider>
     );
 }
 

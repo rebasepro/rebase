@@ -61,8 +61,10 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
         if (props.onUpdate) {
             props.onUpdate(params);
         }
-        setShowEditInPanel(false);
+        setEditInDialog(false);
         if (params.status !== "existing") {
+            // A newly created entity replaces the panel with its own address,
+            // which already leaves the edit view behind.
             sidePanelController.replace({
                 path: params.path,
                 entityId: params.entityId,
@@ -70,6 +72,8 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
                 updateUrl: collection?.openEntityMode !== "dialog",
                 collection: params.collection
             });
+        } else {
+            closeEditView();
         }
 
         if (sideDialogsController.pendingClose) {
@@ -89,13 +93,46 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
 
     const collection = collectionRegistryController.getCollection(path) ?? props.collection;
 
-    const [showEditInPanel, setShowEditInPanel] = useState(selectedTab === "edit");
+    // Dialog mode deliberately stays out of the URL, so it is the only case that
+    // needs local edit state. Everywhere else `edit` is a path segment, which
+    // keeps refresh and the back button working the same way they do in split.
+    const isDialogMode = collection?.openEntityMode === "dialog";
+    const [editInDialog, setEditInDialog] = useState(false);
+    const showEditInPanel = isDialogMode ? editInDialog : selectedTab === "edit";
     const isDetailMode = collection?.defaultEntityAction === "view" && !showEditInPanel && Boolean(entityId);
 
     // Reset edit mode when switching entities
     useEffect(() => {
-        setShowEditInPanel(selectedTab === "edit");
-    }, [entityId, selectedTab]);
+        setEditInDialog(false);
+    }, [entityId]);
+
+    const openEditView = useCallback(() => {
+        if (isDialogMode || !entityId) {
+            setEditInDialog(true);
+            return;
+        }
+        sidePanelController.replace({
+            path,
+            entityId,
+            selectedTab: "edit",
+            updateUrl: true,
+            collection
+        });
+    }, [isDialogMode, entityId, path, collection, sidePanelController]);
+
+    const closeEditView = useCallback(() => {
+        if (isDialogMode || !entityId) {
+            setEditInDialog(false);
+            return;
+        }
+        sidePanelController.replace({
+            path,
+            entityId,
+            selectedTab: undefined,
+            updateUrl: true,
+            collection
+        });
+    }, [isDialogMode, entityId, path, collection, sidePanelController]);
 
     // One-time correction: when the side panel opens without the correct
     // selectedTab but the resolved collection (from the registry) has a
@@ -154,7 +191,7 @@ entityId }
                         entityId={entityId!}
                         parentCollectionSlugs={parentCollectionSlugs}
                         parentEntityIds={parentEntityIds}
-                        onEditClick={() => setShowEditInPanel(true)}
+                        onEditClick={openEditView}
                         barActions={({
                             status,
                             values
@@ -203,7 +240,7 @@ entityId }
                         parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                         onValuesModified={onValuesModified}
                         onSaved={onUpdate}
-                        navigateBack={() => setShowEditInPanel(false)}
+                        navigateBack={closeEditView}
                         barActions={({
                             status,
                             values

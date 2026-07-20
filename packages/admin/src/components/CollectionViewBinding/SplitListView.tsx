@@ -8,11 +8,12 @@ import {
     defaultBorderMixin,
     ResizablePanels
 } from "@rebasepro/ui";
-import { useLargeLayout } from "@rebasepro/app";
+import { useLargeLayout, UnsavedChangesDialog, useNavigationBlocker } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../index";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUrlController } from "../../index";
 import { ErrorBoundary } from "@rebasepro/ui";
+import { withViewMode } from "../../util/view_mode";
 
 export type SplitListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: CollectionConfig<M>;
@@ -54,6 +55,27 @@ export type SplitListViewProps<M extends Record<string, unknown> = Record<string
 };
 
 const PANEL_SIZE_KEY = "rebase_split_list_panel_size";
+
+/**
+ * Whether the element accepts text, and therefore owns the keystroke.
+ * Covers native fields plus the ARIA roles custom editors expose.
+ */
+function isTextEntryTarget(target: HTMLElement | null): boolean {
+    if (!target) return false;
+    const tag = target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (target.isContentEditable) return true;
+    return Boolean(target.closest('[contenteditable="true"], [role="textbox"], [role="combobox"], [role="searchbox"]'));
+}
+
+/**
+ * Whether a bare letter shortcut may act on this target. Only the list side of
+ * the split owns them — inside the detail panel a keystroke belongs to the form.
+ */
+function isListShortcutTarget(target: HTMLElement | null, detailPanel: HTMLElement | null): boolean {
+    if (!target || target === document.body) return true;
+    return !detailPanel?.contains(target);
+}
 
 function getSavedPanelSize(path: string): number {
     try {
@@ -115,6 +137,37 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     const showDetail = selectedEntityId !== undefined;
 
+    // ── Unsaved changes ──
+    // The detail form lives inside the split layout, so every way out of it
+    // (Escape, j/k, clicking another row, the browser back button) is a plain
+    // router navigation. A ref — not state — because the blocker predicate must
+    // observe the change synchronously, before the navigation it is guarding.
+    const dirty = useRef(false);
+    const detailPanelRef = useRef<HTMLDivElement>(null);
+    const setDirty = useCallback((modified: boolean) => {
+        dirty.current = modified;
+    }, []);
+
+    // The form remounts per entity, so its dirty state must not leak into the next one.
+    useEffect(() => {
+        dirty.current = false;
+    }, [selectedEntityId]);
+
+    const blocker = useNavigationBlocker(useCallback(({
+        currentLocation,
+        nextLocation
+    }) => {
+        if (!dirty.current) return false;
+        if (currentLocation.pathname === nextLocation.pathname) return false;
+        // Side panel overlays (e.g. following a relation) render above the form
+        // and leave it mounted — nothing is lost in either direction.
+        const nextHash = nextLocation.hash;
+        if (nextHash === "#side" || nextHash === "#new_side") return false;
+        const currentHash = currentLocation.hash;
+        if (currentHash === "#side" || currentHash === "#new_side") return false;
+        return true;
+    }, []));
+
     // Panel size state with persistence
     const [panelSize, setPanelSize] = useState(() => getSavedPanelSize(path));
 
@@ -170,16 +223,15 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         };
     }, [selectedEntityId]); // Intentionally only depend on selectedEntityId
 
+    // Build a URL below this collection, preserving the active view mode.
+    const buildUrl = useCallback((subPath: string) => {
+        return withViewMode(urlController.buildUrlCollectionPath(subPath));
+    }, [urlController]);
+
     // Close the detail panel: navigate back to the collection path
     const handleCloseDetail = useCallback(() => {
-        let collectionUrl = urlController.buildUrlCollectionPath(path);
-        // Preserve the __view query param so the view mode is retained
-        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-        if (currentViewParam) {
-            collectionUrl += `${collectionUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-        }
-        navigate(collectionUrl);
-    }, [navigate, urlController, path]);
+        navigate(buildUrl(path));
+    }, [navigate, buildUrl, path]);
 
     // ── Keyboard navigation ──
     const entityIds = useMemo(
@@ -189,22 +241,32 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Don't intercept when user is typing in an input/textarea
-            const tag = (e.target as HTMLElement)?.tagName;
-            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target as HTMLElement)?.isContentEditable) {
-                // Only intercept Escape when inside the detail panel
-                if (e.key === "Escape" && selectedEntityId) {
-                    handleCloseDetail();
-                    e.preventDefault();
-                }
-                return;
-            }
+            const target = e.target as HTMLElement | null;
 
-            if (e.key === "Escape" && selectedEntityId) {
+            // Radix overlays own the keyboard while they are open — including Escape.
+            if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+
+            if (e.key === "Escape") {
+                if (!selectedEntityId) return;
+                // First Escape leaves the field (which may also be dismissing its
+                // own dropdown), a second one closes the panel. Closing straight
+                // from a focused field would discard an in-progress edit.
+                if (isTextEntryTarget(target)) {
+                    target?.blur();
+                    e.preventDefault();
+                    return;
+                }
                 handleCloseDetail();
                 e.preventDefault();
                 return;
             }
+
+            // Record navigation only belongs to the list side. Inside the detail
+            // panel these keys are the form's — arrows move between fields, and a
+            // bare letter is input for widgets that aren't native fields (rich
+            // text, code editors, comboboxes).
+            if (!isListShortcutTarget(target, detailPanelRef.current)) return;
+            if (isTextEntryTarget(target)) return;
 
             // Arrow down / j → next entity
             if ((e.key === "ArrowDown" || e.key === "j") && !e.metaKey && !e.ctrlKey) {
@@ -282,6 +344,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
 
     const detailPanel = renderedEntityId !== undefined ? (
         <div
+            ref={detailPanelRef}
             className={cls(
                 "flex-1 flex flex-col min-w-0 h-full transition-all ease-out w-full",
                 animationPhase === "entered"
@@ -302,25 +365,15 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                         selectedTab={selectedTab}
                         layout="split"
                         onEditClick={() => {
-                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}/edit`);
-                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-                            if (currentViewParam) {
-                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-                            }
-                            navigate(entityUrl);
+                            navigate(buildUrl(`${path}/${renderedEntityId}/edit`));
                         }}
                         onTabChange={(params) => {
                             const newSelectedTab = params.selectedTab;
-                            let entityUrl = urlController.buildUrlCollectionPath(
+                            navigate(buildUrl(
                                 newSelectedTab
                                     ? `${path}/${renderedEntityId}/${newSelectedTab}`
                                     : `${path}/${renderedEntityId}`
-                            );
-                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-                            if (currentViewParam) {
-                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-                            }
-                            navigate(entityUrl);
+                            ));
                         }}
                     />
                     : <EditViewBinding
@@ -332,34 +385,21 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                         parentEntityIds={usedParentEntityIds}
                         selectedTab={selectedTab}
                         layout="split"
-                        onSaved={(params) => {
-                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}`);
-                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-                            if (currentViewParam) {
-                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-                            }
-                            navigate(entityUrl, { replace: true });
+                        onValuesModified={setDirty}
+                        onSaved={() => {
+                            setDirty(false);
+                            navigate(buildUrl(`${path}/${renderedEntityId}`), { replace: true });
                         }}
                         navigateBack={() => {
-                            let entityUrl = urlController.buildUrlCollectionPath(`${path}/${renderedEntityId}`);
-                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-                            if (currentViewParam) {
-                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-                            }
-                            navigate(entityUrl);
+                            navigate(buildUrl(`${path}/${renderedEntityId}`));
                         }}
                         onTabChange={(params) => {
                             const newSelectedTab = params.selectedTab;
-                            let entityUrl = urlController.buildUrlCollectionPath(
+                            navigate(buildUrl(
                                 newSelectedTab
                                     ? `${path}/${renderedEntityId}/${newSelectedTab}`
                                     : `${path}/${renderedEntityId}`
-                            );
-                            const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-                            if (currentViewParam) {
-                                entityUrl += `${entityUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-                            }
-                            navigate(entityUrl);
+                            ));
                         }}
                     />
                 }
@@ -368,14 +408,25 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     ) : <></>;
 
     return (
-        <ResizablePanels
-            stacked={!largeLayout}
-            firstPanel={listPanel}
-            secondPanel={detailPanel}
-            showSecondPanel={isDetailVisible}
-            panelSizePercent={animationPhase === "entering" ? 100 : panelSize}
-            onPanelSizeChange={setPanelSize}
-            minPanelSizePx={240}
-        />
+        <>
+            <ResizablePanels
+                stacked={!largeLayout}
+                firstPanel={listPanel}
+                secondPanel={detailPanel}
+                showSecondPanel={isDetailVisible}
+                panelSizePercent={animationPhase === "entering" ? 100 : panelSize}
+                onPanelSizeChange={setPanelSize}
+                minPanelSizePx={240}
+            />
+
+            <UnsavedChangesDialog
+                open={blocker?.state === "blocked"}
+                handleOk={() => {
+                    dirty.current = false;
+                    blocker?.proceed?.();
+                }}
+                handleCancel={() => blocker?.reset?.()}
+                body={<>You have unsaved changes in this <b>{collection.singularName ?? collection.name}</b>.</>}/>
+        </>
     );
 }
