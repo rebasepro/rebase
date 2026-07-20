@@ -380,9 +380,23 @@ export interface SQLAdmin {
     fetchAvailableDatabases?(): Promise<string[]>;
 
     /**
-     * Fetch the available database roles.
+     * Fetch the available *native PostgreSQL* database roles (from `pg_roles`).
+     *
+     * These are connection-level roles — what the SQL editor can `SET ROLE` to,
+     * and what `SecurityRule.pgRoles` targets. They are NOT application roles;
+     * for those use {@link fetchApplicationRoles}.
      */
     fetchAvailableRoles?(): Promise<string[]>;
+
+    /**
+     * Fetch the *application-level* roles in use in this project.
+     *
+     * These are the strings stored on the users table's `roles` column and
+     * exposed to policies as `auth.roles()` — what `SecurityRule.roles`
+     * matches against. Distinct from {@link fetchAvailableRoles}; the two are
+     * not interchangeable.
+     */
+    fetchApplicationRoles?(): Promise<string[]>;
 
     /**
      * Fetch the current database name.

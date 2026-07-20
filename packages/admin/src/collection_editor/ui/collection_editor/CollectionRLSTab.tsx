@@ -132,6 +132,41 @@ export function CollectionRLSTab() {
         fetchLivePolicies();
     }, [databaseAdmin, values.id, values.table, values.alias]);
 
+    /**
+     * Application roles available to `SecurityRule.roles`.
+     *
+     * Deliberately NOT `fetchAvailableRoles` — that returns native pg_roles
+     * (postgres, rebase_user, …), which can never satisfy an application-role
+     * condition.
+     */
+    const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+    const [rolesUnavailable, setRolesUnavailable] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchRoles = async () => {
+            if (!databaseAdmin?.fetchApplicationRoles) {
+                // Older backend, or a driver with no application-role concept.
+                if (mounted) setRolesUnavailable(true);
+                return;
+            }
+            try {
+                const fetched = await databaseAdmin.fetchApplicationRoles();
+                if (mounted) {
+                    setAvailableRoles(fetched);
+                    setRolesUnavailable(false);
+                }
+            } catch (e) {
+                console.error("Failed to fetch application roles", e);
+                if (mounted) setRolesUnavailable(true);
+            }
+        };
+        fetchRoles();
+        return () => {
+            mounted = false;
+        };
+    }, [databaseAdmin]);
+
     const tableName = values.id || values.table || values.alias;
 
     /**
@@ -219,7 +254,7 @@ export function CollectionRLSTab() {
                                         tablename: values.id || values.table || values.alias || "your_table",
                                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
                                         cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                                        roles: rule.roles || ["public"],
+                                        roles: rule.roles || [],
                                         qual: rule.using || null,
                                         with_check: rule.withCheck || null
                                     })}>
@@ -293,6 +328,8 @@ export function CollectionRLSTab() {
                         <InlinePolicyEditor
                             policy={editingPolicy === "new" ? undefined : editingPolicy}
                             table={values.id || values.table || values.alias || "your_table"}
+                            availableRoles={availableRoles}
+                            rolesUnavailable={rolesUnavailable}
                             onSave={handleSave}
                             onCancel={() => setEditingPolicy(null)}
                         />
@@ -307,29 +344,56 @@ export function CollectionRLSTab() {
 
 type PolicyCommand = "ALL" | "SELECT" | "INSERT" | "UPDATE" | "DELETE";
 const COMMAND_OPTIONS: PolicyCommand[] = ["ALL", "SELECT", "INSERT", "UPDATE", "DELETE"];
-const ROLE_OPTIONS = ["public", "authenticated", "anon", "admin"];
 
 function InlinePolicyEditor({
     policy,
     table,
+    availableRoles,
+    rolesUnavailable,
     onSave,
     onCancel
 }: {
     policy?: PostgresPolicy;
     table: string;
+    availableRoles: string[];
+    rolesUnavailable: boolean;
     onSave: (policyData: Partial<PostgresPolicy>) => void;
     onCancel: () => void;
 }) {
     const [name, setName] = useState(policy?.policyname || "");
     const [behavior, setBehavior] = useState<"PERMISSIVE" | "RESTRICTIVE">(policy?.permissive || "PERMISSIVE");
     const [command, setCommand] = useState<PolicyCommand>((policy?.cmd as PolicyCommand) || "ALL");
+    // No roles means "not restricted by role". Seeding a value here would
+    // silently narrow every new policy to it.
     const [roles, setRoles] = useState<string[]>(
-        policy?.roles ? (Array.isArray(policy.roles) ? policy.roles : [policy.roles]) : ["public"]
+        policy?.roles ? (Array.isArray(policy.roles) ? policy.roles : [policy.roles]) : []
     );
+    const [customRole, setCustomRole] = useState("");
     const [usingExpr, setUsingExpr] = useState(policy?.qual || "");
     const [checkExpr, setCheckExpr] = useState(policy?.with_check || "");
 
     const showCheck = command === "ALL" || command === "INSERT" || command === "UPDATE";
+
+    /**
+     * Roles offered in the dropdown: those in use in the project, plus any the
+     * rule already carries. The union matters — application roles are derived
+     * from what users hold, so a role that is referenced here but assigned to
+     * nobody would otherwise vanish from its own policy on the next save.
+     */
+    const roleOptions = useMemo(
+        () => Array.from(new Set([...availableRoles, ...roles])).sort(),
+        [availableRoles, roles]
+    );
+
+    const addCustomRole = () => {
+        const trimmed = customRole.trim();
+        if (!trimmed || roles.includes(trimmed)) {
+            setCustomRole("");
+            return;
+        }
+        setRoles([...roles, trimmed]);
+        setCustomRole("");
+    };
 
     return (
         <>
@@ -365,10 +429,41 @@ function InlinePolicyEditor({
                         </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                        <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Target Roles</Typography>
-                        <MultiSelect size="small" value={roles} onValueChange={setRoles} placeholder="Select roles">
-                            {ROLE_OPTIONS.map(r => <MultiSelectItem key={r} value={r}>{r}</MultiSelectItem>)}
-                        </MultiSelect>
+                        <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Application Roles</Typography>
+                        <Typography variant="caption" className="text-text-secondary opacity-80 -mt-1">
+                            Roles held by users of this project, matched via <span className="font-mono">auth.roles()</span>.
+                            These are not PostgreSQL roles — leave empty to apply the policy to everyone.
+                        </Typography>
+                        {roleOptions.length > 0 && (
+                            <MultiSelect size="small" value={roles} onValueChange={setRoles} placeholder="Select roles">
+                                {roleOptions.map(r => <MultiSelectItem key={r} value={r}>{r}</MultiSelectItem>)}
+                            </MultiSelect>
+                        )}
+                        {rolesUnavailable && roleOptions.length === 0 && (
+                            <Typography variant="caption" className="text-text-secondary opacity-80">
+                                Could not load the project&apos;s roles — enter them manually below.
+                            </Typography>
+                        )}
+                        {!rolesUnavailable && roleOptions.length === 0 && (
+                            <Typography variant="caption" className="text-text-secondary opacity-80">
+                                No roles are assigned to any user yet — enter one manually below.
+                            </Typography>
+                        )}
+                        <div className="flex gap-2 items-center">
+                            <TextField size="small" value={customRole}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCustomRole(e.target.value)}
+                                onKeyDown={(e: React.KeyboardEvent) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addCustomRole();
+                                    }
+                                }}
+                                placeholder="Add a role not listed, e.g. editor"/>
+                            <Button size="small" variant="outlined" color="neutral"
+                                disabled={!customRole.trim()} onClick={addCustomRole}>
+                                Add
+                            </Button>
+                        </div>
                     </div>
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">

@@ -1071,9 +1071,14 @@ export interface SecurityRuleBase {
      * **Shortcut.** Restrict this rule to users that have one of these
      * application-level roles.
      *
-     * **Important:** These are NOT native PostgreSQL database roles. They are
-     * application roles managed by Rebase, stored in the `rebase.user_roles`
-     * table, and injected into each transaction via `auth.roles()`.
+     * **Important:** These are NOT native PostgreSQL database roles — names
+     * like `public`, `anon` or `authenticated` belong to {@link pgRoles} and
+     * produce a condition no user can satisfy if used here. These are
+     * application roles managed by Rebase, stored as an inline `roles TEXT[]`
+     * column on the users table, and injected into each transaction as
+     * `app.user_roles` — which `auth.roles()` reads.
+     *
+     * There is no roles registry: a role exists once it is assigned to a user.
      *
      * Generates a safe array-overlap condition — the user passes if they hold
      * *any* of the listed roles:
@@ -1105,10 +1110,10 @@ export interface SecurityRuleBase {
      * every database connection). This is correct for most setups where
      * a single database role is used for all connections.
      *
-     * **Important:** These are NOT the same as the application-level `roles`
-     * (admin, editor, viewer, etc.) — those are enforced in the USING/WITH
-     * CHECK clauses via `auth.roles()`. This field controls the PostgreSQL
-     * `TO` clause in `CREATE POLICY ... TO role_name`.
+     * **Important:** These are NOT the same as the application-level
+     * {@link roles} (admin, editor, viewer, etc.) — those are enforced in the
+     * USING/WITH CHECK clauses via `auth.roles()`. This field controls the
+     * PostgreSQL `TO` clause in `CREATE POLICY ... TO role_name`.
      *
      * Use this if you have dedicated PostgreSQL roles (e.g. `app_read`,
      * `app_write`) and want policies to target specific ones.

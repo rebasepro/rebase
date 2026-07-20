@@ -288,6 +288,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                 executeSql: wsAdmin.executeSql!.bind(wsAdmin),
                 fetchAvailableDatabases: wsAdmin.fetchAvailableDatabases?.bind(wsAdmin),
                 fetchAvailableRoles: wsAdmin.fetchAvailableRoles?.bind(wsAdmin),
+                fetchApplicationRoles: wsAdmin.fetchApplicationRoles?.bind(wsAdmin),
                 fetchCurrentDatabase: wsAdmin.fetchCurrentDatabase?.bind(wsAdmin),
                 fetchUnmappedTables: wsAdmin.fetchUnmappedTables?.bind(wsAdmin),
                 fetchTableMetadata: wsAdmin.fetchTableMetadata?.bind(wsAdmin),

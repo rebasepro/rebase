@@ -126,6 +126,9 @@ databaseId },
             fetchAvailableRoles(): Promise<string[]> {
                 return client.fetchAvailableRoles();
             },
+            fetchApplicationRoles(): Promise<string[]> {
+                return client.fetchApplicationRoles();
+            },
             fetchCurrentDatabase(): Promise<string | undefined> {
                 return client.fetchCurrentDatabase();
             },

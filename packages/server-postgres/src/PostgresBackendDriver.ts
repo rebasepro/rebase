@@ -111,6 +111,7 @@ export class PostgresBackendDriver implements DataDriver {
             executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
             fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
             fetchAvailableRoles: () => this.fetchAvailableRoles(),
+            fetchApplicationRoles: () => this.fetchApplicationRoles(),
             fetchCurrentDatabase: () => this.fetchCurrentDatabase(),
             fetchUnmappedTables: (...args: Parameters<NonNullable<DatabaseAdmin["fetchUnmappedTables"]>>) => this.fetchUnmappedTables(...args),
             fetchTableMetadata: (...args: Parameters<NonNullable<DatabaseAdmin["fetchTableMetadata"]>>) => this.fetchTableMetadata(...args),
@@ -1169,6 +1170,56 @@ export class PostgresBackendDriver implements DataDriver {
             "SELECT rolname FROM pg_roles WHERE pg_has_role(current_user, rolname, 'member') ORDER BY rolname;"
         );
         return result.map((r: Record<string, unknown>) => r.rolname as string);
+    }
+
+    /**
+     * Application-level roles actually in use in this project.
+     *
+     * Distinct from {@link fetchAvailableRoles}, which returns native
+     * PostgreSQL roles from `pg_roles` (`postgres`, `rebase_user`, …). Those
+     * are the roles the SQL editor can `SET ROLE` to. *These* are the strings
+     * held in the users table's `roles` column, injected per-transaction as
+     * `auth.roles()` and matched by `SecurityRule.roles`. Feeding the pg roles
+     * into a `SecurityRule.roles` field produces a condition no user can ever
+     * satisfy, so the two must not be conflated.
+     *
+     * Roles have no registry table — they were migrated out of
+     * `rebase.user_roles` onto an inline `roles TEXT[]` column — so the live
+     * set is derived from what is assigned. A role that is declared in a policy
+     * but held by nobody yet cannot be discovered here; callers that need it
+     * should union in the roles they already know about.
+     */
+    async fetchApplicationRoles(): Promise<string[]> {
+        // The users table lives in `rebase` for a default (public) setup, but
+        // follows the configured schema otherwise — locate it rather than
+        // assuming. The `roles` ARRAY column is what makes it the auth table.
+        const located = await this.executeSql(`
+            SELECT table_schema, table_name
+            FROM information_schema.columns
+            WHERE column_name = 'roles'
+              AND data_type = 'ARRAY'
+              AND table_name = 'users'
+              AND table_schema NOT IN ('information_schema', 'pg_catalog')
+            ORDER BY (table_schema = 'rebase') DESC, table_schema
+            LIMIT 1;
+        `);
+        if (located.length === 0) return [];
+
+        const schema = located[0].table_schema as string;
+        const table = located[0].table_name as string;
+        // Identifiers come from information_schema, not user input, but they
+        // are still interpolated — quote them so odd-but-legal names survive.
+        const qualified = `"${schema.replace(/"/g, "\"\"")}"."${table.replace(/"/g, "\"\"")}"`;
+
+        const rows = await this.executeSql(`
+            SELECT DISTINCT unnest(roles) AS role
+            FROM ${qualified}
+            WHERE roles IS NOT NULL
+            ORDER BY role;
+        `);
+        return rows
+            .map((r) => r.role as string)
+            .filter((r): r is string => typeof r === "string" && r.length > 0);
     }
 
     async fetchCurrentDatabase(): Promise<string | undefined> {
