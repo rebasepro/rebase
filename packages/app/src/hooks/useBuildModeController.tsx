@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 
-import { ModeController } from "./index";
+import type { ModeController } from "./useModeController";
 
 /**
  * Use this hook to build a color mode controller that determines

@@ -1,5 +1,5 @@
 import { parseFirst } from "pgsql-ast-parser";
-import { TableInfo } from "../components/SQLEditor/SQLEditor";
+import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 import { CollectionConfig } from "@rebasepro/types";
 
 /**

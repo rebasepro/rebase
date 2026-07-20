@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from "@jest/globals";
 import { determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
-import { TableInfo } from "../components/SQLEditor/SQLEditor";
+import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 import { CollectionConfig } from "@rebasepro/types";
 
 const mockSchemas: Record<string, TableInfo[]> = {

@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
-import { useTranslation } from "../hooks";
+import { useTranslation } from "../hooks/useTranslation";
 
 export interface UnsavedChangesDialogProps {
     open: boolean;

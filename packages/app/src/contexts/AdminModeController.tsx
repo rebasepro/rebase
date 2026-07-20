@@ -1,5 +1,5 @@
 import React from "react";
-import { AdminModeController } from "../hooks";
+import type { AdminModeController } from "../hooks/useAdminModeController";
 
 const DEFAULT_ADMIN_MODE_STATE: AdminModeController = {
     mode: "content",

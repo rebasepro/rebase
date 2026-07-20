@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { cls, defaultBorderMixin, IconButton, iconSize, Tab, Tabs, Trash2Icon, Typography } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { SchemaBrowser } from "./SchemaBrowser";
-import { TableInfo } from "./SQLEditor";
+import type { TableInfo } from "./sql_editor_types";
 
 export interface Snippet {
     id: string;

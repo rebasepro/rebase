@@ -14,7 +14,7 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { TableInfo } from "./SQLEditor";
+import type { TableInfo } from "./sql_editor_types";
 import { ErrorView, useTranslation } from "@rebasepro/app";
 
 export const SchemaBrowser = ({

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { AdminModeController } from "./index";
+import type { AdminModeController } from "./useAdminModeController";
 
 /**
  * Use this hook to build an admin mode controller that determines

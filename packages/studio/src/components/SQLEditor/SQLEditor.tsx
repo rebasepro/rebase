@@ -49,17 +49,9 @@ import { parseFirst } from "pgsql-ast-parser";
 import { determineTableAndPK, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
-export interface SQLEditorColumnInfo {
-    name: string;
-    dataType: string;
-    isPrimaryKey: boolean;
-}
+import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
 
-export interface TableInfo {
-    schemaName: string;
-    tableName: string;
-    columns: SQLEditorColumnInfo[];
-}
+export type { SQLEditorColumnInfo, TableInfo };
 
 const QueryLoadingView = () => {
     const [elapsed, setElapsed] = useState(0);

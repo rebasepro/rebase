@@ -1,5 +1,5 @@
 import React from "react";
-import { ModeController } from "../hooks";
+import type { ModeController } from "../hooks/useModeController";
 
 const DEFAULT_MODE_STATE: ModeController = {
     mode: "light",

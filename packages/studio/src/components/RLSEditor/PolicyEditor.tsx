@@ -21,7 +21,7 @@ import {
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { MonacoEditor } from "../SQLEditor/MonacoEditor";
-import { PostgresPolicy } from "./RLSEditor";
+import type { PostgresPolicy } from "./RLSEditor";
 
 export interface PolicyEditorProps {
     policy?: PostgresPolicy;

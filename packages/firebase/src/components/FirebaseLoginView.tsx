@@ -26,13 +26,12 @@ import {
     PhoneMultiFactorGenerator,
     RecaptchaVerifier
 } from "@firebase/auth";
-import {
+import type {
     FirebaseAuthController,
     FirebaseSignInOption,
-    FirebaseSignInProvider,
-    RECAPTCHA_CONTAINER_ID,
-    useRecaptcha
-} from "../index";
+    FirebaseSignInProvider
+} from "../types/auth";
+import { RECAPTCHA_CONTAINER_ID, useRecaptcha } from "../hooks/useRecaptcha";
 
 /**
  * @category Firebase
