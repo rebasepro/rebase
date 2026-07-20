@@ -55,7 +55,7 @@ describe("MfaService", () => {
                 rows: [
                     {
                         id: "factor-1",
-                        user_id: "user-123",
+                        uid: "user-123",
                         factor_type: "totp",
                         friendly_name: "My Authenticator",
                         verified: false,
@@ -75,7 +75,7 @@ describe("MfaService", () => {
             expect(mockExecute).toHaveBeenCalledTimes(1);
             expect(result).toEqual({
                 id: "factor-1",
-                userId: "user-123",
+                uid: "user-123",
                 factorType: "totp",
                 friendlyName: "My Authenticator",
                 verified: false,
@@ -90,7 +90,7 @@ describe("MfaService", () => {
                 rows: [
                     {
                         id: "factor-2",
-                        user_id: "user-123",
+                        uid: "user-123",
                         factor_type: "totp",
                         friendly_name: null,
                         verified: false,
@@ -120,7 +120,7 @@ describe("MfaService", () => {
                 rows: [
                     {
                         id: "factor-1",
-                        user_id: "user-123",
+                        uid: "user-123",
                         factor_type: "totp",
                         friendly_name: "App1",
                         verified: true,
@@ -129,7 +129,7 @@ describe("MfaService", () => {
                     },
                     {
                         id: "factor-2",
-                        user_id: "user-123",
+                        uid: "user-123",
                         factor_type: "totp",
                         friendly_name: null,
                         verified: false,
@@ -145,7 +145,7 @@ describe("MfaService", () => {
             expect(result).toHaveLength(2);
             expect(result[0]).toEqual({
                 id: "factor-1",
-                userId: "user-123",
+                uid: "user-123",
                 factorType: "totp",
                 friendlyName: "App1",
                 verified: true,
@@ -174,7 +174,7 @@ describe("MfaService", () => {
                 rows: [
                     {
                         id: "factor-1",
-                        user_id: "user-123",
+                        uid: "user-123",
                         factor_type: "totp",
                         secret_encrypted: "enc-secret",
                         friendly_name: "My TOTP",
@@ -190,7 +190,7 @@ describe("MfaService", () => {
             expect(result).not.toBeNull();
             expect(result).toEqual({
                 id: "factor-1",
-                userId: "user-123",
+                uid: "user-123",
                 factorType: "totp",
                 secretEncrypted: "enc-secret",
                 friendlyName: "My TOTP",
@@ -226,7 +226,7 @@ describe("MfaService", () => {
     // deleteMfaFactor
     // =========================================================================
     describe("deleteMfaFactor", () => {
-        it("should execute DELETE matching factorId AND userId", async () => {
+        it("should execute DELETE matching factorId AND uid", async () => {
             mockExecute.mockResolvedValueOnce({ rows: [] });
 
             await mfaService.deleteMfaFactor("factor-1", "user-123");

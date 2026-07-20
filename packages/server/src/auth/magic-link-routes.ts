@@ -34,12 +34,12 @@ export function mountMagicLinkRoutes(deps: {
         refreshToken: string,
         providerId: string
     ) => unknown;
-    createSessionAndTokens: (userId: string, userAgent: string, ipAddress: string) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
+    createSessionAndTokens: (uid: string, userAgent: string, ipAddress: string) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
     applyTransformHook: (
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
         request: Request,
-        userId: string
+        uid: string
     ) => Promise<AuthResponsePayload>;
 }) {
     const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = deps;
@@ -136,7 +136,7 @@ export function mountMagicLinkRoutes(deps: {
         await authRepo.markMagicLinkTokenUsed(tokenHash);
 
         // Get user
-        const user = await authRepo.getUserById(storedToken.userId);
+        const user = await authRepo.getUserById(storedToken.uid);
         if (!user) {
             throw ApiError.badRequest("Invalid or expired magic link", "INVALID_TOKEN");
         }

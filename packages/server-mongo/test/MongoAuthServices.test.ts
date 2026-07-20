@@ -150,7 +150,7 @@ name: "Administrator" });
 
             const token = await repo.findRefreshTokenByHash("hash_token");
             expect(token).not.toBeNull();
-            expect(token?.userId).toBe("user1");
+            expect(token?.uid).toBe("user1");
             expect(token?.tokenHash).toBe("hash_token");
             expect(token?.userAgent).toBe("Mozilla");
             expect(token?.ipAddress).toBe("127.0.0.1");
@@ -173,7 +173,7 @@ name: "Administrator" });
 
             const validToken = await repo.findValidPasswordResetToken("reset_hash_valid");
             expect(validToken).not.toBeNull();
-            expect(validToken?.userId).toBe("user_valid");
+            expect(validToken?.uid).toBe("user_valid");
 
             const expiredToken = await repo.findValidPasswordResetToken("reset_hash_expired");
             expect(expiredToken).toBeNull();

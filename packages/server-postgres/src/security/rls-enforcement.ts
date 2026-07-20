@@ -200,7 +200,7 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
  * SECURITY: this function is only ever called on the **user** path (the server
  * context uses the base/owner driver and never calls it). The default policies
  * treat `auth.uid() IS NULL` as the trusted server context, and `auth.uid()`
- * is `NULLIF(current_setting('app.user_id'), '')` — so an EMPTY user id would
+ * is `NULLIF(current_setting('app.uid'), '')` — so an EMPTY user id would
  * be read as NULL and silently escalate a user request to server privileges.
  * Coerce empty/blank ids to `ANONYMOUS_USER_ID` here, at the single chokepoint,
  * rather than trusting every caller (e.g. realtime subscription auth) to do it.
@@ -212,8 +212,14 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
     const normalizedRoles = auth.roles.map((r: unknown) =>
         typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
     );
+    // `app.user_id` is the pre-rename spelling, still written because policies
+    // are data: a database provisioned before the rename holds rules compiled
+    // to `current_setting('app.user_id')`, and those predicates would evaluate
+    // to NULL — failing open or locking out — if we stopped setting it. Drop
+    // the alias only once no live database carries a legacy policy.
     await tx.execute(drizzleSql`
         SELECT
+            set_config('app.uid', ${uid}, true),
             set_config('app.user_id', ${uid}, true),
             set_config('app.user_roles', ${normalizedRoles.join(",")}, true),
             set_config('app.jwt', ${JSON.stringify({ sub: uid, roles: auth.roles })}, true)

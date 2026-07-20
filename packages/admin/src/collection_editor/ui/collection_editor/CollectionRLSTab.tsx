@@ -468,13 +468,13 @@ function InlinePolicyEditor({
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">USING expression</Typography>
-                            <TextField value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
+                            <TextField value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
                         </div>
                     )}
                     {showCheck && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">WITH CHECK expression</Typography>
-                            <TextField value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = user_id"/>
+                            <TextField value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
                         </div>
                     )}
                 </Paper>

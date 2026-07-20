@@ -372,12 +372,12 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
             }
         },
 
-        async getUserRoles(userId: string): Promise<string[]> {
-            return repo.getUserRoleIds(userId);
+        async getUserRoles(uid: string): Promise<string[]> {
+            return repo.getUserRoleIds(uid);
         },
 
-        async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
-            await repo.setUserRoles(userId, roleIds);
+        async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
+            await repo.setUserRoles(uid, roleIds);
         }
     };
 }

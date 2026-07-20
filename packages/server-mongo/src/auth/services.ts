@@ -93,14 +93,14 @@ export class MongoUserService implements UserRepository {
         const identity = await this.identitiesCollection.findOne({ provider,
 providerId });
         if (!identity) return null;
-        return this.getUserById(identity.userId);
+        return this.getUserById(identity.uid);
     }
 
-    async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
-        const docs = await this.identitiesCollection.find({ userId }).toArray();
+    async getUserIdentities(uid: string): Promise<UserIdentityData[]> {
+        const docs = await this.identitiesCollection.find({ uid }).toArray();
         return docs.map(doc => ({
             id: doc.id,
-            userId: doc.userId,
+            uid: doc.uid,
             provider: doc.provider,
             providerId: doc.providerId,
             profileData: doc.profileData ?? null,
@@ -109,7 +109,7 @@ providerId });
         }));
     }
 
-    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
+    async linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
         const now = new Date();
         await this.identitiesCollection.updateOne(
             { provider,
@@ -118,7 +118,7 @@ providerId },
                 $setOnInsert: {
                     _id: new ObjectId().toString(),
                     id: new ObjectId().toString(),
-                    userId,
+                    uid,
                     provider,
                     providerId,
                     createdAt: now
@@ -143,8 +143,8 @@ updatedAt: new Date() };
 
     async deleteUser(id: string): Promise<void> {
         await this.collection.deleteOne({ id });
-        await this.identitiesCollection.deleteMany({ userId: id });
-        await this.userRolesCollection.deleteMany({ userId: id });
+        await this.identitiesCollection.deleteMany({ uid: id });
+        await this.userRolesCollection.deleteMany({ uid: id });
     }
 
     async listUsers(): Promise<UserData[]> {
@@ -174,7 +174,7 @@ $options: "i" } }
 
         if (roleId) {
             const userRoles = await this.userRolesCollection.find({ roleId }).toArray();
-            const userIds = userRoles.map(ur => ur.userId);
+            const userIds = userRoles.map(ur => ur.uid);
             query.id = { $in: userIds };
         }
 
@@ -223,8 +223,8 @@ updatedAt: new Date() } }
         return doc ? toUser(doc) : null;
     }
 
-    async getUserRoles(userId: string): Promise<RoleData[]> {
-        const userRoles = await this.userRolesCollection.find({ userId }).toArray();
+    async getUserRoles(uid: string): Promise<RoleData[]> {
+        const userRoles = await this.userRolesCollection.find({ uid }).toArray();
         const roleIds = userRoles.map(ur => ur.roleId);
         if (roleIds.length === 0) return [];
 
@@ -238,38 +238,38 @@ updatedAt: new Date() } }
         }));
     }
 
-    async getUserRoleIds(userId: string): Promise<string[]> {
-        const userRoles = await this.userRolesCollection.find({ userId }).toArray();
+    async getUserRoleIds(uid: string): Promise<string[]> {
+        const userRoles = await this.userRolesCollection.find({ uid }).toArray();
         return userRoles.map(ur => ur.roleId);
     }
 
-    async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
-        await this.userRolesCollection.deleteMany({ userId });
+    async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
+        await this.userRolesCollection.deleteMany({ uid });
             if (roleIds.length > 0) {
             const docs = roleIds.map(roleId => ({
                 _id: new ObjectId().toString(),
-                userId,
+                uid,
                 roleId
             }));
             await this.userRolesCollection.insertMany(docs);
         }
     }
 
-    async assignDefaultRole(userId: string, roleId: string): Promise<void> {
+    async assignDefaultRole(uid: string, roleId: string): Promise<void> {
         await this.userRolesCollection.updateOne(
-            { userId,
+            { uid,
 roleId },
             { $setOnInsert: { _id: new ObjectId().toString(),
-userId,
+uid,
 roleId } },
             { upsert: true }
         );
     }
 
-    async getUserWithRoles(userId: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
-        const user = await this.getUserById(userId);
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+        const user = await this.getUserById(uid);
         if (!user) return null;
-        const roles = await this.getUserRoles(userId);
+        const roles = await this.getUserRoles(uid);
         return { user,
 roles };
     }
@@ -336,12 +336,12 @@ export class MongoRefreshTokenService {
         return this.db.collection<MongoDoc>("rebase_refresh_tokens");
     }
 
-    async createToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
+    async createToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
         const safeUserAgent = userAgent || "";
         const safeIpAddress = ipAddress || "";
 
         await this.collection.deleteMany({
-            userId,
+            uid,
             userAgent: safeUserAgent,
             ipAddress: safeIpAddress
         });
@@ -349,7 +349,7 @@ export class MongoRefreshTokenService {
         await this.collection.insertOne({
             _id: new ObjectId().toString(),
             id: new ObjectId().toString(),
-            userId,
+            uid,
             tokenHash,
             expiresAt,
             createdAt: new Date(),
@@ -363,7 +363,7 @@ export class MongoRefreshTokenService {
         if (!doc) return null;
         return {
             id: doc.id,
-            userId: doc.userId,
+            uid: doc.uid,
             tokenHash: doc.tokenHash,
             expiresAt: new Date(doc.expiresAt),
             createdAt: new Date(doc.createdAt),
@@ -376,15 +376,15 @@ export class MongoRefreshTokenService {
         await this.collection.deleteOne({ tokenHash });
     }
 
-    async deleteAllForUser(userId: string): Promise<void> {
-        await this.collection.deleteMany({ userId });
+    async deleteAllForUser(uid: string): Promise<void> {
+        await this.collection.deleteMany({ uid });
     }
 
-    async listForUser(userId: string): Promise<RefreshTokenInfo[]> {
-        const docs = await this.collection.find({ userId }).sort({ createdAt: 1 }).toArray();
+    async listForUser(uid: string): Promise<RefreshTokenInfo[]> {
+        const docs = await this.collection.find({ uid }).sort({ createdAt: 1 }).toArray();
         return docs.map(doc => ({
             id: doc.id,
-            userId: doc.userId,
+            uid: doc.uid,
             tokenHash: doc.tokenHash,
             expiresAt: new Date(doc.expiresAt),
             createdAt: new Date(doc.createdAt),
@@ -393,9 +393,9 @@ export class MongoRefreshTokenService {
         }));
     }
 
-    async deleteById(id: string, userId: string): Promise<void> {
+    async deleteById(id: string, uid: string): Promise<void> {
         await this.collection.deleteOne({ id,
-userId });
+uid });
     }
 }
 
@@ -406,20 +406,20 @@ export class MongoPasswordResetTokenService {
         return this.db.collection<MongoDoc>("rebase_password_reset_tokens");
     }
 
-    async createToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.collection.deleteMany({ userId,
+    async createToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.collection.deleteMany({ uid,
 usedAt: null });
 
         await this.collection.insertOne({
             _id: new ObjectId().toString(),
-            userId,
+            uid,
             tokenHash,
             expiresAt,
             usedAt: null
         });
     }
 
-    async findValidByHash(tokenHash: string): Promise<{ userId: string; expiresAt: Date } | null> {
+    async findValidByHash(tokenHash: string): Promise<{ uid: string; expiresAt: Date } | null> {
         const doc = await this.collection.findOne({
             tokenHash,
             usedAt: null,
@@ -429,7 +429,7 @@ usedAt: null });
         if (!doc) return null;
 
         return {
-            userId: doc.userId,
+            uid: doc.uid,
             expiresAt: new Date(doc.expiresAt)
         };
     }
@@ -441,8 +441,8 @@ usedAt: null });
         );
     }
 
-    async deleteAllForUser(userId: string): Promise<void> {
-        await this.collection.deleteMany({ userId });
+    async deleteAllForUser(uid: string): Promise<void> {
+        await this.collection.deleteMany({ uid });
     }
 
     async deleteExpired(): Promise<void> {
@@ -459,8 +459,8 @@ export class MongoTokenRepository implements TokenRepository {
         this.passwordResetTokenService = new MongoPasswordResetTokenService(db);
     }
 
-    async createRefreshToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.refreshTokenService.createToken(userId, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
+        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -471,20 +471,20 @@ export class MongoTokenRepository implements TokenRepository {
         await this.refreshTokenService.deleteByHash(tokenHash);
     }
 
-    async deleteAllRefreshTokensForUser(userId: string): Promise<void> {
-        await this.refreshTokenService.deleteAllForUser(userId);
+    async deleteAllRefreshTokensForUser(uid: string): Promise<void> {
+        await this.refreshTokenService.deleteAllForUser(uid);
     }
 
-    async listRefreshTokensForUser(userId: string): Promise<RefreshTokenInfo[]> {
-        return this.refreshTokenService.listForUser(userId);
+    async listRefreshTokensForUser(uid: string): Promise<RefreshTokenInfo[]> {
+        return this.refreshTokenService.listForUser(uid);
     }
 
-    async deleteRefreshTokenById(id: string, userId: string): Promise<void> {
-        await this.refreshTokenService.deleteById(id, userId);
+    async deleteRefreshTokenById(id: string, uid: string): Promise<void> {
+        await this.refreshTokenService.deleteById(id, uid);
     }
 
-    async createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.passwordResetTokenService.createToken(userId, tokenHash, expiresAt);
+    async createPasswordResetToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.passwordResetTokenService.createToken(uid, tokenHash, expiresAt);
     }
 
     async findValidPasswordResetToken(tokenHash: string): Promise<PasswordResetTokenInfo | null> {
@@ -495,8 +495,8 @@ export class MongoTokenRepository implements TokenRepository {
         await this.passwordResetTokenService.markAsUsed(tokenHash);
     }
 
-    async deleteAllPasswordResetTokensForUser(userId: string): Promise<void> {
-        await this.passwordResetTokenService.deleteAllForUser(userId);
+    async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
+        await this.passwordResetTokenService.deleteAllForUser(uid);
     }
 
     async deleteExpiredTokens(): Promise<void> {
@@ -505,17 +505,17 @@ export class MongoTokenRepository implements TokenRepository {
 
     // Magic link token operations
 
-    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    async createMagicLinkToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
         const col = this.db.collection("magic_link_tokens");
-        await col.deleteMany({ userId, usedAt: null });
-        await col.insertOne({ userId, tokenHash, expiresAt, usedAt: null, createdAt: new Date() });
+        await col.deleteMany({ uid, usedAt: null });
+        await col.insertOne({ uid, tokenHash, expiresAt, usedAt: null, createdAt: new Date() });
     }
 
     async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
         const col = this.db.collection("magic_link_tokens");
         const doc = await col.findOne({ tokenHash, usedAt: null, expiresAt: { $gt: new Date() } });
         if (!doc) return null;
-        return { userId: doc.userId as string, expiresAt: doc.expiresAt as Date };
+        return { uid: doc.uid as string, expiresAt: doc.expiresAt as Date };
     }
 
     async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
@@ -551,12 +551,12 @@ export class MongoAuthRepository implements AuthRepository {
         return this.userService.getUserByIdentity(provider, providerId);
     }
 
-    async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
-        return this.userService.getUserIdentities(userId);
+    async getUserIdentities(uid: string): Promise<UserIdentityData[]> {
+        return this.userService.getUserIdentities(uid);
     }
 
-    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
-        return this.userService.linkUserIdentity(userId, provider, providerId, profileData);
+    async linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
+        return this.userService.linkUserIdentity(uid, provider, providerId, profileData);
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
@@ -591,24 +591,24 @@ export class MongoAuthRepository implements AuthRepository {
         return this.userService.getUserByVerificationToken(token);
     }
 
-    async getUserRoles(userId: string): Promise<RoleData[]> {
-        return this.userService.getUserRoles(userId);
+    async getUserRoles(uid: string): Promise<RoleData[]> {
+        return this.userService.getUserRoles(uid);
     }
 
-    async getUserRoleIds(userId: string): Promise<string[]> {
-        return this.userService.getUserRoleIds(userId);
+    async getUserRoleIds(uid: string): Promise<string[]> {
+        return this.userService.getUserRoleIds(uid);
     }
 
-    async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
-        await this.userService.setUserRoles(userId, roleIds);
+    async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
+        await this.userService.setUserRoles(uid, roleIds);
     }
 
-    async assignDefaultRole(userId: string, roleId: string): Promise<void> {
-        await this.userService.assignDefaultRole(userId, roleId);
+    async assignDefaultRole(uid: string, roleId: string): Promise<void> {
+        await this.userService.assignDefaultRole(uid, roleId);
     }
 
-    async getUserWithRoles(userId: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
-        return this.userService.getUserWithRoles(userId);
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+        return this.userService.getUserWithRoles(uid);
     }
 
     async getRoleById(id: string): Promise<RoleData | null> {
@@ -631,8 +631,8 @@ export class MongoAuthRepository implements AuthRepository {
         await this.roleService.deleteRole(id);
     }
 
-    async createRefreshToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.tokenRepository.createRefreshToken(userId, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
+        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -643,20 +643,20 @@ export class MongoAuthRepository implements AuthRepository {
         await this.tokenRepository.deleteRefreshToken(tokenHash);
     }
 
-    async deleteAllRefreshTokensForUser(userId: string): Promise<void> {
-        await this.tokenRepository.deleteAllRefreshTokensForUser(userId);
+    async deleteAllRefreshTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllRefreshTokensForUser(uid);
     }
 
-    async listRefreshTokensForUser(userId: string): Promise<RefreshTokenInfo[]> {
-        return this.tokenRepository.listRefreshTokensForUser(userId);
+    async listRefreshTokensForUser(uid: string): Promise<RefreshTokenInfo[]> {
+        return this.tokenRepository.listRefreshTokensForUser(uid);
     }
 
-    async deleteRefreshTokenById(id: string, userId: string): Promise<void> {
-        await this.tokenRepository.deleteRefreshTokenById(id, userId);
+    async deleteRefreshTokenById(id: string, uid: string): Promise<void> {
+        await this.tokenRepository.deleteRefreshTokenById(id, uid);
     }
 
-    async createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.tokenRepository.createPasswordResetToken(userId, tokenHash, expiresAt);
+    async createPasswordResetToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.tokenRepository.createPasswordResetToken(uid, tokenHash, expiresAt);
     }
 
     async findValidPasswordResetToken(tokenHash: string): Promise<PasswordResetTokenInfo | null> {
@@ -667,8 +667,8 @@ export class MongoAuthRepository implements AuthRepository {
         await this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
     }
 
-    async deleteAllPasswordResetTokensForUser(userId: string): Promise<void> {
-        await this.tokenRepository.deleteAllPasswordResetTokensForUser(userId);
+    async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllPasswordResetTokensForUser(uid);
     }
 
     async deleteExpiredTokens(): Promise<void> {
@@ -677,8 +677,8 @@ export class MongoAuthRepository implements AuthRepository {
 
     // Magic link token operations
 
-    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.tokenRepository.createMagicLinkToken(userId, tokenHash, expiresAt);
+    async createMagicLinkToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.tokenRepository.createMagicLinkToken(uid, tokenHash, expiresAt);
     }
 
     async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
@@ -690,10 +690,10 @@ export class MongoAuthRepository implements AuthRepository {
     }
 
     // MFA Repository Stub
-    async createMfaFactor(userId: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
+    async createMfaFactor(uid: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
         throw new Error("MFA is not implemented for MongoDB");
     }
-    async getMfaFactors(userId: string): Promise<MfaFactor[]> {
+    async getMfaFactors(uid: string): Promise<MfaFactor[]> {
         return [];
     }
     async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
@@ -702,7 +702,7 @@ export class MongoAuthRepository implements AuthRepository {
     async verifyMfaFactor(factorId: string): Promise<void> {
         throw new Error("MFA is not implemented for MongoDB");
     }
-    async deleteMfaFactor(factorId: string, userId: string): Promise<void> {
+    async deleteMfaFactor(factorId: string, uid: string): Promise<void> {
         throw new Error("MFA is not implemented for MongoDB");
     }
     async createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo> {
@@ -714,19 +714,19 @@ export class MongoAuthRepository implements AuthRepository {
     async verifyMfaChallenge(challengeId: string): Promise<void> {
         throw new Error("MFA is not implemented for MongoDB");
     }
-    async createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void> {
+    async createRecoveryCodes(uid: string, codeHashes: string[]): Promise<void> {
         throw new Error("MFA is not implemented for MongoDB");
     }
-    async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+    async useRecoveryCode(uid: string, codeHash: string): Promise<boolean> {
         return false;
     }
-    async getUnusedRecoveryCodeCount(userId: string): Promise<number> {
+    async getUnusedRecoveryCodeCount(uid: string): Promise<number> {
         return 0;
     }
-    async deleteAllRecoveryCodes(userId: string): Promise<void> {
+    async deleteAllRecoveryCodes(uid: string): Promise<void> {
         // No-op
     }
-    async hasVerifiedMfaFactors(userId: string): Promise<boolean> {
+    async hasVerifiedMfaFactors(uid: string): Promise<boolean> {
         return false;
     }
 }

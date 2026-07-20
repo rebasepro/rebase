@@ -33,7 +33,7 @@ export function mountMfaRoutes(
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
         request: Request,
-        userId: string
+        uid: string
     ) => Promise<AuthResponsePayload>
 ): void {
     const authRepo = config.authRepo;
@@ -112,7 +112,7 @@ export function mountMfaRoutes(
 
         // Get the factor
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.userId !== userCtx.uid) {
+        if (!factor || factor.uid !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -155,7 +155,7 @@ export function mountMfaRoutes(
 
         // Verify the factor belongs to this user and is verified
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.userId !== userCtx.uid) {
+        if (!factor || factor.uid !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -197,7 +197,7 @@ export function mountMfaRoutes(
 
         // Get the factor and verify ownership
         const factor = await authRepo.getMfaFactorById(challenge.factorId);
-        if (!factor || factor.userId !== userCtx.uid) {
+        if (!factor || factor.uid !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -303,7 +303,7 @@ export function mountMfaRoutes(
 
         // Verify ownership
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.userId !== userCtx.uid) {
+        if (!factor || factor.uid !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 

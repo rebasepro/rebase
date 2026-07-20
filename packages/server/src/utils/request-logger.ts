@@ -57,7 +57,7 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
 
         // Extract the user id from context if auth middleware ran.
         //
-        // This read `c.get("userId")` — a context key nothing has ever set, so
+        // This read `c.get("uid")` — a context key nothing has ever set, so
         // no request log has ever carried a user. The auth middlewares all set
         // `user`; the id lives on it.
         const uid = (c.get("user") as { uid?: string } | undefined)?.uid;

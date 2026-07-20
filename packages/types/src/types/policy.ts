@@ -34,7 +34,7 @@ export type PolicyExpression =
 /**
  * The id a request without a logged-in user reports as `auth.uid()`.
  *
- * A user-context request always sets `app.user_id`: blank would read back as
+ * A user-context request always sets `app.uid`: blank would read back as
  * `NULL`, and `NULL` is how the trusted server context is recognised, so an
  * anonymous visitor would be promoted to server privileges. The driver
  * therefore substitutes this sentinel at the single chokepoint where the GUC

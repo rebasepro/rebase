@@ -24,8 +24,14 @@
 export const AUTH_BOOTSTRAP_SQL = `-- Auth schema + RLS helper functions (required by the policies below)
 CREATE SCHEMA IF NOT EXISTS auth;
 
+-- Falls back to the pre-rename \`app.user_id\` so a database that has taken the
+-- new schema but is still served by an older backend keeps resolving the
+-- principal. Drop the COALESCE once no such deployment remains.
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
-    SELECT NULLIF(current_setting('app.user_id', true), '');
+    SELECT COALESCE(
+        NULLIF(current_setting('app.uid', true), ''),
+        NULLIF(current_setting('app.user_id', true), '')
+    );
 $$ LANGUAGE sql STABLE;
 
 CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$

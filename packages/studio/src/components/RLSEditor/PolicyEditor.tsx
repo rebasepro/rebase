@@ -84,34 +84,34 @@ const POLICY_PRESETS: PolicyPreset[] = [
     {
         id: "user_select_own",
         label: "Users can read their own rows",
-        description: "Users can only read rows where the user_id matches their auth.uid()",
+        description: "Users can only read rows where the uid matches their auth.uid()",
         policyname: "Users can select their own data",
         cmd: "SELECT",
         permissive: "PERMISSIVE",
         roles: ["authenticated"],
-        qual: "auth.uid() = user_id",
+        qual: "auth.uid() = uid",
         with_check: ""
     },
     {
         id: "user_update_own",
         label: "Users can update their own rows",
-        description: "Users can only update rows where the user_id matches their auth.uid()",
+        description: "Users can only update rows where the uid matches their auth.uid()",
         policyname: "Users can update their own data",
         cmd: "UPDATE",
         permissive: "PERMISSIVE",
         roles: ["authenticated"],
-        qual: "auth.uid() = user_id",
-        with_check: "auth.uid() = user_id"
+        qual: "auth.uid() = uid",
+        with_check: "auth.uid() = uid"
     },
     {
         id: "user_delete_own",
         label: "Users can delete their own rows",
-        description: "Users can only delete rows where the user_id matches their auth.uid()",
+        description: "Users can only delete rows where the uid matches their auth.uid()",
         policyname: "Users can delete their own data",
         cmd: "DELETE",
         permissive: "PERMISSIVE",
         roles: ["authenticated"],
-        qual: "auth.uid() = user_id",
+        qual: "auth.uid() = uid",
         with_check: ""
     }
 ];
@@ -395,7 +395,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step3_desc")}
                             </Typography>
                             <div className={cls("bg-surface-100 dark:bg-surface-950 px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
-                                Example: auth.uid() = user_id
+                                Example: auth.uid() = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_step3_example")}
@@ -408,7 +408,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step4_desc")}
                             </Typography>
                             <div className={cls("bg-surface-100 dark:bg-surface-950 px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
-                                Example: auth.uid() = user_id
+                                Example: auth.uid() = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_step4_example")}
@@ -423,7 +423,7 @@ export const PolicyEditor = ({
                             <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark font-normal">
                                 <li>
                                     <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.uid()</code>
-                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">auth.uid() = user_id</code></span>
+                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">auth.uid() = uid</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.jwt()</code>

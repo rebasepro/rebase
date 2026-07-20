@@ -105,8 +105,8 @@ passwordHash: data.passwordHash }))
         setEmailVerified: jest.fn().mockResolvedValue(undefined),
         setVerificationToken: jest.fn().mockResolvedValue(undefined),
         getUserByVerificationToken: jest.fn().mockResolvedValue(null),
-        getUserWithRoles: jest.fn().mockImplementation(async (userId) => {
-            const user = mockUser({ id: userId });
+        getUserWithRoles: jest.fn().mockImplementation(async (uid) => {
+            const user = mockUser({ id: uid });
             return { user,
 roles: [mockRole("editor")] };
         }),
@@ -201,8 +201,8 @@ function json(body: Record<string, unknown>) {
     };
 }
 
-function authHeader(userId = "user-1", roles = ["editor"]) {
-    return { Authorization: `Bearer ${generateAccessToken(userId, roles)}` };
+function authHeader(uid = "user-1", roles = ["editor"]) {
+    return { Authorization: `Bearer ${generateAccessToken(uid, roles)}` };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -403,7 +403,7 @@ password: "Any1" }));
             expect(logger.info).toHaveBeenCalledWith(
                 expect.stringContaining("[Security Audit] Auth login success"),
                 expect.objectContaining({
-                    userId: "user-1",
+                    uid: "user-1",
                     email: "test@example.com",
                     eventType: "auth.login.success"
                 })
@@ -421,7 +421,7 @@ password: "Any1" }));
                 expect.stringContaining("[Security Audit] Auth login failure"),
                 expect.objectContaining({
                     email: "test@example.com",
-                    userId: "user-1",
+                    uid: "user-1",
                     eventType: "auth.login.failure"
                 })
             );
@@ -534,9 +534,9 @@ withEmail: false }); // Hack to pass empty list of providers
     //
     // The escape hatch the EMAIL_NOT_VERIFIED rejection points users at.
     describe("POST /auth/link/google", () => {
-        function linkRequest(userId: string, idToken: string) {
+        function linkRequest(uid: string, idToken: string) {
             const req = json({ idToken });
-            return { ...req, headers: { ...req.headers, ...authHeader(userId) } };
+            return { ...req, headers: { ...req.headers, ...authHeader(uid) } };
         }
 
         it("requires authentication", async () => {
@@ -641,7 +641,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp({ cookieAuth: { sameSite: "Lax" } });
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: "old-hash",
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
@@ -673,7 +673,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: "old-hash",
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
@@ -693,7 +693,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: "old-hash",
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
@@ -715,7 +715,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: "old-hash",
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
@@ -737,7 +737,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: "old-hash",
                 expiresAt: new Date(Date.now() + 86400000),
                 createdAt: new Date(),
@@ -766,7 +766,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: "expired-hash",
                 expiresAt: new Date(Date.now() - 1000), // expired
                 createdAt: new Date(),
@@ -849,7 +849,7 @@ withEmail: false }); // Hack to pass empty list of providers
         it("resets password with valid token", async () => {
             const app = createApp();
             mockAuthRepo.findValidPasswordResetToken.mockResolvedValueOnce({
-                userId: "user-1",
+                uid: "user-1",
                 expiresAt: new Date(Date.now() + 3600000)
             });
 
@@ -863,7 +863,7 @@ password: "NewStrong1" }));
         it("invalidates all sessions after password reset", async () => {
             const app = createApp();
             mockAuthRepo.findValidPasswordResetToken.mockResolvedValueOnce({
-                userId: "user-1",
+                uid: "user-1",
                 expiresAt: new Date(Date.now() + 3600000)
             });
 
@@ -1114,7 +1114,7 @@ newPassword: "New1Pass" }),
             const app = createApp();
             mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([
                 { id: "s1",
-userId: "user-1",
+uid: "user-1",
 tokenHash: "h1",
 expiresAt: new Date(),
 createdAt: new Date(),

@@ -146,11 +146,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
         request: Request,
-        userId: string
+        uid: string
     ): Promise<AuthResponsePayload> {
         if (!ops.transformAuthResponse) return response;
         try {
-            return await ops.transformAuthResponse(response, { userId, method, request });
+            return await ops.transformAuthResponse(response, { uid, method, request });
         } catch (err) {
             logger.error("[AuthHooks] transformAuthResponse error", {
                 error: err instanceof Error ? err.message : err
@@ -247,27 +247,27 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     /**
      * Helper to generate and store session tokens
      */
-    async function createSessionAndTokens(userId: string, userAgent: string, ipAddress: string) {
-        const roles = await authRepo.getUserRoles(userId);
+    async function createSessionAndTokens(uid: string, userAgent: string, ipAddress: string) {
+        const roles = await authRepo.getUserRoles(uid);
         const roleIds = roles.map(r => r.id);
 
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
         if (ops.customizeAccessToken) {
-            const user = await authRepo.getUserById(userId);
+            const user = await authRepo.getUserById(uid);
             if (user) {
-                const defaultClaims: Record<string, unknown> = { userId,
+                const defaultClaims: Record<string, unknown> = { uid,
 roles: roleIds,
 aal: "aal1" };
                 customClaims = await ops.customizeAccessToken(defaultClaims, user);
             }
         }
 
-        const accessToken = generateAccessToken(userId, roleIds, "aal1", customClaims);
+        const accessToken = generateAccessToken(uid, roleIds, "aal1", customClaims);
         const refreshToken = generateRefreshToken();
 
         await authRepo.createRefreshToken(
-            userId,
+            uid,
             hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             userAgent,
@@ -401,7 +401,7 @@ displayName: user.displayName });
                 logger.warn("[Security Audit] Auth login failure", {
                     eventType: "auth.login.failure",
                     email,
-                    userId: user.id
+                    uid: user.id
                 });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
@@ -422,7 +422,7 @@ displayName: user.displayName });
 
         logger.info("[Security Audit] Auth login success", {
             eventType: "auth.login.success",
-            userId: user.id,
+            uid: user.id,
             email
         });
 
@@ -674,17 +674,17 @@ displayName: user.displayName }, appName);
 
         // Update password
         const passwordHash = await ops.hashPassword(password);
-        await authRepo.updatePassword(storedToken.userId, passwordHash);
+        await authRepo.updatePassword(storedToken.uid, passwordHash);
 
         // Mark token as used
         await authRepo.markPasswordResetTokenUsed(tokenHash);
 
         // Invalidate all refresh tokens (security: log out all sessions)
-        await authRepo.deleteAllRefreshTokensForUser(storedToken.userId);
+        await authRepo.deleteAllRefreshTokensForUser(storedToken.uid);
 
         // Fire onPasswordReset hook (fire-and-forget)
         if (ops.onPasswordReset) {
-            ops.onPasswordReset(storedToken.userId).catch(err => {
+            ops.onPasswordReset(storedToken.uid).catch(err => {
                 logger.error("[AuthHooks] onPasswordReset error", { error: err instanceof Error ? err.message : err });
             });
         }
@@ -852,7 +852,7 @@ message: "Email verified successfully" });
         }
 
         // Generate new tokens
-        const roles = await authRepo.getUserRoles(storedToken.userId);
+        const roles = await authRepo.getUserRoles(storedToken.uid);
         const roleIds = roles.map(r => r.id);
 
         // Best-effort: load the user so we can return it in the response, which
@@ -860,9 +860,9 @@ message: "Email verified successfully" });
         // start in cookie mode). This enrichment must NEVER break refresh — on
         // any failure we fall back to a tokens-only response (the pre-existing
         // behavior), and the client restores the user via GET /me.
-        const user = await authRepo.getUserById(storedToken.userId).catch((err: unknown) => {
+        const user = await authRepo.getUserById(storedToken.uid).catch((err: unknown) => {
             logger.warn("[Auth] Could not load user during token refresh; returning tokens only", {
-                userId: storedToken.userId,
+                uid: storedToken.uid,
                 error: err instanceof Error ? err.message : String(err)
             });
             return null;
@@ -871,13 +871,13 @@ message: "Email verified successfully" });
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
         if (ops.customizeAccessToken && user) {
-            const defaultClaims: Record<string, unknown> = { userId: storedToken.userId,
+            const defaultClaims: Record<string, unknown> = { uid: storedToken.uid,
 roles: roleIds,
 aal: "aal1" };
             customClaims = await ops.customizeAccessToken(defaultClaims, user);
         }
 
-        const newAccessToken = generateAccessToken(storedToken.userId, roleIds, "aal1", customClaims);
+        const newAccessToken = generateAccessToken(storedToken.uid, roleIds, "aal1", customClaims);
         const newRefreshToken = generateRefreshToken();
 
         // Rotate refresh token (delete old, create new)
@@ -886,7 +886,7 @@ aal: "aal1" };
 
         await authRepo.deleteRefreshToken(tokenHash);
         await authRepo.createRefreshToken(
-            storedToken.userId,
+            storedToken.uid,
             hashRefreshToken(newRefreshToken),
             getRefreshTokenExpiry(),
             userAgent,
@@ -911,7 +911,7 @@ aal: "aal1" };
                 refreshResponse = tokensOnlyResponse;
             }
         }
-        const transformedResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.userId);
+        const transformedResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.uid);
         const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
         return c.json(finalResponse);
     });

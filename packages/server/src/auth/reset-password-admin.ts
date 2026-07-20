@@ -33,7 +33,7 @@ export interface ResetPasswordRouteConfig {
 /**
  * Create a standalone admin route for resetting user passwords.
  *
- * Mounts: POST /users/:userId/reset-password
+ * Mounts: POST /users/:uid/reset-password
  */
 export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
@@ -44,9 +44,9 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
     router.onError(errorHandler);
     router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
 
-    router.post("/users/:userId/reset-password", requireAdmin, async (c) => {
-        const userId = c.req.param("userId");
-        const existing = await authRepo.getUserById(userId);
+    router.post("/users/:uid/reset-password", requireAdmin, async (c) => {
+        const uid = c.req.param("uid");
+        const existing = await authRepo.getUserById(uid);
         if (!existing) {
             throw ApiError.notFound("User not found");
         }

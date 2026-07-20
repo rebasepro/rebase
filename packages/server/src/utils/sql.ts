@@ -3,10 +3,10 @@ import { sql, SQL } from "drizzle-orm";
 /**
  * Returns a SQL chunk calling `auth.uid()` — the current user's ID.
  * This is a PostgreSQL RLS helper function created in the `auth` schema
- * that reads `app.user_id` set per-transaction by `withAuth()`.
+ * that reads `app.uid` set per-transaction by `withAuth()`.
  *
  * @example
- * sql`${table.user_id} = ${authUid()}`
+ * sql`${table.uid} = ${authUid()}`
  */
 export const authUid = (): SQL => {
     return sql`auth.uid()`;

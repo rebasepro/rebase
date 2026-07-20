@@ -169,6 +169,10 @@ describe("Auth Services", () => {
                 // pooled-connection context can never scope the privileged write.
                 const firstExecuteSql = mockExecute.mock.calls[0]?.[0] as { strings?: readonly string[] } | undefined;
                 const sqlText = (firstExecuteSql?.strings ?? []).join("");
+                expect(sqlText).toContain("set_config('app.uid', '', true)");
+                // The pre-rename GUC must be cleared too: a policy written
+                // against `app.user_id` would otherwise read a leaked value and
+                // scope this privileged write.
                 expect(sqlText).toContain("set_config('app.user_id', '', true)");
                 expect(sqlText).toContain("set_config('app.user_roles', '', true)");
                 expect(sqlText).toContain("set_config('app.jwt', '', true)");
@@ -499,7 +503,7 @@ email: "test@example.com" })],
 
                 expect(db.insert).toHaveBeenCalledWith(refreshTokens);
                 expect(mockInsertValues).toHaveBeenCalledWith({
-                    userId: "user-123",
+                    uid: "user-123",
                     tokenHash: "token-hash",
                     expiresAt,
                     ipAddress: "",
@@ -511,12 +515,12 @@ email: "test@example.com" })],
         describe("findByHash", () => {
             it("should find token by hash", async () => {
                 const expiresAt = new Date();
-                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123",
+                mockSelectWhere.mockResolvedValueOnce([{ uid: "user-123",
 expiresAt }]);
 
                 const result = await refreshTokenService.findByHash("token-hash");
 
-                expect(result).toEqual({ userId: "user-123",
+                expect(result).toEqual({ uid: "user-123",
 expiresAt });
             });
 
@@ -569,16 +573,16 @@ expiresAt });
         describe("findValidByHash", () => {
             it("should find valid token", async () => {
                 const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123",
+                mockSelectWhere.mockResolvedValueOnce([{ uid: "user-123",
 expiresAt }]);
                 mockExecute.mockResolvedValueOnce({
-                    rows: [{ user_id: "user-123",
+                    rows: [{ uid: "user-123",
 expires_at: expiresAt }]
                 });
 
                 const result = await passwordResetTokenService.findValidByHash("token-hash");
 
-                expect(result).toEqual({ userId: "user-123",
+                expect(result).toEqual({ uid: "user-123",
 expiresAt });
             });
 
@@ -592,7 +596,7 @@ expiresAt });
 
             it("should return null when token is expired or used", async () => {
                 const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-                mockSelectWhere.mockResolvedValueOnce([{ userId: "user-123",
+                mockSelectWhere.mockResolvedValueOnce([{ uid: "user-123",
 expiresAt }]);
                 mockExecute.mockResolvedValueOnce({ rows: [] }); // No valid token found
 

@@ -86,7 +86,7 @@ export class UserService implements UserRepository {
      * Run a privileged auth write with an explicitly cleared RLS context.
      *
      * The auth services run on the base/owner connection, which by design
-     * carries a NULL `app.user_id` so the `auth.uid() IS NULL` server-escape
+     * carries a NULL `app.uid` so the `auth.uid() IS NULL` server-escape
      * in the default policies applies. That NULL is normally guaranteed by
      * `set_config(..., is_local = true)` resetting at transaction end — but a
      * GUC that survives on a pooled connection (or a connection role that
@@ -100,7 +100,8 @@ export class UserService implements UserRepository {
     private async withServerContext<T>(fn: (db: NodePgDatabase) => Promise<T>): Promise<T> {
         return await this.db.transaction(async (tx) => {
             await tx.execute(sql`
-                SELECT set_config('app.user_id', '', true),
+                SELECT set_config('app.uid', '', true),
+                       set_config('app.user_id', '', true),
                        set_config('app.user_roles', '', true),
                        set_config('app.jwt', '', true)
             `);
@@ -253,7 +254,7 @@ export class UserService implements UserRepository {
         const result = await this.db
             .select({ user: this.usersTable })
             .from(this.usersTable)
-            .innerJoin(this.userIdentitiesTable, eq(userIdCol, this.userIdentitiesTable.userId))
+            .innerJoin(this.userIdentitiesTable, eq(userIdCol, this.userIdentitiesTable.uid))
             .where(
                 sql`${this.userIdentitiesTable.provider} = ${provider} AND ${this.userIdentitiesTable.providerId} = ${providerId}`
             )
@@ -263,17 +264,17 @@ export class UserService implements UserRepository {
         return this.mapRowToUser(result[0].user as Record<string, unknown>);
     }
 
-    async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
+    async getUserIdentities(uid: string): Promise<UserIdentityData[]> {
         const schema = getTableConfig(this.userIdentitiesTable).schema || "public";
         const result = await this.db.execute(sql`
-            SELECT id, user_id, provider, provider_id, profile_data, created_at, updated_at
+            SELECT id, uid, provider, provider_id, profile_data, created_at, updated_at
             FROM ${sql.raw(`"${schema}"."user_identities"`)}
-            WHERE user_id = ${userId}
+            WHERE uid = ${uid}
         `);
 
         return result.rows.map((row: Record<string, unknown>) => ({
             id: row.id as string,
-            userId: row.user_id as string,
+            uid: row.uid as string,
             provider: row.provider as string,
             providerId: row.provider_id as string,
             profileData: (row.profile_data as Record<string, unknown> | null) ?? null,
@@ -282,9 +283,9 @@ export class UserService implements UserRepository {
         }));
     }
 
-    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
+    async linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
         await this.withServerContext(async (db) => db.insert(this.userIdentitiesTable).values({
-            userId,
+            uid,
             provider,
             providerId,
             profileData: profileData || null
@@ -452,10 +453,10 @@ export class UserService implements UserRepository {
     /**
      * Get roles for a user from database (inline TEXT[] column)
      */
-    async getUserRoles(userId: string): Promise<Role[]> {
+    async getUserRoles(uid: string): Promise<Role[]> {
         const usersTableName = this.getQualifiedUsersTableName();
         const result = await this.db.execute(sql`
-            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${userId}
+            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${uid}
         `);
 
         if (result.rows.length === 0) return [];
@@ -475,10 +476,10 @@ export class UserService implements UserRepository {
     /**
      * Get role IDs for a user
      */
-    async getUserRoleIds(userId: string): Promise<string[]> {
+    async getUserRoleIds(uid: string): Promise<string[]> {
         const usersTableName = this.getQualifiedUsersTableName();
         const result = await this.db.execute(sql`
-            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${userId}
+            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${uid}
         `);
 
         if (result.rows.length === 0) return [];
@@ -490,36 +491,36 @@ export class UserService implements UserRepository {
     /**
      * Set roles for a user (replaces existing roles)
      */
-    async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
+    async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
         const usersTableName = this.getQualifiedUsersTableName();
         const rolesArray = `{${roleIds.join(",")}}`;
         await this.withServerContext(async (db) => db.execute(sql`
             UPDATE ${sql.raw(usersTableName)}
             SET roles = ${rolesArray}::text[], updated_at = NOW()
-            WHERE id = ${userId}
+            WHERE id = ${uid}
         `));
     }
 
     /**
      * Assign a specific role to new user (appends if not present)
      */
-    async assignDefaultRole(userId: string, roleId: string): Promise<void> {
+    async assignDefaultRole(uid: string, roleId: string): Promise<void> {
         const usersTableName = this.getQualifiedUsersTableName();
         await this.withServerContext(async (db) => db.execute(sql`
             UPDATE ${sql.raw(usersTableName)}
             SET roles = array_append(roles, ${roleId}), updated_at = NOW()
-            WHERE id = ${userId} AND NOT (${roleId} = ANY(roles))
+            WHERE id = ${uid} AND NOT (${roleId} = ANY(roles))
         `));
     }
 
     /**
      * Get user with their roles
      */
-    async getUserWithRoles(userId: string): Promise<{ user: UserData; roles: Role[] } | null> {
-        const user = await this.getUserById(userId);
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: Role[] } | null> {
+        const user = await this.getUserById(uid);
         if (!user) return null;
 
-        const roles = await this.getUserRoles(userId);
+        const roles = await this.getUserRoles(uid);
         return { user,
             roles };
     }
@@ -540,20 +541,20 @@ export class RefreshTokenService {
         }
     }
 
-    async createToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
+    async createToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
         // Fallback to empty string because UNIQUE constraints treat NULLs as strictly distinct in standard Postgres.
-        // We want (userId, NULL, NULL) to collide and overwrite, so we map undefined/null to empty strings.
+        // We want (uid, NULL, NULL) to collide and overwrite, so we map undefined/null to empty strings.
         const safeUserAgent = userAgent || "";
         const safeIpAddress = ipAddress || "";
 
-        // Atomic upsert keyed on the device session (user_id, user_agent, ip_address).
+        // Atomic upsert keyed on the device session (uid, user_agent, ip_address).
         // A DELETE-then-INSERT races under concurrent refreshes — cookie-mode boot can
         // fire two /refresh calls at once (both carrying the same refresh cookie): both
         // DELETE, then the second INSERT violates `unique_device_session` and 500s.
         // A single INSERT ... ON CONFLICT DO UPDATE rotates the token atomically.
         await this.db.insert(this.refreshTokensTable)
             .values({
-                userId,
+                uid,
                 tokenHash,
                 expiresAt,
                 userAgent: safeUserAgent,
@@ -561,7 +562,7 @@ export class RefreshTokenService {
             })
             .onConflictDoUpdate({
                 target: [
-                    this.refreshTokensTable.userId,
+                    this.refreshTokensTable.uid,
                     this.refreshTokensTable.userAgent,
                     this.refreshTokensTable.ipAddress
                 ],
@@ -573,7 +574,7 @@ export class RefreshTokenService {
         const [token] = await this.db
             .select({
                 id: this.refreshTokensTable.id,
-                userId: this.refreshTokensTable.userId,
+                uid: this.refreshTokensTable.uid,
                 tokenHash: this.refreshTokensTable.tokenHash,
                 expiresAt: this.refreshTokensTable.expiresAt,
                 createdAt: this.refreshTokensTable.createdAt,
@@ -590,15 +591,15 @@ export class RefreshTokenService {
         await this.db.delete(this.refreshTokensTable).where(eq(this.refreshTokensTable.tokenHash, tokenHash));
     }
 
-    async deleteAllForUser(userId: string): Promise<void> {
-        await this.db.delete(this.refreshTokensTable).where(eq(this.refreshTokensTable.userId, userId));
+    async deleteAllForUser(uid: string): Promise<void> {
+        await this.db.delete(this.refreshTokensTable).where(eq(this.refreshTokensTable.uid, uid));
     }
 
-    async listForUser(userId: string): Promise<RefreshTokenInfo[]> {
+    async listForUser(uid: string): Promise<RefreshTokenInfo[]> {
         const tokens = await this.db
             .select({
                 id: this.refreshTokensTable.id,
-                userId: this.refreshTokensTable.userId,
+                uid: this.refreshTokensTable.uid,
                 tokenHash: this.refreshTokensTable.tokenHash,
                 expiresAt: this.refreshTokensTable.expiresAt,
                 createdAt: this.refreshTokensTable.createdAt,
@@ -606,15 +607,15 @@ export class RefreshTokenService {
                 ipAddress: this.refreshTokensTable.ipAddress
             })
             .from(this.refreshTokensTable)
-            .where(eq(this.refreshTokensTable.userId, userId))
+            .where(eq(this.refreshTokensTable.uid, uid))
             .orderBy(this.refreshTokensTable.createdAt);
 
         return tokens as RefreshTokenInfo[];
     }
 
-    async deleteById(id: string, userId: string): Promise<void> {
+    async deleteById(id: string, uid: string): Promise<void> {
         await this.db.delete(this.refreshTokensTable)
-            .where(sql`${this.refreshTokensTable.id} = ${id} AND ${this.refreshTokensTable.userId} = ${userId}`);
+            .where(sql`${this.refreshTokensTable.id} = ${id} AND ${this.refreshTokensTable.uid} = ${uid}`);
     }
 }
 
@@ -644,16 +645,16 @@ export class PasswordResetTokenService {
     /**
      * Create a password reset token
      */
-    async createToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    async createToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
         // Delete any existing unused tokens for this user
         const tableName = this.getQualifiedPasswordResetTokensTableName();
         await this.db.execute(sql`
             DELETE FROM ${sql.raw(tableName)} 
-            WHERE user_id = ${userId} AND used_at IS NULL
+            WHERE uid = ${uid} AND used_at IS NULL
         `);
 
         await this.db.insert(this.passwordResetTokensTable).values({
-            userId,
+            uid,
             tokenHash,
             expiresAt
         });
@@ -662,21 +663,21 @@ export class PasswordResetTokenService {
     /**
      * Find a valid (not expired, not used) token by hash
      */
-    async findValidByHash(tokenHash: string): Promise<{ userId: string; expiresAt: Date } | null> {
+    async findValidByHash(tokenHash: string): Promise<{ uid: string; expiresAt: Date } | null> {
         const [token] = await this.db
             .select({
-                userId: this.passwordResetTokensTable.userId,
+                uid: this.passwordResetTokensTable.uid,
                 expiresAt: this.passwordResetTokensTable.expiresAt
             })
             .from(this.passwordResetTokensTable)
-            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash)) as unknown as Array<{ userId: string; expiresAt: Date }>;
+            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash)) as unknown as Array<{ uid: string; expiresAt: Date }>;
 
         if (!token) return null;
 
         // Check if expired or used
         const tableName = this.getQualifiedPasswordResetTokensTableName();
         const result = await this.db.execute(sql`
-            SELECT user_id, expires_at 
+            SELECT uid, expires_at 
             FROM ${sql.raw(tableName)} 
             WHERE token_hash = ${tokenHash} 
               AND used_at IS NULL 
@@ -685,9 +686,9 @@ export class PasswordResetTokenService {
 
         if (result.rows.length === 0) return null;
 
-        const row = result.rows[0] as { user_id: string; expires_at: string | number | Date };
+        const row = result.rows[0] as { uid: string; expires_at: string | number | Date };
         return {
-            userId: row.user_id,
+            uid: row.uid,
             expiresAt: new Date(row.expires_at)
         };
     }
@@ -705,8 +706,8 @@ export class PasswordResetTokenService {
     /**
      * Delete all tokens for a user
      */
-    async deleteAllForUser(userId: string): Promise<void> {
-        await this.db.delete(this.passwordResetTokensTable).where(eq(this.passwordResetTokensTable.userId, userId));
+    async deleteAllForUser(uid: string): Promise<void> {
+        await this.db.delete(this.passwordResetTokensTable).where(eq(this.passwordResetTokensTable.uid, uid));
     }
 
     /**
@@ -741,16 +742,16 @@ export class MagicLinkTokenService {
         return `"${schema}"."${name}"`;
     }
 
-    async createToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    async createToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
         // Delete any existing unused tokens for this user
         const tableName = this.getQualifiedTableName();
         await this.db.execute(sql`
             DELETE FROM ${sql.raw(tableName)} 
-            WHERE user_id = ${userId} AND used_at IS NULL
+            WHERE uid = ${uid} AND used_at IS NULL
         `);
 
         await this.db.insert(this.magicLinkTokensTable).values({
-            userId,
+            uid,
             tokenHash,
             expiresAt
         });
@@ -759,7 +760,7 @@ export class MagicLinkTokenService {
     async findValidByHash(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
         const tableName = this.getQualifiedTableName();
         const result = await this.db.execute(sql`
-            SELECT user_id, expires_at 
+            SELECT uid, expires_at 
             FROM ${sql.raw(tableName)} 
             WHERE token_hash = ${tokenHash} 
               AND used_at IS NULL 
@@ -768,9 +769,9 @@ export class MagicLinkTokenService {
 
         if (result.rows.length === 0) return null;
 
-        const row = result.rows[0] as { user_id: string; expires_at: string | number | Date };
+        const row = result.rows[0] as { uid: string; expires_at: string | number | Date };
         return {
-            userId: row.user_id,
+            uid: row.uid,
             expiresAt: new Date(row.expires_at)
         };
     }
@@ -803,8 +804,8 @@ export class PostgresTokenRepository implements TokenRepository {
 
     // Refresh token operations
 
-    async createRefreshToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.refreshTokenService.createToken(userId, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
+        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -815,22 +816,22 @@ export class PostgresTokenRepository implements TokenRepository {
         await this.refreshTokenService.deleteByHash(tokenHash);
     }
 
-    async deleteAllRefreshTokensForUser(userId: string): Promise<void> {
-        await this.refreshTokenService.deleteAllForUser(userId);
+    async deleteAllRefreshTokensForUser(uid: string): Promise<void> {
+        await this.refreshTokenService.deleteAllForUser(uid);
     }
 
-    async listRefreshTokensForUser(userId: string): Promise<RefreshTokenInfo[]> {
-        return this.refreshTokenService.listForUser(userId);
+    async listRefreshTokensForUser(uid: string): Promise<RefreshTokenInfo[]> {
+        return this.refreshTokenService.listForUser(uid);
     }
 
-    async deleteRefreshTokenById(id: string, userId: string): Promise<void> {
-        await this.refreshTokenService.deleteById(id, userId);
+    async deleteRefreshTokenById(id: string, uid: string): Promise<void> {
+        await this.refreshTokenService.deleteById(id, uid);
     }
 
     // Password reset token operations
 
-    async createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.passwordResetTokenService.createToken(userId, tokenHash, expiresAt);
+    async createPasswordResetToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.passwordResetTokenService.createToken(uid, tokenHash, expiresAt);
     }
 
     async findValidPasswordResetToken(tokenHash: string): Promise<PasswordResetTokenInfo | null> {
@@ -841,8 +842,8 @@ export class PostgresTokenRepository implements TokenRepository {
         await this.passwordResetTokenService.markAsUsed(tokenHash);
     }
 
-    async deleteAllPasswordResetTokensForUser(userId: string): Promise<void> {
-        await this.passwordResetTokenService.deleteAllForUser(userId);
+    async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
+        await this.passwordResetTokenService.deleteAllForUser(uid);
     }
 
     async deleteExpiredTokens(): Promise<void> {
@@ -851,8 +852,8 @@ export class PostgresTokenRepository implements TokenRepository {
 
     // Magic link token operations
 
-    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.magicLinkTokenService.createToken(userId, tokenHash, expiresAt);
+    async createMagicLinkToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.magicLinkTokenService.createToken(uid, tokenHash, expiresAt);
     }
 
     async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
@@ -899,12 +900,12 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserByIdentity(provider, providerId);
     }
 
-    async getUserIdentities(userId: string): Promise<UserIdentityData[]> {
-        return this.userService.getUserIdentities(userId);
+    async getUserIdentities(uid: string): Promise<UserIdentityData[]> {
+        return this.userService.getUserIdentities(uid);
     }
 
-    async linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
-        return this.userService.linkUserIdentity(userId, provider, providerId, profileData);
+    async linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void> {
+        return this.userService.linkUserIdentity(uid, provider, providerId, profileData);
     }
 
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
@@ -939,24 +940,24 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserByVerificationToken(token);
     }
 
-    async getUserRoles(userId: string): Promise<RoleData[]> {
-        return this.userService.getUserRoles(userId);
+    async getUserRoles(uid: string): Promise<RoleData[]> {
+        return this.userService.getUserRoles(uid);
     }
 
-    async getUserRoleIds(userId: string): Promise<string[]> {
-        return this.userService.getUserRoleIds(userId);
+    async getUserRoleIds(uid: string): Promise<string[]> {
+        return this.userService.getUserRoleIds(uid);
     }
 
-    async setUserRoles(userId: string, roleIds: string[]): Promise<void> {
-        await this.userService.setUserRoles(userId, roleIds);
+    async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
+        await this.userService.setUserRoles(uid, roleIds);
     }
 
-    async assignDefaultRole(userId: string, roleId: string): Promise<void> {
-        await this.userService.assignDefaultRole(userId, roleId);
+    async assignDefaultRole(uid: string, roleId: string): Promise<void> {
+        await this.userService.assignDefaultRole(uid, roleId);
     }
 
-    async getUserWithRoles(userId: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
-        return this.userService.getUserWithRoles(userId);
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+        return this.userService.getUserWithRoles(uid);
     }
 
     // Role operations (roles are inline on users, synthesized from string IDs)
@@ -1017,8 +1018,8 @@ collectionPermissions: null }
 
     // Token operations (delegate to PostgresTokenRepository)
 
-    async createRefreshToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.tokenRepository.createRefreshToken(userId, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
+        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -1029,20 +1030,20 @@ collectionPermissions: null }
         await this.tokenRepository.deleteRefreshToken(tokenHash);
     }
 
-    async deleteAllRefreshTokensForUser(userId: string): Promise<void> {
-        await this.tokenRepository.deleteAllRefreshTokensForUser(userId);
+    async deleteAllRefreshTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllRefreshTokensForUser(uid);
     }
 
-    async listRefreshTokensForUser(userId: string): Promise<RefreshTokenInfo[]> {
-        return this.tokenRepository.listRefreshTokensForUser(userId);
+    async listRefreshTokensForUser(uid: string): Promise<RefreshTokenInfo[]> {
+        return this.tokenRepository.listRefreshTokensForUser(uid);
     }
 
-    async deleteRefreshTokenById(id: string, userId: string): Promise<void> {
-        await this.tokenRepository.deleteRefreshTokenById(id, userId);
+    async deleteRefreshTokenById(id: string, uid: string): Promise<void> {
+        await this.tokenRepository.deleteRefreshTokenById(id, uid);
     }
 
-    async createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.tokenRepository.createPasswordResetToken(userId, tokenHash, expiresAt);
+    async createPasswordResetToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.tokenRepository.createPasswordResetToken(uid, tokenHash, expiresAt);
     }
 
     async findValidPasswordResetToken(tokenHash: string): Promise<PasswordResetTokenInfo | null> {
@@ -1053,8 +1054,8 @@ collectionPermissions: null }
         await this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
     }
 
-    async deleteAllPasswordResetTokensForUser(userId: string): Promise<void> {
-        await this.tokenRepository.deleteAllPasswordResetTokensForUser(userId);
+    async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllPasswordResetTokensForUser(uid);
     }
 
     async deleteExpiredTokens(): Promise<void> {
@@ -1063,8 +1064,8 @@ collectionPermissions: null }
 
     // Magic link token operations
 
-    async createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
-        await this.tokenRepository.createMagicLinkToken(userId, tokenHash, expiresAt);
+    async createMagicLinkToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void> {
+        await this.tokenRepository.createMagicLinkToken(uid, tokenHash, expiresAt);
     }
 
     async findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null> {
@@ -1085,12 +1086,12 @@ collectionPermissions: null }
         return this._mfaService;
     }
 
-    async createMfaFactor(userId: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
-        return this.getMfaService().createMfaFactor(userId, factorType, secretEncrypted, friendlyName);
+    async createMfaFactor(uid: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
+        return this.getMfaService().createMfaFactor(uid, factorType, secretEncrypted, friendlyName);
     }
 
-    async getMfaFactors(userId: string): Promise<MfaFactor[]> {
-        return this.getMfaService().getMfaFactors(userId);
+    async getMfaFactors(uid: string): Promise<MfaFactor[]> {
+        return this.getMfaService().getMfaFactors(uid);
     }
 
     async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
@@ -1101,8 +1102,8 @@ collectionPermissions: null }
         return this.getMfaService().verifyMfaFactor(factorId);
     }
 
-    async deleteMfaFactor(factorId: string, userId: string): Promise<void> {
-        return this.getMfaService().deleteMfaFactor(factorId, userId);
+    async deleteMfaFactor(factorId: string, uid: string): Promise<void> {
+        return this.getMfaService().deleteMfaFactor(factorId, uid);
     }
 
     async createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo> {
@@ -1117,24 +1118,24 @@ collectionPermissions: null }
         return this.getMfaService().verifyMfaChallenge(challengeId);
     }
 
-    async createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void> {
-        return this.getMfaService().createRecoveryCodes(userId, codeHashes);
+    async createRecoveryCodes(uid: string, codeHashes: string[]): Promise<void> {
+        return this.getMfaService().createRecoveryCodes(uid, codeHashes);
     }
 
-    async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
-        return this.getMfaService().useRecoveryCode(userId, codeHash);
+    async useRecoveryCode(uid: string, codeHash: string): Promise<boolean> {
+        return this.getMfaService().useRecoveryCode(uid, codeHash);
     }
 
-    async getUnusedRecoveryCodeCount(userId: string): Promise<number> {
-        return this.getMfaService().getUnusedRecoveryCodeCount(userId);
+    async getUnusedRecoveryCodeCount(uid: string): Promise<number> {
+        return this.getMfaService().getUnusedRecoveryCodeCount(uid);
     }
 
-    async deleteAllRecoveryCodes(userId: string): Promise<void> {
-        return this.getMfaService().deleteAllRecoveryCodes(userId);
+    async deleteAllRecoveryCodes(uid: string): Promise<void> {
+        return this.getMfaService().deleteAllRecoveryCodes(uid);
     }
 
-    async hasVerifiedMfaFactors(userId: string): Promise<boolean> {
-        return this.getMfaService().hasVerifiedMfaFactors(userId);
+    async hasVerifiedMfaFactors(uid: string): Promise<boolean> {
+        return this.getMfaService().hasVerifiedMfaFactors(uid);
     }
 }
 
@@ -1154,22 +1155,22 @@ export class MfaService implements MfaRepository {
     }
 
     async createMfaFactor(
-        userId: string,
+        uid: string,
         factorType: "totp",
         secretEncrypted: string,
         friendlyName?: string
     ): Promise<MfaFactor> {
         const tableName = this.qualify("mfa_factors");
         const result = await this.db.execute(sql`
-            INSERT INTO ${sql.raw(tableName)} (user_id, factor_type, secret_encrypted, friendly_name)
-            VALUES (${userId}, ${factorType}, ${secretEncrypted}, ${friendlyName ?? null})
-            RETURNING id, user_id, factor_type, friendly_name, verified, created_at, updated_at
+            INSERT INTO ${sql.raw(tableName)} (uid, factor_type, secret_encrypted, friendly_name)
+            VALUES (${uid}, ${factorType}, ${secretEncrypted}, ${friendlyName ?? null})
+            RETURNING id, uid, factor_type, friendly_name, verified, created_at, updated_at
         `);
 
         const row = result.rows[0] as Record<string, unknown>;
         return {
             id: row.id as string,
-            userId: row.user_id as string,
+            uid: row.uid as string,
             factorType: row.factor_type as "totp",
             friendlyName: (row.friendly_name as string | null) ?? undefined,
             verified: row.verified as boolean,
@@ -1178,18 +1179,18 @@ export class MfaService implements MfaRepository {
         };
     }
 
-    async getMfaFactors(userId: string): Promise<MfaFactor[]> {
+    async getMfaFactors(uid: string): Promise<MfaFactor[]> {
         const tableName = this.qualify("mfa_factors");
         const result = await this.db.execute(sql`
-            SELECT id, user_id, factor_type, friendly_name, verified, created_at, updated_at
+            SELECT id, uid, factor_type, friendly_name, verified, created_at, updated_at
             FROM ${sql.raw(tableName)}
-            WHERE user_id = ${userId}
+            WHERE uid = ${uid}
             ORDER BY created_at
         `);
 
         return (result.rows as Array<Record<string, unknown>>).map(row => ({
             id: row.id as string,
-            userId: row.user_id as string,
+            uid: row.uid as string,
             factorType: row.factor_type as "totp",
             friendlyName: (row.friendly_name as string | null) ?? undefined,
             verified: row.verified as boolean,
@@ -1201,7 +1202,7 @@ export class MfaService implements MfaRepository {
     async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
         const tableName = this.qualify("mfa_factors");
         const result = await this.db.execute(sql`
-            SELECT id, user_id, factor_type, secret_encrypted, friendly_name, verified, created_at, updated_at
+            SELECT id, uid, factor_type, secret_encrypted, friendly_name, verified, created_at, updated_at
             FROM ${sql.raw(tableName)}
             WHERE id = ${factorId}
         `);
@@ -1211,7 +1212,7 @@ export class MfaService implements MfaRepository {
         const row = result.rows[0] as Record<string, unknown>;
         return {
             id: row.id as string,
-            userId: row.user_id as string,
+            uid: row.uid as string,
             factorType: row.factor_type as "totp",
             secretEncrypted: row.secret_encrypted as string,
             friendlyName: (row.friendly_name as string | null) ?? undefined,
@@ -1230,11 +1231,11 @@ export class MfaService implements MfaRepository {
         `);
     }
 
-    async deleteMfaFactor(factorId: string, userId: string): Promise<void> {
+    async deleteMfaFactor(factorId: string, uid: string): Promise<void> {
         const tableName = this.qualify("mfa_factors");
         await this.db.execute(sql`
             DELETE FROM ${sql.raw(tableName)}
-            WHERE id = ${factorId} AND user_id = ${userId}
+            WHERE id = ${factorId} AND uid = ${uid}
         `);
     }
 
@@ -1287,56 +1288,56 @@ export class MfaService implements MfaRepository {
         `);
     }
 
-    async createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void> {
+    async createRecoveryCodes(uid: string, codeHashes: string[]): Promise<void> {
         const tableName = this.qualify("recovery_codes");
         // Delete existing codes first
         await this.db.execute(sql`
-            DELETE FROM ${sql.raw(tableName)} WHERE user_id = ${userId}
+            DELETE FROM ${sql.raw(tableName)} WHERE uid = ${uid}
         `);
 
         // Insert new codes
         for (const hash of codeHashes) {
             await this.db.execute(sql`
-                INSERT INTO ${sql.raw(tableName)} (user_id, code_hash)
-                VALUES (${userId}, ${hash})
+                INSERT INTO ${sql.raw(tableName)} (uid, code_hash)
+                VALUES (${uid}, ${hash})
             `);
         }
     }
 
-    async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+    async useRecoveryCode(uid: string, codeHash: string): Promise<boolean> {
         const tableName = this.qualify("recovery_codes");
         const result = await this.db.execute(sql`
             UPDATE ${sql.raw(tableName)}
             SET used_at = NOW()
-            WHERE user_id = ${userId} AND code_hash = ${codeHash} AND used_at IS NULL
+            WHERE uid = ${uid} AND code_hash = ${codeHash} AND used_at IS NULL
             RETURNING id
         `);
 
         return result.rows.length > 0;
     }
 
-    async getUnusedRecoveryCodeCount(userId: string): Promise<number> {
+    async getUnusedRecoveryCodeCount(uid: string): Promise<number> {
         const tableName = this.qualify("recovery_codes");
         const result = await this.db.execute(sql`
             SELECT COUNT(*)::int as count FROM ${sql.raw(tableName)}
-            WHERE user_id = ${userId} AND used_at IS NULL
+            WHERE uid = ${uid} AND used_at IS NULL
         `);
 
         return (result.rows[0] as { count: number }).count;
     }
 
-    async deleteAllRecoveryCodes(userId: string): Promise<void> {
+    async deleteAllRecoveryCodes(uid: string): Promise<void> {
         const tableName = this.qualify("recovery_codes");
         await this.db.execute(sql`
-            DELETE FROM ${sql.raw(tableName)} WHERE user_id = ${userId}
+            DELETE FROM ${sql.raw(tableName)} WHERE uid = ${uid}
         `);
     }
 
-    async hasVerifiedMfaFactors(userId: string): Promise<boolean> {
+    async hasVerifiedMfaFactors(uid: string): Promise<boolean> {
         const tableName = this.qualify("mfa_factors");
         const result = await this.db.execute(sql`
             SELECT COUNT(*)::int as count FROM ${sql.raw(tableName)}
-            WHERE user_id = ${userId} AND verified = TRUE
+            WHERE uid = ${uid} AND verified = TRUE
         `);
 
         return (result.rows[0] as { count: number }).count > 0;

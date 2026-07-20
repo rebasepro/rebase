@@ -159,7 +159,7 @@ export interface AuthHooks {
      *
      * This is fire-and-forget — errors are logged but do not fail the request.
      */
-    afterLogout?(userId: string): Promise<void>;
+    afterLogout?(uid: string): Promise<void>;
 
     /**
      * Called after successful MFA verification.
@@ -168,13 +168,13 @@ export interface AuthHooks {
      *
      * This is fire-and-forget — errors are logged but do not fail the request.
      */
-    onMfaVerified?(userId: string, factorId: string): Promise<void>;
+    onMfaVerified?(uid: string, factorId: string): Promise<void>;
 
     /**
      * Customize JWT access token claims before signing.
      *
      * Return the modified claims object. The returned claims are merged
-     * into the JWT payload alongside standard claims (userId, roles).
+     * into the JWT payload alongside standard claims (uid, roles).
      *
      * @param claims - The default claims that would be included.
      * @param user - The authenticated user data.
@@ -209,7 +209,7 @@ export interface AuthHooks {
      *
      * This is fire-and-forget — errors are logged but do not fail the request.
      */
-    onPasswordReset?(userId: string): Promise<void>;
+    onPasswordReset?(uid: string): Promise<void>;
 
     /**
      * Called before a user is deleted.
@@ -217,7 +217,7 @@ export interface AuthHooks {
      * Throw an error to prevent deletion (e.g. for users with active
      * subscriptions, pending transactions, etc.).
      */
-    beforeUserDelete?(userId: string): Promise<void>;
+    beforeUserDelete?(uid: string): Promise<void>;
 
     /**
      * Called after a user is deleted.
@@ -226,7 +226,7 @@ export interface AuthHooks {
      *
      * This is fire-and-forget — errors are logged but do not fail the request.
      */
-    afterUserDelete?(userId: string): Promise<void>;
+    afterUserDelete?(uid: string): Promise<void>;
 
     /**
      * Optional hook to customize or override the default user creation flow via the admin panel/REST API.
@@ -251,7 +251,7 @@ export interface AuthHooks {
      * When provided, this replaces the built-in password reset token generation, hashing, and email logic.
      */
     onAdminResetPassword?(
-        userId: string,
+        uid: string,
         ctx: {
             authRepo: AuthRepository;
             emailService?: EmailService;

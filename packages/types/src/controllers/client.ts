@@ -139,11 +139,11 @@ export interface AdminAPI {
         orderBy?: string;
         orderDir?: "asc" | "desc";
     }): Promise<{ users: AdminUser[]; total: number; limit: number; offset: number }>;
-    getUser(userId: string): Promise<{ user: AdminUser }>;
+    getUser(uid: string): Promise<{ user: AdminUser }>;
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
-    updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
-    deleteUser(userId: string): Promise<{ success: boolean }>;
-    resetPassword(userId: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
+    updateUser(uid: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
+    deleteUser(uid: string): Promise<{ success: boolean }>;
+    resetPassword(uid: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
     listRoles(): Promise<{ roles: Array<{ id: string; name: string }> }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }

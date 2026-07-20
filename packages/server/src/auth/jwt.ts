@@ -12,7 +12,7 @@ export interface AccessTokenPayload {
     /**
      * The user's id — the same spelling the domain model, the auth adapters and
      * the RLS layer (`auth.uid()`) all use. Tokens minted before this rename
-     * carry `userId` instead, and older external IdPs may send `sub`;
+     * carry `uid` instead, and older external IdPs may send `sub`;
      * {@link verifyAccessToken} accepts all three and normalises to this.
      */
     uid: string;
@@ -162,7 +162,10 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { userId?: string; uid?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string };
+        // `userId` is the pre-rename claim: tokens minted by an older backend
+        // are still in circulation and must keep verifying until they expire,
+        // or a deploy signs every active session out.
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { uid?: string; userId?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;

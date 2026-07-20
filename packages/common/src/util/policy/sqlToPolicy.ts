@@ -10,7 +10,7 @@ import { ANONYMOUS_USER_ID, LiteralPolicyOperand, PolicyExpression, policy } fro
  * It handles:
  * - `field = 'literal'`
  * - `field != 'literal'`
- * - `field = current_setting('app.user_id')`
+ * - `field = current_setting('app.uid')` (or the legacy `app.user_id`)
  * - `A AND B`, `A OR B` — only where the keyword is at the top level
  * - `true`
  * - `IN (...)` (as optimistic true)
@@ -245,8 +245,11 @@ export function findAnonymousGrants(expr: PolicyExpression): AnonymousGrantRisk[
 }
 
 function parseOperand(str: string) {
-    // current_setting('app.user_id') or auth.uid()
-    if (/current_setting\s*\(\s*'app\.user_id'\s*\)/i.test(str) || /auth\.uid\(\)/i.test(str)) {
+    // current_setting('app.uid') or auth.uid(). `app.user_id` is the
+    // pre-rename spelling and stays parseable: policies are data, so a
+    // database provisioned before the rename still holds rules written
+    // against it, and round-tripping one must not silently drop the operand.
+    if (/current_setting\s*\(\s*'app\.(uid|user_id)'\s*\)/i.test(str) || /auth\.uid\(\)/i.test(str)) {
         return policy.authUid();
     }
 

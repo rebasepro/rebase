@@ -35,14 +35,14 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const refreshTokens = tableCreator("refresh_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
         userAgent: varchar("user_agent", { length: 500 }),
         ipAddress: varchar("ip_address", { length: 45 }),
         createdAt: timestamp("created_at").defaultNow().notNull()
     }, (table) => ({
-        uniqueDeviceSession: unique("unique_device_session").on(table.userId, table.userAgent, table.ipAddress)
+        uniqueDeviceSession: unique("unique_device_session").on(table.uid, table.userAgent, table.ipAddress)
     }));
 
     /**
@@ -50,7 +50,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const passwordResetTokens = tableCreator("password_reset_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
         usedAt: timestamp("used_at"),
@@ -71,7 +71,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const userIdentities = tableCreator("user_identities", {
         id: uuid("id").defaultRandom().primaryKey(),
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         provider: varchar("provider", { length: 50 }).notNull(), // e.g. 'google', 'linkedin'
         providerId: varchar("provider_id", { length: 255 }).notNull(),
         profileData: jsonb("profile_data"),
@@ -86,7 +86,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const mfaFactors = tableCreator("mfa_factors", {
         id: uuid("id").defaultRandom().primaryKey(),
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         factorType: varchar("factor_type", { length: 20 }).notNull(), // 'totp'
         secretEncrypted: varchar("secret_encrypted", { length: 500 }).notNull(),
         friendlyName: varchar("friendly_name", { length: 255 }),
@@ -112,7 +112,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const recoveryCodes = tableCreator("recovery_codes", {
         id: uuid("id").defaultRandom().primaryKey(),
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         codeHash: varchar("code_hash", { length: 255 }).notNull(),
         usedAt: timestamp("used_at"),
         createdAt: timestamp("created_at").defaultNow().notNull()
@@ -123,7 +123,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const magicLinkTokens = tableCreator("magic_link_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
-        userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
         usedAt: timestamp("used_at"),
@@ -171,28 +171,28 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
     user: one(users, {
-        fields: [refreshTokens.userId],
+        fields: [refreshTokens.uid],
         references: [users.id]
     })
 }));
 
 export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
     user: one(users, {
-        fields: [passwordResetTokens.userId],
+        fields: [passwordResetTokens.uid],
         references: [users.id]
     })
 }));
 
 export const userIdentitiesRelations = relations(userIdentities, ({ one }) => ({
     user: one(users, {
-        fields: [userIdentities.userId],
+        fields: [userIdentities.uid],
         references: [users.id]
     })
 }));
 
 export const mfaFactorsRelations = relations(mfaFactors, ({ one, many }) => ({
     user: one(users, {
-        fields: [mfaFactors.userId],
+        fields: [mfaFactors.uid],
         references: [users.id]
     }),
     challenges: many(mfaChallenges)
@@ -207,14 +207,14 @@ export const mfaChallengesRelations = relations(mfaChallenges, ({ one }) => ({
 
 export const recoveryCodesRelations = relations(recoveryCodes, ({ one }) => ({
     user: one(users, {
-        fields: [recoveryCodes.userId],
+        fields: [recoveryCodes.uid],
         references: [users.id]
     })
 }));
 
 export const magicLinkTokensRelations = relations(magicLinkTokens, ({ one }) => ({
     user: one(users, {
-        fields: [magicLinkTokens.userId],
+        fields: [magicLinkTokens.uid],
         references: [users.id]
     })
 }));

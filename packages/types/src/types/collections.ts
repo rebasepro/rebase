@@ -1344,7 +1344,7 @@ export interface AuthCollectionConfig {
      * Override for custom reset flows.
      */
     onResetPassword?: (
-        userId: string,
+        uid: string,
         ctx: AuthCollectionContext
     ) => Promise<AuthCollectionResetResult>;
 

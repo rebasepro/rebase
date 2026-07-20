@@ -25,7 +25,7 @@ interface SessionRoutesConfig {
         refreshToken: string,
         providerId: string
     ) => unknown;
-    createSessionAndTokens: (userId: string, userAgent: string, ipAddress: string) => Promise<{
+    createSessionAndTokens: (uid: string, userAgent: string, ipAddress: string) => Promise<{
         roleIds: string[];
         accessToken: string;
         refreshToken: string;
@@ -34,7 +34,7 @@ interface SessionRoutesConfig {
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
         request: Request,
-        userId: string
+        uid: string
     ) => Promise<AuthResponsePayload>;
 }
 
@@ -79,7 +79,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         clearRefreshCookie(c, config.cookieAuth);
 
         // Call afterLogout hook (fire-and-forget)
-        // Extract userId from the access token if present
+        // Extract uid from the access token if present
         const authHeader = c.req.header("authorization");
         if (ops.afterLogout && authHeader?.startsWith("Bearer ")) {
             const { verifyAccessToken } = await import("./jwt");

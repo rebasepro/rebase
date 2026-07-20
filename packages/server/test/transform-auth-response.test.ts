@@ -99,8 +99,8 @@ passwordHash: data.passwordHash }))
         setEmailVerified: jest.fn().mockResolvedValue(undefined),
         setVerificationToken: jest.fn().mockResolvedValue(undefined),
         getUserByVerificationToken: jest.fn().mockResolvedValue(null),
-        getUserWithRoles: jest.fn().mockImplementation(async (userId) => {
-            const user = mockUser({ id: userId });
+        getUserWithRoles: jest.fn().mockImplementation(async (uid) => {
+            const user = mockUser({ id: uid });
             return { user,
 roles: [mockRole("editor")] };
         }),
@@ -177,7 +177,7 @@ accessExpiresIn: "1h" });
             // Verify context
             const context = transformHook.mock.calls[0][1] as TransformAuthResponseContext;
             expect(context.method).toBe("register");
-            expect(context.userId).toBeTruthy();
+            expect(context.uid).toBeTruthy();
             expect(context.request).toBeInstanceOf(Request);
 
             // Verify the custom field was injected
@@ -228,7 +228,7 @@ accessExpiresIn: "1h" });
             const hashedToken = hashRefreshToken(rawRefreshToken);
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
-                userId: "user-1",
+                uid: "user-1",
                 tokenHash: hashedToken,
                 expiresAt: new Date(Date.now() + 86400000), // 1 day from now
                 createdAt: new Date(),

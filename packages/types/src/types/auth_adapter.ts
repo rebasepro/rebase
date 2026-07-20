@@ -94,7 +94,7 @@ export interface AuthAdapterCapabilities {
      */
     passwordReset: boolean;
     /**
-     * Whether the adapter exposes `POST /admin/users/:userId/reset-password`,
+     * Whether the adapter exposes `POST /admin/users/:uid/reset-password`,
      * letting an admin reset another user's password.
      *
      * Independent of `passwordReset`: the built-in adapter supports this even
@@ -198,8 +198,8 @@ export interface UserManagementAdapter {
     createUser(data: AuthCreateUserData): Promise<AuthUserData>;
     updateUser(id: string, data: Partial<AuthCreateUserData>): Promise<AuthUserData | null>;
     deleteUser(id: string): Promise<void>;
-    getUserRoles(userId: string): Promise<string[]>;
-    setUserRoles(userId: string, roleIds: string[]): Promise<void>;
+    getUserRoles(uid: string): Promise<string[]>;
+    setUserRoles(uid: string, roleIds: string[]): Promise<void>;
 }
 
 // ─── User Creation Lifecycle ─────────────────────────────────────────────────
@@ -281,7 +281,7 @@ export interface AuthResponsePayload {
  */
 export interface TransformAuthResponseContext {
     /** The authenticated user's ID. */
-    userId: string;
+    uid: string;
     /** The auth method that triggered this response. */
     method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "mfa";
     /** The raw HTTP request (for reading headers, IP, etc.). */

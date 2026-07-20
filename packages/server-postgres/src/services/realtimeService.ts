@@ -97,7 +97,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             searchString?: string;
         };
         // Auth context for RLS — when set, refetches run in a transaction
-        // with set_config('app.user_id', ...) / set_config('app.user_roles', ...)
+        // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
         authContext?: SubscriptionAuthContext;
     }>();
 

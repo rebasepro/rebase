@@ -336,7 +336,7 @@ export interface RebaseBackendConfig {
      * storageAuthorize: async ({ key, user, operation }) => {
      *     if (!user) return false;
      *     const [ownerId] = key.split("/");
-     *     return ownerId === user.userId || operation === "read";
+     *     return ownerId === user.uid || operation === "read";
      * }
      * ```
      *

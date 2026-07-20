@@ -93,8 +93,8 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         }
 
         const user = c.get("user");
-        const createdBy = (user && typeof user === "object" && "userId" in user)
-            ? (user.userId as string)
+        const createdBy = (user && typeof user === "object" && "uid" in user)
+            ? (user.uid as string)
             : "unknown";
 
         const request: CreateApiKeyRequest = {

@@ -44,7 +44,7 @@ export interface CreateUserData {
  */
 export interface UserIdentityData {
     id: string;
-    userId: string;
+    uid: string;
     provider: string;
     providerId: string;
     profileData?: Record<string, unknown> | null;
@@ -124,7 +124,7 @@ export interface CreateRoleData {
  */
 export interface RefreshTokenInfo {
     id: string;
-    userId: string;
+    uid: string;
     tokenHash: string;
     expiresAt: Date;
     createdAt: Date;
@@ -136,7 +136,7 @@ export interface RefreshTokenInfo {
  * Password reset token info
  */
 export interface PasswordResetTokenInfo {
-    userId: string;
+    uid: string;
     expiresAt: Date;
 }
 
@@ -144,7 +144,7 @@ export interface PasswordResetTokenInfo {
  * Magic link token info
  */
 export interface MagicLinkTokenInfo {
-    userId: string;
+    uid: string;
     expiresAt: Date;
 }
 
@@ -209,12 +209,12 @@ export interface UserRepository {
     /**
      * Get all identities linked to a user
      */
-    getUserIdentities(userId: string): Promise<UserIdentityData[]>;
+    getUserIdentities(uid: string): Promise<UserIdentityData[]>;
 
     /**
      * Link a new OAuth identity to a user
      */
-    linkUserIdentity(userId: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void>;
+    linkUserIdentity(uid: string, provider: string, providerId: string, profileData?: Record<string, unknown>): Promise<void>;
 
     /**
      * Update a user
@@ -259,27 +259,27 @@ export interface UserRepository {
     /**
      * Get roles for a user
      */
-    getUserRoles(userId: string): Promise<RoleData[]>;
+    getUserRoles(uid: string): Promise<RoleData[]>;
 
     /**
      * Get role IDs for a user
      */
-    getUserRoleIds(userId: string): Promise<string[]>;
+    getUserRoleIds(uid: string): Promise<string[]>;
 
     /**
      * Set roles for a user (replaces existing roles)
      */
-    setUserRoles(userId: string, roleIds: string[]): Promise<void>;
+    setUserRoles(uid: string, roleIds: string[]): Promise<void>;
 
     /**
      * Assign a specific role to a new user
      */
-    assignDefaultRole(userId: string, roleId: string): Promise<void>;
+    assignDefaultRole(uid: string, roleId: string): Promise<void>;
 
     /**
      * Get user with their roles
      */
-    getUserWithRoles(userId: string): Promise<{ user: UserData; roles: RoleData[] } | null>;
+    getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null>;
 }
 
 /**
@@ -323,7 +323,7 @@ export interface TokenRepository {
     /**
      * Create a new refresh token
      */
-    createRefreshToken(userId: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void>;
+    createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void>;
 
     /**
      * Find a refresh token by hash
@@ -338,24 +338,24 @@ export interface TokenRepository {
     /**
      * Delete all refresh tokens for a user
      */
-    deleteAllRefreshTokensForUser(userId: string): Promise<void>;
+    deleteAllRefreshTokensForUser(uid: string): Promise<void>;
 
     /**
      * List all refresh tokens for a user
      */
-    listRefreshTokensForUser(userId: string): Promise<RefreshTokenInfo[]>;
+    listRefreshTokensForUser(uid: string): Promise<RefreshTokenInfo[]>;
 
     /**
      * Delete a specific refresh token by its primary key ID
      */
-    deleteRefreshTokenById(id: string, userId: string): Promise<void>;
+    deleteRefreshTokenById(id: string, uid: string): Promise<void>;
 
     // Password reset tokens
 
     /**
      * Create a password reset token
      */
-    createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+    createPasswordResetToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void>;
 
     /**
      * Find a valid (not expired, not used) password reset token by hash
@@ -370,7 +370,7 @@ export interface TokenRepository {
     /**
      * Delete all password reset tokens for a user
      */
-    deleteAllPasswordResetTokensForUser(userId: string): Promise<void>;
+    deleteAllPasswordResetTokensForUser(uid: string): Promise<void>;
 
     /**
      * Clean up expired tokens
@@ -382,7 +382,7 @@ export interface TokenRepository {
     /**
      * Create a magic link token
      */
-    createMagicLinkToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+    createMagicLinkToken(uid: string, tokenHash: string, expiresAt: Date): Promise<void>;
 
     /**
      * Find a valid (not expired, not used) magic link token by hash
@@ -404,7 +404,7 @@ export interface TokenRepository {
  */
 export interface MfaFactor {
     id: string;
-    userId: string;
+    uid: string;
     factorType: "totp";
     friendlyName?: string;
     verified: boolean;
@@ -428,7 +428,7 @@ export interface MfaChallengeInfo {
  */
 export interface RecoveryCode {
     id: string;
-    userId: string;
+    uid: string;
     usedAt?: Date;
 }
 
@@ -440,12 +440,12 @@ export interface MfaRepository {
     /**
      * Create a new MFA factor for a user
      */
-    createMfaFactor(userId: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor>;
+    createMfaFactor(uid: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor>;
 
     /**
      * Get all MFA factors for a user
      */
-    getMfaFactors(userId: string): Promise<MfaFactor[]>;
+    getMfaFactors(uid: string): Promise<MfaFactor[]>;
 
     /**
      * Get a specific MFA factor by ID
@@ -460,7 +460,7 @@ export interface MfaRepository {
     /**
      * Delete an MFA factor
      */
-    deleteMfaFactor(factorId: string, userId: string): Promise<void>;
+    deleteMfaFactor(factorId: string, uid: string): Promise<void>;
 
     /**
      * Create an MFA challenge
@@ -480,27 +480,27 @@ export interface MfaRepository {
     /**
      * Create recovery codes for a user
      */
-    createRecoveryCodes(userId: string, codeHashes: string[]): Promise<void>;
+    createRecoveryCodes(uid: string, codeHashes: string[]): Promise<void>;
 
     /**
      * Use a recovery code (mark as used)
      */
-    useRecoveryCode(userId: string, codeHash: string): Promise<boolean>;
+    useRecoveryCode(uid: string, codeHash: string): Promise<boolean>;
 
     /**
      * Get unused recovery code count for a user
      */
-    getUnusedRecoveryCodeCount(userId: string): Promise<number>;
+    getUnusedRecoveryCodeCount(uid: string): Promise<number>;
 
     /**
      * Delete all recovery codes for a user
      */
-    deleteAllRecoveryCodes(userId: string): Promise<void>;
+    deleteAllRecoveryCodes(uid: string): Promise<void>;
 
     /**
      * Check if a user has any verified MFA factors
      */
-    hasVerifiedMfaFactors(userId: string): Promise<boolean>;
+    hasVerifiedMfaFactors(uid: string): Promise<boolean>;
 }
 
 /**

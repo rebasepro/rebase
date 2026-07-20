@@ -112,13 +112,87 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             )
         `);
 
+        // ── Migration: auth FK column user_id → uid, phase 1 (expand) ───────
+        // Must run BEFORE the dependent tables below: CREATE TABLE IF NOT
+        // EXISTS never revisits an existing table, so a database provisioned
+        // before this migration still lacks `uid` — and the
+        // CREATE INDEX ... (uid) statements that follow would fail on it.
+        //
+        // Deliberately NOT a plain RENAME. Both Cloud Run and Kubernetes roll
+        // deploys, so old and new pods serve the same database at the same time,
+        // and a rollback puts old code back in front of a migrated database. A
+        // rename breaks every auth query on whichever side is out of step.
+        // Instead: add `uid`, backfill it, drop the NOT NULL on `user_id`, and
+        // keep the two in sync with a trigger, so a backend of either era can
+        // read and write. `scripts/drop-legacy-auth-user-id.sql` removes the
+        // column once no old backend remains (phase 2, contract).
+        //
+        // Idempotent throughout: every step is guarded on catalogue state.
+        await db.execute(sql`
+            CREATE OR REPLACE FUNCTION ${sql.raw(`"${authSchema}"`)}.sync_uid_user_id() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.uid IS NULL AND NEW.user_id IS NOT NULL THEN
+                    NEW.uid := NEW.user_id;
+                ELSIF NEW.user_id IS NULL AND NEW.uid IS NOT NULL THEN
+                    NEW.user_id := NEW.uid;
+                END IF;
+                RETURN NEW;
+            END $$ LANGUAGE plpgsql
+        `);
+
+        for (const authTable of [
+            "user_identities",
+            "refresh_tokens",
+            "password_reset_tokens",
+            "magic_link_tokens",
+            "mfa_factors",
+            "recovery_codes"
+        ]) {
+            const qualified = `"${authSchema}"."${authTable}"`;
+            await db.execute(sql`
+                DO $$
+                DECLARE
+                    has_legacy boolean;
+                    has_uid    boolean;
+                BEGIN
+                    SELECT
+                        bool_or(column_name = 'user_id'),
+                        bool_or(column_name = 'uid')
+                    INTO has_legacy, has_uid
+                    FROM information_schema.columns
+                    WHERE table_schema = ${sql.raw(`'${authSchema}'`)}
+                      AND table_name = ${sql.raw(`'${authTable}'`)};
+
+                    -- Table absent, or already uid-only (a fresh install, or
+                    -- phase 2 already run): nothing to do.
+                    IF has_legacy IS NOT TRUE THEN
+                        RETURN;
+                    END IF;
+
+                    IF has_uid IS NOT TRUE THEN
+                        EXECUTE ${sql.raw(`'ALTER TABLE ${qualified} ADD COLUMN uid ${userIdType} REFERENCES ${usersTableName}(id) ON DELETE CASCADE'`)};
+                        EXECUTE ${sql.raw(`'UPDATE ${qualified} SET uid = user_id WHERE uid IS NULL'`)};
+                        EXECUTE ${sql.raw(`'CREATE INDEX IF NOT EXISTS idx_${authTable}_uid ON ${qualified}(uid)'`)};
+                    END IF;
+
+                    -- New code inserts uid and never user_id, so the legacy
+                    -- column can no longer be NOT NULL. The trigger below
+                    -- backfills it, but the constraint is checked first.
+                    EXECUTE ${sql.raw(`'ALTER TABLE ${qualified} ALTER COLUMN user_id DROP NOT NULL'`)};
+
+                    EXECUTE ${sql.raw(`'DROP TRIGGER IF EXISTS sync_uid_user_id ON ${qualified}'`)};
+                    EXECUTE ${sql.raw(`'CREATE TRIGGER sync_uid_user_id BEFORE INSERT OR UPDATE ON ${qualified} FOR EACH ROW EXECUTE FUNCTION "${authSchema}".sync_uid_user_id()'`)};
+                END $$
+            `);
+        }
+
         // ── Create dependent auth tables (idempotent) ───────────────────
 
         // Create user_identities table
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(userIdentitiesTable)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 provider TEXT NOT NULL,
                 provider_id TEXT NOT NULL,
                 profile_data JSONB,
@@ -131,7 +205,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // Create indexes on user_identities
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_user_identities_user 
-            ON ${sql.raw(userIdentitiesTable)}(user_id)
+            ON ${sql.raw(userIdentitiesTable)}(uid)
         `);
 
 
@@ -139,13 +213,13 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(refreshTokensTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                 user_agent TEXT,
                 ip_address TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                CONSTRAINT unique_device_session UNIQUE (user_id, user_agent, ip_address)
+                CONSTRAINT unique_device_session UNIQUE (uid, user_agent, ip_address)
             )
         `);
 
@@ -155,17 +229,17 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             ON ${sql.raw(refreshTokensTableName)}(token_hash)
         `);
 
-        // Create index on user_id for cleanup operations
+        // Create index on uid for cleanup operations
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user 
-            ON ${sql.raw(refreshTokensTableName)}(user_id)
+            ON ${sql.raw(refreshTokensTableName)}(uid)
         `);
 
         // Create password reset tokens table
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(passwordResetTokensTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                 used_at TIMESTAMP WITH TIME ZONE,
@@ -179,10 +253,10 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             ON ${sql.raw(passwordResetTokensTableName)}(token_hash)
         `);
 
-        // Create index on user_id for password reset cleanup
+        // Create index on uid for password reset cleanup
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user 
-            ON ${sql.raw(passwordResetTokensTableName)}(user_id)
+            ON ${sql.raw(passwordResetTokensTableName)}(uid)
         `);
 
         // Create magic link tokens table
@@ -190,7 +264,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(magicLinkTokensTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 token_hash TEXT NOT NULL UNIQUE,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
                 used_at TIMESTAMP WITH TIME ZONE,
@@ -204,10 +278,10 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             ON ${sql.raw(magicLinkTokensTableName)}(token_hash)
         `);
 
-        // Create index on user_id for magic link cleanup
+        // Create index on uid for magic link cleanup
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_user 
-            ON ${sql.raw(magicLinkTokensTableName)}(user_id)
+            ON ${sql.raw(magicLinkTokensTableName)}(uid)
         `);
 
         // Create app config table
@@ -226,9 +300,15 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         await db.transaction(async (tx) => {
             await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
 
+            // Falls back to the pre-rename `app.user_id` so a database that has
+            // taken the new schema but is still served by an older backend keeps
+            // resolving the principal. Keep in sync with AUTH_BOOTSTRAP_SQL.
             await tx.execute(sql`
                 CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
-                    SELECT NULLIF(current_setting('app.user_id', true), '');
+                    SELECT COALESCE(
+                        NULLIF(current_setting('app.uid', true), ''),
+                        NULLIF(current_setting('app.user_id', true), '')
+                    );
                 $$ LANGUAGE sql STABLE
             `);
 
@@ -322,7 +402,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(mfaFactorsTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 factor_type TEXT NOT NULL DEFAULT 'totp',
                 secret_encrypted TEXT NOT NULL,
                 friendly_name TEXT,
@@ -335,7 +415,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // Create indexes on mfa_factors
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_mfa_factors_user
-            ON ${sql.raw(mfaFactorsTableName)}(user_id)
+            ON ${sql.raw(mfaFactorsTableName)}(uid)
         `);
 
         // Create mfa_challenges table
@@ -360,7 +440,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(recoveryCodesTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                user_id ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
                 code_hash TEXT NOT NULL,
                 used_at TIMESTAMP WITH TIME ZONE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -370,7 +450,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // Create indexes on recovery_codes
         await db.execute(sql`
             CREATE INDEX IF NOT EXISTS idx_recovery_codes_user
-            ON ${sql.raw(recoveryCodesTableName)}(user_id)
+            ON ${sql.raw(recoveryCodesTableName)}(uid)
         `);
 
         // ── Migration: clear stale FORCE ROW LEVEL SECURITY (older RLS model) ──

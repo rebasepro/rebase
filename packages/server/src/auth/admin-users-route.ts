@@ -3,10 +3,10 @@
  *
  * Mounts:
  *   GET /users
- *   GET /users/:userId
+ *   GET /users/:uid
  *   POST /users
- *   PUT /users/:userId
- *   DELETE /users/:userId
+ *   PUT /users/:uid
+ *   DELETE /users/:uid
  *   POST /bootstrap
  */
 
@@ -93,11 +93,11 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             throw ApiError.forbidden("Admin users already exist. Bootstrap not allowed.", "BOOTSTRAP_COMPLETED");
         }
 
-        const userId = "userId" in user ? (user as { userId: string }).userId : ("uid" in user ? (user as { uid: string }).uid : undefined);
-        if (!userId) {
+        const uid = "uid" in user ? (user as { uid: string }).uid : ("uid" in user ? (user as { uid: string }).uid : undefined);
+        if (!uid) {
             throw ApiError.unauthorized("User ID not found in auth context");
         }
-        const caller = await authRepo.getUserById(userId);
+        const caller = await authRepo.getUserById(uid);
         if (!caller) {
             throw ApiError.notFound("Authenticated user does not exist in the database.", "USER_NOT_FOUND");
         }
@@ -117,10 +117,10 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
                 if (at !== bt) return at < bt ? a : b;
                 return a.id < b.id ? a : b;
             });
-            if (earliest.id !== userId) {
+            if (earliest.id !== uid) {
                 logger.warn("[Security Audit] Bootstrap denied: caller is not the earliest-registered user", {
                     eventType: "auth.bootstrap.denied",
-                    callerId: userId,
+                    callerId: uid,
                     earliestUserId: earliest.id
                 });
                 throw ApiError.forbidden(
@@ -131,10 +131,10 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             }
         }
 
-        await authRepo.setUserRoles(userId, ["admin"]);
+        await authRepo.setUserRoles(uid, ["admin"]);
         logger.info("[Security Audit] Initial admin bootstrapped", {
             eventType: "auth.bootstrap.success",
-            userId
+            uid
         });
 
         if (config.setBootstrapCompleted) {
@@ -145,7 +145,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             success: true,
             message: "You are now an admin",
             user: {
-                uid: userId,
+                uid: uid,
                 roles: ["admin"]
             }
         });
@@ -185,9 +185,9 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         });
     });
 
-    router.get("/users/:userId", requireAdmin, async (c) => {
-        const userId = c.req.param("userId");
-        const result = await authRepo.getUserWithRoles(userId);
+    router.get("/users/:uid", requireAdmin, async (c) => {
+        const uid = c.req.param("uid");
+        const result = await authRepo.getUserWithRoles(uid);
 
         if (!result) {
             throw ApiError.notFound("User not found");
@@ -255,12 +255,12 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         );
     });
 
-    router.put("/users/:userId", requireAdmin, async (c) => {
-        const userId = c.req.param("userId");
+    router.put("/users/:uid", requireAdmin, async (c) => {
+        const uid = c.req.param("uid");
         const body = await c.req.json();
         const { password, email, displayName, roles } = body;
 
-        const existing = await authRepo.getUserById(userId);
+        const existing = await authRepo.getUserById(uid);
         if (!existing) {
             throw ApiError.notFound("User not found");
         }
@@ -278,11 +278,11 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         }
 
         if (Object.keys(updates).length > 0) {
-            await authRepo.updateUser(userId, updates);
+            await authRepo.updateUser(uid, updates);
         }
 
         if (roles !== undefined && Array.isArray(roles)) {
-            const currentRoles = await authRepo.getUserRoleIds(userId);
+            const currentRoles = await authRepo.getUserRoleIds(uid);
             const wasAdmin = currentRoles.includes("admin");
             const willBeAdmin = roles.includes("admin");
 
@@ -295,29 +295,29 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
                     throw ApiError.forbidden("Cannot demote the last administrator", "LAST_ADMIN");
                 }
             }
-            await authRepo.setUserRoles(userId, roles);
+            await authRepo.setUserRoles(uid, roles);
         }
 
-        const result = await authRepo.getUserWithRoles(userId);
+        const result = await authRepo.getUserWithRoles(uid);
         const adminUser = toAdminUser(result!.user, result!.roles.map((r) => r.id));
 
         return c.json({ user: adminUser });
     });
 
-    router.delete("/users/:userId", requireAdmin, async (c) => {
-        const userId = c.req.param("userId");
+    router.delete("/users/:uid", requireAdmin, async (c) => {
+        const uid = c.req.param("uid");
         const authUser = c.get("user") as { uid?: string } | undefined;
 
-        if (authUser?.uid === userId) {
+        if (authUser?.uid === uid) {
             throw ApiError.badRequest("Cannot delete your own account", "SELF_DELETE");
         }
 
-        const existing = await authRepo.getUserById(userId);
+        const existing = await authRepo.getUserById(uid);
         if (!existing) {
             throw ApiError.notFound("User not found");
         }
 
-        const roles = await authRepo.getUserRoleIds(userId);
+        const roles = await authRepo.getUserRoleIds(uid);
         if (roles.includes("admin")) {
             const adminUsers = await authRepo.listUsersPaginated({
                 roleId: "admin",
@@ -328,7 +328,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             }
         }
 
-        await authRepo.deleteUser(userId);
+        await authRepo.deleteUser(uid);
         return c.json({ success: true });
     });
 

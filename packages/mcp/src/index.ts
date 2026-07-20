@@ -278,7 +278,7 @@ type RebaseClient = {
         createUser: (opts: Record<string, unknown>) => Promise<unknown>;
         updateUser: (id: string, opts: Record<string, unknown>) => Promise<unknown>;
         deleteUser: (id: string) => Promise<unknown>;
-        resetPassword: (userId: string, options?: { password?: string }) => Promise<{ user: unknown; temporaryPassword?: string; invitationSent?: boolean }>;
+        resetPassword: (uid: string, options?: { password?: string }) => Promise<{ user: unknown; temporaryPassword?: string; invitationSent?: boolean }>;
         listRoles: () => Promise<unknown>;
     };
     cron: {
@@ -585,14 +585,14 @@ description: "Role IDs to assign" }
         inputSchema: {
             type: "object",
             properties: {
-                userId: { type: "string",
+                uid: { type: "string",
 description: "User UID" },
                 email: { type: "string" },
                 displayName: { type: "string" },
                 roles: { type: "array",
 items: { type: "string" } }
             },
-            required: ["userId"]
+            required: ["uid"]
         }
     },
     {
@@ -601,10 +601,10 @@ items: { type: "string" } }
         inputSchema: {
             type: "object",
             properties: {
-                userId: { type: "string",
+                uid: { type: "string",
 description: "User UID" }
             },
-            required: ["userId"]
+            required: ["uid"]
         }
     },
     {
@@ -1119,18 +1119,18 @@ roles });
         }
 
         case "update_user": {
-            const argsObj = args as { userId: string; email?: string; displayName?: string; roles?: string[] };
-            const { userId, email, displayName, roles } = argsObj;
-            const result = await client.admin.updateUser(userId, { email,
+            const argsObj = args as { uid: string; email?: string; displayName?: string; roles?: string[] };
+            const { uid, email, displayName, roles } = argsObj;
+            const result = await client.admin.updateUser(uid, { email,
 displayName,
 roles });
             return jsonResult(result);
         }
 
         case "delete_user": {
-            const argsObj = args as { userId: string };
-            const { userId } = argsObj;
-            const result = await client.admin.deleteUser(userId);
+            const argsObj = args as { uid: string };
+            const { uid } = argsObj;
+            const result = await client.admin.deleteUser(uid);
             return jsonResult(result);
         }
 
@@ -1149,13 +1149,13 @@ roles });
             if (!user) {
                 return textResult(`User with email "${email}" not found.`);
             }
-            const userId = user.uid || user.id;
-            if (!userId) {
+            const uid = user.uid || user.id;
+            if (!uid) {
                 return textResult(`Could not determine user ID for "${email}".`);
             }
 
             // Step 2: Reset password via admin API
-            const resetResult = await client.admin.resetPassword(userId, password ? { password } : undefined);
+            const resetResult = await client.admin.resetPassword(uid, password ? { password } : undefined);
 
             return jsonResult({
                 message: `Password reset for ${email}`,
