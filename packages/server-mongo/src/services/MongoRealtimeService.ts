@@ -17,7 +17,7 @@ import {
 import { WebSocket } from "ws";
 import { MongoDataService } from "../db/MongoDataService";
 
-import { MongoDriver } from "./MongoDriver";
+import type { MongoDriver } from "./MongoDriver";
 import { logger } from "@rebasepro/server";
 
 interface Subscription {

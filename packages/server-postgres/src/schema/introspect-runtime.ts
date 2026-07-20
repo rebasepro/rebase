@@ -23,11 +23,11 @@ import {
     buildTablesMap,
     buildEnumMap,
     identifyJoinTables,
-    humanize,
     singularize,
     mapPgType,
     getIconForTable
 } from "./introspect-db-logic";
+import { humanize } from "./introspect-db-naming";
 
 export interface IntrospectedSchema {
     tablesMap: Map<string, TableMeta>;

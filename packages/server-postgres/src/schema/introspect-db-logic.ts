@@ -7,6 +7,7 @@
  * and consumed directly by tests.
  */
 import { inferPropertyFromData } from "./introspect-db-inference";
+import { humanize } from "./introspect-db-naming";
 
 // ── Typed interfaces for SQL query results ────────────────────────────
 
@@ -115,16 +116,6 @@ export function singularize(word: string): string {
     }
 
     return word;
-}
-
-/**
- * Convert a snake_case name to a human-readable Title Case label.
- * e.g. "created_at" -> "Created At", "customer_id" -> "Customer Id"
- */
-export function humanize(snakeName: string): string {
-    return snakeName
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**

@@ -1,9 +1,10 @@
 import {
-    singularize, humanize, toCollectionVarName, getIconForTable,
+    singularize, toCollectionVarName, getIconForTable,
     mapPgType, buildEnumMap, buildTablesMap, identifyJoinTables,
     generateIndexContent, mergeIndexContent, safeHostFromUrl,
     EnumValue, TableRow, TableColumn, PrimaryKeyRow, ForeignKeyRow
 } from "../src/schema/introspect-db-logic";
+import { humanize } from "../src/schema/introspect-db-naming";
 
 // ═══════════════════════════════════════════════════════════════════════
 // singularize()

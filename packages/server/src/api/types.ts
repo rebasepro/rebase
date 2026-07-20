@@ -1,5 +1,5 @@
 import { VectorSearchParams, LogicalCondition, FilterValues } from "@rebasepro/types";
-import { AuthResult } from "../auth/middleware";
+import type { AuthResult } from "../auth/middleware";
 import { DataDriver } from "@rebasepro/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 

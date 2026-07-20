@@ -1,7 +1,7 @@
 import { MiddlewareHandler, Context } from "hono";
 import { DataDriver, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, verifyDownloadToken } from "./jwt";
-import { HonoEnv } from "../api/types";
+import type { HonoEnv } from "../api/types";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
 import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";

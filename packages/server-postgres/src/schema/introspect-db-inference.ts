@@ -1,4 +1,4 @@
-import { humanize } from "./introspect-db-logic";
+import { humanize } from "./introspect-db-naming";
 
 export interface InferenceResult {
     propType?: string; // If the inference changes the base type
