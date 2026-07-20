@@ -7,7 +7,7 @@ import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { getReferenceFrom } from "@rebasepro/common";
 import { ReferencePreview } from "../preview";
 import { Button, cls } from "@rebasepro/ui";
-import { useCollectionRegistryController } from "../index";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 
 export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
     name?: string,

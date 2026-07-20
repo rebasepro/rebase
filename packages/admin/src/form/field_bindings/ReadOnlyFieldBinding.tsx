@@ -5,7 +5,8 @@ import React from "react";
 ;
 
 import { PropertyPreview } from "../../preview";
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
 import { cls } from "@rebasepro/ui";

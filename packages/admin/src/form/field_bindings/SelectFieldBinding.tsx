@@ -3,7 +3,8 @@ import type { NumberProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
 
 ;
-import { FieldHelperText, LabelWithIcon } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { cls, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";

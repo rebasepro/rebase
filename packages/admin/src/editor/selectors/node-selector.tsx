@@ -1,6 +1,6 @@
 
 import { EditorState, Transaction } from "prosemirror-state";
-import { EditorBubbleItem } from "../components";
+import { EditorBubbleItem } from "../components/editor-bubble-item";
 import { useTranslation } from "@rebasepro/app";
 
 import {

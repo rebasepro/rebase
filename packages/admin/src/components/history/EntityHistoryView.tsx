@@ -7,7 +7,7 @@ import { EntityHistoryEntry } from "./EntityHistoryEntry";
 import { useSnackbarController, useAuthController } from "@rebasepro/app";
 import { ConfirmationDialog } from "@rebasepro/app";
 import { useState } from "react";
-import { useHistory } from "../../index";
+import { useHistory } from "../../hooks/useHistory";
 
 /**
  * Entity history tab view. Shows a paginated list of entity revisions

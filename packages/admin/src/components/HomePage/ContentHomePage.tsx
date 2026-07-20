@@ -23,7 +23,8 @@ import { useCollapsedGroups, buildCollapsedDefaults, useCustomizationController,
 import { useRestoreScroll } from "@rebasepro/app";
 
 import { SchemaDriftBanner } from "@rebasepro/app";
-import { useBreadcrumbsController, useCMSContext } from "../../index";
+import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
+import { useCMSContext } from "../../hooks/useCMSContext";
 
 export const DEFAULT_GROUP_NAME = "Views";
 export const ADMIN_GROUP_NAME = "Admin";

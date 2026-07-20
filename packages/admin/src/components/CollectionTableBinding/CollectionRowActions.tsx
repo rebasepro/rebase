@@ -17,7 +17,7 @@ import {
 import { useTranslation } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/common";
-import { useCMSContext } from "../../index";
+import { useCMSContext } from "../../hooks/useCMSContext";
 
 /**
  *

@@ -18,7 +18,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 import { CollectionEditorDialogs } from "./CollectionEditorDialogs";
 import { useEffect } from "react";
 import { useTranslation } from "@rebasepro/app";
-import { useBreadcrumbsController } from "../index";
+import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 
 function SettingsView() {
     const { t } = useTranslation();

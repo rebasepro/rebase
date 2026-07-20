@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { EditorBubbleItem } from "../components";
+import { EditorBubbleItem } from "../components/editor-bubble-item";
 import { Button, CheckIcon, ChevronDownIcon, Popover } from "@rebasepro/ui";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { isMarkActive, getMarkAttributes, setMark, unsetMark } from "../utils/prosemirror-utils";

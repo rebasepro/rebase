@@ -26,7 +26,9 @@ import {
     saveEntityToCache
 } from "@rebasepro/app";
 
-import { useCollectionRegistryController, useSidePanel, useCMSContext } from "../index";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import { useSidePanel } from "../hooks/useSidePanel";
+import { useCMSContext } from "../hooks/useCMSContext";
 import { EntityForm } from "./EntityForm";
 import {
     extractTouchedValues,

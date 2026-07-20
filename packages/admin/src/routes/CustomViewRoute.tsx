@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import type { AppView } from "@rebasepro/types";
-import { useBreadcrumbsController, useUrlController } from "../index";
+import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 
 export function CustomViewRoute({ view }: {
     view: AppView

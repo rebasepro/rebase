@@ -2,7 +2,8 @@ import type { FieldProps } from "../../types/fields";
 import type { StringProperty } from "@rebasepro/types";
 import React from "react";
 
-import { FieldHelperText, LabelWithIcon } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 import { UserSelector } from "../../components/UserSelector";

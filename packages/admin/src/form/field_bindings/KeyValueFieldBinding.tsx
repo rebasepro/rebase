@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import { DataType, GeoPoint } from "@rebasepro/types";
 
 import { ArrayContainer } from "../../components/ArrayContainer";
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import {
     BooleanSwitchWithLabel,
     Button,

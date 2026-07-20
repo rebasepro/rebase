@@ -4,7 +4,8 @@ import React from "react";
 
 ;
 import { getIconForProperty } from "../../util/property_utils";
-import { FieldHelperText, LabelWithIcon } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { BooleanSwitchWithLabel } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";

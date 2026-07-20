@@ -23,7 +23,8 @@ import { useSelectionController } from "../CollectionViewBinding/useSelectionCon
 import { useColumnIds } from "@rebasepro/app";
 import { useSideDialogContext } from "../SideDialogs";
 import { useAnalyticsController } from "@rebasepro/app";
-import { useUrlController, useSidePanel } from "../../index";
+import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
+import { useSidePanel } from "../../hooks/useSidePanel";
 
 /**
  * @group Components

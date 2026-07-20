@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 
 import { Field, useFormex } from "@rebasepro/forms";
 
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { EnumValuesChip } from "../../preview";
 

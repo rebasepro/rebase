@@ -7,7 +7,8 @@ import React, { useCallback, useMemo } from "react";
 import { Entity, EntityReference } from "@rebasepro/types";
 import { ErrorView } from "@rebasepro/app";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
 import { IconForView } from "@rebasepro/app";
@@ -15,7 +16,7 @@ import { getIconForProperty } from "../../util/property_utils";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { cls } from "@rebasepro/ui";
-import { useCollectionRegistryController } from "../../index";
+import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 
 /**
  * Field that opens a reference selection dialog.

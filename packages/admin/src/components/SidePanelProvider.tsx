@@ -6,8 +6,9 @@ import { SidePanelControllerContext } from "../hooks/useSidePanel";
 import { SideDialogsControllerContext } from "../contexts/SideDialogsControllerContext";
 import { BreadcrumbsProvider } from "../contexts/BreacrumbsContext";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
-import { useCollectionRegistryController, useUrlController } from "../index";
-import { useNavigationStateController } from "../index";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
+import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { useAuthController, useBridgeRegistration } from "@rebasepro/app";
 
 /**

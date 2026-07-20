@@ -5,7 +5,8 @@ import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../preview";
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
 import { getReferenceFrom } from "@rebasepro/common";
@@ -13,7 +14,7 @@ import { getReferenceFrom } from "@rebasepro/common";
 import { useTranslation, ErrorView } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { useCollectionRegistryController } from "../../index";
+import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 
 type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, EntityReference[]>;
 

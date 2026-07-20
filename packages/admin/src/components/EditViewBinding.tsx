@@ -5,7 +5,8 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useStat
 import { Entity, EntityStatus, getCollectionDataPath } from "@rebasepro/types";
 import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 
-import { CollectionViewBinding, EntityViewBinding } from "../components";
+import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
+import { EntityViewBinding } from "./EntityViewBinding";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     CenteredView,
@@ -48,7 +49,7 @@ import { JsonPreviewBinding } from "../components/JsonPreviewBinding";
 const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
-import { useUrlController } from "../index";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigate } from "react-router-dom";
 
 import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";

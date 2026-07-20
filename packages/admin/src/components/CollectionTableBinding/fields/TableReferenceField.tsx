@@ -11,7 +11,7 @@ import { useComponentOverride, ErrorView, CollectionScopeProvider } from "@rebas
 import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getReferenceFrom } from "@rebasepro/common";
-import { useCollectionRegistryController } from "../../../index";
+import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
 
 type TableReferenceFieldProps = {
     name: string;

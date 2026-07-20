@@ -5,7 +5,8 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useStat
 import { Entity, EntityStatus, getCollectionDataPath, Property } from "@rebasepro/types";
 import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 
-import { CollectionViewBinding, EntityViewBinding } from "../components";
+import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
+import { EntityViewBinding } from "./EntityViewBinding";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
@@ -39,7 +40,8 @@ import {
     useLargeLayout,
     useSlot
 } from "@rebasepro/app";
-import { useUrlController, useCollectionRegistryController } from "../index";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate } from "react-router-dom";
 import { getValueInPath } from "@rebasepro/utils";
 import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";

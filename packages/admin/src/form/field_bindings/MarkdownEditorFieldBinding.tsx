@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { useAuthController, useStorageSource } from "@rebasepro/app";
 import { useStorageSources } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";

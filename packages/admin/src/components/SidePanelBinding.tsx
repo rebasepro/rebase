@@ -10,8 +10,9 @@ import { DetailViewBinding } from "./DetailViewBinding";
 import { useSideDialogContext } from "./SideDialogs";
 import { useNavigate } from "react-router-dom";
 import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/app";
-import { useCollectionRegistryController, useSidePanel } from "../index";
-import { useUrlController } from "../index";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import { useSidePanel } from "../hooks/useSidePanel";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { resolveDefaultSelectedView } from "@rebasepro/common";
 
 /**

@@ -8,7 +8,7 @@ import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
-import { useCollectionRegistryController } from "../../index";
+import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { getEntityTitlePropertyKey } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 

@@ -7,7 +7,7 @@ import { ReferencePreview } from "../../../preview";
 import { Button, Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useTranslation } from "@rebasepro/app";
-import { useCollectionRegistryController } from "../../../index";
+import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
 
 interface ReferenceFilterFieldProps {
     name: string,

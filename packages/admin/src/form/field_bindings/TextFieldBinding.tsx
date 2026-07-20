@@ -13,7 +13,8 @@ import {
     XIcon
 } from "@rebasepro/ui";
 import { PreviewType } from "@rebasepro/types";
-import { FieldHelperText, LabelWithIcon } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyPreview } from "../../preview";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";

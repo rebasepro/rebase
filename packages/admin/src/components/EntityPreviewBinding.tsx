@@ -27,7 +27,8 @@ import { IconForView } from "@rebasepro/app";
 import { getPropertyInPath } from "../util/property_utils";
 import { getEntityPreviewKeys, getEntityTitlePropertyKey } from "../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
-import { useCollectionRegistryController, useSidePanel } from "../index";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import { useSidePanel } from "../hooks/useSidePanel";
 
 export type EntityPreviewBindingProps = {
     size?: PreviewSize,

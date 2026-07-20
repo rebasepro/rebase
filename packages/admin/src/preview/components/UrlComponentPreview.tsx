@@ -5,16 +5,9 @@ import { PreviewType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { cls, ExternalLinkIcon, FileTextIcon, Tooltip, Typography } from "@rebasepro/ui";
 import { EmptyValue } from "./EmptyValue";
-import { getThumbnailMeasure } from "../util";
+import { getThumbnailMeasure, sanitizeUrl } from "../util";
 
-export function sanitizeUrl(url: string | undefined): string {
-    if (!url) return "about:blank";
-    const trimmed = url.trim();
-    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) {
-        return "about:blank";
-    }
-    return trimmed;
-}
+export { sanitizeUrl };
 
 /**
  * @group Preview components

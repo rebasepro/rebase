@@ -1,8 +1,8 @@
-import { SelectionProps, SelectionTableBinding } from "../components";
+import { SelectionProps, SelectionTableBinding } from "../components/ReferenceTable/SelectionTableBinding";
 import type { CollectionConfig } from "@rebasepro/types";
 import { useCallback, useMemo } from "react";
-import { useSideDialogsController } from "../index";
-import { useCollectionRegistryController } from "../index";
+import { useSideDialogsController } from "./useSideDialogsController";
+import { useCollectionRegistryController } from "./navigation/contexts/CollectionRegistryContext";
 
 /**
  * This hook is used to open a side dialog that allows the selection

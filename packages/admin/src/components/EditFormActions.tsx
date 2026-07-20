@@ -5,7 +5,7 @@ import type { EntityAction, EntityActionClickProps, SidePanelController } from "
 import React, { useMemo } from "react";
 import { Entity, getCollectionDataPath, RebaseContext } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
-import { copyEntityAction, deleteEntityAction } from "../components";
+import { copyEntityAction, deleteEntityAction } from "./common/default_entity_actions";
 import { mergeEntityActions } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
@@ -19,7 +19,7 @@ import { SideDialogController, useSideDialogContext } from "./SideDialogs";
 import { FormexController } from "@rebasepro/forms";
 import { ErrorTooltip } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
-import { useCMSContext } from "../index";
+import { useCMSContext } from "../hooks/useCMSContext";
 
 export function EditFormActions({
     collection,

@@ -70,13 +70,11 @@ import { useSelectionController } from "./useSelectionController";
 import { CollectionViewStartActions } from "./CollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
 import { mergeDeep } from "@rebasepro/utils";
-import {
-    useBreadcrumbsController,
-    useCMSContext,
-    useCollectionRegistryController,
-    useSidePanel,
-    useUrlController
-} from "../../index";
+import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
+import { useCMSContext } from "../../hooks/useCMSContext";
+import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
+import { useSidePanel } from "../../hooks/useSidePanel";
+import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 
 const EMPTY_ARRAY: never[] = [];
 const DEFAULT_ENTITY_OPEN_MODE = "split";

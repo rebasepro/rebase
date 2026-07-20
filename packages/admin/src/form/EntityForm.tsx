@@ -15,7 +15,10 @@ import { getFormFieldKeys } from "@rebasepro/app";
 import { Alert, Button, Chip, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
-import { FormEntry, FormLayout, LabelWithIconAndTooltip, PropertyFieldBinding } from "../form";
+import { FormEntry } from "./components/FormEntry";
+import { FormLayout } from "./components/FormLayout";
+import { LabelWithIconAndTooltip } from "./components/LabelWithIconAndTooltip";
+import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
 import { CustomFieldValidator, getEntitySchema } from "./validation";

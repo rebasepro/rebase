@@ -5,8 +5,8 @@ import { Entity, EntityRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
-import { EntityPreviewBinding, EntityPreviewContainer } from "../../components";
-import { useCollectionRegistryController } from "../../index";
+import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
+import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { getEntityTitlePropertyKey } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 

@@ -4,7 +4,8 @@ import React from "react";
 
 ;
 
-import { FieldHelperText, LabelWithIcon } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useCustomizationController } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { DateTimeField } from "@rebasepro/ui";

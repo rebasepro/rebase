@@ -3,7 +3,7 @@ import React, { CSSProperties, useMemo, useState, useEffect } from "react";impor
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { getThumbnailMeasure } from "../util";
 import { useTranslation } from "@rebasepro/app";
-import { sanitizeUrl } from "./UrlComponentPreview";
+import { sanitizeUrl } from "../util";
 
 /**
  * @group Preview components

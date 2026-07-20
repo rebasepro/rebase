@@ -9,9 +9,9 @@ import {
     ResizablePanels
 } from "@rebasepro/ui";
 import { useLargeLayout } from "@rebasepro/app";
-import { useCollectionRegistryController } from "../../index";
+import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useUrlController } from "../../index";
+import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { ErrorBoundary } from "@rebasepro/ui";
 
 export type SplitListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {

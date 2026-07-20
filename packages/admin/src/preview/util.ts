@@ -1,5 +1,14 @@
 import { CollectionSize } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
+export function sanitizeUrl(url: string | undefined): string {
+    if (!url) return "about:blank";
+    const trimmed = url.trim();
+    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) {
+        return "about:blank";
+    }
+    return trimmed;
+}
+
 export const SMALL_THUMBNAIL = 40;
 export const MEDIUM_THUMBNAIL = 100;
 export const LARGE_THUMBNAIL = 200;

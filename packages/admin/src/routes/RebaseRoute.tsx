@@ -4,14 +4,15 @@ import { EditViewBinding } from "../components/EditViewBinding";
 import { DetailViewBinding } from "../components/DetailViewBinding";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CollectionViewBinding } from "../components";
+import { CollectionViewBinding } from "../components/CollectionViewBinding/CollectionViewBinding";
 import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride } from "@rebasepro/app";
 import { UnsavedChangesDialog } from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/common";
 import { toArray } from "@rebasepro/utils";
-import { useCollectionRegistryController, useUrlController } from "../index";
-import { useBreadcrumbsController } from "../index";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
+import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 
 export function RebaseRoute() {
 

@@ -9,7 +9,7 @@ import { EnumForm } from "../EnumForm";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ArrayPropertyValidation } from "./validation/ArrayPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
-import { PropertyWithId } from "../PropertyEditView";
+import type { PropertyWithId } from "../PropertyEditView";
 
 export function EnumPropertyField({
     multiselect,

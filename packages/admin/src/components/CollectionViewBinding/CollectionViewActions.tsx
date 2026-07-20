@@ -13,7 +13,7 @@ const ImportCollectionAction = lazy(() => import("../../data_import/import").the
 const ExportCollectionAction = lazy(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
-import { useCMSContext } from "../../index";
+import { useCMSContext } from "../../hooks/useCMSContext";
 
 export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: CollectionConfig<M>;

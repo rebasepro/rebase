@@ -38,7 +38,7 @@ import { useAnalyticsController } from "@rebasepro/app";
 import { setIn } from "@rebasepro/forms";
 import { useBoardDataController } from "./useBoardDataController";
 import { useKanbanDragAndDrop } from "./hooks/useKanbanDragAndDrop";
-import { useSidePanel } from "../../index";
+import { useSidePanel } from "../../hooks/useSidePanel";
 import { generateNKeysBetween } from "fractional-indexing";
 
 export type CollectionBoardViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {

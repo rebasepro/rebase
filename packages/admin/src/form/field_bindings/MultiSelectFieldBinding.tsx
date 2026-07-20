@@ -3,7 +3,8 @@ import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback } from "react";
 
 ;
-import { FieldHelperText, LabelWithIconAndTooltip } from "../components";
+import { FieldHelperText } from "../components/FieldHelperText";
+import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { enumToObjectEntries, getLabelOrConfigFrom } from "@rebasepro/common";

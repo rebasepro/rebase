@@ -10,7 +10,8 @@ import { FiltersDialog } from "./FiltersDialog";
 import { FilterPresetsButton } from "./FilterPresetsButton";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router-dom";
-import { useUrlController, useCMSContext } from "../../index";
+import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
+import { useCMSContext } from "../../hooks/useCMSContext";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: CollectionConfig<M>;

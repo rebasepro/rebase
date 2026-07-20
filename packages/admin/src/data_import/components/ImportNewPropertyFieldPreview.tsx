@@ -1,10 +1,8 @@
 import React from "react";
 import { useCustomizationController } from "@rebasepro/app";
 import { Property } from "@rebasepro/types";
-import {
-    getFieldConfig,
-    PropertyConfigBadge
-} from "../../components";
+import { getFieldConfig } from "../../components/field_configs";
+import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
 import { ErrorBoundary, IconButton, PencilIcon, TextField } from "@rebasepro/ui";
 
 export function ImportNewPropertyFieldPreview({

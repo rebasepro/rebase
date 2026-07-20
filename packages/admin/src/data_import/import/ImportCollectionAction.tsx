@@ -6,11 +6,9 @@ import {
 } from "@rebasepro/app";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
 import { CollectionActionsProps, Properties, Property, User, CollectionConfig } from "@rebasepro/types";
-import {
-    getFieldConfig,
-    PropertyConfigBadge,
-    useSelectionController
-} from "../../components";
+import { getFieldConfig } from "../../components/field_configs";
+import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
+import { useSelectionController } from "../../components/CollectionViewBinding/useSelectionController";
 import { CollectionTableBinding } from "../../components/CollectionTableBinding/CollectionTableBinding";
 import { useCollectionRegistryController } from "../../hooks";
 import {
@@ -32,7 +30,9 @@ import {
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { useImportConfig } from "../hooks";
 import { convertDataToEntity, getInferenceType } from "../utils";
-import { DataNewPropertiesMapping, ImportFileUpload, ImportSaveInProgress } from "../components";
+import { DataNewPropertiesMapping } from "../components/DataNewPropertiesMapping";
+import { ImportFileUpload } from "../components/ImportFileUpload";
+import { ImportSaveInProgress } from "../components/ImportSaveInProgress";
 import { ImportConfig } from "../types";
 import { slugify } from "@rebasepro/utils";
 

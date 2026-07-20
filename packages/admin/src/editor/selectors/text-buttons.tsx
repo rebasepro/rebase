@@ -1,6 +1,6 @@
 
 import { EditorState, Transaction } from "prosemirror-state";
-import { EditorBubbleItem } from "../components";
+import { EditorBubbleItem } from "../components/editor-bubble-item";
 import type { SelectorItem } from "./node-selector";
 import { BoldIcon, Button, cls, CodeIcon, ItalicIcon, StrikethroughIcon, UnderlineIcon } from "@rebasepro/ui";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
