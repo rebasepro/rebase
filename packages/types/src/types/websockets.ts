@@ -72,6 +72,51 @@ export interface CollectionPatchMessage extends WebSocketMessage {
 }
 
 /**
+ * One retained broadcast, as it travels on the wire.
+ *
+ * `seq` is per-channel, dense and monotonically increasing — it is the only
+ * thing a reconnecting client needs to say where it got to. See
+ * {@link ChannelHistoryMessage}.
+ */
+export interface ChannelHistoryEntry {
+    seq: number;
+    event: string;
+    payload: unknown;
+    /**
+     * The server-side client id of whoever sent it, for information only.
+     *
+     * Deliberately not used to filter a client's own messages out of a replay:
+     * a reconnect assigns a brand-new client id, so the very case replay exists
+     * for is the case where this would fail to match. Consumers that cannot
+     * tolerate re-applying their own operations must make them idempotent.
+     */
+    senderId?: string;
+    /** When the server accepted it, ISO-8601. */
+    at: string;
+}
+
+/**
+ * Server → client: the retained messages a client missed.
+ *
+ * `retained: false` means the channel has no retention rule configured, so
+ * there is no history to replay and there never will be — an explicit answer
+ * rather than an empty one, so a client can tell "nothing missed" apart from
+ * "this channel does not keep history".
+ */
+export interface ChannelHistoryMessage extends WebSocketMessage {
+    type: "channel_history";
+    channel: string;
+    messages: ChannelHistoryEntry[];
+    retained: boolean;
+    /**
+     * The highest seq the server holds for this channel, whether or not it was
+     * returned. Lets a client that capped its request with `limit` see that it
+     * is still behind, and decide to resync wholesale instead of paging.
+     */
+    latestSeq?: number;
+}
+
+/**
  * Column metadata returned by table introspection.
  */
 export interface TableColumnInfo {

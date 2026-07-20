@@ -1,11 +1,11 @@
 ---
 name: rebase-realtime
-description: Guide for the Rebase WebSocket realtime engine. Use this skill when the user needs real-time data synchronization, broadcast channels, presence tracking, table change broadcasts, or live updates in their application.
+description: Guide for the Rebase WebSocket realtime engine. Use this skill when the user needs real-time data synchronization, broadcast channels, presence tracking, channel message history and reconnect catch-up (collaborative/op-based editing), table change broadcasts, or live updates in their application.
 ---
 
 # Rebase Realtime Engine
 
-Rebase includes a built-in WebSocket-based realtime engine that broadcasts database changes, supports broadcast channels for arbitrary client-to-client messaging, and provides presence tracking for online status.
+Rebase includes a built-in WebSocket-based realtime engine that broadcasts database changes, supports broadcast channels for arbitrary client-to-client messaging (optionally with replayable message history), and provides presence tracking for online status.
 
 > **IMPORTANT FOR AGENTS:** The WebSocket protocol uses specific message types that differ from typical pub/sub patterns. Read the **Message Types** section carefully before generating any WebSocket code. Do NOT invent message type names — use only the types documented here.
 
@@ -342,6 +342,7 @@ ws.onmessage = (event) => {
 | `presence_track` | `{ channel, state }` | Track presence with custom state (auto-joins channel) |
 | `presence_untrack` | `{ channel }` | Stop tracking presence |
 | `presence_state` | `{ channel }` | Request full presence entity |
+| `channel_history` | `{ channel, sinceSeq?, limit? }` | Request retained messages after `sinceSeq` (retained channels only) |
 | `FETCH_COLLECTION` | `FetchCollectionProps` | One-shot collection fetch (request/response) |
 | `FETCH_ENTITY` | `FetchEntityProps` | One-shot entity fetch |
 | `SAVE_ENTITY` | `SaveEntityProps` | Create or update a entity |
@@ -358,9 +359,10 @@ ws.onmessage = (event) => {
 | `collection_update` | `{ subscriptionId, entities }` | Full collection data (authoritative refetch) |
 | `entity_update` | `{ subscriptionId, entity }` | Single entity data (entity or `null` if deleted) |
 | `collection_entity_patch` | `{ subscriptionId, entityId, entity }` | Instant single-entity patch for a collection subscription |
-| `broadcast` | `{ channel, event, payload }` | Broadcast from another channel member |
+| `broadcast` | `{ channel, event, payload, seq? }` | Broadcast from another channel member. `seq` is present only on retained channels |
 | `presence_state` | `{ channel, presences }` | Full presence entity |
 | `presence_diff` | `{ channel, joins, leaves }` | Incremental presence update |
+| `channel_history` | `{ channel, messages, retained, latestSeq? }` | Retained messages a client missed. `retained: false` means the channel keeps no history |
 | `ERROR` | `{ requestId?, payload: { error: { message, code } } }` | General error |
 | `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { entities } }` | Response to FETCH_COLLECTION |
 | `FETCH_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to FETCH_ENTITY |
@@ -448,6 +450,63 @@ ws.send(JSON.stringify({
 ```
 
 When a client disconnects, they are automatically removed from all channels.
+
+## Channel History and Catch-Up
+
+By default a broadcast reaches currently-connected members and is then gone — correct for cursors and notifications, and it costs nothing. A channel can instead be configured to **retain** its messages, so a reconnecting client catches up on what it missed rather than resyncing. This is what makes channels usable for operation streams (collaborative editing).
+
+> **IMPORTANT FOR AGENTS:** Retention is configured on the **server** and cannot be requested by a client. `{ history: true }` on the client only asks the SDK to *use* history for a channel the server already retains. If the user reports "history isn't working", check the server config first — the symptom of a missing rule is `retained: false`, not an error.
+
+### Server config (required)
+
+```typescript
+createPostgresAdapter({
+    connection: db,
+    schema: { tables, enums, relations },
+    realtime: {
+        channels: [
+            // Most specific first — first match wins.
+            { match: "doc:*", limit: 500, ttl: "24h" }
+        ]
+    }
+})
+```
+
+`match` is an exact channel name or a trailing-`*` prefix — **not** a general glob (`"doc:*:live"` matches nothing). A rule needs at least one of `limit` or `ttl`, or it is ignored and logged; unbounded retention is refused rather than honoured.
+
+`ttl` accepts `"30s"`, `"15m"`, `"24h"`, `"7d"`, or a millisecond number. An unparseable value is ignored with a warning rather than guessed at.
+
+### Client usage
+
+```typescript
+const channel = client.realtime.channel("doc:42", { history: true });
+
+// Replayed messages arrive through the SAME handler, in order.
+channel.onBroadcast("op", (payload) => applyOperation(payload));
+await channel.join();
+```
+
+The SDK requests catch-up on `join()` and after every reconnect, resuming from the highest `seq` it has delivered. Explicit fetch:
+
+```typescript
+const { messages, retained, latestSeq } = await channel.history({ sinceSeq, limit });
+console.log(channel.sequence); // highest seq delivered so far
+```
+
+### Behaviour worth knowing
+
+- **`seq` is per-channel, dense and increasing.** It appears on `BroadcastEvent.seq` only for retained channels; ephemeral broadcasts have no `seq`.
+- **`replayed: true`** marks a message delivered by catch-up rather than live. Handlers usually ignore it.
+- **Replays overlap, and duplicates are dropped by the SDK.** Anything at or below the last delivered sequence is discarded, so handlers never see a message twice.
+- **Your own messages are not filtered out of a replay.** A reconnect assigns a new client id, so filtering by sender would fail in exactly the case catch-up exists for. Operations must be idempotent.
+- **A message that cannot be persisted is not delivered**, and the sender gets a `CHANNEL_HISTORY_WRITE_FAILED` error. Delivering it would leave a gap no replay could repair.
+- **Live messages are held back during catch-up** so ordering holds, bounded by a 10s timeout.
+
+### Storage
+
+Two tables in the `rebase` schema, created on startup only when a rule exists: `rebase.channel_messages` (keyed `(channel, seq)`) and `rebase.channel_cursors`. Pruning removes messages only — cursors are kept forever, because restarting a sequence would change what a client's saved resume point means.
+
+> **Security:** history has the same access model as the channel. Anyone who may join may replay what was said before they arrived. Enabling retention on a publicly-joinable channel makes its past readable to any visitor.
 
 ## Presence Tracking
 

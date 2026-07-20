@@ -35,6 +35,61 @@ export interface PresenceDiff {
 export interface BroadcastEvent {
     event: string;
     payload: unknown;
+    /**
+     * Per-channel sequence number, present only on retained channels.
+     *
+     * Monotonically increasing and dense, so a consumer that remembers the last
+     * one it applied can tell the server exactly where to resume from.
+     */
+    seq?: number;
+    /**
+     * True when this arrived through catch-up rather than live.
+     *
+     * Handlers do not have to care — replayed messages are delivered to the
+     * same `onBroadcast` handlers, in sequence order, so an operation stream
+     * needs no second code path. It is exposed for consumers that want to,
+     * for example, skip an animation while fast-forwarding.
+     */
+    replayed?: boolean;
+}
+
+/** One retained message, as returned by {@link RebaseRealtimeChannel.history}. */
+export interface ChannelHistoryEntry {
+    seq: number;
+    event: string;
+    payload: unknown;
+    senderId?: string;
+    at?: string;
+}
+
+/** The answer to a catch-up request. */
+export interface ChannelHistoryResult {
+    messages: ChannelHistoryEntry[];
+    /**
+     * Whether the server retains anything for this channel.
+     *
+     * False means there is no retention rule configured for it, so the empty
+     * list means "never keeps history" rather than "you missed nothing" — a
+     * client that needs to converge has to fall back to a full resync.
+     */
+    retained: boolean;
+    /** Highest sequence the server holds, even if this batch was capped. */
+    latestSeq?: number;
+}
+
+/** Options for a channel handle. */
+export interface ChannelOptions {
+    /**
+     * Ask the server to replay what this client missed, on join and on every
+     * reconnect.
+     *
+     * Only meaningful for a channel the *server* has a retention rule for —
+     * retention is configured on the backend, since a channel is created by
+     * whoever names it and a client-chosen history depth would let any visitor
+     * commit the backend to unbounded storage. On a channel with no rule the
+     * server answers `retained: false` and this is inert.
+     */
+    history?: boolean;
 }
 
 /** The socket operations a channel needs; satisfied by RebaseWebSocketClient. */
@@ -52,6 +107,15 @@ export interface ChannelTransport {
  */
 const PRESENCE_HEARTBEAT_MS = 20_000;
 
+/**
+ * How long live messages are held back waiting for a catch-up response.
+ *
+ * Short, because the cost of waiting is visible — on a collaborative document
+ * this is a stall in everyone else's edits appearing. Long enough that a slow
+ * replay of a busy channel is not abandoned needlessly.
+ */
+const CATCH_UP_TIMEOUT_MS = 10_000;
+
 export class RebaseRealtimeChannel {
     private presenceHandlers = new Set<(state: PresenceState, diff?: PresenceDiff) => void>();
     private broadcastHandlers = new Set<(event: BroadcastEvent) => void>();
@@ -64,10 +128,72 @@ export class RebaseRealtimeChannel {
     private heartbeat: ReturnType<typeof setInterval> | null = null;
     private joined = false;
 
+    /** Whether this handle asks the server to replay missed messages. */
+    private wantsHistory: boolean;
+
+    /**
+     * Highest sequence number delivered to handlers so far.
+     *
+     * This is the resume point sent as `sinceSeq`, and the watermark that makes
+     * replay idempotent: catch-up ranges overlap with what arrived live, and
+     * anything at or below this has already been seen.
+     */
+    private lastSeq = 0;
+
+    /**
+     * Live messages that arrived while a catch-up was in flight.
+     *
+     * Without this they would be delivered ahead of the older messages being
+     * fetched, and — worse — would advance {@link lastSeq} past them, so the
+     * catch-up response would then be discarded as already-seen and those
+     * messages would be lost for good. Held here and flushed, in order, once
+     * the replay lands.
+     */
+    private pendingLive: BroadcastEvent[] = [];
+    private catchUpInFlight = false;
+
+    /**
+     * Deadline for a catch-up response.
+     *
+     * Buffering live messages is only safe because the wait is bounded. A
+     * catch-up frame that never arrives — a server that dropped it, a socket
+     * that died between request and reply — would otherwise leave the channel
+     * silently holding every subsequent edit forever, which is a worse failure
+     * than the one replay was added to fix.
+     */
+    private catchUpTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    /**
+     * Callers of {@link history} awaiting the next `channel_history` frame.
+     *
+     * These frames are addressed by channel rather than by request id, so they
+     * are matched in arrival order. Requests on one channel are serialized by
+     * the socket, so FIFO is the right correlation here.
+     */
+    private historyWaiters: Array<(result: ChannelHistoryResult) => void> = [];
+
     constructor(
         public readonly name: string,
-        private transport: ChannelTransport
-    ) {}
+        private transport: ChannelTransport,
+        options: ChannelOptions = {}
+    ) {
+        this.wantsHistory = options.history ?? false;
+    }
+
+    /**
+     * Turn on catch-up for a handle that was created without it.
+     *
+     * The client hands back the same channel object for a given name, so a
+     * later `channel(name, { history: true })` has no new object to configure —
+     * it upgrades this one instead. Idempotent, and never downgrades: one
+     * caller asking for history must not be switched off by another that did
+     * not ask.
+     */
+    enableHistory(): void {
+        if (this.wantsHistory) return;
+        this.wantsHistory = true;
+        if (this.joined) void this.requestHistory();
+    }
 
     /**
      * Join the channel and ask for the current roster.
@@ -113,6 +239,7 @@ export class RebaseRealtimeChannel {
         // Not optional. Joining does not push the roster — without this the
         // channel believes it is alone until somebody else happens to move.
         await this.send("presence_state");
+        if (this.wantsHistory) await this.requestHistory();
     }
 
     private async rejoin(): Promise<void> {
@@ -122,9 +249,59 @@ export class RebaseRealtimeChannel {
             if (this.trackedState) {
                 await this.send("presence_track", { state: this.trackedState });
             }
+            // The reason this class tracks a sequence number at all: whatever
+            // was broadcast while the socket was down was delivered to everyone
+            // else and never to us. Asking from `lastSeq` is the difference
+            // between resuming and resyncing the whole document.
+            if (this.wantsHistory) await this.requestHistory();
         } catch {
             // The socket is down again; the next reconnect will retry.
         }
+    }
+
+    /**
+     * Ask the server for everything after {@link lastSeq}.
+     *
+     * Live messages are buffered from here until the answer arrives — see
+     * {@link pendingLive}.
+     */
+    private async requestHistory(limit?: number): Promise<void> {
+        this.catchUpInFlight = true;
+
+        if (this.catchUpTimeout) clearTimeout(this.catchUpTimeout);
+        this.catchUpTimeout = setTimeout(() => this.abandonCatchUp(), CATCH_UP_TIMEOUT_MS);
+        (this.catchUpTimeout as unknown as { unref?: () => void }).unref?.();
+
+        try {
+            await this.send("channel_history", {
+                sinceSeq: this.lastSeq,
+                ...(limit !== undefined ? { limit } : {})
+            });
+        } catch {
+            // The frame never went out, so nothing will answer it.
+            this.abandonCatchUp();
+        }
+    }
+
+    /**
+     * Give up waiting for a catch-up and release what was held back.
+     *
+     * The buffered messages are still the freshest thing this client has, so
+     * they are delivered rather than dropped. Callers of {@link history} are
+     * answered with `retained: false` — accurate in the sense that matters:
+     * this client has no history to work from and has to resync.
+     */
+    private abandonCatchUp(): void {
+        if (this.catchUpTimeout) {
+            clearTimeout(this.catchUpTimeout);
+            this.catchUpTimeout = null;
+        }
+        if (!this.catchUpInFlight) return;
+        this.catchUpInFlight = false;
+        for (const resolve of this.historyWaiters.splice(0)) {
+            resolve({ messages: [], retained: false });
+        }
+        this.flushPendingLive();
     }
 
     /**
@@ -192,6 +369,37 @@ export class RebaseRealtimeChannel {
         return () => this.broadcastHandlers.delete(wrapped);
     }
 
+    /**
+     * The last sequence number this channel has delivered.
+     *
+     * Zero on a channel that retains nothing. Persist it if you want catch-up
+     * to survive a page reload as well as a reconnect, and pass it back via
+     * {@link history}.
+     */
+    get sequence(): number {
+        return this.lastSeq;
+    }
+
+    /**
+     * Fetch retained messages explicitly, instead of waiting for join or
+     * reconnect to do it.
+     *
+     * Defaults to resuming from {@link sequence}. Messages are delivered to
+     * `onBroadcast` handlers as usual — the returned value is for callers that
+     * want to inspect the batch, or to learn from `retained` that the channel
+     * keeps no history at all.
+     */
+    async history(options: { sinceSeq?: number; limit?: number } = {}): Promise<ChannelHistoryResult> {
+        await this.join();
+        if (options.sinceSeq !== undefined) this.lastSeq = options.sinceSeq;
+
+        const result = new Promise<ChannelHistoryResult>((resolve) => {
+            this.historyWaiters.push(resolve);
+        });
+        await this.requestHistory(options.limit);
+        return result;
+    }
+
     /** Leave the channel and release every listener and timer. */
     async leave(): Promise<void> {
         this.stopHeartbeat();
@@ -199,6 +407,18 @@ export class RebaseRealtimeChannel {
         this.presences = {};
         this.presenceHandlers.clear();
         this.broadcastHandlers.clear();
+        // A rejoin is a fresh start: replaying from a watermark left over from
+        // the previous membership would silently skip everything before it.
+        this.lastSeq = 0;
+        this.pendingLive = [];
+        this.catchUpInFlight = false;
+        if (this.catchUpTimeout) {
+            clearTimeout(this.catchUpTimeout);
+            this.catchUpTimeout = null;
+        }
+        for (const resolve of this.historyWaiters.splice(0)) {
+            resolve({ messages: [], retained: false });
+        }
 
         for (const off of this.unsubscribers) off();
         this.unsubscribers = [];
@@ -235,11 +455,81 @@ export class RebaseRealtimeChannel {
                 break;
             }
             case "broadcast": {
-                const event = { event: message.event as string, payload: message.payload };
-                for (const handler of this.broadcastHandlers) handler(event);
+                const seq = typeof message.seq === "number" ? message.seq : undefined;
+                const event: BroadcastEvent = {
+                    event: message.event as string,
+                    payload: message.payload,
+                    ...(seq !== undefined ? { seq } : {})
+                };
+
+                // Unsequenced channels keep the original behaviour exactly:
+                // straight through, no buffering, no watermark.
+                if (seq === undefined) {
+                    this.deliver(event);
+                    break;
+                }
+
+                if (this.catchUpInFlight) {
+                    this.pendingLive.push(event);
+                    break;
+                }
+                if (seq <= this.lastSeq) break; // already delivered
+                this.lastSeq = seq;
+                this.deliver(event);
+                break;
+            }
+            case "channel_history": {
+                this.catchUpInFlight = false;
+                if (this.catchUpTimeout) {
+                    clearTimeout(this.catchUpTimeout);
+                    this.catchUpTimeout = null;
+                }
+
+                const entries = (message.messages as ChannelHistoryEntry[] | undefined) ?? [];
+                const retained = message.retained === true;
+                const latestSeq = typeof message.latestSeq === "number" ? message.latestSeq : undefined;
+
+                for (const resolve of this.historyWaiters.splice(0)) {
+                    resolve({ messages: entries, retained, latestSeq });
+                }
+
+                // Server-ordered ascending; the watermark check makes the
+                // overlap with anything already seen a no-op rather than a
+                // double-apply.
+                for (const entry of entries) {
+                    if (entry.seq <= this.lastSeq) continue;
+                    this.lastSeq = entry.seq;
+                    this.deliver({
+                        event: entry.event,
+                        payload: entry.payload,
+                        seq: entry.seq,
+                        replayed: true
+                    });
+                }
+
+                this.flushPendingLive();
                 break;
             }
         }
+    }
+
+    /** Deliver everything held back during a catch-up, in sequence order. */
+    private flushPendingLive(): void {
+        if (this.pendingLive.length === 0) return;
+        const buffered = this.pendingLive.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+        this.pendingLive = [];
+        for (const event of buffered) {
+            const seq = event.seq;
+            if (seq !== undefined) {
+                if (seq <= this.lastSeq) continue;
+                this.lastSeq = seq;
+            }
+            this.deliver(event);
+        }
+    }
+
+    private deliver(event: BroadcastEvent): void {
+        for (const handler of [...this.broadcastHandlers]) handler(event);
     }
 
     private emitPresence(diff?: PresenceDiff): void {

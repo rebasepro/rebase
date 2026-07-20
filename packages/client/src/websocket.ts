@@ -64,7 +64,11 @@ const CHANNEL_MESSAGE_TYPES = new Set([
     "broadcast",
     "presence_track",
     "presence_untrack",
-    "presence_state"
+    "presence_state",
+    // The catch-up request. Like `presence_state`, its answer comes back as a
+    // channel-addressed frame rather than a response envelope, so it must not
+    // be given a pending request to wait on.
+    "channel_history"
 ]);
 
 /**
@@ -599,7 +603,7 @@ export class RebaseWebSocketClient {
         // before the subscription paths — none of which would match it, and
         // the message would otherwise fall through and be dropped silently.
         if (typeof message.channel === "string" &&
-            (type === "broadcast" || type === "presence_state" || type === "presence_diff")) {
+            (type === "broadcast" || type === "presence_state" || type === "presence_diff" || type === "channel_history")) {
             const handlers = this.channelHandlers.get(message.channel);
             if (handlers) {
                 for (const handler of [...handlers]) {

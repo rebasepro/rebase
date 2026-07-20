@@ -594,7 +594,8 @@ colors: true }));
                     case "broadcast":
                     case "presence_track":
                     case "presence_untrack":
-                    case "presence_state": {
+                    case "presence_state":
+                    case "channel_history": {
                         wsDebug("🔄 [WebSocket Server] Routing realtime message to RealtimeService:", type);
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);

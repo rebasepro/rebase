@@ -246,6 +246,42 @@ export interface SingleSubscriptionConfig {
 }
 
 /**
+ * Opt-in retention for one set of broadcast channels.
+ *
+ * Retention is configured on the server and nowhere else. A channel is created
+ * by whoever names it, so letting a client ask for its own history depth would
+ * let any visitor commit the backend to unbounded storage; and presence-only or
+ * notification-only channels — the overwhelming majority — must not pay for a
+ * feature they never use. With no rules configured nothing is written, no table
+ * is created, and broadcast behaves exactly as it did before history existed.
+ */
+export interface ChannelRetentionRule {
+    /**
+     * Channel name to match. Either exact (`"doc:42"`) or a trailing-`*` prefix
+     * (`"doc:*"`). Deliberately not a full glob or RegExp: this decides what
+     * gets written to disk, and a rule whose blast radius is not obvious at a
+     * glance is the wrong shape for that.
+     */
+    match: string;
+    /** Keep at most this many of the most recent messages per channel. */
+    limit?: number;
+    /**
+     * Keep messages for at most this long. Accepts a millisecond count or a
+     * short duration string (`"30s"`, `"15m"`, `"24h"`, `"7d"`).
+     */
+    ttl?: number | string;
+}
+
+/** Server-side realtime options. */
+export interface RealtimeChannelsConfig {
+    /**
+     * Retention rules, most specific first — the first match wins. Omitted or
+     * empty means no channel retains anything.
+     */
+    channels?: ChannelRetentionRule[];
+}
+
+/**
  * Abstract realtime provider interface.
  * Handles real-time subscriptions and notifications for entity changes.
  */

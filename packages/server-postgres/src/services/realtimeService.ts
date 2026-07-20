@@ -15,6 +15,8 @@ import { logger } from "@rebasepro/server";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
+import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
+import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
@@ -52,6 +54,28 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     // Presence: channel → Map<clientId, { state, lastSeen }>
     private presence = new Map<string, Map<string, { state: Record<string, unknown>; lastSeen: number }>>();
+
+    /**
+     * Ordered, replayable history for channels that opt into it.
+     *
+     * Undefined until {@link configureChannelHistory} is called, and inert even
+     * then unless retention rules were supplied — so presence and ephemeral
+     * notification channels never touch it. See `channel-history.ts`.
+     */
+    private channelHistory?: ChannelHistoryStore;
+
+    /**
+     * One promise chain per retained channel, so that assigning a sequence
+     * number and fanning the message out happen in the same order for every
+     * message on that channel.
+     *
+     * Without it, two concurrent broadcasts can be numbered 4 and 5 by the
+     * database and still reach subscribers as 5 then 4 — live order and replay
+     * order would disagree, which is exactly the divergence sequence numbers
+     * are supposed to rule out. Keyed by channel, so unrelated channels never
+     * wait on each other.
+     */
+    private channelSendQueues = new Map<string, Promise<void>>();
     private presenceInterval?: ReturnType<typeof setInterval>;
     private static readonly PRESENCE_TIMEOUT_MS = 30000; // 30s
     private dataService: DataService;
@@ -320,6 +344,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     payload?.channel as string,
                     payload?.event as string,
                     payload?.payload
+                );
+                break;
+            case "channel_history":
+                await this.handleChannelHistoryRequest(
+                    clientId,
+                    payload?.channel as string,
+                    payload?.sinceSeq as number | undefined,
+                    payload?.limit as number | undefined
                 );
                 break;
 
@@ -1039,8 +1071,85 @@ roles: activeAuth.roles },
         this.removePresence(clientId, channel);
     }
 
-    /** Broadcast a message to all clients in a channel except sender */
+    /**
+     * Broadcast a message to all clients in a channel except the sender.
+     *
+     * On a channel with no retention rule this is what it always was: a
+     * synchronous fan-out to whoever is connected, with no sequence number, no
+     * SQL and no await — the body below runs to completion before returning.
+     *
+     * On a retained channel the message is durably numbered first and only then
+     * delivered, through a per-channel queue so that delivery order matches
+     * sequence order. That ordering is the whole point: a client that catches up
+     * with `sinceSeq` has to arrive at the same state as one that never
+     * disconnected.
+     */
     broadcastToChannel(clientId: string, channel: string, event: string, payload: unknown): void {
+        const retention = this.channelHistory?.retentionFor(channel);
+        if (!retention) {
+            this.fanOutBroadcast(clientId, channel, event, payload);
+            return;
+        }
+
+        const previous = this.channelSendQueues.get(channel) ?? Promise.resolve();
+        const next = previous
+            // A failed predecessor must not poison the chain — the next message
+            // on this channel is independent and still deserves to be sent.
+            .catch(() => { /* already reported below */ })
+            .then(() => this.persistAndFanOut(clientId, channel, event, payload, retention));
+
+        this.channelSendQueues.set(channel, next);
+        void next.finally(() => {
+            // Only clear if nothing has queued behind us in the meantime.
+            if (this.channelSendQueues.get(channel) === next) this.channelSendQueues.delete(channel);
+        });
+    }
+
+    /**
+     * Number a broadcast, store it, then deliver it.
+     *
+     * A message that cannot be stored is **not** delivered. Delivering it would
+     * put it in front of live subscribers while leaving it absent from every
+     * future replay — the two views of the channel would disagree permanently,
+     * and no later message could repair the gap. Failing loudly to the sender
+     * instead lets it retry, which for an operation stream is the only outcome
+     * that keeps clients convergent.
+     */
+    private async persistAndFanOut(
+        clientId: string,
+        channel: string,
+        event: string,
+        payload: unknown,
+        retention: ResolvedRetention
+    ): Promise<void> {
+        let seq: number;
+        try {
+            ({ seq } = await this.channelHistory!.append(channel, event, payload, clientId));
+        } catch (error) {
+            logger.error(`❌ [ChannelHistory] Could not persist broadcast on "${channel}" — message dropped`, { error });
+            this.sendError(
+                clientId,
+                `Could not persist broadcast on retained channel "${channel}"`,
+                undefined,
+                "CHANNEL_HISTORY_WRITE_FAILED"
+            );
+            return;
+        }
+
+        this.fanOutBroadcast(clientId, channel, event, payload, seq);
+
+        try {
+            await this.channelHistory!.prune(channel, retention);
+        } catch (error) {
+            // Retention is a housekeeping concern; the message is already
+            // delivered and durable, so a failed prune must not surface as a
+            // broadcast failure. It will be retried on the next message.
+            logger.warn(`⚠️ [ChannelHistory] Prune failed for "${channel}"`, { error });
+        }
+    }
+
+    /** Deliver a broadcast frame to every member of a channel but the sender. */
+    private fanOutBroadcast(clientId: string, channel: string, event: string, payload: unknown, seq?: number): void {
         const members = this.channels.get(channel);
         if (!members) return;
 
@@ -1048,7 +1157,8 @@ roles: activeAuth.roles },
             type: "broadcast",
             channel,
             event,
-            payload
+            payload,
+            ...(seq !== undefined ? { seq } : {})
         });
 
         for (const memberId of members) {
@@ -1057,6 +1167,79 @@ roles: activeAuth.roles },
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(message);
             }
+        }
+    }
+
+    // =============================================================================
+    // Channel History
+    // =============================================================================
+
+    /**
+     * Install retention rules and create the tables they need.
+     *
+     * Safe to call with no rules (and safe not to call at all): the store stays
+     * inert, no schema is created, and broadcast keeps its original
+     * fire-and-forget path.
+     */
+    async configureChannelHistory(rules: ChannelRetentionRule[] | undefined): Promise<void> {
+        this.channelHistory = new ChannelHistoryStore(this.db, rules ?? []);
+        if (!this.channelHistory.enabled) return;
+        await this.channelHistory.ensureTables();
+    }
+
+    /** Whether any channel is configured to retain messages. */
+    public isChannelHistoryEnabled(): boolean {
+        return this.channelHistory?.enabled ?? false;
+    }
+
+    /**
+     * Answer a client's catch-up request.
+     *
+     * A channel with no retention rule is answered with `retained: false`
+     * rather than an empty list, so the client can tell "you missed nothing"
+     * apart from "this channel never keeps anything" — the second means its
+     * reconnect strategy has to be a full resync, and silence would leave it
+     * guessing.
+     */
+    private async handleChannelHistoryRequest(
+        clientId: string,
+        channel: string,
+        sinceSeq?: number,
+        limit?: number
+    ): Promise<void> {
+        if (!channel) return;
+
+        const retention = this.channelHistory?.retentionFor(channel);
+        if (!retention) {
+            this.sendChannelHistory(clientId, channel, [], false);
+            return;
+        }
+
+        try {
+            const { messages, latestSeq } = await this.channelHistory!.replay(channel, sinceSeq, limit);
+            this.sendChannelHistory(clientId, channel, messages, true, latestSeq);
+        } catch (error) {
+            logger.error(`❌ [ChannelHistory] Replay failed for "${channel}"`, { error });
+            this.sendError(clientId, `Could not replay history for channel "${channel}"`, undefined, "CHANNEL_HISTORY_READ_FAILED");
+        }
+    }
+
+    private sendChannelHistory(
+        clientId: string,
+        channel: string,
+        messages: ChannelHistoryEntry[],
+        retained: boolean,
+        latestSeq?: number
+    ): void {
+        const ws = this.clients.get(clientId);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "channel_history",
+                channel,
+                messages,
+                retained,
+                ...(latestSeq !== undefined ? { latestSeq } : {})
+            }));
         }
     }
 
@@ -1191,6 +1374,11 @@ lastSeen: Date.now() });
         // 3. Clear broadcast channels and presence
         this.channels.clear();
         this.presence.clear();
+        // Pending history writes hold the pool open; let them settle before the
+        // caller closes it, but never let a rejected one break shutdown.
+        await Promise.allSettled([...this.channelSendQueues.values()]);
+        this.channelSendQueues.clear();
+        this.channelHistory?.clear();
         if (this.presenceInterval) {
             clearInterval(this.presenceInterval);
             this.presenceInterval = undefined;

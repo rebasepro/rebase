@@ -209,7 +209,62 @@ Channels are lightweight and ephemeral — they exist as long as at least one cl
 
 Channel and presence frames do not require an account: anonymous visitors can join public channels, and the server still authorizes every frame.
 
-> **Broadcasts are not replayed.** They reach currently-connected members only; there is no history. A client that reconnects has no way to know it missed one. That is fine for notifications that self-correct (a "someone saved" nudge is superseded by the next save), but it means channels are not a transport for an operation stream where a silent gap would cause divergence.
+> **By default, broadcasts are not replayed.** They reach currently-connected members only. That is what you want for notifications that self-correct — a "someone saved" nudge is superseded by the next save — and it costs nothing. For an operation stream, where a silent gap causes divergence, enable [message history](#message-history-and-catch-up) on the channel.
+
+## Message History and Catch-Up
+
+A channel can be configured to keep its broadcasts, so a client that reconnects catches up on what it missed instead of resyncing from scratch. This is what makes channels usable as a transport for collaborative editing.
+
+Retention is configured **on the server**, per channel pattern — see [Realtime Backend](/docs/backend/realtime#channel-retention). A client cannot turn it on for itself, because a channel is created by whoever names it, and a client-chosen history depth would let any visitor commit your backend to unbounded storage.
+
+On a retained channel, pass `{ history: true }` and the SDK does the rest:
+
+```typescript
+const channel = client.realtime.channel("doc:42", { history: true });
+
+// Handlers receive replayed messages exactly like live ones, in order.
+channel.onBroadcast("op", (payload) => {
+    applyOperation(payload);
+});
+
+await channel.join();
+```
+
+On `join()` and after every reconnect, the SDK asks the server for everything after the last sequence number it saw, and delivers the result through the same handlers. There is no second code path to write: a handler that applies an operation correctly when live applies it correctly on catch-up.
+
+### Sequence numbers
+
+Every broadcast on a retained channel carries a `seq` — per-channel, gapless, and increasing. It is the client's resume point.
+
+```typescript
+channel.onBroadcast((event) => {
+    console.log(event.seq);       // 1, 2, 3, …
+    console.log(event.replayed);  // true when delivered by catch-up
+});
+
+console.log(channel.sequence); // highest seq delivered so far
+```
+
+Persist `channel.sequence` if you want catch-up to survive a page reload as well as a reconnect, and pass it back via `history({ sinceSeq })`.
+
+### Fetching history explicitly
+
+```typescript
+const { messages, retained, latestSeq } = await channel.history({
+    sinceSeq: 0,
+    limit: 100
+});
+```
+
+`retained: false` means the channel keeps no history and never will — an explicit answer, so you can tell "you missed nothing" apart from "this channel has no retention rule". In the second case a client that needs to converge has to fall back to a full resync.
+
+`latestSeq` is the highest sequence the server holds, whether or not this batch reached it. If it is far beyond your last delivered `seq`, you are further behind than one page and resyncing may be cheaper than paging.
+
+:::note[Replays can overlap, and that is fine]
+The server cannot know exactly which messages reached you before the socket dropped, so a catch-up range may include some you already applied. The SDK discards anything at or below the sequence it has already delivered, so handlers never see a message twice.
+
+Your own messages are **not** filtered out of a replay: a reconnect assigns a new client id, so the very case catch-up exists for is the one where that filter would fail. Make operations idempotent if re-applying your own would be a problem.
+:::
 
 ## Presence Tracking
 
@@ -258,6 +313,7 @@ A reconnect also drops server-side channel membership and presence; the SDK re-j
 |----------|--------|
 | Dashboard with live data | `listen()` with filters |
 | Chat or messaging | `channel.broadcast()` |
+| Collaborative editing / operation streams | `channel(name, { history: true })` |
 | Typing indicators / online status | `channel.track()` + `channel.onPresence()` |
 | Detail page with live updates | `listenById()` |
 | Admin panel monitoring | `listen()` with `orderBy` and `limit` |

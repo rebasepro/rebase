@@ -165,6 +165,8 @@ La difusión se gestiona a nivel del protocolo WebSocket. El servidor admite est
 | `leave_channel` | Cliente → Servidor | Abandonar un canal                      |
 | `broadcast`     | Cliente → Servidor | Enviar un mensaje a todos los miembros del canal |
 | `broadcast`     | Servidor → Cliente | Recibir un mensaje de otro miembro      |
+| `channel_history` | Cliente → Servidor | Solicitar mensajes retenidos posteriores a una secuencia |
+| `channel_history` | Servidor → Cliente | Los mensajes retenidos que un cliente se perdió |
 
 Cuando un cliente envía un mensaje `broadcast`, el servidor lo retransmite a **todos los demás miembros** de ese canal (el emisor no recibe su propio mensaje).
 
@@ -188,6 +190,67 @@ Cuando un cliente envía un mensaje `broadcast`, el servidor lo retransmite a **
 }
 ```
 
+## Retención de Canales
+
+Por defecto, una difusión llega a los miembros conectados en ese momento y luego desaparece. Es el equilibrio correcto para notificaciones y cursores, y no cuesta nada.
+
+Para un flujo de operaciones — edición colaborativa, cualquier cosa donde un hueco silencioso cause divergencia — un canal puede configurarse para **retener** sus mensajes. Las difusiones retenidas reciben un número de secuencia por canal y se almacenan, de modo que un cliente que se reconecta puede pedir todo lo posterior al último que vio.
+
+La retención es opcional y se configura aquí, en el servidor:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
+
+await initializeRebaseBackend({
+    app,
+    server,
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations },
+        realtime: {
+            channels: [
+                // Most specific first — the first match wins.
+                { match: "doc:draft:*", limit: 100 },
+                { match: "doc:*", limit: 500, ttl: "24h" }
+            ]
+        }
+    })
+});
+```
+
+| Campo | Descripción |
+|-------|-------------|
+| `match` | Nombre exacto del canal (`"doc:42"`) o un prefijo terminado en `*` (`"doc:*"`) |
+| `limit` | Conservar como máximo este número de mensajes más recientes por canal |
+| `ttl` | Conservar los mensajes como máximo este tiempo — `"30s"`, `"15m"`, `"24h"`, `"7d"`, o milisegundos |
+
+Una regla necesita al menos `limit` o `ttl`. Una que no tenga ninguno se ignora y se registra, porque la retención ilimitada casi nunca es intencionada y no se puede deshacer una vez que la tabla ha crecido.
+
+:::note[¿Por qué no dejar que los clientes pidan historial?]
+Un canal lo crea quien lo nombra. Si un cliente pudiera elegir su propia profundidad de historial, cualquier visitante podría comprometer su backend con almacenamiento ilimitado. Configurarlo aquí también significa que los canales de presencia y notificación — la inmensa mayoría — no pagan nada: sin reglas configuradas, no se crea ninguna tabla y la difusión sigue el mismo camino síncrono de siempre.
+:::
+
+### Almacenamiento
+
+Los canales con retención usan dos tablas en el esquema `rebase`, creadas automáticamente al arrancar cuando hay al menos una regla configurada:
+
+| Tabla | Contenido |
+|-------|-----------|
+| `rebase.channel_messages` | Los mensajes retenidos, indexados por `(channel, seq)` |
+| `rebase.channel_cursors` | La secuencia más alta emitida por canal |
+
+La poda ocurre a medida que llegan los mensajes, limitada por canal para que el coste dependa del tiempo transcurrido y no del volumen de escritura. Solo elimina filas de `channel_messages` — los cursores se conservan indefinidamente (es una fila pequeña por canal), porque reiniciar la secuencia de un canal cambiaría el significado del punto de reanudación guardado por un cliente.
+
+### Garantías de entrega
+
+- **Ordenado.** Los números de secuencia se asignan por canal, y el orden de entrega coincide con el orden de secuencia.
+- **Duradero antes que entregado.** Un mensaje que no se puede almacenar no se entrega a nadie, y se avisa al remitente. Entregarlo lo pondría ante los suscriptores en vivo dejándolo fuera de toda repetición futura, y ningún mensaje posterior podría reparar ese hueco.
+- **Al menos una vez al recuperar.** Un rango de repetición puede solaparse con mensajes que el cliente ya recibió; el SDK descarta los que ya entregó.
+
+:::caution[El historial tiene el mismo modelo de acceso que el canal]
+Cualquiera que pueda unirse a un canal puede reproducir sus mensajes retenidos, incluidos los difundidos antes de su llegada. La retención es opcional por patrón de canal, así que considere que activarla en un canal de acceso público hace legible el pasado de ese canal para cualquier visitante.
+:::
 ## Seguimiento de Presencia
 
 La presencia rastrea qué usuarios están actualmente en línea en un canal y permite que cada usuario comparta un estado personalizado (p. ej., posición del cursor, estado).

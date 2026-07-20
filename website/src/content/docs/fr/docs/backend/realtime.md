@@ -165,6 +165,8 @@ La diffusion est gérée au niveau du protocole WebSocket. Le serveur prend en c
 | `leave_channel` | Client → Serveur | Quitter un canal                        |
 | `broadcast`     | Client → Serveur | Envoyer un message à tous les membres du canal |
 | `broadcast`     | Serveur → Client | Recevoir un message d'un autre membre   |
+| `channel_history` | Client → Serveur | Demander les messages conservés après une séquence |
+| `channel_history` | Serveur → Client | Les messages conservés qu'un client a manqués |
 
 Lorsqu'un client envoie un message `broadcast`, le serveur le relaie à **tous les autres membres** de ce canal (l'expéditeur ne reçoit pas son propre message).
 
@@ -188,6 +190,67 @@ Lorsqu'un client envoie un message `broadcast`, le serveur le relaie à **tous l
 }
 ```
 
+## Conservation des canaux
+
+Par défaut, une diffusion atteint les membres connectés à cet instant, puis disparaît. C'est le bon compromis pour les notifications et les curseurs, et cela ne coûte rien.
+
+Pour un flux d'opérations — édition collaborative, tout ce où un trou silencieux provoque une divergence — un canal peut être configuré pour **conserver** ses messages. Les diffusions conservées reçoivent un numéro de séquence par canal et sont stockées, de sorte qu'un client qui se reconnecte peut demander tout ce qui suit la dernière qu'il a vue.
+
+La conservation est optionnelle et se configure ici, côté serveur :
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
+
+await initializeRebaseBackend({
+    app,
+    server,
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations },
+        realtime: {
+            channels: [
+                // Most specific first — the first match wins.
+                { match: "doc:draft:*", limit: 100 },
+                { match: "doc:*", limit: 500, ttl: "24h" }
+            ]
+        }
+    })
+});
+```
+
+| Champ | Description |
+|-------|-------------|
+| `match` | Nom exact du canal (`"doc:42"`) ou un préfixe terminé par `*` (`"doc:*"`) |
+| `limit` | Conserver au plus ce nombre de messages les plus récents par canal |
+| `ttl` | Conserver les messages au plus pendant cette durée — `"30s"`, `"15m"`, `"24h"`, `"7d"`, ou des millisecondes |
+
+Une règle exige au moins `limit` ou `ttl`. Une règle sans ni l'un ni l'autre est ignorée et journalisée, car une conservation illimitée n'est presque jamais voulue et ne peut plus être annulée une fois la table grossie.
+
+:::note[Pourquoi ne pas laisser les clients demander l'historique ?]
+Un canal est créé par celui qui le nomme. Si un client pouvait choisir sa propre profondeur d'historique, n'importe quel visiteur pourrait engager votre backend sur un stockage illimité. Le configurer ici signifie aussi que les canaux de présence et de notification — l'immense majorité — ne paient rien : sans règle configurée, aucune table n'est créée et la diffusion emprunte le même chemin synchrone qu'auparavant.
+:::
+
+### Stockage
+
+Les canaux avec conservation utilisent deux tables du schéma `rebase`, créées automatiquement au démarrage dès qu'au moins une règle est configurée :
+
+| Table | Contenu |
+|-------|-----------|
+| `rebase.channel_messages` | Les messages conservés, indexés par `(channel, seq)` |
+| `rebase.channel_cursors` | La séquence la plus élevée émise par canal |
+
+L'élagage a lieu à mesure que les messages arrivent, limité par canal pour que le coût suive le temps écoulé plutôt que le volume d'écriture. Il ne supprime que des lignes de `channel_messages` — les curseurs sont conservés indéfiniment (une petite ligne par canal), car redémarrer la séquence d'un canal changerait le sens du point de reprise enregistré par un client.
+
+### Garanties de livraison
+
+- **Ordonné.** Les numéros de séquence sont attribués par canal, et l'ordre de livraison correspond à l'ordre de séquence.
+- **Durable avant d'être livré.** Un message qui ne peut pas être stocké n'est livré à personne, et l'expéditeur en est informé. Le livrer le placerait devant les abonnés en direct tout en le laissant hors de tout rejeu futur, et aucun message ultérieur ne pourrait réparer ce trou.
+- **Au moins une fois au rattrapage.** Une plage de rejeu peut recouvrir des messages qu'un client a déjà reçus ; le SDK écarte ceux qu'il a déjà livrés.
+
+:::caution[L'historique a le même modèle d'accès que le canal]
+Quiconque peut rejoindre un canal peut rejouer ses messages conservés, y compris ceux diffusés avant son arrivée. La conservation est optionnelle par motif de canal : activez-la sur un canal ouvert au public en sachant que le passé de ce canal devient lisible par n'importe quel visiteur.
+:::
 ## Suivi de présence
 
 La présence suit quels utilisateurs sont actuellement en ligne dans un canal et permet à chaque utilisateur de partager un état personnalisé (par ex. position du curseur, statut).
