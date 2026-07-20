@@ -34,34 +34,10 @@
     "watch": "vite build --watch",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
-    "test": "jest --passWithNoTests",
+    "test": "jest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
     "smoke:baas": "tsx scripts/smoke-baas.ts"
-  },
-  "jest": {
-    "transform": {
-      "^.+\\.tsx?$": "ts-jest"
-    },
-    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "test/e2e/"
-    ],
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx",
-      "json",
-      "node"
-    ],
-    "moduleNameMapper": {
-      "^chalk$": "<rootDir>/test/mocks/chalk.cjs",
-      "^\\.{1,2}/module-dir$": "<rootDir>/test/mocks/module-dir.cjs",
-      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    }
   },
   "exports": {
     ".": {

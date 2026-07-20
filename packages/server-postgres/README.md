@@ -76,6 +76,27 @@ process.on("SIGTERM", async () => {
 | `statementTimeout` | 30,000 |
 | `keepAlive` | true |
 
+## Testing
+
+This package runs **two test runners**, split by directory. This is deliberate — check which half you are in before running anything.
+
+| Tests | Runner | Config | Command |
+|-------|--------|--------|---------|
+| `test/*.ts` (unit) | jest | [`jest.config.cjs`](./jest.config.cjs) | `pnpm test` |
+| `test/e2e/**` (integration) | vitest | [`vitest.e2e.config.ts`](./vitest.e2e.config.ts) | `pnpm test:e2e` |
+
+The unit tests use jest's injected globals (`describe`/`it`/`expect`) and `jest.mock`. The e2e tests import explicitly from `vitest` and need Docker (testcontainers spins up a real Postgres).
+
+**Running a single unit test:**
+
+```bash
+npx jest test/auth-services.test.ts
+```
+
+Pointing `vitest` at a unit test is the easy mistake here — it produces a bare `ReferenceError: jest is not defined` and a "no tests" result, which looks exactly like a dead or broken test file rather than the wrong runner. [`vitest.config.ts`](./vitest.config.ts) exists solely to intercept that and print the command you actually wanted.
+
+`pnpm test` runs jest **without** `--passWithNoTests`: if the unit suite ever stops being collected, CI fails instead of going quietly green.
+
 ## Related Packages
 
 | Package | Role |
