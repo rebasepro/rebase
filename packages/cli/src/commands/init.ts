@@ -952,9 +952,15 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             if (/[\r\n]/.test(databaseUrl)) {
                 throw new Error("Invalid DATABASE_URL: multiline values are not allowed.");
             }
+            // DATABASE_PASSWORD is still written even though the URL points
+            // elsewhere: docker-compose.yml interpolates it into both
+            // POSTGRES_PASSWORD and the backend's own DATABASE_URL, defaulting
+            // to `${DATABASE_PASSWORD:-changeme}`. Omitting it here shipped a
+            // compose stack whose database password was literally "changeme",
+            // on a service that publishes a host port by default.
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
-                `DATABASE_URL=${databaseUrl}`
+                `DATABASE_URL=${databaseUrl}\nDATABASE_PASSWORD=${dbPassword}`
             );
         } else {
             const dbPort = await findAvailablePort(5432);

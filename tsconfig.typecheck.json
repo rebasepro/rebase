@@ -179,7 +179,8 @@
     "packages/studio/src",
     "packages/types/src",
     "packages/ui/src",
-    "packages/utils/src"
+    "packages/utils/src",
+    "e2e"
   ],
   "exclude": [
     "**/node_modules",

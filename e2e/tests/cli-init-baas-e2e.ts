@@ -19,6 +19,7 @@ import {
     packLocalPackages,
     rewritePackagesToTarballs,
     configureServiceKey,
+    assertPortFree,
     startPgContainer,
     stopPgContainer,
     rootDir,
@@ -29,6 +30,13 @@ import {
 const projectPath = path.join(rootDir, "test-cli-init-baas-project");
 const cleanEnv = getCleanEnv();
 const serviceKey = "mysupersecretkey12345678901234567890";
+
+/**
+ * Port the scaffolded baas backend is driven on. Configurable for the same
+ * reason as the cms suite: another dev server on the machine may already own
+ * the default, and every assertion here targets this exact port.
+ */
+const backendPort = Number(process.env.E2E_BAAS_BACKEND_PORT || 3098);
 
 /** Authenticated fetch — without this every /api/data path 401s alike, and a
  *  missing collection is indistinguishable from a guarded one. */
@@ -163,15 +171,18 @@ async function run() {
 
         // ── 5. Boot ──────────────────────────────────────────────────────
         console.log("\n🚀 Step 5: Booting the API...");
+        // Stop if something else owns the port: `rebase dev` would fall back to
+        // another one and every assertion below would hit the wrong server.
+        await assertPortFree(backendPort);
         // `rebase dev` otherwise derives a per-project port, so pin one.
-        devProcess = execa("node", [cliBin, "dev", "--port", "3098"], {
+        devProcess = execa("node", [cliBin, "dev", "--port", String(backendPort)], {
             cwd: projectPath,
             env: cleanEnv,
             stdio: "inherit",
             detached: true // so killTree can reap the backend it spawns
         }) as unknown as { pid?: number; kill(signal?: string): void };
 
-        const base = "http://localhost:3098";
+        const base = `http://localhost:${backendPort}`;
         const up = await waitForApi(`${base}/health`);
         check("API boots and is healthy", up);
         if (!up) throw new Error("API never became healthy");

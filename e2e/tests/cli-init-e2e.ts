@@ -102,6 +102,15 @@ const projectPath = path.join(rootDir, "test-cli-init-project");
 const screenshotDir = process.env.SCREENSHOT_DIR || path.join(rootDir, "e2e-screenshots");
 const serviceKey = "mysupersecretkey12345678901234567890";
 
+/**
+ * Port the scaffolded backend is driven on.
+ *
+ * Configurable because a dev server left running elsewhere on the machine
+ * (a git worktree, another checkout) owns 3099 and this suite asserts against
+ * that exact port. `E2E_BACKEND_PORT=3199 npx tsx ...` gets out of its way.
+ */
+const backendPort = Number(process.env.E2E_BACKEND_PORT || 3099);
+
 export function getCleanEnv(): Record<string, string> {
     const cleanEnv = { ...process.env } as Record<string, string>;
     for (const key of Object.keys(cleanEnv)) {
@@ -293,29 +302,105 @@ export function modifyDockerfilesForTarballs(projectPath: string) {
     }
 }
 
-export function configureServiceKey(projectPath: string, key: string) {
-    const envPath = path.join(projectPath, ".env");
-    if (!fs.existsSync(envPath)) return;
-    let content = fs.readFileSync(envPath, "utf-8");
-    if (content.includes("REBASE_SERVICE_KEY=")) {
-        content = content.replace(/#?\s*REBASE_SERVICE_KEY=.*/g, `REBASE_SERVICE_KEY=${key}`);
-    } else {
-        content += `\nREBASE_SERVICE_KEY=${key}\n`;
+/**
+ * Refuse to start when something already owns the port this suite tests on.
+ *
+ * `rebase dev --port 3099` falls back to another port when 3099 is taken, but
+ * every assertion here is hardcoded to 3099 — so the suite would quietly test
+ * whatever *other* server happened to be listening. That is not hypothetical:
+ * a dev server left running in a git worktree held 3099 and the browser step
+ * drove it instead, producing failures that had nothing to do with the code
+ * under test. Better to stop with a message naming the squatter.
+ */
+export async function assertPortFree(port: number): Promise<void> {
+    let pids = "";
+    try {
+        const { stdout } = await execa("lsof", ["-ti", `:${port}`, "-sTCP:LISTEN"]);
+        pids = stdout.trim();
+    } catch {
+        return; // lsof exits non-zero when nothing is listening — the good case.
     }
+    if (!pids) return;
+
+    let detail = pids.split("\n").join(", ");
+    try {
+        const { stdout } = await execa("ps", ["-o", "command=", "-p", pids.split("\n")[0]]);
+        detail += ` (${stdout.trim().slice(0, 120)})`;
+    } catch { /* best effort */ }
+
+    throw new Error(
+        `Port ${port} is already in use by pid(s) ${detail}.\n` +
+        "This suite asserts against that exact port, so it would test the wrong server. " +
+        `Stop the process (e.g. \`kill $(lsof -ti :${port})\`) and re-run.`
+    );
+}
+
+/**
+ * Set `NAME=value` in a .env file, replacing any existing — or commented-out —
+ * assignment.
+ *
+ * Deliberately line-based. The regex this replaces matched an optional `#`,
+ * then `\s*`, then the variable name — and `\s` matches newlines. Once the CLI started
+ * emitting the assignment uncommented, the leftmost match began at the end of
+ * the *previous* line and swallowed the newline, welding the variable onto the
+ * comment above it:
+ *
+ *     # Generate with: node -e "..."REBASE_SERVICE_KEY=mysupersecretkey...
+ *
+ * dotenv reads that as a comment, so the variable was never set. The failure
+ * then surfaced nowhere near the cause: the server auto-generated its own
+ * REBASE_SERVICE_KEY and answered every service-key request with a 401.
+ */
+function setEnvVar(content: string, name: string, value: string): string {
+    const assignment = `${name}=${value}`;
+    const lines = content.split("\n");
+    let replaced = false;
+
+    const updated = lines.map(line => {
+        // Anchored to the line start, so it can never cross a line boundary.
+        if (new RegExp(`^\\s*#?\\s*${name}=`).test(line)) {
+            replaced = true;
+            return assignment;
+        }
+        return line;
+    });
+
+    if (!replaced) {
+        // Guarantee the assignment begins its own line.
+        if (updated.length > 0 && updated[updated.length - 1] !== "") updated.push("");
+        updated.push(assignment, "");
+    }
+
+    return updated.join("\n");
+}
+
+/**
+ * Write the variable, then confirm it is readable as its own assignment.
+ * Both of these silently did nothing for days; a wrong .env is invisible until
+ * it surfaces as an unrelated-looking auth failure much later.
+ */
+function writeEnvVar(projectPath: string, name: string, value: string): boolean {
+    const envPath = path.join(projectPath, ".env");
+    if (!fs.existsSync(envPath)) return false;
+    const content = setEnvVar(fs.readFileSync(envPath, "utf-8"), name, value);
     fs.writeFileSync(envPath, content, "utf-8");
+
+    if (!content.split("\n").some(l => l === `${name}=${value}`)) {
+        throw new Error(
+            `Failed to set ${name} in .env — it did not end up on a line of its own, ` +
+            "so dotenv will ignore it and the server will fall back to a generated value."
+        );
+    }
+    return true;
+}
+
+export function configureServiceKey(projectPath: string, key: string) {
+    if (!writeEnvVar(projectPath, "REBASE_SERVICE_KEY", key)) return;
     console.log("🔑 Configured REBASE_SERVICE_KEY in .env file");
 }
 
 export function configureAllowLocalhostInEnv(projectPath: string) {
-    const envPath = path.join(projectPath, ".env");
-    if (!fs.existsSync(envPath)) return;
-    let content = fs.readFileSync(envPath, "utf-8");
-    if (content.includes("ALLOW_LOCALHOST_IN_PRODUCTION=")) {
-        content = content.replace(/#?\s*ALLOW_LOCALHOST_IN_PRODUCTION=.*/g, "ALLOW_LOCALHOST_IN_PRODUCTION=true");
-    } else {
-        content += "\nALLOW_LOCALHOST_IN_PRODUCTION=true\n";
-    }
-    fs.writeFileSync(envPath, content, "utf-8");
+    if (!writeEnvVar(projectPath, "ALLOW_LOCALHOST_IN_PRODUCTION", "true")) return;
     console.log("🔓 Configured ALLOW_LOCALHOST_IN_PRODUCTION=true in .env file");
 }
 
@@ -622,11 +707,12 @@ force: true });
 
         // 7. Start the local dev server using 'rebase dev'
         console.log("\n🖥️ Step 7: Starting local development server...");
+        await assertPortFree(backendPort);
         const devProcess = execa("node", [
             cliBin,
             "dev",
             "--port",
-            "3099"
+            String(backendPort)
         ], {
             cwd: projectPath,
             env: cleanEnv,
@@ -644,7 +730,7 @@ force: true });
                 reject(new Error("Timeout waiting for dev server to start"));
             }, 90000);
 
-            devProcess.stdout?.on("data", (data) => {
+            devProcess.stdout?.on("data", (data: Buffer) => {
                 const output = data.toString();
                 process.stdout.write(output);
                 accumulatedOutput += output;
@@ -654,7 +740,7 @@ force: true });
 
                 if (cleanOutput.includes("[admin]") && (cleanOutput.includes("Local:") || cleanOutput.includes("Frontend URL:"))) {
                     const matches = cleanOutput.match(/http:\/\/localhost:\d+/g) || [];
-                    const fUrl = matches.find(url => !url.includes("3099"));
+                    const fUrl = matches.find(url => !url.includes(String(backendPort)));
                     if (fUrl && !frontendUrl) {
                         frontendUrl = fUrl;
                         console.log(`\nDetected Frontend URL: ${frontendUrl}`);
@@ -663,7 +749,7 @@ force: true });
 
                 if (cleanOutput.includes("[backend]") && cleanOutput.includes("Server running at")) {
                     const matches = cleanOutput.match(/http:\/\/localhost:\d+/g) || [];
-                    const bUrl = matches.find(url => url.includes("3099"));
+                    const bUrl = matches.find(url => url.includes(String(backendPort)));
                     if (bUrl && !backendUrl) {
                         backendUrl = bUrl;
                         console.log(`Detected Backend URL: ${backendUrl}`);
@@ -676,11 +762,11 @@ force: true });
                 }
             });
 
-            devProcess.stderr?.on("data", (data) => {
+            devProcess.stderr?.on("data", (data: Buffer) => {
                 process.stderr.write(data.toString());
             });
 
-            devProcess.catch((err) => {
+            devProcess.catch((err: unknown) => {
                 clearTimeout(timeout);
                 reject(err);
             });
@@ -777,7 +863,7 @@ timeout: 10000 });
 
             // 8. Hit the API using service key authentication
             console.log("\n⚡ Step 8: Hitting the Local REST API directly...");
-            const apiResponse = await fetch("http://localhost:3099/api/data/books", {
+            const apiResponse = await fetch(`http://localhost:${backendPort}/api/data/books`, {
                 headers: {
                     "Authorization": `Bearer ${serviceKey}`
                 }
