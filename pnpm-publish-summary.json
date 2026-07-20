@@ -1,14 +1,14 @@
 {
 	"publishedPackages": [
 		{
-			"id": "@rebasepro/formex@0.9.0",
-			"name": "@rebasepro/formex",
-			"version": "0.9.0",
-			"size": 20548,
-			"unpackedSize": 114387,
-			"shasum": "14b92473af0cdaa688d2b2a0d77a7f2c742a8c2d",
-			"integrity": "sha512-gDOwbzUC6TVpDfAR5kIVUHYDX4yob3+GI4AyNXtI3/gqW+NnTZ1deB1NIXirbEegIBcpJXxs/dDCfXMuah/o2A==",
-			"filename": "rebasepro-formex-0.9.0.tgz",
+			"id": "@rebasepro/forms@0.10.0",
+			"name": "@rebasepro/forms",
+			"version": "0.10.0",
+			"size": 17034,
+			"unpackedSize": 72900,
+			"shasum": "edd6a9b1540a1a306144f237fab9f0da811cc238",
+			"integrity": "sha512-u5yAGwbbGEkb9joj3Bn3VQlvJTwHFNY/IsgmJSpKd3KuYBov26QXChzYSxIQjhV60A83yGE5Jlks16yL8ZgV6w==",
+			"filename": "rebasepro-forms-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/Field.d.ts"
@@ -24,12 +24,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
 				},
 				{
 					"path": "dist/types.d.ts"
@@ -68,18 +62,18 @@
 					"path": "src/utils.ts"
 				}
 			],
-			"entryCount": 19,
+			"entryCount": 17,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/types@0.9.0",
+			"id": "@rebasepro/types@0.10.0",
 			"name": "@rebasepro/types",
-			"version": "0.9.0",
-			"size": 215938,
-			"unpackedSize": 1015670,
-			"shasum": "e29549af948c9aa18223bd13b47a3c554442bc6a",
-			"integrity": "sha512-qfXmrBkO5jqPquBrCVrctH8beblwB90l8NY4Jgwx77YKEbOQOUZvk2jqqc6Px0bad4kgP6KggPIWcbztqgjcNA==",
-			"filename": "rebasepro-types-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 192217,
+			"unpackedSize": 915097,
+			"shasum": "3f11479c6fdb9314dd33259709e5056df019dd76",
+			"integrity": "sha512-cWsnoGKtWhmJvhfeBXPI4t5tlj35UXXolfHC2nqdkxGLlEe3W31KwVop1okAEgafCeybrZALmIDse2OoJQRIuA==",
+			"filename": "rebasepro-types-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/controllers/analytics_controller.d.ts"
@@ -151,12 +145,6 @@
 					"path": "dist/index.es.js.map"
 				},
 				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
 					"path": "dist/rebase_context.d.ts"
 				},
 				{
@@ -167,6 +155,9 @@
 				},
 				{
 					"path": "dist/types/backend.d.ts"
+				},
+				{
+					"path": "dist/types/backup.d.ts"
 				},
 				{
 					"path": "dist/types/breadcrumbs.d.ts"
@@ -349,6 +340,9 @@
 					"path": "src/types/backend.ts"
 				},
 				{
+					"path": "src/types/backup.ts"
+				},
+				{
 					"path": "src/types/breadcrumbs.ts"
 				},
 				{
@@ -449,14 +443,14 @@
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/ui@0.9.0",
+			"id": "@rebasepro/ui@0.10.0",
 			"name": "@rebasepro/ui",
-			"version": "0.9.0",
-			"size": 322995,
-			"unpackedSize": 1509639,
-			"shasum": "30ddcffe18fdb06f99183eb978d1e84fa78da2e2",
-			"integrity": "sha512-BDJQHF86T+5AIz0Uf4dOD8NbDOa1XyteFQFqamq7fiqC5k8eZiK0caznAYVzgYnTJjn0q4RrzeBNGQbhPYBz0Q==",
-			"filename": "rebasepro-ui-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 323100,
+			"unpackedSize": 1510821,
+			"shasum": "7ca07e68ec20be9f4f5a419c810bbf335142080a",
+			"integrity": "sha512-c0ENjluhtWOpw7VVeYGtF9BoqpQAkaFweg5Ly5mifNGG3V/PsNiDq2L6SWJSdnPNO7HArH7wlexoq+rsLSkXwQ==",
+			"filename": "rebasepro-ui-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/components/Alert.d.ts"
@@ -1171,14 +1165,14 @@
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/agent-skills@0.9.0",
+			"id": "@rebasepro/agent-skills@0.10.0",
 			"name": "@rebasepro/agent-skills",
-			"version": "0.9.0",
-			"size": 177744,
-			"unpackedSize": 598322,
-			"shasum": "c6d53884e7df654683bf3ca9ec8a77790b2c144c",
-			"integrity": "sha512-DaGIEJigt71VKrjc9YPc6HZ8Noo4cPAt0u4vKb5PNPBG0Bg1yoLw7SQOAscfavHhCSOcnsqIuDkZJb+losGjjg==",
-			"filename": "rebasepro-agent-skills-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 190160,
+			"unpackedSize": 628986,
+			"shasum": "5ef694d7675f56688a81fb208652dbeb94b8659e",
+			"integrity": "sha512-/wJSHxsJehz6vurJI77Aqte/+jfxKK0Kk2dhRdIw+6mGp+Xriv4Cqr5dHUG4TuMgg+CQCnQyYahMFc185TozMA==",
+			"filename": "rebasepro-agent-skills-0.10.0.tgz",
 			"files": [
 				{
 					"path": "LICENSE"
@@ -1302,14 +1296,14 @@
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/utils@0.9.0",
+			"id": "@rebasepro/utils@0.10.0",
 			"name": "@rebasepro/utils",
-			"version": "0.9.0",
-			"size": 41544,
-			"unpackedSize": 172641,
-			"shasum": "7659d7b9e3f0bca6d744efe5d0483217c4f58ba5",
-			"integrity": "sha512-xsoGV6O2gehRCesshfmIz1NbRuDfZo4fjxjS4TdMTVCQXwpJQZbnnaVaSTM7OkLapzGSsRpEbrxBwCKWe2u8bQ==",
-			"filename": "rebasepro-utils-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 36132,
+			"unpackedSize": 131195,
+			"shasum": "e3b3632c09b77189e30e6401d44223e1ef812d36",
+			"integrity": "sha512-2q7830h5g7GPcZukb9rR1M4BDnx0gAUq1rLa5a5D6KTwadALOo09RdnaoZwxwre+s0yomYrFkLLTZnOC/v4d9w==",
+			"filename": "rebasepro-utils-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/arrays.d.ts"
@@ -1336,12 +1330,6 @@
 					"path": "dist/index.es.js.map"
 				},
 				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
 					"path": "dist/names.d.ts"
 				},
 				{
@@ -1354,7 +1342,13 @@
 					"path": "dist/plurals.d.ts"
 				},
 				{
+					"path": "dist/policy-names.d.ts"
+				},
+				{
 					"path": "dist/regexp.d.ts"
+				},
+				{
+					"path": "dist/sha1.d.ts"
 				},
 				{
 					"path": "dist/strings.d.ts"
@@ -1399,24 +1393,30 @@
 					"path": "src/plurals.ts"
 				},
 				{
+					"path": "src/policy-names.ts"
+				},
+				{
 					"path": "src/regexp.ts"
+				},
+				{
+					"path": "src/sha1.ts"
 				},
 				{
 					"path": "src/strings.ts"
 				}
 			],
-			"entryCount": 31,
+			"entryCount": 33,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/common@0.9.0",
+			"id": "@rebasepro/common@0.10.0",
 			"name": "@rebasepro/common",
-			"version": "0.9.0",
-			"size": 245349,
-			"unpackedSize": 1101560,
-			"shasum": "5ac886b3c28de54ef094cabced2406cee4b1e72e",
-			"integrity": "sha512-gpm9qluAwb0CPzgyMTs1QAIRpsH7jB+KqWTxgzgh50eR9v7pAhk0JdwVxZjBlzFQtsoh5UhYwdCQIHTYiATSZA==",
-			"filename": "rebasepro-common-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 192085,
+			"unpackedSize": 838050,
+			"shasum": "317c0b10f1fd0898719e3367d6ae77311f4fac54",
+			"integrity": "sha512-2l2m6BAkU1Rw6fZ+b7GVdWP1m7PWz/2R/VQWp6aJpFyIlNR0AcZGxG5/d1Urj14LYYMtQU5JG76xGvcl+6r/kQ==",
+			"filename": "rebasepro-common-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/collections/CollectionRegistry.d.ts"
@@ -1455,13 +1455,10 @@
 					"path": "dist/index.es.js.map"
 				},
 				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
 					"path": "dist/table-classification.d.ts"
+				},
+				{
+					"path": "dist/util/auth-default-policies.d.ts"
 				},
 				{
 					"path": "dist/util/builders.d.ts"
@@ -1488,7 +1485,13 @@
 					"path": "dist/util/filter-operator-resolution.d.ts"
 				},
 				{
+					"path": "dist/util/identity.d.ts"
+				},
+				{
 					"path": "dist/util/index.d.ts"
+				},
+				{
+					"path": "dist/util/junction-policies.d.ts"
 				},
 				{
 					"path": "dist/util/navigation_from_path.d.ts"
@@ -1581,6 +1584,9 @@
 					"path": "src/types/json-logic-js.d.ts"
 				},
 				{
+					"path": "src/util/auth-default-policies.ts"
+				},
+				{
 					"path": "src/util/builders.ts"
 				},
 				{
@@ -1605,7 +1611,13 @@
 					"path": "src/util/filter-operator-resolution.ts"
 				},
 				{
+					"path": "src/util/identity.ts"
+				},
+				{
 					"path": "src/util/index.ts"
+				},
+				{
+					"path": "src/util/junction-policies.ts"
 				},
 				{
 					"path": "src/util/navigation_from_path.ts"
@@ -1653,18 +1665,18 @@
 					"path": "src/util/storage.ts"
 				}
 			],
-			"entryCount": 78,
+			"entryCount": 82,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/schema-inference@0.9.0",
-			"name": "@rebasepro/schema-inference",
-			"version": "0.9.0",
-			"size": 31379,
-			"unpackedSize": 164374,
-			"shasum": "62d7f2eb0a5808dd86383169fd23fc560d1868b9",
-			"integrity": "sha512-aJTY+kFthzwXksiHTPAUK91Tn/mFC4LHP6ACKxnhYIbpG8Xl18ROQDnPOTBEc6RmQRNnVDLnU063LEQJNMYDTw==",
-			"filename": "rebasepro-schema-inference-0.9.0.tgz",
+			"id": "@rebasepro/inference@0.10.0",
+			"name": "@rebasepro/inference",
+			"version": "0.10.0",
+			"size": 22120,
+			"unpackedSize": 112185,
+			"shasum": "3a39bfd094b2b68b8425523cfc98614dd0899519",
+			"integrity": "sha512-LXf0MKY9I6FRaGZIhwuXWQ0KJy9jtxspeMEST0yFvbHXJQ2sVdJo4C4ZdK51QjvCLIOIk31vYDrYMBzwW//w1g==",
+			"filename": "rebasepro-inference-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/builders/reference_property_builder.d.ts"
@@ -1686,12 +1698,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.cjs"
-				},
-				{
-					"path": "dist/index.umd.cjs.map"
 				},
 				{
 					"path": "dist/strings.d.ts"
@@ -1739,162 +1745,31 @@
 					"path": "src/util.ts"
 				}
 			],
-			"entryCount": 24,
+			"entryCount": 22,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/client@0.9.0",
-			"name": "@rebasepro/client",
-			"version": "0.9.0",
-			"size": 169412,
-			"unpackedSize": 794530,
-			"shasum": "1d4d96c40cd30862ce0501ea8dcc9895b65e4666",
-			"integrity": "sha512-s452t1Lk1ld7lrzqTyqT0EurviFGcLGdThUFVKDpX7VNXnvG5ObS0BR+6hLkzL7KIiFLfzW7ldAijawjKpDpJg==",
-			"filename": "rebasepro-client-0.9.0.tgz",
+			"id": "@rebasepro/app@0.10.0",
+			"name": "@rebasepro/app",
+			"version": "0.10.0",
+			"size": 732785,
+			"unpackedSize": 3169685,
+			"shasum": "b5d31ecd0cf0d9438867246dec4ece1ba2cfc58a",
+			"integrity": "sha512-lXrXBZDHmz924bWhlBB2A2EgXAerh8hpAqOK0txijXXNysFlYrkDOQnmI6uXGWIcEPC1Yfpf5JVKPKyPrbgX2A==",
+			"filename": "rebasepro-app-0.10.0.tgz",
 			"files": [
 				{
-					"path": "dist/admin.d.ts"
+					"path": "dist/auth/api.d.ts"
 				},
 				{
-					"path": "dist/api-keys.d.ts"
+					"path": "dist/auth/index.d.ts"
 				},
 				{
-					"path": "dist/auth.d.ts"
+					"path": "dist/auth/types.d.ts"
 				},
 				{
-					"path": "dist/collection.d.ts"
+					"path": "dist/auth/useRebaseAuthController.d.ts"
 				},
-				{
-					"path": "dist/collection.test.d.ts"
-				},
-				{
-					"path": "dist/cron.d.ts"
-				},
-				{
-					"path": "dist/cron.test.d.ts"
-				},
-				{
-					"path": "dist/data-proxy.test.d.ts"
-				},
-				{
-					"path": "dist/errors.d.ts"
-				},
-				{
-					"path": "dist/functions.d.ts"
-				},
-				{
-					"path": "dist/index.d.ts"
-				},
-				{
-					"path": "dist/index.es.js"
-				},
-				{
-					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
-					"path": "dist/query_builder.d.ts"
-				},
-				{
-					"path": "dist/reviver.d.ts"
-				},
-				{
-					"path": "dist/sdk_query_builder.d.ts"
-				},
-				{
-					"path": "dist/storage-registry.d.ts"
-				},
-				{
-					"path": "dist/storage.d.ts"
-				},
-				{
-					"path": "dist/transport.d.ts"
-				},
-				{
-					"path": "dist/websocket.d.ts"
-				},
-				{
-					"path": "LICENSE"
-				},
-				{
-					"path": "package.json"
-				},
-				{
-					"path": "README.md"
-				},
-				{
-					"path": "src/admin.ts"
-				},
-				{
-					"path": "src/api-keys.ts"
-				},
-				{
-					"path": "src/auth.ts"
-				},
-				{
-					"path": "src/collection.test.ts"
-				},
-				{
-					"path": "src/collection.ts"
-				},
-				{
-					"path": "src/cron.test.ts"
-				},
-				{
-					"path": "src/cron.ts"
-				},
-				{
-					"path": "src/data-proxy.test.ts"
-				},
-				{
-					"path": "src/errors.ts"
-				},
-				{
-					"path": "src/functions.ts"
-				},
-				{
-					"path": "src/index.ts"
-				},
-				{
-					"path": "src/query_builder.ts"
-				},
-				{
-					"path": "src/reviver.ts"
-				},
-				{
-					"path": "src/sdk_query_builder.ts"
-				},
-				{
-					"path": "src/storage-registry.ts"
-				},
-				{
-					"path": "src/storage.ts"
-				},
-				{
-					"path": "src/transport.ts"
-				},
-				{
-					"path": "src/websocket.ts"
-				}
-			],
-			"entryCount": 43,
-			"bundled": []
-		},
-		{
-			"id": "@rebasepro/core@0.9.0",
-			"name": "@rebasepro/core",
-			"version": "0.9.0",
-			"size": 1160953,
-			"unpackedSize": 5160422,
-			"shasum": "d0201804ba128e6126b3caebdf27f179308cf88a",
-			"integrity": "sha512-oL+4FOXfLzUryqObDPVe1dwZtiYnBnGu1/sBjnnfSgYMjINdMN/eHUOVSmHihwqRuDWZzbaL8JxXDqeAvLnqpg==",
-			"filename": "rebasepro-core-0.9.0.tgz",
-			"files": [
 				{
 					"path": "dist/components/AIIcon.d.ts"
 				},
@@ -2020,6 +1895,9 @@
 				},
 				{
 					"path": "dist/contexts/AuthControllerContext.d.ts"
+				},
+				{
+					"path": "dist/contexts/CollectionResolverContext.d.ts"
 				},
 				{
 					"path": "dist/contexts/CollectionScopeContext.d.ts"
@@ -2175,6 +2053,9 @@
 					"path": "dist/hooks/useModeController.d.ts"
 				},
 				{
+					"path": "dist/hooks/useNavigationBlocker.d.ts"
+				},
+				{
 					"path": "dist/hooks/usePermissions.d.ts"
 				},
 				{
@@ -2221,12 +2102,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
 				},
 				{
 					"path": "dist/internal/common.d.ts"
@@ -2296,6 +2171,18 @@
 				},
 				{
 					"path": "README.md"
+				},
+				{
+					"path": "src/auth/api.ts"
+				},
+				{
+					"path": "src/auth/index.ts"
+				},
+				{
+					"path": "src/auth/types.ts"
+				},
+				{
+					"path": "src/auth/useRebaseAuthController.ts"
 				},
 				{
 					"path": "src/components/AIIcon.tsx"
@@ -2422,6 +2309,9 @@
 				},
 				{
 					"path": "src/contexts/AuthControllerContext.tsx"
+				},
+				{
+					"path": "src/contexts/CollectionResolverContext.tsx"
 				},
 				{
 					"path": "src/contexts/CollectionScopeContext.tsx"
@@ -2577,6 +2467,9 @@
 					"path": "src/hooks/useModeController.tsx"
 				},
 				{
+					"path": "src/hooks/useNavigationBlocker.tsx"
+				},
+				{
 					"path": "src/hooks/usePermissions.ts"
 				},
 				{
@@ -2676,18 +2569,170 @@
 					"path": "src/vitePlugin.ts"
 				}
 			],
-			"entryCount": 260,
+			"entryCount": 270,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/admin@0.9.0",
+			"id": "@rebasepro/client@0.10.0",
+			"name": "@rebasepro/client",
+			"version": "0.10.0",
+			"size": 159906,
+			"unpackedSize": 715524,
+			"shasum": "c7154954d4c40c4d0f1044639bcd85e519014756",
+			"integrity": "sha512-VX/TaQUYy1E20uaargS4K7CyqqbOcCa5Y08dE/WHbU6AfhDeX72fYhV/L/eFuGS9ADpuE0VpIvBXFVGCb+YIKw==",
+			"filename": "rebasepro-client-0.10.0.tgz",
+			"files": [
+				{
+					"path": "dist/admin.d.ts"
+				},
+				{
+					"path": "dist/api-keys.d.ts"
+				},
+				{
+					"path": "dist/auth.d.ts"
+				},
+				{
+					"path": "dist/backups.d.ts"
+				},
+				{
+					"path": "dist/collection.d.ts"
+				},
+				{
+					"path": "dist/cron.d.ts"
+				},
+				{
+					"path": "dist/errors.d.ts"
+				},
+				{
+					"path": "dist/functions.d.ts"
+				},
+				{
+					"path": "dist/index.d.ts"
+				},
+				{
+					"path": "dist/index.es.js"
+				},
+				{
+					"path": "dist/index.es.js.map"
+				},
+				{
+					"path": "dist/query_builder.d.ts"
+				},
+				{
+					"path": "dist/realtime-channel.d.ts"
+				},
+				{
+					"path": "dist/reviver.d.ts"
+				},
+				{
+					"path": "dist/sdk_query_builder.d.ts"
+				},
+				{
+					"path": "dist/storage-registry.d.ts"
+				},
+				{
+					"path": "dist/storage.d.ts"
+				},
+				{
+					"path": "dist/transport.d.ts"
+				},
+				{
+					"path": "dist/websocket.d.ts"
+				},
+				{
+					"path": "LICENSE"
+				},
+				{
+					"path": "package.json"
+				},
+				{
+					"path": "README.md"
+				},
+				{
+					"path": "src/admin.ts"
+				},
+				{
+					"path": "src/api-keys.ts"
+				},
+				{
+					"path": "src/auth.ts"
+				},
+				{
+					"path": "src/backups.ts"
+				},
+				{
+					"path": "src/collection.test.ts"
+				},
+				{
+					"path": "src/collection.ts"
+				},
+				{
+					"path": "src/cron.test.ts"
+				},
+				{
+					"path": "src/cron.ts"
+				},
+				{
+					"path": "src/data-proxy.test.ts"
+				},
+				{
+					"path": "src/errors.ts"
+				},
+				{
+					"path": "src/functions.ts"
+				},
+				{
+					"path": "src/index.ts"
+				},
+				{
+					"path": "src/query_builder.ts"
+				},
+				{
+					"path": "src/realtime-channel.test.ts"
+				},
+				{
+					"path": "src/realtime-channel.ts"
+				},
+				{
+					"path": "src/realtime-optout.test.ts"
+				},
+				{
+					"path": "src/realtime-row-identity.test.ts"
+				},
+				{
+					"path": "src/reviver.ts"
+				},
+				{
+					"path": "src/sdk_query_builder.ts"
+				},
+				{
+					"path": "src/storage-registry.ts"
+				},
+				{
+					"path": "src/storage.ts"
+				},
+				{
+					"path": "src/transport-baseurl.test.ts"
+				},
+				{
+					"path": "src/transport.ts"
+				},
+				{
+					"path": "src/websocket.ts"
+				}
+			],
+			"entryCount": 46,
+			"bundled": []
+		},
+		{
+			"id": "@rebasepro/admin@0.10.0",
 			"name": "@rebasepro/admin",
-			"version": "0.9.0",
-			"size": 1433867,
-			"unpackedSize": 6831075,
-			"shasum": "13f8b0c4b1cc3e3f7062f4e2cadbfc4de319c7e9",
-			"integrity": "sha512-tgBkfOU063eoq1BVm6rDXAU/tSKGJu1QbhugcnIhl4fplRo8xrCmAIQQOQCszUFPfrQMphUbK6OByI+QlTBwsA==",
-			"filename": "rebasepro-admin-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 1457044,
+			"unpackedSize": 6898678,
+			"shasum": "de67d31a08da02032befe15173d3c3f0bd422aaa",
+			"integrity": "sha512-DtUllGxUk+Ywj8XsnGJ5t+WIvocRWbXapCEza8WsEwuaurROGxlg1f4QOhFYHJDgJh47oLpROTk6JWXtuAFp9A==",
+			"filename": "rebasepro-admin-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/collection_editor_ui.d.ts"
@@ -2990,10 +3035,10 @@
 					"path": "dist/collection_editor/validateCollectionJson.d.ts"
 				},
 				{
-					"path": "dist/CollectionEditorDialog-B-7uW3iJ.js"
+					"path": "dist/CollectionEditorDialog-BOlKGGg7.js"
 				},
 				{
-					"path": "dist/CollectionEditorDialog-B-7uW3iJ.js.map"
+					"path": "dist/CollectionEditorDialog-BOlKGGg7.js.map"
 				},
 				{
 					"path": "dist/components/admin/CreationResultDialog.d.ts"
@@ -3251,10 +3296,10 @@
 					"path": "dist/components/PropertyIdCopyTooltip.d.ts"
 				},
 				{
-					"path": "dist/components/RebaseAuthGate.d.ts"
+					"path": "dist/components/RebaseAdmin.d.ts"
 				},
 				{
-					"path": "dist/components/RebaseCMS.d.ts"
+					"path": "dist/components/RebaseAuthGate.d.ts"
 				},
 				{
 					"path": "dist/components/RebaseLayout.d.ts"
@@ -3518,6 +3563,12 @@
 					"path": "dist/editor/utils/useDebouncedCallback.d.ts"
 				},
 				{
+					"path": "dist/export-BM6HPujv.js"
+				},
+				{
+					"path": "dist/export-BM6HPujv.js.map"
+				},
+				{
 					"path": "dist/form/components/ErrorFocus.d.ts"
 				},
 				{
@@ -3629,10 +3680,10 @@
 					"path": "dist/form/validation.d.ts"
 				},
 				{
-					"path": "dist/history-7X5bON_n.js"
+					"path": "dist/history-CtIPJxvQ.js"
 				},
 				{
-					"path": "dist/history-7X5bON_n.js.map"
+					"path": "dist/history-CtIPJxvQ.js.map"
 				},
 				{
 					"path": "dist/hooks/index.d.ts"
@@ -3704,10 +3755,19 @@
 					"path": "dist/hooks/useSidePanel.d.ts"
 				},
 				{
+					"path": "dist/import-DzQnT03v.js"
+				},
+				{
+					"path": "dist/import-DzQnT03v.js.map"
+				},
+				{
 					"path": "dist/index.d.ts"
 				},
 				{
 					"path": "dist/index.js"
+				},
+				{
+					"path": "dist/index.js.map"
 				},
 				{
 					"path": "dist/markdown-CklalUUk.js"
@@ -3794,19 +3854,19 @@
 					"path": "dist/preview/util.d.ts"
 				},
 				{
-					"path": "dist/PropertyEditView-7KMTcrqi.js"
+					"path": "dist/PropertyEditView-i51tFOfM.js"
 				},
 				{
-					"path": "dist/PropertyEditView-7KMTcrqi.js.map"
+					"path": "dist/PropertyEditView-i51tFOfM.js.map"
 				},
 				{
 					"path": "dist/rolldown-runtime-D7D4PA-g.js"
 				},
 				{
-					"path": "dist/RouterCollectionsStudioView-epqIbZrJ.js"
+					"path": "dist/RouterCollectionsStudioView-Dh4W53PU.js"
 				},
 				{
-					"path": "dist/RouterCollectionsStudioView-epqIbZrJ.js.map"
+					"path": "dist/RouterCollectionsStudioView-Dh4W53PU.js.map"
 				},
 				{
 					"path": "dist/routes/CustomViewRoute.d.ts"
@@ -3816,12 +3876,6 @@
 				},
 				{
 					"path": "dist/routes/RebaseRoute.d.ts"
-				},
-				{
-					"path": "dist/src-sUZfe29F.js"
-				},
-				{
-					"path": "dist/src-sUZfe29F.js.map"
 				},
 				{
 					"path": "dist/types/components/EntityFormActionsProps.d.ts"
@@ -3843,6 +3897,12 @@
 				},
 				{
 					"path": "dist/types/index.d.ts"
+				},
+				{
+					"path": "dist/util-XFwQ9FEc.js"
+				},
+				{
+					"path": "dist/util-XFwQ9FEc.js.map"
 				},
 				{
 					"path": "dist/util/dataControllerAdapter.d.ts"
@@ -3870,6 +3930,9 @@
 				},
 				{
 					"path": "dist/util/view_constants.d.ts"
+				},
+				{
+					"path": "dist/util/view_mode.d.ts"
 				},
 				{
 					"path": "LICENSE"
@@ -4430,10 +4493,10 @@
 					"path": "src/components/PropertyIdCopyTooltip.tsx"
 				},
 				{
-					"path": "src/components/RebaseAuthGate.tsx"
+					"path": "src/components/RebaseAdmin.tsx"
 				},
 				{
-					"path": "src/components/RebaseCMS.tsx"
+					"path": "src/components/RebaseAuthGate.tsx"
 				},
 				{
 					"path": "src/components/RebaseLayout.tsx"
@@ -5010,79 +5073,23 @@
 				},
 				{
 					"path": "src/util/view_constants.ts"
+				},
+				{
+					"path": "src/util/view_mode.ts"
 				}
 			],
-			"entryCount": 774,
+			"entryCount": 781,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/auth@0.9.0",
-			"name": "@rebasepro/auth",
-			"version": "0.9.0",
-			"size": 16672,
-			"unpackedSize": 110416,
-			"shasum": "f0435fec93b05d990d7252c2c3f7ba8a46d438b8",
-			"integrity": "sha512-cHEVjqoyhs19ZJ+FkXxovsNMAhlQFUr61h7tqBX6uiFFqLVQXsKeyhnTdA64YfIfPJohLGvZQQAqSpRf5WB5Rg==",
-			"filename": "rebasepro-auth-0.9.0.tgz",
-			"files": [
-				{
-					"path": "dist/api.d.ts"
-				},
-				{
-					"path": "dist/hooks/useRebaseAuthController.d.ts"
-				},
-				{
-					"path": "dist/index.d.ts"
-				},
-				{
-					"path": "dist/index.es.js"
-				},
-				{
-					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
-					"path": "dist/types.d.ts"
-				},
-				{
-					"path": "LICENSE"
-				},
-				{
-					"path": "package.json"
-				},
-				{
-					"path": "README.md"
-				},
-				{
-					"path": "src/api.ts"
-				},
-				{
-					"path": "src/hooks/useRebaseAuthController.ts"
-				},
-				{
-					"path": "src/index.ts"
-				},
-				{
-					"path": "src/types.ts"
-				}
-			],
-			"entryCount": 15,
-			"bundled": []
-		},
-		{
-			"id": "@rebasepro/client-postgresql@0.9.0",
-			"name": "@rebasepro/client-postgresql",
-			"version": "0.9.0",
-			"size": 6275,
-			"unpackedSize": 27627,
-			"shasum": "830410f95ca8ab98c7bb3ec6b76c302d34c948a7",
-			"integrity": "sha512-Usqc6ya6EJyiaETbGl3GyV4IcsUWRCqDRwbbXWi12pWsaT+CMadIfpIgjbAS7iGGRPP/KGVgzIBN9Exf9RkYmA==",
-			"filename": "rebasepro-client-postgresql-0.9.0.tgz",
+			"id": "@rebasepro/client-postgres@0.10.0",
+			"name": "@rebasepro/client-postgres",
+			"version": "0.10.0",
+			"size": 5386,
+			"unpackedSize": 17409,
+			"shasum": "470907ac986c032c62ab2f33dcdb1ba2748fb638",
+			"integrity": "sha512-6G0R8xMYSs6ngD9UVkjtooWMHEj6ubw6x1zhUObkT9eQa6Q0fvzaVsmwdrUhrm6laBQTZ2nI5ggO6O+bCSGGTQ==",
+			"filename": "rebasepro-client-postgres-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/index.d.ts"
@@ -5092,12 +5099,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
 				},
 				{
 					"path": "dist/usePostgresClientDriver.d.ts"
@@ -5112,18 +5113,56 @@
 					"path": "README.md"
 				}
 			],
-			"entryCount": 9,
+			"entryCount": 7,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/mcp-server@0.9.0",
-			"name": "@rebasepro/mcp-server",
-			"version": "0.9.0",
-			"size": 20778,
-			"unpackedSize": 95354,
-			"shasum": "d218b272fc8e6fe8ee4ab60ee72d95a9694aa389",
-			"integrity": "sha512-puXBJBgh8jeAkaDPKKQulGTg28SRPEqmdKy9n6TOR1qBqt1B9q2Esg0F7ediRzPpZGe7mBnxrK4PFiI6ESmUVQ==",
-			"filename": "rebasepro-mcp-server-0.9.0.tgz",
+			"id": "@rebasepro/codegen@0.10.0",
+			"name": "@rebasepro/codegen",
+			"version": "0.10.0",
+			"size": 8198,
+			"unpackedSize": 32361,
+			"shasum": "31d52693d8568072cb327d5c6e5d682e124026fc",
+			"integrity": "sha512-fCPVZSY4OrirmqGpUPHNVzRWKwnfqLe3mBnUorjh+dDAXlOqN9lxuq/NkkDxrVuGKgoEoa8V9JfAABgXEgdpKQ==",
+			"filename": "rebasepro-codegen-0.10.0.tgz",
+			"files": [
+				{
+					"path": "dist/generate-types.d.ts"
+				},
+				{
+					"path": "dist/index.d.ts"
+				},
+				{
+					"path": "dist/index.es.js"
+				},
+				{
+					"path": "dist/index.es.js.map"
+				},
+				{
+					"path": "dist/utils.d.ts"
+				},
+				{
+					"path": "LICENSE"
+				},
+				{
+					"path": "package.json"
+				},
+				{
+					"path": "README.md"
+				}
+			],
+			"entryCount": 8,
+			"bundled": []
+		},
+		{
+			"id": "@rebasepro/mcp@0.10.0",
+			"name": "@rebasepro/mcp",
+			"version": "0.10.0",
+			"size": 20940,
+			"unpackedSize": 95688,
+			"shasum": "15227304266af7f93352d59e7b28a2dbcc0fe37d",
+			"integrity": "sha512-VzQeCmu876sRTKtMtxWBXIL+LaVR0f49i+SdChVMSTQI2gIh4Zce+0TDCBYleTCyLRcdsg7Ui5QEJ3ISHTbsJQ==",
+			"filename": "rebasepro-mcp-0.10.0.tgz",
 			"files": [
 				{
 					"path": "bin/rebase-mcp.js"
@@ -5154,14 +5193,14 @@
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/plugin-insights@0.9.0",
+			"id": "@rebasepro/plugin-insights@0.10.0",
 			"name": "@rebasepro/plugin-insights",
-			"version": "0.9.0",
-			"size": 43879,
-			"unpackedSize": 201992,
-			"shasum": "283153fccb79a216f51c81c7c9914a98def66daf",
-			"integrity": "sha512-kz4+iqF9EqI7rud7lB+bDnRD3o6jf3USDIJHmId0dRD7+ZLMPvP7nNOUT/a0v1MHpMDJ7gM69sGJCRcJ3dcWxA==",
-			"filename": "rebasepro-plugin-insights-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 31206,
+			"unpackedSize": 133107,
+			"shasum": "753c05eab7c9dbac14e7c30d0d62bb89d49a2408",
+			"integrity": "sha512-+DQ876UWh+2Bi1teGs8i3MRZBrxXMN7ujDDlClC/48omTaksUBT2ql2+omjhUoPad3gaW8dp/mWTTL11id5a8Q==",
+			"filename": "rebasepro-plugin-insights-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/components/CollectionInsightsInline.d.ts"
@@ -5198,12 +5237,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
 				},
 				{
 					"path": "dist/types/engine.d.ts"
@@ -5272,62 +5305,18 @@
 					"path": "src/useInsightsPlugin.tsx"
 				}
 			],
-			"entryCount": 36,
+			"entryCount": 34,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/sdk-generator@0.9.0",
-			"name": "@rebasepro/sdk-generator",
-			"version": "0.9.0",
-			"size": 9783,
-			"unpackedSize": 58461,
-			"shasum": "0b7b8a75bcd73af964442cef2c8e411ab49c5181",
-			"integrity": "sha512-xhRGpYKevBoex3BLdeJQNgbFVWG3pvxOHxkLmD6YhQLrw+05/iU+QyT5YT4wRksnXxR4IPBkQ39KkM+5+hcFaw==",
-			"filename": "rebasepro-sdk-generator-0.9.0.tgz",
-			"files": [
-				{
-					"path": "dist/generate-types.d.ts"
-				},
-				{
-					"path": "dist/index.cjs"
-				},
-				{
-					"path": "dist/index.cjs.map"
-				},
-				{
-					"path": "dist/index.d.ts"
-				},
-				{
-					"path": "dist/index.es.js"
-				},
-				{
-					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/utils.d.ts"
-				},
-				{
-					"path": "LICENSE"
-				},
-				{
-					"path": "package.json"
-				},
-				{
-					"path": "README.md"
-				}
-			],
-			"entryCount": 10,
-			"bundled": []
-		},
-		{
-			"id": "@rebasepro/server-core@0.9.0",
-			"name": "@rebasepro/server-core",
-			"version": "0.9.0",
-			"size": 2491866,
-			"unpackedSize": 11271610,
-			"shasum": "73025c58fa600d0bef42be5481f419f419ab2526",
-			"integrity": "sha512-+IliQs/IEAmhsO7A8252kOh1z0+IrvKA/dJE5DUc/oqndd/ZvRpLqDXqx0/vzRF2oN+ypKSbzzW24t1vI1b5yw==",
-			"filename": "rebasepro-server-core-0.9.0.tgz",
+			"id": "@rebasepro/server@0.10.0",
+			"name": "@rebasepro/server",
+			"version": "0.10.0",
+			"size": 772071,
+			"unpackedSize": 3385046,
+			"shasum": "15b38f9986345347ceacb02addee2932a193457b",
+			"integrity": "sha512-2gK/s3U4O/a5dKkXEQszl1X0SRLw6AYJTdNzQhv0EDyjVgCbWRF5tsqOaf5VjUpQTvpnxPNtTl9pKhP5jl1p7A==",
+			"filename": "rebasepro-server-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/api/ast-schema-editor.d.ts"
@@ -5355,6 +5344,9 @@
 				},
 				{
 					"path": "dist/api/rest/query-parser.d.ts"
+				},
+				{
+					"path": "dist/api/rest/write-validation.d.ts"
 				},
 				{
 					"path": "dist/api/schema-editor-routes.d.ts"
@@ -5403,6 +5395,9 @@
 				},
 				{
 					"path": "dist/auth/builtin-auth-adapter.d.ts"
+				},
+				{
+					"path": "dist/auth/collection-callback-warning.d.ts"
 				},
 				{
 					"path": "dist/auth/cookie-utils.d.ts"
@@ -5462,6 +5457,9 @@
 					"path": "dist/auth/password.d.ts"
 				},
 				{
+					"path": "dist/auth/rate-limit-store.d.ts"
+				},
+				{
 					"path": "dist/auth/rate-limiter.d.ts"
 				},
 				{
@@ -5484,6 +5482,15 @@
 				},
 				{
 					"path": "dist/auth/twitter-oauth.d.ts"
+				},
+				{
+					"path": "dist/backup/backup-common.d.ts"
+				},
+				{
+					"path": "dist/backup/backup-routes.d.ts"
+				},
+				{
+					"path": "dist/backup/index.d.ts"
 				},
 				{
 					"path": "dist/collections/BackendCollectionRegistry.d.ts"
@@ -5561,12 +5568,6 @@
 					"path": "dist/index.es.js.map"
 				},
 				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
 					"path": "dist/init.d.ts"
 				},
 				{
@@ -5585,10 +5586,10 @@
 					"path": "dist/init/storage.d.ts"
 				},
 				{
-					"path": "dist/jwt-BwIn8xmk.js"
+					"path": "dist/jwt-B3zjddCa.js"
 				},
 				{
-					"path": "dist/jwt-BwIn8xmk.js.map"
+					"path": "dist/jwt-B3zjddCa.js.map"
 				},
 				{
 					"path": "dist/logger-BYU66ENZ.js"
@@ -5597,16 +5598,10 @@
 					"path": "dist/logger-BYU66ENZ.js.map"
 				},
 				{
-					"path": "dist/ms-DnYXB-Wd.js"
+					"path": "dist/openapi-generator-DqSIwNLV.js"
 				},
 				{
-					"path": "dist/ms-DnYXB-Wd.js.map"
-				},
-				{
-					"path": "dist/openapi-generator-Z9oYWLf_.js"
-				},
-				{
-					"path": "dist/openapi-generator-Z9oYWLf_.js.map"
+					"path": "dist/openapi-generator-DqSIwNLV.js.map"
 				},
 				{
 					"path": "dist/schema-editor-routes-D3ef8zu1.js"
@@ -5630,16 +5625,10 @@
 					"path": "dist/singleton.d.ts"
 				},
 				{
-					"path": "dist/src-B4OLmNVa.js"
+					"path": "dist/src-CsHhSKbi.js"
 				},
 				{
-					"path": "dist/src-B4OLmNVa.js.map"
-				},
-				{
-					"path": "dist/src-B5WkP1Rv.js"
-				},
-				{
-					"path": "dist/src-B5WkP1Rv.js.map"
+					"path": "dist/src-CsHhSKbi.js.map"
 				},
 				{
 					"path": "dist/storage/GCSStorageController.d.ts"
@@ -5672,6 +5661,9 @@
 					"path": "dist/types/index.d.ts"
 				},
 				{
+					"path": "dist/utils/compression.d.ts"
+				},
+				{
 					"path": "dist/utils/dev-port.d.ts"
 				},
 				{
@@ -5702,18 +5694,18 @@
 					"path": "README.md"
 				}
 			],
-			"entryCount": 124,
+			"entryCount": 125,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/client-firebase@0.9.0",
-			"name": "@rebasepro/client-firebase",
-			"version": "0.9.0",
-			"size": 194645,
-			"unpackedSize": 858276,
-			"shasum": "6af2a1618b1c2c7c1ea6316c136456916e8b9b57",
-			"integrity": "sha512-ReH8VtPPDNjrHfPGb64abGJQ0qNnWLOef8wDUgHpFek6gPloMiQYJq/+zMHXAmbMHUHW5Z2vuVOjVqMXVYFZzg==",
-			"filename": "rebasepro-client-firebase-0.9.0.tgz",
+			"id": "@rebasepro/firebase@0.10.0",
+			"name": "@rebasepro/firebase",
+			"version": "0.10.0",
+			"size": 119877,
+			"unpackedSize": 520615,
+			"shasum": "d0669d0b7eab405aa5d0709d627de6fccdfde8d5",
+			"integrity": "sha512-wAuEtWDIEPrf7d7aGvg4KM9U2k3BSpoTJ6VBaUKzE2ikF3hcoDbvMNzOqFM+C+Jn/uAXMUIyuuSM20CD6VnjTg==",
+			"filename": "rebasepro-firebase-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/components/FirebaseLoginView.d.ts"
@@ -5768,12 +5760,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
 				},
 				{
 					"path": "dist/types/appcheck.d.ts"
@@ -5905,18 +5891,18 @@
 					"path": "src/utils/text_search_controller.ts"
 				}
 			],
-			"entryCount": 63,
+			"entryCount": 61,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/plugin-data-enhancement@0.9.0",
-			"name": "@rebasepro/plugin-data-enhancement",
-			"version": "0.9.0",
-			"size": 54055,
-			"unpackedSize": 242432,
-			"shasum": "06701aaec09fd05dff9b14357a71a5dcdb4964f0",
-			"integrity": "sha512-Cnkx/OxE1H8zbGOKztKmSzWTrzv2IJ3t2fhYMTaeBQvLvNO2VXisQUAScmQUqyEpu0cCkOJEBjrJ9rNrQQbxYA==",
-			"filename": "rebasepro-plugin-data-enhancement-0.9.0.tgz",
+			"id": "@rebasepro/plugin-ai@0.10.0",
+			"name": "@rebasepro/plugin-ai",
+			"version": "0.10.0",
+			"size": 36888,
+			"unpackedSize": 154904,
+			"shasum": "8b49b76ac29295f63d83e78a3ec1cdd7a08d0156",
+			"integrity": "sha512-tPEoxn90cfmGJIPv5Si2uhZzx0twCGZrB5BWz2RLUpuraoyxvp6acgeuep3oQk48P05Eyqwd/T86zod2NMWu6A==",
+			"filename": "rebasepro-plugin-ai-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/api.d.ts"
@@ -5938,12 +5924,6 @@
 				},
 				{
 					"path": "dist/index.es.js.map"
-				},
-				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
 				},
 				{
 					"path": "dist/types/data_enhancement_controller.d.ts"
@@ -6030,18 +6010,18 @@
 					"path": "src/vite-env.d.ts"
 				}
 			],
-			"entryCount": 37,
+			"entryCount": 35,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/server-mongodb@0.9.0",
-			"name": "@rebasepro/server-mongodb",
-			"version": "0.9.0",
-			"size": 150108,
-			"unpackedSize": 796726,
-			"shasum": "44a59ecf8c39456fec6068d31228708544f032c8",
-			"integrity": "sha512-mlPi9mt9DgPDWRjCCsrNokxCAEMaCDn3HRhoEV1Npdy+kvmmGfaTUm3PAXEDjhAyMW4Mi818DYq/wk8s3CIg2w==",
-			"filename": "rebasepro-server-mongodb-0.9.0.tgz",
+			"id": "@rebasepro/server-mongo@0.10.0",
+			"name": "@rebasepro/server-mongo",
+			"version": "0.10.0",
+			"size": 93640,
+			"unpackedSize": 497225,
+			"shasum": "ecaf6bf685a078cf3075944ca6a4a7acf2f4f8ee",
+			"integrity": "sha512-JJ6O0M6nOjWdQVprPkPldD02jKHgI+B9ws2UFQOavKcHYne1D3pGDKBX7msmTvgFWpqneXwZ3rBj/+t8b2A0kw==",
+			"filename": "rebasepro-server-mongo-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/auth/ensure-collections.d.ts"
@@ -6074,16 +6054,16 @@
 					"path": "dist/db/MongoDataService.d.ts.map"
 				},
 				{
-					"path": "dist/ensure-collections-Dr7D_lhr.js"
+					"path": "dist/ensure-collections-Bkx_O5CQ.js"
 				},
 				{
-					"path": "dist/ensure-collections-Dr7D_lhr.js.map"
+					"path": "dist/ensure-collections-Bkx_O5CQ.js.map"
 				},
 				{
-					"path": "dist/ensure-history-collection-I2OBeTr2.js"
+					"path": "dist/ensure-history-collection-yajOt2dv.js"
 				},
 				{
-					"path": "dist/ensure-history-collection-I2OBeTr2.js.map"
+					"path": "dist/ensure-history-collection-yajOt2dv.js.map"
 				},
 				{
 					"path": "dist/factory.d.ts"
@@ -6110,12 +6090,6 @@
 					"path": "dist/index.es.js.map"
 				},
 				{
-					"path": "dist/index.umd.js"
-				},
-				{
-					"path": "dist/index.umd.js.map"
-				},
-				{
 					"path": "dist/MongoBootstrapper.d.ts"
 				},
 				{
@@ -6140,10 +6114,10 @@
 					"path": "dist/services/MongoRealtimeService.d.ts.map"
 				},
 				{
-					"path": "dist/websocket-BOXgJuBi.js"
+					"path": "dist/websocket-CoKu1mvm.js"
 				},
 				{
-					"path": "dist/websocket-BOXgJuBi.js.map"
+					"path": "dist/websocket-CoKu1mvm.js.map"
 				},
 				{
 					"path": "dist/websocket.d.ts"
@@ -6200,24 +6174,42 @@
 					"path": "src/websocket.ts"
 				}
 			],
-			"entryCount": 52,
+			"entryCount": 50,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/server-postgresql@0.9.0",
-			"name": "@rebasepro/server-postgresql",
-			"version": "0.9.0",
-			"size": 557630,
-			"unpackedSize": 2835900,
-			"shasum": "51271f8d6ef1a1d79a5e681f3e12d1f6fc10fd42",
-			"integrity": "sha512-fuBjvPjzVIT0MhZPMjoObTNQdFe++vURRsRjdHZcrUhx20y3kl+h2P1ICS8N7QGEOJCCfhe3YmdR2iBjkX/bMQ==",
-			"filename": "rebasepro-server-postgresql-0.9.0.tgz",
+			"id": "@rebasepro/server-postgres@0.10.0",
+			"name": "@rebasepro/server-postgres",
+			"version": "0.10.0",
+			"size": 948643,
+			"unpackedSize": 4327189,
+			"shasum": "740af2d9feae2422025fed0e413388860e133f49",
+			"integrity": "sha512-0Jpq1s8dvVtpnEtS4MxL+O/67PJr99c1iwboIzE5CeHDTlXZmJlIeKLKX5d80JVOHevmVzv62aWqoX11KEdCUg==",
+			"filename": "rebasepro-server-postgres-0.10.0.tgz",
 			"files": [
 				{
 					"path": "dist/auth/ensure-tables.d.ts"
 				},
 				{
 					"path": "dist/auth/services.d.ts"
+				},
+				{
+					"path": "dist/backup/backup-cli.d.ts"
+				},
+				{
+					"path": "dist/backup/backup-cron.d.ts"
+				},
+				{
+					"path": "dist/backup/backup-service.d.ts"
+				},
+				{
+					"path": "dist/backup/index.d.ts"
+				},
+				{
+					"path": "dist/backup/pg-tools.d.ts"
+				},
+				{
+					"path": "dist/backup/retention.d.ts"
 				},
 				{
 					"path": "dist/cli-errors.d.ts"
@@ -6227,6 +6219,9 @@
 				},
 				{
 					"path": "dist/cli.d.ts"
+				},
+				{
+					"path": "dist/collections/buildRegistry.d.ts"
 				},
 				{
 					"path": "dist/collections/PostgresCollectionRegistry.d.ts"
@@ -6259,6 +6254,9 @@
 					"path": "dist/interfaces.d.ts"
 				},
 				{
+					"path": "dist/module-dir.d.ts"
+				},
+				{
 					"path": "dist/PostgresAdapter.d.ts"
 				},
 				{
@@ -6268,7 +6266,7 @@
 					"path": "dist/PostgresBootstrapper.d.ts"
 				},
 				{
-					"path": "dist/schema/auth-default-policies.d.ts"
+					"path": "dist/schema/auth-bootstrap-sql.d.ts"
 				},
 				{
 					"path": "dist/schema/auth-schema.d.ts"
@@ -6278,6 +6276,9 @@
 				},
 				{
 					"path": "dist/schema/doctor.d.ts"
+				},
+				{
+					"path": "dist/schema/dynamic-tables.d.ts"
 				},
 				{
 					"path": "dist/schema/generate-drizzle-schema-logic.d.ts"
@@ -6298,13 +6299,34 @@
 					"path": "dist/schema/introspect-db-logic.d.ts"
 				},
 				{
+					"path": "dist/schema/introspect-db-naming.d.ts"
+				},
+				{
 					"path": "dist/schema/introspect-db.d.ts"
+				},
+				{
+					"path": "dist/schema/introspect-runtime.d.ts"
 				},
 				{
 					"path": "dist/schema/test-schema.d.ts"
 				},
 				{
+					"path": "dist/security/policy-drift.d.ts"
+				},
+				{
+					"path": "dist/security/rls-enforcement.d.ts"
+				},
+				{
 					"path": "dist/services/BranchService.d.ts"
+				},
+				{
+					"path": "dist/services/cdc/CdcListener.d.ts"
+				},
+				{
+					"path": "dist/services/cdc/trigger-cdc.d.ts"
+				},
+				{
+					"path": "dist/services/channel-history.d.ts"
 				},
 				{
 					"path": "dist/services/collection-helpers.d.ts"
@@ -6326,6 +6348,9 @@
 				},
 				{
 					"path": "dist/services/RelationService.d.ts"
+				},
+				{
+					"path": "dist/services/row-pipeline.d.ts"
 				},
 				{
 					"path": "dist/types.d.ts"
@@ -6361,6 +6386,24 @@
 					"path": "src/auth/services.ts"
 				},
 				{
+					"path": "src/backup/backup-cli.ts"
+				},
+				{
+					"path": "src/backup/backup-cron.ts"
+				},
+				{
+					"path": "src/backup/backup-service.ts"
+				},
+				{
+					"path": "src/backup/index.ts"
+				},
+				{
+					"path": "src/backup/pg-tools.ts"
+				},
+				{
+					"path": "src/backup/retention.ts"
+				},
+				{
 					"path": "src/cli-errors.ts"
 				},
 				{
@@ -6368,6 +6411,9 @@
 				},
 				{
 					"path": "src/cli.ts"
+				},
+				{
+					"path": "src/collections/buildRegistry.ts"
 				},
 				{
 					"path": "src/collections/PostgresCollectionRegistry.ts"
@@ -6394,6 +6440,9 @@
 					"path": "src/interfaces.ts"
 				},
 				{
+					"path": "src/module-dir.ts"
+				},
+				{
 					"path": "src/PostgresAdapter.ts"
 				},
 				{
@@ -6403,7 +6452,7 @@
 					"path": "src/PostgresBootstrapper.ts"
 				},
 				{
-					"path": "src/schema/auth-default-policies.ts"
+					"path": "src/schema/auth-bootstrap-sql.ts"
 				},
 				{
 					"path": "src/schema/auth-schema.ts"
@@ -6413,6 +6462,12 @@
 				},
 				{
 					"path": "src/schema/doctor.ts"
+				},
+				{
+					"path": "src/schema/dynamic-tables.test.ts"
+				},
+				{
+					"path": "src/schema/dynamic-tables.ts"
 				},
 				{
 					"path": "src/schema/generate-drizzle-schema-logic.ts"
@@ -6433,13 +6488,43 @@
 					"path": "src/schema/introspect-db-logic.ts"
 				},
 				{
+					"path": "src/schema/introspect-db-naming.ts"
+				},
+				{
 					"path": "src/schema/introspect-db.ts"
+				},
+				{
+					"path": "src/schema/introspect-runtime.test.ts"
+				},
+				{
+					"path": "src/schema/introspect-runtime.ts"
 				},
 				{
 					"path": "src/schema/test-schema.ts"
 				},
 				{
+					"path": "src/security/anonymous-grants.test.ts"
+				},
+				{
+					"path": "src/security/policy-drift.test.ts"
+				},
+				{
+					"path": "src/security/policy-drift.ts"
+				},
+				{
+					"path": "src/security/rls-enforcement.ts"
+				},
+				{
 					"path": "src/services/BranchService.ts"
+				},
+				{
+					"path": "src/services/cdc/CdcListener.ts"
+				},
+				{
+					"path": "src/services/cdc/trigger-cdc.ts"
+				},
+				{
+					"path": "src/services/channel-history.ts"
 				},
 				{
 					"path": "src/services/collection-helpers.ts"
@@ -6463,6 +6548,9 @@
 					"path": "src/services/RelationService.ts"
 				},
 				{
+					"path": "src/services/row-pipeline.ts"
+				},
+				{
 					"path": "src/types.ts"
 				},
 				{
@@ -6481,42 +6569,48 @@
 					"path": "src/websocket.ts"
 				}
 			],
-			"entryCount": 89,
+			"entryCount": 127,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/studio@0.9.0",
+			"id": "@rebasepro/studio@0.10.0",
 			"name": "@rebasepro/studio",
-			"version": "0.9.0",
-			"size": 617640,
-			"unpackedSize": 3292576,
-			"shasum": "c577cce91f8e5456b68c15548a5e691c95a2b104",
-			"integrity": "sha512-kxHAiQsETG6AeFGsOBLgICSr0cnsEcNNt/Oz1e8QWiDDlqPv3zjbNLH7BhaagJj0CQkYsP1+DShJenDI2SmAbA==",
-			"filename": "rebasepro-studio-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 386909,
+			"unpackedSize": 1988342,
+			"shasum": "b9011bfaee0aaa7a993bed577b693f7aee0a64e3",
+			"integrity": "sha512-5S1ygzoCAvYtMJIzI0hofiCXQLjlVTjvioDFaEeg4IhFS0lIQZ/e5pUjqKbxjYJGak91lepti/JftPoBc8N32w==",
+			"filename": "rebasepro-studio-0.10.0.tgz",
 			"files": [
 				{
-					"path": "dist/ApiExplorer-CdIwR9Ga.js"
+					"path": "dist/ApiExplorer-B9M9-uy_.js"
 				},
 				{
-					"path": "dist/ApiExplorer-CdIwR9Ga.js.map"
+					"path": "dist/ApiExplorer-B9M9-uy_.js.map"
 				},
 				{
-					"path": "dist/ApiKeysView-D-_FSlNL.js"
+					"path": "dist/ApiKeysView-vQKqt2wl.js"
 				},
 				{
-					"path": "dist/ApiKeysView-D-_FSlNL.js.map"
+					"path": "dist/ApiKeysView-vQKqt2wl.js.map"
 				},
 				{
-					"path": "dist/AuthSimulationSelector-iEZ-Or_1.js"
+					"path": "dist/AuthSimulationSelector-Bougd521.js"
 				},
 				{
-					"path": "dist/AuthSimulationSelector-iEZ-Or_1.js.map"
+					"path": "dist/AuthSimulationSelector-Bougd521.js.map"
 				},
 				{
-					"path": "dist/BranchesView-Dlg78EQ8.js"
+					"path": "dist/BackupsView-DNS6LdVg.js"
 				},
 				{
-					"path": "dist/BranchesView-Dlg78EQ8.js.map"
+					"path": "dist/BackupsView-DNS6LdVg.js.map"
+				},
+				{
+					"path": "dist/BranchesView-DH0qnU9J.js"
+				},
+				{
+					"path": "dist/BranchesView-DH0qnU9J.js.map"
 				},
 				{
 					"path": "dist/components/ApiExplorer/ApiExplorer.d.ts"
@@ -6538,6 +6632,9 @@
 				},
 				{
 					"path": "dist/components/AuthSimulationSelector.d.ts"
+				},
+				{
+					"path": "dist/components/Backups/BackupsView.d.ts"
 				},
 				{
 					"path": "dist/components/Branches/BranchesView.d.ts"
@@ -6594,6 +6691,9 @@
 					"path": "dist/components/SQLEditor/SchemaBrowser.d.ts"
 				},
 				{
+					"path": "dist/components/SQLEditor/sql_editor_types.d.ts"
+				},
+				{
 					"path": "dist/components/SQLEditor/SQLEditor.d.ts"
 				},
 				{
@@ -6606,10 +6706,10 @@
 					"path": "dist/components/StudioHomePage.d.ts"
 				},
 				{
-					"path": "dist/CronJobsView-4gdtJvoe.js"
+					"path": "dist/CronJobsView-B59i3Mis.js"
 				},
 				{
-					"path": "dist/CronJobsView-4gdtJvoe.js.map"
+					"path": "dist/CronJobsView-B59i3Mis.js.map"
 				},
 				{
 					"path": "dist/index.d.ts"
@@ -6621,52 +6721,46 @@
 					"path": "dist/index.es.js.map"
 				},
 				{
-					"path": "dist/index.umd.js"
+					"path": "dist/JSEditor-BeHHuxhA.js"
 				},
 				{
-					"path": "dist/index.umd.js.map"
+					"path": "dist/JSEditor-BeHHuxhA.js.map"
 				},
 				{
-					"path": "dist/JSEditor-Sgmw1SHC.js"
+					"path": "dist/LogsExplorer-BCXoGREr.js"
 				},
 				{
-					"path": "dist/JSEditor-Sgmw1SHC.js.map"
+					"path": "dist/LogsExplorer-BCXoGREr.js.map"
 				},
 				{
-					"path": "dist/LogsExplorer-J4xfsuv3.js"
+					"path": "dist/MonacoEditor-D0_QljcX.js"
 				},
 				{
-					"path": "dist/LogsExplorer-J4xfsuv3.js.map"
+					"path": "dist/MonacoEditor-D0_QljcX.js.map"
 				},
 				{
-					"path": "dist/MonacoEditor-COZqrIJ1.js"
+					"path": "dist/RLSEditor-rLlMcZPG.js"
 				},
 				{
-					"path": "dist/MonacoEditor-COZqrIJ1.js.map"
+					"path": "dist/RLSEditor-rLlMcZPG.js.map"
 				},
 				{
-					"path": "dist/RLSEditor-DPhky8XW.js"
+					"path": "dist/SchemaVisualizer-C_ErehfH.js"
 				},
 				{
-					"path": "dist/RLSEditor-DPhky8XW.js.map"
+					"path": "dist/SchemaVisualizer-C_ErehfH.js.map"
 				},
 				{
-					"path": "dist/SchemaVisualizer-WK4ZZR5X.js"
+					"path": "dist/SQLEditor-_dCqVAN_.js"
 				},
 				{
-					"path": "dist/SchemaVisualizer-WK4ZZR5X.js.map"
+					"path": "dist/SQLEditor-_dCqVAN_.js.map"
 				},
 				{
-					"path": "dist/SQLEditor-CgR2hlUI.js"
+					"path": "dist/StorageView-UvyM2xdW.js"
 				},
 				{
-					"path": "dist/SQLEditor-CgR2hlUI.js.map"
-				},
-				{
-					"path": "dist/StorageView-BMhD29YO.js"
-				},
-				{
-					"path": "dist/StorageView-BMhD29YO.js.map"
+					"path": "dist/StorageView-UvyM2xdW.js.map"
 				},
 				{
 					"path": "dist/utils/pgColumnToProperty.d.ts"
@@ -6703,6 +6797,9 @@
 				},
 				{
 					"path": "src/components/AuthSimulationSelector.tsx"
+				},
+				{
+					"path": "src/components/Backups/BackupsView.tsx"
 				},
 				{
 					"path": "src/components/Branches/BranchesView.tsx"
@@ -6759,6 +6856,9 @@
 					"path": "src/components/SQLEditor/SchemaBrowser.tsx"
 				},
 				{
+					"path": "src/components/SQLEditor/sql_editor_types.ts"
+				},
+				{
 					"path": "src/components/SQLEditor/SQLEditor.tsx"
 				},
 				{
@@ -6789,18 +6889,18 @@
 					"path": "src/utils/sql_utils.ts"
 				}
 			],
-			"entryCount": 98,
+			"entryCount": 102,
 			"bundled": []
 		},
 		{
-			"id": "@rebasepro/cli@0.9.0",
+			"id": "@rebasepro/cli@0.10.0",
 			"name": "@rebasepro/cli",
-			"version": "0.9.0",
-			"size": 79908,
-			"unpackedSize": 323203,
-			"shasum": "4819014381aa80cc08914a4b991d0cbca0327fd0",
-			"integrity": "sha512-dTF1ZjA5+gRQ/wsKKtwkW04oHJmlBgrHQLMPU/jpFYaz6gLf7/ewu4io5WeOB4L806W3FkAL+37QkhhGd0NGdQ==",
-			"filename": "rebasepro-cli-0.9.0.tgz",
+			"version": "0.10.0",
+			"size": 207726,
+			"unpackedSize": 863034,
+			"shasum": "7dc2846b09bf4303157ff27906f594d6aa2c7268",
+			"integrity": "sha512-bbJYsXjas0JxSaMj8bZmbjoUc09r7He5B8njCkHbOsW1VN7hcMYUr0fiCI8vr1jG+YsHf2lR0d+bFw3vpuJJUA==",
+			"filename": "rebasepro-cli-0.10.0.tgz",
 			"files": [
 				{
 					"path": "bin/rebase.js"
@@ -6816,6 +6916,54 @@
 				},
 				{
 					"path": "dist/commands/build.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/auth.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/context.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/databases.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/debug.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/deploy.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/deployments.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/domains.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/env.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/extensions.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/index.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/link.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/orgs.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/power.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/projects.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/resources.d.ts"
+				},
+				{
+					"path": "dist/commands/cloud/settings.d.ts"
 				},
 				{
 					"path": "dist/commands/db.d.ts"
@@ -6864,6 +7012,24 @@
 				},
 				{
 					"path": "README.md"
+				},
+				{
+					"path": "templates/overlays/baas/backend/package.json"
+				},
+				{
+					"path": "templates/overlays/baas/backend/src/index.ts"
+				},
+				{
+					"path": "templates/overlays/baas/backend/tsconfig.json"
+				},
+				{
+					"path": "templates/overlays/baas/package.json"
+				},
+				{
+					"path": "templates/overlays/baas/pnpm-workspace.yaml"
+				},
+				{
+					"path": "templates/overlays/baas/README.md"
 				},
 				{
 					"path": "templates/template/.cursorrules"
@@ -6983,6 +7149,12 @@
 					"path": "templates/template/frontend/vite.config.ts"
 				},
 				{
+					"path": "templates/template/gitignore"
+				},
+				{
+					"path": "templates/template/npmrc"
+				},
+				{
 					"path": "templates/template/package.json"
 				},
 				{
@@ -6995,7 +7167,7 @@
 					"path": "templates/template/scripts/example.ts"
 				}
 			],
-			"entryCount": 64,
+			"entryCount": 88,
 			"bundled": []
 		}
 	]

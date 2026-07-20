@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-20
+
 ### Breaking
 
 - **The authenticated principal is `uid` everywhere** — the identity had two names. `uid` was the domain model's: the `User` type, the `AuthenticatedUser` adapter contract, the driver scope, and the RLS layer, where policies read `auth.uid()`. `userId` was the JWT claim's, inherited by the Hono request context because it was populated straight from the decoded payload. A request crossed that boundary twice, so a route handler and a collection hook two frames apart saw the same person under different keys — and three unrelated places had independently grown the same defensive `a ?? b` read to cope. `uid` wins because `userId` was confined to four server-side packages while `uid` is the vocabulary of twelve, and because the two ends of the stack — Postgres policies and the client SDK — already agreed on it.
